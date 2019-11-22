@@ -13,25 +13,25 @@ description = "Exonum blockchain example implementing a cryptocurrency."
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
-circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.12.0", path = "../../../exonum" }
 exonum-derive = { version = "0.12.0", path = "../../../components/derive" }
 exonum-merkledb = { version = "0.12.0", path = "../../../components/merkledb" }
-exonum-crypto = { version = "0.12.0", path = "../../../components/crypto" }
-exonum-configuration = { version = "0.12.0", path = "../../../services/configuration" }
+exonum-crypto = { version = "0.12.0", path = "../../../components/crypto"}
+exonum-proto = { version = "0.12.0", path = "../../../components/proto" }
+exonum-cli = { version = "0.12.0", path = "../../../cli" }
 serde = "1.0.0"
 serde_derive = "1.0.0"
 failure = "0.1.5"
 protobuf = "2.8.0"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.12.0", path = "../../../testkit" }
+exonum-testkit = { version = "0.12.0", path = "../../../test-suite/testkit" }
 serde_json = "1.0.0"
 pretty_assertions = "0.6.1"
 assert_matches = "1.2.0"
-hex = "0.3.2"
+hex = "0.4"
 
 [build-dependencies]
 exonum-build = { version = "0.12.0", path = "../../../components/build" }

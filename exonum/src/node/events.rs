@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-use crate::blockchain::{get_tx, Schema};
-use crate::events::{
-    error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
+
+use crate::{
+    blockchain::Schema,
+    events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent},
 };
 
 impl EventHandler for NodeHandler {
@@ -29,15 +30,13 @@ impl EventHandler for NodeHandler {
 }
 
 impl NodeHandler {
-    // clippy sure that `InternalEvent` is not consumed in the body
-    // this is because of internal `Copy` types in `JumpToRound`.
-    #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     fn handle_internal_event(&mut self, event: InternalEvent) {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
             InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
             InternalEvent::MessageVerified(msg) => self.handle_message(*msg),
+            InternalEvent::RestartApi => unreachable!(),
         }
     }
 
@@ -87,7 +86,6 @@ impl NodeHandler {
                 }
             }
             ExternalMessage::Shutdown => self.handle_shutdown(),
-            ExternalMessage::Rebroadcast => self.handle_rebroadcast(),
         }
     }
 
@@ -109,34 +107,19 @@ impl NodeHandler {
         }
     }
 
-    /// Schedule execution for later time
+    /// Schedule execution for later time.
     pub(crate) fn execute_later(&mut self, event: InternalRequest) {
         self.channel.internal_requests.send(event).log_error();
     }
 
-    /// Broadcasts all transactions from the pool to other validators.
-    pub(crate) fn handle_rebroadcast(&mut self) {
-        use exonum_crypto::Hash;
-        let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-
-        let mut txs: Vec<Hash> = self.state.tx_cache().keys().cloned().collect();
-        txs.extend(schema.transactions_pool().iter());
-
-        for tx_hash in txs {
-            self.broadcast(
-                get_tx(&tx_hash, &schema.transactions(), &self.state.tx_cache())
-                    .expect("Rebroadcast: invalid transaction hash"),
-            )
-        }
-    }
-
+    /// Shutdown current node.
     pub(crate) fn handle_shutdown(&mut self) {
         // Send `Shutdown` to stop event-loop.
         self.execute_later(InternalRequest::Shutdown);
-
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
+        // Notify the blockchain about the shutdown.
+        self.blockchain.shutdown();
     }
 
     fn flush_txs_into_pool(&mut self) {

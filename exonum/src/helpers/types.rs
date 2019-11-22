@@ -14,14 +14,12 @@
 
 //! Common widely used type definitions.
 
-use std::{fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
-
+use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryValue, ObjectHash};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{borrow::Cow, fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 use zeroize::Zeroize;
 
-use crate::crypto::{CryptoHash, Hash};
-use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryValue, ObjectHash};
-use std::borrow::Cow;
+use crate::crypto::Hash;
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -245,7 +243,7 @@ impl BinaryValue for Round {
         self.0.into_bytes()
     }
 
-    fn from_bytes(value: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         Ok(Round(
             <u32 as BinaryValue>::from_bytes(value).expect("Error while deserializing value"),
         ))
@@ -275,7 +273,7 @@ impl ValidatorId {
 }
 
 impl fmt::Display for Height {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -287,14 +285,8 @@ impl From<Height> for u64 {
 }
 
 impl fmt::Display for Round {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-impl CryptoHash for Round {
-    fn hash(&self) -> Hash {
-        self.0.hash()
     }
 }
 
@@ -311,7 +303,7 @@ impl From<Round> for u64 {
 }
 
 impl fmt::Display for ValidatorId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }

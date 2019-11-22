@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Used in bench functions for convenience: we want to be able to pass these functions
+// to `ParameterizedBenchmark::new()`.
+#![allow(clippy::trivially_copy_pass_by_ref)]
+
 const MESSAGES_COUNT: u64 = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
@@ -26,14 +30,13 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use exonum::events::InternalRequest;
-use exonum::node::EventsPoolCapacity;
-use exonum::node::ExternalMessage;
 use exonum::{
     crypto,
+    events::InternalRequest,
     events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
-    messages::{Message, RawTransaction, ServiceTransaction},
-    node::NodeChannel,
+    messages::{Message, Verified},
+    node::{EventsPoolCapacity, ExternalMessage, NodeChannel},
+    runtime::{AnyTx, CallInfo},
 };
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -83,11 +86,14 @@ fn gen_messages(count: u64, tx_size: usize) -> Vec<Vec<u8>> {
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
-            let msg = Message::new(
-                RawTransaction::new(
-                    0,
-                    ServiceTransaction::from_raw_unchecked(0, vec![0; tx_size]),
-                ),
+            let msg = Verified::from_value(
+                AnyTx {
+                    call_info: CallInfo {
+                        instance_id: 0,
+                        method_id: 0,
+                    },
+                    arguments: vec![0; tx_size],
+                },
                 p,
                 &s,
             );
@@ -181,9 +187,7 @@ impl MessageVerifier {
 
         tx_sender
             .send_all(stream::iter_ok(
-                messages
-                    .into_iter()
-                    .map(|message| InternalRequest::VerifyMessage(message)),
+                messages.into_iter().map(InternalRequest::VerifyMessage),
             ))
             .map(drop)
             .map_err(drop)
@@ -201,7 +205,7 @@ impl MessageVerifier {
     }
 }
 
-fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
+fn bench_verify_messages_simple(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
     b.iter_with_setup(
         || messages.clone(),
@@ -213,7 +217,7 @@ fn bench_verify_messages_simple(b: &mut Bencher, &size: &usize) {
     )
 }
 
-fn bench_verify_messages_event_loop(b: &mut Bencher, &size: &usize) {
+fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
 
     let verifier = MessageVerifier::new();

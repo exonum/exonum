@@ -14,100 +14,12 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
+use exonum_merkledb::BinaryValue;
 
 use std::{borrow::Cow, collections::HashMap};
 
-use super::schema;
-use super::ProtobufConvert;
-use crate::crypto::{self, Hash, PublicKey, Signature};
-use exonum_merkledb::BinaryValue;
-
-#[test]
-fn test_hash_pb_convert() {
-    let data = [7; crypto::HASH_SIZE];
-    let hash = Hash::from_slice(&data).unwrap();
-
-    let pb_hash = hash.to_pb();
-    assert_eq!(&pb_hash.get_data(), &data);
-
-    let hash_round_trip: Hash = ProtobufConvert::from_pb(pb_hash).unwrap();
-    assert_eq!(hash_round_trip, hash);
-}
-
-#[test]
-fn test_hash_wrong_pb_convert() {
-    let pb_hash = schema::helpers::Hash::new();
-    assert!(<Hash as ProtobufConvert>::from_pb(pb_hash).is_err());
-
-    let mut pb_hash = schema::helpers::Hash::new();
-    pb_hash.set_data([7; crypto::HASH_SIZE + 1].to_vec());
-    assert!(<Hash as ProtobufConvert>::from_pb(pb_hash).is_err());
-
-    let mut pb_hash = schema::helpers::Hash::new();
-    pb_hash.set_data([7; crypto::HASH_SIZE - 1].to_vec());
-    assert!(<Hash as ProtobufConvert>::from_pb(pb_hash).is_err());
-}
-
-#[test]
-fn test_pubkey_pb_convert() {
-    let data = [7; crypto::PUBLIC_KEY_LENGTH];
-    let key = PublicKey::from_slice(&data).unwrap();
-
-    let pb_key = key.to_pb();
-    assert_eq!(&pb_key.get_data(), &data);
-
-    let key_round_trip: PublicKey = ProtobufConvert::from_pb(pb_key).unwrap();
-    assert_eq!(key_round_trip, key);
-}
-
-#[test]
-fn test_pubkey_wrong_pb_convert() {
-    let pb_key = schema::helpers::PublicKey::new();
-    assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
-
-    let mut pb_key = schema::helpers::PublicKey::new();
-    pb_key.set_data([7; crypto::PUBLIC_KEY_LENGTH + 1].to_vec());
-    assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
-
-    let mut pb_key = schema::helpers::PublicKey::new();
-    pb_key.set_data([7; crypto::PUBLIC_KEY_LENGTH - 1].to_vec());
-    assert!(<PublicKey as ProtobufConvert>::from_pb(pb_key).is_err());
-}
-
-#[test]
-fn test_signature_pb_convert() {
-    let data: &[u8] = &[8; crypto::SIGNATURE_LENGTH];
-    let sign = Signature::from_slice(data).unwrap();
-
-    let pb_sign = sign.to_pb();
-    assert_eq!(pb_sign.get_data(), data);
-
-    let sign_round_trip: Signature = ProtobufConvert::from_pb(pb_sign).unwrap();
-    assert_eq!(sign_round_trip, sign);
-}
-
-#[test]
-fn test_signature_wrong_pb_convert() {
-    let pb_sign = schema::helpers::Signature::new();
-    assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
-
-    let mut pb_sign = schema::helpers::Signature::new();
-    pb_sign.set_data([8; crypto::SIGNATURE_LENGTH + 1].to_vec());
-    assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
-
-    let mut pb_sign = schema::helpers::Signature::new();
-    pb_sign.set_data([8; crypto::SIGNATURE_LENGTH - 1].to_vec());
-    assert!(<Signature as ProtobufConvert>::from_pb(pb_sign).is_err());
-}
-
-#[test]
-fn test_bitvec_pb_convert() {
-    let bv = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
-
-    let pb_bv = bv.to_pb();
-    let pb_round_trip: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
-    assert_eq!(pb_round_trip, bv);
-}
+use super::{schema, ProtobufConvert};
+use crate::crypto::{self, Hash, PublicKey};
 
 #[test]
 fn test_date_time_pb_convert() {
@@ -117,8 +29,8 @@ fn test_date_time_pb_convert() {
     assert_eq!(pb_round_trip, dt);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::tests::Point", crate = "crate")]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::tests::Point")]
 struct Point {
     x: u32,
     y: u32,
@@ -137,8 +49,8 @@ fn test_simple_struct_round_trip() {
     assert_eq!(point_encode_round_trip, point);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::tests::TestProtobufConvert", crate = "crate")]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::tests::TestProtobufConvert")]
 struct StructWithScalarTypes {
     key: PublicKey,
     hash: Hash,
@@ -196,8 +108,8 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::tests::TestProtobufConvertRepeated", crate = "crate")]
+#[protobuf_convert(source = "schema::tests::TestProtobufConvertRepeated")]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,
     bytes_array: Vec<Vec<u8>>,
@@ -226,8 +138,8 @@ fn test_repeated_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, rep_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::tests::TestProtobufConvertMap", crate = "crate")]
+#[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::tests::TestProtobufConvertMap")]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
     string_map: HashMap<u32, String>,
@@ -267,8 +179,8 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[derive(Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "schema::tests::TestFixedArrays", crate = "crate")]
+#[protobuf_convert(source = "schema::tests::TestFixedArrays")]
+#[derive(Clone, Copy, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
     fixed_array_16: [u8; 16],

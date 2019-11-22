@@ -21,20 +21,17 @@ extern crate serde_derive;
 
 use crate::block::bench_block;
 use crate::crypto::bench_crypto;
-use crate::storage::bench_storage;
 use crate::transactions::bench_verify_transactions;
 
 mod block;
 mod crypto;
 mod proto;
-mod storage;
 mod transactions;
 
 criterion_group!(
     benches,
     bench_crypto,
     bench_block,
-    bench_storage,
     bench_verify_transactions
 );
 criterion_main!(benches);

@@ -14,17 +14,11 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
 extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
 #[macro_use]
 extern crate serde_derive;
 
@@ -36,62 +30,29 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
+use exonum::{
+    crypto::Hash,
+    runtime::{api::ServiceApiBuilder, rust::Service, BlockchainData},
+};
 use exonum_merkledb::Snapshot;
 
-use exonum::{
-    api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
-    crypto::Hash,
-    helpers::fabric::{self, Context},
-    messages::RawTransaction,
-};
+use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
 
-use crate::transactions::WalletTransactions;
-
-/// Unique service ID.
-const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
-/// Name of the service.
-const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
-const INITIAL_BALANCE: u64 = 100;
+pub const INITIAL_BALANCE: u64 = 100;
 
-/// Exonum `Service` implementation.
-#[derive(Default, Debug)]
-pub struct Service;
+/// Cryptocurrency service implementation.
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("CryptocurrencyInterface"))]
+#[service_factory(proto_sources = "proto")]
+pub struct CryptocurrencyService;
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        CRYPTOCURRENCY_SERVICE_ID
-    }
-
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(view);
-        schema.state_hash()
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        WalletTransactions::tx_from_raw(raw).map(Into::into)
+impl Service for CryptocurrencyService {
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
-    }
-}
-
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct ServiceFactory;
-
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service)
+        CryptocurrencyApi.wire(builder);
     }
 }

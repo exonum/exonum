@@ -18,10 +18,10 @@ use std::marker::PhantomData;
 
 use exonum_crypto::Hash;
 
-use crate::views::IndexAddress;
 use crate::{
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, View},
-    BinaryKey, BinaryValue, ObjectHash,
+    access::{Access, AccessError, FromAccess},
+    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
+    BinaryValue, ObjectHash,
 };
 
 /// An index that may only contain one element.
@@ -31,126 +31,31 @@ use crate::{
 ///
 /// [`BinaryValue`]: trait.BinaryValue.html
 #[derive(Debug)]
-pub struct Entry<T: IndexAccess, V> {
+pub struct Entry<T: RawAccess, V> {
     base: View<T>,
-    state: IndexState<T, ()>,
     _v: PhantomData<V>,
 }
 
-impl<T, V> AnyObject<T> for Entry<T, V>
+impl<T, V> FromAccess<T> for Entry<T::Base, V>
 where
-    T: IndexAccess,
+    T: Access,
     V: BinaryValue,
 {
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::Entry
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::Entry)?;
+        Ok(Self::new(view))
     }
 }
 
 impl<T, V> Entry<T, V>
 where
-    T: IndexAccess,
-    V: BinaryValue + ObjectHash,
+    T: RawAccess,
+    V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: trait.Snapshot.html
-    /// [`&mut Fork`]: struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::Entry)
-            .index_name(index_name)
-            .build::<()>();
-
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let base = view.into();
         Self {
             base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: trait.Snapshot.html
-    /// [`&mut Fork`]: struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let index_id = vec![01];
-    /// let snapshot = db.snapshot();
-    /// let index: Entry<_, u8> = Entry::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey,
-        I: ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::Entry)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build::<()>();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::Entry)
-            .build_existed::<()>()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::Entry)
-            .build::<()>();
-
-        Self {
-            base,
-            state,
             _v: PhantomData,
         }
     }
@@ -160,12 +65,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.get_entry("name");
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -180,12 +84,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.get_entry("name");
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -194,43 +97,23 @@ where
     pub fn exists(&self) -> bool {
         self.base.contains(&())
     }
+}
 
-    /// Returns hash of the entry or default hash value if does not exist.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
-    /// use exonum_crypto::{self, Hash};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
-    /// assert_eq!(Hash::default(), index.hash());
-    ///
-    /// let value = 10;
-    /// index.set(value);
-    /// assert_eq!(exonum_crypto::hash(&[value]), index.hash());
-    /// ```
-    pub fn hash(&self) -> Hash {
-        self.base
-            .get::<(), V>(&())
-            .map(|v| v.object_hash())
-            .unwrap_or_default()
-    }
-
+impl<T, V> Entry<T, V>
+where
+    T: RawAccessMut,
+    V: BinaryValue + ObjectHash,
+{
     /// Changes a value of the entry.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -244,12 +127,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -266,12 +148,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -293,12 +174,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, Entry};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = Entry::new(name, &fork);
+    /// let mut index = fork.get_entry("name");
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -311,5 +191,35 @@ where
         let previous = self.get();
         self.set(value);
         previous
+    }
+}
+
+impl<T, V> ObjectHash for Entry<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue + ObjectHash,
+{
+    /// Returns hash of the entry or default hash value if does not exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry, ObjectHash};
+    /// use exonum_crypto::{self, Hash};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = fork.get_entry("name");
+    /// assert_eq!(Hash::default(), index.object_hash());
+    ///
+    /// let value = 10;
+    /// index.set(value);
+    /// assert_eq!(exonum_crypto::hash(&[value]), index.object_hash());
+    /// ```
+    fn object_hash(&self) -> Hash {
+        self.base
+            .get::<(), V>(&())
+            .map(|v| v.object_hash())
+            .unwrap_or_default()
     }
 }

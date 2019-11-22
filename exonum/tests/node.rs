@@ -14,8 +14,19 @@
 
 // This is a regression test for exonum node.
 
-use futures::{sync::oneshot, Future, IntoFuture};
-use serde_json::Value;
+use exonum::{
+    blockchain::InstanceCollection,
+    crypto::Hash,
+    helpers,
+    node::{ApiSender, ExternalMessage, Node, NodeConfig},
+    runtime::{
+        rust::{AfterCommitContext, Service},
+        BlockchainData, Runtime,
+    },
+};
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+use exonum_merkledb::{Database, Snapshot, TemporaryDB};
+use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
@@ -25,64 +36,65 @@ use std::{
     time::Duration,
 };
 
-use exonum_merkledb::{Database, Fork, Snapshot, TemporaryDB};
+#[exonum_interface]
+trait CommitWatcherInterface {}
 
-use exonum::{
-    blockchain::{Service, ServiceContext, Transaction},
-    crypto::Hash,
-    helpers,
-    messages::RawTransaction,
-    node::{ApiSender, ExternalMessage, Node},
-};
+#[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("CommitWatcherInterface"))]
+#[service_factory(
+    artifact_name = "after-commit",
+    artifact_version = "1.0.0",
+    proto_sources = "exonum::proto::schema",
+    service_constructor = "CommitWatcherService::new_instance"
+)]
+struct CommitWatcherService(mpsc::UnboundedSender<()>);
 
-struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
-
-impl Service for CommitWatcherService {
-    fn service_id(&self) -> u16 {
-        255
-    }
-
-    fn service_name(&self) -> &str {
-        "commit_watcher"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
-
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        unreachable!("An unknown transaction received");
-    }
-
-    fn after_commit(&self, _context: &ServiceContext) {
-        if let Some(oneshot) = self.0.lock().unwrap().take() {
-            oneshot.send(()).unwrap();
-        }
+impl CommitWatcherService {
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(self.clone())
     }
 }
 
-struct InitializeCheckerService(pub Arc<Mutex<u64>>);
+impl CommitWatcherInterface for CommitWatcherService {}
 
-impl Service for InitializeCheckerService {
-    fn service_id(&self) -> u16 {
-        256
+impl Service for CommitWatcherService {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
 
-    fn service_name(&self) -> &str {
-        "initialize_checker"
+    fn after_commit(&self, _context: AfterCommitContext<'_>) {
+        self.0.unbounded_send(()).ok();
     }
+}
 
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        Vec::new()
+#[exonum_interface]
+trait StartCheckerInterface {}
+
+#[derive(Debug, ServiceDispatcher)]
+#[service_dispatcher(implements("StartCheckerInterface"))]
+struct StartCheckerService;
+
+impl StartCheckerInterface for StartCheckerService {}
+
+impl Service for StartCheckerService {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
     }
+}
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        unreachable!("An unknown transaction received");
-    }
+#[derive(Debug, ServiceFactory)]
+#[service_factory(
+    artifact_name = "configure",
+    artifact_version = "1.0.2",
+    proto_sources = "exonum::proto::schema",
+    service_constructor = "StartCheckerServiceFactory::new_instance"
+)]
+struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 
-    fn initialize(&self, _fork: &Fork) -> Value {
+impl StartCheckerServiceFactory {
+    fn new_instance(&self) -> Box<dyn Service> {
         *self.0.lock().unwrap() += 1;
-        Value::Null
+        Box::new(StartCheckerService)
     }
 }
 
@@ -91,13 +103,24 @@ struct RunHandle {
     api_tx: ApiSender,
 }
 
-fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
-        let (commit_tx, commit_rx) = oneshot::channel();
-        let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let node = Node::new(TemporaryDB::new(), vec![service], node_cfg, None);
+        let (commit_tx, commit_rx) = mpsc::unbounded();
+
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![InstanceCollection::new(CommitWatcherService(commit_tx))
+            .with_instance(2, "commit-watcher", ())];
+
+        let node = Node::new(
+            TemporaryDB::new(),
+            external_runtimes,
+            services,
+            node_cfg,
+            None,
+        );
+
         let api_tx = node.channel();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || {
@@ -111,7 +134,6 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Recei
 }
 
 #[test]
-#[ignore] //TODO: Research why node tests randomly fails. [ECR-2363]
 fn test_node_run() {
     let (nodes, commit_rxs) = run_nodes(4, 16_300);
 
@@ -133,9 +155,17 @@ fn test_node_run() {
 
 #[test]
 fn test_node_restart_regression() {
-    let start_node = |node_cfg, db, init_times| {
-        let service = Box::new(InitializeCheckerService(init_times));
-        let node = Node::new(db, vec![service], node_cfg, None);
+    let start_node = |node_cfg: NodeConfig, db, start_times| {
+        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let services = vec![
+            InstanceCollection::new(StartCheckerServiceFactory(start_times)).with_instance(
+                4,
+                "startup-checker",
+                (),
+            ),
+        ];
+
+        let node = Node::new(db, external_runtimes, services, node_cfg, None);
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();
@@ -147,13 +177,16 @@ fn test_node_restart_regression() {
         node_thread.join().unwrap();
     };
 
-    let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+    let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
 
-    let init_times = Arc::new(Mutex::new(0));
+    let start_times = Arc::new(Mutex::new(0));
     // First launch
-    start_node(node_cfg.clone(), db.clone(), Arc::clone(&init_times));
+    start_node(node_cfg.clone(), db.clone(), Arc::clone(&start_times));
     // Second launch
-    start_node(node_cfg, db, Arc::clone(&init_times));
-    assert_eq!(*init_times.lock().unwrap(), 1);
+    start_node(node_cfg, db, Arc::clone(&start_times));
+
+    // The service is created two times on instantiation (for `start_adding_service`
+    // and `commit_service` methods), and then once on each new node startup.
+    assert_eq!(*start_times.lock().unwrap(), 3);
 }

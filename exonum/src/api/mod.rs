@@ -13,44 +13,47 @@
 // limitations under the License.
 
 //! API and corresponding utilities.
+
 pub use self::{
     error::Error,
-    state::ServiceApiState,
     with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
 };
+
+pub mod backends;
+pub mod error;
+pub mod manager;
+pub mod node;
+pub mod websocket;
 
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
-use self::{backends::actix, node::public::ExplorerApi};
-use crate::blockchain::{Blockchain, SharedNodeState};
-use crate::crypto::PublicKey;
-use crate::node::ApiSender;
+use self::{
+    backends::actix,
+    node::{
+        private::{NodeInfo, SystemApi as PrivateSystemApi},
+        public::{ExplorerApi, SystemApi},
+    },
+};
+use crate::{api::node::SharedNodeState, blockchain::Blockchain};
 
-pub mod backends;
-pub mod error;
-pub mod node;
-mod state;
-pub mod websocket;
 mod with;
 
-/// Defines an object that could be used as an API backend.
-///
 /// This trait is used to implement an API backend for Exonum.
-pub trait ServiceApiBackend: Sized {
+pub trait ApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
     /// Concrete backend API builder.
     type Backend;
 
-    /// Adds the given endpoint handler to the backend.
+    /// Add the given endpoint handler to the backend.
     fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
         N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
@@ -58,13 +61,13 @@ pub trait ServiceApiBackend: Sized {
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Adds the given mutable endpoint handler to the backend.
+    /// Add the given mutable endpoint handler to the backend.
     fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
         N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
@@ -72,30 +75,30 @@ pub trait ServiceApiBackend: Sized {
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Adds the raw endpoint handler for the given backend.
+    /// Add the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 
-    /// Binds API handlers to the given backend.
+    /// Bind API handlers to the given backend.
     fn wire(&self, output: Self::Backend) -> Self::Backend;
 }
 
-/// Service API builder for the concrete API scope or in other words
-/// access level (public or private).
+/// Exonum API builder for the concrete API scope or, in other words,
+/// API access level (public or private).
 ///
 /// Endpoints cannot be declared to the builder directly, first you need to
 /// indicate the scope the endpoint(s) will belong to.
 #[derive(Debug, Clone, Default)]
-pub struct ServiceApiScope {
+pub struct ApiScope {
     pub(crate) actix_backend: actix::ApiBuilder,
 }
 
-impl ServiceApiScope {
-    /// Creates a new instance.
+impl ApiScope {
+    /// Create a new instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Adds the given endpoint handler to the API scope. These endpoints
+    /// Add the given endpoint handler to the API scope. These endpoints
     /// are designed for reading operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -107,7 +110,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
@@ -115,7 +118,7 @@ impl ServiceApiScope {
         self
     }
 
-    /// Adds the given mutable endpoint handler to the API scope. These endpoints
+    /// Add the given mutable endpoint handler to the API scope. These endpoints
     /// are designed for modification operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -126,7 +129,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
@@ -134,139 +137,33 @@ impl ServiceApiScope {
         self
     }
 
-    /// Returns a mutable reference to the underlying web backend.
+    /// Return a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         &mut self.actix_backend
     }
 }
 
-/// Service API builder, which is used to add service-specific endpoints to the node API.
-///
-/// # Examples
-///
-/// The example below shows a common practice of API implementation.
-///
-/// ```rust
-/// #[macro_use] extern crate exonum;
-/// #[macro_use] extern crate serde_derive;
-/// extern crate futures;
-///
-/// use futures::Future;
-///
-/// use std::net::SocketAddr;
-///
-/// use exonum::api::{self, ServiceApiBuilder, ServiceApiState};
-/// use exonum::blockchain::{Schema};
-/// use exonum::crypto::{Hash, PublicKey};
-///
-/// // Declares a type which describes an API specification and implementation.
-/// pub struct MyApi;
-///
-/// // Declares structures for requests and responses.
-///
-/// // For the web backend, `MyQuery` will be deserialized from a `block_height={number}` string.
-/// #[derive(Deserialize, Clone, Copy)]
-/// pub struct MyQuery {
-///     pub block_height: u64
-/// }
-///
-/// // For the web backend, `BlockInfo` will be serialized into a JSON string.
-/// #[derive(Serialize, Clone, Copy)]
-/// pub struct BlockInfo {
-///     pub hash: Hash,
-/// }
-///
-/// // Creates API handlers.
-/// impl MyApi {
-///     // Immutable handler, which returns a hash of the block at the given height.
-///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
-///         let snapshot = state.snapshot();
-///         let schema = Schema::new(&snapshot);
-///         Ok(schema.block_hashes_by_height()
-///             .get(query.block_height)
-///             .map(|hash| BlockInfo { hash })
-///         )
-///     }
-///
-///     // Mutable handler which removes the peer with the given key from the cache.
-///     pub fn remove_peer(state: &ServiceApiState, query: PublicKey) -> api::Result<()> {
-///         let mut blockchain = state.blockchain().clone();
-///         Ok(blockchain.remove_peer_with_pubkey(&query))
-///     }
-///
-///     // Simple handler without any parameters.
-///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
-///         Ok(())
-///     }
-///
-///     // You may also create asynchronous handlers for long requests.
-///     pub fn block_hash_async(state: &ServiceApiState, query: MyQuery)
-///      -> api::FutureResult<Option<Hash>> {
-///         let blockchain = state.blockchain().clone().snapshot();
-///         Box::new(futures::lazy(move || {
-///             let schema = Schema::new(&blockchain);
-///             Ok(schema.block_hashes_by_height().get(query.block_height))
-///         }))
-///     }
-/// }
-///
-/// # let mut builder = ServiceApiBuilder::default();
-/// // Adds `MyApi` handlers to the corresponding builder.
-/// builder.public_scope()
-///     .endpoint("v1/ping", MyApi::ping)
-///     .endpoint("v1/block_hash", MyApi::block_hash)
-///     .endpoint("v1/block_hash_async", MyApi::block_hash_async);
-/// // Adds a mutable endpoint for to the private API.
-/// builder.private_scope()
-///     .endpoint_mut("v1/remove_peer", MyApi::remove_peer);
-/// ```
+/// Exonum API builder, which is used to add endpoints to the node API.
 #[derive(Debug, Clone, Default)]
-pub struct ServiceApiBuilder {
-    blockchain: Option<Blockchain>,
-    public_scope: ServiceApiScope,
-    private_scope: ServiceApiScope,
+pub struct ApiBuilder {
+    pub(crate) public_scope: ApiScope,
+    pub(crate) private_scope: ApiScope,
 }
 
-impl ServiceApiBuilder {
-    /// Creates a new service API builder.
+impl ApiBuilder {
+    /// Create a new API builder.
     pub fn new() -> Self {
-        Self {
-            blockchain: None,
-            ..Default::default()
-        }
+        Self::default()
     }
 
-    fn with_blockchain(blockchain: Blockchain) -> Self {
-        Self {
-            blockchain: Some(blockchain),
-            ..Default::default()
-        }
-    }
-
-    /// Returns a mutable reference to the public API scope builder.
-    pub fn public_scope(&mut self) -> &mut ServiceApiScope {
+    /// Return a mutable reference to the public API scope builder.
+    pub fn public_scope(&mut self) -> &mut ApiScope {
         &mut self.public_scope
     }
 
-    /// Returns a mutable reference to the private API scope builder.
-    pub fn private_scope(&mut self) -> &mut ServiceApiScope {
+    /// Return a mutable reference to the private API scope builder.
+    pub fn private_scope(&mut self) -> &mut ApiScope {
         &mut self.private_scope
-    }
-
-    /// Returns an optional reference to the Blockchain.
-    pub fn blockchain(&self) -> Option<&Blockchain> {
-        self.blockchain.as_ref()
-    }
-
-    /// Returns an optional reference to the ApiSender.
-    pub fn api_sender(&self) -> Option<&ApiSender> {
-        self.blockchain().map(|blockchain| &blockchain.api_sender)
-    }
-
-    /// Returns an optional value to the PublicKey.
-    pub fn public_key(&self) -> Option<PublicKey> {
-        self.blockchain()
-            .map(|blockchain| blockchain.service_keypair.0)
     }
 }
 
@@ -280,7 +177,7 @@ pub enum ApiAccess {
 }
 
 impl fmt::Display for ApiAccess {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ApiAccess::Public => f.write_str("public"),
             ApiAccess::Private => f.write_str("private"),
@@ -293,94 +190,67 @@ impl fmt::Display for ApiAccess {
 /// This trait enables implementing additional API scopes, besides the built-in
 /// private and public scopes.
 pub trait ExtendApiBackend {
-    /// Extends API backend by the given scopes.
+    /// Extend API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
     where
-        I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
+        I: IntoIterator<Item = (&'a str, &'a ApiScope)>;
 }
 
 /// Exonum node API aggregator. This structure enables several API backends to
 /// operate simultaneously. Currently, only HTTP v1 backend is available.
 #[derive(Debug, Clone)]
 pub struct ApiAggregator {
-    blockchain: Blockchain,
-    node_state: SharedNodeState,
-    inner: BTreeMap<String, ServiceApiBuilder>,
+    endpoints: BTreeMap<String, ApiBuilder>,
 }
 
 impl ApiAggregator {
-    /// Aggregates API for the given blockchain and node state.
+    /// Creates an API aggregator for the given blockchain and node state.
     pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
-        let mut inner = BTreeMap::new();
-        // Adds built-in APIs.
-        inner.insert(
+        let mut endpoints = BTreeMap::new();
+        endpoints.insert(
             "system".to_owned(),
-            Self::system_api(&blockchain, node_state.clone()),
+            Self::system_api(blockchain.clone(), node_state.clone()),
         );
-        inner.insert(
+        endpoints.insert(
             "explorer".to_owned(),
-            Self::explorer_api(&blockchain, node_state.clone()),
+            Self::explorer_api(blockchain, node_state),
         );
-        // Adds services APIs.
-        inner.extend(blockchain.service_map().iter().map(|(_, service)| {
-            let mut builder = ServiceApiBuilder::with_blockchain(blockchain.clone());
-            service.wire_api(&mut builder);
-            // TODO think about prefixes for non web backends. (ECR-1758)
-            let prefix = format!("services/{}", service.service_name());
-            (prefix, builder)
-        }));
-
-        Self {
-            inner,
-            blockchain,
-            node_state,
-        }
+        Self { endpoints }
     }
 
-    /// Returns a reference to the blockchain used by the aggregator.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
+    /// Inserts a handler for a set of endpoints with the given mount point.
+    pub fn insert(&mut self, name: &str, api: ApiBuilder) {
+        self.endpoints.insert(name.to_owned(), api);
     }
 
-    /// Extends the given API backend by handlers with the given access level.
+    /// Extends the list of endpoint handlers with the new specified handlers.
+    pub fn extend(&mut self, endpoints: impl IntoIterator<Item = (String, ApiBuilder)>) {
+        self.endpoints.extend(endpoints);
+    }
+
+    /// Extend the given API backend by handlers with the given access level.
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
+        let endpoints = self.endpoints.iter();
         match access {
-            ApiAccess::Public => backend.extend(
-                self.inner
-                    .iter()
-                    .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
-            ),
-            ApiAccess::Private => backend.extend(
-                self.inner
-                    .iter()
-                    .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
-            ),
+            ApiAccess::Public => backend
+                .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.public_scope))),
+            ApiAccess::Private => backend
+                .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.private_scope))),
         }
     }
 
-    /// Adds API factory with the given prefix to the aggregator.
-    pub fn insert<S: Into<String>>(&mut self, prefix: S, builder: ServiceApiBuilder) {
-        self.inner.insert(prefix.into(), builder);
-    }
-
-    fn explorer_api(
-        blockchain: &Blockchain,
-        shared_node_state: SharedNodeState,
-    ) -> ServiceApiBuilder {
-        let mut builder = ServiceApiBuilder::new();
-        let service_api_state = ServiceApiState::new(blockchain.clone());
-        ExplorerApi::wire(builder.public_scope(), service_api_state, shared_node_state);
+    fn explorer_api(blockchain: Blockchain, shared_node_state: SharedNodeState) -> ApiBuilder {
+        let mut builder = ApiBuilder::new();
+        ExplorerApi::new(blockchain).wire(builder.public_scope(), shared_node_state);
         builder
     }
 
-    fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
-        let mut builder = ServiceApiBuilder::new();
-        let node_info = self::node::private::NodeInfo::new(
-            blockchain.service_map().iter().map(|(_, service)| service),
-        );
-        self::node::private::SystemApi::new(node_info, shared_api_state.clone())
+    fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
+        let mut builder = ApiBuilder::new();
+        let sender = blockchain.sender().clone();
+        PrivateSystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
             .wire(builder.private_scope());
-        self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+        SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
         builder
     }
 }

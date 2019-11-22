@@ -12,125 +12,396 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code, unsafe_code)]
-
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
-
-use crate::blockchain::{
-    Blockchain, ExecutionError, ExecutionResult, Schema, Service, Transaction, TransactionContext,
-    TransactionSet,
+use exonum_crypto::{self as crypto, Hash};
+use exonum_merkledb::{
+    access::AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot,
+    TemporaryDB,
 };
-use crate::crypto::{gen_keypair, Hash};
-use crate::helpers::{Height, ValidatorId};
-use crate::messages::{Message, RawTransaction};
-use crate::proto;
-use exonum_merkledb::{Database, Error as StorageError, Fork, ListIndex, Snapshot};
-use std::collections::BTreeMap;
+use exonum_proto::ProtobufConvert;
+use futures::{sync::mpsc, Future};
 
-const IDX_NAME: &str = "idx_name";
-const TEST_SERVICE_ID: u16 = 255;
+use std::{collections::BTreeMap, panic, sync::Mutex};
 
-struct TestService;
+use crate::{
+    blockchain::{
+        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema,
+    },
+    helpers::{generate_testnet_config, Height, ValidatorId},
+    messages::Verified,
+    node::ApiSender,
+    proto::schema::tests::*,
+    runtime::{
+        error::ErrorKind,
+        rust::{CallContext, Service, ServiceFactory, Transaction},
+        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
+        InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+    },
+};
 
-impl Service for TestService {
-    fn service_id(&self) -> u16 {
-        TEST_SERVICE_ID
-    }
+const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
+const TEST_SERVICE_NAME: &str = "test_service";
+const IDX_NAME: &str = "test_service.val";
 
-    fn service_name(&self) -> &'static str {
-        "test service"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        Ok(TestServiceTxs::tx_from_raw(raw)?.into())
-    }
-}
-
-#[derive(Serialize, Deserialize, ProtobufConvert, Debug, Clone)]
-#[exonum(pb = "proto::schema::tests::TestServiceTx", crate = "crate")]
-struct Tx {
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
+struct TestExecute {
     value: u64,
 }
 
-impl Tx {
-    fn new(value: u64) -> Self {
-        Self { value }
-    }
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
+struct TestDeploy {
+    value: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, TransactionSet, Debug)]
-#[exonum(crate = "crate")]
-enum TestServiceTxs {
-    Tx(Tx),
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
+struct TestAdd {
+    value: u64,
 }
 
-impl Transaction for Tx {
-    fn execute(&self, tc: TransactionContext) -> ExecutionResult {
-        if self.value == 42 {
-            panic!(StorageError::new("42"))
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
+struct TestCallInitialize {
+    value: u64,
+}
+
+#[exonum_interface(crate = "crate")]
+trait TestDispatcherInterface {
+    fn test_execute(
+        &self,
+        context: CallContext<'_>,
+        arg: TestExecute,
+    ) -> Result<(), ExecutionError>;
+
+    fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError>;
+
+    fn test_add(&self, context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError>;
+}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("TestDispatcherInterface"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "test_dispatcher",
+    proto_sources = "crate::proto::schema"
+)]
+struct TestDispatcherService;
+
+impl Service for TestDispatcherService {
+    fn initialize(&self, _context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+        if !params.is_empty() {
+            let v = TestExecute::from_bytes(params.into()).unwrap();
+            if v.value == 42 {
+                panic!("42!");
+            } else {
+                return Err(ExecutionError::new(
+                    ExecutionErrorKind::service(0),
+                    "value is not a great answer",
+                ));
+            }
         }
-        let mut index = ListIndex::new(IDX_NAME, tc.fork());
-        index.push(self.value);
-        index.push(42 / self.value);
         Ok(())
     }
+
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
 }
 
-fn gen_tempdir_name() -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(10).collect()
-}
-
-fn handling_tx_panic(blockchain: &mut Blockchain) {
-    let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_transaction(Tx::new(3), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_ok2 = Message::sign_transaction(Tx::new(4), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_failed = Message::sign_transaction(Tx::new(0), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_storage_error = Message::sign_transaction(Tx::new(42), TEST_SERVICE_ID, pk, &sec_key);
-
-    let patch = {
-        let fork = blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-
-            schema.add_transaction_into_pool(tx_ok1.clone());
-            schema.add_transaction_into_pool(tx_ok2.clone());
-            schema.add_transaction_into_pool(tx_failed.clone());
-            schema.add_transaction_into_pool(tx_storage_error.clone());
+impl TestDispatcherInterface for TestDispatcherService {
+    fn test_execute(
+        &self,
+        context: CallContext<'_>,
+        arg: TestExecute,
+    ) -> Result<(), ExecutionError> {
+        if arg.value == 42 {
+            panic!(StorageError::new("42"))
         }
-        fork.into_patch()
-    };
+        let mut index = context.service_data().get_list("val");
+        index.push(arg.value);
+        index.push(42 / arg.value);
+        Ok(())
+    }
+
+    fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError> {
+        context.service_data().get_entry("val").set(arg.value);
+
+        let artifact = if arg.value == 24 {
+            ServicePanicImpl.artifact_id().into()
+        } else {
+            ServiceGoodImpl.artifact_id().into()
+        };
+        context.start_artifact_registration(artifact, vec![])?;
+        if arg.value == 42 {
+            return Err(DispatcherError::UnknownArtifactId.into());
+        }
+
+        Ok(())
+    }
+
+    fn test_add(&self, mut context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError> {
+        {
+            let mut index = context.service_data().get_entry("val");
+            index.set(arg.value);
+        }
+
+        let instance_id = {
+            let mut instance_id_entry = context.service_data().get_entry("instance_ids");
+            let instance_id = instance_id_entry.get().unwrap_or(TEST_SERVICE_ID + 1);
+            instance_id_entry.set(instance_id + 1);
+
+            instance_id
+        };
+
+        let config = match arg.value {
+            42 => TestExecute { value: 42 }.into_bytes(),
+            18 => TestExecute { value: 18 }.into_bytes(),
+            _ => Vec::new(),
+        };
+
+        let artifact = if arg.value == 24 {
+            ServicePanicImpl.artifact_id().into()
+        } else {
+            TestDispatcherService.artifact_id().into()
+        };
+
+        let instance_name = format!("good-service-{}", arg.value);
+        let spec = InstanceSpec {
+            id: instance_id,
+            name: instance_name,
+            artifact,
+        };
+
+        context.start_adding_service(spec, config)
+    }
+}
+
+#[exonum_interface(crate = "crate")]
+trait ServiceGood {}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServiceGood"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "good_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema"
+)]
+pub struct ServiceGoodImpl;
+
+impl ServiceGood for ServiceGoodImpl {}
+
+impl Service for ServiceGoodImpl {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn before_commit(&self, context: CallContext<'_>) {
+        let mut index = context.service_data().get_list("val");
+        index.push(1);
+    }
+}
+
+#[exonum_interface(crate = "crate")]
+trait ServicePanic {}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServicePanic"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "panic_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema"
+)]
+struct ServicePanicImpl;
+
+impl ServicePanic for ServicePanicImpl {}
+
+impl Service for ServicePanicImpl {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn before_commit(&self, _context: CallContext<'_>) {
+        panic!("42");
+    }
+}
+
+#[exonum_interface(crate = "crate")]
+trait ServicePanicStorageError {}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServicePanicStorageError"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "storage_error_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema"
+)]
+struct ServicePanicStorageErrorImpl;
+
+impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
+
+impl Service for ServicePanicStorageErrorImpl {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn before_commit(&self, _context: CallContext<'_>) {
+        panic!(StorageError::new("42"));
+    }
+}
+
+const TX_CHECK_RESULT_SERVICE_ID: InstanceId = 255;
+
+lazy_static! {
+    static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));
+}
+
+#[protobuf_convert(source = "TestServiceTx")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+struct TxResult {
+    value: u64,
+}
+
+#[exonum_interface(crate = "crate")]
+trait TxResultCheckInterface {
+    fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError>;
+}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("TxResultCheckInterface"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "tx_result_check",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema"
+)]
+struct TxResultCheckService;
+
+impl TxResultCheckInterface for TxResultCheckService {
+    fn tx_result(&self, context: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError> {
+        let mut entry = context.service_data().get_entry("status");
+        entry.set(arg.value);
+        EXECUTION_STATUS.lock().unwrap().clone()
+    }
+}
+
+impl Service for TxResultCheckService {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+}
+
+fn assert_service_execute(blockchain: &mut BlockchainMut) {
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
+    let snapshot = blockchain.snapshot();
+    let index = snapshot.get_list("service_good.val");
+    assert_eq!(index.len(), 1);
+    assert_eq!(index.get(0), Some(1));
+}
+
+fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
+    blockchain.merge(patch).unwrap();
+    let snapshot = blockchain.snapshot();
+    assert!(snapshot
+        .as_ref()
+        .get_list::<_, u32>("service_panic.val")
+        .is_empty());
+}
+
+fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> ExecutionStatus {
+    let tx_hash = tx.object_hash();
+    blockchain
+        .merge({
+            let fork = blockchain.fork();
+            let mut schema = Schema::new(&fork);
+            schema.add_transaction_into_pool(tx.clone());
+            fork.into_patch()
+        })
+        .unwrap();
+
+    let (block_hash, patch) = blockchain.create_patch(
+        ValidatorId::zero(),
+        Height::zero(),
+        &[tx.object_hash()],
+        &mut BTreeMap::new(),
+    );
+
+    blockchain
+        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
+        .unwrap();
+    let snapshot = blockchain.snapshot();
+    Schema::new(&snapshot)
+        .transaction_results()
+        .get(&tx_hash)
+        .unwrap()
+}
+
+fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> BlockchainMut {
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let service_keypair = config.service_keypair();
+    let api_notifier = mpsc::channel(0).0;
+
+    Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed())
+        .into_mut(config.consensus)
+        .with_rust_runtime(api_notifier, instances)
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn handling_tx_panic_error() {
+    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
+        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+
+    let (pk, sec_key) = crypto::gen_keypair();
+    let tx_ok1 = TestExecute { value: 3 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok2 = TestExecute { value: 4 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_failed = TestExecute { value: 0 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_storage_error = TestExecute { value: 42 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+
+    let fork = blockchain.fork();
+    let mut schema = Schema::new(&fork);
+    schema.add_transaction_into_pool(tx_ok1.clone());
+    schema.add_transaction_into_pool(tx_ok2.clone());
+    schema.add_transaction_into_pool(tx_failed.clone());
+    schema.add_transaction_into_pool(tx_storage_error.clone());
+    blockchain.merge(fork.into_patch()).unwrap();
 
     let (_, patch) = blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
-        &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
+        &[
+            tx_ok1.object_hash(),
+            tx_failed.object_hash(),
+            tx_ok2.object_hash(),
+        ],
         &mut BTreeMap::new(),
     );
-
     blockchain.merge(patch).unwrap();
-    let snapshot = blockchain.snapshot();
 
+    let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     assert_eq!(
-        schema.transactions().get(&tx_ok1.hash()),
+        schema.transactions().get(&tx_ok1.object_hash()),
         Some(tx_ok1.clone())
     );
     assert_eq!(
-        schema.transactions().get(&tx_ok2.hash()),
+        schema.transactions().get(&tx_ok2.object_hash()),
         Some(tx_ok2.clone())
     );
     assert_eq!(
-        schema.transactions().get(&tx_failed.hash()),
+        schema.transactions().get(&tx_failed.object_hash()),
         Some(tx_failed.clone())
     );
 
-    let index = ListIndex::new(IDX_NAME, &snapshot);
-
+    let index = snapshot.get_list(IDX_NAME);
     assert_eq!(index.len(), 4);
     assert_eq!(index.get(0), Some(3));
     assert_eq!(index.get(1), Some(14));
@@ -138,396 +409,284 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
     assert_eq!(index.get(3), Some(10));
 }
 
-fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
-    let (pk, sec_key) = gen_keypair();
-    let tx_ok1 = Message::sign_transaction(Tx::new(3), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_ok2 = Message::sign_transaction(Tx::new(4), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_failed = Message::sign_transaction(Tx::new(0), TEST_SERVICE_ID, pk, &sec_key);
-    let tx_storage_error = Message::sign_transaction(Tx::new(42), TEST_SERVICE_ID, pk, &sec_key);
+#[test]
+#[should_panic]
+fn handling_tx_panic_storage_error() {
+    let mut blockchain =
+        create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
+            .with_instance(TEST_SERVICE_ID, IDX_NAME, ())]);
 
-    let patch = {
-        let fork = blockchain.fork();
-        {
-            let mut schema = Schema::new(&fork);
-            schema.add_transaction_into_pool(tx_ok1.clone());
-            schema.add_transaction_into_pool(tx_ok2.clone());
-            schema.add_transaction_into_pool(tx_failed.clone());
-            schema.add_transaction_into_pool(tx_storage_error.clone());
-        }
-        fork.into_patch()
-    };
-    blockchain.merge(patch).unwrap();
+    let (pk, sec_key) = crypto::gen_keypair();
+    let tx_ok1 = TestExecute { value: 3 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_ok2 = TestExecute { value: 4 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_failed = TestExecute { value: 0 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+    let tx_storage_error = TestExecute { value: 42 }.sign(TEST_SERVICE_ID, pk, &sec_key);
+
+    let fork = blockchain.fork();
+    let mut schema = Schema::new(&fork);
+    schema.add_transaction_into_pool(tx_ok1.clone());
+    schema.add_transaction_into_pool(tx_ok2.clone());
+    schema.add_transaction_into_pool(tx_failed.clone());
+    schema.add_transaction_into_pool(tx_storage_error.clone());
+    blockchain.merge(fork.into_patch()).unwrap();
     blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
-        &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
+        &[
+            tx_ok1.object_hash(),
+            tx_storage_error.object_hash(),
+            tx_ok2.object_hash(),
+        ],
         &mut BTreeMap::new(),
     );
 }
 
-mod transactions_tests {
-    use super::TEST_SERVICE_ID;
-    use crate::blockchain::{ExecutionResult, Transaction, TransactionContext, TransactionSet};
-    use crate::crypto::gen_keypair;
-    use crate::messages::Message;
-    use crate::proto::schema::tests::{BlockchainTestTxA, BlockchainTestTxB};
+#[test]
+fn service_execute_good() {
+    let mut blockchain = create_blockchain(vec![
+        InstanceCollection::new(ServiceGoodImpl).with_instance(3, "service_good", ())
+    ]);
+    assert_service_execute(&mut blockchain);
+}
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
-    struct A {
-        a: u64,
-    }
-    impl A {
-        fn new(a: u64) -> Self {
-            Self { a }
+#[test]
+fn service_execute_panic() {
+    let mut blockchain = create_blockchain(vec![
+        InstanceCollection::new(ServicePanicImpl).with_instance(4, "service_panic", ())
+    ]);
+    assert_service_execute_panic(&mut blockchain);
+}
+
+#[test]
+#[should_panic]
+fn service_execute_panic_storage_error() {
+    let mut blockchain =
+        create_blockchain(vec![InstanceCollection::new(ServicePanicStorageErrorImpl)
+            .with_instance(5, "service_panic", ())]);
+    assert_service_execute_panic(&mut blockchain);
+}
+
+#[test]
+fn error_discards_transaction_changes() {
+    let statuses = [
+        Err(ExecutionError::new(ErrorKind::service(0), "")),
+        Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
+        Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
+        Err(ExecutionError::new(ErrorKind::Panic, "PANIC")),
+        Ok(()),
+    ];
+
+    let (pk, sec_key) = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TxResultCheckService)
+        .with_instance(TX_CHECK_RESULT_SERVICE_ID, "check_result", ())]);
+    let db = TemporaryDB::new();
+
+    for (index, status) in statuses.iter().enumerate() {
+        let index = index as u64;
+        *EXECUTION_STATUS.lock().unwrap() = status.clone();
+
+        let transaction = TxResult { value: index }.sign(TX_CHECK_RESULT_SERVICE_ID, pk, &sec_key);
+        let hash = transaction.object_hash();
+        let fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+        schema.add_transaction_into_pool(transaction.clone());
+        blockchain.merge(fork.into_patch()).unwrap();
+
+        let (_, patch) = blockchain.create_patch(
+            ValidatorId::zero(),
+            Height(index),
+            &[hash],
+            &mut BTreeMap::new(),
+        );
+        db.merge(patch).unwrap();
+
+        let snapshot = db.snapshot();
+        let entry = snapshot
+            .as_ref()
+            .get_entry::<_, u64>("check_result.status")
+            .get();
+        if status.is_err() {
+            assert!(entry.is_none());
+        } else {
+            assert_eq!(Some(index), entry);
         }
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "BlockchainTestTxB", crate = "crate")]
-    struct B {
-        b: u64,
-        c: u32,
-    }
-    impl B {
-        fn new(b: u64, c: u32) -> Self {
-            Self { b, c }
-        }
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "BlockchainTestTxA", crate = "crate")]
-    struct C {
-        a: u64,
-    }
-    impl C {
-        fn new(a: u64) -> Self {
-            Self { a }
-        }
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(crate = "crate")]
-    enum MyTransactions {
-        A(A),
-        B(B),
-        C(C),
-    }
-
-    impl Transaction for A {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
-            Ok(())
-        }
-    }
-
-    impl Transaction for B {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
-            Ok(())
-        }
-    }
-
-    impl Transaction for C {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
-            Ok(())
-        }
-    }
-
-    #[test]
-    fn deserialize_from_json() {
-        fn round_trip<T: Into<MyTransactions>>(t: T) {
-            let t = t.into();
-            let initial = serde_json::to_value(&t).unwrap();
-            println!("{:?}", initial);
-            let parsed: MyTransactions = serde_json::from_value(initial.clone()).unwrap();
-            let round_tripped = serde_json::to_value(&parsed).unwrap();
-            assert_eq!(initial, round_tripped);
-        }
-
-        let a = A::new(0);
-        let b = B::new(1, 2);
-        let c = C::new(0);
-        round_trip(a);
-        round_trip(b);
-        round_trip(c);
-    }
-
-    #[test]
-    fn deserialize_from_raw() {
-        fn round_trip<T: Into<MyTransactions>>(t: T) {
-            let (pk, sec_key) = gen_keypair();
-            use std::ops::Deref;
-            let set = t.into();
-            let initial_json = serde_json::to_value(&set).unwrap();
-            let msg = Message::sign_transaction(set, TEST_SERVICE_ID, pk, &sec_key);
-
-            let parsed = MyTransactions::tx_from_raw(msg.deref().clone()).unwrap();
-            let round_tripped = serde_json::to_value(&parsed).unwrap();
-            assert_eq!(initial_json, round_tripped);
-        }
-
-        let a = A::new(0);
-        let b = B::new(1, 2);
-        let c = C::new(0);
-        round_trip(a);
-        round_trip(b);
-        round_trip(c);
     }
 }
 
-struct ServiceGood;
+#[test]
+fn test_dispatcher_deploy_good() {
+    let keypair = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![
+        InstanceCollection::new(TestDispatcherService).with_instance(
+            TEST_SERVICE_ID,
+            TEST_SERVICE_NAME,
+            (),
+        ),
+        InstanceCollection::new(ServiceGoodImpl),
+    ]);
 
-impl Service for ServiceGood {
-    fn service_id(&self) -> u16 {
-        1
-    }
-    fn service_name(&self) -> &'static str {
-        "some_service"
-    }
+    let artifact_id = ServiceGoodImpl.artifact_id().into();
 
-    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
+    // Tests deployment procedure for the available artifact.
+    assert!(!blockchain.dispatcher.is_artifact_deployed(&artifact_id));
+    blockchain
+        .dispatcher
+        .deploy_artifact(artifact_id.clone(), vec![])
+        .wait()
+        .unwrap();
+    assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
 
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        unimplemented!()
-    }
-
-    fn before_commit(&self, fork: &Fork) {
-        let mut index = ListIndex::new(IDX_NAME, fork);
-        index.push(1);
-    }
+    // Tests the register artifact action for the deployed artifact.
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .artifacts()
+        .contains(&artifact_id.name));
+    execute_transaction(
+        &mut blockchain,
+        TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    let snapshot = blockchain.snapshot();
+    assert!(DispatcherSchema::new(&snapshot)
+        .artifacts()
+        .contains(&artifact_id.name));
+    assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
-struct ServicePanic;
+#[test]
+fn test_dispatcher_already_deployed() {
+    let keypair = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![
+        InstanceCollection::new(TestDispatcherService).with_instance(
+            TEST_SERVICE_ID,
+            TEST_SERVICE_NAME,
+            (),
+        ),
+        InstanceCollection::new(ServiceGoodImpl).with_instance(11, "good", ()),
+    ]);
+    let artifact_id = ServiceGoodImpl.artifact_id().into();
 
-impl Service for ServicePanic {
-    fn service_id(&self) -> u16 {
-        1
-    }
-
-    fn service_name(&self) -> &'static str {
-        "some_service"
-    }
-
-    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        unimplemented!()
-    }
-
-    fn before_commit(&self, _fork: &Fork) {
-        panic!("42");
-    }
+    // Tests that we get an error if we try to deploy already deployed artifact.
+    assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
+    let err = blockchain
+        .dispatcher
+        .deploy_artifact(artifact_id.clone(), vec![])
+        .wait()
+        .unwrap_err();
+    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.into());
+    // Tests that we cannot register artifact twice.
+    let result = execute_transaction(
+        &mut blockchain,
+        TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    assert_eq!(
+        result.0,
+        Err(DispatcherError::ArtifactAlreadyDeployed.into())
+    );
 }
 
-struct ServicePanicStorageError;
+#[test]
+#[should_panic(expected = "Unable to deploy registered artifact")]
+fn test_dispatcher_register_unavailable() {
+    let keypair = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![
+        InstanceCollection::new(TestDispatcherService).with_instance(
+            TEST_SERVICE_ID,
+            TEST_SERVICE_NAME,
+            (),
+        ),
+        InstanceCollection::new(ServiceGoodImpl),
+    ]);
 
-impl Service for ServicePanicStorageError {
-    fn service_id(&self) -> u16 {
-        1
-    }
-
-    fn service_name(&self) -> &'static str {
-        "some_service"
-    }
-
-    fn state_hash(&self, _snapshot: &dyn Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-
-    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        unimplemented!()
-    }
-
-    fn before_commit(&self, _fork: &Fork) {
-        panic!(ExecutionError::new(42));
-    }
+    let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
+    blockchain
+        .dispatcher
+        .deploy_artifact(artifact_id.clone(), vec![])
+        .wait()
+        .unwrap();
+    // Tests ExecutionError during the register artifact execution.
+    execute_transaction(
+        &mut blockchain,
+        TestDeploy { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .artifacts()
+        .contains(&artifact_id.name));
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
+    // Tests that an unavailable artifact will not be registered.
+    execute_transaction(
+        &mut blockchain,
+        TestDeploy { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
 }
 
-fn assert_service_execute(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
-    db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
-    let index = ListIndex::new(IDX_NAME, &snapshot);
-    assert_eq!(index.len(), 1);
-    assert_eq!(index.get(0), Some(1));
+#[test]
+fn test_dispatcher_start_service_good() {
+    let keypair = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
+        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+    // Tests start service for the good service.
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-1".to_owned()));
+    execute_transaction(
+        &mut blockchain,
+        TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    let snapshot = blockchain.snapshot();
+    assert!(DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-1".to_owned()));
+    assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
-fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut dyn Database) {
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
-    db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
-    let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
-    assert!(index.is_empty());
-}
+#[test]
+fn test_dispatcher_start_service_rollback() {
+    let keypair = crypto::gen_keypair();
+    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
+        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
 
-mod memorydb_tests {
-    use futures::sync::mpsc;
+    // Tests that a service with an unregistered artifact will not be started.
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-24".to_owned()));
+    execute_transaction(
+        &mut blockchain,
+        TestAdd { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-24".to_owned()));
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 
-    use crate::blockchain::{Blockchain, Service};
-    use crate::crypto::gen_keypair;
-    use crate::node::ApiSender;
-    use exonum_merkledb::{Database, TemporaryDB};
+    // Tests that a service with panic during the configure will not be started.
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-42".to_owned()));
+    execute_transaction(
+        &mut blockchain,
+        TestAdd { value: 42 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-42".to_owned()));
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 
-    use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
-
-    fn create_database() -> Box<dyn Database> {
-        Box::new(TemporaryDB::new())
-    }
-
-    fn create_blockchain() -> Blockchain {
-        let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(0);
-        Blockchain::new(
-            TemporaryDB::new(),
-            vec![Box::new(super::TestService) as Box<dyn Service>],
-            service_keypair.0,
-            service_keypair.1,
-            ApiSender::new(api_channel.0),
-        )
-    }
-
-    fn create_blockchain_with_service(service: Box<dyn Service>) -> Blockchain {
-        let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(0);
-        Blockchain::new(
-            TemporaryDB::new(),
-            vec![service],
-            service_keypair.0,
-            service_keypair.1,
-            ApiSender::new(api_channel.0),
-        )
-    }
-
-    #[test]
-    fn handling_tx_panic() {
-        let mut blockchain = create_blockchain();
-        super::handling_tx_panic(&mut blockchain);
-    }
-
-    #[test]
-    #[should_panic]
-    fn handling_tx_panic_storage_error() {
-        let mut blockchain = create_blockchain();
-        super::handling_tx_panic_storage_error(&mut blockchain);
-    }
-
-    #[test]
-    fn service_execute() {
-        let blockchain = create_blockchain_with_service(Box::new(ServiceGood));
-        let mut db = create_database();
-        super::assert_service_execute(&blockchain, db.as_mut());
-    }
-
-    #[test]
-    fn service_execute_panic() {
-        let blockchain = create_blockchain_with_service(Box::new(ServicePanic));
-        let mut db = create_database();
-        super::assert_service_execute_panic(&blockchain, db.as_mut());
-    }
-
-    #[test]
-    #[should_panic]
-    fn service_execute_panic_storage_error() {
-        let blockchain = create_blockchain_with_service(Box::new(ServicePanicStorageError));
-        let mut db = create_database();
-        super::assert_service_execute(&blockchain, db.as_mut());
-    }
-}
-
-mod rocksdb_tests {
-    use futures::sync::mpsc;
-    use tempdir::TempDir;
-
-    use std::path::Path;
-
-    use crate::blockchain::{Blockchain, Service};
-    use crate::crypto::gen_keypair;
-    use crate::node::ApiSender;
-    use exonum_merkledb::{Database, DbOptions, RocksDB};
-
-    use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
-
-    fn create_database(path: &Path) -> Box<dyn Database> {
-        let opts = DbOptions::default();
-        Box::new(RocksDB::open(path, &opts).unwrap())
-    }
-
-    fn create_blockchain(path: &Path) -> Blockchain {
-        let db = create_database(path);
-        let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(0);
-        Blockchain::new(
-            db,
-            vec![Box::new(super::TestService) as Box<dyn Service>],
-            service_keypair.0,
-            service_keypair.1,
-            ApiSender::new(api_channel.0),
-        )
-    }
-
-    fn create_blockchain_with_service(path: &Path, service: Box<dyn Service>) -> Blockchain {
-        let db = create_database(path);
-        let service_keypair = gen_keypair();
-        let api_channel = mpsc::channel(0);
-        Blockchain::new(
-            db,
-            vec![service],
-            service_keypair.0,
-            service_keypair.1,
-            ApiSender::new(api_channel.0),
-        )
-    }
-
-    fn create_temp_dir() -> TempDir {
-        TempDir::new(super::gen_tempdir_name().as_str()).unwrap()
-    }
-
-    #[test]
-    fn handling_tx_panic() {
-        let dir = create_temp_dir();
-        let mut blockchain = create_blockchain(dir.path());
-        super::handling_tx_panic(&mut blockchain);
-    }
-
-    #[test]
-    #[should_panic]
-    fn handling_tx_panic_storage_error() {
-        let dir = create_temp_dir();
-        let mut blockchain = create_blockchain(dir.path());
-        super::handling_tx_panic_storage_error(&mut blockchain);
-    }
-
-    #[test]
-    fn service_execute() {
-        let dir = create_temp_dir();
-        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServiceGood));
-        let dir = create_temp_dir();
-        let mut db = create_database(dir.path());
-        super::assert_service_execute(&blockchain, db.as_mut());
-    }
-
-    #[test]
-    fn service_execute_panic() {
-        let dir = create_temp_dir();
-        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanic));
-        let dir = create_temp_dir();
-        let mut db = create_database(dir.path());
-        super::assert_service_execute_panic(&blockchain, db.as_mut());
-    }
-
-    #[test]
-    #[should_panic]
-    fn service_execute_panic_storage_error() {
-        let dir = create_temp_dir();
-        let blockchain =
-            create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
-        let dir = create_temp_dir();
-        let mut db = create_database(dir.path());
-        super::assert_service_execute(&blockchain, db.as_mut());
-    }
+    // Tests that a service with execution error during the configure will not be started.
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-18".to_owned()));
+    execute_transaction(
+        &mut blockchain,
+        TestAdd { value: 18 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    );
+    let snapshot = blockchain.snapshot();
+    assert!(!DispatcherSchema::new(&snapshot)
+        .service_instances()
+        .contains(&"good-service-18".to_owned()));
+    assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 }

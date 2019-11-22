@@ -15,8 +15,7 @@
 //! Exonum-time API.
 
 use chrono::{DateTime, Utc};
-
-use exonum::{api, blockchain::Schema, crypto::PublicKey};
+use exonum::{crypto::PublicKey, runtime::api};
 
 use crate::TimeSchema;
 
@@ -29,45 +28,40 @@ pub struct ValidatorTime {
     pub time: Option<DateTime<Utc>>,
 }
 
-/// Implements the exonum-time public API.
-#[derive(Debug)]
+/// Implement the public API for Exonum time.
+#[derive(Debug, Clone)]
 pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
     pub fn current_time(
-        state: &api::ServiceApiState,
+        state: &api::ServiceApiState<'_>,
         _query: (),
     ) -> api::Result<Option<DateTime<Utc>>> {
-        let view = state.snapshot();
-        let schema = TimeSchema::new(&view);
-        Ok(schema.time().get())
+        Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
-    /// Used to extend Api.
-    pub fn wire(builder: &mut api::ServiceApiBuilder) {
+    /// Extend API.
+    pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/current_time", Self::current_time);
     }
 }
 
-/// Implements the exonum-time private API.
-#[derive(Debug)]
+/// Implement the private API for Exonum time.
+#[derive(Debug, Clone)]
 pub struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
     pub fn all_validators_times(
-        state: &api::ServiceApiState,
-        _query: (),
+        state: &api::ServiceApiState<'_>,
     ) -> api::Result<Vec<ValidatorTime>> {
-        let view = state.snapshot();
-        let schema = TimeSchema::new(&view);
-        let idx = schema.validators_times();
-
-        // The times of all validators for which time is known.
-        let validators_times = idx
+        let schema = TimeSchema::new(state.service_data());
+        // All available times of the validators.
+        let validators_times = schema
+            .validators_times
             .iter()
             .map(|(public_key, time)| ValidatorTime {
                 public_key,
@@ -79,31 +73,36 @@ impl PrivateApi {
 
     /// Endpoint for getting time values for current validators.
     pub fn current_validators_time(
-        state: &api::ServiceApiState,
-        _query: (),
+        state: &api::ServiceApiState<'_>,
     ) -> api::Result<Vec<ValidatorTime>> {
-        let view = state.snapshot();
-        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(&view);
-        let idx = schema.validators_times();
+        let validator_keys = state.data().for_core().consensus_config().validator_keys;
+        let schema = TimeSchema::new(state.service_data());
 
-        // The times of current validators.
+        // Times of the current validators.
         // `None` if the time of the validator is unknown.
         let validators_times = validator_keys
             .iter()
             .map(|validator| ValidatorTime {
                 public_key: validator.service_key,
-                time: idx.get(&validator.service_key),
+                time: schema.validators_times.get(&validator.service_key),
             })
             .collect::<Vec<_>>();
         Ok(validators_times)
     }
 
     /// Used to extend Api.
-    pub fn wire(builder: &mut api::ServiceApiBuilder) {
+    pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
         builder
             .private_scope()
-            .endpoint("v1/validators_times", Self::current_validators_time)
-            .endpoint("v1/validators_times/all", Self::all_validators_times);
+            .endpoint("v1/validators_times", {
+                move |state: &api::ServiceApiState<'_>, _query: ()| {
+                    Self::current_validators_time(state)
+                }
+            })
+            .endpoint("v1/validators_times/all", {
+                move |state: &api::ServiceApiState<'_>, _query: ()| {
+                    Self::all_validators_times(state)
+                }
+            });
     }
 }

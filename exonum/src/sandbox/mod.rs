@@ -13,26 +13,28 @@
 // limitations under the License.
 
 use bit_vec::BitVec;
+use exonum_keys::Keys;
+use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, TemporaryDB};
+use exonum_proto::impl_binary_value_for_pb_message;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    convert::TryFrom,
+    fmt::Debug,
     iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::{AddAssign, Deref},
+    ops::{AddAssign, Deref, DerefMut},
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use exonum_merkledb::{HashTag, MapProof, ObjectHash, TemporaryDB};
-
-use crate::blockchain::check_tx;
-use crate::messages::PoolTransactionsRequest;
 use crate::{
+    api::node::SharedNodeState,
     blockchain::{
-        Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-        SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys,
+        contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
+        IndexCoordinates, InstanceCollection, Schema, SchemaOrigin, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -41,9 +43,9 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
     messages::{
-        BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, ProtocolMessage, RawTransaction, Signed,
-        SignedMessage, Status, TransactionsRequest, TransactionsResponse,
+        AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
+        PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
+        SignedMessage, Status, TransactionsRequest, TransactionsResponse, Verified,
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
@@ -51,7 +53,7 @@ use crate::{
         SystemStateProvider,
     },
     sandbox::{
-        config_updater::ConfigUpdateService, sandbox_tests_helper::PROPOSE_TIMEOUT,
+        config_updater::ConfigUpdaterService, sandbox_tests_helper::PROPOSE_TIMEOUT,
         timestamping::TimestampingService,
     },
 };
@@ -83,11 +85,40 @@ impl SystemStateProvider for SandboxSystemStateProvider {
     }
 }
 
+/// Guarded queue for messages sent by the sandbox. If the queue is not empty when dropped,
+/// it panics.
+#[derive(Debug, Default)]
+pub struct GuardedQueue(VecDeque<(PublicKey, Message)>);
+
+impl Deref for GuardedQueue {
+    type Target = VecDeque<(PublicKey, Message)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GuardedQueue {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for GuardedQueue {
+    fn drop(&mut self) {
+        if !std::thread::panicking() {
+            if let Some((addr, msg)) = self.0.pop_front() {
+                panic!("Sent unexpected message {:?} to {}", msg, addr);
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
-    pub sent: VecDeque<(PublicKey, Message)>,
+    pub sent: GuardedQueue,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
@@ -113,9 +144,8 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => {
-                        let protocol_msg =
-                            Message::deserialize(msg).expect("Expected valid message.");
-                        self.sent.push_back((peer, protocol_msg))
+                        let msg = Message::from_signed(msg).expect("Expected valid message.");
+                        self.sent.push_back((peer, msg))
                     }
                     NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
@@ -130,18 +160,22 @@ impl SandboxInner {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
                     InternalRequest::Timeout(t) => self.timers.push(t),
+
                     InternalRequest::JumpToRound(height, round) => self
                         .handler
                         .handle_event(InternalEvent::JumpToRound(height, round).into()),
-                    InternalRequest::Shutdown => unimplemented!(),
-                    InternalRequest::VerifyMessage(message) => {
-                        let protocol =
-                            Message::deserialize(SignedMessage::from_raw_buffer(message).unwrap())
-                                .unwrap();
-                        self.handler.handle_event(
-                            InternalEvent::MessageVerified(Box::new(protocol)).into(),
-                        );
+
+                    InternalRequest::VerifyMessage(raw) => {
+                        let msg = SignedMessage::from_bytes(raw.into())
+                            .and_then(SignedMessage::into_verified::<ExonumMessage>)
+                            .map(Message::from)
+                            .unwrap();
+
+                        self.handler
+                            .handle_event(InternalEvent::MessageVerified(Box::new(msg)).into())
                     }
+
+                    InternalRequest::Shutdown => unreachable!(),
                 }
             }
             Ok(())
@@ -165,7 +199,7 @@ pub struct Sandbox {
     inner: RefCell<SandboxInner>,
     addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
-    connect: Option<Signed<Connect>>,
+    connect: Option<Verified<Connect>>,
 }
 
 impl Sandbox {
@@ -201,7 +235,7 @@ impl Sandbox {
 
     fn check_unexpected_message(&self) {
         if let Some((addr, msg)) = self.pop_sent_message() {
-            panic!("Send unexpected message {:?} to {}", msg, addr);
+            panic!("Sent unexpected message {:?} to {}", msg, addr);
         }
     }
 
@@ -222,48 +256,48 @@ impl Sandbox {
     /// Creates a `BlockRequest` message signed by this validator.
     pub fn create_block_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
+        author: PublicKey,
+        to: PublicKey,
         height: Height,
         secret_key: &SecretKey,
-    ) -> Signed<BlockRequest> {
-        Message::concrete(BlockRequest::new(to, height), *author, secret_key)
+    ) -> Verified<BlockRequest> {
+        Verified::from_value(BlockRequest::new(to, height), author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
     pub fn create_status(
         &self,
-        author: &PublicKey,
+        author: PublicKey,
         height: Height,
-        last_hash: &Hash,
+        last_hash: Hash,
         pool_size: u64,
         secret_key: &SecretKey,
-    ) -> Signed<Status> {
-        Message::concrete(
+    ) -> Verified<Status> {
+        Verified::from_value(
             Status::new(height, last_hash, pool_size),
-            *author,
+            author,
             secret_key,
         )
     }
 
     /// Creates a `BlockResponse` message signed by this validator.
-    pub fn create_block_response<I: IntoIterator<Item = Signed<Precommit>>>(
+    pub fn create_block_response(
         &self,
-        public_key: &PublicKey,
-        to: &PublicKey,
+        public_key: PublicKey,
+        to: PublicKey,
         block: Block,
-        precommits: I,
-        tx_hashes: &[Hash],
+        precommits: impl IntoIterator<Item = Verified<Precommit>>,
+        tx_hashes: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
-    ) -> Signed<BlockResponse> {
-        Message::concrete(
+    ) -> Verified<BlockResponse> {
+        Verified::from_value(
             BlockResponse::new(
                 to,
                 block,
-                precommits.into_iter().map(Signed::serialize).collect(),
+                precommits.into_iter().map(Verified::into_bytes),
                 tx_hashes,
             ),
-            *public_key,
+            public_key,
             secret_key,
         )
     }
@@ -276,8 +310,8 @@ impl Sandbox {
         time: chrono::DateTime<::chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
-    ) -> Signed<Connect> {
-        Message::concrete(
+    ) -> Verified<Connect> {
+        Verified::from_value(
             Connect::new(&addr, time, user_agent),
             *public_key,
             secret_key,
@@ -287,21 +321,21 @@ impl Sandbox {
     /// Creates a `PeersRequest` message signed by this validator.
     pub fn create_peers_request(
         &self,
-        public_key: &PublicKey,
-        to: &PublicKey,
+        public_key: PublicKey,
+        to: PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<PeersRequest> {
-        Message::concrete(PeersRequest::new(to), *public_key, secret_key)
+    ) -> Verified<PeersRequest> {
+        Verified::from_value(PeersRequest::new(to), public_key, secret_key)
     }
 
     /// Creates a `PoolTransactionsRequest` message signed by this validator.
     pub fn create_pool_transactions_request(
         &self,
-        public_key: &PublicKey,
+        public_key: PublicKey,
         to: PublicKey,
         secret_key: &SecretKey,
-    ) -> Signed<PoolTransactionsRequest> {
-        Message::concrete(PoolTransactionsRequest::new(to), *public_key, secret_key)
+    ) -> Verified<PoolTransactionsRequest> {
+        Verified::from_value(PoolTransactionsRequest::new(to), public_key, secret_key)
     }
 
     /// Creates a `Propose` message signed by this validator.
@@ -310,11 +344,11 @@ impl Sandbox {
         validator_id: ValidatorId,
         height: Height,
         round: Round,
-        last_hash: &Hash,
-        tx_hashes: &[Hash],
+        last_hash: Hash,
+        tx_hashes: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
-    ) -> Signed<Propose> {
-        Message::concrete(
+    ) -> Verified<Propose> {
+        Verified::from_value(
             Propose::new(validator_id, height, round, last_hash, tx_hashes),
             self.public_key(validator_id),
             secret_key,
@@ -328,12 +362,12 @@ impl Sandbox {
         validator_id: ValidatorId,
         propose_height: Height,
         propose_round: Round,
-        propose_hash: &Hash,
-        block_hash: &Hash,
+        propose_hash: Hash,
+        block_hash: Hash,
         system_time: chrono::DateTime<chrono::Utc>,
         secret_key: &SecretKey,
-    ) -> Signed<Precommit> {
-        Message::concrete(
+    ) -> Verified<Precommit> {
+        Verified::from_value(
             Precommit::new(
                 validator_id,
                 propose_height,
@@ -353,16 +387,16 @@ impl Sandbox {
         validator_id: ValidatorId,
         propose_height: Height,
         propose_round: Round,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         locked_round: Round,
         secret_key: &SecretKey,
-    ) -> Signed<Prevote> {
-        Message::concrete(
+    ) -> Verified<Prevote> {
+        Verified::from_value(
             Prevote::new(
                 validator_id,
                 propose_height,
                 propose_round,
-                &propose_hash,
+                propose_hash,
                 locked_round,
             ),
             self.public_key(validator_id),
@@ -374,17 +408,17 @@ impl Sandbox {
     #[allow(clippy::too_many_arguments)]
     pub fn create_prevote_request(
         &self,
-        from: &PublicKey,
-        to: &PublicKey,
+        from: PublicKey,
+        to: PublicKey,
         height: Height,
         round: Round,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         validators: BitVec,
         secret_key: &SecretKey,
-    ) -> Signed<PrevotesRequest> {
-        Message::concrete(
+    ) -> Verified<PrevotesRequest> {
+        Verified::from_value(
             PrevotesRequest::new(to, height, round, propose_hash, validators),
-            *from,
+            from,
             secret_key,
         )
     }
@@ -392,15 +426,15 @@ impl Sandbox {
     /// Creates a `ProposeRequest` message signed by this validator.
     pub fn create_propose_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
+        author: PublicKey,
+        to: PublicKey,
         height: Height,
-        propose_hash: &Hash,
+        propose_hash: Hash,
         secret_key: &SecretKey,
-    ) -> Signed<ProposeRequest> {
-        Message::concrete(
+    ) -> Verified<ProposeRequest> {
+        Verified::from_value(
             ProposeRequest::new(to, height, propose_hash),
-            *author,
+            author,
             secret_key,
         )
     }
@@ -408,28 +442,25 @@ impl Sandbox {
     /// Creates a `TransactionsRequest` message signed by this validator.
     pub fn create_transactions_request(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
-        txs: &[Hash],
+        author: PublicKey,
+        to: PublicKey,
+        txs: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
-    ) -> Signed<TransactionsRequest> {
-        Message::concrete(TransactionsRequest::new(to, txs), *author, secret_key)
+    ) -> Verified<TransactionsRequest> {
+        Verified::from_value(TransactionsRequest::new(to, txs), author, secret_key)
     }
 
     /// Creates a `TransactionsResponse` message signed by this validator.
-    pub fn create_transactions_response<I>(
+    pub fn create_transactions_response(
         &self,
-        author: &PublicKey,
-        to: &PublicKey,
-        txs: I,
+        author: PublicKey,
+        to: PublicKey,
+        txs: impl IntoIterator<Item = Verified<AnyTx>>,
         secret_key: &SecretKey,
-    ) -> Signed<TransactionsResponse>
-    where
-        I: IntoIterator<Item = Signed<RawTransaction>>,
-    {
-        Message::concrete(
-            TransactionsResponse::new(to, txs.into_iter().map(Signed::serialize).collect()),
-            *author,
+    ) -> Verified<TransactionsResponse> {
+        Verified::from_value(
+            TransactionsResponse::new(to, txs.into_iter().map(Verified::into_bytes)),
+            author,
             secret_key,
         )
     }
@@ -454,40 +485,33 @@ impl Sandbox {
         *inner.time.lock().unwrap() = new_time;
     }
 
-    pub fn node_handler_mut(&self) -> RefMut<NodeHandler> {
+    pub fn node_handler_mut(&self) -> RefMut<'_, NodeHandler> {
         RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler)
     }
 
-    pub fn node_state(&self) -> Ref<State> {
+    pub fn node_state(&self) -> Ref<'_, State> {
         Ref::map(self.inner.borrow(), |inner| inner.handler.state())
     }
 
-    pub fn blockchain_ref(&self) -> Ref<Blockchain> {
-        Ref::map(self.inner.borrow(), |inner| &inner.handler.blockchain)
+    pub fn blockchain(&self) -> Blockchain {
+        self.inner.borrow().handler.blockchain.as_ref().clone()
     }
 
-    pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
+    pub fn blockchain_mut<'s>(&'s self) -> impl DerefMut<Target = BlockchainMut> + 's {
         RefMut::map(self.inner.borrow_mut(), |inner| {
             &mut inner.handler.blockchain
         })
     }
 
     /// Returns connect message used during initialization.
-    pub fn connect(&self) -> Option<&Signed<Connect>> {
+    pub fn connect(&self) -> Option<&Verified<Connect>> {
         self.connect.as_ref()
     }
 
-    pub fn recv<T: ProtocolMessage>(&self, msg: &Signed<T>) {
+    pub fn recv<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
         self.check_unexpected_message();
-        let event = NetworkEvent::MessageReceived(msg.clone().serialize());
+        let event = NetworkEvent::MessageReceived(msg.as_raw().to_bytes());
         self.inner.borrow_mut().handle_event(event);
-    }
-
-    pub fn recv_rebroadcast(&self) {
-        self.check_unexpected_message();
-        self.inner
-            .borrow_mut()
-            .handle_event(ExternalMessage::Rebroadcast);
     }
 
     pub fn process_events(&self) {
@@ -498,11 +522,17 @@ impl Sandbox {
         self.inner.borrow_mut().sent.pop_front()
     }
 
-    pub fn send<T: ProtocolMessage>(&self, key: PublicKey, msg: &Signed<T>) {
-        let expected_msg = T::into_protocol(msg.clone());
+    pub fn send<T>(&self, key: PublicKey, expected_msg: &Verified<T>)
+    where
+        T: TryFrom<SignedMessage> + Debug,
+    {
         self.process_events();
         if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-            assert_eq!(expected_msg, real_msg, "Expected to send other message");
+            assert_eq!(
+                expected_msg.as_raw(),
+                real_msg.as_raw(),
+                "Expected to send other message"
+            );
             assert_eq!(
                 key, real_addr,
                 "Expected to send message to other recipient"
@@ -519,12 +549,15 @@ impl Sandbox {
         self.process_events();
 
         if let Some((addr, msg)) = self.pop_sent_message() {
-            let peers_request =
-                PeersRequest::try_from(msg).expect("Incorrect message. PeersRequest was expected");
+            let peers_request = Verified::<PeersRequest>::try_from(msg)
+                .expect("Incorrect message. PeersRequest was expected");
 
             let id = self.addresses.iter().position(|ref a| a.public_key == addr);
             if let Some(id) = id {
-                assert_eq!(&self.public_key(ValidatorId(id as u16)), &peers_request.to);
+                assert_eq!(
+                    &self.public_key(ValidatorId(id as u16)),
+                    peers_request.payload().to()
+                );
             } else {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
             }
@@ -533,30 +566,36 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: ProtocolMessage>(&self, msg: &Signed<T>) {
+    pub fn broadcast<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
         self.broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1));
     }
 
-    pub fn try_broadcast<T: ProtocolMessage>(&self, msg: &Signed<T>) -> Result<(), String> {
+    pub fn try_broadcast<T: TryFrom<SignedMessage>>(
+        &self,
+        msg: &Verified<T>,
+    ) -> Result<(), String> {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1))
     }
 
-    pub fn broadcast_to_addrs<'a, T: ProtocolMessage, I>(&self, msg: &Signed<T>, addresses: I)
-    where
+    pub fn broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
+        &self,
+        msg: &Verified<T>,
+        addresses: I,
+    ) where
         I: IntoIterator<Item = &'a PublicKey>,
     {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    pub fn try_broadcast_to_addrs<'a, T: ProtocolMessage, I>(
+    pub fn try_broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
         &self,
-        msg: &Signed<T>,
+        msg: &Verified<T>,
         addresses: I,
     ) -> Result<(), String>
     where
         I: IntoIterator<Item = &'a PublicKey>,
     {
-        let expected_msg = Message::deserialize(msg.signed_message().clone()).unwrap();
+        let expected_msg = msg.as_raw();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -564,9 +603,9 @@ impl Sandbox {
 
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-                let real_msg = Message::deserialize(real_msg.signed_message().clone()).unwrap();
                 assert_eq!(
-                    expected_msg, real_msg,
+                    expected_msg,
+                    real_msg.as_raw(),
                     "Expected to broadcast other message"
                 );
                 if !expected_set.contains(&real_addr) {
@@ -588,9 +627,9 @@ impl Sandbox {
         Ok(())
     }
 
-    pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
+    pub fn check_broadcast_status(&self, height: Height, block_hash: Hash) {
         self.broadcast(&self.create_status(
-            &self.node_public_key(),
+            self.node_public_key(),
             height,
             block_hash,
             0,
@@ -634,33 +673,33 @@ impl Sandbox {
     }
 
     pub fn last_block(&self) -> Block {
-        self.blockchain_ref().last_block()
+        self.blockchain().last_block()
     }
 
     pub fn last_hash(&self) -> Hash {
-        self.blockchain_ref().last_hash()
+        self.blockchain().last_hash()
     }
 
     pub fn last_state_hash(&self) -> Hash {
         *self.last_block().state_hash()
     }
 
-    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Signed<RawTransaction>>
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Verified<AnyTx>>
     where
-        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+        I: IntoIterator<Item = &'a Verified<AnyTx>>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
             .filter(|elem| {
-                let hash_elem = elem.hash();
+                let hash_elem = elem.object_hash();
                 if unique_set.contains(&hash_elem) {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if check_tx(
+                if contains_transaction(
                     &hash_elem,
                     &schema_transactions,
                     self.node_state().tx_cache(),
@@ -674,74 +713,66 @@ impl Sandbox {
     }
 
     /// Extracts state_hash from the fake block.
+    ///
+    /// **NB.** This method does not correctly process transactions that mutate the `Dispatcher`,
+    /// e.g., starting new services.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
-        I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+        I: IntoIterator<Item = &'a Verified<AnyTx>>,
     {
         let height = self.current_height();
         let mut blockchain = self.blockchain_mut();
-        let (hashes, recover, patch) = {
-            let mut hashes = Vec::new();
-            let mut recover = BTreeSet::new();
-            let fork = blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-                for raw in txs {
-                    let hash = raw.hash();
-                    hashes.push(hash);
-                    if schema.transactions().get(&hash).is_none() {
-                        recover.insert(hash);
-                        schema.add_transaction_into_pool(raw.clone());
-                    }
-                }
+
+        let mut hashes = vec![];
+        let mut recover = BTreeSet::new();
+        let fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+        for raw in txs {
+            let hash = raw.object_hash();
+            hashes.push(hash);
+            if schema.transactions().get(&hash).is_none() {
+                recover.insert(hash);
+                schema.add_transaction_into_pool(raw.clone());
             }
+        }
+        blockchain.merge(fork.into_patch()).unwrap();
 
-            (hashes, recover, fork.into_patch())
-        };
-        blockchain.merge(patch).unwrap();
+        let mut fork_with_new_block = blockchain.fork();
+        let (_, patch) =
+            blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
+        fork_with_new_block.merge(patch);
 
-        let fork = {
-            let mut fork = blockchain.fork();
-            let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
-            fork.merge(patch);
-            fork
-        };
-        let patch = {
-            let fork = blockchain.fork();
-            {
-                let mut schema = Schema::new(&fork);
-                for hash in recover {
-                    schema.reject_transaction(&hash).unwrap();
-                }
-            }
-            fork.into_patch()
-        };
-
-        blockchain.merge(patch).unwrap();
-        *Schema::new(&fork).last_block().state_hash()
+        let fork = blockchain.fork();
+        let mut schema = Schema::new(&fork);
+        for hash in recover {
+            schema.reject_transaction(&hash).unwrap();
+        }
+        blockchain.merge(fork.into_patch()).unwrap();
+        *Schema::new(&fork_with_new_block).last_block().state_hash()
     }
 
-    pub fn get_proof_to_service_table(
+    pub fn get_proof_to_index(
         &self,
-        service_id: u16,
-        table_idx: usize,
-    ) -> MapProof<Hash, Hash> {
-        let snapshot = self.blockchain_ref().snapshot();
+        origin: SchemaOrigin,
+        id: u16,
+    ) -> MapProof<IndexCoordinates, Hash> {
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.get_proof_to_service_table(service_id, table_idx)
+        schema
+            .state_hash_aggregator()
+            .get_proof(IndexCoordinates::new(origin, id))
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().object_hash()
+        schema.consensus_config().object_hash()
     }
 
-    pub fn cfg(&self) -> StoredConfiguration {
-        let snapshot = self.blockchain_ref().snapshot();
+    pub fn cfg(&self) -> ConsensusConfig {
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.actual_configuration()
+        schema.consensus_config()
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
@@ -749,13 +780,11 @@ impl Sandbox {
     }
 
     pub fn first_round_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.first_round_timeout
+        self.cfg().first_round_timeout
     }
 
     pub fn round_timeout_increase(&self) -> Milliseconds {
-        (self.cfg().consensus.first_round_timeout
-            * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT)
-            / 100
+        (self.cfg().first_round_timeout * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT) / 100
     }
 
     pub fn current_round_timeout(&self) -> Milliseconds {
@@ -763,9 +792,8 @@ impl Sandbox {
         self.first_round_timeout() + previous_round * self.round_timeout_increase()
     }
 
-    #[allow(clippy::let_and_return)]
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         let idx = schema.transactions_pool();
 
@@ -779,7 +807,7 @@ impl Sandbox {
     }
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
-        let snapshot = self.blockchain_ref().snapshot();
+        let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema.block_and_precommits(height)
     }
@@ -802,7 +830,7 @@ impl Sandbox {
     }
 
     pub fn assert_pool_len(&self, expected: u64) {
-        let view = self.blockchain_ref().snapshot();
+        let view = self.blockchain().snapshot();
         let schema = Schema::new(&view);
         assert_eq!(expected, schema.transactions_pool_len());
     }
@@ -830,9 +858,9 @@ impl Sandbox {
         let connect = self.connect().map(|c| {
             self.create_connect(
                 &c.author(),
-                c.pub_addr().parse().expect("Expected resolved address"),
+                c.payload().host.parse().expect("Expected resolved address"),
                 time.into(),
-                c.user_agent(),
+                c.payload().user_agent(),
                 self.secret_key(ValidatorId(0)),
             )
         });
@@ -860,36 +888,36 @@ impl Sandbox {
         let address: SocketAddr = self
             .address(ValidatorId(0))
             .parse()
-            .expect("Fail to parse socket address");
-        let inner = self.inner.borrow();
-
-        let blockchain = inner
-            .handler
-            .blockchain
-            .clone_with_api_sender(ApiSender::new(api_channel.0.clone()));
+            .expect("Failed to parse socket address");
+        let inner = self.inner.into_inner();
 
         let node_sender = NodeSender {
             network_requests: network_channel.0.clone().wait(),
             internal_requests: internal_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
-
         let connect_list = ConnectList::from_peers(inner.handler.state.peers());
+
+        let keys = Keys::from_keys(
+            inner.handler.state.consensus_public_key(),
+            inner.handler.state.consensus_secret_key().clone(),
+            inner.handler.state.service_public_key(),
+            inner.handler.state.service_secret_key().clone(),
+        );
 
         let config = Configuration {
             listener: ListenerConfig {
                 address,
-                consensus_public_key: *inner.handler.state.consensus_public_key(),
-                consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
                 connect_list,
             },
             service: ServiceConfig {
-                service_public_key: *inner.handler.state.service_public_key(),
+                service_public_key: inner.handler.state.service_public_key(),
                 service_secret_key: inner.handler.state.service_secret_key().clone(),
             },
             network: NetworkConfiguration::default(),
             peer_discovery: Vec::new(),
             mempool: Default::default(),
+            keys,
         };
 
         let system_state = SandboxSystemStateProvider {
@@ -897,6 +925,8 @@ impl Sandbox {
             shared_time: SharedTime::new(Mutex::new(time)),
         };
 
+        let mut blockchain = inner.handler.blockchain;
+        blockchain.inner().api_sender = ApiSender::new(api_channel.0.clone());
         let mut handler = NodeHandler::new(
             blockchain,
             &address.to_string(),
@@ -909,7 +939,7 @@ impl Sandbox {
         handler.initialize();
 
         let inner = SandboxInner {
-            sent: VecDeque::new(),
+            sent: GuardedQueue::default(),
             events: VecDeque::new(),
             timers: BinaryHeap::new(),
             internal_requests_rx: internal_channel.1,
@@ -920,9 +950,9 @@ impl Sandbox {
         };
         let sandbox = Sandbox {
             inner: RefCell::new(inner),
-            validators_map: self.validators_map.clone(),
-            services_map: self.services_map.clone(),
-            addresses: self.addresses.clone(),
+            validators_map: self.validators_map,
+            services_map: self.services_map,
+            addresses: self.addresses,
             connect: None,
         };
         sandbox.process_events();
@@ -930,7 +960,7 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        *self.node_state().consensus_public_key()
+        self.node_state().consensus_public_key()
     }
 
     fn node_secret_key(&self) -> SecretKey {
@@ -958,16 +988,8 @@ impl Sandbox {
             });
     }
 
-    fn update_config(&self, config: StoredConfiguration) {
+    fn update_config(&self, config: ConsensusConfig) {
         self.inner.borrow_mut().handler.state.update_config(config);
-    }
-}
-
-impl Drop for Sandbox {
-    fn drop(&mut self) {
-        if !::std::thread::panicking() {
-            self.check_unexpected_message();
-        }
     }
 }
 
@@ -975,10 +997,10 @@ impl ConnectList {
     /// Helper method to populate ConnectList after sandbox node restarts and
     /// we have access only to peers stored in `node::state`.
     #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Signed<Connect>>) -> Self {
+    pub fn from_peers(peers: &HashMap<PublicKey, Verified<Connect>>) -> Self {
         let peers: BTreeMap<PublicKey, PeerAddress> = peers
             .iter()
-            .map(|(p, c)| (*p, PeerAddress::new(c.pub_addr().to_owned())))
+            .map(|(p, c)| (*p, PeerAddress::new(c.payload().host.clone())))
             .collect();
         ConnectList { peers }
     }
@@ -986,7 +1008,7 @@ impl ConnectList {
 
 pub struct SandboxBuilder {
     initialize: bool,
-    services: Vec<Box<dyn Service>>,
+    services: Vec<InstanceCollection>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
 }
@@ -1006,6 +1028,7 @@ impl SandboxBuilder {
                 min_propose_timeout: PROPOSE_TIMEOUT,
                 max_propose_timeout: PROPOSE_TIMEOUT,
                 propose_timeout_threshold: std::u32::MAX,
+                validator_keys: Vec::default(),
             },
         }
     }
@@ -1015,7 +1038,7 @@ impl SandboxBuilder {
         self
     }
 
-    pub fn with_services(mut self, services: Vec<Box<dyn Service>>) -> Self {
+    pub fn with_services(mut self, services: Vec<InstanceCollection>) -> Self {
         self.services = services;
         self
     }
@@ -1031,10 +1054,6 @@ impl SandboxBuilder {
     }
 
     pub fn build(self) -> Sandbox {
-        let _ = env_logger::Builder::from_default_env()
-            .target(env_logger::Target::Stdout)
-            .try_init();
-
         let mut sandbox = sandbox_with_services_uninitialized(
             self.services,
             self.consensus_config,
@@ -1046,8 +1065,24 @@ impl SandboxBuilder {
             let time = sandbox.time();
             sandbox.initialize(time, 1, self.validators_count as usize);
         }
-
         sandbox
+    }
+}
+
+impl Schema<&Fork> {
+    /// Removes transaction from the persistent pool.
+    fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
+        let contains = self.transactions_pool().contains(hash);
+        self.transactions_pool().remove(hash);
+        self.transactions().remove(hash);
+
+        if contains {
+            let x = self.transactions_pool_len_index().get().unwrap();
+            self.transactions_pool_len_index().set(x - 1);
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
 
@@ -1058,16 +1093,28 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 
 /// Constructs an uninitialized instance of a `Sandbox`.
 fn sandbox_with_services_uninitialized(
-    services: Vec<Box<dyn Service>>,
+    services: Vec<InstanceCollection>,
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
-    let validators = (0..validators_count)
-        .map(|i| gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])))
+    let keys: (Vec<_>) = (0..validators_count)
+        .map(|i| {
+            (
+                gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
+                gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
+            )
+        })
+        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .collect();
+
+    let validators = keys
+        .iter()
+        .map(|keys| (keys.consensus_pk(), keys.consensus_sk().clone()))
         .collect::<Vec<_>>();
 
-    let service_keys = (0..validators_count)
-        .map(|i| gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])))
+    let service_keys = keys
+        .iter()
+        .map(|keys| (keys.service_pk(), keys.service_sk().clone()))
         .collect::<Vec<_>>();
 
     let addresses = (1..=validators_count)
@@ -1076,47 +1123,44 @@ fn sandbox_with_services_uninitialized(
 
     let str_addresses: Vec<String> = addresses.iter().map(ToString::to_string).collect();
 
-    let connect_infos: Vec<_> = validators
+    let connect_infos: Vec<_> = keys
         .iter()
-        .map(|(p, _)| p)
         .zip(str_addresses.iter())
-        .map(|(p, a)| ConnectInfo {
+        .map(|(keys, a)| ConnectInfo {
             address: a.clone(),
-            public_key: *p,
+            public_key: keys.consensus_pk(),
         })
         .collect();
 
-    let api_channel = mpsc::channel(100);
-    let db = TemporaryDB::new();
-    let mut blockchain = Blockchain::new(
-        db,
-        services,
-        service_keys[0].0,
-        service_keys[0].1.clone(),
-        ApiSender::new(api_channel.0.clone()),
-    );
-
-    let genesis = GenesisConfig::new_with_consensus(
-        consensus,
-        validators
+    let genesis = ConsensusConfig {
+        validator_keys: keys
             .iter()
-            .zip(service_keys.iter())
-            .map(|x| ValidatorKeys {
-                consensus_key: (x.0).0,
-                service_key: (x.1).0,
-            }),
-    );
+            .map(|keys| ValidatorKeys {
+                consensus_key: keys.consensus_pk(),
+                service_key: keys.service_pk(),
+            })
+            .collect(),
+        ..consensus
+    };
 
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    blockchain.initialize(genesis).unwrap();
+    let api_channel = mpsc::channel(100);
+    let blockchain = Blockchain::new(
+        TemporaryDB::new(),
+        service_keys[0].clone(),
+        ApiSender(api_channel.0.clone()),
+    );
+    let blockchain = blockchain
+        .into_mut(genesis)
+        .with_rust_runtime(mpsc::channel(1).0, services)
+        .build()
+        .unwrap();
 
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
-            consensus_public_key: validators[0].0,
-            consensus_secret_key: validators[0].1.clone(),
             connect_list: ConnectList::from_config(connect_list_config),
         },
         service: ServiceConfig {
@@ -1126,6 +1170,7 @@ fn sandbox_with_services_uninitialized(
         network: NetworkConfiguration::default(),
         peer_discovery: Vec::new(),
         mempool: Default::default(),
+        keys: keys[0].clone(),
     };
 
     let system_state = SandboxSystemStateProvider {
@@ -1143,20 +1188,21 @@ fn sandbox_with_services_uninitialized(
         internal_requests: internal_channel.0.clone().wait(),
         api_requests: api_channel.0.clone().wait(),
     };
+    let api_state = SharedNodeState::new(5000);
 
     let mut handler = NodeHandler::new(
-        blockchain.clone(),
+        blockchain,
         &str_addresses[0],
         node_sender,
         Box::new(system_state),
         config.clone(),
-        SharedNodeState::new(5000),
+        api_state,
         None,
     );
     handler.initialize();
 
     let inner = SandboxInner {
-        sent: VecDeque::new(),
+        sent: GuardedQueue::default(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
         network_requests_rx: network_channel.1,
@@ -1185,79 +1231,101 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new().with_services(vec![
-        Box::new(TimestampingService::new()),
-        Box::new(ConfigUpdateService::new()),
+        InstanceCollection::new(TimestampingService).with_instance(
+            TimestampingService::ID,
+            "timestamping",
+            (),
+        ),
+        InstanceCollection::new(ConfigUpdaterService).with_instance(
+            ConfigUpdaterService::ID,
+            "config-updater",
+            (),
+        ),
     ])
 }
 
 pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
 where
-    I: IntoIterator<Item = &'a Signed<RawTransaction>>,
+    I: IntoIterator<Item = &'a Verified<AnyTx>>,
 {
-    let txs = txs.into_iter().map(Signed::hash).collect::<Vec<Hash>>();
+    let txs = txs
+        .into_iter()
+        .map(Verified::object_hash)
+        .collect::<Vec<Hash>>();
     HashTag::hash_list(&txs)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::blockchain::{ExecutionResult, ServiceContext, TransactionContext, TransactionSet};
-    use crate::crypto::{gen_keypair_from_seed, Seed};
-    use crate::messages::RawTransaction;
-    use crate::proto::schema::tests::TxAfterCommit;
-    use crate::sandbox::sandbox_tests_helper::{add_one_height, SandboxState};
     use exonum_merkledb::{BinaryValue, Snapshot};
 
-    const SERVICE_ID: u16 = 1;
+    use crate::{
+        blockchain::ExecutionError,
+        crypto::{gen_keypair_from_seed, Hash, Seed},
+        proto::schema::tests::TxAfterCommit,
+        runtime::{
+            rust::{AfterCommitContext, CallContext, Service, Transaction},
+            AnyTx, BlockchainData, InstanceId,
+        },
+        sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
+    };
 
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    #[exonum(crate = "crate")]
-    enum HandleCommitTransactions {
-        TxAfterCommit(TxAfterCommit),
+    use super::*;
+
+    #[exonum_interface(crate = "crate")]
+    pub trait AfterCommitInterface {
+        fn after_commit(
+            &self,
+            context: CallContext<'_>,
+            arg: TxAfterCommit,
+        ) -> Result<(), ExecutionError>;
     }
 
-    impl TxAfterCommit {
-        pub fn new_with_height(height: Height) -> Signed<RawTransaction> {
-            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            let mut payload_tx = TxAfterCommit::new();
-            payload_tx.set_height(height.0);
-            Message::sign_transaction(payload_tx, SERVICE_ID, keypair.0, &keypair.1)
-        }
-    }
+    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+    #[service_dispatcher(crate = "crate", implements("AfterCommitInterface"))]
+    #[service_factory(
+        crate = "crate",
+        artifact_name = "after_commit",
+        artifact_version = "0.1.0",
+        proto_sources = "crate::proto::schema"
+    )]
+    pub struct AfterCommitService;
 
-    impl_binary_value_for_pb_message! { TxAfterCommit }
-
-    impl Transaction for TxAfterCommit {
-        fn execute(&self, _: TransactionContext) -> ExecutionResult {
+    impl AfterCommitInterface for AfterCommitService {
+        fn after_commit(
+            &self,
+            _context: CallContext<'_>,
+            _arg: TxAfterCommit,
+        ) -> Result<(), ExecutionError> {
             Ok(())
         }
     }
 
-    struct AfterCommitService;
-
     impl Service for AfterCommitService {
-        fn service_id(&self) -> u16 {
-            SERVICE_ID
+        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+            vec![]
         }
 
-        fn service_name(&self) -> &str {
-            "after_commit"
-        }
-
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            Vec::new()
-        }
-
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-            let tx = HandleCommitTransactions::tx_from_raw(raw)?;
-            Ok(tx.into())
-        }
-
-        fn after_commit(&self, context: &ServiceContext) {
+        fn after_commit(&self, context: AfterCommitContext<'_>) {
             let tx = TxAfterCommit::new_with_height(context.height());
             context.broadcast_signed_transaction(tx);
         }
     }
+
+    impl AfterCommitService {
+        pub const ID: InstanceId = 2;
+    }
+
+    impl TxAfterCommit {
+        pub fn new_with_height(height: Height) -> Verified<AnyTx> {
+            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
+            let mut payload_tx = TxAfterCommit::new();
+            payload_tx.set_height(height.0);
+            payload_tx.sign(AfterCommitService::ID, keypair.0, &keypair.1)
+        }
+    }
+
+    impl_binary_value_for_pb_message! { TxAfterCommit }
 
     #[test]
     fn test_sandbox_init() {
@@ -1270,11 +1338,11 @@ mod tests {
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
-        let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
+        let consensus = gen_keypair();
+        let service = gen_keypair();
         let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key: service,
+            consensus_key: consensus.0,
+            service_key: service.0,
         };
 
         let new_peer_addr = gen_primitive_socket_addr(2);
@@ -1283,14 +1351,14 @@ mod tests {
         s.add_peer_to_connect_list(new_peer_addr, validator_keys);
 
         s.recv(&s.create_connect(
-            &public,
+            &consensus.0,
             new_peer_addr.to_string(),
             s.time().into(),
             &user_agent::get(),
-            &secret,
+            &consensus.1,
         ));
         s.send(
-            public,
+            consensus.0,
             &s.create_connect(
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
@@ -1333,10 +1401,10 @@ mod tests {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
+        let (service_key, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
-            service_key: service,
+            service_key,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1359,15 +1427,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
+        let (service_key, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
-            service_key: service,
+            service_key,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1380,15 +1448,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
+        let (service_key, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
-            service_key: service,
+            service_key,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1409,15 +1477,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Send unexpected message")]
+    #[should_panic(expected = "Sent unexpected message")]
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
-        let (service, _) = gen_keypair();
+        let (service_key, _) = gen_keypair();
         let validator_keys = ValidatorKeys {
             consensus_key: public,
-            service_key: service,
+            service_key,
         };
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
@@ -1431,12 +1499,21 @@ mod tests {
         panic!("Oops! We don't catch unexpected message");
     }
 
+    // TODO move to testkit [ECR-3251]
     #[test]
     fn test_sandbox_service_after_commit() {
         let sandbox = SandboxBuilder::new()
             .with_services(vec![
-                Box::new(AfterCommitService),
-                Box::new(TimestampingService::new()),
+                InstanceCollection::new(TimestampingService).with_instance(
+                    TimestampingService::ID,
+                    "timestamping",
+                    (),
+                ),
+                InstanceCollection::new(AfterCommitService).with_instance(
+                    AfterCommitService::ID,
+                    "after-commit",
+                    (),
+                ),
             ])
             .build();
         let state = SandboxState::new();

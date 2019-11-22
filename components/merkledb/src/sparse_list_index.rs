@@ -17,20 +17,17 @@
 //! The given section contains methods related to `SparseListIndex` and iterators
 //! over the items of this index.
 
-use std::{
-    io::{Error, Read, Write},
-    marker::PhantomData,
-};
+use std::{io::Error, marker::PhantomData};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::views::IndexAddress;
 use crate::{
+    access::{Access, AccessError, FromAccess},
     views::{
-        AnyObject, BinaryAttribute, IndexAccess, IndexBuilder, IndexState, IndexType,
-        Iter as ViewIter, View,
+        BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
+        RawAccessMut, View, ViewWithMetadata,
     },
-    BinaryKey, BinaryValue,
+    BinaryValue,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -46,12 +43,12 @@ impl BinaryAttribute for SparseListSize {
         16
     }
 
-    fn write<W: Write>(&self, buffer: &mut W) {
+    fn write(&self, buffer: &mut Vec<u8>) {
         buffer.write_u64::<LittleEndian>(self.capacity).unwrap();
         buffer.write_u64::<LittleEndian>(self.length).unwrap();
     }
 
-    fn read<R: Read>(buffer: &mut R) -> Result<Self, Error> {
+    fn read(mut buffer: &[u8]) -> Result<Self, Error> {
         Ok(Self {
             capacity: buffer.read_u64::<LittleEndian>()?,
             length: buffer.read_u64::<LittleEndian>()?,
@@ -78,7 +75,7 @@ impl BinaryAttribute for SparseListSize {
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
-pub struct SparseListIndex<T: IndexAccess, V> {
+pub struct SparseListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, SparseListSize>,
     _v: PhantomData<V>,
@@ -120,121 +117,24 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
-impl<T, V> AnyObject<T> for SparseListIndex<T, V>
+impl<T, V> FromAccess<T> for SparseListIndex<T::Base, V>
 where
-    T: IndexAccess,
+    T: Access,
     V: BinaryValue,
 {
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::SparseList
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::SparseList)?;
+        Ok(Self::new(view))
     }
 }
 
 impl<T, V> SparseListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::SparseList)
-            .index_name(index_name)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index_id = vec![123];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::new_in_family(
-    ///     name,
-    ///     &index_id,
-    ///     &snapshot,
-    ///  );
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey,
-        I: ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::SparseList)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _v: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::SparseList)
-            .build_existed()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _v: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::SparseList)
-            .build();
-
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let (base, state) = view.into_parts();
         Self {
             base,
             state,
@@ -243,7 +143,7 @@ where
     }
 
     fn size(&self) -> SparseListSize {
-        self.state.get()
+        self.state.get().unwrap_or_default()
     }
 
     /// Returns an element at the indicated position or `None` if the indicated
@@ -252,11 +152,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -275,11 +175,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -295,11 +195,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
@@ -320,11 +220,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -344,11 +244,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -356,7 +256,7 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> SparseListIndexIter<V> {
+    pub fn iter(&self) -> SparseListIndexIter<'_, V> {
         SparseListIndexIter {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
@@ -367,11 +267,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -379,7 +279,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn indices(&self) -> SparseListIndexKeys {
+    pub fn indices(&self) -> SparseListIndexKeys<'_> {
         SparseListIndexKeys {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
@@ -391,11 +291,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -403,7 +303,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> SparseListIndexValues<V> {
+    pub fn values(&self) -> SparseListIndexValues<'_, V> {
         SparseListIndexValues {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
@@ -415,11 +315,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// index.remove(3);
@@ -428,22 +328,28 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> SparseListIndexIter<V> {
+    pub fn iter_from(&self, from: u64) -> SparseListIndexIter<'_, V> {
         SparseListIndexIter {
             base_iter: self.base.iter_from(&(), &from),
         }
     }
+}
 
+impl<T, V> SparseListIndex<T, V>
+where
+    T: RawAccessMut,
+    V: BinaryValue,
+{
     /// Appends an element to the back of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -462,11 +368,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
@@ -476,7 +382,6 @@ where
     /// assert_eq!(None, index.remove(0));
     /// assert_eq!(2, index.capacity());
     /// assert_eq!(1, index.len());
-
     /// assert_eq!(Some(12), index.remove(1));
     /// assert_eq!(2, index.capacity());
     /// ```
@@ -499,11 +404,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -532,11 +437,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -571,11 +476,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -584,8 +489,8 @@ where
     /// assert!(index.is_empty());
     /// ```
     pub fn clear(&mut self) {
-        self.state.set(SparseListSize::default());
-        self.base.clear()
+        self.base.clear();
+        self.state.unset();
     }
 
     /// Removes the first element from the 'SparseListIndex' and returns it, or
@@ -594,11 +499,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new("name", &fork);
+    /// let mut index = fork.get_sparse_list("name");
     /// assert_eq!(None, index.pop());
     ///
     /// index.push(1);
@@ -622,9 +527,9 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
+impl<'a, T, V> std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
-    T: IndexAccess,
+    T: RawAccess,
     V: BinaryValue,
 {
     type Item = (u64, V);
@@ -667,8 +572,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::SparseListIndex;
-    use crate::{db::Database, TemporaryDB};
+    use crate::{access::AccessExt, db::Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 
@@ -677,7 +581,7 @@ mod tests {
     fn test_list_index_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.get_sparse_list(IDX_NAME);
 
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.capacity());
@@ -747,7 +651,7 @@ mod tests {
     fn test_list_index_iter() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut list_index = SparseListIndex::new(IDX_NAME, &fork);
+        let mut list_index = fork.get_sparse_list(IDX_NAME);
 
         list_index.extend(vec![1_u8, 15, 25, 2, 3]);
         assert_eq!(
@@ -785,5 +689,14 @@ mod tests {
             vec![0_u64, 3, 4]
         );
         assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1_u8, 2, 3]);
+    }
+
+    #[test]
+    fn restore_after_no_op_initialization() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_sparse_list::<_, u32>(IDX_NAME);
+        let list = fork.readonly().get_sparse_list::<_, u32>(IDX_NAME);
+        assert!(list.is_empty());
     }
 }

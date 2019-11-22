@@ -12,246 +12,189 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![recursion_limit = "256"]
+//! This crate provides macros for deriving some useful methods and traits for the exonum services.
+
+#![recursion_limit = "128"]
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 extern crate proc_macro;
 
-mod pb_convert;
-mod tx_set;
+mod db_traits;
+mod execution_error;
+mod exonum_interface;
+mod service_dispatcher;
+mod service_factory;
 
+use darling::FromMeta;
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{Attribute, Meta, MetaList, MetaNameValue, NestedMeta};
+use quote::ToTokens;
+use syn::{Attribute, NestedMeta};
 
-// Exonum derive attribute names, used as
-// `#[exonum( [ ATTRIBUTE_NAME = ATTRIBUTE_VALUE or ATTRIBUTE_NAME ],* )]`
-const CRATE_PATH_ATTRIBUTE: &str = "crate";
-const PB_CONVERT_ATTRIBUTE: &str = "pb";
-const SERDE_PB_CONVERT_ATTRIBUTE: &str = "serde_pb_convert";
-
-/// Derives `ProtobufConvert` trait.
+/// Derive `BinaryValue` trait.
+/// Target type must implement `ProtobufConvert` trait.
 ///
-/// Attributes:
-///
-/// * `#[exonum( pb = "path" )]`
-/// Required. `path` is the name of the corresponding protobuf generated struct.
-///
-/// * `#[exonum( crate = "path" )]`
-/// Optional. `path` is prefix of the `exonum` crate(usually "crate" or "exonum").
-///
-/// * `#[exonum( serde_pb_convert )]`
-/// Optional. Implements `serde::{Serialize, Deserialize}` using structs that were generated with
-/// protobuf.
-/// For example, it should be used if you want json representation of your struct
-/// to be compatible with protobuf representation (including proper nesting of fields).
-/// ```text
-/// // For example, struct with `exonum::crypto::Hash` with this
-/// // (de)serializer will be represented as
-/// StructName {
-///     "hash": {
-///         data: [1, 2, ...]
-///     },
-///     // ...
+/// # Example
+/// ```ignore
+/// #[derive(Clone, Debug, BinaryValue)]
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
 /// }
 ///
-/// // With default (de)serializer.
-/// StructName {
-///     "hash": "12af..." // HEX
-///     // ...
-/// }
+/// let wallet = Wallet::new();
+/// let bytes = wallet.to_bytes();
 /// ```
-#[proc_macro_derive(ProtobufConvert, attributes(exonum))]
-pub fn generate_protobuf_convert(input: TokenStream) -> TokenStream {
-    pb_convert::implement_protobuf_convert(input)
+#[proc_macro_derive(BinaryValue)]
+pub fn binary_value(input: TokenStream) -> TokenStream {
+    db_traits::impl_binary_value(input)
 }
 
-/// Derives `TransactionSet` trait for an enum. The enum should have transactions as variants.
+/// Derive `ObjectHash` trait.
+/// Target type must implement `BinaryValue` trait.
 ///
-/// Also implements:
-///
-/// - Conversion from variant types into this enum.
-/// - Conversion from this enum into `ServiceTransaction`.
-/// - Conversion from variants into `ServiceTransaction` (opt-out; see [Attributes](#attributes)).
-/// - Conversion from this enum into `Box<dyn Transaction>`.
-///
-/// # Attributes
-///
-/// ## Crate specification
-///
-/// ```text
-/// #[exonum(crate = "path")]
-/// ```
-///
-/// Optional. `path` is a prefix of types from the `exonum` crate (usually `"crate"`
-/// or `"exonum"`).
-///
-/// ## Conversions for variants
-///
-/// ```text
-/// #[exonum(convert_variants = value)]
-/// ```
-///
-/// Optional. `value` is `bool` or string convertible to `bool` determining if the macro
-/// should derive conversions into `ServiceTransaction` for enum variants.
-/// Switching derivation off is useful (or even necessary)
-/// if the same variant is used in several `TransactionSet`s, or is external to the crate
-/// where `TransactionSet` is defined.
-///
-/// ## Message IDs for variants
-///
-/// ```text
-/// #[exonum(message_id = value)]
-/// ```
-///
-/// Optional; specified on variants. `value` is a `u16` value, or a string convertible to a `u16`
-/// value. Assignment of IDs acts like discriminants in Rust enums:
-///
-/// - By default, `message_id`s are assigned from zero and increase by 1 for each variant.
-/// - If a `message_id` is specified for a variant, but not specified on the following variants,
-///   the `message_id` on the following variants is produced by increasing the last explicit
-///   value.
-///
-/// # Examples
-///
-/// ```
-/// use std::borrow::Cow;
-/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
-/// # use exonum_derive::*;
-/// use serde_derive::*;
-/// # mod proto {
-/// #    pub type Issue = exonum::proto::Hash;
-/// #    pub type Transfer = exonum::proto::Hash;
-/// # }
-///
-/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "proto::Issue")]
-/// pub struct Issue { /* ... */ }
-/// impl Transaction for Issue {
-///     // ...
-/// #   fn execute(&self, context: TransactionContext) -> ExecutionResult {
-/// #       Ok(())
-/// #   }
+/// # Example
+/// ```ignore
+/// #[protobuf_convert(source = "proto::Wallet")]
+/// #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+/// pub struct Wallet {
+///     /// `PublicKey` of the wallet.
+///     pub pub_key: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
 /// }
 ///
-/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "proto::Transfer")]
-/// pub struct Transfer { /* ... */ }
-/// impl Transaction for Transfer {
-///     // ...
-/// #   fn execute(&self, context: TransactionContext) -> ExecutionResult {
-/// #         Ok(())
-/// #   }
-/// }
-///
-/// /// Transactions of some service.
-/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-/// #[exonum(convert_variants = false)]
-/// pub enum Transactions {
-///     /// Issuance transaction.
-///     Issue(Issue),
-///     /// Transfer transaction.
-///     Transfer(Transfer),
-/// }
-///
-/// /// Transactions of some other service (may be defined in other crate).
-/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-/// #[exonum(convert_variants = false)]
-/// pub enum OtherTransactions {
-///     #[exonum(message_id = 5)]
-///     Transfer(Transfer),
-///     // Other transactions...
-/// }
-/// # fn main() {}
+/// let wallet = Wallet::new();
+/// let hash = wallet.object_hash();
 /// ```
-///
-/// It is possible to box variants in order to reduce their stack size:
-///
-/// ```
-/// use std::borrow::Cow;
-/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
-/// # use exonum_derive::*;
-/// use serde_derive::*;
-/// # mod proto {
-/// #    pub type Issue = exonum::proto::Hash;
-/// #    pub type Transfer = exonum::proto::Hash;
-/// # }
-///
-/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[exonum(pb = "proto::Issue")]
-/// pub struct Issue { /* a lot of fields */ }
-/// # impl Transaction for Issue {
-/// #   fn execute(&self, context: TransactionContext) -> ExecutionResult {
-/// #         Ok(())
-/// #   }
-/// # }
-///
-/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-/// pub enum Transactions {
-///     Issue(Box<Issue>),
-///     // other variants...
-/// }
-///
-/// # fn main () {
-/// let tx: Transactions = Issue { /* ... */ }.into();
-/// # }
-/// ```
-#[proc_macro_derive(TransactionSet, attributes(exonum))]
-pub fn transaction_set_derive(input: TokenStream) -> TokenStream {
-    tx_set::implement_transaction_set(input)
+#[proc_macro_derive(ObjectHash)]
+pub fn object_hash(input: TokenStream) -> TokenStream {
+    db_traits::impl_object_hash(input)
 }
 
-/// Exonum types should be imported with `crate::` prefix if inside crate
-/// or with `exonum::` when outside.
-fn get_exonum_types_prefix(attrs: &[Attribute]) -> impl quote::ToTokens {
-    let map_attrs = get_exonum_name_value_attributes(attrs);
-    let crate_path = map_attrs.into_iter().find_map(|nv| {
-        if nv.path.is_ident(CRATE_PATH_ATTRIBUTE) {
-            Some(nv.path)
-        } else {
-            None
-        }
-    });
-
-    if let Some(path) = crate_path {
-        quote!(#path)
-    } else {
-        quote!(exonum)
-    }
+/// Derive `ServiceDispatcher` trait.
+///
+/// # Attributes:
+///
+/// ## Required
+///
+/// * `#[service_dispatcher(implements(""path_1", "path_2""))]`
+///
+/// Path list to the interfaces which have been implemented by the service.
+///
+/// ## Optional
+///
+/// * `#[service_dispatcher(crate = "path")]`
+///
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
+#[proc_macro_derive(ServiceDispatcher, attributes(service_dispatcher))]
+pub fn service_dispatcher(input: TokenStream) -> TokenStream {
+    service_dispatcher::impl_service_dispatcher(input)
 }
 
-/// Extract attributes in the form of `#[exonum(name = "value")]`
-fn get_exonum_attributes(attrs: &[Attribute]) -> Vec<Meta> {
-    let exonum_meta = attrs.iter().find_map(|attr| {
-        attr.parse_meta()
-            .ok()
-            .filter(|m| m.path().is_ident("exonum"))
-    });
-
-    match exonum_meta {
-        Some(Meta::List(MetaList { nested: list, .. })) => list
-            .into_iter()
-            .filter_map(|n| match n {
-                NestedMeta::Meta(meta) => Some(meta),
-                _ => None,
-            })
-            .collect(),
-        Some(_) => panic!("`exonum` attribute should contain list of name value pairs"),
-        None => vec![],
-    }
+/// Derive `ServiceFactory` and `ServiceDispatcher` traits.
+///
+/// # Attributes:
+///
+/// ## Required
+///
+/// * `#[service_factory(proto_sources = "path")]`
+///
+/// Path to the module that was generated by the `exonum_build::protobuf_generate`
+/// and contains the original Protobuf source files of the service.
+///
+/// * `#[service_factory(implements("path_1", "path_2"))]`
+///
+/// Path list to the interfaces which have been implemented by the service.
+///
+/// ## Optional
+///
+/// * `#[service_factory(crate = "path")]`
+///
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
+///
+/// * `#[service_factory(artifact_name = "string")]`
+///
+/// Override artifact name, by default it uses crate name.
+///
+/// * `#[service_factory(artifact_version = "string")]`
+///
+/// Override artifact version, by default it uses crate version.
+///
+/// * `#[service_factory(with_constructor = "path")]`
+///
+/// Override service constructor by the custom function with the following signature:
+///
+/// `Fn(&ServiceFactoryImpl) -> Box<dyn Service>`.
+///
+/// * `#[service_factory(service_name = "string")]`
+///
+/// Use the specified service name for the ServiceDispatcher derivation instead of the struct name.
+#[proc_macro_derive(ServiceFactory, attributes(service_factory))]
+pub fn service_factory(input: TokenStream) -> TokenStream {
+    service_factory::impl_service_factory(input)
 }
 
-fn get_exonum_name_value_attributes(attrs: &[Attribute]) -> Vec<MetaNameValue> {
-    get_exonum_attributes(attrs)
-        .into_iter()
-        .filter_map(|meta| match meta {
-            Meta::NameValue(name_value) => Some(name_value),
-            _ => None,
-        })
-        .collect()
+/// Derives an Exonum service interface for the specified trait.
+///
+/// See the documentation of the Exonum crate for more information.
+///
+/// # Attributes:
+///
+/// ## Optional
+///
+/// * `#[exonum_interface(crate = "path")]`
+///
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
+#[proc_macro_attribute]
+pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
+    exonum_interface::impl_exonum_interface(attr, item)
 }
 
-fn find_exonum_word_attribute(attrs: &[Attribute], ident_name: &str) -> bool {
-    get_exonum_attributes(attrs)
+/// Implements `From<MyError> for ExecutionError` conversion for the given enum.
+///
+/// Enumeration should have an explicit discriminant for each error kind.
+/// Derives `Display` and `Fail` traits using documentation comments for each error kind.
+///
+/// # Attributes:
+///
+/// ## Optional
+///
+/// * `#[execution_error(crate = "path")]`
+///
+/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
+///
+/// * `#[execution_error(kind = "runtime")]`
+///
+/// Error kind has the following values - `service`, `runtime`. The default value is `service`.
+#[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
+pub fn into_execution_error(input: TokenStream) -> TokenStream {
+    execution_error::impl_execution_error(input)
+}
+
+pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMeta> {
+    args.as_ref()
         .iter()
-        .any(|meta| meta.path().is_ident(ident_name))
+        .filter_map(|a| a.parse_meta().ok())
+        .find(|m| m.path().is_ident(name))
+        .map(NestedMeta::from)
+}
+
+#[derive(Debug, FromMeta, PartialEq, Eq)]
+#[darling(default)]
+struct CratePath(syn::Path);
+
+impl Default for CratePath {
+    fn default() -> Self {
+        Self(syn::parse_str("exonum").unwrap())
+    }
+}
+
+impl ToTokens for CratePath {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.0.to_tokens(tokens)
+    }
 }

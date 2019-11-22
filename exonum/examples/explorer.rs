@@ -20,14 +20,20 @@ extern crate exonum_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::{Blockchain, Schema, Transaction, TransactionError},
+    blockchain::BlockchainMut,
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
-    messages::{Message, RawTransaction, Signed},
+    messages::{AnyTx, Verified},
+    runtime::rust::Transaction as _,
 };
+use exonum_merkledb::ObjectHash;
+
+use std::iter;
 
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
@@ -37,16 +43,11 @@ use crate::blockchain::{
 mod blockchain;
 
 /// Creates a transaction for the mempool.
-pub fn mempool_transaction() -> Signed<RawTransaction> {
+pub fn mempool_transaction() -> Verified<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    Message::sign_transaction(
-        CreateWallet::new(&pk_alex, "Alex"),
-        SERVICE_ID,
-        pk_alex,
-        &key_alex,
-    )
+    CreateWallet::new(&pk_alex, "Alex").sign(SERVICE_ID, pk_alex, &key_alex)
 }
 
 /// Creates a sample blockchain for the example.
@@ -58,47 +59,27 @@ pub fn mempool_transaction() -> Signed<RawTransaction> {
 /// - A panicking transaction
 ///
 /// Additionally, a single transaction is placed into the pool.
-pub fn sample_blockchain() -> Blockchain {
+pub fn sample_blockchain() -> BlockchainMut {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = Message::sign_transaction(
-        CreateWallet::new(&pk_alice, "Alice"),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
-    let tx_bob = Message::sign_transaction(
-        CreateWallet::new(&pk_bob, "Bob"),
-        SERVICE_ID,
-        pk_bob,
-        &key_bob,
-    );
-    let tx_transfer = Message::sign_transaction(
-        Transfer::new(&pk_alice, &pk_bob, 100),
-        SERVICE_ID,
-        pk_alice,
-        &key_alice,
-    );
 
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
+    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
-    let fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&fork);
-        schema.add_transaction_into_pool(mempool_transaction());
-    }
-    blockchain.merge(fork.into_patch()).unwrap();
-
+    blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));
     blockchain
 }
 
 fn main() {
     let blockchain = sample_blockchain();
-    let explorer = BlockchainExplorer::new(&blockchain);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(snapshot.as_ref());
 
     // `BlockInfo` usage
-    let block: BlockInfo = explorer.block(Height(1)).unwrap();
+    let block: BlockInfo<'_> = explorer.block(Height(1)).unwrap();
     assert_eq!(block.height(), Height(1));
     assert_eq!(block.len(), 3);
 
@@ -139,10 +120,10 @@ fn main() {
     assert_eq!(tx.location().position_in_block(), 0);
 
     // It is possible to access transaction content
-    let content: &dyn Transaction = tx.content().transaction().unwrap();
+    let content = tx.content();
     println!("{:?}", content);
     // ...and transaction status as well
-    let status: Result<(), &TransactionError> = tx.status();
+    let status = tx.status();
     assert!(status.is_ok());
 
     // `CommittedTransaction` JSON presentation
@@ -170,8 +151,8 @@ fn main() {
         serde_json::to_value(&erroneous_tx).unwrap(),
         json!({
             "status": {
-                "type": "error",
-                "code": 1,
+                "type": "service_error",
+                "code": 0,
                 "description": "Not allowed",
             },
             // Other fields...
@@ -197,14 +178,14 @@ fn main() {
     );
 
     // `TransactionInfo` usage
-    let hash = mempool_transaction().hash();
+    let hash = mempool_transaction().object_hash();
     let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
     assert!(tx.is_in_pool());
     println!("{:?}", tx.content());
 
     // JSON serialization for committed transactions
     let committed_tx: TransactionInfo = explorer
-        .transaction(&block[0].content().signed_message().hash())
+        .transaction(&block[0].content().object_hash())
         .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(
@@ -220,7 +201,9 @@ fn main() {
     );
 
     // JSON serialization for transactions in pool
-    let tx_in_pool: TransactionInfo = explorer.transaction(&mempool_transaction().hash()).unwrap();
+    let tx_in_pool: TransactionInfo = explorer
+        .transaction(&mempool_transaction().object_hash())
+        .unwrap();
     assert_eq!(
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({

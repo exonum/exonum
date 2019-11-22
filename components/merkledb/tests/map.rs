@@ -12,22 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cspell:ignore oneof
-
 //! Property testing for map index and proof map index as a rust collection.
-use std::{collections::HashMap, hash::Hash};
+
+// cspell:ignore oneof
 
 use modifier::Modifier;
 use proptest::{
-    collection::vec, num, prop_assert, prop_assert_eq, prop_oneof, strategy, strategy::Strategy,
-    test_runner::TestCaseResult,
+    collection::vec, num, prop_assert, prop_assert_eq, prop_oneof, proptest, strategy,
+    strategy::Strategy, test_runner::TestCaseResult,
 };
 
-use exonum_merkledb::{BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex};
+use std::{collections::HashMap, hash::Hash, rc::Rc};
 
-use crate::common::ACTIONS_MAX_LEN;
+use exonum_merkledb::{
+    access::AccessExt, BinaryValue, Fork, HashTag, MapIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+};
+
+use crate::{
+    common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN},
+    key::Key,
+};
 
 mod common;
+mod key;
 
 #[derive(Debug, Clone)]
 enum MapAction<K, V> {
@@ -37,6 +44,15 @@ enum MapAction<K, V> {
     Remove(K),
     Clear,
     MergeFork,
+}
+
+impl<K, V> PartialEq<MergeFork> for MapAction<K, V> {
+    fn eq(&self, _: &MergeFork) -> bool {
+        match self {
+            MapAction::MergeFork => true,
+            _ => false,
+        }
+    }
 }
 
 impl<K, V> Modifier<HashMap<K, V>> for MapAction<K, V>
@@ -59,104 +75,120 @@ where
     }
 }
 
-mod map_index {
-    use super::*;
-
-    impl<'a, V> Modifier<MapIndex<&'a Fork, u8, V>> for MapAction<u8, V>
-    where
-        V: BinaryValue,
-    {
-        fn modify(self, map: &mut MapIndex<&'a Fork, u8, V>) {
-            match self {
-                MapAction::Put(k, v) => {
-                    map.put(&k, v);
-                }
-                MapAction::Remove(k) => {
-                    map.remove(&k);
-                }
-                MapAction::Clear => {
-                    map.clear();
-                }
-                _ => unreachable!(),
+impl<V> Modifier<MapIndex<Rc<Fork>, u8, V>> for MapAction<u8, V>
+where
+    V: BinaryValue,
+{
+    fn modify(self, map: &mut MapIndex<Rc<Fork>, u8, V>) {
+        match self {
+            MapAction::Put(k, v) => {
+                map.put(&k, v);
             }
+            MapAction::Remove(k) => {
+                map.remove(&k);
+            }
+            MapAction::Clear => {
+                map.clear();
+            }
+            _ => unreachable!(),
         }
     }
-
-    fn compare_collections(
-        map_index: &MapIndex<&Fork, u8, i32>,
-        ref_map: &HashMap<u8, i32>,
-    ) -> TestCaseResult {
-        for k in ref_map.keys() {
-            prop_assert!(map_index.contains(k));
-        }
-        for (k, v) in map_index.iter() {
-            prop_assert_eq!(Some(&v), ref_map.get(&k));
-        }
-        Ok(())
-    }
-
-    fn generate_action() -> impl Strategy<Value = MapAction<u8, i32>> {
-        prop_oneof![
-            (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
-            num::u8::ANY.prop_map(MapAction::Remove),
-            strategy::Just(MapAction::Clear),
-            strategy::Just(MapAction::MergeFork),
-        ]
-    }
-
-    proptest_compare_collections!(proptest_compare_to_rust_map, MapIndex, HashMap, MapAction);
 }
 
-mod proof_map_index {
-    use super::*;
-
-    impl<'a, V> Modifier<ProofMapIndex<&'a Fork, [u8; 32], V>> for MapAction<[u8; 32], V>
-    where
-        V: BinaryValue + ObjectHash,
-    {
-        fn modify(self, map: &mut ProofMapIndex<&Fork, [u8; 32], V>) {
-            match self {
-                MapAction::Put(k, v) => {
-                    map.put(&k, v);
-                }
-                MapAction::Remove(k) => {
-                    map.remove(&k);
-                }
-                MapAction::Clear => {
-                    map.clear();
-                    assert_eq!(map.object_hash(), HashTag::empty_map_hash());
-                }
-                _ => unreachable!(),
+impl<V> Modifier<ProofMapIndex<Rc<Fork>, Key, V>> for MapAction<Key, V>
+where
+    V: BinaryValue + ObjectHash,
+{
+    fn modify(self, map: &mut ProofMapIndex<Rc<Fork>, Key, V>) {
+        match self {
+            MapAction::Put(k, v) => {
+                map.put(&k, v);
             }
+            MapAction::Remove(k) => {
+                map.remove(&k);
+            }
+            MapAction::Clear => {
+                map.clear();
+                assert_eq!(map.object_hash(), HashTag::empty_map_hash());
+            }
+            _ => unreachable!(),
         }
     }
+}
 
-    fn compare_collections(
-        map_index: &ProofMapIndex<&Fork, [u8; 32], i32>,
-        ref_map: &HashMap<[u8; 32], i32>,
-    ) -> TestCaseResult {
-        for k in ref_map.keys() {
-            prop_assert!(map_index.contains(k));
-        }
-        for (k, v) in map_index.iter() {
-            prop_assert_eq!(Some(&v), ref_map.get(&k));
-        }
-        Ok(())
+impl<V: BinaryValue> FromFork for MapIndex<Rc<Fork>, u8, V> {
+    fn from_fork(fork: Rc<Fork>) -> Self {
+        fork.get_map("test")
     }
 
-    fn generate_action() -> impl Strategy<Value = MapAction<[u8; 32], i32>> {
-        prop_oneof![
-            ((0..8u8), num::i32::ANY).prop_map(|(i, v)| MapAction::Put([i; 32], v)),
-            (0..8u8).prop_map(|i| MapAction::Remove([i; 32])),
-            strategy::Just(MapAction::Clear),
-            strategy::Just(MapAction::MergeFork),
-        ]
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+impl<V: BinaryValue + ObjectHash> FromFork for ProofMapIndex<Rc<Fork>, Key, V> {
+    fn from_fork(fork: Rc<Fork>) -> Self {
+        fork.get_proof_map("test")
     }
 
-    proptest_compare_collections!(
-        proptest_compare_to_rust_map,
-        ProofMapIndex,
-        HashMap,
-        MapAction
-    );
+    fn clear(&mut self) {
+        self.clear();
+    }
+}
+
+fn compare_map(map: &MapIndex<Rc<Fork>, u8, i32>, ref_map: &HashMap<u8, i32>) -> TestCaseResult {
+    for k in ref_map.keys() {
+        prop_assert!(map.contains(k));
+    }
+    for (k, v) in map.iter() {
+        prop_assert_eq!(Some(&v), ref_map.get(&k));
+    }
+    Ok(())
+}
+
+fn compare_proof_map(
+    map: &ProofMapIndex<Rc<Fork>, Key, i32>,
+    ref_map: &HashMap<Key, i32>,
+) -> TestCaseResult {
+    for k in ref_map.keys() {
+        prop_assert!(map.contains(k));
+    }
+    for (k, v) in map.iter() {
+        prop_assert_eq!(Some(&v), ref_map.get(&k));
+    }
+    Ok(())
+}
+
+fn generate_action() -> impl Strategy<Value = MapAction<u8, i32>> {
+    prop_oneof![
+        (num::u8::ANY, num::i32::ANY).prop_map(|(i, v)| MapAction::Put(i, v)),
+        num::u8::ANY.prop_map(MapAction::Remove),
+        strategy::Just(MapAction::Clear),
+        strategy::Just(MapAction::MergeFork),
+    ]
+}
+
+fn generate_proof_action() -> impl Strategy<Value = MapAction<Key, i32>> {
+    prop_oneof![
+        ((0..8u8), num::i32::ANY).prop_map(|(i, v)| MapAction::Put([i; 32].into(), v)),
+        (0..8u8).prop_map(|i| MapAction::Remove([i; 32].into())),
+        strategy::Just(MapAction::Clear),
+        strategy::Just(MapAction::MergeFork),
+    ]
+}
+
+#[test]
+fn compare_map_to_hash_map() {
+    let db = TemporaryDB::new();
+    proptest!(|(ref actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
+        compare_collections(&db, actions, compare_map)?;
+    });
+}
+
+#[test]
+fn compare_proof_map_to_hash_map() {
+    let db = TemporaryDB::new();
+    proptest!(|(ref actions in vec(generate_proof_action(), 1..ACTIONS_MAX_LEN))| {
+        compare_collections(&db, actions, compare_proof_map)?;
+    });
 }

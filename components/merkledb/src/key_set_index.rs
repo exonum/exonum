@@ -20,10 +20,12 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use crate::views::IndexAddress;
 use crate::{
-    views::{AnyObject, IndexAccess, IndexBuilder, IndexState, IndexType, Iter as ViewIter, View},
-    BinaryKey, BinaryValue,
+    access::{Access, AccessError, FromAccess},
+    views::{
+        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
+    },
+    BinaryKey,
 };
 
 /// A set of key items.
@@ -33,9 +35,8 @@ use crate::{
 ///
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 #[derive(Debug)]
-pub struct KeySetIndex<T: IndexAccess, K> {
+pub struct KeySetIndex<T: RawAccess, K> {
     base: View<T>,
-    state: IndexState<T, ()>,
     _k: PhantomData<K>,
 }
 
@@ -52,120 +53,26 @@ pub struct KeySetIndexIter<'a, K> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
-impl<T, K> AnyObject<T> for KeySetIndex<T, K>
+impl<T, K> FromAccess<T> for KeySetIndex<T::Base, K>
 where
-    T: IndexAccess,
+    T: Access,
     K: BinaryKey,
 {
-    fn view(self) -> View<T> {
-        self.base
-    }
-
-    fn object_type(&self) -> IndexType {
-        IndexType::KeySet
-    }
-
-    fn metadata(&self) -> Vec<u8> {
-        self.state.metadata().to_bytes()
+    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
+        let view = access.get_or_create_view(addr, IndexType::KeySet)?;
+        Ok(Self::new(view))
     }
 }
 
 impl<T, K> KeySetIndex<T, K>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
 {
-    /// Creates a new index representation based on the name and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
-    ///
-    /// let db = TemporaryDB::default();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
-    /// ```
-    pub fn new<S: Into<String>>(index_name: S, view: T) -> Self {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::KeySet)
-            .index_name(index_name)
-            .build::<()>();
-
+    fn new(view: ViewWithMetadata<T>) -> Self {
+        let base = view.into();
         Self {
             base,
-            state,
-            _k: PhantomData,
-        }
-    }
-
-    /// Creates a new index representation based on the name, index ID in family
-    /// and storage view.
-    ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
-    /// immutable methods are available. In the second case, both immutable and mutable methods are
-    /// available.
-    ///
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
-    ///
-    /// let db = TemporaryDB::default();
-    /// let snapshot = db.snapshot();
-    /// let name = "name";
-    /// let index_id = vec![123];
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
-    /// ```
-    pub fn new_in_family<S, I>(family_name: S, index_id: &I, view: T) -> Self
-    where
-        I: BinaryKey,
-        I: ?Sized,
-        S: Into<String>,
-    {
-        let (base, state) = IndexBuilder::new(view)
-            .index_type(IndexType::KeySet)
-            .index_name(family_name)
-            .family_id(index_id)
-            .build();
-
-        Self {
-            base,
-            state,
-            _k: PhantomData,
-        }
-    }
-
-    pub(crate) fn get_from<I: Into<IndexAddress>>(address: I, access: T) -> Option<Self> {
-        IndexBuilder::from_address(address, access)
-            .index_type(IndexType::KeySet)
-            .build_existed::<()>()
-            .map(|(base, state)| Self {
-                base,
-                state,
-                _k: PhantomData,
-            })
-    }
-
-    pub(crate) fn create_from<I: Into<IndexAddress>>(address: I, access: T) -> Self {
-        let (base, state) = IndexBuilder::from_address(address, access)
-            .index_type(IndexType::KeySet)
-            .build();
-
-        Self {
-            base,
-            state,
             _k: PhantomData,
         }
     }
@@ -175,12 +82,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.get_key_set("name");
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -199,18 +105,17 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_key_set::<_, u8>("name");
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> KeySetIndexIter<K> {
+    pub fn iter(&self) -> KeySetIndexIter<'_, K> {
         KeySetIndexIter {
             base_iter: self.base.iter(&()),
         }
@@ -222,34 +127,38 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
-    /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
+    /// let fork = db.fork();
+    /// let index = fork.get_key_set::<_, u8>("name");
     ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
+    pub fn iter_from(&self, from: &K) -> KeySetIndexIter<'_, K> {
         KeySetIndexIter {
             base_iter: self.base.iter_from(&(), from),
         }
     }
+}
 
+impl<T, K> KeySetIndex<T, K>
+where
+    T: RawAccessMut,
+    K: BinaryKey,
+{
     /// Adds a key to the set.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -264,12 +173,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -295,12 +203,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
-    /// let name = "name";
     /// let fork = db.fork();
-    /// let mut index = KeySetIndex::new(name, &fork);
+    /// let mut index = fork.get_key_set("name");
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -313,9 +220,9 @@ where
     }
 }
 
-impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
+impl<'a, T, K> std::iter::IntoIterator for &'a KeySetIndex<T, K>
 where
-    T: IndexAccess,
+    T: RawAccess,
     K: BinaryKey,
 {
     type Item = K::Owned;
@@ -340,7 +247,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     const INDEX_NAME: &str = "test_index_name";
 
@@ -350,13 +257,10 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, String> = KeySetIndex::new(INDEX_NAME, &fork);
-
+        let mut index: KeySetIndex<_, String> = fork.get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
-
         index.insert(KEY.to_owned());
         assert_eq!(true, index.contains(KEY));
-
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
     }
@@ -367,12 +271,10 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, Vec<u8>> = KeySetIndex::new(INDEX_NAME, &fork);
+        let mut index: KeySetIndex<_, Vec<u8>> = fork.get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
-
         index.insert(KEY.to_owned());
         assert_eq!(true, index.contains(KEY));
-
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
     }
@@ -381,17 +283,14 @@ mod tests {
     fn key_set_methods() {
         let db = TemporaryDB::default();
         let fork = db.fork();
-        let mut index = KeySetIndex::new(INDEX_NAME, &fork);
 
+        let mut index = fork.get_key_set(INDEX_NAME);
         assert!(!index.contains(&1_u8));
-
         index.insert(1_u8);
         assert!(index.contains(&1_u8));
-
         index.insert(2_u8);
         let key = index.iter().next().unwrap();
         index.remove(&key);
-
         assert!(!index.contains(&1_u8));
         index.clear();
         assert!(!index.contains(&2_u8));

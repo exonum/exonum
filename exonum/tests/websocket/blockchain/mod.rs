@@ -14,45 +14,47 @@
 
 //! Simplified node emulation for testing websockets.
 
+use exonum::{
+    blockchain::InstanceCollection,
+    crypto::{Hash, PublicKey},
+    helpers,
+    node::{ApiSender, Node},
+    runtime::{
+        rust::{CallContext, Service},
+        BlockchainData, InstanceId, Runtime,
+    },
+};
+use exonum_merkledb::{Snapshot, TemporaryDB};
+use exonum_proto::ProtobufConvert;
+
 use std::{
     net::SocketAddr,
     thread::{self, JoinHandle},
+    time::Duration,
 };
-
-use exonum::{
-    blockchain::{
-        ExecutionError, ExecutionResult, Service, Transaction, TransactionContext, TransactionSet,
-    },
-    crypto::{Hash, PublicKey},
-    helpers,
-    messages::RawTransaction,
-    node::{ApiSender, Node},
-};
-
-use exonum_merkledb::{Snapshot, TemporaryDB};
 
 mod proto;
 
-pub const SERVICE_ID: u16 = 0;
+pub const SERVICE_ID: InstanceId = 118;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::CreateWallet")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
     pub name: String,
 }
 
 impl CreateWallet {
-    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
+    pub fn new(pubkey: PublicKey, name: &str) -> Self {
         Self {
-            pubkey: *pubkey,
+            pubkey,
             name: name.to_owned(),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::Transfer")]
+#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
     pub from: PublicKey,
     pub to: PublicKey,
@@ -60,57 +62,44 @@ pub struct Transfer {
 }
 
 impl Transfer {
-    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
-        Self {
-            from: *from,
-            to: *to,
-            amount,
-        }
+    pub fn new(from: PublicKey, to: PublicKey, amount: u64) -> Self {
+        Self { from, to, amount }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub enum Transactions {
-    CreateWallet(CreateWallet),
-    Transfer(Transfer),
+#[derive(Debug, IntoExecutionError)]
+pub enum Error {
+    /// Not allowed
+    NotAllowed = 0,
 }
 
-impl Transaction for CreateWallet {
-    fn execute(&self, _: TransactionContext) -> ExecutionResult {
-        if self.name.starts_with("Al") {
+#[exonum_interface]
+pub trait MyServiceInterface {
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "ws-test", proto_sources = "exonum::proto::schema")]
+#[service_dispatcher(implements("MyServiceInterface"))]
+struct MyService;
+
+impl MyServiceInterface for MyService {
+    fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+        if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(ExecutionError::with_description(
-                1,
-                "Not allowed".to_string(),
-            ))
+            Err(Error::NotAllowed)
         }
     }
-}
-
-impl Transaction for Transfer {
-    fn execute(&self, _: TransactionContext) -> ExecutionResult {
+    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), Error> {
         panic!("oops")
     }
 }
 
-struct MyService;
-
 impl Service for MyService {
-    fn service_id(&self) -> u16 {
-        SERVICE_ID
-    }
-
-    fn service_name(&self) -> &str {
-        "my-service"
-    }
-
-    fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        Transactions::tx_from_raw(raw).map(Transactions::into)
     }
 }
 
@@ -126,13 +115,27 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .parse::<SocketAddr>()
             .unwrap(),
     );
-    let service = Box::new(MyService);
-    let node = Node::new(TemporaryDB::new(), vec![service], node_cfg, None);
+
+    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+    let services =
+        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
+
+    let node = Node::new(
+        TemporaryDB::new(),
+        external_runtimes,
+        services,
+        node_cfg,
+        None,
+    );
+
     let api_tx = node.channel();
-    RunHandle {
+    let handle = RunHandle {
         node_thread: thread::spawn(move || {
             node.run().unwrap();
         }),
         api_tx,
-    }
+    };
+    // Wait until the node has fully started.
+    thread::sleep(Duration::from_secs(1));
+    handle
 }

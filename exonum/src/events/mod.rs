@@ -55,6 +55,8 @@ pub enum InternalEvent {
     /// Message has been successfully verified.
     /// Message is boxed here so that enum variants have similar size.
     MessageVerified(Box<Message>),
+    /// Restart actix ver api.
+    RestartApi,
 }
 
 #[derive(Debug)]

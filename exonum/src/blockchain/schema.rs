@@ -8,21 +8,26 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY owner, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
 use exonum_merkledb::{
-    Entry, IndexAccess, KeySetIndex, ListIndex, MapIndex, MapProof, ObjectHash, ProofListIndex,
-    ProofMapIndex,
+    access::{Access, AccessExt, RawAccessMut},
+    BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
-use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
+use exonum_proto::ProtobufConvert;
+
+use std::mem;
+
+use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
 use crate::{
-    crypto::{CryptoHash, Hash, PublicKey},
-    helpers::{Height, Round},
-    messages::{Connect, Message, Precommit, RawTransaction, Signed},
+    crypto::{self, Hash, PublicKey},
+    helpers::{Height, Round, ValidatorId},
+    messages::{AnyTx, Connect, Message, Precommit, Verified},
     proto,
+    runtime::InstanceId,
 };
 
 /// Defines `&str` constants with given name and value.
@@ -47,49 +52,18 @@ define_names!(
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
-    CONFIGS => "configs";
-    CONFIGS_ACTUAL_FROM => "configs_actual_from";
     STATE_HASH_AGGREGATOR => "state_hash_aggregator";
     PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
+    CONSENSUS_CONFIG => "consensus.config";
 );
-
-/// Configuration index.
-#[derive(Debug, Serialize, Deserialize, ProtobufConvert)]
-#[exonum(pb = "proto::ConfigReference", crate = "crate")]
-pub struct ConfigReference {
-    /// Height since which this configuration becomes actual.
-    actual_from: Height,
-    /// Hash of the configuration contents that serialized as raw bytes vec.
-    cfg_hash: Hash,
-}
-
-impl ConfigReference {
-    /// New ConfigReference
-    pub fn new(actual_from: Height, cfg_hash: &Hash) -> Self {
-        Self {
-            actual_from,
-            cfg_hash: *cfg_hash,
-        }
-    }
-
-    /// Height since which this configuration becomes actual.
-    pub fn actual_from(&self) -> Height {
-        self.actual_from
-    }
-
-    /// Hash of the configuration contents that serialized as raw bytes vec.
-    pub fn cfg_hash(&self) -> &Hash {
-        &self.cfg_hash
-    }
-}
 
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::TxLocation", crate = "crate")]
+#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,
@@ -121,24 +95,24 @@ impl TxLocation {
 /// Indices defined by this schema are present in the blockchain regardless of
 /// the deployed services and store general-purpose information, such as
 /// committed transactions.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Schema<T> {
+    // For performance reasons, we don't use the field-per-index schema pattern.
+    // Indeed, the core schema has many indexes, most of which are never accessed
+    // for any particular `Schema` instance.
     access: T,
 }
 
-impl<T> Schema<T>
-where
-    T: IndexAccess,
-{
-    /// Constructs information schema for the given `snapshot`.
-    pub fn new(access: T) -> Self {
+impl<T: Access> Schema<T> {
+    /// Constructs information schema based on the given `access`.
+    pub(crate) fn new(access: T) -> Self {
         Self { access }
     }
 
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
-    pub fn transactions(&self) -> MapIndex<T, Hash, Signed<RawTransaction>> {
-        MapIndex::new(TRANSACTIONS, self.access.clone())
+    pub fn transactions(&self) -> MapIndex<T::Base, Hash, Verified<AnyTx>> {
+        self.access.clone().get_map(TRANSACTIONS)
     }
 
     /// Returns a table that represents a map with a key-value pair of a transaction
@@ -146,13 +120,13 @@ where
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T, Hash, TransactionResult> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, self.access.clone())
+    pub fn transaction_results(&self) -> ProofMapIndex<T::Base, Hash, ExecutionStatus> {
+        self.access.clone().get_proof_map(TRANSACTION_RESULTS)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
-    pub(crate) fn transactions_len_index(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_LEN, self.access.clone())
+    pub(crate) fn transactions_len_index(&self) -> Entry<T::Base, u64> {
+        self.access.clone().get_entry(TRANSACTIONS_LEN)
     }
 
     /// Returns the number of transactions in the blockchain.
@@ -163,13 +137,13 @@ where
     }
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
-    pub fn transactions_pool(&self) -> KeySetIndex<T, Hash> {
-        KeySetIndex::new(TRANSACTIONS_POOL, self.access.clone())
+    pub fn transactions_pool(&self) -> KeySetIndex<T::Base, Hash> {
+        self.access.clone().get_key_set(TRANSACTIONS_POOL)
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
-    pub(crate) fn transactions_pool_len_index(&self) -> Entry<T, u64> {
-        Entry::new(TRANSACTIONS_POOL_LEN, self.access.clone())
+    pub(crate) fn transactions_pool_len_index(&self) -> Entry<T::Base, u64> {
+        self.access.clone().get_entry(TRANSACTIONS_POOL_LEN)
     }
 
     /// Returns the number of transactions in the pool.
@@ -180,42 +154,36 @@ where
 
     /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
-    pub fn transactions_locations(&self) -> MapIndex<T, Hash, TxLocation> {
-        MapIndex::new(TRANSACTIONS_LOCATIONS, self.access.clone())
+    pub fn transactions_locations(&self) -> MapIndex<T::Base, Hash, TxLocation> {
+        self.access.clone().get_map(TRANSACTIONS_LOCATIONS)
     }
 
     /// Returns a table that stores a block object for every block height.
-    pub fn blocks(&self) -> MapIndex<T, Hash, Block> {
-        MapIndex::new(BLOCKS, self.access.clone())
+    pub fn blocks(&self) -> MapIndex<T::Base, Hash, Block> {
+        self.access.clone().get_map(BLOCKS)
     }
 
     /// Returns a table that keeps block hashes for corresponding block heights.
-    pub fn block_hashes_by_height(&self) -> ListIndex<T, Hash> {
-        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.access.clone())
+    pub fn block_hashes_by_height(&self) -> ListIndex<T::Base, Hash> {
+        self.access.clone().get_list(BLOCK_HASHES_BY_HEIGHT)
     }
 
     /// Returns a table that keeps a list of transactions for each block.
-    pub fn block_transactions(&self, height: Height) -> ProofListIndex<T, Hash> {
+    pub fn block_transactions(&self, height: Height) -> ProofListIndex<T::Base, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.access.clone())
+        self.access
+            .clone()
+            .get_proof_list((BLOCK_TRANSACTIONS, &height))
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
-    pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Signed<Precommit>> {
-        ListIndex::new_in_family(PRECOMMITS, hash, self.access.clone())
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<T::Base, Verified<Precommit>> {
+        self.access.clone().get_list((PRECOMMITS, hash))
     }
 
-    /// Returns a table that represents a map with a key-value pair of a
-    /// configuration hash and contents.
-    pub fn configs(&self) -> ProofMapIndex<T, Hash, StoredConfiguration> {
-        // configs patricia merkle tree <block height> json
-        ProofMapIndex::new(CONFIGS, self.access.clone())
-    }
-
-    /// Returns an auxiliary table that keeps hash references to configurations in
-    /// the increasing order of their `actual_from` height.
-    pub fn configs_actual_from(&self) -> ListIndex<T, ConfigReference> {
-        ListIndex::new(CONFIGS_ACTUAL_FROM, self.access.clone())
+    /// Returns an actual consensus configuration entry.
+    pub fn consensus_config_entry(&self) -> Entry<T::Base, ConsensusConfig> {
+        self.access.clone().get_entry(CONSENSUS_CONFIG)
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -226,33 +194,31 @@ where
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing the root hash of this table.
     ///
-    /// - Table **key** is 32 bytes of normalized coordinates of a service
-    /// table, as returned by the `service_table_unique_key` helper function.
-    /// - Table **value** is the root hash of a service table, which contributes
+    /// - Table **key** contains normalized coordinates of an index.
+    /// - Table **value** contains a root hash of the index, which contributes
     /// to the `state_hash` of the resulting block.
-    ///
-    /// Core tables participate in the resulting state_hash with `CORE_SERVICE`
-    /// service_id. Their vector is returned by the `core_state_hash` method.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, Hash, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.access.clone())
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T::Base, IndexCoordinates, Hash> {
+        self.access.clone().get_proof_map(STATE_HASH_AGGREGATOR)
     }
 
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn peers_cache(&self) -> MapIndex<T, PublicKey, Signed<Connect>> {
-        MapIndex::new(PEERS_CACHE, self.access.clone())
+    pub(crate) fn peers_cache(&self) -> MapIndex<T::Base, PublicKey, Verified<Connect>> {
+        self.access.clone().get_map(PEERS_CACHE)
     }
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T, Message> {
-        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.access.clone())
+    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
+        self.access.clone().get_list(CONSENSUS_MESSAGES_CACHE)
     }
 
     /// Returns the saved value of the consensus round. Returns the first round
     /// if it has not been saved.
     pub(crate) fn consensus_round(&self) -> Round {
-        Entry::new(CONSENSUS_ROUND, self.access.clone())
+        self.access
+            .clone()
+            .get_entry(CONSENSUS_ROUND)
             .get()
             .unwrap_or_else(Round::first)
     }
@@ -264,15 +230,10 @@ where
 
     /// Returns the block for the given height with the proof of its inclusion.
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
-        let block_hash = match self.block_hash_by_height(height) {
-            None => return None,
-            Some(block_hash) => block_hash,
-        };
+        let block_hash = self.block_hash_by_height(height)?;
         let block = self.blocks().get(&block_hash).unwrap();
-        let precommits_table = self.precommits(&block_hash);
-        let precommits = precommits_table.iter().collect();
-        let res = BlockProof { block, precommits };
-        Some(res)
+        let precommits = self.precommits(&block_hash).iter().collect();
+        Some(BlockProof { block, precommits })
     }
 
     /// Returns the latest committed block.
@@ -302,168 +263,56 @@ where
         Height(len - 1)
     }
 
-    /// Returns the configuration for the latest height of the blockchain.
+    /// Returns an actual consensus configuration of the blockchain.
     ///
     /// # Panics
     ///
     /// Panics if the "genesis block" was not created.
-    pub fn actual_configuration(&self) -> StoredConfiguration {
-        let next_height = self.next_height();
-        let res = self.configuration_by_height(next_height);
-        trace!("Retrieved actual_config: {:?}", res);
-        res
-    }
-
-    /// Returns the nearest following configuration which will be applied after
-    /// the current one, if it exists.
-    pub fn following_configuration(&self) -> Option<StoredConfiguration> {
-        let next_height = self.next_height();
-        let idx = self.find_configurations_index_by_height(next_height);
-        match self.configs_actual_from().get(idx + 1) {
-            Some(cfg_ref) => {
-                let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| {
-                    panic!("Config with hash {:?} is absent in configs table", cfg_hash)
-                });
-                Some(cfg)
-            }
-            None => None,
-        }
-    }
-
-    /// Returns the previous configuration if it exists.
-    pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
-        let next_height = self.next_height();
-        let idx = self.find_configurations_index_by_height(next_height);
-        if idx > 0 {
-            let cfg_ref = self
-                .configs_actual_from()
-                .get(idx - 1)
-                .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
-            let cfg_hash = cfg_ref.cfg_hash();
-            let cfg = self.configuration_by_hash(cfg_hash).unwrap_or_else(|| {
-                panic!("Config with hash {:?} is absent in configs table", cfg_hash)
-            });
-            Some(cfg)
-        } else {
-            None
-        }
-    }
-
-    /// Returns the configuration that is actual for the given height.
-    pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
-        let idx = self.find_configurations_index_by_height(height);
-        let cfg_ref = self
-            .configs_actual_from()
-            .get(idx)
-            .unwrap_or_else(|| panic!("Configuration at index {} not found", idx));
-        let cfg_hash = cfg_ref.cfg_hash();
-        self.configuration_by_hash(cfg_hash)
-            .unwrap_or_else(|| panic!("Config with hash {:?} is absent in configs table", cfg_hash))
-    }
-
-    /// Returns the configuration for the given configuration hash.
-    pub fn configuration_by_hash(&self, hash: &Hash) -> Option<StoredConfiguration> {
-        self.configs().get(hash)
+    pub fn consensus_config(&self) -> ConsensusConfig {
+        self.consensus_config_entry()
+            .get()
+            .expect("Consensus configuration is absent")
     }
 
     /// Returns the `state_hash` table for core tables.
-    pub fn core_state_hash(&self) -> Vec<Hash> {
+    pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.configs().object_hash(),
+            self.consensus_config_entry().object_hash(),
             self.transaction_results().object_hash(),
         ]
     }
 
-    /// Constructs a proof of inclusion of a root hash of a specific service
-    /// table into the block `state_hash`.
-    ///
-    /// The `service_id` and `table_idx` are automatically combined to form the key of the
-    /// required service table; this key serves as a search query for the method.
-    /// The service table key is uniquely identified by a `(u16, u16)` tuple
-    /// of table coordinates.
-    ///
-    /// If found, the method returns the root hash as a value of the proof leaf
-    /// corresponding to the required service table key. Otherwise, a partial
-    /// path to the service table key is returned, which proves its exclusion.
-    ///
-    /// The resulting proof can be used as a component of proof of state of an
-    /// entity stored in the blockchain state at a specific height. The proof is
-    /// tied to the `state_hash` of the corresponding `Block`. State of some meta tables
-    /// of core and services isn't tracked.
-    ///
-    /// # Arguments
-    ///
-    /// * `service_id` - `service_id` as returned by instance of type of
-    /// `Service` trait.
-    /// * `table_idx` - index of the service table in `Vec`, returned by the
-    /// `state_hash` method of an instance of a type of the `Service` trait.
-    pub fn get_proof_to_service_table(
-        &self,
-        service_id: u16,
-        table_idx: usize,
-    ) -> MapProof<Hash, Hash> {
-        let key = Blockchain::service_table_unique_key(service_id, table_idx);
-        let sum_table = self.state_hash_aggregator();
-        sum_table.get_proof(key)
+    /// Attempts to find a `ValidatorId` by the provided service public key.
+    pub fn validator_id(&self, service_public_key: PublicKey) -> Option<ValidatorId> {
+        self.consensus_config()
+            .find_validator(|validator_keys| service_public_key == validator_keys.service_key)
     }
+}
 
+impl<T: Access> Schema<T>
+where
+    T::Base: RawAccessMut,
+{
     /// Saves the given consensus round value into the storage.
     pub(crate) fn set_consensus_round(&mut self, round: Round) {
-        let mut entry: Entry<T, _> = Entry::new(CONSENSUS_ROUND, self.access.clone());
-        entry.set(round);
+        self.access.clone().get_entry(CONSENSUS_ROUND).set(round);
     }
 
-    /// Adds a new configuration to the blockchain, which will become actual at
-    /// the `actual_from` height in `config_data`.
-    pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
-        let actual_from = config_data.actual_from;
-        if let Some(last_cfg) = self.configs_actual_from().last() {
-            if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
-                // TODO: Replace panic with errors. (ECR-123)
-                panic!(
-                    "Attempting to commit configuration with incorrect previous hash: {:?}, \
-                     expected: {:?}",
-                    config_data.previous_cfg_hash,
-                    last_cfg.cfg_hash()
-                );
-            }
-
-            if actual_from <= last_cfg.actual_from() {
-                panic!(
-                    "Attempting to commit configuration with actual_from {} less than the last \
-                     committed the last committed actual_from {}",
-                    actual_from,
-                    last_cfg.actual_from()
-                );
-            }
-        }
-
-        info!(
-            "Scheduled the following configuration for acceptance: {:?}",
-            &config_data
-        );
-
-        let cfg_hash = config_data.hash();
-        self.configs().put(&cfg_hash, config_data);
-
-        let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
-        self.configs_actual_from().push(cfg_ref);
-    }
-
-    /// Adds transaction into the persistent pool.
-    /// This method increment `transactions_pool_len_index`,
-    /// be sure to decrement it when transaction committed.
+    /// Adds a transaction into the persistent pool. The caller must ensure that the transaction
+    /// is not already in the pool.
+    ///
+    /// This method increments the number of transactions in the pool,
+    /// be sure to decrement it when the transaction committed.
     #[doc(hidden)]
-    pub fn add_transaction_into_pool(&mut self, tx: Signed<RawTransaction>) {
-        self.transactions_pool().insert(tx.hash());
+    pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
+        self.transactions_pool().insert(tx.object_hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);
-        self.transactions().put(&tx.hash(), tx);
+        self.transactions().put(&tx.object_hash(), tx);
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
-    pub(crate) fn commit_transaction(&mut self, hash: &Hash, tx: Signed<RawTransaction>) {
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash, height: Height, tx: Verified<AnyTx>) {
         if !self.transactions().contains(hash) {
             self.transactions().put(hash, tx)
         }
@@ -473,48 +322,196 @@ where
             let txs_pool_len = self.transactions_pool_len_index().get().unwrap();
             self.transactions_pool_len_index().set(txs_pool_len - 1);
         }
+
+        self.block_transactions(height).push(*hash);
     }
 
     /// Updates transaction count of the blockchain.
-    pub fn update_transaction_count(&mut self, count: u64) {
+    pub(crate) fn update_transaction_count(&mut self, count: u64) {
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
     }
+}
 
-    /// Removes transaction from the persistent pool.
-    #[cfg(test)]
-    pub(crate) fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
-        let contains = self.transactions_pool().contains(hash);
-        self.transactions_pool().remove(hash);
-        self.transactions().remove(hash);
+/// Describes the origin of the information schema.
+///
+/// A schema origin is a convenient wrapper over a two first parameters of an
+/// [`IndexCoordinates`](struct.IndexCoordinates.html) to simple calculation of coordinates of the specific index.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::blockchain::SchemaOrigin;
+/// // Compute coordinate for the first index of runtime schema with ID 0.
+/// let runtime_coordinate = SchemaOrigin::Runtime(0).coordinate_for(0);
+/// // Compute coordinate for the first index of service schema with instance ID 0.
+/// let schema_coordinate = SchemaOrigin::Service(0).coordinate_for(0);
+/// // Note that the `origin_label` of these coordinates are different
+/// // but `local_schema_id` are same.
+/// assert_ne!(
+///     runtime_coordinate.origin_label,
+///     schema_coordinate.origin_label
+/// );
+/// assert_eq!(
+///     runtime_coordinate.local_schema_id,
+///     schema_coordinate.local_schema_id
+/// );
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SchemaOrigin {
+    /// This is a Core schema.
+    Core,
+    /// Schema belongs to the runtime with the specified ID.
+    Runtime(u32),
+    /// This is a service schema with the specified instance ID.
+    Service(InstanceId),
+}
 
-        if contains {
-            let x = self.transactions_pool_len_index().get().unwrap();
-            self.transactions_pool_len_index().set(x - 1);
-            Ok(())
-        } else {
-            Err(())
+impl SchemaOrigin {
+    /// Computes coordinates for a given schema index.
+    pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
+        IndexCoordinates::new(self, index_id)
+    }
+
+    /// Returns the corresponding origin label.
+    fn origin_label(self) -> OriginLabel {
+        match self {
+            SchemaOrigin::Core => OriginLabel::Core,
+            SchemaOrigin::Runtime { .. } => OriginLabel::Runtime,
+            SchemaOrigin::Service { .. } => OriginLabel::Service,
         }
     }
 
-    fn find_configurations_index_by_height(&self, height: Height) -> u64 {
-        let actual_from = self.configs_actual_from();
-        for i in (0..actual_from.len()).rev() {
-            if actual_from.get(i).unwrap().actual_from() <= height {
-                return i as u64;
-            }
+    /// Returns the corresponding schema ID.
+    fn local_schema_id(self) -> u32 {
+        match self {
+            SchemaOrigin::Service(instance_id) => instance_id,
+            SchemaOrigin::Runtime(runtime_id) => runtime_id,
+            SchemaOrigin::Core => 0,
         }
-        panic!(
-            "Couldn't not find any config for height {}, \
-             that means that genesis block was created incorrectly.",
-            height
-        )
+    }
+}
+
+/// Label for the corresponding schema origin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[repr(u16)]
+pub enum OriginLabel {
+    /// Origin label for Core schemas.
+    Core = 0,
+    /// Origin label for runtime schemas.
+    Runtime = 2,
+    /// Origin label for service schemas.
+    Service = 3,
+}
+
+/// Normalized coordinates of the index in the [`state_hash_aggregator`][state_hash_aggregator] table.
+///
+/// This coordinate is used to map the index to its contribution to the blockchain state hash.
+/// Each index has its own unique coordinates.
+///
+/// [See also.][SchemaOrigin]
+///
+/// [state_hash_aggregator]: struct.Schema.html#method.state_hash_aggregator
+/// [SchemaOrigin]: enum.SchemaOrigin.html
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct IndexCoordinates {
+    /// Determines which category of an information schemas an index belongs to.
+    pub origin_label: u16,
+    /// Identifier of the schema to which the index belongs, should be unique in the corresponding
+    /// origin category.
+    pub local_schema_id: u32,
+    /// Index identifier in the corresponding information schema.
+    pub index_id: u16,
+}
+
+impl IndexCoordinates {
+    /// Creates index coordinates for the index with the specified schema origin
+    /// and index identifier.
+    pub fn new(schema_origin: SchemaOrigin, index_id: u16) -> Self {
+        Self {
+            origin_label: schema_origin.origin_label() as u16,
+            local_schema_id: schema_origin.local_schema_id(),
+            index_id,
+        }
     }
 
-    /// Returns the next height of the blockchain.
-    /// Its value is equal to "height of the latest committed block" + 1.
-    fn next_height(&self) -> Height {
-        Height(self.block_hashes_by_height().len())
+    /// For the given schema origin, returns a list of the index coordinates that match the
+    /// corresponding hashes of the indices.
+    pub fn locate(
+        schema_origin: SchemaOrigin,
+        object_hashes: impl IntoIterator<Item = Hash>,
+    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
+        object_hashes
+            .into_iter()
+            .enumerate()
+            .map(move |(id, hash)| (schema_origin.coordinate_for(id as u16), hash))
+    }
+
+    /// Returns a schema origin for this index.
+    pub fn schema_origin(self) -> SchemaOrigin {
+        match self.origin_label {
+            0 => SchemaOrigin::Core,
+            2 => SchemaOrigin::Runtime(self.local_schema_id),
+            3 => SchemaOrigin::Service(self.local_schema_id),
+            other => panic!("Unknown index owner: {}!", other),
+        }
+    }
+}
+
+impl BinaryKey for IndexCoordinates {
+    fn size(&self) -> usize {
+        mem::size_of_val(self)
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        let mut pos = 0;
+        pos += self.origin_label.write(&mut buffer[pos..]);
+        pos += self.local_schema_id.write(&mut buffer[pos..]);
+        pos += self.index_id.write(&mut buffer[pos..]);
+        pos
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        let origin_label = u16::read(&buffer[0..2]);
+        let local_schema_id = u32::read(&buffer[2..6]);
+        let index_id = u16::read(&buffer[6..8]);
+        Self {
+            origin_label,
+            local_schema_id,
+            index_id,
+        }
+    }
+}
+
+impl ObjectHash for IndexCoordinates {
+    fn object_hash(&self) -> Hash {
+        let mut bytes = vec![0; self.size()];
+        self.write(&mut bytes);
+        crypto::hash(&bytes)
+    }
+}
+
+#[test]
+fn index_coordinates_binary_key_round_trip() {
+    let schema_origins = vec![
+        (SchemaOrigin::Runtime(0), 0),
+        (SchemaOrigin::Runtime(0), 5),
+        (SchemaOrigin::Runtime(1), 0),
+        (SchemaOrigin::Runtime(1), 2),
+        (SchemaOrigin::Service(2), 0),
+        (SchemaOrigin::Service(2), 1),
+        (SchemaOrigin::Service(0), 0),
+        (SchemaOrigin::Service(0), 1),
+    ];
+
+    for (schema_origin, index_id) in schema_origins {
+        let coordinate = IndexCoordinates::new(schema_origin, index_id);
+        let mut buf = vec![0; coordinate.size()];
+        coordinate.write(&mut buf);
+
+        let coordinate2 = IndexCoordinates::read(&buf);
+        assert_eq!(coordinate, coordinate2);
+        assert_eq!(coordinate2.schema_origin(), schema_origin);
     }
 }

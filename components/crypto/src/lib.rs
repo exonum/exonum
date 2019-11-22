@@ -23,28 +23,27 @@
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use]
+extern crate failure;
+
+pub use self::proto::*;
+
 #[doc(inline)]
 pub use self::crypto_impl::{
     HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-pub use self::utils::{generate_keys_file, read_keys_from_file};
 
-use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Duration, Utc};
-use rust_decimal::Decimal;
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     Serialize, Serializer,
 };
-use uuid::Uuid;
 
 use std::{
     default::Default,
     fmt,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
@@ -56,13 +55,15 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 #[macro_use]
 mod macros;
 
+#[cfg(feature = "with-protobuf")]
+pub mod proto;
+
 pub(crate) mod crypto_lib;
-pub(crate) mod utils;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
-fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
+fn write_short_hex(f: &mut fmt::Formatter<'_>, slice: &[u8]) -> fmt::Result {
     for byte in slice.iter().take(BYTES_IN_DEBUG) {
         write!(f, "{:02x}", byte)?;
     }
@@ -173,16 +174,6 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 pub fn hash(data: &[u8]) -> Hash {
     let dig = crypto_impl::hash(data);
     Hash(dig)
-}
-
-/// A common trait for the ability to compute a cryptographic hash.
-pub trait CryptoHash {
-    /// Returns a hash of the value.
-    ///
-    /// The hashing strategy must satisfy the basic requirements of cryptographic hashing:
-    /// equal values must have the same hash and not equal values must have different hashes
-    /// (except for negligible probability).
-    fn hash(&self) -> Hash;
 }
 
 /// Initializes the cryptographic backend.
@@ -499,176 +490,42 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
-/// Returns a hash consisting of zeros.
-impl Default for Hash {
-    fn default() -> Self {
-        Self::zero()
+#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KeyPair {
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl KeyPair {
+    pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        debug_assert!(
+            verify_keys_match(&public_key, &secret_key),
+            "Public key does not match the secret key."
+        );
+
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
     }
 }
 
-impl CryptoHash for Hash {
-    fn hash(&self) -> Hash {
-        *self
+impl From<(PublicKey, SecretKey)> for KeyPair {
+    fn from(keys: (PublicKey, SecretKey)) -> Self {
+        Self::from_keys(keys.0, keys.1)
     }
 }
 
-impl CryptoHash for bool {
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
-    }
-}
-
-impl CryptoHash for u8 {
-    fn hash(&self) -> Hash {
-        hash(&[*self])
-    }
-}
-
-impl CryptoHash for u16 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_u16(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u32 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_u32(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u64 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_u64(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u128 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 16];
-        LittleEndian::write_u128(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i8 {
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
-    }
-}
-
-impl CryptoHash for i16 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_i16(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i32 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_i32(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i64 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_i64(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i128 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 16];
-        LittleEndian::write_i128(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for () {
-    fn hash(&self) -> Hash {
-        Hash(crypto_impl::EMPTY_SLICE_HASH)
-    }
-}
-
-impl CryptoHash for PublicKey {
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}
-
-impl CryptoHash for Vec<u8> {
-    fn hash(&self) -> Hash {
-        hash(self)
-    }
-}
-
-impl CryptoHash for String {
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}
-
-impl CryptoHash for SystemTime {
-    fn hash(&self) -> Hash {
-        let duration = self
-            .duration_since(UNIX_EPOCH)
-            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
-
-        let mut buffer = [0_u8; 12];
-        LittleEndian::write_u64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        hash(&buffer)
-    }
-}
-
-impl CryptoHash for DateTime<Utc> {
-    fn hash(&self) -> Hash {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        buffer.hash()
-    }
-}
-
-// TODO: think about move it anywhere (ECR-2217).
-impl CryptoHash for Duration {
-    fn hash(&self) -> Hash {
-        let secs = self.num_seconds();
-        let nanos_as_duration = *self - Self::seconds(secs);
-        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_i32(&mut buffer[8..12], nanos);
-        buffer.hash()
-    }
-}
-
-impl CryptoHash for Uuid {
-    fn hash(&self) -> Hash {
-        hash(self.as_bytes())
-    }
-}
-
-impl CryptoHash for Decimal {
-    fn hash(&self) -> Hash {
-        hash(&self.serialize())
-    }
+fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    crypto_impl::verify_keys_match(&public_key.0, &secret_key.0)
 }
 
 #[cfg(test)]
@@ -768,13 +625,6 @@ mod tests {
     }
 
     #[test]
-    fn range_sodium() {
-        let h = hash(&[]);
-        let sub_range = &h[10..20];
-        assert_eq!(&crypto_impl::EMPTY_SLICE_HASH[10..20], sub_range);
-    }
-
-    #[test]
     fn hash_streaming_zero() {
         let h1 = hash(&[]);
         let state = HashStream::new();
@@ -810,11 +660,6 @@ mod tests {
         assert!(verified_stream.verify(&sig, &pk));
     }
 
-    #[test]
-    fn empty_slice_hash() {
-        assert_eq!(Hash(super::crypto_impl::EMPTY_SLICE_HASH), hash(&[]));
-    }
-
     fn assert_serialize_deserialize<T>(original_value: &T)
     where
         T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
@@ -822,5 +667,19 @@ mod tests {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();
         assert_eq!(*original_value, deserialized_value);
+    }
+
+    #[test]
+    fn valid_keypair() {
+        let (pk, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_keypair() {
+        let (pk, _) = gen_keypair();
+        let (_, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
     }
 }

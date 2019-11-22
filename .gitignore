@@ -1,3 +1,14 @@
+# Python virtual environment
+.venv
+
+# Python packages
+*.egg-info
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
 # vim files
 *.swp
 # macos files
@@ -20,6 +31,7 @@ node_modules
 npm-debug.log
 
 # IDE files
+.mypy_cache
 .idea
 .vscode
 *.iml

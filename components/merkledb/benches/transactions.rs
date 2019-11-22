@@ -21,8 +21,9 @@ use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_merkledb::{
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, ListIndex, MapIndex,
-    ObjectAccess, ObjectHash, ProofListIndex, ProofMapIndex, RefMut, TemporaryDB,
+    access::{Access, FromAccess},
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -135,7 +136,7 @@ impl BinaryValue for Wallet {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -152,7 +153,7 @@ impl BinaryValue for Transaction {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -169,7 +170,7 @@ impl BinaryValue for Block {
         bincode::serialize(self).unwrap()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         bincode::deserialize(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -178,48 +179,43 @@ impl Transaction {
     fn execute(&self, fork: &Fork) {
         let tx_hash = self.object_hash();
 
-        let schema = RefSchema::new(fork);
-        schema.transactions().put(&self.object_hash(), *self);
+        let mut schema = Schema::new(fork);
+        schema.transactions.put(&self.object_hash(), *self);
 
-        let mut owner_wallet = schema.wallets().get(&self.sender).unwrap_or_default();
+        let mut owner_wallet = schema.wallets.get(&self.sender).unwrap_or_default();
         owner_wallet.outgoing += self.amount;
         owner_wallet.history_root = schema.add_transaction_to_history(&self.sender, tx_hash);
-        schema.wallets().put(&self.sender, owner_wallet);
+        schema.wallets.put(&self.sender, owner_wallet);
 
-        let mut receiver_wallet = schema.wallets().get(&self.receiver).unwrap_or_default();
+        let mut receiver_wallet = schema.wallets.get(&self.receiver).unwrap_or_default();
         receiver_wallet.incoming += self.amount;
         receiver_wallet.history_root = schema.add_transaction_to_history(&self.receiver, tx_hash);
-        schema.wallets().put(&self.receiver, receiver_wallet);
+        schema.wallets.put(&self.receiver, receiver_wallet);
     }
 }
 
-struct RefSchema<T: ObjectAccess>(T);
+struct Schema<T: Access> {
+    transactions: MapIndex<T::Base, Hash, Transaction>,
+    blocks: ListIndex<T::Base, Hash>,
+    wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
+    wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
+}
 
-impl<T: ObjectAccess> RefSchema<T> {
-    fn new(object_access: T) -> Self {
-        Self(object_access)
-    }
-
-    fn transactions(&self) -> RefMut<MapIndex<T, Hash, Transaction>> {
-        self.0.get_object("transactions")
-    }
-
-    fn blocks(&self) -> RefMut<ListIndex<T, Hash>> {
-        self.0.get_object("blocks")
-    }
-
-    fn wallets(&self) -> RefMut<ProofMapIndex<T, PublicKey, Wallet>> {
-        self.0.get_object("wallets")
-    }
-
-    fn wallets_history(&self, owner: &PublicKey) -> RefMut<ProofListIndex<T, Hash>> {
-        self.0.get_object(("wallets.history", owner))
+impl<T: Access> Schema<T> {
+    fn new(access: T) -> Self {
+        Self {
+            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
+            blocks: FromAccess::from_access(access.clone(), "blocks".into()).unwrap(),
+            wallets: FromAccess::from_access(access.clone(), "wallets".into()).unwrap(),
+            wallet_history: FromAccess::from_access(access.clone(), "wallet_history".into())
+                .unwrap(),
+        }
     }
 }
 
-impl<T: ObjectAccess> RefSchema<T> {
+impl<'a> Schema<&'a Fork> {
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
-        let mut history = self.wallets_history(owner);
+        let mut history = self.wallet_history.get(owner);
         history.push(tx_hash);
         history.object_hash()
     }
@@ -231,15 +227,14 @@ impl Block {
         for transaction in &self.transactions {
             transaction.execute(&fork);
         }
-        RefSchema::new(&fork).blocks().push(self.object_hash());
+        Schema::new(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
 }
 
 fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
-    let mut rng: StdRng = SeedableRng::from_seed(SEED);
+    let mut rng = StdRng::from_seed(SEED);
     let users = (0..wallets_count)
-        .into_iter()
         .map(|idx| {
             let mut base = [0; PUBLIC_KEY_LENGTH];
             rng.fill_bytes(&mut base);
@@ -253,7 +248,6 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
     };
 
     (0..blocks)
-        .into_iter()
         .map(move |_| {
             let transactions = (0..txs_count)
                 .map(|_| Transaction {
@@ -275,7 +269,7 @@ pub fn bench_transactions(c: &mut Criterion) {
         "transactions",
         ParameterizedBenchmark::new(
             "currency_like",
-            move |b: &mut Bencher, params: &BenchParams| {
+            move |b: &mut Bencher<'_>, params: &BenchParams| {
                 let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
                 b.iter_with_setup(TemporaryDB::new, |db| {
                     for block in &blocks {
@@ -283,8 +277,8 @@ pub fn bench_transactions(c: &mut Criterion) {
                     }
                     // Some fast assertions.
                     let snapshot = db.snapshot();
-                    let schema = RefSchema::new(&snapshot);
-                    assert_eq!(schema.blocks().len(), params.blocks as u64);
+                    let schema = Schema::new(&snapshot);
+                    assert_eq!(schema.blocks.len(), params.blocks as u64);
                 })
             },
             item_counts,

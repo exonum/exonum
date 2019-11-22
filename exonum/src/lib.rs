@@ -22,38 +22,31 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![cfg_attr(feature = "long_benchmarks", feature(test))]
-// TODO This lints produces a lot of code style warnings [ERC2699]
-// #![cfg_attr(feature = "cargo-clippy", warn(clippy::pedantic))]
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(
-          // Next `cast_*` lints don't give alternatives.
-          clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-          // `filter(..).map(..)` often looks more shorter and readable.
-          clippy::filter_map,
-          // Next lints produce too much noise/false positives.
-          clippy::module_name_repetitions, clippy::similar_names,
-          // Variant name ends with the enum name. Similar behavior to similar_names.
-          clippy::pub_enum_variant_names,
-          // Next lints allowed due to false positive.
-          clippy::doc_markdown,
-          // '... may panic' lints.
-          clippy::indexing_slicing,
-    )
-)]
+#![allow(clippy::use_self)]
+// #![warn(clippy::pedantic)]
+// #![allow(
+//     // The following `cast_*` lints do not give alternatives:
+//     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+//     // `filter(..).map(..)` often looks shorter and more readable.
+//     clippy::filter_map,
+//     // The following lints produce too much noise/false positives:
+//     clippy::module_name_repetitions, clippy::similar_names,
+//     // Variant name ends with the enum name. Demonstrates similar behavior to `similar_names`.
+//     clippy::pub_enum_variant_names,
+//     // '... may panic' lints.
+//     clippy::indexing_slicing,
+//     // Suggestions for improvement that look inadequate in respect of the code that uses a lot of generics.
+//     clippy::default_trait_access,
+// )]
 
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-#[macro_use(crate_version, crate_authors)]
-extern crate clap;
 #[macro_use]
 extern crate exonum_derive;
+pub use exonum_merkledb;
 #[cfg(feature = "sodiumoxide-crypto")]
 extern crate exonum_sodiumoxide as sodiumoxide;
-#[macro_use]
-pub extern crate exonum_merkledb;
 #[macro_use]
 extern crate failure;
 #[macro_use]
@@ -71,6 +64,8 @@ extern crate lazy_static;
 extern crate test;
 
 pub use exonum_crypto as crypto;
+pub use exonum_keys as keys;
+pub use exonum_merkledb as merkledb;
 
 #[macro_use]
 pub mod proto;
@@ -85,7 +80,8 @@ pub mod api;
 pub mod events;
 pub mod explorer;
 pub mod node;
+#[macro_use]
+pub mod runtime;
 
-//TODO: revert sandbox
 #[cfg(test)]
 mod sandbox;

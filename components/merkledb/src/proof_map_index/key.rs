@@ -20,7 +20,7 @@ use std::{
 
 use leb128;
 
-use exonum_crypto::HASH_SIZE;
+use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
 
 use crate::{BinaryKey, ObjectHash};
 
@@ -55,6 +55,44 @@ macro_rules! div_ceil {
 fn reset_bits(value: &mut u8, pos: u16) {
     let reset_bits_mask = !(255_u8 << pos as u8);
     *value &= reset_bits_mask;
+}
+
+/// Hashed variant of proof map key.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Hashed;
+
+/// Raw variant of proof map key.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Raw;
+
+/// Trait defining key transforming function used to transform key to `ProofPath`.
+pub trait ToProofPath<K> {
+    /// Transforms key to `ProofPath`.
+    fn transform_key(key: &K) -> ProofPath;
+}
+
+impl<K: ObjectHash> ToProofPath<K> for Hashed {
+    fn transform_key(key: &K) -> ProofPath {
+        ProofPath::from_bytes(key.object_hash())
+    }
+}
+
+impl ToProofPath<PublicKey> for Raw {
+    fn transform_key(key: &PublicKey) -> ProofPath {
+        ProofPath::from_bytes(key.as_ref())
+    }
+}
+
+impl ToProofPath<Hash> for Raw {
+    fn transform_key(key: &Hash) -> ProofPath {
+        ProofPath::from_bytes(key.as_ref())
+    }
+}
+
+impl ToProofPath<[u8; 32]> for Raw {
+    fn transform_key(key: &[u8; 32]) -> ProofPath {
+        ProofPath::from_bytes(key)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -98,11 +136,6 @@ pub struct ProofPath {
 }
 
 impl ProofPath {
-    /// Creates a path from the given key.
-    pub fn new(key: &impl ObjectHash) -> Self {
-        Self::from_bytes(key.object_hash())
-    }
-
     /// Checks if this is a path to a leaf `ProofMapIndex` node.
     pub fn is_leaf(&self) -> bool {
         self.bytes[0] == LEAF_KEY_PREFIX
@@ -293,7 +326,7 @@ impl PartialEq for ProofPath {
 }
 
 impl std::fmt::Debug for ProofPath {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // 8 bits + '|' symbol per byte.
         let mut bits = String::with_capacity(KEY_SIZE * 9);
         for byte in 0..self.raw_key().len() {
@@ -469,7 +502,7 @@ mod tests {
         let path = ProofPath::from_bytes(&[1; 32]).prefix(3);
         assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
         let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
-        assert_eq!(path, ProofPath::new(&[0b_0010_0101; 32]).prefix(6));
+        assert_eq!(path, Raw::transform_key(&[0b_0010_0101; 32]).prefix(6));
 
         // Fuzz tests for roundtrip.
         let mut rng = rand::thread_rng();

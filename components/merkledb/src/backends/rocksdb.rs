@@ -20,8 +20,9 @@ pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksD
 
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
-use rocksdb::checkpoint::Checkpoint;
-use rocksdb::{self, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch};
+use rocksdb::{
+    self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
+};
 
 use crate::{
     db::{check_database, Change},
@@ -36,6 +37,7 @@ use crate::{
 /// use different databases.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
+    options: DbOptions,
 }
 
 impl From<DbOptions> for RocksDbOptions {
@@ -48,6 +50,7 @@ impl From<&DbOptions> for RocksDbOptions {
     fn from(opts: &DbOptions) -> Self {
         let mut defaults = Self::default();
         defaults.create_if_missing(opts.create_if_missing);
+        defaults.set_compression_type(opts.compression_type.into());
         defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
         defaults
     }
@@ -83,6 +86,7 @@ impl RocksDB {
         };
         let mut db = Self {
             db: Arc::new(inner),
+            options: *options,
         };
         check_database(&mut db)?;
         Ok(db)
@@ -105,10 +109,7 @@ impl RocksDB {
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
-                None => self
-                    .db
-                    .create_cf(&cf_name, &DbOptions::default().into())
-                    .unwrap(),
+                None => self.db.create_cf(&cf_name, &self.options.into()).unwrap(),
             };
 
             for prefix in changes.prefixes_to_remove() {
@@ -129,7 +130,7 @@ impl RocksDB {
     fn remove_with_prefix(
         &self,
         batch: &mut WriteBatch,
-        cf: ColumnFamily,
+        cf: ColumnFamily<'_>,
         cf_name: &str,
         prefix: &[u8],
     ) -> crate::Result<()> {
@@ -221,13 +222,13 @@ impl From<RocksDB> for Arc<dyn Database> {
 }
 
 impl fmt::Debug for RocksDB {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RocksDB").finish()
     }
 }
 
 impl fmt::Debug for RocksDBSnapshot {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RocksDBSnapshot").finish()
     }
 }

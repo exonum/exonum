@@ -21,43 +21,54 @@ use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
-    messages::{to_hex_string, RawTransaction, Signed},
+    messages::Verified,
+    runtime::{rust::Transaction, AnyTx, InstanceId},
 };
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
-use exonum_time::{time_provider::MockTimeProvider, TimeService};
-
-use std::time::SystemTime;
-
+use exonum_merkledb::ObjectHash;
+use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
+use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use exonum_timestamping::{
     api::TimestampQuery,
     schema::{Timestamp, TimestampEntry},
-    transactions::TxTimestamp,
-    Service,
+    transactions::{Config, TxTimestamp},
+    TimestampingService,
 };
+
+use std::time::SystemTime;
+
+const TIME_SERVICE_ID: InstanceId = 2;
+const TIME_SERVICE_NAME: &str = "my-time";
+const SERVICE_ID: InstanceId = 3;
+const SERVICE_NAME: &str = "my-timestamping";
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let mut testkit = TestKitBuilder::validator()
-        .with_service(Service)
-        .with_service(TimeService::with_provider(mock_provider.clone()))
+        .with_rust_service(
+            InstanceCollection::new(TimeServiceFactory::with_provider(mock_provider.clone()))
+                .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
+        )
+        .with_rust_service(InstanceCollection::new(TimestampingService).with_instance(
+            SERVICE_ID,
+            SERVICE_NAME,
+            Config {
+                time_service_name: TIME_SERVICE_NAME.to_owned(),
+            },
+        ))
         .create();
     testkit.create_blocks_until(Height(2)); // TimeService is None if no blocks were forged
     (testkit, mock_provider)
 }
 
 /// Assert transaction status
-fn assert_status(
-    api: &TestKitApi,
-    tx: &Signed<RawTransaction>,
-    expected_status: &serde_json::Value,
-) {
-    let info: serde_json::Value = api
+fn assert_status(api: &TestKitApi, tx: &Verified<AnyTx>, expected_status: &serde_json::Value) {
+    let content: serde_json::Value = api
         .public(ApiKind::Explorer)
-        .query(&TransactionQuery::new(tx.hash()))
+        .query(&TransactionQuery::new(tx.object_hash()))
         .get("v1/transactions")
         .unwrap();
 
-    if let serde_json::Value::Object(mut info) = info {
+    if let serde_json::Value::Object(mut info) = content {
         let tx_status = info.remove("status").unwrap();
         assert_eq!(tx_status, *expected_status);
     } else {
@@ -67,10 +78,10 @@ fn assert_status(
 
 #[test]
 fn test_api_get_timestamp_nothing() {
-    let (testkit, _) = init_testkit();
+    let (mut testkit, _) = init_testkit();
     let api = testkit.api();
     let entry: Option<TimestampEntry> = api
-        .public(ApiKind::Service("timestamping"))
+        .public(ApiKind::Service(SERVICE_NAME))
         .query(&TimestampQuery::new(Hash::zero()))
         .get("v1/timestamps/value")
         .unwrap();
@@ -80,39 +91,35 @@ fn test_api_get_timestamp_nothing() {
 
 #[test]
 fn test_api_post_timestamp() {
-    let (testkit, _) = init_testkit();
-
-    let info = Timestamp::new(&Hash::zero(), "metadata");
+    let (mut testkit, _) = init_testkit();
+    let content = Timestamp::new(&Hash::zero(), "metadata");
     let keypair = gen_keypair();
-    let tx = TxTimestamp::sign(&keypair.0, info, &keypair.1);
+    let tx = TxTimestamp { content }.sign(SERVICE_ID, keypair.0, &keypair.1);
 
     let api = testkit.api();
-    let data = to_hex_string(&tx);
-
     let tx_info: TransactionResponse = api
         .public(ApiKind::Explorer)
-        .query(&json!({ "tx_body": data }))
+        .query(&json!({ "tx_body": tx }))
         .post("v1/transactions")
         .unwrap();
 
-    assert_eq!(tx.hash(), tx_info.tx_hash);
+    assert_eq!(tx.object_hash(), tx_info.tx_hash);
 }
 
 #[test]
 fn test_api_get_timestamp_proof() {
     let (mut testkit, _) = init_testkit();
-
     let keypair = gen_keypair();
 
     // Create timestamp
-    let info = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = TxTimestamp::sign(&keypair.0, info, &keypair.1);
+    let content = Timestamp::new(&Hash::zero(), "metadata");
+    let tx = TxTimestamp { content }.sign(SERVICE_ID, keypair.0, &keypair.1);
     testkit.create_block_with_transactions(txvec![tx.clone()]);
 
-    // get proof
+    // Get proof.
     let api = testkit.api();
     let _: serde_json::Value = api
-        .public(ApiKind::Service("timestamping"))
+        .public(ApiKind::Service(SERVICE_NAME))
         .query(&TimestampQuery::new(Hash::zero()))
         .get("v1/timestamps/proof")
         .unwrap();
@@ -123,37 +130,46 @@ fn test_api_get_timestamp_proof() {
 #[test]
 fn test_api_get_timestamp_entry() {
     let (mut testkit, _) = init_testkit();
-
     let keypair = gen_keypair();
 
     // Create timestamp
-    let info = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = TxTimestamp::sign(&keypair.0, info.clone(), &keypair.1);
+    let content = Timestamp::new(&Hash::zero(), "metadata");
+    let tx = TxTimestamp {
+        content: content.clone(),
+    }
+    .sign(SERVICE_ID, keypair.0, &keypair.1);
     testkit.create_block_with_transactions(txvec![tx.clone()]);
 
     let api = testkit.api();
     let entry: Option<TimestampEntry> = api
-        .public(ApiKind::Service("timestamping"))
+        .public(ApiKind::Service(SERVICE_NAME))
         .query(&TimestampQuery::new(Hash::zero()))
         .get("v1/timestamps/value")
         .unwrap();
 
     let entry = entry.unwrap();
-    assert_eq!(entry.timestamp, info);
-    assert_eq!(entry.tx_hash, tx.hash());
+    assert_eq!(entry.timestamp, content);
+    assert_eq!(entry.tx_hash, tx.object_hash());
 }
 
 #[test]
 fn test_api_can_not_add_same_content_hash() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();
-
     let keypair = gen_keypair();
     let content_hash = hash(&[1]);
     let timestamp1 = Timestamp::new(&content_hash, "metadata");
     let timestamp2 = Timestamp::new(&content_hash, "other metadata");
-    let tx_ok = TxTimestamp::sign(&keypair.0, timestamp1.clone(), &keypair.1);
-    let tx_err = TxTimestamp::sign(&keypair.0, timestamp2.clone(), &keypair.1);
+
+    let tx_ok = TxTimestamp {
+        content: timestamp1.clone(),
+    }
+    .sign(SERVICE_ID, keypair.0, &keypair.1);
+
+    let tx_err = TxTimestamp {
+        content: timestamp2.clone(),
+    }
+    .sign(SERVICE_ID, keypair.0, &keypair.1);
 
     testkit.create_block_with_transaction(tx_ok.clone());
     assert_status(&api, &tx_ok, &json!({ "type": "success" }));
@@ -162,6 +178,10 @@ fn test_api_can_not_add_same_content_hash() {
     assert_status(
         &api,
         &tx_err,
-        &json!({ "type": "error", "code": 0, "description": "Content hash already exists" }),
+        &json!({
+            "type": "service_error",
+            "code": 0,
+            "description": "Content hash already exists."
+        }),
     );
 }

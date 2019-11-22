@@ -28,15 +28,18 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::{net::SocketAddr, thread, time::Duration};
 
-use crate::crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH};
-use crate::events::{
-    error::into_failure,
-    noise::{
-        wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
-        Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
-        NoiseWrapper, TransportWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
+use crate::{
+    crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
+    events::{
+        error::into_failure,
+        noise::{
+            wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
+            Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+            NoiseWrapper, TransportWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
+        },
+        tests::raw_message,
     },
-    tests::raw_message,
+    messages::BinaryValue,
 };
 
 #[test]
@@ -72,7 +75,7 @@ fn noise_converted_keys_handshake() {
     use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 
     const MSG_SIZE: usize = 4096;
-    static PATTERN: &'static str = "Noise_XK_25519_ChaChaPoly_SHA256";
+    const PATTERN: &str = "Noise_XK_25519_ChaChaPoly_SHA256";
 
     // Handshake initiator keypair.
     let (public_key_i, secret_key_i) = gen_keypair();
@@ -163,7 +166,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let message = raw_message(msg_size);
 
     initiator
-        .encrypt_msg(message.raw(), &mut buffer_msg)
+        .encrypt_msg(&message.to_bytes(), &mut buffer_msg)
         .unwrap_or_else(|e| panic!("Unable to encrypt message with size {}: {}", msg_size, e));
 
     let len = LittleEndian::read_u32(&buffer_msg[..HEADER_LENGTH]) as usize;
@@ -171,7 +174,7 @@ fn check_encrypt_decrypt_message(msg_size: usize) {
     let res = responder
         .decrypt_msg(len, &mut buffer_msg)
         .unwrap_or_else(|e| panic!("Unable to decrypt message with size {}: {}", msg_size, e));
-    assert_eq!(message.raw(), &res);
+    assert_eq!(&message.to_bytes(), &res);
 }
 
 fn create_noise_sessions() -> (TransportWrapper, TransportWrapper) {

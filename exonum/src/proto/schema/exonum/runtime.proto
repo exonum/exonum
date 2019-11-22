@@ -1,0 +1,79 @@
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.runtime;
+
+option java_package = "com.exonum.core.messages";
+
+import "blockchain.proto";
+import "google/protobuf/empty.proto";
+
+// Unique service transaction identifier.
+message CallInfo {
+  // Unique service instance identifier. The dispatcher uses this identifier to find the
+  // corresponding runtime to execute a transaction.
+  uint32 instance_id = 1;
+  // Identifier of the method in the service interface required for the call.
+  uint32 method_id = 2;
+}
+
+message AnyTx {
+  CallInfo call_info = 1;
+  bytes arguments = 2;
+}
+
+message ArtifactId {
+  uint32 runtime_id = 1;
+  string name = 2;
+}
+
+message ArtifactSpec {
+  ArtifactId artifact = 1;
+  bytes payload = 2;
+}
+
+message InstanceSpec {
+  uint32 id = 1;
+  string name = 2;
+  ArtifactId artifact = 3;
+}
+
+// The kind of ExecutionError.
+enum ErrorKind {
+  PANIC = 0;
+  DISPATCHER = 1;
+  RUNTIME = 2;
+  SERVICE = 3;
+}
+
+// Result of unsuccessful runtime execution.
+message ExecutionError {
+  // The kind of error that indicates in which module the error occurred.
+  ErrorKind kind = 1;
+  // User defined error code that can have different meanings for the different
+  // error kinds.
+  uint32 code = 2;
+  // Optional description which doesn't affect `object_hash`.
+  string description = 3;
+}
+
+// Result of runtime execution.
+message ExecutionStatus {
+  oneof result {
+    google.protobuf.Empty ok = 1;
+    ExecutionError error = 2;
+  }
+}
