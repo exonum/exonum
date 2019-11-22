@@ -81,7 +81,7 @@ impl PublicApi {
             .unwrap();
         let to_table = blockchain_schema
             .state_hash_aggregator()
-            .get_proof(SchemaOrigin::Service(state.instance.id).coordinate_for(0));
+            .get_proof(SchemaOrigin::Service(state.instance().id).coordinate_for(0));
         let to_wallet = currency_schema.wallets.get_proof(pub_key);
 
         let wallet_proof = WalletProof {

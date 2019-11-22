@@ -250,7 +250,10 @@ where
                         "Sending confirmation for deployment request {:?}",
                         unconfirmed_request
                     );
-                    tx_sender.send(DeployConfirmation::from(unconfirmed_request));
+                    let confirmation = DeployConfirmation::from(unconfirmed_request);
+                    if let Err(e) = tx_sender.send(confirmation) {
+                        log::error!("Cannot send confirmation: {}", e);
+                    }
                 }
                 Ok(())
             });

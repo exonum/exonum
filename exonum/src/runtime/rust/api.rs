@@ -20,11 +20,10 @@ use exonum_merkledb::{access::Prefixed, Snapshot};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
+use super::Broadcaster;
 use crate::{
     api::{ApiBuilder, ApiScope},
-    blockchain::Blockchain,
-    crypto::{PublicKey, SecretKey},
-    node::ApiSender,
+    blockchain::{Blockchain, Schema as CoreSchema},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
 
@@ -34,11 +33,8 @@ use crate::{
 /// and other parts of the blockchain.
 #[derive(Debug)]
 pub struct ServiceApiState<'a> {
-    /// Service instance descriptor of the current API handler.
-    pub instance: InstanceDescriptor<'a>,
-    /// Service key pair of the current node.
-    pub service_keypair: &'a (PublicKey, SecretKey),
-    api_sender: &'a ApiSender,
+    /// Transaction broadcaster.
+    broadcaster: Broadcaster<'a>,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
 }
@@ -47,16 +43,18 @@ impl<'a> ServiceApiState<'a> {
     /// Create service API state snapshot from the given blockchain and instance descriptor.
     pub fn from_api_context(blockchain: &'a Blockchain, instance: InstanceDescriptor<'a>) -> Self {
         Self {
-            service_keypair: blockchain.service_keypair(),
-            instance,
-            api_sender: blockchain.sender(),
+            broadcaster: Broadcaster::new(
+                instance,
+                blockchain.service_keypair(),
+                blockchain.sender(),
+            ),
             snapshot: blockchain.snapshot(),
         }
     }
 
     /// Returns readonly access to blockchain data.
     pub fn data(&'a self) -> BlockchainData<&dyn Snapshot> {
-        BlockchainData::new(&self.snapshot, self.instance)
+        BlockchainData::new(&self.snapshot, self.instance())
     }
 
     /// Returns readonly access to the data of the executing service.
@@ -64,9 +62,21 @@ impl<'a> ServiceApiState<'a> {
         self.data().for_executing_service()
     }
 
-    /// Return a reference to the transactions sender.
-    pub fn sender(&self) -> &ApiSender {
-        self.api_sender
+    /// Returns information about the executing service.
+    pub fn instance(&self) -> InstanceDescriptor<'_> {
+        self.broadcaster.instance()
+    }
+
+    /// Returns a transaction broadcaster if the current node is a validator. If the node
+    /// is not a validator, returns `None`.
+    pub fn broadcast(&self) -> Option<Broadcaster<'a>> {
+        CoreSchema::new(&self.snapshot).validator_id(self.broadcaster.keypair().0)?;
+        Some(self.broadcaster.clone())
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
+    pub fn generic_broadcast(&self) -> Broadcaster<'a> {
+        self.broadcaster.clone()
     }
 }
 
@@ -158,7 +168,7 @@ impl ServiceApiScope {
 ///
 /// The example below shows a common practice of the API implementation.
 ///
-/// ```rust
+/// ```
 /// use serde_derive::{Deserialize, Serialize};
 ///
 /// use exonum::{
@@ -188,8 +198,11 @@ impl ServiceApiScope {
 ///
 /// // Create API handlers.
 /// impl MyApi {
-///     // Immutable handler which returns a hash of the block at the given height.
-///     pub fn block_hash(state: &ServiceApiState, query: MyQuery) -> api::Result<Option<BlockInfo>> {
+///     /// Immutable handler which returns a hash of the block at the given height.
+///     pub fn block_hash(
+///         state: &ServiceApiState,
+///         query: MyQuery,
+///     ) -> api::Result<Option<BlockInfo>> {
 ///         let schema = state.data().for_core();
 ///         Ok(schema
 ///             .block_hashes_by_height()
@@ -197,20 +210,12 @@ impl ServiceApiScope {
 ///             .map(|hash| BlockInfo { hash }))
 ///     }
 ///
-///     // Mutable handler which sends `Shutdown` request to the node.
-///     pub fn shutdown(state: &ServiceApiState, _query: ()) -> api::Result<()> {
-///         state
-///             .sender()
-///             .send_external_message(ExternalMessage::Shutdown)
-///             .map_err(From::from)
-///     }
-///
-///     // Simple handler without any parameters.
+///     /// Simple handler without any parameters.
 ///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
 ///
-///     // You may also create asynchronous handlers for long requests.
+///     /// You may also create asynchronous handlers for long requests.
 ///     pub fn async_operation(
 ///         _state: &ServiceApiState,
 ///         query: MyQuery,
@@ -225,16 +230,14 @@ impl ServiceApiScope {
 ///     // Add `MyApi` handlers to the corresponding builder.
 ///     builder
 ///         .public_scope()
-///         .endpoint("v1/ping", MyApi::ping)
 ///         .endpoint("v1/block_hash", MyApi::block_hash)
 ///         .endpoint("v1/async_operation", MyApi::async_operation);
 ///     // Add a mutable endpoint to the private API.
 ///     builder
 ///         .private_scope()
-///         .endpoint_mut("v1/shutdown", MyApi::shutdown);
+///         .endpoint("v1/ping", MyApi::ping);
 ///     builder
 /// }
-///
 /// # fn main() {
 /// #     use exonum::{blockchain::Blockchain, node::ApiSender, runtime::InstanceDescriptor};
 /// #     use exonum_merkledb::TemporaryDB;

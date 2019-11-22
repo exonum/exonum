@@ -110,10 +110,10 @@ impl Service for AfterCommitService {
         let tx = TxAfterCommit::new(context.height());
         if counter < 10_000 {
             if let Some(broadcast) = context.broadcast() {
-                broadcast.send(tx);
+                broadcast.send(tx).ok();
             }
         } else {
-            context.generic_broadcast().send(tx);
+            context.generic_broadcast().send(tx).ok();
         }
     }
 }
