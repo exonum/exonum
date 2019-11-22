@@ -117,7 +117,7 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 /// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
 ///
 /// * `#[service_factory(artifact_name = "string")]`
-///   
+///
 /// Override artifact name, by default it uses crate name.
 ///
 /// * `#[service_factory(artifact_version = "string")]`

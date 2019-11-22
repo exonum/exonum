@@ -34,7 +34,7 @@ use crate::{
     api::node::SharedNodeState,
     blockchain::{
         contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
-        IndexCoordinates, IndexOwner, InstanceCollection, Schema, ValidatorKeys,
+        IndexCoordinates, InstanceCollection, Schema, SchemaOrigin, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -753,14 +753,14 @@ impl Sandbox {
 
     pub fn get_proof_to_index(
         &self,
-        kind: IndexOwner,
+        origin: SchemaOrigin,
         id: u16,
     ) -> MapProof<IndexCoordinates, Hash> {
         let snapshot = self.blockchain().snapshot();
         let schema = Schema::new(&snapshot);
         schema
             .state_hash_aggregator()
-            .get_proof(IndexCoordinates::new(kind, id))
+            .get_proof(IndexCoordinates::new(origin, id))
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {
