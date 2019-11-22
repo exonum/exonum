@@ -94,7 +94,7 @@ impl Schema<Prefixed<'_, &Fork>> {
     }
 
     /// Initializes `vacant_instance_id` with provided value.
-    pub(crate) fn initialize_instance_id(&mut self, value: InstanceId) {
+    pub(crate) fn initialize_vacant_instance_id_entry(&mut self, value: InstanceId) {
         self.vacant_instance_id.set(value);
     }
 }

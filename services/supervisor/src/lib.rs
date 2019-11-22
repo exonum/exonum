@@ -140,7 +140,7 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
 
             // We're going to use ID obtained above, so the vacant ID is next to it.
             let vacant_instance_id = new_instance_id + 1;
-            schema.initialize_instance_id(vacant_instance_id);
+            schema.initialize_vacant_instance_id_entry(vacant_instance_id);
 
             new_instance_id
         }
