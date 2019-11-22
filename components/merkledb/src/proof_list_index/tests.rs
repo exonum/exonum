@@ -333,6 +333,7 @@ fn random_proofs() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn index_and_proof_roots() {
     let db = TemporaryDB::new();
     let fork = db.fork();

@@ -438,6 +438,7 @@ where
         check_map_multiproof(&proof, keys, &table);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn test_build_proof_in_complex_tree() {
         let db = TemporaryDB::default();
         let fork = db.fork();
@@ -646,6 +647,7 @@ where
         check_map_proof(&proof, Some([32; 32]), &table);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn test_build_multiproof_simple() {
         let db = TemporaryDB::default();
         let fork = db.fork();
@@ -1570,6 +1572,7 @@ fn restore_after_no_op_initialization() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_tree_with_hashed_key() {
     use byteorder::{ByteOrder, LittleEndian};
     use exonum_crypto::Hash;

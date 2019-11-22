@@ -55,14 +55,14 @@ where
 {
     if name.as_ref().is_empty() {
         Err("Index name must not be empty".into())
-    } else if !predicate(name) {
+    } else if predicate(name) {
+        Ok(())
+    } else {
         Err(format!(
             "Wrong characters using in name ({}). {}",
             name.as_ref(),
             desc
         ))
-    } else {
-        Ok(())
     }
 }
 

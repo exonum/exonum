@@ -929,6 +929,7 @@ fn test_metadata_index_wrong_type() {
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
     let err = ListIndex::<_, Vec<u8>>::from_access(&snapshot, "simple".into()).unwrap_err();
+
     assert_matches!(
         err,
         AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }

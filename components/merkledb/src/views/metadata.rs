@@ -333,11 +333,11 @@ where
             metadata
         });
         let real_index_type = metadata.index_type;
-        let mut index_address = metadata.index_address();
+        let mut index_address_from_metadata = metadata.index_address();
         // Set index address name, since metadata itself doesn't know it.
-        index_address.name = index_name;
+        index_address_from_metadata.name = index_name;
         let this = Self {
-            view: View::new(index_access, index_address.clone()),
+            view: View::new(index_access, index_address_from_metadata.clone()),
             metadata,
             index_full_name,
             is_phantom,
@@ -346,7 +346,7 @@ where
             Ok(this)
         } else {
             Err(AccessError {
-                addr: index_address,
+                addr: index_address.clone(),
                 kind: AccessErrorKind::WrongIndexType {
                     expected: index_type,
                     actual: real_index_type,
