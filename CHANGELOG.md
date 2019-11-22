@@ -15,6 +15,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Used `rust` version is updated to 1.38.0. (#1481)
 
 - Transaction serialization format was changed to `protobuf`. (#1283)
+
 - `create_checkpoint` method has been implemented for the `RocksDB` struct.
   This method uses
   [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
