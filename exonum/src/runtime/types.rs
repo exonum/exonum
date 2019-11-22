@@ -343,15 +343,6 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
     }
 }
 
-/// Status of a service instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DeployStatus {
-    /// The service instance has been successfully deployed.
-    Active,
-    /// The service instance is pending deployment.
-    Pending,
-}
-
 #[test]
 fn parse_artifact_id_correct() {
     "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
