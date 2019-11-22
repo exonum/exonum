@@ -482,6 +482,9 @@ Key points:
 - `system/v1/shutdown` endpoint has been modified and now accepts empty POST
   requests. (#1526)
 
+- `exonum-protobuf-convert` has been replaced with external `protobuf-convert`
+  crate. (#1561)
+
 - `keys` module has been moved into `exonum-keys` crate. (#1497)
 
 #### exonum-merkledb
