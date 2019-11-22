@@ -16,15 +16,15 @@
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess},
+    access::{Access, FromAccess},
     Fork, ListIndex, MapIndex, ObjectHash, ProofMapIndex,
 };
 
-use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
+use crate::runtime::{InstanceId, InstanceQuery};
 
 use super::{
     types::{ArtifactState, ArtifactStatus, InstanceState, ServiceStatus},
-    ArtifactId, ArtifactSpec, Error, InstanceSpec,
+    ArtifactSpec, Error, InstanceSpec,
 };
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
@@ -32,7 +32,6 @@ const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
 const INSTANCES: &str = "dispatcher_instances";
 const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
-const PENDING_INSTANCE_IDS: &str = "dispatcher_pending_instance_ids";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
@@ -58,7 +57,7 @@ impl<T: Access> Schema<T> {
         Self {
             artifacts: construct(&access, ARTIFACTS),
             instances: construct(&access, INSTANCES),
-            instances_by_id: construct(&access, PENDING_INSTANCE_IDS),
+            instances_by_id: construct(&access, INSTANCE_IDS),
             pending_artifacts: construct(&access, PENDING_ARTIFACTS),
             pending_instances: construct(&access, PENDING_INSTANCES),
         }

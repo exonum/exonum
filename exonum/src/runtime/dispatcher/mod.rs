@@ -131,7 +131,12 @@ impl Dispatcher {
         access: &dyn Snapshot,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
         let mut aggregator = HashMap::new();
-        // Inserts state hashes for the runtimes.
+        // Insert state hash of Dispatcher schema
+        aggregator.extend(IndexCoordinates::locate(
+            SchemaOrigin::Dispatcher,
+            Schema::new(access).state_hash(),
+        ));
+        // Insert state hashes for the runtimes.
         for (runtime_id, runtime) in &self.runtimes {
             let state = runtime.state_hashes(access);
             aggregator.extend(
