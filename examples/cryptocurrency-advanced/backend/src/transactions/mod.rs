@@ -18,6 +18,9 @@
 // ECR-1771 for the details.
 #![allow(bare_trait_objects)]
 
+
+pub mod create_duel;
+
 use exonum::{
     blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
     crypto::{PublicKey, SecretKey},
@@ -56,6 +59,18 @@ pub enum Error {
     /// Can be emitted by `Transfer`.
     #[fail(display = "Insufficient currency amount")]
     InsufficientCurrencyAmount = 3,
+
+    /// Поединок уже существует.
+    ///
+    /// Can be emitted by `CreateDuel`.
+    #[fail(display = "Поединок уже существует")]
+    DuelAlreadyExists = 4,
+
+    /// В поединке должно участвовать 2 игрока.
+    ///
+    /// Can be emitted by `CreateDuel`.
+    #[fail(display = "В поединке должно участвовать 2 игрока")]
+    NeedTwoPlayers = 5,
 }
 
 impl From<Error> for ExecutionError {
@@ -108,6 +123,8 @@ pub enum WalletTransactions {
     Issue(Issue),
     /// CreateWallet tx.
     CreateWallet(CreateWallet),
+    /// Транзакция создания поединка.
+    CreateDuel(create_duel::CreateDuel),
 }
 
 impl CreateWallet {

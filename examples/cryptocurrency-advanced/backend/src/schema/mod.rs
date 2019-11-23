@@ -14,6 +14,8 @@
 
 //! Cryptocurrency database schema.
 
+pub mod duel;
+
 use exonum_merkledb::{IndexAccess, ObjectHash, ProofListIndex, ProofMapIndex};
 
 use exonum::crypto::{Hash, PublicKey};
