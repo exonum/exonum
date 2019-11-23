@@ -5,6 +5,7 @@ import * as Blockchain from '../src/plugins/blockchain.js'
 import actual from './data/actual.json'
 import proof from './data/proof.json'
 import 'babel-polyfill'
+import * as Exonum from 'exonum-client'
 
 const mock = new MockAdapter(axios)
 const bigIntRegex = /[0-9]+/i
@@ -167,5 +168,9 @@ describe('Interaction with blockchain', () => {
           }
         }
       )
+  })
+
+  it('should create new duel', async () => {
+    await expect(Vue.prototype.$blockchain.createDuel(keyPair, Exonum.keyPair().publicKey, Exonum.keyPair().publicKey, Exonum.keyPair().publicKey, Exonum.keyPair().publicKey, Exonum.keyPair().publicKey, Exonum.keyPair().publicKey, 101)).resolves
   })
 })

@@ -4,40 +4,16 @@
     <form @submit.prevent="vote">
       <div class="form-group">
         <label class="control-label">Ключ судьи:</label>
-        <input
-          v-model="judge_key"
-          type="text"
-          class="form-control"
-          placeholder="Enter judge key"
-          maxlength="64"
-          minlength="64"
-          required
-        />
+        <input v-model="judge_key" type="text" class="form-control" placeholder="Enter judge key" maxlength="64" minlength="64" required>
       </div>
       <div class="form-group">
         <label class="control-label">Ключ поединка:</label>
-        <input
-          v-model="duel_key"
-          type="text"
-          class="form-control"
-          placeholder="Enter duel key"
-          maxlength="64"
-          minlength="64"
-          required
-        />
+        <input v-model="duel_key" type="text" class="form-control" placeholder="Enter duel key" maxlength="64" minlength="64" required>
       </div>
       <div class="form-group">
         <label class="d-block">Голосовать за:</label>
         <div v-for="variant in variants" :key="variant.id" class="form-check form-check-inline">
-          <input
-            :id="variant.id"
-            :value="variant.name"
-            :checked="winner == variant.id"
-            v-model="winner"
-            class="form-check-input"
-            type="radio"
-            requred
-          />
+          <input :id="variant.id" :value="variant.name" :checked="winner == variant.id" v-model="winner" class="form-check-input" type="radio" requred>
           <label :for="variant.id" class="form-check-label">{{ variant.name }}</label>
         </div>
       </div>

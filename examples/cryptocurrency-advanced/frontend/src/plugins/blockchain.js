@@ -77,15 +77,15 @@ module.exports = {
 
         // Transaction data
         const data = {
-          key: Exonum.keyPair().publicKey,
-          player1_key: player1_key,
-          player2_key: player2_key,
-          judge1_key: judge1_key,
-          judge2_key: judge2_key,
-          judge3_key: judge3_key,
+          key: { data: Exonum.hexadecimalToUint8Array(Exonum.keyPair().publicKey) },
+          player1_key: { data: Exonum.hexadecimalToUint8Array(player1_key) },
+          player2_key: { data: Exonum.hexadecimalToUint8Array(player2_key) },
+          judge1_key: { data: Exonum.hexadecimalToUint8Array(judge1_key) },
+          judge2_key: { data: Exonum.hexadecimalToUint8Array(judge2_key) },
+          judge3_key: { data: Exonum.hexadecimalToUint8Array(judge3_key) },
           situation_number: situation_number
         }
-        debugger
+
         // Send transaction into blockchain
         return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
       },
@@ -102,6 +102,7 @@ module.exports = {
       getTransaction(hash) {
         return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
       },
+
 
       createWallet(keyPair, name) {
         // Describe transaction

@@ -61,7 +61,7 @@
         judge1_key: Exonum.keyPair().publicKey,
         judge2_key: Exonum.keyPair().publicKey,
         judge3_key: Exonum.keyPair().publicKey,
-        situation_number: Exonum.randomUint64(),
+        situation_number: 101,
         isSpinnerVisible: false,
       }
     },
