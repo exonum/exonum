@@ -1,5 +1,5 @@
 [package]
-name = "exonum-cryptocurrency-advanced"
+name = "exonum_mwf"
 version = "0.12.0"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]

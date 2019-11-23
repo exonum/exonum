@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Bash script for testing the docker container for exonum-cryptocurrency-advanced demo.
+# Bash script for testing the docker container for exonum_mwf demo.
 #
 
 set -e
@@ -15,11 +15,11 @@ STATUS=0
 
 # Runs docker container.
 function launch-server {
-    docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:demo & sleep 20
+    docker run -p 8000-8008:8000-8008 exonumhub/exonum_mwf:demo & sleep 20
 }
 
 function kill-server {
-    docker ps | grep exonumhub/exonum-cryptocurrency-advanced:demo | gawk '{print $1}' | xargs docker stop || true
+    docker ps | grep exonumhub/exonum_mwf:demo | gawk '{print $1}' | xargs docker stop || true
 }
 
 # Creates a wallet in the cryptocurrency-advanced demo.

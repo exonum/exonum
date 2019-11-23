@@ -776,7 +776,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Additional service example has been added along with frontend. (#646)
 
-#### exonum-cryptocurrency-advanced
+#### exonum_mwf
 
 - Advanced cryptocurrency example becomes a public library (is published on
   crates.io). (#709)
@@ -802,7 +802,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Error description has been added to the return value of the transactions. (#695)
 
-#### exonum-cryptocurrency-advanced
+#### exonum_mwf
 
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
 
@@ -982,7 +982,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `TestKit::explorer()` method allows to access the blockchain explorer. (#535)
 
-#### exonum-cryptocurrency-advanced
+#### exonum_mwf
 
 - A more complex example has been added featuring best practices for service
   writing. (#595)

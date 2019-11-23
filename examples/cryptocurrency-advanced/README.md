@@ -27,7 +27,7 @@ Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:demo
+docker run -p 8000-8008:8000-8008 exonumhub/exonum_mwf:demo
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
@@ -70,19 +70,19 @@ Generate template:
 ```sh
 mkdir example
 
-exonum-cryptocurrency-advanced generate-template example/common.toml --validators-count 4
+exonum_mwf generate-template example/common.toml --validators-count 4
 ```
 
 Generate public and secrets keys for each node:
 
 ```sh
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/1 --peer-address 127.0.0.1:6331 -n
+exonum_mwf generate-config example/common.toml  example/1 --peer-address 127.0.0.1:6331 -n
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/2 --peer-address 127.0.0.1:6332 -n
+exonum_mwf generate-config example/common.toml  example/2 --peer-address 127.0.0.1:6332 -n
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/3 --peer-address 127.0.0.1:6333 -n
+exonum_mwf generate-config example/common.toml  example/3 --peer-address 127.0.0.1:6333 -n
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/4 --peer-address 127.0.0.1:6334 -n
+exonum_mwf generate-config example/common.toml  example/4 --peer-address 127.0.0.1:6334 -n
 ```
 
 Note that in case of copying files with consensus and service keys to the other machines, you must change the access permissions of these files for every machine.
@@ -96,25 +96,25 @@ sudo chmod 600 service.toml
 Finalize configs:
 
 ```sh
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/1/sec.toml example/1/node.toml --public-configs example/{1,2,3,4}/pub.toml
+exonum_mwf finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/1/sec.toml example/1/node.toml --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/2/sec.toml example/2/node.toml --public-configs example/{1,2,3,4}/pub.toml
+exonum_mwf finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/2/sec.toml example/2/node.toml --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/3/sec.toml example/3/node.toml --public-configs example/{1,2,3,4}/pub.toml
+exonum_mwf finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/3/sec.toml example/3/node.toml --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/4/sec.toml example/4/node.toml --public-configs example/{1,2,3,4}/pub.toml
+exonum_mwf finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/4/sec.toml example/4/node.toml --public-configs example/{1,2,3,4}/pub.toml
 ```
 
 Run nodes:
 
 ```sh
-exonum-cryptocurrency-advanced run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
+exonum_mwf run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --consensus-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --consensus-key-pass pass --service-key-pass pass
+exonum_mwf run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --consensus-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --consensus-key-pass pass --service-key-pass pass
+exonum_mwf run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --consensus-key-pass pass --service-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --consensus-key-pass pass --service-key-pass pass
+exonum_mwf run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --consensus-key-pass pass --service-key-pass pass
 ```
 
 <!-- markdownlint-enable MD013 -->
@@ -136,7 +136,7 @@ npm run build
 Run the application:
 
 ```sh
-npm start -- --port=8280 --api-root=http://127.0.0.1:8200
+npm start -- --port=8280 --api-root=http://10.150.11.132:8091
 ```
 
 `--port` is a port for Node.JS app.

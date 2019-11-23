@@ -29,7 +29,7 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use exonum_cryptocurrency_advanced::{
+use exonum_mwf::{
     api::{WalletInfo, WalletQuery},
     transactions::{CreateWallet, Transfer},
     wallet::Wallet,

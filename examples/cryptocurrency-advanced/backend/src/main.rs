@@ -14,7 +14,7 @@
 
 use exonum::helpers::fabric::NodeBuilder;
 use exonum_configuration as configuration;
-use exonum_cryptocurrency_advanced as cryptocurrency;
+use exonum_mwf as cryptocurrency;
 
 fn main() {
     exonum::crypto::init();
