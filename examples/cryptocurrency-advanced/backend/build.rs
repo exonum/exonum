@@ -5,6 +5,6 @@ fn main() {
     protobuf_generate(
         "src/proto",
         &["src/proto", &exonum_protos],
-        "protobuf_mod.rs",
+        "protobuf_mod3.rs",
     );
 }

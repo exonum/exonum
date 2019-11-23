@@ -14,6 +14,7 @@
 
 syntax = "proto3";
 
+//package exonum.exonum_mwf;
 package exonum.examples.cryptocurrency_advanced;
 
 import "helpers.proto";
@@ -54,4 +55,55 @@ message Wallet {
   uint64 history_len = 4;
   // `Hash` of the transactions history.
   exonum.Hash history_hash = 5;
+}
+
+/// Транзакция создания поединка.
+message CreateDuel {
+  // Ключ поединка.
+  exonum.PublicKey key = 1;
+
+  /// Ключ играка 1.
+  exonum.PublicKey player1_key = 2;
+  /// Ключ играка 2.
+  exonum.PublicKey player2_key = 3;
+
+  /// Ключ судьи 1.
+  exonum.PublicKey judge1_key = 4;
+  /// Ключ судьи 2.
+  exonum.PublicKey judge2_key = 5;
+  /// Ключ судьи 3.
+  exonum.PublicKey judge3_key = 6;
+
+  /// Номер ситуации.
+  uint64 situation_number = 7;
+}
+
+/// Поединок.
+message Duel {
+  // Ключ поединка.
+  exonum.PublicKey key = 1;
+
+  /// Ключ арбитра.
+  exonum.PublicKey arbiter_key = 2;
+
+  /// Ключ играка 1.
+  exonum.PublicKey player1_key = 3;
+  /// Ключ играка 2.
+  exonum.PublicKey player2_key = 4;
+
+  /// Ключ судьи 1.
+  exonum.PublicKey judge1_key = 5;
+  /// Ключ судьи 2.
+  exonum.PublicKey judge2_key = 6;
+  /// Ключ судьи 3.
+  exonum.PublicKey judge3_key = 7;
+
+  /// Номер ситуации.
+  uint64 situation_number = 8;
+
+  /// Количество транзакция связанных с поединком.
+  uint64 history_len = 9;
+
+  // `Hash` of the transactions history.
+  exonum.Hash history_hash = 10;
 }
