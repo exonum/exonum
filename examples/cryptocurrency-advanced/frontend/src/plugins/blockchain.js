@@ -8,6 +8,7 @@ const SERVICE_ID = 128
 const TX_TRANSFER_ID = 0
 const TX_ISSUE_ID = 1
 const TX_WALLET_ID = 2
+const TX_DUEL_ID = 3
 const TABLE_INDEX = 0
 const Wallet = Exonum.newType(proto.exonum.examples.cryptocurrency_advanced.Wallet)
 
@@ -38,6 +39,15 @@ function CreateTransaction(publicKey) {
   })
 }
 
+function DuelTransaction(publicKey) {
+  return Exonum.newTransaction({
+    author: publicKey,
+    service_id: SERVICE_ID,
+    message_id: TX_DUEL_ID,
+    schema: proto.exonum.examples.cryptocurrency_advanced.CreateDuel
+  })
+}
+
 function getTransaction(transaction, publicKey) {
   if (transaction.name) {
     return new CreateTransaction(publicKey)
@@ -59,6 +69,38 @@ module.exports = {
 
       generateSeed() {
         return Exonum.randomUint64()
+      },
+
+      createDuel(keyPair, player1_key, player2_key, judge1_key, judge2_key, judge3_key, situation_number) {
+        // Describe transaction
+        const transaction = new DuelTransaction(keyPair.publicKey)
+
+        // Transaction data
+        const data = {
+          key: Exonum.keyPair().publicKey,
+          player1_key: player1_key,
+          player2_key: player2_key,
+          judge1_key: judge1_key,
+          judge2_key: judge2_key,
+          judge3_key: judge3_key,
+          situation_number: situation_number
+        }
+        debugger
+        // Send transaction into blockchain
+        return transaction.send(TRANSACTION_URL, data, keyPair.secretKey)
+      },
+
+      getBlocks(latest) {
+        const suffix = !isNaN(latest) ? '&latest=' + latest : ''
+        return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}${suffix}`).then(response => response.data)
+      },
+
+      getBlock(height) {
+        return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
+      },
+
+      getTransaction(hash) {
+        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
       },
 
       createWallet(keyPair, name) {
@@ -186,19 +228,6 @@ module.exports = {
             })
         })
       },
-
-      getBlocks(latest) {
-        const suffix = !isNaN(latest) ? '&latest=' + latest : ''
-        return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}${suffix}`).then(response => response.data)
-      },
-
-      getBlock(height) {
-        return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
-      },
-
-      getTransaction(hash) {
-        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
-      }
     }
   }
 }

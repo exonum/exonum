@@ -5,6 +5,7 @@ import WalletPage from '../pages/Wallet.vue'
 import BlockchainPage from '../pages/Blockchain.vue'
 import BlockPage from '../pages/Block.vue'
 import TransactionPage from '../pages/Transaction.vue'
+import DuelPage from '../pages/Duel.vue'
 
 Vue.use(Router)
 
@@ -19,6 +20,11 @@ export default new Router({
       path: '/user',
       name: 'user',
       component: WalletPage
+    },
+    {
+      path: '/duel',
+      name: 'duel',
+      component: DuelPage
     },
     {
       path: '/blockchain',
