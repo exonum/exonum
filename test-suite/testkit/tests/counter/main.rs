@@ -440,8 +440,8 @@ fn test_explorer_blocks_basic() {
         .get("v1/blocks?count=10")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(0));
-    assert_eq!(*blocks[0].block.prev_hash(), crypto::Hash::zero());
+    assert_eq!(blocks[0].block.height, Height(0));
+    assert_eq!(blocks[0].block.prev_hash, crypto::Hash::zero());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(1));
 
@@ -460,7 +460,8 @@ fn test_explorer_blocks_basic() {
                 "tx_count": 0,
                 "prev_hash": crypto::Hash::zero(),
                 "tx_hash": HashTag::empty_list_hash(),
-                "state_hash": blocks[0].block.state_hash(),
+                "state_hash": blocks[0].block.state_hash,
+                "call_hash": blocks[0].block.call_hash,
             }],
         })
     );
@@ -473,11 +474,11 @@ fn test_explorer_blocks_basic() {
         .get("v1/blocks?count=10")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(1));
-    assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.object_hash());
-    assert_eq!(blocks[0].block.tx_count(), 0);
-    assert_eq!(blocks[1].block.height(), Height(0));
-    assert_eq!(*blocks[1].block.prev_hash(), crypto::Hash::default());
+    assert_eq!(blocks[0].block.height, Height(1));
+    assert_eq!(blocks[0].block.prev_hash, blocks[1].block.object_hash());
+    assert_eq!(blocks[0].block.tx_count, 0);
+    assert_eq!(blocks[1].block.height, Height(0));
+    assert_eq!(blocks[1].block.prev_hash, crypto::Hash::default());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
@@ -503,7 +504,8 @@ fn test_explorer_blocks_basic() {
                 "tx_count": 0,
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
-                "state_hash": blocks[0].block.state_hash(),
+                "state_hash": blocks[0].block.state_hash,
+                "call_hash": blocks[0].block.call_hash,
                 "precommits": [precommit],
             }],
         })
@@ -523,7 +525,8 @@ fn test_explorer_blocks_basic() {
                 "tx_count": 0,
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
-                "state_hash": blocks[0].block.state_hash(),
+                "state_hash": blocks[0].block.state_hash,
+                "call_hash": blocks[0].block.call_hash,
                 "time": precommit.payload().time(),
             }],
         })
@@ -575,9 +578,9 @@ fn test_explorer_blocks_skip_empty_small() {
         .get("v1/blocks?count=10")
         .unwrap();
     assert_eq!(blocks.len(), 3);
-    assert_eq!(blocks[0].block.height(), Height(2));
-    assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.object_hash());
-    assert_eq!(blocks[0].block.tx_count(), 1);
+    assert_eq!(blocks[0].block.height, Height(2));
+    assert_eq!(blocks[0].block.prev_hash, blocks[1].block.object_hash());
+    assert_eq!(blocks[0].block.tx_count, 1);
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
@@ -586,7 +589,7 @@ fn test_explorer_blocks_skip_empty_small() {
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
@@ -598,7 +601,7 @@ fn test_explorer_blocks_skip_empty_small() {
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
 }
@@ -618,7 +621,7 @@ fn test_explorer_blocks_skip_empty() {
         .get("v1/blocks?count=1&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(5));
     assert_eq!(range.end, Height(6));
 
@@ -627,8 +630,8 @@ fn test_explorer_blocks_skip_empty() {
         .get("v1/blocks?count=3&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(5));
-    assert_eq!(blocks[1].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(5));
+    assert_eq!(blocks[1].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(6));
 }
@@ -649,7 +652,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
 
@@ -659,7 +662,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=10&earliest=3")
         .unwrap();
     assert_eq!(blocks.len(), 3);
-    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(6));
 
@@ -669,7 +672,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=10&latest=4&earliest=3")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(4));
+    assert_eq!(blocks[0].block.height, Height(4));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(5));
 
@@ -679,7 +682,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=2&latest=4&earliest=1")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(4));
+    assert_eq!(blocks[0].block.height, Height(4));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(5));
 
@@ -689,7 +692,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=2&latest=5")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(4));
     assert_eq!(range.end, Height(6));
 
@@ -754,7 +757,7 @@ fn test_explorer_single_block() {
         let explorer = BlockchainExplorer::new(snapshot.as_ref());
         let block = explorer.block(Height(0)).unwrap();
         assert_eq!(block.height(), Height(0));
-        assert_eq!(*block.header().prev_hash(), crypto::Hash::default());
+        assert_eq!(block.header().prev_hash, crypto::Hash::default());
         assert_eq!(&*block.transaction_hashes(), &[]);
     }
 
@@ -772,7 +775,7 @@ fn test_explorer_single_block() {
         assert_eq!(block.height(), Height(1));
         assert_eq!(block.len(), 1);
         assert_eq!(
-            *block.header().tx_hash(),
+            block.header().tx_hash,
             HashTag::hash_list(&[tx.object_hash()])
         );
         assert_eq!(&*block.transaction_hashes(), &[tx.object_hash()]);
@@ -854,7 +857,7 @@ fn test_explorer_transaction_info() {
     let block = explorer.block(Height(1)).unwrap();
     assert!(committed
         .location_proof()
-        .check_against_hash(*block.header().tx_hash())
+        .check_against_hash(block.header().tx_hash)
         .is_ok());
 }
 

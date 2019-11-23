@@ -632,10 +632,10 @@ impl TestKit {
 
     /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
-        self.blockchain.as_ref().last_block().height()
+        self.blockchain.as_ref().last_block().height
     }
 
-    /// Return an actual blockchain configuration.
+    /// Returns an actual blockchain configuration.
     pub fn consensus_config(&self) -> ConsensusConfig {
         self.snapshot().for_core().consensus_config()
     }
