@@ -5,11 +5,17 @@ import WalletPage from '../pages/Wallet.vue'
 import BlockchainPage from '../pages/Blockchain.vue'
 import BlockPage from '../pages/Block.vue'
 import TransactionPage from '../pages/Transaction.vue'
+import VotePage from '../pages/Vote.vue'
 
 Vue.use(Router)
 
 export default new Router({
   routes: [
+    {
+      path: '/vote',
+      name: 'vote',
+      component: VotePage
+    },
     {
       path: '/',
       name: 'home',
