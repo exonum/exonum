@@ -61,7 +61,7 @@
         judge1_key: Exonum.keyPair().publicKey,
         judge2_key: Exonum.keyPair().publicKey,
         judge3_key: Exonum.keyPair().publicKey,
-        situation_number: 101,
+        situation_number: null,
         isSpinnerVisible: false,
       }
     },
@@ -121,11 +121,11 @@
         if (!this.$validateHex(this.keyPair.publicKey)) {
           return this.$notify('error', 'Invalid public key is passed')
         }
-        /*
-        if (this.arbitrator === this.keyPair.publicKey) {
-          return this.$notify('error', 'Can not transfer funds to yourself')
+        
+        if (this.situation_number === null) {
+          return this.$notify('error', 'Empty situation_number')
         }
-        */
+        
         this.isSpinnerVisible = true
 
         const seed = this.$blockchain.generateSeed()
