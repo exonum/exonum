@@ -28,7 +28,10 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, CallContext, Service, Transaction},
+        rust::{
+            AfterCommitContext, CallContext, DefaultInstance, InstanceInfoProvider, Service,
+            Transaction,
+        },
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -282,4 +285,11 @@ where
             Vec::default(),
         )
     }
+}
+
+impl<Mode: mode::SupervisorMode> InstanceInfoProvider for Supervisor<Mode> {}
+
+impl<Mode: mode::SupervisorMode> DefaultInstance for Supervisor<Mode> {
+    const DEFAULT_INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
+    const DEFAULT_INSTANCE_NAME: &'static str = Self::NAME;
 }

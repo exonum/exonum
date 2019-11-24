@@ -66,8 +66,7 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_factory(TestServiceImpl);
+    let runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(TestServiceImpl);
     let event_handle = Arc::default();
     let runtime = Inspected {
         inner: runtime,

@@ -19,7 +19,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{CallContext, Service},
+        rust::{CallContext, DefaultInstance, InstanceInfoProvider, Service},
         BlockchainData, DispatcherError, InstanceId,
     },
 };
@@ -131,6 +131,13 @@ impl From<IncService> for InstanceCollection {
     fn from(instance: IncService) -> Self {
         InstanceCollection::new(instance).with_instance(SERVICE_ID, SERVICE_NAME, Vec::default())
     }
+}
+
+impl InstanceInfoProvider for IncService {}
+
+impl DefaultInstance for IncService {
+    const DEFAULT_INSTANCE_ID: InstanceId = SERVICE_ID;
+    const DEFAULT_INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
 impl Configure for IncService {

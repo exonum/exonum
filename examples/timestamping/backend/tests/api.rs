@@ -22,10 +22,13 @@ use exonum::{
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
     messages::Verified,
-    runtime::{rust::Transaction, AnyTx, InstanceId},
+    runtime::{
+        rust::{InstanceInfoProvider, Transaction},
+        AnyTx, InstanceId,
+    },
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use exonum_timestamping::{
     api::TimestampQuery,
@@ -43,18 +46,21 @@ const SERVICE_NAME: &str = "my-timestamping";
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
+    let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
+    let timestamping = TimestampingService;
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(
-            InstanceCollection::new(TimeServiceFactory::with_provider(mock_provider.clone()))
-                .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
-        )
-        .with_rust_service(InstanceCollection::new(TimestampingService).with_instance(
+        .with_artifact(time_service.get_artifact(), ())
+        .with_instance(time_service.get_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()))
+        .with_rust_service(time_service)
+        .with_artifact(timestamping.get_artifact(), ())
+        .with_instance(timestamping.get_instance(
             SERVICE_ID,
             SERVICE_NAME,
             Config {
                 time_service_name: TIME_SERVICE_NAME.to_owned(),
             },
         ))
+        .with_rust_service(timestamping)
         .create();
     testkit.create_blocks_until(Height(2)); // TimeService is None if no blocks were forged
     (testkit, mock_provider)

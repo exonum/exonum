@@ -180,7 +180,7 @@ mod tests {
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::{
-            rust::{CallContext, Service, Transaction},
+            rust::{CallContext, InstanceInfoProvider, Service, Transaction},
             BlockchainData,
         },
     };
@@ -190,7 +190,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::{proto, InstanceCollection, TestKitApi, TestKitBuilder};
+    use crate::{proto, TestKitApi, TestKitBuilder};
 
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
@@ -215,6 +215,8 @@ mod tests {
     #[service_factory(artifact_name = "sample-service", proto_sources = "crate::proto")]
     #[service_dispatcher(implements("SampleServiceInterface"))]
     struct SampleService;
+
+    impl InstanceInfoProvider for SampleService {}
 
     #[exonum_interface]
     trait SampleServiceInterface {
@@ -244,12 +246,11 @@ mod tests {
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> TestKitApi {
+        let service = SampleService;
         let mut testkit = TestKitBuilder::validator()
-            .with_rust_service(InstanceCollection::new(SampleService).with_instance(
-                TIMESTAMP_SERVICE_ID,
-                TIMESTAMP_SERVICE_NAME,
-                (),
-            ))
+            .with_artifact(service.get_artifact(), ())
+            .with_instance(service.get_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME, ()))
+            .with_rust_service(service)
             .create();
         testkit.create_blocks_until(height);
         // Process incoming events in background.

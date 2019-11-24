@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum::{
     api,
@@ -215,16 +215,16 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .create()
 }
 
 fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .with_validators(n)
         .create()
 }
@@ -236,19 +236,17 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .with_validators(1)
         .create()
 }
 
 fn testkit_with_inc_service_and_static_instance() -> TestKit {
-    let service = IncService;
-    let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_rust_service_default(IncService)
         .create()
 }
 
@@ -554,8 +552,8 @@ fn test_start_two_services_in_one_request() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .create();
     deploy_default(&mut testkit);
 

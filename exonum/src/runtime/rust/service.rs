@@ -18,6 +18,7 @@ use futures::IntoFuture;
 use std::fmt::{self, Debug};
 
 use crate::{
+    blockchain::config::InstanceInitParams,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
     messages::Verified,
@@ -129,6 +130,34 @@ where
 {
     fn from(factory: T) -> Self {
         Box::new(factory) as Self
+    }
+}
+
+pub trait InstanceInfoProvider: ServiceFactory {
+    fn get_instance(
+        &self,
+        id: InstanceId,
+        name: impl Into<String>,
+        constructor: impl BinaryValue,
+    ) -> InstanceInitParams {
+        InstanceInitParams::new(id, name.into(), self.get_artifact(), constructor)
+    }
+
+    fn get_artifact(&self) -> ArtifactId {
+        self.artifact_id().clone().into()
+    }
+}
+
+pub trait DefaultInstance: InstanceInfoProvider {
+    const DEFAULT_INSTANCE_ID: InstanceId;
+    const DEFAULT_INSTANCE_NAME: &'static str;
+
+    fn default_instance(&self) -> InstanceInitParams {
+        self.get_instance(
+            Self::DEFAULT_INSTANCE_ID,
+            Self::DEFAULT_INSTANCE_NAME,
+            vec![],
+        )
     }
 }
 

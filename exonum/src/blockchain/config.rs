@@ -21,14 +21,14 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
     messages::{BinaryValue, SIGNED_MESSAGE_MIN_SIZE},
     proto::schema::{blockchain, runtime},
-    runtime::{ArtifactId, ArtifactSpec, InstanceSpec},
+    runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };
 
 use exonum_proto::ProtobufConvert;
@@ -342,12 +342,31 @@ pub struct InstanceInitParams {
     pub constructor: Vec<u8>,
 }
 
+impl InstanceInitParams {
+    /// Generic constructor.
+    pub fn new(
+        id: InstanceId,
+        name: impl Into<String>,
+        artifact: ArtifactId,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        InstanceInitParams {
+            instance_spec: InstanceSpec {
+                id,
+                name: name.into(),
+                artifact,
+            },
+            constructor: constructor.into_bytes(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct GenesisConfigBuilder {
     /// Consensus config.
     consensus_config: ConsensusConfig,
     /// Artifacts specifications for builtin services.
-    artifacts: Vec<ArtifactSpec>,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
     /// Instances of builtin services.
     builtin_instances: Vec<InstanceInitParams>,
 }
@@ -388,23 +407,46 @@ impl GenesisConfigBuilder {
     pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
         Self {
             consensus_config,
-            artifacts: vec![],
+            artifacts: HashMap::new(),
             builtin_instances: vec![],
         }
     }
 
+    /// Adds an artifact with corresponding deploy arguments. Does nothing in case artifact with
+    /// given id is already added.
+    pub fn with_artifact(mut self, artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
+        if !self.artifacts.contains_key(&artifact) {
+            self.artifacts.insert(artifact, deploy_spec.into_bytes());
+        }
+        self
+    }
+
+    // TODO remove
     pub fn with_service(mut self, instance_config: InstanceConfig) -> Self {
         if !instance_config.instances.is_empty() {
-            self.artifacts.push(instance_config.artifact_spec);
+            self.artifacts.insert(
+                instance_config.artifact_spec.artifact,
+                instance_config.artifact_spec.payload,
+            );
         }
         self.builtin_instances.extend(instance_config.instances);
         self
     }
 
+    pub fn with_service_new(mut self, instance_params: InstanceInitParams) -> Self {
+        self.builtin_instances.push(instance_params);
+        self
+    }
+
     pub fn build(self) -> GenesisConfig {
+        let artifacts = self
+            .artifacts
+            .into_iter()
+            .map(|(artifact, payload)| ArtifactSpec { artifact, payload })
+            .collect::<Vec<_>>();
         GenesisConfig {
             consensus_config: self.consensus_config,
-            artifacts: self.artifacts,
+            artifacts,
             builtin_instances: self.builtin_instances,
         }
     }

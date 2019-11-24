@@ -18,7 +18,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError},
 };
-use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
+use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::{
     error::Error,
@@ -37,21 +37,9 @@ mod services;
 fn testkit_with_interfaces() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(InstanceCollection::new(WalletService).with_instance(
-            WalletService::ID,
-            "wallet",
-            vec![],
-        ))
-        .with_rust_service(InstanceCollection::new(DepositService).with_instance(
-            DepositService::ID,
-            "deposit",
-            vec![],
-        ))
-        .with_rust_service(InstanceCollection::new(AnyCallService).with_instance(
-            AnyCallService::ID,
-            "any-call",
-            vec![],
-        ))
+        .with_rust_service_default(WalletService)
+        .with_rust_service_default(DepositService)
+        .with_rust_service_default(AnyCallService)
         .create()
 }
 

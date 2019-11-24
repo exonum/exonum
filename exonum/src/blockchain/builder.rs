@@ -154,16 +154,18 @@ mod tests {
 
     use super::*;
     use crate::{
-        // Import service from tests, so we won't have implement other one.
-        blockchain::{tests::ServiceGoodImpl as SampleService, ConsensusConfig},
-        helpers::{create_rust_runtime_and_genesis_config, generate_testnet_config, Height},
+        blockchain::{
+            config::GenesisConfigBuilder, tests::ServiceGoodImpl as SampleService, ConsensusConfig,
+        },
+        helpers::{generate_testnet_config, Height},
+        runtime::rust::{InstanceInfoProvider, RustRuntime},
     };
 
     #[test]
     fn finalize_without_genesis_block() {
         let config = generate_testnet_config(1, 0)[0].clone();
-        let (rust_runtime, genesis_config) =
-            create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, vec![]);
+        let rust_runtime = RustRuntime::new(mpsc::channel(0).0);
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
         let blockchain = Blockchain::build_for_tests()
             .into_mut(genesis_config)
             .with_runtime(rust_runtime)
@@ -175,10 +177,31 @@ mod tests {
         // TODO check dispatcher schema.
     }
 
-    fn test_finalizing_services(services: Vec<InstanceCollection>) {
+    // Attempts to create blockchain for particular Rust services and its instances assuming all of
+    // these are builtin services.
+    fn test_finalizing_services(
+        services: Vec<Box<dyn ServiceFactory>>,
+        instances: Vec<InstanceInitParams>,
+    ) {
         let config = generate_testnet_config(1, 0)[0].clone();
-        let (rust_runtime, genesis_config) =
-            create_rust_runtime_and_genesis_config(mpsc::channel(0).0, config.consensus, services);
+        let rust_runtime = services
+            .into_iter()
+            .fold(RustRuntime::new(mpsc::channel(0).0), |runtime, factory| {
+                runtime.with_factory(factory)
+            });
+
+        let genesis_config = instances
+            .into_iter()
+            .fold(
+                GenesisConfigBuilder::with_consensus_config(config.consensus),
+                |builder, instance| {
+                    builder
+                        .with_artifact(instance.instance_spec.artifact.clone(), ())
+                        .with_service_new(instance)
+                },
+            )
+            .build();
+
         Blockchain::build_for_tests()
             .into_mut(genesis_config)
             .with_runtime(rust_runtime)
@@ -189,36 +212,42 @@ mod tests {
     #[test]
     #[should_panic(expected = "already used")]
     fn finalize_duplicate_services() {
-        test_finalizing_services(vec![
-            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-        ]);
+        let sample_service = SampleService;
+        let instance = sample_service.get_instance(0, "sample", ());
+        test_finalizing_services(
+            vec![sample_service.into()],
+            vec![instance.clone(), instance],
+        );
     }
 
     #[test]
     #[should_panic(expected = "already used")]
     fn finalize_services_with_duplicate_names() {
-        test_finalizing_services(vec![
-            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-            InstanceCollection::new(SampleService).with_instance(1, "sample", ()),
-        ]);
+        let sample_service = SampleService;
+        let instances = vec![
+            sample_service.get_instance(0, "sample", ()),
+            sample_service.get_instance(1, "sample", ()),
+        ];
+        test_finalizing_services(vec![sample_service.into()], instances);
     }
 
     #[test]
     #[should_panic(expected = "already used")]
     fn finalize_services_with_duplicate_ids() {
-        test_finalizing_services(vec![
-            InstanceCollection::new(SampleService).with_instance(0, "sample", ()),
-            InstanceCollection::new(SampleService).with_instance(0, "other-sample", ()),
-        ]);
+        let sample_service = SampleService;
+        let instances = vec![
+            sample_service.get_instance(0, "sample", ()),
+            sample_service.get_instance(0, "other-sample", ()),
+        ];
+        test_finalizing_services(vec![sample_service.into()], instances);
     }
 
     #[test]
     #[should_panic(expected = "Consensus configuration must have at least one validator")]
     fn finalize_invalid_consensus_config() {
         let consensus_config = ConsensusConfig::default();
-        let (rust_runtime, genesis_config) =
-            create_rust_runtime_and_genesis_config(mpsc::channel(0).0, consensus_config, vec![]);
+        let rust_runtime = RustRuntime::new(mpsc::channel(0).0);
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config).build();
         Blockchain::build_for_tests()
             .into_mut(genesis_config)
             .with_runtime(rust_runtime)

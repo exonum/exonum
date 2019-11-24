@@ -194,7 +194,7 @@ pub mod contracts {
         crypto::Hash,
         runtime::{
             api::ServiceApiBuilder,
-            rust::{CallContext, Service},
+            rust::{CallContext, InstanceInfoProvider, Service},
             BlockchainData,
         },
     };
@@ -223,6 +223,8 @@ pub mod contracts {
     #[service_dispatcher(implements("CryptocurrencyInterface"))]
     #[service_factory(proto_sources = "crate::proto")]
     pub struct CryptocurrencyService;
+
+    impl InstanceInfoProvider for CryptocurrencyService {}
 
     impl CryptocurrencyInterface for CryptocurrencyService {
         fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {

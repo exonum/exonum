@@ -20,20 +20,16 @@ pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NA
 
 use exonum::{explorer::BlockchainExplorer, helpers::Height, runtime::rust::Transaction};
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use exonum_testkit::{InstanceCollection, TestKitBuilder};
+use exonum_testkit::TestKitBuilder;
 
 mod hooks;
 mod proto;
-
-fn after_commit_service_instances(factory: AfterCommitService) -> InstanceCollection {
-    InstanceCollection::new(factory).with_instance(SERVICE_ID, SERVICE_NAME, ())
-}
 
 #[test]
 fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(after_commit_service_instances(service.clone()))
+        .with_rust_service_default(service.clone())
         .create();
 
     // Check that `after_commit` invoked on the correct height.
@@ -62,10 +58,9 @@ fn test_after_commit() {
 
 #[test]
 fn restart_testkit() {
-    let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_rust_service(after_commit_service_instances(service.clone()))
+        .with_rust_service_default(AfterCommitService::new())
         .create();
     testkit.create_blocks_until(Height(5));
 
@@ -73,9 +68,7 @@ fn restart_testkit() {
     assert_eq!(stopped.height(), Height(5));
     assert_eq!(stopped.network().validators().len(), 3);
     let service = AfterCommitService::new();
-    let runtime = stopped
-        .rust_runtime()
-        .with_factory(service.clone());
+    let runtime = stopped.rust_runtime().with_factory(service.clone());
     let mut testkit = stopped.resume(vec![runtime]);
     for _ in 0..3 {
         testkit.create_block();
@@ -108,7 +101,7 @@ fn restart_testkit() {
 #[test]
 fn tx_pool_is_retained_on_restart() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(after_commit_service_instances(AfterCommitService::new()))
+        .with_rust_service_default(AfterCommitService::new())
         .create();
 
     let tx_hashes: Vec<_> = (100..105)

@@ -18,7 +18,7 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{Transaction, CallContext, Service}},
+//!     runtime::{BlockchainData, SnapshotExt, rust::{InstanceInfoProvider, Transaction, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
@@ -65,15 +65,17 @@
 //!     }
 //! }
 //!
+//! impl InstanceInfoProvider for TimestampingService {}
+//!
 //! fn main() {
 //!     // Create testkit for network with four validators
 //!     // and add a builtin timestamping service with ID=1.
+//!     let service = TimestampingService;
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_rust_service(
-//!             InstanceCollection::new(TimestampingService)
-//!                 .with_instance(SERVICE_ID, "timestamping", ())
-//!         )
+//!         .with_artifact(service.get_artifact(), ())
+//!         .with_instance(service.get_instance(SERVICE_ID, "timestamping", ()))
+//!         .with_rust_service(service)
 //!         .create();
 //!
 //!     // Create few transactions.
@@ -151,11 +153,12 @@ use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         manager::UpdateEndpoints,
-        ApiAccess,
+        node::SharedNodeState,
+        ApiAccess, ApiAggregator,
     },
     blockchain::{
-        config::{GenesisConfig, GenesisConfigBuilder},
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig
+        config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
@@ -163,7 +166,10 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{rust::ServiceFactory, InstanceId, Runtime, SnapshotExt},
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        ArtifactId, InstanceId, Runtime, SnapshotExt,
+    },
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
@@ -180,9 +186,6 @@ use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
 };
-use exonum::api::node::SharedNodeState;
-use exonum::api::ApiAggregator;
-use exonum::runtime::rust::RustRuntime;
 
 #[macro_use]
 mod macros;
@@ -228,12 +231,14 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
+        let service_factory = service_factory.into();
+        let artifact: ArtifactId = service_factory.artifact_id().clone().into();
+        let instance =
+            InstanceInitParams::new(id, name.into(), artifact.clone(), constructor.into_bytes());
         TestKitBuilder::validator()
-            .with_rust_service(InstanceCollection::new(service_factory).with_instance(
-                id,
-                name,
-                constructor,
-            ))
+            .with_artifact(artifact, ())
+            .with_instance(instance)
+            .with_rust_service(service_factory)
             .create()
     }
 
@@ -352,7 +357,7 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{BlockchainData, rust::{Transaction, CallContext, Service}},
+    /// #     runtime::{BlockchainData, rust::{InstanceInfoProvider, Transaction, CallContext, Service}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;
@@ -381,6 +386,8 @@ impl TestKit {
     /// #     }
     /// # }
     /// #
+    /// # impl InstanceInfoProvider for ExampleService {}
+    /// #
     /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
     /// # #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
     /// # pub struct ExampleTx {
@@ -391,11 +398,11 @@ impl TestKit {
     /// # fn assert_something_about(_: &TestKit) {}
     /// #
     /// # fn main() {
+    /// let service = ExampleService;
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_rust_service(
-    ///         InstanceCollection::new(ExampleService)
-    ///            .with_instance(SERVICE_ID, "example", ())
-    ///     )
+    ///     .with_artifact(service.get_artifact(), ())
+    ///     .with_instance(service.get_instance(SERVICE_ID, "example", ()))
+    ///     .with_rust_service(ExampleService)
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();

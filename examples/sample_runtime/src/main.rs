@@ -17,8 +17,7 @@
 
 use exonum::{
     blockchain::{
-        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, ConsensusConfig,
-        InstanceCollection, ValidatorKeys,
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys,
     },
     helpers::Height,
     keys::Keys,
@@ -26,7 +25,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::{RustRuntime, Transaction},
+        rust::{DefaultInstance, RustRuntime, Transaction},
         AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime,
        SnapshotExt,
@@ -268,7 +267,7 @@ fn main() {
 
     let db = TemporaryDB::new();
     let node_cfg = node_config();
-    let genesis = node_cfg.consensus.clone();
+    let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
     let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
@@ -276,12 +275,12 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
-    let (factory, cfg) = InstanceCollection::from(SimpleSupervisor::new()).into();
-    let rust_runtime =
-        RustRuntime::new(channel.endpoints.0.clone()).with_factory(factory);
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(genesis)
-        .with_service(cfg)
+    let supervisor_service = SimpleSupervisor::new();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+        .with_service_new(supervisor_service.default_instance())
         .build();
+    let rust_runtime =
+        RustRuntime::new(channel.endpoints.0.clone()).with_factory(supervisor_service);
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())

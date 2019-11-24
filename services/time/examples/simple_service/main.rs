@@ -33,12 +33,12 @@ use exonum::{
     helpers::Height,
     messages::Verified,
     runtime::{
-        rust::{CallContext, Service, Transaction},
+        rust::{CallContext, InstanceInfoProvider, Service, Transaction},
         AnyTx, BlockchainData, InstanceId, SnapshotExt,
     },
 };
 use exonum_proto::ProtobufConvert;
-use exonum_testkit::{InstanceCollection, TestKitBuilder};
+use exonum_testkit::TestKitBuilder;
 use exonum_time::{
     schema::TimeSchema,
     time_provider::{MockTimeProvider, TimeProvider},
@@ -139,21 +139,20 @@ impl Service for MarkerService {
     }
 }
 
+impl InstanceInfoProvider for MarkerService {}
+
 fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());
     // Create testkit for network with one validator.
+    let time_service =
+        TimeServiceFactory::with_provider(mock_provider.clone() as Arc<dyn TimeProvider>);
+    let marker_service = MarkerService;
+
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(
-            InstanceCollection::new(TimeServiceFactory::with_provider(
-                mock_provider.clone() as Arc<dyn TimeProvider>
-            ))
-            .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
-        )
-        .with_rust_service(InstanceCollection::new(MarkerService).with_instance(
-            SERVICE_ID,
-            SERVICE_NAME,
-            (),
-        ))
+        .with_instance(time_service.get_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()))
+        .with_rust_service(time_service)
+        .with_instance(marker_service.get_instance(SERVICE_ID, SERVICE_NAME, ()))
+        .with_rust_service(marker_service)
         .create();
 
     mock_provider.set_time(Utc.timestamp(10, 0));

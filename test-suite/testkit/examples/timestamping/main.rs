@@ -24,13 +24,13 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash},
     runtime::{
-        rust::{CallContext, Service, Transaction},
+        rust::{CallContext, InstanceInfoProvider, Service, Transaction},
         BlockchainData, SnapshotExt,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot};
 use exonum_proto::ProtobufConvert;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKitBuilder};
 
 mod proto;
 
@@ -64,6 +64,8 @@ trait TimestampingInterface {
 #[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
+impl InstanceInfoProvider for TimestampingService {}
+
 impl TimestampingInterface for TimestampingService {
     fn timestamp(
         &self,
@@ -83,13 +85,11 @@ impl Service for TimestampingService {
 fn main() {
     let instance_id = 512;
     // Create a testkit for a network with four validators.
+    let service = TimestampingService;
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_rust_service(InstanceCollection::new(TimestampingService).with_instance(
-            instance_id,
-            "timestamping",
-            (),
-        ))
+        .with_instance(service.get_instance(instance_id, "timestamping", ()))
+        .with_rust_service(service)
         .create();
     // Create few transactions.
     let keypair = gen_keypair();

@@ -13,11 +13,14 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{ConsensusConfig, InstanceCollection},
+    blockchain::ConsensusConfig,
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        rust::{InstanceInfoProvider, Transaction},
+        InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+    },
 };
 use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -148,30 +151,27 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service_default(DecentralizedSupervisor::new())
         .create()
 }
 
 pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
-    let service = ConfigChangeService;
-    let collection =
-        InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_rust_service_default(ConfigChangeService)
         .create()
 }
 
 pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
-    let collection = InstanceCollection::new(service)
-        .with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ())
-        .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_rust_service_default(DecentralizedSupervisor::new())
+        .with_artifact(service.get_artifact(), ())
+        .with_instance(service.get_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ()))
+        .with_instance(service.get_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ()))
+        .with_rust_service(service)
         .create()
 }
 

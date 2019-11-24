@@ -27,13 +27,11 @@ use exonum::{
     runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{txvec, ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{txvec, ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 use serde_json::json;
 
-use crate::inflating_cryptocurrency::{
-    CreateWallet, CurrencyService, Transfer, SERVICE_ID, SERVICE_NAME,
-};
+use crate::inflating_cryptocurrency::{CreateWallet, CurrencyService, Transfer, SERVICE_ID};
 
 mod inflating_cryptocurrency;
 mod proto;
@@ -41,11 +39,7 @@ mod proto;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_rust_service(InstanceCollection::new(CurrencyService).with_instance(
-            SERVICE_ID,
-            SERVICE_NAME,
-            (),
-        ))
+        .with_rust_service_default(CurrencyService)
         .create()
 }
 

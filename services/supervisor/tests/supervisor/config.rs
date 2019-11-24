@@ -16,10 +16,12 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
 use exonum::{
-    blockchain::InstanceCollection,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{rust::Transaction, InstanceId, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        rust::{InstanceInfoProvider, Transaction},
+        InstanceId, SUPERVISOR_INSTANCE_ID,
+    },
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
@@ -463,17 +465,18 @@ fn test_another_configuration_change_proposal() {
 fn test_service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
     let keypair = crypto::gen_keypair();
+    let fake_supervisor = DecentralizedSupervisor::new();
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_rust_service(
-            InstanceCollection::new(DecentralizedSupervisor::new()).with_instance(
-                FAKE_SUPERVISOR_ID,
-                "fake-supervisor",
-                Vec::default(),
-            ),
-        )
-        .with_rust_service(ConfigChangeService)
+        .with_artifact(fake_supervisor.get_artifact(), ())
+        .with_instance(fake_supervisor.get_instance(
+            FAKE_SUPERVISOR_ID,
+            "fake-supervisor",
+            Vec::default(),
+        ))
+        .with_rust_service(fake_supervisor)
+        .with_rust_service_default(ConfigChangeService)
         .create();
 
     let params = "I am a new parameter".to_owned();

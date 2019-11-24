@@ -190,7 +190,8 @@ pub use self::{
     call_context::CallContext,
     error::Error,
     service::{
-        AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
+        AfterCommitContext, DefaultInstance, InstanceInfoProvider, Interface, Service,
+        ServiceDispatcher, ServiceFactory, Transaction,
     },
 };
 
@@ -299,10 +300,7 @@ impl RustRuntime {
 
     /// Adds a new service factory to the runtime and returns
     /// a modified `RustRuntime` object for further chaining.
-    pub fn with_factory(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
+    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
         let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);

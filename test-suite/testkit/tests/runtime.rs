@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::config::InstanceConfig,
+    blockchain::config::InstanceInitParams,
     runtime::{
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
         Runtime, StateHashAggregator,
@@ -111,14 +111,6 @@ impl Runtime for TestRuntime {
         self.tester.is_artifact_deployed(id)
     }
 
-    fn commit_service(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn start_adding_service(
         &self,
         _context: ExecutionContext<'_>,
@@ -126,6 +118,14 @@ impl Runtime for TestRuntime {
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.tester.configure_service(parameters);
+        Ok(())
+    }
+
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        _spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -167,7 +167,7 @@ impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
 fn test_runtime_factory() {
     let tester = Arc::new(RuntimeTester::default());
 
-    let artifact_spec: Vec<u8> = "deploy_spec".into();
+    let deploy_args: Vec<u8> = "deploy_spec".into();
     let constructor: Vec<u8> = "constructor_params".into();
     let instance_spec = InstanceSpec::new(
         1,
@@ -176,15 +176,19 @@ fn test_runtime_factory() {
     )
     .unwrap();
 
-    let inst_cfg = InstanceConfig::new(instance_spec.artifact.clone(), artifact_spec.clone())
-        .with_instance(instance_spec.clone(), constructor.clone());
+    let inst_cfg = InstanceInitParams {
+        instance_spec: instance_spec.clone(),
+        constructor: constructor.clone(),
+    };
+    let artifact = instance_spec.artifact.clone();
 
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()
         .with_additional_runtime(TestRuntime::with_runtime_tester(tester.clone()))
-        .with_instances(vec![inst_cfg])
+        .with_artifact(artifact.clone(), deploy_args.clone())
+        .with_instance(inst_cfg)
         .create();
 
-    tester.assert_artifact_deployed(instance_spec.artifact, artifact_spec);
+    tester.assert_artifact_deployed(artifact, deploy_args);
     tester.assert_config_params_passed(constructor);
 }
