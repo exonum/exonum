@@ -144,12 +144,11 @@ jobs:
 
   # Integration tests.
   - name: integration-tests
-    env:
-    - PATH=/opt/python/3.7.1/bin:$PATH
     before_install:
-    - sudo apt-get install python3-pip
-    - python3 -V
-    - sudo python3 -m pip install pip
+    - sudo apt-get install software-properties-common
+    - sudo add-apt-repository -y ppa:deadsnakes/ppa
+    - sudo apt-get update
+    - sudo apt-get install -y python3.6 python3-pip python3-setuptools
     install:
     - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
     - nvm install 8 && nvm use 8
