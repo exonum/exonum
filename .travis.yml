@@ -147,7 +147,7 @@ jobs:
     env:
     - PATH=/opt/python/3.7.1/bin:$PATH
     before_install:
-    - sudo apt-get install python3-pip
+    - sudo sudo python3.7 -m pip install
     - pip3 install pip --upgrade
     install:
     - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
