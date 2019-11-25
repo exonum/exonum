@@ -25,9 +25,11 @@ use exonum::{
         AnyTx, BlockchainData, InstanceId,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
+use serde_derive::*;
 
 use std::collections::BTreeMap;
 

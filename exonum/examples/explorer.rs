@@ -15,23 +15,18 @@
 //! Examples of usage of a blockchain explorer.
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::BlockchainMut,
+    blockchain::{BlockchainMut, CallLocation},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
+    merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
     runtime::rust::Transaction as _,
 };
-use exonum_merkledb::ObjectHash;
+use serde_json::json;
 
 use std::iter;
 
@@ -146,7 +141,8 @@ fn main() {
     );
 
     // JSON for erroneous transactions
-    let erroneous_tx = explorer.block(Height(1)).unwrap().transaction(1).unwrap();
+    let block_info = explorer.block(Height(1)).unwrap();
+    let erroneous_tx = block_info.transaction(1).unwrap();
     assert_eq!(
         serde_json::to_value(&erroneous_tx).unwrap(),
         json!({
@@ -162,6 +158,14 @@ fn main() {
             "time": erroneous_tx.time(),
         })
     );
+    // It is possible to extract a proof of a transaction error. The proof is tied
+    // to the `error_hash` mentioned in the block header.
+    let proof: MapProof<_, _> = block_info.error_proof(CallLocation::Transaction(1));
+    let proof = proof
+        .check_against_hash(block_info.header().error_hash)
+        .unwrap();
+    let (_, error) = proof.entries().next().unwrap();
+    assert_eq!(error.description, "Not allowed");
 
     // JSON for panicking transactions
     let panicked_tx = explorer.block(Height(1)).unwrap().transaction(2).unwrap();
