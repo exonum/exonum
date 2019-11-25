@@ -47,6 +47,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
 
+- Services can now use `BlockchainData` and `SnapshotExt` types to access data
+  from the blockchain in a more structured manner. (#1523)
+
 - Placeholder for changes due to dynamic services (#9999)
 
 #### exonum-merkledb
@@ -56,6 +59,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Differentiated (read-only / read-write) access to the database
   was introduced. (#1523)
+
+- It is now possible to have readonly access to indexes given a `Fork`
+  via a `ReadonlyFork` wrapper. Readonly access works like `RefCell::borrow`
+  (vs `RefCell::borrow_mut` for `Fork`); it is possible to create an
+  unlimited number of indexes with readonly access based on the same fork.
+  (#1523)
+  
+- Service schemas can now use a declarative layout, in which every field
+  corresponds to a separate index or a group of indexes. It is possible
+  to derive a constructor for such schemas via `FromAccess` derive macro.
+  (#1523, #1562)
 
 #### exonum-proto
 

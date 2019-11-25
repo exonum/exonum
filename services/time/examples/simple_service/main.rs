@@ -14,37 +14,28 @@
 
 //! Service, which uses the time oracle.
 
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate exonum_derive;
-
-use exonum_merkledb::{
-    access::{Access, FromAccess},
-    ObjectHash, ProofMapIndex, Snapshot,
-};
-
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey},
     helpers::Height,
+    merkledb::{access::Access, ObjectHash, ProofMapIndex, Snapshot},
     messages::Verified,
     runtime::{
         rust::{CallContext, InstanceInfoProvider, Service, Transaction},
         AnyTx, BlockchainData, InstanceId, SnapshotExt,
     },
 };
+use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
 use exonum_testkit::TestKitBuilder;
+use serde_derive::*;
+
 use exonum_time::{
     schema::TimeSchema,
     time_provider::{MockTimeProvider, TimeProvider},
     TimeServiceFactory,
 };
-
 use std::sync::Arc;
 
 mod proto;
@@ -59,18 +50,12 @@ const SERVICE_ID: InstanceId = 128;
 const SERVICE_NAME: &str = "marker";
 
 /// Marker service database schema.
-#[derive(Debug)]
+#[derive(Debug, FromAccess)]
 pub struct MarkerSchema<T: Access> {
     marks: ProofMapIndex<T::Base, PublicKey, i32>,
 }
 
 impl<T: Access> MarkerSchema<T> {
-    fn new(access: T) -> Self {
-        Self {
-            marks: FromAccess::from_access(access, "marks".into()).unwrap(),
-        }
-    }
-
     /// Returns hashes for stored table.
     fn state_hash(&self) -> Vec<Hash> {
         vec![self.marks.object_hash()]
@@ -182,7 +167,7 @@ fn main() {
         &keypair3.0,
         &keypair3.1,
     );
-    testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
+    testkit.create_block_with_transactions(vec![tx1, tx2, tx3]);
 
     let snapshot = testkit.snapshot();
     let schema = MarkerSchema::new(snapshot.for_service(SERVICE_NAME).unwrap());
@@ -191,7 +176,7 @@ fn main() {
     assert_eq!(schema.marks.get(&keypair3.0), None);
 
     let tx4 = TxMarker::signed(4, Utc.timestamp(15, 0), &keypair3.0, &keypair3.1);
-    testkit.create_block_with_transactions(txvec![tx4]);
+    testkit.create_block_with_transactions(vec![tx4]);
 
     let snapshot = testkit.snapshot();
     let schema = MarkerSchema::new(snapshot.for_service(SERVICE_NAME).unwrap());
