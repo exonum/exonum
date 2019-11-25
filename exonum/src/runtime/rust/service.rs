@@ -12,24 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{access::Prefixed, BinaryValue, Snapshot};
+use exonum_merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot};
+use failure::Error;
 use futures::IntoFuture;
 
-use std::fmt::{self, Debug};
+use std::{
+    borrow::Cow,
+    fmt::{self, Debug},
+};
 
 use crate::{
     crypto::{Hash, PublicKey, SecretKey},
-    helpers::Height,
+    helpers::{Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
     runtime::{
-        api::ServiceApiBuilder,
         dispatcher::{Action, Mailbox},
         AnyTx, ArtifactId, CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
-use super::{ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId};
+use super::{
+    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId,
+};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -167,16 +172,14 @@ pub trait Transaction<Svc: ?Sized>: BinaryValue {
 
 /// Provide context for the `after_commit` handler.
 pub struct AfterCommitContext<'a> {
-    /// Service instance associated with the current context.
-    pub instance: InstanceDescriptor<'a>,
     /// Reference to the dispatcher mailbox.
     mailbox: &'a mut Mailbox,
     /// Read-only snapshot of the current blockchain state.
     snapshot: &'a dyn Snapshot,
-    /// Service key pair of the current node.
-    pub service_keypair: &'a (PublicKey, SecretKey),
-    /// Channel to send signed transactions to the transactions pool.
-    tx_sender: &'a ApiSender,
+    /// Transaction broadcaster.
+    broadcaster: Broadcaster<'a>,
+    /// ID of the node as a validator.
+    validator_id: Option<ValidatorId>,
 }
 
 impl<'a> AfterCommitContext<'a> {
@@ -187,19 +190,19 @@ impl<'a> AfterCommitContext<'a> {
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
+        validator_id: Option<ValidatorId>,
     ) -> Self {
         Self {
             mailbox,
-            instance,
             snapshot,
-            service_keypair,
-            tx_sender,
+            validator_id,
+            broadcaster: Broadcaster::new(instance, service_keypair, tx_sender),
         }
     }
 
     /// Returns blockchain data for the snapshot associated with this context.
     pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
-        BlockchainData::new(self.snapshot, self.instance)
+        BlockchainData::new(self.snapshot, self.broadcaster.instance())
     }
 
     /// Returns snapshot of the data for the executing service.
@@ -213,29 +216,26 @@ impl<'a> AfterCommitContext<'a> {
         self.data().for_core().height()
     }
 
-    /// Signs and broadcasts a transaction to the other nodes in the network.
-    pub fn broadcast_transaction<Svc: ?Sized>(&self, tx: impl Transaction<Svc>) {
-        let msg = tx.sign(
-            self.instance.id,
-            self.service_keypair.0,
-            &self.service_keypair.1,
-        );
-        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
-            error!("Couldn't broadcast transaction {}.", e);
-        }
+    /// Returns the service key of this node.
+    pub fn service_key(&self) -> PublicKey {
+        self.broadcaster.service_keypair.0
     }
 
-    /// Broadcasts a transaction to the other nodes in the network.
-    /// This transaction should be signed externally.
-    pub fn broadcast_signed_transaction(&self, msg: Verified<AnyTx>) {
-        if let Err(e) = self.tx_sender.broadcast_transaction(msg) {
-            error!("Couldn't broadcast transaction {}.", e);
-        }
+    /// Returns the ID of this node as a validator. If the node is not a validator, returns `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_id
     }
 
-    /// Returns a transaction broadcaster.
-    pub fn transaction_broadcaster(&self) -> ApiSender {
-        self.tx_sender.clone()
+    /// Returns a transaction broadcaster if the current node is a validator. If the node
+    /// is not a validator, returns `None`.
+    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+        self.validator_id?;
+        Some(self.broadcaster.clone())
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
+    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
+        self.broadcaster.clone()
     }
 
     /// Provides a privileged interface to the supervisor service.
@@ -243,12 +243,111 @@ impl<'a> AfterCommitContext<'a> {
     /// `None` will be returned if the caller is not a supervisor.
     #[doc(hidden)]
     pub fn supervisor_extensions(&mut self) -> Option<SupervisorExtensions<'_>> {
-        if !is_supervisor(self.instance.id) {
+        if !is_supervisor(self.broadcaster.instance().id) {
             return None;
         }
         Some(SupervisorExtensions {
             mailbox: &mut *self.mailbox,
         })
+    }
+}
+
+// It is impossible to use `Cow` with `InstanceDescriptor` since it has a lifetime of its own.
+#[derive(Debug, Clone)]
+enum CowInstanceDescriptor<'a> {
+    Borrowed(InstanceDescriptor<'a>),
+    Owned { id: InstanceId, name: String },
+}
+
+impl CowInstanceDescriptor<'_> {
+    fn as_ref(&self) -> InstanceDescriptor<'_> {
+        match self {
+            Self::Borrowed(descriptor) => *descriptor,
+            Self::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
+        }
+    }
+
+    fn into_owned(self) -> CowInstanceDescriptor<'static> {
+        match self {
+            Self::Borrowed(InstanceDescriptor { id, name }) => CowInstanceDescriptor::Owned {
+                id,
+                name: name.to_owned(),
+            },
+            Self::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
+        }
+    }
+}
+
+/// Transaction broadcaster.
+///
+/// Transaction broadcast allows a service to create transactions in the `after_commit`
+/// handler or the HTTP API handlers and broadcast them to the connected Exonum nodes.
+/// The transactions are addressed to the executing service instance and are signed
+/// by the [service keypair] of the node.
+///
+/// Broadcasting functionality is primarily useful for services that receive information
+/// from outside the blockchain and need to translate it to transactions. As an example,
+/// a time oracle service may broadcast local node time and build the blockchain-wide time
+/// by processing corresponding transactions.
+///
+/// [service keypair]: ../../blockchain/config/struct.ValidatorKeys.html#structfield.service_key
+#[derive(Debug, Clone)]
+pub struct Broadcaster<'a> {
+    instance: CowInstanceDescriptor<'a>,
+    service_keypair: Cow<'a, (PublicKey, SecretKey)>,
+    tx_sender: Cow<'a, ApiSender>,
+}
+
+impl<'a> Broadcaster<'a> {
+    /// Creates a new broadcaster.
+    pub(super) fn new(
+        instance: InstanceDescriptor<'a>,
+        service_keypair: &'a (PublicKey, SecretKey),
+        tx_sender: &'a ApiSender,
+    ) -> Self {
+        Self {
+            instance: CowInstanceDescriptor::Borrowed(instance),
+            service_keypair: Cow::Borrowed(service_keypair),
+            tx_sender: Cow::Borrowed(tx_sender),
+        }
+    }
+
+    pub(super) fn keypair(&self) -> &(PublicKey, SecretKey) {
+        self.service_keypair.as_ref()
+    }
+
+    pub(super) fn instance(&self) -> InstanceDescriptor<'_> {
+        self.instance.as_ref()
+    }
+
+    /// Signs and broadcasts a transaction to the other nodes in the network.
+    ///
+    /// The transaction is signed by the service keypair of the node. The same input transaction
+    /// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
+    /// field to the input transaction (e.g., a `u64`) and change it between the calls.
+    ///
+    /// # Return value
+    ///
+    /// Returns the hash of the created transaction, or an error if the transaction cannot be
+    /// broadcast. An error means that the node is being shut down.
+    pub fn send<Svc: ?Sized, T>(self, tx: T) -> Result<Hash, Error>
+    where
+        T: Transaction<Svc>,
+    {
+        let (public_key, secret_key) = self.service_keypair.as_ref();
+        let msg = tx.sign(self.instance().id, *public_key, secret_key);
+        let tx_hash = msg.object_hash();
+        self.tx_sender.broadcast_transaction(msg).map(|()| tx_hash)
+    }
+
+    /// Converts the broadcaster into the owned representation, which can be used to broadcast
+    /// transactions asynchronously.
+    pub fn into_owned(self) -> Broadcaster<'static> {
+        Broadcaster {
+            instance: self.instance.into_owned(),
+            service_keypair: Cow::Owned(self.service_keypair.into_owned()),
+            tx_sender: Cow::Owned(self.tx_sender.into_owned()),
+        }
     }
 }
 
@@ -282,7 +381,7 @@ impl SupervisorExtensions<'_> {
 impl Debug for AfterCommitContext<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AfterCommitContext")
-            .field("instance", &self.instance)
+            .field("instance", &self.broadcaster.instance)
             .finish()
     }
 }

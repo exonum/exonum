@@ -829,7 +829,7 @@ impl ApiSender {
             .map_err(into_failure)
     }
 
-    /// Broadcast transaction to other node.
+    /// Broadcast transaction to other nodes in the blockchain network.
     pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)

@@ -40,8 +40,7 @@ use exonum_proto::ProtobufConvert;
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
-    /// Service key is used for services, for example, the configuration
-    /// updater service, the anchoring service, etc.
+    /// Service key is used to sign transactions broadcast by the services.
     pub service_key: PublicKey,
 }
 

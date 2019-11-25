@@ -18,7 +18,7 @@ use exonum_merkledb::{proof_map_index::Raw, MapProof};
 use exonum::{
     blockchain::{BlockProof, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
-    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+    runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
 use crate::schema::{Schema, TimestampEntry};
@@ -76,7 +76,7 @@ impl PublicApi {
             .unwrap();
         let state_proof = blockchain_schema
             .state_hash_aggregator()
-            .get_proof(SchemaOrigin::Service(state.instance.id).coordinate_for(0));
+            .get_proof(SchemaOrigin::Service(state.instance().id).coordinate_for(0));
 
         let schema = Schema::new(state.service_data());
         let timestamp_proof = schema.timestamps.get_proof(hash);

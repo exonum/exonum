@@ -118,7 +118,7 @@ message PoolTransactionsRequest {
 }
 
 message ExonumMessage {
-  oneof message {
+  oneof kind {
     exonum.runtime.AnyTx any_tx = 1;
     Connect connect = 2;
     Status status = 3;

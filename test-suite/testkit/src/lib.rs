@@ -121,7 +121,7 @@
 //! }
 //! ```
 
-//#![warn(missing_debug_implementations, missing_docs)]
+#![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
 #[cfg_attr(test, macro_use)]

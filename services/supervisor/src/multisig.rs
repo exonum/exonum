@@ -15,21 +15,20 @@
 //! Helper module for multisignature transactions.
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
+use exonum::{
+    crypto::{self, Hash, PublicKey},
+    merkledb::{
+        access::{Access, RawAccessMut},
+        BinaryKey, BinaryValue, Error as MerkledbError, ObjectHash, ProofMapIndex,
+    },
+};
+use exonum_derive::*;
 
 use std::{
     borrow::Cow,
     collections::BTreeSet,
-    fmt,
     io::{Cursor, Write},
     mem,
-};
-
-use exonum::{
-    crypto::{self, Hash, PublicKey},
-    merkledb::{
-        access::{Access, AccessError, FromAccess, RawAccessMut},
-        BinaryKey, BinaryValue, Error as MerkledbError, IndexAddress, ObjectHash, ProofMapIndex,
-    },
 };
 
 /// Wrapper over a `ProofMapIndex` representing a set of values with 0 or more
@@ -37,33 +36,13 @@ use exonum::{
 ///
 /// Votes are represented as public keys of authors and no verification for
 /// ownership is performed within this index.
-pub struct MultisigIndex<T: Access, V: ObjectHash> {
+#[derive(Debug, FromAccess)]
+#[from_access(transparent)]
+pub struct MultisigIndex<T: Access, V>
+where
+    V: BinaryKey + ObjectHash,
+{
     index: ProofMapIndex<T::Base, V, BinarySet<PublicKey>>,
-}
-
-impl<T, V> fmt::Debug for MultisigIndex<T, V>
-where
-    T: Access,
-    V: BinaryKey + ObjectHash,
-{
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("MultisigIndex")
-            .field("index", &self.index)
-            .finish()
-    }
-}
-
-impl<T, V> FromAccess<T> for MultisigIndex<T, V>
-where
-    T: Access,
-    V: BinaryKey + ObjectHash,
-{
-    fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
-        Ok(Self {
-            index: FromAccess::from_access(access, addr)?,
-        })
-    }
 }
 
 impl<T, V> MultisigIndex<T, V>
