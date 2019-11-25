@@ -119,7 +119,7 @@ impl TestKitApi {
         )
     }
 
-    /// Creates a wrapper around over Exonum node API.
+    /// Creates a wrapper over Exonum node API.
     pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
         ExonumNodeApi::new(self)
     }
@@ -362,7 +362,7 @@ impl<'a> ExonumNodeApi<'a> {
         }
     }
 
-    /// Performs a GET request to "/services" system endpoint.
+    /// Performs a GET request to the "/services" system endpoint.
     pub fn services(&self) -> DispatcherInfo {
         self.inner
             .public(ApiKind::System)
