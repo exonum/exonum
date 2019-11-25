@@ -20,7 +20,7 @@ bit-vec = "0.6.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 exonum-derive = { path = "../derive", version = "0.12.0"}
-exonum-protobuf-convert = { version = "0.12.0", path = "../protobuf-convert"}
+protobuf-convert = "0.2.0"
 
 [features]
 default = ["with-serde"]
