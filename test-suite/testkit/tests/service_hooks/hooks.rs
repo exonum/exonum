@@ -109,11 +109,11 @@ impl Service for AfterCommitService {
         // Test both validator-specific and generic sending.
         let tx = TxAfterCommit::new(context.height());
         if counter < 10_000 {
-            if let Some(broadcast) = context.broadcast() {
+            if let Some(broadcast) = context.broadcaster() {
                 broadcast.send(tx).ok();
             }
         } else {
-            context.generic_broadcast().send(tx).ok();
+            context.generic_broadcaster().send(tx).ok();
         }
     }
 }

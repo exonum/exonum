@@ -69,13 +69,13 @@ impl<'a> ServiceApiState<'a> {
 
     /// Returns a transaction broadcaster if the current node is a validator. If the node
     /// is not a validator, returns `None`.
-    pub fn broadcast(&self) -> Option<Broadcaster<'a>> {
+    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
         CoreSchema::new(&self.snapshot).validator_id(self.broadcaster.keypair().0)?;
         Some(self.broadcaster.clone())
     }
 
     /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
-    pub fn generic_broadcast(&self) -> Broadcaster<'a> {
+    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
     }
 }

@@ -141,7 +141,7 @@ struct CounterApi;
 impl CounterApi {
     fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
-        let tx_hash = state.generic_broadcast().send(Increment::new(value))?;
+        let tx_hash = state.generic_broadcaster().send(Increment::new(value))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -152,7 +152,7 @@ impl CounterApi {
 
     fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
-        let tx_hash = state.generic_broadcast().send(Reset)?;
+        let tx_hash = state.generic_broadcaster().send(Reset)?;
         Ok(TransactionResponse { tx_hash })
     }
 

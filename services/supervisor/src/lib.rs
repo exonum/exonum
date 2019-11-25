@@ -239,7 +239,7 @@ where
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-            let tx_sender = context.broadcast().map(Broadcaster::into_owned);
+            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
 
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             // We should deploy the artifact for all nodes, but send confirmations only

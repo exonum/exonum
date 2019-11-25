@@ -225,13 +225,13 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns a transaction broadcaster if the current node is a validator. If the node
     /// is not a validator, returns `None`.
-    pub fn broadcast(&self) -> Option<Broadcaster<'a>> {
+    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
         self.validator_id?;
         Some(self.broadcaster.clone())
     }
 
     /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
-    pub fn generic_broadcast(&self) -> Broadcaster<'a> {
+    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
     }
 
@@ -259,19 +259,18 @@ enum CowInstanceDescriptor<'a> {
 impl CowInstanceDescriptor<'_> {
     fn as_ref(&self) -> InstanceDescriptor<'_> {
         match self {
-            CowInstanceDescriptor::Borrowed(descriptor) => *descriptor,
-            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
+            Self::Borrowed(descriptor) => *descriptor,
+            Self::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
         }
     }
 
     fn into_owned(self) -> CowInstanceDescriptor<'static> {
-        use self::CowInstanceDescriptor::*;
         match self {
-            Borrowed(InstanceDescriptor { id, name }) => Owned {
+            Self::Borrowed(InstanceDescriptor { id, name }) => CowInstanceDescriptor::Owned {
                 id,
                 name: name.to_owned(),
             },
-            Owned { id, name } => Owned { id, name },
+            Self::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
         }
     }
 }

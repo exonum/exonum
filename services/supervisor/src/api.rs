@@ -66,7 +66,7 @@ impl<'a> ApiImpl<'a> {
     ) -> Result<Hash, api::Error> {
         let tx_sender = self
             .0
-            .broadcast()
+            .broadcaster()
             .ok_or_else(|| api::Error::BadRequest("Node is not a validator".to_owned()))?;
         let tx_hash = tx_sender.send(transaction)?;
         Ok(tx_hash)
