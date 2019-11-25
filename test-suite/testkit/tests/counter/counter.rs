@@ -25,7 +25,7 @@ use exonum::{
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
         rust::{CallContext, Service},
-        BlockchainData, InstanceId,
+        BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -98,6 +98,8 @@ impl Increment {
 pub enum Error {
     /// Adding zero does nothing!
     AddingZero = 0,
+    /// What's the question?
+    AnswerToTheUltimateQuestion = 1,
 }
 
 #[exonum_interface]
@@ -231,6 +233,15 @@ pub struct CounterService;
 impl Service for CounterService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
+    }
+
+    fn before_commit(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let schema = CounterSchema::new(context.service_data());
+        if schema.counter.get() == Some(42) {
+            Err(Error::AnswerToTheUltimateQuestion.into())
+        } else {
+            Ok(())
+        }
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

@@ -156,6 +156,47 @@ fn test_explorer_basics() {
 }
 
 #[test]
+fn test_explorer_errors_in_block() {
+    let mut blockchain = create_blockchain();
+    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let payload_bob = CreateWallet::new(&pk_bob, "Bob");
+    let tx_bob = payload_bob.sign(SERVICE_ID, pk_bob, &key_bob);
+
+    create_block(&mut blockchain, vec![tx_bob]);
+    let snapshot = blockchain.snapshot();
+    let explorer = BlockchainExplorer::new(&snapshot);
+    let block = explorer.block_with_txs(Height(1)).unwrap();
+    assert_eq!(block.len(), 1);
+    assert_eq!(block.errors.len(), 1);
+    assert_eq!(
+        serde_json::to_value(&block).unwrap(),
+        json!({
+            "block": {
+                "proposer_id": block.header.proposer_id,
+                "height": 1,
+                "tx_count": 1,
+                "prev_hash": block.header.prev_hash,
+                "tx_hash": block.header.tx_hash,
+                "state_hash": block.header.state_hash,
+                "error_hash": block.header.error_hash,
+            },
+            "precommits": block.precommits,
+            "transactions": [
+                block[0], // We aren't that interested in the transaction contents in this test
+            ],
+            "errors": [{
+                "location": { "type": "transaction", "index": 0 },
+                "error": {
+                    "type": "service_error",
+                    "code": 0,
+                    "description": "Not allowed",
+                },
+            }],
+        })
+    );
+}
+
+#[test]
 fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
     let (pk_alice, key_alice) = crypto::gen_keypair();

@@ -367,66 +367,66 @@ impl ObjectHash for ExecutionStatus {
     }
 }
 
+/// Version of `ExecutionStatus` used in serde serializaiton.
+#[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Debug, Serialize, Deserialize)]
+enum SerdeExecutionStatus {
+    Success,
+    Panic { description: String },
+    DispatcherError { description: String, code: u8 },
+    RuntimeError { description: String, code: u8 },
+    ServiceError { description: String, code: u8 },
+}
+
+impl From<&ExecutionError> for SerdeExecutionStatus {
+    fn from(err: &ExecutionError) -> Self {
+        let description = err.description.clone();
+        match err.kind {
+            ErrorKind::Panic => Self::Panic { description },
+            ErrorKind::Dispatcher { code } => Self::DispatcherError { code, description },
+            ErrorKind::Runtime { code } => Self::RuntimeError { code, description },
+            ErrorKind::Service { code } => Self::ServiceError { code, description },
+        }
+    }
+}
+
+impl From<&Result<(), ExecutionError>> for SerdeExecutionStatus {
+    fn from(inner: &Result<(), ExecutionError>) -> Self {
+        if let Err(err) = &inner {
+            Self::from(err)
+        } else {
+            Self::Success
+        }
+    }
+}
+
+impl From<SerdeExecutionStatus> for Result<(), ExecutionError> {
+    fn from(inner: SerdeExecutionStatus) -> Self {
+        match inner {
+            SerdeExecutionStatus::Success => Ok(()),
+            SerdeExecutionStatus::Panic { description } => {
+                Err(ExecutionError::new(ErrorKind::Panic, description))
+            }
+            SerdeExecutionStatus::DispatcherError { description, code } => Err(
+                ExecutionError::new(ErrorKind::Dispatcher { code }, description),
+            ),
+            SerdeExecutionStatus::RuntimeError { description, code } => Err(ExecutionError::new(
+                ErrorKind::Runtime { code },
+                description,
+            )),
+            SerdeExecutionStatus::ServiceError { description, code } => Err(ExecutionError::new(
+                ErrorKind::Service { code },
+                description,
+            )),
+        }
+    }
+}
+
 /// More convenient serde layout for the `ExecutionResult`.
 mod execution_result {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    use super::{ErrorKind, ExecutionError};
-
-    #[serde(tag = "type", rename_all = "snake_case")]
-    #[derive(Debug, Serialize, Deserialize)]
-    enum ExecutionStatus {
-        Success,
-        Panic { description: String },
-        DispatcherError { description: String, code: u8 },
-        RuntimeError { description: String, code: u8 },
-        ServiceError { description: String, code: u8 },
-    }
-
-    impl From<&Result<(), ExecutionError>> for ExecutionStatus {
-        fn from(inner: &Result<(), ExecutionError>) -> Self {
-            if let Err(err) = &inner {
-                let description = err.description.clone();
-                match err.kind {
-                    ErrorKind::Panic => ExecutionStatus::Panic { description },
-                    ErrorKind::Dispatcher { code } => {
-                        ExecutionStatus::DispatcherError { code, description }
-                    }
-                    ErrorKind::Runtime { code } => {
-                        ExecutionStatus::RuntimeError { code, description }
-                    }
-                    ErrorKind::Service { code } => {
-                        ExecutionStatus::ServiceError { code, description }
-                    }
-                }
-            } else {
-                ExecutionStatus::Success
-            }
-        }
-    }
-
-    impl From<ExecutionStatus> for Result<(), ExecutionError> {
-        fn from(inner: ExecutionStatus) -> Self {
-            match inner {
-                ExecutionStatus::Success => Ok(()),
-                ExecutionStatus::Panic { description } => {
-                    Err(ExecutionError::new(ErrorKind::Panic, description))
-                }
-                ExecutionStatus::DispatcherError { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Dispatcher { code },
-                    description,
-                )),
-                ExecutionStatus::RuntimeError { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Runtime { code },
-                    description,
-                )),
-                ExecutionStatus::ServiceError { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Service { code },
-                    description,
-                )),
-            }
-        }
-    }
+    use super::{ExecutionError, SerdeExecutionStatus};
 
     pub fn serialize<S>(
         inner: &Result<(), ExecutionError>,
@@ -435,14 +435,41 @@ mod execution_result {
     where
         S: Serializer,
     {
-        ExecutionStatus::from(inner).serialize(serializer)
+        SerdeExecutionStatus::from(inner).serialize(serializer)
     }
 
     pub fn deserialize<'a, D>(deserializer: D) -> Result<Result<(), ExecutionError>, D::Error>
     where
         D: Deserializer<'a>,
     {
-        ExecutionStatus::deserialize(deserializer).map(From::from)
+        SerdeExecutionStatus::deserialize(deserializer).map(From::from)
+    }
+}
+
+/// More convenient serde layout for the `ExecutionError`.
+pub(crate) mod execution_error {
+    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::{ExecutionError, SerdeExecutionStatus};
+
+    pub fn serialize<S>(inner: &ExecutionError, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerdeExecutionStatus::from(inner).serialize(serializer)
+    }
+
+    pub fn deserialize<'a, D>(deserializer: D) -> Result<ExecutionError, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        let status = SerdeExecutionStatus::deserialize(deserializer)?;
+        let res: Result<(), ExecutionError> = status.into();
+        if let Err(e) = res {
+            Ok(e)
+        } else {
+            Err(D::Error::custom("Not an error"))
+        }
     }
 }
 

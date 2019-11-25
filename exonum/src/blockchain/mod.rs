@@ -292,7 +292,7 @@ impl BlockchainMut {
             let errors = self.dispatcher.before_commit(&mut fork);
             let mut call_results = Schema::new(&fork).call_errors(height);
             for (service_id, error) in errors {
-                let location = CallLocation::BeforeCommit(service_id);
+                let location = CallLocation::before_commit(service_id);
                 call_results.put(&location, error);
             }
         }
@@ -380,7 +380,7 @@ impl BlockchainMut {
         if let Err(e) = tx_result {
             schema
                 .call_errors(height)
-                .put(&CallLocation::Transaction(index as u64), e);
+                .put(&CallLocation::transaction(index as u64), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);

@@ -18,7 +18,7 @@
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{BlockchainMut, CallLocation},
+    blockchain::{BlockchainMut, CallLocation, ExecutionErrorKind},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -28,7 +28,7 @@ use exonum::{
 };
 use serde_json::json;
 
-use std::iter;
+use std::{collections::HashMap, iter};
 
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
@@ -158,9 +158,28 @@ fn main() {
             "time": erroneous_tx.time(),
         })
     );
-    // It is possible to extract a proof of a transaction error. The proof is tied
+
+    // `BlockWithTransactions` contains errors that have occurred during block execution.
+    for (i, error) in block.errors.iter().enumerate() {
+        println!("Error #{}: {}", i + 1, error);
+    }
+    // In this block, two errors correspond to 2nd and 3rd transactions. Originally, errors
+    // are stored in a `Vec` for serialization reasons, but they can be converted
+    // into a `HashMap` with a builtin method.
+    let errors: HashMap<_, _> = block.error_map();
+    assert_eq!(errors.len(), 2);
+    assert_eq!(
+        errors[&CallLocation::transaction(1)].description,
+        "Not allowed"
+    );
+    assert_eq!(
+        errors[&CallLocation::transaction(2)].kind,
+        ExecutionErrorKind::Panic
+    );
+
+    // It is possible to extract a proof of a transaction error using `BlockInfo`. The proof is tied
     // to the `error_hash` mentioned in the block header.
-    let proof: MapProof<_, _> = block_info.error_proof(CallLocation::Transaction(1));
+    let proof: MapProof<_, _> = block_info.error_proof(CallLocation::transaction(1));
     let proof = proof
         .check_against_hash(block_info.header().error_hash)
         .unwrap();

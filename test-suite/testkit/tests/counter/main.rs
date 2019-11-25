@@ -24,7 +24,7 @@ use exonum::{
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{
-    txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
+    ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
 };
 use hex::FromHex;
 use pretty_assertions::assert_eq;
@@ -77,7 +77,7 @@ fn test_inc_count_create_block() {
         .unwrap();
     assert_eq!(counter, 5);
 
-    testkit.create_block_with_transactions(txvec![
+    testkit.create_block_with_transactions(vec![
         Increment::new(4).sign(SERVICE_ID, pubkey, &key),
         Increment::new(1).sign(SERVICE_ID, pubkey, &key),
     ]);
@@ -222,7 +222,7 @@ fn test_probe() {
         Increment::new(3).sign(SERVICE_ID, pubkey, &key)
     };
 
-    let snapshot = testkit.probe_all(txvec![tx.clone(), other_tx.clone()]);
+    let snapshot = testkit.probe_all(vec![tx.clone(), other_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(8));
 
@@ -294,10 +294,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.counter.get(), None);
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
+    let snapshot = testkit.probe_all(vec![tx.clone(), admin_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(0));
-    let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
+    let snapshot = testkit.probe_all(vec![admin_tx.clone(), tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(6));
     // Check that data is (still) not persisted
@@ -320,10 +320,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.counter.get(), Some(10));
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
+    let snapshot = testkit.probe_all(vec![tx.clone(), admin_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(0));
-    let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
+    let snapshot = testkit.probe_all(vec![admin_tx.clone(), tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(6));
     // Check that data is (still) not persisted
@@ -351,7 +351,7 @@ fn test_probe_duplicate_tx() {
 
     // Check the mixed case, when some probed transactions are committed and some are not
     let other_tx = inc_count(&api, 7);
-    let snapshot = testkit.probe_all(txvec![tx, other_tx]);
+    let snapshot = testkit.probe_all(vec![tx, other_tx]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(12));
 }
@@ -857,10 +857,10 @@ fn test_explorer_transaction_info() {
         .check_against_hash(block.header().tx_hash)
         .is_ok());
 
-    let proof = block.error_proof(CallLocation::Transaction(0));
+    let proof = block.error_proof(CallLocation::transaction(0));
     let proof = proof.check_against_hash(block.header().error_hash).unwrap();
     let (&call_location, status) = proof.all_entries().next().unwrap();
-    assert_eq!(call_location, CallLocation::Transaction(0));
+    assert_eq!(call_location, CallLocation::transaction(0));
     assert!(status.is_none());
 }
 
@@ -876,7 +876,7 @@ fn test_explorer_transaction_statuses() {
     let (pubkey, key) = crypto::gen_keypair();
     let panicking_tx = Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key);
 
-    let block = testkit.create_block_with_transactions(txvec![
+    let block = testkit.create_block_with_transactions(vec![
         tx.clone(),
         error_tx.clone(),
         panicking_tx.clone(),
@@ -904,21 +904,33 @@ fn test_explorer_transaction_statuses() {
         .collect();
     check_statuses(&statuses);
 
+    // Check errors in the `BlockWithTransactions`.
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 2);
+    assert_eq!(
+        errors[&CallLocation::transaction(1)].description,
+        "Adding zero does nothing!"
+    );
+    assert_eq!(
+        errors[&CallLocation::transaction(2)].kind,
+        ExecutionErrorKind::Panic
+    );
+
     // Check status proofs for transactions.
     let snapshot = testkit.snapshot();
     let explorer = BlockchainExplorer::new(&snapshot);
     let block_info = explorer.block(testkit.height()).unwrap();
-    let proof = block_info.error_proof(CallLocation::Transaction(0));
+    let proof = block_info.error_proof(CallLocation::transaction(0));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 0);
-    let proof = block_info.error_proof(CallLocation::Transaction(1));
+    let proof = block_info.error_proof(CallLocation::transaction(1));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
         proof.entries().next().unwrap().1.description,
         "Adding zero does nothing!"
     );
-    let proof = block_info.error_proof(CallLocation::Transaction(2));
+    let proof = block_info.error_proof(CallLocation::transaction(2));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
@@ -943,4 +955,26 @@ fn test_explorer_transaction_statuses() {
     })
     .collect();
     check_statuses(&statuses);
+}
+
+#[test]
+fn test_explorer_with_before_commit_error() {
+    let (mut testkit, _) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx1 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx2 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
+
+    let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[&CallLocation::before_commit(SERVICE_ID)]
+        .description
+        .contains("What's the question?"));
+    assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
+
+    let tx3 = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+    let block = testkit.create_block_with_transaction(tx3);
+    assert!(block.errors.is_empty());
+    assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
 }

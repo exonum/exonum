@@ -564,7 +564,7 @@ fn test_service_config_discard_single_apply_error() {
     let err = snapshot
         .for_core()
         .call_errors(testkit.height())
-        .get(&CallLocation::BeforeCommit(SUPERVISOR_INSTANCE_ID))
+        .get(&CallLocation::before_commit(SUPERVISOR_INSTANCE_ID))
         .unwrap();
     assert!(err.description.contains("IncService: Configure error"));
 
@@ -600,7 +600,7 @@ fn test_service_config_discard_single_apply_panic() {
     let err = snapshot
         .for_core()
         .call_errors(testkit.height())
-        .get(&CallLocation::BeforeCommit(SUPERVISOR_INSTANCE_ID))
+        .get(&CallLocation::before_commit(SUPERVISOR_INSTANCE_ID))
         .unwrap();
     assert!(err.description.contains("IncService: Configure panic"));
 

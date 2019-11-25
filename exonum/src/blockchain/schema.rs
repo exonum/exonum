@@ -17,10 +17,10 @@ use exonum_merkledb::{
     impl_binary_key_for_binary_value, BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex,
 };
-
 use exonum_proto::ProtobufConvert;
+use failure::format_err;
 
-use std::mem;
+use std::{fmt, mem};
 
 use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
 use crate::{
@@ -140,7 +140,7 @@ impl<T: Access> Schema<T> {
             return None;
         }
 
-        let call_location = CallLocation::Transaction(location.position_in_block as u64);
+        let call_location = CallLocation::transaction(location.position_in_block as u64);
         Some(
             match self.call_errors(location.block_height).get(&call_location) {
                 None => Ok(()),
@@ -357,16 +357,91 @@ where
 }
 
 /// Location of an isolated call within a block.
-#[derive(Debug, Clone, Copy, PartialEq, BinaryValue, ObjectHash, ProtobufConvert)]
-#[protobuf_convert(source = "pb_blockchain::CallLocation", oneof_field = "call")]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, BinaryValue, ObjectHash,
+)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum CallLocation {
     /// Call of a transaction within the block.
-    Transaction(u64),
+    Transaction {
+        /// Zero-based transaction index.
+        index: u64,
+    },
     /// Call of `before_commit` hook in a service.
-    BeforeCommit(InstanceId),
+    BeforeCommit {
+        /// Numerical service identifier.
+        id: InstanceId,
+    },
+}
+
+impl ProtobufConvert for CallLocation {
+    type ProtoStruct = pb_blockchain::CallLocation;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        match self {
+            Self::Transaction { index } => pb.set_transaction(*index),
+            Self::BeforeCommit { id } => pb.set_before_commit(*id),
+        }
+        pb
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        if pb.has_transaction() {
+            Ok(Self::Transaction {
+                index: pb.get_transaction(),
+            })
+        } else if pb.has_before_commit() {
+            Ok(Self::BeforeCommit {
+                id: pb.get_before_commit(),
+            })
+        } else {
+            Err(format_err!("Invalid location format"))
+        }
+    }
+}
+
+impl CallLocation {
+    /// Creates a location corresponding to a transaction.
+    pub fn transaction(index: u64) -> Self {
+        Self::Transaction { index }
+    }
+
+    /// Creates a location corresponding to a `before_commit` call.
+    pub fn before_commit(id: InstanceId) -> Self {
+        Self::BeforeCommit { id }
+    }
 }
 
 impl_binary_key_for_binary_value!(CallLocation);
+
+impl fmt::Display for CallLocation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
+            Self::BeforeCommit { id } => {
+                write!(formatter, "`before_commit` for service with ID {}", id)
+            }
+        }
+    }
+}
+
+#[test]
+fn location_json_serialization() {
+    use serde_json::json;
+
+    let location = CallLocation::transaction(1);
+    assert_eq!(
+        serde_json::to_value(location).unwrap(),
+        json!({ "type": "transaction", "index": 1 })
+    );
+
+    let location = CallLocation::before_commit(1_000);
+    assert_eq!(
+        serde_json::to_value(location).unwrap(),
+        json!({ "type": "before_commit", "id": 1_000 })
+    );
+}
 
 /// Describes the origin of the information schema.
 ///
