@@ -24,10 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{
-    access::{Access, FromAccess},
-    MapIndex, Snapshot,
-};
+use exonum_merkledb::{access::Access, MapIndex, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -80,18 +77,12 @@ impl Wallet {
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
+#[derive(FromAccess)]
 pub struct CurrencySchema<T: Access> {
     pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
 }
 
 impl<T: Access> CurrencySchema<T> {
-    /// Creates a new schema instance.
-    pub fn new(access: T) -> Self {
-        Self {
-            wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
-        }
-    }
-
     /// Gets a specific wallet from the storage.
     pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets.get(pub_key)

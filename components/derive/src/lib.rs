@@ -75,6 +75,61 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
     db_traits::impl_object_hash(input)
 }
 
+/// Derive `FromAccess` trait.
+///
+/// This macro can be applied only to `struct`s, each field of which implements `FromAccess`
+/// itself (e.g., indexes, `Group`s, or `Lazy` indexes). The macro instantiates each field
+/// using the address created by appending a dot `.` and the name of the field or its override
+/// (see [below](#rename)) to the root address where the struct is created. For example,
+/// if the struct is created at the address `"foo"` and has fields `"list"` and `"map"`, they
+/// will be instantiated at addresses `"foo.list"` and `"foo.map"`, respectively.
+///
+/// The struct must have at least one type param, which will correspond to the `Access` type.
+/// The derive logic will determine this param as the first param with `T: Access` bound.
+/// If there are no such params, but there is a single type param, it will be used.
+///
+/// # Container Attributes
+///
+/// ## `transparent`
+///
+/// ```text
+/// #[from_access(transparent)]`
+/// ```
+///
+/// Switches to the *transparent* layout similarly to `#[repr(transparent)]`
+/// or `#[serde(transparent)]`.
+/// A struct with the transparent layout must have a single field. The field will be created at
+/// the same address as the struct itself (i.e., no suffix will be added).
+///
+/// ## `schema`
+///
+/// ```text
+/// #[from_access(schema)]
+/// ```
+///
+/// Derives schema-specific interfaces:
+///
+/// - Constructor `pub fn new(access: T) -> Self` with a generic doc comment. Implemented
+///   by `unwrap()`ing the value returned by `FromAccess::from_root`.
+///
+/// The `schema` param is automatically switched on if the struct name ends with `Schema`.
+/// To opt out, use `#[from_access(schema = false)]`.
+///
+/// # Field Attributes
+///
+/// ## `rename`
+///
+/// ```text
+/// #[from_access(rename = "name")]
+/// ```
+///
+/// Changes the suffix appended to the address when creating a field. The name should follow
+/// conventions for index names.
+#[proc_macro_derive(FromAccess, attributes(from_access))]
+pub fn from_access(input: TokenStream) -> TokenStream {
+    db_traits::impl_from_access(input)
+}
+
 /// Derive `ServiceDispatcher` trait.
 ///
 /// # Attributes:
@@ -95,7 +150,7 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
     service_dispatcher::impl_service_dispatcher(input)
 }
 
-/// Derive `ServiceFactory` and `ServiceDispatcher` traits.
+/// Derive `ServiceFactory` trait.
 ///
 /// # Attributes:
 ///
@@ -117,7 +172,7 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
 /// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
 ///
 /// * `#[service_factory(artifact_name = "string")]`
-///   
+///
 /// Override artifact name, by default it uses crate name.
 ///
 /// * `#[service_factory(artifact_version = "string")]`

@@ -27,7 +27,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     Entry, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -38,20 +38,13 @@ use exonum_supervisor::Configure;
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
-#[derive(Debug)]
+#[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
     count: Entry<T::Base, u64>,
     params: Entry<T::Base, String>,
 }
 
 impl<T: Access> Schema<T> {
-    pub fn new(access: T) -> Self {
-        Self {
-            count: FromAccess::from_access(access.clone(), "count".into()).unwrap(),
-            params: FromAccess::from_access(access, "params".into()).unwrap(),
-        }
-    }
-
     pub fn count(&self) -> Option<u64> {
         self.count.get()
     }

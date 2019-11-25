@@ -31,7 +31,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     Entry, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -48,16 +48,9 @@ pub const SERVICE_ID: InstanceId = 2;
 /// "correct horse battery staple" brainwallet pubkey in Ed25519 with a SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
+#[derive(FromAccess)]
 pub struct CounterSchema<T: Access> {
     pub counter: Entry<T::Base, u64>,
-}
-
-impl<T: Access> CounterSchema<T> {
-    pub fn new(access: T) -> Self {
-        Self {
-            counter: FromAccess::from_access(access, "counter".into()).unwrap(),
-        }
-    }
 }
 
 impl<T> CounterSchema<T>

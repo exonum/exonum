@@ -58,7 +58,7 @@ message ServiceConfig {
 
 // This message contains one atomic configuration change.
 message ConfigChange {
-  oneof message {
+  oneof kind {
     // New consensus config.
     exonum.Config consensus = 1;
     // New service instance config.
