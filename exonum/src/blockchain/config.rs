@@ -296,6 +296,9 @@ impl ValidateInput for ConsensusConfig {
     }
 }
 
+/// Genesis config parameters.
+///
+/// Information from this entity get saved to the genesis block.
 #[derive(
     Debug,
     Clone,
@@ -360,6 +363,7 @@ impl InstanceInitParams {
     }
 }
 
+/// Creates `GenesisConfig` from components.
 #[derive(Debug)]
 pub struct GenesisConfigBuilder {
     /// Consensus config.
@@ -371,6 +375,7 @@ pub struct GenesisConfigBuilder {
 }
 
 impl GenesisConfigBuilder {
+    /// Creates a new builder instance based on the `ConsensusConfig`.
     pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
         Self {
             consensus_config,
@@ -379,7 +384,7 @@ impl GenesisConfigBuilder {
         }
     }
 
-    /// Adds an artifact with corresponding deploy arguments. Does nothing in case artifact with
+    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
     pub fn with_artifact(mut self, artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
         if !self.artifacts.contains_key(&artifact) {
@@ -388,11 +393,13 @@ impl GenesisConfigBuilder {
         self
     }
 
+    /// Adds service instance initialization parameters.
     pub fn with_service(mut self, instance_params: InstanceInitParams) -> Self {
         self.builtin_instances.push(instance_params);
         self
     }
 
+    /// Produces `GenesisConfig` from collected components.
     pub fn build(self) -> GenesisConfig {
         let artifacts = self
             .artifacts

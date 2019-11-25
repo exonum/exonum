@@ -222,7 +222,7 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds an artifact with corresponding deploy arguments. Does nothing in case artifact with
+    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
     pub fn with_artifact(mut self, artifact: ArtifactId, deploy_args: impl BinaryValue) -> Self {
         if !self.artifacts.contains_key(&artifact) {
