@@ -136,14 +136,14 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
 
             let new_instance_id = builtin_instances
                 .values()
-                .max_by_key(|spec| spec.id)
                 .map(|spec| spec.id)
+                .max()
                 .unwrap_or(SUPERVISOR_INSTANCE_ID)
                 + 1;
 
             // We're going to use ID obtained above, so the vacant ID is next to it.
             let vacant_instance_id = new_instance_id + 1;
-            schema.initialize_vacant_instance_id_entry(vacant_instance_id);
+            schema.vacant_instance_id.set(vacant_instance_id);
 
             new_instance_id
         }

@@ -15,7 +15,7 @@
 //! Information schema for the runtime dispatcher.
 
 use exonum_merkledb::{
-    access::{Access, AccessExt, RawAccess},
+    access::{Access, AccessExt},
     AsReadonly, Fork, MapIndex,
 };
 
@@ -120,13 +120,9 @@ impl<T: Access> Schema<T> {
 }
 
 // `AsReadonly` specialization to ensure that we won't leak mutable schema access.
-impl<T, U> Schema<T>
-where
-    T: AsReadonly<Readonly = U>,
-    U: Access + RawAccess,
-{
+impl<T: AsReadonly> Schema<T> {
     /// Readonly set of launched service instances.
-    pub fn running_instances(&self) -> MapIndex<U::Base, String, InstanceSpec> {
+    pub fn running_instances(&self) -> MapIndex<T::Readonly, String, InstanceSpec> {
         self.access.as_readonly().get_map(SERVICE_INSTANCES)
     }
 }

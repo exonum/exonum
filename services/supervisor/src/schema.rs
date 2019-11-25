@@ -92,11 +92,6 @@ impl Schema<Prefixed<'_, &Fork>> {
         self.vacant_instance_id.set(id + 1);
         Some(id)
     }
-
-    /// Initializes `vacant_instance_id` with provided value.
-    pub(crate) fn initialize_vacant_instance_id_entry(&mut self, value: InstanceId) {
-        self.vacant_instance_id.set(value);
-    }
 }
 
 /// Creates an index given its name and access object.
