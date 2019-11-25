@@ -146,7 +146,7 @@ jobs:
   - name: integration-tests
     before_install:
     - sudo apt-get update
-    - sudo apt-get install -y python3, python3-pip, python3-setuptools
+    - sudo apt-get install -y python3.6 python3-pip python3-setuptools
     install:
     - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
     - nvm install 8 && nvm use 8
