@@ -94,7 +94,7 @@ fn create_blockchain(
     let api_sender = ApiSender::new(mpsc::channel(0).0);
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
     BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_rust_runtime(mpsc::channel(0).0, services)
+        .with_rust_runtime(mpsc::channel(1).0, services)
         .build()
         .unwrap()
 }

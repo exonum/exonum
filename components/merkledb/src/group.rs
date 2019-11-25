@@ -6,10 +6,38 @@ use crate::{
     BinaryKey,
 };
 
+// cspell:ignore foob
+
 /// Group of indexes distinguished by a prefix.
 ///
 /// All indexes in the group have the same type. Indexes are initialized lazily;
 /// i.e., no initialization is performed when the group is created.
+///
+/// # Safety
+///
+/// Using a group within a group (including indirectly via components) can lead to index collision
+/// if the keys in both groups have variable length (e.g., keys are strings). A collision in turn
+/// may result in logical errors and data corruption. For example:
+///
+/// ```
+/// # use exonum_merkledb::{
+/// #     access::{Access, AccessExt, FromAccess},
+/// #     Database, Group, ListIndex, TemporaryDB,
+/// # };
+/// type StrGroup<T> = Group<T, str, ListIndex<<T as Access>::Base, u64>>;
+///
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let outer_group: Group<_, str, StrGroup<_>> =
+///     FromAccess::from_access(&fork, "group".into()).unwrap();
+/// outer_group.get("foo").get("bar").extend(vec![1, 2]);
+/// outer_group.get("foob").get("ar").push(3);
+/// // Both accessed lists have the same address and thus share the same data:
+/// assert_eq!(
+///     fork.get_list(("group", "foobar")).iter().collect::<Vec<u64>>(),
+///     vec![1, 2, 3]
+/// );
+/// ```
 ///
 /// # Examples
 ///

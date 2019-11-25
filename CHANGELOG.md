@@ -9,6 +9,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- **Most important**: new Dynamic Services feature was introduced. For details see
+  the [Dynamic Services](#dynamic-services-feature) section of the changelog.
+
+- Used `rust` version is updated to 1.38.0. (#1481)
+
+- Transaction serialization format was changed to `protobuf`. (#1283)
+
 - `create_checkpoint` method has been implemented for the `RocksDB` struct.
   This method uses
   [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
@@ -29,7 +36,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Command line parameters `--service-key-pass` and `--consensus-key-pass` was
   removed in favor of `--master-key-pass` parameter. For example now you can
-  run node with the command below (#1459).
+  run the node with the command below. (#1459)
 
     ```bash
     cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
@@ -42,7 +49,29 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   
 - Dot symbol is not allowed in service names anymore. (#1558)
 
+- Services can now use `BlockchainData` and `SnapshotExt` types to access data
+  from the blockchain in a more structured manner. (#1523)
+
 - Placeholder for changes due to dynamic services (#9999)
+
+#### exonum-merkledb
+
+- Nested proofs for `ProofListIndex` are replaced with a flat
+  (non-recursive) format. (#1450)
+
+- Differentiated (read-only / read-write) access to the database
+  was introduced. (#1523)
+
+- It is now possible to have readonly access to indexes given a `Fork`
+  via a `ReadonlyFork` wrapper. Readonly access works like `RefCell::borrow`
+  (vs `RefCell::borrow_mut` for `Fork`); it is possible to create an
+  unlimited number of indexes with readonly access based on the same fork.
+  (#1523)
+  
+- Service schemas can now use a declarative layout, in which every field
+  corresponds to a separate index or a group of indexes. It is possible
+  to derive a constructor for such schemas via `FromAccess` derive macro.
+  (#1523, #1562)
 
 #### exonum-proto
 
@@ -51,11 +80,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-protobuf-convert
 
-- Introduced a new crate `exonum-protobuf-convert`. Derive macro `ProtobufConvert`
-  is moved to this crate. (#1501)
+- Introduced a new crate `exonum-protobuf-convert`. Derive macro
+  `ProtobufConvert` is moved to this crate. (#1501)
 
-- Derive macro `ProtobufConvert` now doesn't derive `BinaryValue` and `ObjectHash`
-  traits. There are separate derive macros for them in `exonum-derive` crate. (#1501)
+- Derive macro `ProtobufConvert` now does not derive the `BinaryValue` and
+  `ObjectHash` traits. There are separate derive macros for them in
+  the `exonum-derive` crate. (#1501)
 
 #### exonum-build
 
@@ -66,9 +96,362 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
   module in the `exonum`. (#1459)
-  
-- Protobuf serialization for crypto types are now implemented in `exonum-crypto`
-  crate (#1496).
+
+- Protobuf serialization for crypto types is now implemented in the `exonum-crypto`
+  crate. (#1496)
+
+### Dynamic Services Feature
+
+#### Overview
+
+In `exonum` 0.13, a new service workflow is introduced, named
+"Dynamic Services".
+
+Key points of this feature are the following:
+
+- `exonum` now supports different environments of code execution (runtimes).
+  Only native `rust` runtime is enabled by default, but support of
+  different programming languages can be added quite easily.
+
+  For details see the [`Runtime` trait docs][runtime-trait] and the
+  [`sample_runtime` example][sample-runtime].
+
+  [runtime-trait]: https://docs.rs/exonum/0.13.0/exonum/runtime/trait.Runtime.html
+  [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13/examples/sample_runtime
+
+- Services are not statically tied to the compiled binary anymore. There is
+  support of adding new service types (aka artifacts) dynamically and starting new
+  instances of services.
+
+  For details see [`runtime` module docs][runtime-docs].
+
+  [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+
+- Services now can have initialization parameters, provided within service start
+  procedure.
+
+- Services now support configuration changes via `Configure` interface.
+
+- `configuration` service was replaced with the `supervisor` service, which is
+  capable of not only changing configuration, but of deploying and starting
+  services as well. For details see [`supervisor` service][supervisor].
+
+  [supervisor]: https://github.com/exonum/exonum/tree/v0.13/services/supervisor
+
+#### Migration Guide
+
+There are a lot of backward-incompatible changes introduced within 0.13 release.
+So to make the changes apparent, compare the `Cryptocurrency` example service versions
+for [0.12.1][crypt-0-12] and [0.13.0][crypt-0-13] releases.
+
+[crypt-0-12]: https://github.com/exonum/exonum/blob/v0.12.1/examples/cryptocurrency/
+[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13/examples/cryptocurrency/
+
+Key points:
+
+- Merkledb schema is now declarative and can contain indices as fields.
+
+- Access to the database is now isolated for services.
+  A service cannot get the write access to another service or the blockchain schema.
+
+- Transactions do not have the `execute` method anymore. Instead, a service defines
+  and implements an interface trait which contains all the business logic.
+
+- Services do not launch at the node start by default. For launching a
+  service, use an [`exonum-launcher`][launcher] tool.
+
+  [launcher]: https://github.com/exonum/exonum-launcher
+
+#### Important PRs for Dynamic Services
+
+<!-- markdownlint-disable no-inline-html -->
+<details>
+    <summary>Below you can find a list of pull requests
+    which have significant meaning for the implementation of the Dynamic Services
+    feature.
+    Pull requests are ordered chronologically.</summary>
+
+- #1253: Interface mocks for dynamic services
+
+- #1263: Add new rust services interface
+
+- #1261: Basic dispatcher functionality
+
+- #1275: Dynamic services integration
+
+- #1345: Implement a new `Transaction` trait [ECR-3222]
+
+- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+
+- #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
+
+- #1376: Restore system API endpoints
+
+- #1389: Check and improve messages verification procedure [ECR-3272]
+
+- #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
+
+- #1467: Implement Configure interface [ECR-3306]
+
+- #1473: Extract supervisor service from core
+
+- #1482: Add shutdown method into runtime trait
+
+- #1484: Implement configuration update logic in Supervisor [ECR-3583]
+
+- #1492: Do start and initialize service at single step [ECR-3222]
+
+- #1537: Finalize Exonum-derive macros [ECR-3800]
+
+- #1538: Supervisor modes [ECR-3794] [ECR-3771]
+
+</details>
+<!-- markdownlint-enable no-inline-html -->
+
+#### Full History of the Dynamic Services Implementation
+
+<!-- markdownlint-disable no-inline-html -->
+<details>
+    <summary>Below you can find a list of all pull requests related
+    to the implementation of the Dynamic Services feature.
+    Pull requests are ordered chronologically.</summary>
+
+- #1243: Old behavior dispatcher
+
+- #1509: Make dispatcher mostly synchronous
+
+- #1245: Add basic runtime env interface + rust implementation
+
+- #1253: Interface mocks for dynamic services
+
+- #1261: Basic dispatcher functionality
+
+- #1263: Add new rust services interface
+
+- #1267: Move configuration service to the core
+
+- #1269: Rust artifact and additional functionality for rust runtime.
+
+- #1270: Dynamic configuration service
+
+- #1275: Dynamic services integration
+
+- #1287: Remove macro from service interface trait definition
+
+- #1290: Add support of state hash calculation into runtimes & services
+
+- #1291: Change service builder and web api.
+
+- #1325: Dynamic services: fix time service compilation
+
+- #1326: Remove genesis_init from dynamic services [ECR-3226]
+
+- #1327: Remove unsafe code from runtimes
+
+- #1330: A small amount of code improvements. [ECR-3222]
+
+- #1331: Rename dispatch to call_info
+
+- #1332: Fix tests in blockchain module
+
+- #1334: Fix sandbox tests in dynamic services [ECR-3230]
+
+- #1336: Rename traits methods in dynamic services  [ECR-3222]
+
+- #1337: Fix a lot of tests in dynamic services
+
+- #1338: Refine `start_service` logic [ECR-3222, ECR-3235]
+
+- #1340: Fix testkit [ECR-3229]
+
+- #1343: Add service name and id to `Service` trait methods. [ECR-3235]
+
+- #1345: Implement a new `Transaction` trait [ECR-3222]
+
+- #1346: Fix transactions benchmarks in dynamic services
+
+- #1348: Fix big performance regression in dynamic services
+
+- #1349: Don't verify SignedMessage during the deserialization
+
+- #1350: Refactor signature verification code [ECR-3222]
+
+- #1353: Rework blockchain explorer [ECR-3259]
+
+- #1354: Fix `cargo test --all` compilation
+
+- #1357: Some refactoring by clippy suggestion
+
+- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+
+- #1367: Rename ArtifactSpec to ArtifactId [ECR-3291]
+
+- #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
+
+- #1374: Polish code and make travis almost happy
+
+- #1375: Add deadline_height to StartService transaction [ECR-3298]
+
+- #1376: Restore system API endpoints
+
+- #1378: Finalize artifact deployment logic [ECR-3291]
+
+- #1379: Implement state_hash computation for dispatcher.
+
+- #1380: Make tests green again.
+
+- #1381: Include proto file sources in artifact information. [ECR-3309]
+
+- #1382: Replace impl_service_dispatcher by the attribute in
+  service_interface [ECR-3222]
+
+- #1387: Improve execution error handling for dynamic services [ECR-3236]
+
+- #1389: Check and improve messages verification procedure [ECR-3272]
+
+- #1392: Implement verification for ArtifactId and InstanceSpec
+  with the unit tests [ECR-3360]
+
+- #1393: Add macro to implement hex serde representation
+  for the BinaryValue types [ECR-3222]
+
+- #1394: Update documentation of the messages module [ECR-3275]
+
+- #1396: Document runtime life cycle [ECR-3275]
+
+- #1405: Dynamic services supervisor tests [ECR-3266]
+
+- #1411: Refine Runtime trait [ECR-3412]
+
+- #1427: Try to re deploy artifact before registration.
+
+- #1429: Review unwraps in dynamic services [ECR-3419]
+
+- #1430: Expand documentation on configuration parameters usage [ECR-3463]
+
+- #1431: Update dispatcher info to show changes in list
+  of deployed artifacts
+
+- #1432: Refine exonum-derive crate on top of darling [ECR-3343]
+
+- #1434: Replace `dispatcher` attribute in `exonum_service`
+  by the `service_interface` in `ServiceFactory` [ECR-3474]
+
+- #1438: Remove dispatcher reference from Runtime trait
+
+- #1443: Replace fabric module with exonum-cli crate [ECR-3457]
+
+- #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
+
+- #1451: Add the service interface name option to the proto files
+
+- #1452: Remove default state_hash implementation
+
+- #1454: Simplify blockchain configuration [ECR-3357]
+
+- #1462: Fix API Freeze on startup
+
+- #1465: Improve ProtobufConvert for enum variants
+
+- #1467: Implement Configure interface [ECR-3306]
+
+- #1472: Fix some of the testkit ignored doctests
+
+- #1473: Extract supervisor service from core
+
+- #1476: Improve support for additional runtimes in TestKit [ECR-3444]
+
+- #1482: Add shutdown method into runtime trait
+
+- #1483: Use strings for protobuf files
+
+- #1484: Implement configuration update logic in Supervisor [ECR-3583]
+
+- #1488: Add support of external runtimes to exonum-cli
+
+- #1489: Avoid waiting in the `add_transaction` endpoint [ECR-3222]
+
+- #1490: Fix supervisor creation
+
+- #1491: Polish testkit [ECR-3222]
+
+- #1492: Do start and initialize service at single step [ECR-3222]
+
+- #1493: Document Rust runtime services traits [ECR-3275]
+
+- #1494: Enhancements in Testkit
+
+- #1495: Implement API endpoints that shows config
+  proposals in Supervisor [ECR-3610]
+
+- #1504: Clarify runtime shutdown method [ECR-3696]
+
+- #1505: Proto optimization [ECR-3472]
+
+- #1508: Remove validator_id method from AfterCommitContext
+
+- #1509: Make dispatcher mostly synchronous
+
+- #1511: Add includes to proto-sources
+
+- #1514: Use enum to represent ErrorKind [ECR-3717]
+
+- #1515: Introduce test-suite directory
+
+- #1517: Clarify SignedMessage documentation [ECR-3478]
+
+- #1518: Remove data duplication from DeployConfirmation [ECR-3770]
+
+- #1519: Add anonymous lifetimes [ECR-3757]
+
+- #1520: SimpleSupervisor: Verify that config proposal
+  is sent by validator [ECR-3742]
+
+- #1521: Implement ObjectHash for SignedMessage
+
+- #1522: Remove ApiContext structure [ECR-3745]
+
+- #1525: Make protobuf artifacts implementation detail
+
+  of Rust runtime [ECR-3776]
+
+- #1526: Sending an empty POST request to /shutdown endpoint
+  doesn't work [ECR-3756]
+
+- #1528: Document parts of Rust runtime [ECR-3285]
+
+- #1530: Improve `Runtime` docs
+
+- #1531: ProofMapIndex variants for hashed and raw keys [ECR-3777]
+
+- #1537: Finalize Exonum-derive macros [ECR-3800]
+
+- #1538: Supervisor modes [ECR-3794] [ECR-3771]
+
+- #1539: Restore warn(missing_docs) in the Exonum crate [ECR-3821]
+
+- #1540: Deploy workflow
+
+- #1542: Write proper examples for the Exonum traits derivation [ECR-3822]
+
+- #1544: Remove atty dependency
+
+- #1546: Move multisig module to the supervisor crate [ECR-3823]
+
+- #1547: Remove metrics module
+
+- #1548: Remove TransactionMessage alias [ECR-3222]
+
+- #1549: Encapsulate Blockchain fields [ECR-3222]
+
+- #1550: Remove isolate method [ECR-3820]
+
+- #1552: Assign instance IDs in the Supervisor [ECR-3746]
+
+- #1555: Update MerkleDB docs
+
+</details>
+<!-- markdownlint-enable no-inline-html -->
 
 #### exonum-merkledb
 
@@ -82,6 +465,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `http_backend_config.server_restart_retry_timeout` added into `NetworkConfiguration`.
   They are intended to configure restart settings of the HTTP-server (#1536).
 
+- `exonum` now has a `python` library for implementing integration tests. (#1516)
+
 #### exonum-merkledb
 
 - `ProofListIndex` now implements `truncate()` and `pop()` methods, allowing
@@ -93,7 +478,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `HashTag::hash_list()` was extended to support values of any appropriate type,
   not only `Hash`. (#1455)
 
-- `ProtobufConvert` has been implemented for `MapProof`. (#1512)
+- `ProtobufConvert` has been implemented for `MapProof` (#1512) and `ListProof` (#1513).
 
 - New variant of the `ProofMapIndex` have been introduced - `RawProofMapIndex`.
   It is used for keys that maps directly to `ProofPath`, for example `Hash` and
@@ -104,17 +489,40 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - For `Hash` keys both map variants works the same, because `ObjectHash`
   implementation for `Hash` returns the hash itself.
 
-### Internal improvements
+#### exonum-cli
+
+- Old `fabric` module is replaced with new `exonum-cli` crate. (#1443)
+
+- `exonum-cli` provides a public reexport of `structopt` crate. (#1461)
+
+### Internal Improvements
 
 #### exonum
 
 - `system/v1/shutdown` endpoint has been modified and now accepts empty POST
   requests. (#1526)
 
+- `exonum-protobuf-convert` has been replaced with external `protobuf-convert`
+  crate. (#1561)
+
+- `keys` module has been moved into `exonum-keys` crate. (#1497)
+
 #### exonum-merkledb
 
 - `ProofListIndex::extend()` method has been refactored, leading to up to 10x
   performance improvements for large lists. (#1455)
+
+- Proofs building mechanisms have been heavily refactored. (#1460)
+
+### Bug Fixes
+
+#### exonum
+
+- Localhost ports 8080/8081 are now allowed in CORS within the `run-dev` mode. (#1415)
+
+#### exonum-merkledb
+
+- `index_metadata` now correctly loads the provided index address name (#1478).
 
 ## 0.12.1 - 2019-09-19
 
