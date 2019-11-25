@@ -148,6 +148,7 @@ jobs:
     - sudo apt-get update
     - sudo apt-get install python3
     - sudo apt-get install python3-pip
+    - sudo apt-get install -y python3-setuptools
     install:
     - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
     - nvm install 8 && nvm use 8
