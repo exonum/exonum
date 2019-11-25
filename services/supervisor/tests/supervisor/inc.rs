@@ -15,7 +15,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ExecutionError, InstanceCollection},
+    blockchain::ExecutionError,
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
@@ -124,12 +124,6 @@ impl Service for IncService {
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         PublicApi::wire(builder);
-    }
-}
-
-impl From<IncService> for InstanceCollection {
-    fn from(instance: IncService) -> Self {
-        InstanceCollection::new(instance).with_instance(SERVICE_ID, SERVICE_NAME, Vec::default())
     }
 }
 
