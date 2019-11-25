@@ -46,14 +46,6 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Instance identifier for first deployed service.
-///
-/// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
-/// identifiers for built-in services which can be created only during the blockchain genesis
-/// block creation.
-// TODO: remove [ECR-3851]
-const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
-
 /// Decentralized supervisor.
 pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
 
@@ -109,7 +101,8 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     start_service.name,
                     start_service.artifact
                 );
-                let id = Schema::new(context.service_data()).assign_instance_id();
+
+                let id = assign_instance_id(context);
                 let (instance_spec, config) = start_service.into_parts(id);
 
                 context
@@ -121,6 +114,40 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
         }
     }
     Ok(())
+}
+
+/// Assigns the instance ID for a new service, initializing the schema `vacant_instance_id`
+/// entry if needed.
+fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
+    let mut schema = Schema::new(context.service_data());
+    match schema.assign_instance_id() {
+        Some(id) => id,
+        None => {
+            // Instance ID entry is not initialized, do it now.
+            // We have to do it lazy, since dispatcher doesn't know the amount
+            // of builtin instances until the genesis block is committed, and
+            // `before_commit` hook is not invoked for services at the genesis
+            // block.
+
+            // ID for the new instance is next to the highest builtin ID to avoid
+            // overlap if builtin identifiers space is sparse.
+            let dispatcher_schema = context.data().for_dispatcher();
+            let builtin_instances = dispatcher_schema.running_instances();
+
+            let new_instance_id = builtin_instances
+                .values()
+                .map(|spec| spec.id)
+                .max()
+                .unwrap_or(SUPERVISOR_INSTANCE_ID)
+                + 1;
+
+            // We're going to use ID obtained above, so the vacant ID is next to it.
+            let vacant_instance_id = new_instance_id + 1;
+            schema.vacant_instance_id.set(vacant_instance_id);
+
+            new_instance_id
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]

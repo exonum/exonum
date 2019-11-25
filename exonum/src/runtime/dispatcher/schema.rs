@@ -16,7 +16,7 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Fork, MapIndex,
+    AsReadonly, Fork, MapIndex,
 };
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
@@ -116,6 +116,14 @@ impl<T: Access> Schema<T> {
                     .get(name)
                     .map(|spec| (spec, DeployStatus::Pending))
             })
+    }
+}
+
+// `AsReadonly` specialization to ensure that we won't leak mutable schema access.
+impl<T: AsReadonly> Schema<T> {
+    /// Readonly set of launched service instances.
+    pub fn running_instances(&self) -> MapIndex<T::Readonly, String, InstanceSpec> {
+        self.access.as_readonly().get_map(SERVICE_INSTANCES)
     }
 }
 
