@@ -247,21 +247,14 @@ fn test_duplicate_tx() {
 fn test_probe_advanced() {
     let (mut testkit, api) = init_testkit();
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(6).sign(SERVICE_ID, pubkey, &key)
-    };
-    let other_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(10).sign(SERVICE_ID, pubkey, &key)
-    };
-    let admin_tx = {
-        let (pubkey, key) = crypto::gen_keypair_from_seed(
-            &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
-        );
-        assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-        Reset.sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(6).sign(SERVICE_ID, pubkey, &key);
+    let other_tx = Increment::new(10).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair_from_seed(
+        &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
+    );
+    assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
+    let admin_tx = Reset.sign(SERVICE_ID, pubkey, &key);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -324,7 +317,6 @@ fn test_probe_duplicate_tx() {
     assert_eq!(schema.counter.get(), Some(5));
 
     testkit.create_block();
-
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(5));
@@ -354,10 +346,8 @@ fn test_snapshot_comparison() {
     api.send(tx);
     testkit.create_block();
 
-    let other_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(3).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
     testkit
         .probe(other_tx.clone())
         .compare(testkit.snapshot())
@@ -372,10 +362,8 @@ fn test_snapshot_comparison() {
 fn test_snapshot_comparison_panic() {
     let (mut testkit, api) = init_testkit();
     let increment_by = 5;
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(increment_by).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(increment_by).sign(SERVICE_ID, pubkey, &key);
 
     api.send(tx.clone());
     testkit.create_block();
@@ -395,10 +383,8 @@ fn test_snapshot_comparison_panic() {
 fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
-        let tx = {
-            let (pubkey, key) = crypto::gen_keypair();
-            Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key)
-        };
+        let (pubkey, key) = crypto::gen_keypair();
+        let tx = Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key);
         testkit.api().send(tx.clone());
     }
     testkit.create_block();
@@ -737,10 +723,8 @@ fn test_explorer_single_block() {
         assert_eq!(&*block.transaction_hashes(), &[]);
     }
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
@@ -778,11 +762,8 @@ fn test_explorer_transaction_info() {
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
-
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
 
     let info = api
         .public(ApiKind::Explorer)
