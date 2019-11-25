@@ -119,6 +119,7 @@ impl TestKitApi {
         )
     }
 
+    /// Creates a wrapper around over Exonum node API.
     pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
         ExonumNodeApi::new(self)
     }
@@ -322,6 +323,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 }
 
 /// A convenience wrapper for Exonum node API to reduce the boilerplate code.
+#[derive(Debug)]
 pub struct ExonumNodeApi<'a> {
     pub inner: &'a TestKitApi,
 }
@@ -348,16 +350,19 @@ impl<'a> ExonumNodeApi<'a> {
         }
     }
 
+    /// Asserts that the transaction with the given hash was executed successfully.
     pub fn assert_tx_success(&self, tx_hash: Hash) {
         self.assert_tx_status(tx_hash, &ExecutionStatus::ok());
     }
 
+    /// Same as `assert_tx_success`, but for a sequence of transactions.
     pub fn assert_txs_success(&self, tx_hashes: &[Hash]) {
         for &tx_hash in tx_hashes {
             self.assert_tx_success(tx_hash);
         }
     }
 
+    /// Performs a GET request to "/services" system endpoint.
     pub fn services(&self) -> DispatcherInfo {
         self.inner
             .public(ApiKind::System)
