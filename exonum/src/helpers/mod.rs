@@ -175,7 +175,7 @@ pub fn create_rust_runtime_and_genesis_config(
             .fold(config_builder, |builder, instance| {
                 builder
                     .with_artifact(instance.instance_spec.artifact.clone(), ())
-                    .with_service(instance)
+                    .with_instance(instance)
             });
     }
 

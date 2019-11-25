@@ -131,7 +131,7 @@ pub fn create_blockchain() -> BlockchainMut {
     let my_service = MyService;
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(my_service.get_artifact(), ())
-        .with_service(my_service.get_instance(SERVICE_ID, "my-service", ()))
+        .with_instance(my_service.get_instance(SERVICE_ID, "my-service", ()))
         .build();
     let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(my_service);
     BlockchainBuilder::new(blockchain, genesis_config)

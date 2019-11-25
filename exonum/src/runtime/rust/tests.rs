@@ -456,7 +456,7 @@ fn rust_runtime_with_builtin_services() {
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
         .with_artifact(artifact.clone(), ())
-        .with_service(InstanceInitParams {
+        .with_instance(InstanceInitParams {
             instance_spec: spec.clone(),
             constructor: constructor.clone().into_bytes(),
         })
@@ -673,9 +673,9 @@ fn dependent_builtin_service() {
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(main_service.get_artifact(), ())
-        .with_service(main_service.default_instance())
+        .with_instance(main_service.default_instance())
         .with_artifact(dep_service.get_artifact(), ())
-        .with_service(dep_service.default_instance())
+        .with_instance(dep_service.default_instance())
         .build();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)
@@ -711,8 +711,8 @@ fn dependent_builtin_service_with_incorrect_order() {
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(main_service.get_artifact(), ())
         .with_artifact(dep_service.get_artifact(), ())
-        .with_service(dep_service.default_instance()) // <-- Incorrect service ordering
-        .with_service(main_service.default_instance())
+        .with_instance(dep_service.default_instance()) // <-- Incorrect service ordering
+        .with_instance(main_service.default_instance())
         .build();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)
@@ -810,7 +810,7 @@ fn dependent_service_in_successive_block() {
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(main_service.get_artifact(), ())
-        .with_service(main_service.default_instance())
+        .with_instance(main_service.default_instance())
         .build();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)

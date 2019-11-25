@@ -183,7 +183,7 @@ mod tests {
                 |builder, instance| {
                     builder
                         .with_artifact(instance.instance_spec.artifact.clone(), ())
-                        .with_service(instance)
+                        .with_instance(instance)
                 },
             )
             .build();
