@@ -112,14 +112,16 @@ impl Dispatcher {
         &mut self,
         fork: &mut Fork,
         spec: InstanceSpec,
-        artifact_spec: impl BinaryValue,
+        artifact_payload: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         debug!("add builtin service: {:?}", spec);
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
-            self.commit_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
+            Self::commit_artifact(fork, spec.artifact.clone(), artifact_payload.to_bytes())?;
+            // Wait until the artifact is ready to instantiate the service instances.
+            self.block_until_deployed(spec.artifact.clone(), artifact_payload.into_bytes());
         }
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
@@ -205,26 +207,6 @@ impl Dispatcher {
                     panic!("Unable to deploy registered artifact. {}", e)
                 });
         }
-    }
-
-    /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
-    /// deployed.
-    pub(crate) fn commit_artifact_sync(
-        &mut self,
-        fork: &Fork,
-        artifact: ArtifactId,
-        payload: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        // TODO: revise dispatcher integrity checks [ECR-3743]
-        debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
-        let spec = ArtifactSpec {
-            artifact,
-            payload: payload.into_bytes(),
-        };
-
-        self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
-        Schema::new(fork).add_pending_artifact(spec.clone())?;
-        Ok(())
     }
 
     // TODO documentation [ECR-3275]

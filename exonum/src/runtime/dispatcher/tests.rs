@@ -14,7 +14,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
-use exonum_merkledb::{Database, Fork, ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
 
 use std::{
@@ -81,6 +81,19 @@ impl Dispatcher {
             .ok_or(DispatcherError::IncorrectRuntime)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, arguments)
+    }
+
+    /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
+    /// deployed.
+    pub(crate) fn commit_artifact_sync(
+        &mut self,
+        fork: &Fork,
+        artifact: ArtifactId,
+        payload: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        Self::commit_artifact(fork, artifact.clone(), payload.to_bytes())?;
+        self.block_until_deployed(artifact, payload.into_bytes());
+        Ok(())
     }
 }
 
