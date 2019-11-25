@@ -19,12 +19,12 @@ use exonum::{
     crypto::{Hash, PublicKey},
 };
 use exonum_merkledb::{
-    access::{Access, FromAccess, Prefixed, RawAccessMut},
+    access::{Access, RawAccessMut},
     Entry, ObjectHash, ProofMapIndex,
 };
 
 /// `Exonum-time` service database schema.
-#[derive(Debug)]
+#[derive(Debug, FromAccess)]
 pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
@@ -32,25 +32,15 @@ pub struct TimeSchema<T: Access> {
     pub time: Entry<T::Base, DateTime<Utc>>,
 }
 
-impl<'a, T: Access> TimeSchema<Prefixed<'a, T>> {
-    /// Constructs schema for the given `access`.
-    pub fn new(access: Prefixed<'a, T>) -> Self {
-        Self {
-            validators_times: FromAccess::from_access(access.clone(), "validators_times".into())
-                .unwrap(),
-            time: FromAccess::from_access(access, "time".into()).unwrap(),
-        }
-    }
-
+impl<T: Access> TimeSchema<T> {
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.validators_times.object_hash(), self.time.object_hash()]
     }
 }
 
-impl<'a, T> TimeSchema<Prefixed<'a, T>>
+impl<T: Access> TimeSchema<T>
 where
-    T: Access,
     T::Base: RawAccessMut,
 {
     /// Returns an error if the currently registered validator time is greater than `time`.

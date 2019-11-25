@@ -39,6 +39,7 @@ protobuf = { version = "2.8.1", features = ["with-serde"], optional = true }
 [dev-dependencies]
 assert_matches = "1.3.0"
 criterion = "0.3"
+exonum-derive = { version = "0.12.0", path = "../derive" }
 rand = "0.7"
 proptest = "0.9"
 modifier = "0.1"
