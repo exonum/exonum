@@ -154,7 +154,6 @@ impl Schema<&Fork> {
     // Marks pending artifacts as deployed.
     pub(super) fn mark_pending_artifacts_as_active(&mut self) {
         for spec in &self.pending_artifacts {
-            debug!("pending to active: {:?}", spec);
             self.artifacts.put(
                 &spec.artifact.name.clone(),
                 ArtifactState {
@@ -168,7 +167,6 @@ impl Schema<&Fork> {
     /// Marks pending instances as active.
     pub(super) fn mark_pending_instances_as_active(&mut self) {
         for spec in &self.pending_instances {
-            debug!("pending to active: {:?}", spec);
             self.instances.put(
                 &spec.name.clone(),
                 InstanceState {

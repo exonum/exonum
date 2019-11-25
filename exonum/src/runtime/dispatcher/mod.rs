@@ -82,14 +82,23 @@ impl Dispatcher {
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
-        for ArtifactSpec { artifact, payload } in
-            schema.artifacts.values().filter_map(ArtifactState::active)
-        {
-            self.deploy_artifact(artifact, payload).wait()?;
+        for state in schema.artifacts.values() {
+            debug_assert_eq!(
+                state.status,
+                ArtifactStatus::Active,
+                "BUG: Artifact should not be in pending state."
+            );
+            self.deploy_artifact(state.spec.artifact, state.spec.payload)
+                .wait()?;
         }
         // Restart active service instances.
-        for instance in schema.instances.values().filter_map(InstanceState::active) {
-            self.start_service(snapshot, &instance)?;
+        for state in schema.instances.values() {
+            debug_assert_eq!(
+                state.status,
+                InstanceStatus::Active,
+                "BUG: Service instance should not be in pending state."
+            );
+            self.start_service(snapshot, &state.spec)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
@@ -115,7 +124,6 @@ impl Dispatcher {
         artifact_payload: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        debug!("add builtin service: {:?}", spec);
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
@@ -171,7 +179,7 @@ impl Dispatcher {
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            Either::A(runtime.deploy_artifact(artifact.clone(), payload))
+            Either::A(runtime.deploy_artifact(artifact, payload))
         } else {
             Either::B(future::err(Error::IncorrectRuntime.into()))
         }
@@ -234,7 +242,6 @@ impl Dispatcher {
     /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for proposal and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
-        debug!("before_commit");
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
             if self.runtimes[&info.runtime_id]
@@ -254,7 +261,6 @@ impl Dispatcher {
     /// **NB.** Changes made to the `fork` in this method MUST be the same for all nodes.
     /// This is not checked by the consensus algorithm as usual.
     pub(crate) fn commit_block(&mut self, fork: &mut Fork) {
-        debug!("Commit block");
         // If the fork is dirty, `snapshot` will be outdated, which can trip
         // `Runtime::start_service()` calls.
         fork.flush();
@@ -273,7 +279,6 @@ impl Dispatcher {
     }
 
     pub(crate) fn activate_pending_entities(&self, fork: &mut Fork) {
-        debug!("activate_pending_entities");
         let mut schema = Schema::new(&*fork);
         schema.mark_pending_artifacts_as_active();
         schema.mark_pending_instances_as_active();

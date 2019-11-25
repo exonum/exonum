@@ -228,8 +228,8 @@ impl BlockchainMut {
     ) -> Result<(), Error> {
         config.validate()?;
         let mut fork = self.fork();
+        // Write genesis configuration to the blockchain.
         Schema::new(&fork).consensus_config_entry().set(config);
-
         // Add service instances.
         for instance_config in initial_services {
             self.dispatcher.add_builtin_service(
@@ -287,12 +287,10 @@ impl BlockchainMut {
                 // cannot be deserialized or it isn't in the pool.
                 .expect("Transaction execution error");
         }
-
-        // Skip execution for genesis block.
+        // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
             self.dispatcher.before_commit(&mut fork);
         }
-
         // Get tx & state hash.
         let schema = Schema::new(&fork);
         let state_hash = {
@@ -317,7 +315,7 @@ impl BlockchainMut {
         };
         let tx_hash = schema.block_transactions(height).object_hash();
 
-        // Create block.
+        // Create block header.
         let block = Block::new(
             proposer_id,
             height,
