@@ -387,9 +387,9 @@ impl GenesisConfigBuilder {
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
     pub fn with_artifact(mut self, artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
-        if !self.artifacts.contains_key(&artifact) {
-            self.artifacts.insert(artifact, deploy_spec.into_bytes());
-        }
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| deploy_spec.into_bytes());
         self
     }
 
