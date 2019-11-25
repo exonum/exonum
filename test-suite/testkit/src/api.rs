@@ -119,7 +119,7 @@ impl TestKitApi {
         )
     }
 
-    /// Creates wrapper for Exonum node api.
+    /// Creates wrapper for Exonum node API.
     pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
         ExonumNodeApi::new(self)
     }
