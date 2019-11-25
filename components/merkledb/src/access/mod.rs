@@ -135,13 +135,26 @@ pub enum AccessErrorKind {
         actual: IndexType,
     },
 
-    /// Index has invalid name.
-    #[fail(display = "{}", _0)]
-    InvalidIndexName(String),
+    /// Index name is reserved. It's forbidden for user to create indexes with names
+    /// starting with `__`.
+    #[fail(display = "Index name is reserved")]
+    ReservedName,
 
-    /// System index has invalid name.
-    #[fail(display = "{}", _0)]
-    InvalidSystemIndexName(String),
+    /// Index name is empty.
+    #[fail(display = "Index name must not be empty")]
+    EmptyName,
+
+    /// Index contains invalid characters.
+    #[fail(
+        display = "Invalid characters using in name ({}). Use {}",
+        name, allowed_chars
+    )]
+    InvalidCharsInName {
+        /// Name that contains invalid chars.
+        name: String,
+        /// Characters allowed in name.
+        allowed_chars: String,
+    },
 
     /// Custom error.
     #[fail(display = "{}", _0)]

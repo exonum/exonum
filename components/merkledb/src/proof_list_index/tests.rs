@@ -14,6 +14,8 @@
 
 // spell-checker:ignore upup
 
+#![allow(clippy::too_many_lines)]
+
 use exonum_crypto::Hash;
 use rand::{thread_rng, Rng};
 use serde_json::{self, json};
@@ -333,7 +335,6 @@ fn random_proofs() {
 }
 
 #[test]
-#[allow(clippy::too_many_lines)]
 fn index_and_proof_roots() {
     let db = TemporaryDB::new();
     let fork = db.fork();

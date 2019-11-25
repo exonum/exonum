@@ -22,7 +22,7 @@ pub fn is_valid_index_full_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref()
         .as_bytes()
         .iter()
-        .all(|c| is_allowed_index_name_char(*c) || *c == b'.')
+        .all(|&c| is_allowed_index_name_char(c) || c == b'.')
 }
 
 /// Validates index name prefix, it shouldn't contain the dot.
@@ -47,22 +47,34 @@ pub fn is_allowed_index_name_char(c: u8) -> bool {
 
 // Allow because it's looks more readable.
 #[allow(clippy::if_not_else)]
-fn check_valid_name<S: AsRef<str> + Copy, F>(
-    name: S,
+fn check_valid_name<F>(
+    addr: IndexAddress,
     predicate: F,
-    desc: &str,
-) -> Result<(), String>
+    allowed_chars: String,
+) -> Result<(), AccessError>
 where
-    F: Fn(S) -> bool,
+    F: Fn(String) -> bool,
 {
-    if name.as_ref().is_empty() {
-        Err("Index name must not be empty".into())
-    } else if !predicate(name) {
-        Err(format!(
-            "Wrong characters using in name ({}). {}",
-            name.as_ref(),
-            desc
-        ))
+    let name = addr.name.clone();
+
+    if name.starts_with("__") {
+        Err(AccessError {
+            addr,
+            kind: AccessErrorKind::ReservedName,
+        })
+    } else if name.is_empty() {
+        Err(AccessError {
+            addr,
+            kind: AccessErrorKind::EmptyName,
+        })
+    } else if !predicate(name.clone()) {
+        Err(AccessError {
+            addr,
+            kind: AccessErrorKind::InvalidCharsInName {
+                name,
+                allowed_chars,
+            },
+        })
     } else {
         Ok(())
     }
@@ -70,31 +82,47 @@ where
 
 /// Calls the `is_valid_index_full_name` function with the given index address.
 pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
-    let name = &addr.name;
-    let is_system = name.starts_with("__");
-
-    match check_valid_name(name, is_valid_index_full_name, "Use: a-zA-Z0-9 and _-.") {
-        Err(msg) => {
-            let kind = if is_system {
-                AccessErrorKind::InvalidIndexName(msg)
-            } else {
-                AccessErrorKind::InvalidSystemIndexName(msg)
-            };
-
-            Err(AccessError {
-                addr: addr.clone(),
-                kind,
-            })
-        }
-        _ => Ok(()),
-    }
+    check_valid_name(
+        addr.clone(),
+        is_valid_index_full_name,
+        "a-zA-Z0-9 and _-.".into(),
+    )
 }
 
 /// Calls the `is_valid_index_name_component` function with the given
 /// name and panics if it returns `false`.
 pub(crate) fn assert_valid_name_component(name: &str) {
-    if let Err(msg) = check_valid_name(name, is_valid_index_name_component, "Use: a-zA-Z0-9 and _-")
-    {
-        panic!(msg)
+    if let Err(access_error) = check_valid_name(
+        name.into(),
+        is_valid_index_name_component,
+        "a-zA-Z0-9 and _-".into(),
+    ) {
+        panic!(access_error.to_string())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        access::{AccessErrorKind, FromAccess},
+        Database, ListIndex, TemporaryDB,
+    };
+
+    #[test]
+    fn index_name_validation() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        let e = ListIndex::<_, u32>::from_access(&fork, "".into()).unwrap_err();
+        assert_matches!(e.kind, AccessErrorKind::EmptyName);
+        let e = ListIndex::<_, u32>::from_access(&fork, "__METADATA__".into()).unwrap_err();
+        assert_matches!(e.kind, AccessErrorKind::ReservedName);
+        // spell-checker:disable
+        let e = ListIndex::<_, u32>::from_access(
+            &fork,
+            "\u{441}\u{43f}\u{438}\u{441}\u{43e}\u{43a}".into(),
+        )
+        .unwrap_err();
+        assert_matches!(e.kind, AccessErrorKind::InvalidCharsInName { .. } );
     }
 }

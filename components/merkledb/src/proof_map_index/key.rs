@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This lint is triggered
+#![allow(clippy::range_plus_one)]
+
 use std::{
     cmp::{min, Ordering},
     io::{Cursor, Write},
@@ -151,7 +154,6 @@ impl ProofPath {
     /// # Panics
     ///
     /// Panics if the given bytes has different length than the `KEY_SIZE`.
-    #[allow(clippy::range_plus_one)]
     pub(crate) fn from_bytes(bytes: impl AsRef<[u8]>) -> Self {
         let mut inner = [0; PROOF_PATH_SIZE];
         inner[0] = LEAF_KEY_PREFIX;
@@ -316,7 +318,6 @@ impl BitsRange for ProofPath {
     }
 
     // False positive clippy warning.
-    #[allow(clippy::range_plus_one)]
     fn raw_key(&self) -> &[u8] {
         &self.bytes[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]
     }
@@ -471,7 +472,6 @@ mod tests {
         }
 
         /// Reads the proof path from the compressed binary representation.
-        #[allow(clippy::range_plus_one)]
         fn read_compressed(value: &[u8]) -> Self {
             let mut reader = Cursor::new(value);
             let bits_len = leb128::read::unsigned(&mut reader).unwrap() as usize;
