@@ -314,10 +314,9 @@ pub struct GenesisConfig {
     pub consensus_config: ConsensusConfig,
 
     /// Artifacts specification of builtin services.
-    pub artifacts: Vec<ArtifactSpec>, // TODO: HashSet? Duplications? Perhaps check in builder?
+    pub artifacts: Vec<ArtifactSpec>,
 
-    /// List of the privileged services with the configuration parameters that are created directly
-    /// in the genesis block.
+    /// List of services with its configuration parameters that are created directly in the genesis block.
     pub builtin_instances: Vec<InstanceInitParams>,
 }
 

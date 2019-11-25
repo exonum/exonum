@@ -233,20 +233,14 @@ impl BlockchainMut {
             .set(genesis_config.consensus_config);
 
         for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
-            if !self.dispatcher.is_artifact_deployed(&artifact) {
-                self.dispatcher
-                    .deploy_artifact_sync(&fork, artifact, payload)?;
-            }
+            self.dispatcher
+                .deploy_artifact_sync(&fork, artifact, payload)?;
         }
 
         // Add service instances.
-        for InstanceInitParams {
-            instance_spec,
-            constructor,
-        } in genesis_config.builtin_instances
-        {
+        for inst in genesis_config.builtin_instances {
             self.dispatcher
-                .add_builtin_service(&mut fork, instance_spec, constructor)?;
+                .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
         }
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,

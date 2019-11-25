@@ -129,7 +129,7 @@ pub fn create_blockchain() -> BlockchainMut {
     );
 
     let my_service = MyService;
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(my_service.get_artifact(), ())
         .with_service(my_service.get_instance(SERVICE_ID, "my-service", ()))
         .build();
