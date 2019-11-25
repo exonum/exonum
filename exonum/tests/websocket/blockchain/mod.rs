@@ -15,12 +15,12 @@
 //! Simplified node emulation for testing websockets.
 
 use exonum::{
-    blockchain::InstanceCollection,
+    blockchain::config::GenesisConfigBuilder,
     crypto::{Hash, PublicKey},
     helpers,
     node::{ApiSender, Node},
     runtime::{
-        rust::{CallContext, Service},
+        rust::{CallContext, InstanceInfoProvider, Service},
         BlockchainData, InstanceId, Runtime,
     },
 };
@@ -84,6 +84,8 @@ pub trait MyServiceInterface {
 #[service_dispatcher(implements("MyServiceInterface"))]
 struct MyService;
 
+impl InstanceInfoProvider for MyService {}
+
 impl MyServiceInterface for MyService {
     fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {
@@ -117,14 +119,19 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
     );
 
     let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-    let services =
-        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
+    let service = MyService;
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+        .with_artifact(service.get_artifact(), ())
+        .with_instance(service.get_instance(SERVICE_ID, "my-service", ()))
+        .build();
+    let services = vec![service.into()];
 
     let node = Node::new(
         TemporaryDB::new(),
         external_runtimes,
         services,
         node_cfg,
+        genesis_config,
         None,
     );
 

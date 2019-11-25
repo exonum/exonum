@@ -15,12 +15,12 @@
 // This is a regression test for exonum node.
 
 use exonum::{
-    blockchain::InstanceCollection,
+    blockchain::config::GenesisConfigBuilder,
     crypto::Hash,
     helpers,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
-        rust::{AfterCommitContext, Service},
+        rust::{AfterCommitContext, InstanceInfoProvider, Service},
         BlockchainData, Runtime,
     },
 };
@@ -48,6 +48,8 @@ trait CommitWatcherInterface {}
     service_constructor = "CommitWatcherService::new_instance"
 )]
 struct CommitWatcherService(mpsc::UnboundedSender<()>);
+
+impl InstanceInfoProvider for CommitWatcherService {}
 
 impl CommitWatcherService {
     fn new_instance(&self) -> Box<dyn Service> {
@@ -91,6 +93,8 @@ impl Service for StartCheckerService {
 )]
 struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
 
+impl InstanceInfoProvider for StartCheckerServiceFactory {}
+
 impl StartCheckerServiceFactory {
     fn new_instance(&self) -> Box<dyn Service> {
         *self.0.lock().unwrap() += 1;
@@ -110,14 +114,20 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
         let (commit_tx, commit_rx) = mpsc::unbounded();
 
         let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-        let services = vec![InstanceCollection::new(CommitWatcherService(commit_tx))
-            .with_instance(2, "commit-watcher", ())];
+        let service = CommitWatcherService(commit_tx);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+                .with_artifact(service.get_artifact(), ())
+                .with_instance(service.get_instance(2, "commit-watcher", ()))
+                .build();
+        let services = vec![service.into()];
 
         let node = Node::new(
             TemporaryDB::new(),
             external_runtimes,
             services,
             node_cfg,
+            genesis_config,
             None,
         );
 
@@ -157,15 +167,22 @@ fn test_node_run() {
 fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, db, start_times| {
         let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-        let services = vec![
-            InstanceCollection::new(StartCheckerServiceFactory(start_times)).with_instance(
-                4,
-                "startup-checker",
-                (),
-            ),
-        ];
+        let service = StartCheckerServiceFactory(start_times);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+                .with_artifact(service.get_artifact(), ())
+                .with_instance(service.get_instance(4, "startup-checker", ()))
+                .build();
+        let services = vec![service.into()];
 
-        let node = Node::new(db, external_runtimes, services, node_cfg, None);
+        let node = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();

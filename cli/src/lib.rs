@@ -90,10 +90,13 @@
 pub use structopt;
 
 use exonum::{
-    blockchain::InstanceCollection,
+    blockchain::config::GenesisConfigBuilder,
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::{rust::ServiceFactory, Runtime},
+    runtime::{
+        rust::{DefaultInstance, InstanceInfoProvider, ServiceFactory},
+        Runtime,
+    },
 };
 use exonum_supervisor::SimpleSupervisor;
 
@@ -126,11 +129,6 @@ impl NodeBuilder {
         self
     }
 
-    fn builtin_services(&self) -> Vec<InstanceCollection> {
-        // Supervisor service is enabled by default.
-        vec![InstanceCollection::from(SimpleSupervisor::new())]
-    }
-
     /// Adds a new Runtime to the list of available runtimes.
     ///
     /// Note that you don't have to add a Rust Runtime, since it's included by default.
@@ -145,14 +143,20 @@ impl NodeBuilder {
     pub fn run(self) -> Result<(), failure::Error> {
         let command = Command::from_args();
 
-        let services = self
-            .builtin_services()
-            .into_iter()
-            .chain(self.services.into_iter().map(InstanceCollection::new));
-
-        let runtimes = self.external_runtimes;
-
         if let StandardResult::Run(run_config) = command.execute()? {
+            let supervisor = SimpleSupervisor::new();
+
+            // Add builtin services to genesis config.
+            let genesis_config = GenesisConfigBuilder::with_consensus_config(
+                run_config.node_config.consensus.clone(),
+            )
+            .with_artifact(supervisor.get_artifact(), ())
+            .with_instance(supervisor.default_instance())
+            .build();
+
+            let mut services: Vec<Box<dyn ServiceFactory>> = vec![supervisor.into()];
+            services.extend(self.services);
+
             let db_options = &run_config.node_config.database;
             let database: Arc<dyn Database> =
                 Arc::new(RocksDB::open(run_config.db_path, db_options)?);
@@ -160,9 +164,10 @@ impl NodeBuilder {
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
             let node = Node::new(
                 database,
-                runtimes,
+                self.external_runtimes,
                 services,
                 run_config.node_config,
+                genesis_config,
                 Some(node_config_path),
             );
 

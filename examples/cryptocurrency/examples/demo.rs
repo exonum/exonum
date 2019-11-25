@@ -14,7 +14,7 @@
 use exonum_merkledb::TemporaryDB;
 
 use exonum::{
-    blockchain::{ConsensusConfig, InstanceCollection, ValidatorKeys},
+    blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
 };
@@ -65,14 +65,18 @@ fn main() {
     exonum::helpers::init_logger().unwrap();
 
     let external_runtimes: Vec<(u32, Box<dyn exonum::runtime::Runtime>)> = vec![];
-    let services = vec![InstanceCollection::new(CryptocurrencyService)];
+    let services = vec![CryptocurrencyService.into()];
+    let node_config = node_config();
+    let genesis_config =
+        GenesisConfigBuilder::with_consensus_config(node_config.consensus.clone()).build();
 
     println!("Creating database in temporary dir...");
     let node = Node::new(
         TemporaryDB::new(),
         external_runtimes,
         services,
-        node_config(),
+        node_config,
+        genesis_config,
         None,
     );
     println!("Starting a single node...");
