@@ -44,7 +44,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::config::{GenesisConfig, InstanceInitParams},
+    blockchain::config::GenesisConfig,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},

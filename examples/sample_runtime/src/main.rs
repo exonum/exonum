@@ -26,9 +26,8 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         rust::{DefaultInstance, RustRuntime, Transaction},
-        AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime,
-       SnapshotExt,
+        AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
         StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };

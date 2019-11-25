@@ -48,13 +48,14 @@ use std::{collections::BTreeMap, iter, sync::Arc};
 use exonum::{
     blockchain::{
         config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut,
-        ConsensusConfig, InstanceCollection,  ValidatorKeys,
+        ConsensusConfig, InstanceCollection, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{create_rust_runtime_and_genesis_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::{rust::RustRuntime}, SnapshotExt},
+    runtime::rust::RustRuntime,
+    SnapshotExt,
 };
 
 /// Number of transactions added to the blockchain before the bench begins.

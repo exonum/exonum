@@ -62,7 +62,7 @@ impl BlockchainBuilder {
 
     /// Adds an additional runtime with the specified identifier and returns
     /// a modified `Self` object for further chaining.
-    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+    pub fn with_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }
