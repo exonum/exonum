@@ -56,7 +56,6 @@ fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
     // instances and artifacts, do this call again to mark pending artifacts and instances as
     // active. [ECR-3222]
     blockchain.dispatcher().activate_pending_entities(&mut fork);
-
     blockchain
         .commit(
             fork.into_patch(),
@@ -437,6 +436,8 @@ fn basic_rust_runtime() {
 
 #[test]
 fn rust_runtime_with_builtin_services() {
+    // let _ = crate::helpers::init_logger();
+
     let (runtime, event_handle) = create_runtime();
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
     let config = generate_testnet_config(1, 0)[0].clone();

@@ -242,6 +242,7 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
+        self.dispatcher.before_commit(&mut fork);
         self.dispatcher.commit_block(&mut fork);
         self.merge(fork.into_patch())?;
 
@@ -288,9 +289,7 @@ impl BlockchainMut {
         }
 
         // Skip execution for genesis block.
-        debug!("Create patch for {}", height);
         if height > Height(0) {
-            debug!("Before commit");
             self.dispatcher.before_commit(&mut fork);
         }
 

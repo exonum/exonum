@@ -115,13 +115,15 @@ impl Dispatcher {
         artifact_spec: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        debug!("add builtin service: {:?}", spec);
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
             self.commit_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
         }
         // Start the built-in service instance.
-        self.commit_service_sync(fork, spec, constructor)?;
+        ExecutionContext::new(self, fork, Caller::Blockchain)
+            .start_adding_service(spec, constructor)?;
         Ok(())
     }
 
@@ -221,36 +223,7 @@ impl Dispatcher {
         };
 
         self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
-        Schema::new(fork).add_active_artifact(spec.clone())?;
-        Ok(())
-    }
-
-    pub(crate) fn commit_service_sync(
-        &mut self,
-        fork: &mut Fork,
-        spec: InstanceSpec,
-        constructor: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        // TODO: revise dispatcher integrity checks [ECR-3743]
-        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
-
-        let runtime = self
-            .runtime_by_id(spec.artifact.runtime_id)
-            .ok_or(Error::IncorrectRuntime)?;
-        // Initialize service instance.
-        runtime.start_adding_service(
-            ExecutionContext::new(self, fork, Caller::Blockchain),
-            &spec,
-            constructor,
-        )?;
-        // Add service instance to the dispatcher schema.
-        Schema::new(&*fork).add_active_service(spec.clone())?;
-        // Commit started service to Runtime.
-        // If the fork is dirty, `snapshot` will be outdated, which can trip
-        // `Runtime::start_service()` calls.
-        fork.flush();
-        let snapshot = fork.snapshot_without_unflushed_changes();
-        self.start_service(snapshot, &spec)?;
+        Schema::new(fork).add_pending_artifact(spec.clone())?;
         Ok(())
     }
 
@@ -279,6 +252,7 @@ impl Dispatcher {
     /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for proposal and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
+        debug!("before_commit");
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
             if self.runtimes[&info.runtime_id]
@@ -298,6 +272,7 @@ impl Dispatcher {
     /// **NB.** Changes made to the `fork` in this method MUST be the same for all nodes.
     /// This is not checked by the consensus algorithm as usual.
     pub(crate) fn commit_block(&mut self, fork: &mut Fork) {
+        debug!("Commit block");
         // If the fork is dirty, `snapshot` will be outdated, which can trip
         // `Runtime::start_service()` calls.
         fork.flush();
@@ -316,6 +291,7 @@ impl Dispatcher {
     }
 
     pub(crate) fn activate_pending_entities(&self, fork: &mut Fork) {
+        debug!("activate_pending_entities");
         let mut schema = Schema::new(&*fork);
         schema.mark_pending_artifacts_as_active();
         schema.mark_pending_instances_as_active();

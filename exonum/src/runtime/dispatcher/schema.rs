@@ -114,24 +114,6 @@ impl Schema<&Fork> {
         Ok(())
     }
 
-    /// Adds previously deployed artifact specification.
-    pub(super) fn add_active_artifact(&mut self, spec: ArtifactSpec) -> Result<(), Error> {
-        // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts.contains(&spec.artifact.name) {
-            return Err(Error::ArtifactAlreadyDeployed);
-        }
-        // Add artifact to registry with active status.
-        let artifact_name = spec.artifact.name.clone();
-        self.artifacts.put(
-            &artifact_name,
-            ArtifactState {
-                spec,
-                status: ArtifactStatus::Active,
-            },
-        );
-        Ok(())
-    }
-
     /// Adds information about a pending service instance to the schema.
     pub(crate) fn add_pending_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
         let artifact_id = self
@@ -169,45 +151,10 @@ impl Schema<&Fork> {
         Ok(())
     }
 
-    /// Adds previously started service instance.
-    pub(super) fn add_active_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
-        let artifact_id = self
-            .artifacts
-            .get(&spec.artifact.name)
-            .ok_or(Error::ArtifactNotDeployed)?
-            .spec
-            .artifact;
-
-        // Checks that runtime identifier is proper in instance.
-        if artifact_id != spec.artifact {
-            return Err(Error::IncorrectRuntime);
-        }
-        // Checks that instance name doesn't exist.
-        if self.instances.contains(&spec.name) {
-            return Err(Error::ServiceNameExists);
-        }
-        // Checks that instance identifier doesn't exist.
-        // TODO: revise dispatcher integrity checks [ECR-3743]
-        if self.instances_by_id.contains(&spec.id) {
-            return Err(Error::ServiceIdExists);
-        }
-
-        let id = spec.id;
-        let name = spec.name.clone();
-        self.instances.put(
-            &name,
-            InstanceState {
-                spec: spec.clone(),
-                status: InstanceStatus::Active,
-            },
-        );
-        self.instances_by_id.put(&id, name);
-        Ok(())
-    }
-
     // Marks pending artifacts as deployed.
     pub(super) fn mark_pending_artifacts_as_active(&mut self) {
         for spec in &self.pending_artifacts {
+            debug!("pending to active: {:?}", spec);
             self.artifacts.put(
                 &spec.artifact.name.clone(),
                 ArtifactState {
@@ -221,6 +168,7 @@ impl Schema<&Fork> {
     /// Marks pending instances as active.
     pub(super) fn mark_pending_instances_as_active(&mut self) {
         for spec in &self.pending_instances {
+            debug!("pending to active: {:?}", spec);
             self.instances.put(
                 &spec.name.clone(),
                 InstanceState {
