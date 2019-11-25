@@ -123,7 +123,7 @@ impl CommittedTransactionSummary {
             tx_hash: *tx_hash,
             service_id,
             message_id: tx_id,
-            status: tx_result,
+            status: ExecutionStatus(tx_result),
             location,
             location_proof,
             time,

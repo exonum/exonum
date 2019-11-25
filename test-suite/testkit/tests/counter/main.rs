@@ -12,14 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate assert_matches;
-#[macro_use]
-extern crate pretty_assertions;
-
+use assert_matches::assert_matches;
 use exonum::{
     api::{node::public::explorer::TransactionQuery, Error as ApiError},
-    blockchain::{ExecutionError, ExecutionErrorKind},
+    blockchain::{CallLocation, ExecutionError, ExecutionErrorKind},
     crypto::{self, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
@@ -31,6 +27,7 @@ use exonum_testkit::{
     txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
 };
 use hex::FromHex;
+use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
@@ -461,7 +458,7 @@ fn test_explorer_blocks_basic() {
                 "prev_hash": crypto::Hash::zero(),
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
-                "call_hash": blocks[0].block.call_hash,
+                "error_hash": blocks[0].block.error_hash,
             }],
         })
     );
@@ -505,7 +502,7 @@ fn test_explorer_blocks_basic() {
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
-                "call_hash": blocks[0].block.call_hash,
+                "error_hash": blocks[0].block.error_hash,
                 "precommits": [precommit],
             }],
         })
@@ -526,7 +523,7 @@ fn test_explorer_blocks_basic() {
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
-                "call_hash": blocks[0].block.call_hash,
+                "error_hash": blocks[0].block.error_hash,
                 "time": precommit.payload().time(),
             }],
         })
@@ -859,6 +856,12 @@ fn test_explorer_transaction_info() {
         .location_proof()
         .check_against_hash(block.header().tx_hash)
         .is_ok());
+
+    let proof = block.error_proof(CallLocation::Transaction(0));
+    let proof = proof.check_against_hash(block.header().error_hash).unwrap();
+    let (&call_location, status) = proof.all_entries().next().unwrap();
+    assert_eq!(call_location, CallLocation::Transaction(0));
+    assert!(status.is_none());
 }
 
 #[test]
@@ -866,19 +869,12 @@ fn test_explorer_transaction_statuses() {
     use exonum::explorer::TransactionInfo;
 
     let (mut testkit, api) = init_testkit();
-
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
-    let error_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(0).sign(SERVICE_ID, pubkey, &key)
-    };
-    let panicking_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair();
+    let error_tx = Increment::new(0).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair();
+    let panicking_tx = Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key);
 
     let block = testkit.create_block_with_transactions(txvec![
         tx.clone(),
@@ -907,6 +903,28 @@ fn test_explorer_transaction_statuses() {
         .map(|tx| tx.status().map_err(Clone::clone))
         .collect();
     check_statuses(&statuses);
+
+    // Check status proofs for transactions.
+    let snapshot = testkit.snapshot();
+    let explorer = BlockchainExplorer::new(&snapshot);
+    let block_info = explorer.block(testkit.height()).unwrap();
+    let proof = block_info.error_proof(CallLocation::Transaction(0));
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 0);
+    let proof = block_info.error_proof(CallLocation::Transaction(1));
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+    assert_eq!(
+        proof.entries().next().unwrap().1.description,
+        "Adding zero does nothing!"
+    );
+    let proof = block_info.error_proof(CallLocation::Transaction(2));
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+    assert_eq!(
+        proof.entries().next().unwrap().1.kind,
+        ExecutionErrorKind::Panic
+    );
 
     // Now, the same statuses retrieved via explorer web API.
     let statuses: Vec<_> = [

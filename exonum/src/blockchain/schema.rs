@@ -22,7 +22,7 @@ use exonum_proto::ProtobufConvert;
 
 use std::mem;
 
-use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
+use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
 use crate::{
     crypto::{self, Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
@@ -44,7 +44,7 @@ macro_rules! define_names {
 
 define_names!(
     TRANSACTIONS => "transactions";
-    CALL_RESULTS => "call_results";
+    CALL_ERRORS => "call_errors";
     TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
@@ -124,20 +124,29 @@ impl<T: Access> Schema<T> {
     ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
-    pub fn call_results(
+    pub fn call_errors(
         &self,
         block_height: Height,
-    ) -> ProofMapIndex<T::Base, CallLocation, ExecutionStatus> {
+    ) -> ProofMapIndex<T::Base, CallLocation, ExecutionError> {
         self.access
             .clone()
-            .get_proof_map((CALL_RESULTS, &block_height.0))
+            .get_proof_map((CALL_ERRORS, &block_height.0))
     }
 
     /// Returns the result of the execution of a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
-    pub fn transaction_result(&self, location: TxLocation) -> Option<ExecutionStatus> {
+    pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
+        if self.block_transactions(location.block_height).len() <= location.position_in_block {
+            return None;
+        }
+
         let call_location = CallLocation::Transaction(location.position_in_block as u64);
-        self.call_results(location.block_height).get(&call_location)
+        Some(
+            match self.call_errors(location.block_height).get(&call_location) {
+                None => Ok(()),
+                Some(e) => Err(e),
+            },
+        )
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.

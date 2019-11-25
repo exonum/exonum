@@ -18,7 +18,7 @@
 //! See the `explorer` example in the crate for examples of usage.
 
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ListProof, ObjectHash, Snapshot};
+use exonum_merkledb::{ListProof, MapProof, ObjectHash, Snapshot};
 use serde::{Serialize, Serializer};
 
 use std::{
@@ -31,7 +31,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, ExecutionError, ExecutionStatus, Schema, TxLocation},
+    blockchain::{Block, CallLocation, ExecutionError, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
     messages::{AnyTx, Precommit, Verified},
@@ -148,6 +148,22 @@ impl<'a> BlockInfo<'a> {
         self.transaction_hashes()
             .get(index)
             .map(|hash| self.explorer.committed_transaction(hash, None))
+    }
+
+    /// Returns the proof for the execution status of a call within this block.
+    ///
+    /// Note that if the call did not result in an error or did not happen at all, the returned
+    /// proof will not contain entries. To distinguish between two cases, one can inspect
+    /// the number of transactions in the block or IDs of the active services when the block
+    /// was executed.
+    pub fn error_proof(
+        &self,
+        call_location: CallLocation,
+    ) -> MapProof<CallLocation, ExecutionError> {
+        self.explorer
+            .schema
+            .call_errors(self.header.height)
+            .get_proof(call_location)
     }
 
     /// Iterates over transactions in the block.
@@ -580,7 +596,7 @@ impl<'a> BlockchainExplorer<'a> {
             }),
             location,
             location_proof,
-            status,
+            status: ExecutionStatus(status),
             time,
         }
     }

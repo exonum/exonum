@@ -224,22 +224,27 @@ impl Dispatcher {
     }
 
     /// Calls `before_commit` for all currently active services, isolating each call.
-    pub(crate) fn before_commit(
-        &self,
-        fork: &mut Fork,
-    ) -> Vec<(InstanceId, Result<(), ExecutionError>)> {
+    ///
+    /// # Return value
+    ///
+    /// Returns errors that occurred during the calls.
+    pub(crate) fn before_commit(&self, fork: &mut Fork) -> Vec<(InstanceId, ExecutionError)> {
         self.service_infos
             .iter()
-            .map(|(&service_id, info)| {
+            .filter_map(|(&service_id, info)| {
                 let context = ExecutionContext::new(self, fork, Caller::Blockchain);
                 let result = self.runtimes[&info.runtime_id].before_commit(context, service_id);
 
-                if result.is_ok() {
-                    fork.flush();
-                } else {
-                    fork.rollback();
+                match result {
+                    Ok(()) => {
+                        fork.flush();
+                        None
+                    }
+                    Err(e) => {
+                        fork.rollback();
+                        Some((service_id, e))
+                    }
                 }
-                (service_id, result)
             })
             .collect()
     }

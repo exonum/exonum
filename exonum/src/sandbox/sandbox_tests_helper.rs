@@ -44,7 +44,7 @@ pub struct BlockBuilder<'a> {
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
-    call_hash: Option<Hash>,
+    error_hash: Option<Hash>,
     tx_count: Option<u32>,
 
     sandbox: &'a TimestampingSandbox,
@@ -58,7 +58,7 @@ impl<'a> BlockBuilder<'a> {
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
-            call_hash: None,
+            error_hash: None,
             tx_count: None,
 
             sandbox,
@@ -89,8 +89,8 @@ impl<'a> BlockBuilder<'a> {
         self
     }
 
-    pub fn with_call_hash(mut self, call_hash: &Hash) -> Self {
-        self.call_hash = Some(*call_hash);
+    pub fn with_error_hash(mut self, error_hash: &Hash) -> Self {
+        self.error_hash = Some(*error_hash);
         self
     }
 
@@ -106,9 +106,7 @@ impl<'a> BlockBuilder<'a> {
             state_hash: self
                 .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
-            call_hash: self
-                .call_hash
-                .unwrap_or_else(|| self.sandbox.call_hash_for_empty_block()),
+            error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
         }
     }
 }
@@ -361,11 +359,11 @@ where
                 sandbox.last_block().object_hash()
             );
 
-            let (state_hash, call_hash) = sandbox.compute_block_hashes(&raw_txs);
+            let (state_hash, error_hash) = sandbox.compute_block_hashes(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
                 .with_state_hash(&state_hash)
-                .with_call_hash(&call_hash)
+                .with_error_hash(&error_hash)
                 .build();
 
             trace!("new_block: {:?}", block);
@@ -464,11 +462,11 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.assert_lock(round, Some(propose.object_hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
-            let (state_hash, call_hash) = sandbox.compute_block_hashes(&raw_txs);
+            let (state_hash, error_hash) = sandbox.compute_block_hashes(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
                 .with_state_hash(&state_hash)
-                .with_call_hash(&call_hash)
+                .with_error_hash(&error_hash)
                 .build();
             trace!("new_block: {:?}", block);
             trace!("new_block.object_hash(): {:?}", block.object_hash());

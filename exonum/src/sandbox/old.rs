@@ -81,7 +81,7 @@ fn create_block(sandbox: &Sandbox) -> Block {
         prev_hash: sandbox.last_hash(),
         tx_hash: HashTag::empty_list_hash(),
         state_hash: sandbox.last_state_hash(),
-        call_hash: sandbox.call_hash_for_empty_block(),
+        error_hash: HashTag::empty_map_hash(),
     }
 }
 

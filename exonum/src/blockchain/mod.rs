@@ -289,11 +289,11 @@ impl BlockchainMut {
 
         // Skip `before_commit` hook for the genesis block.
         if height > Height(0) {
-            let results = self.dispatcher.before_commit(&mut fork);
-            let mut call_results = Schema::new(&fork).call_results(height);
-            for (service_id, result) in results {
+            let errors = self.dispatcher.before_commit(&mut fork);
+            let mut call_results = Schema::new(&fork).call_errors(height);
+            for (service_id, error) in errors {
                 let location = CallLocation::BeforeCommit(service_id);
-                call_results.put(&location, ExecutionStatus(result));
+                call_results.put(&location, error);
             }
         }
 
@@ -321,7 +321,7 @@ impl BlockchainMut {
         };
 
         let tx_hash = schema.block_transactions(height).object_hash();
-        let call_hash = schema.call_results(height).object_hash();
+        let error_hash = schema.call_errors(height).object_hash();
 
         // Create block.
         let block = Block {
@@ -331,7 +331,7 @@ impl BlockchainMut {
             prev_hash: last_hash,
             tx_hash,
             state_hash,
-            call_hash,
+            error_hash,
         };
         trace!("execute block = {:?}", block);
 
@@ -376,10 +376,12 @@ impl BlockchainMut {
         }
 
         let mut schema = Schema::new(&*fork);
-        schema.call_results(height).put(
-            &CallLocation::Transaction(index as u64),
-            ExecutionStatus(tx_result),
-        );
+
+        if let Err(e) = tx_result {
+            schema
+                .call_errors(height)
+                .put(&CallLocation::Transaction(index as u64), e);
+        }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
         let location = TxLocation::new(height, index as u64);

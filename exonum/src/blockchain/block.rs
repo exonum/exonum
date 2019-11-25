@@ -56,9 +56,9 @@ pub struct Block {
     pub tx_hash: Hash,
     /// Hash of the blockchain state after applying transactions in the block.
     pub state_hash: Hash,
-    /// Root hash of the Merkle Patricia tree of the calls performed within the block.
-    /// These calls are transactions and `before_commit` hooks for services.
-    pub call_hash: Hash,
+    /// Root hash of the Merkle Patricia tree of the erroneous calls performed within the block.
+    /// These calls can include transactions and/or `before_commit` hooks for services.
+    pub error_hash: Hash,
 }
 
 /// Block with its `Precommit` messages.
@@ -90,7 +90,7 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-        let call_hash = hash(&[10, 11]);
+        let error_hash = hash(&[10, 11]);
         let block = Block {
             proposer_id,
             height,
@@ -98,7 +98,7 @@ mod tests {
             prev_hash,
             tx_hash,
             state_hash,
-            call_hash,
+            error_hash,
         };
 
         let json_str = ::serde_json::to_string(&block).unwrap();

@@ -131,7 +131,7 @@ fn test_block() {
         prev_hash: crypto::hash(&[1]),
         tx_hash: crypto::hash(&txs),
         state_hash: crypto::hash(&[3]),
-        call_hash: crypto::hash(&[4]),
+        error_hash: crypto::hash(&[4]),
     };
 
     let precommits = vec![

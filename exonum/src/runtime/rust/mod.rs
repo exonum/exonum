@@ -582,11 +582,10 @@ impl Runtime for RustRuntime {
         let descriptor = instance.descriptor();
         let result = catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_commit(context);
-            Ok(())
+            instance.as_ref().before_commit(context)
         });
         if let Err(ref e) = result {
-            error!(
+            info!(
                 "Service \"{}\" `before_commit` failed with error: {:?}",
                 instance.name, e
             );

@@ -14,9 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{
-    access::AccessExt, BinaryValue, Database, Fork, MapProof, ObjectHash, TemporaryDB,
-};
+use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, TemporaryDB};
 use exonum_proto::impl_binary_value_for_pb_message;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -32,8 +30,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::blockchain::CallLocation;
-use crate::runtime::error::ExecutionStatus;
 use crate::{
     api::node::SharedNodeState,
     blockchain::{
@@ -717,7 +713,7 @@ impl Sandbox {
             .collect()
     }
 
-    /// Extracts `state_hash` and `call_hash` from the fake block.
+    /// Extracts `state_hash` and `error_hash` from the fake block.
     ///
     /// **NB.** This method does not correctly process transactions that mutate the `Dispatcher`,
     /// e.g., starting new services.
@@ -752,33 +748,16 @@ impl Sandbox {
         blockchain.merge(fork.into_patch()).unwrap();
 
         let block = Schema::new(&fork_with_new_block).last_block();
-        (block.state_hash, block.call_hash)
-    }
-
-    /// Returns expected `call_hash` for a block without transactions. The `call_hash`
-    /// in this case consists of `before_commit` results of the services.
-    pub fn call_hash_for_empty_block(&self) -> Hash {
-        let db = TemporaryDB::new();
-        let fork = db.fork();
-        let mut call_results = fork.get_proof_map("call_results");
-        call_results.put(
-            &CallLocation::BeforeCommit(TimestampingService::ID),
-            ExecutionStatus(Ok(())),
-        );
-        call_results.put(
-            &CallLocation::BeforeCommit(ConfigUpdaterService::ID),
-            ExecutionStatus(Ok(())),
-        );
-        call_results.object_hash()
+        (block.state_hash, block.error_hash)
     }
 
     pub fn create_block(&self, txs: &[Verified<AnyTx>]) -> Block {
         let tx_hashes: Vec<_> = txs.iter().map(ObjectHash::object_hash).collect();
-        let (state_hash, call_hash) = self.compute_block_hashes(txs);
+        let (state_hash, error_hash) = self.compute_block_hashes(txs);
         BlockBuilder::new(self)
             .with_txs_hashes(&tx_hashes)
             .with_state_hash(&state_hash)
-            .with_call_hash(&call_hash)
+            .with_error_hash(&error_hash)
             .build()
     }
 
