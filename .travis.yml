@@ -145,7 +145,7 @@ jobs:
   # Integration tests.
   - name: integration-tests
     install:
-    - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
+    - pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
