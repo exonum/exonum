@@ -812,6 +812,14 @@ impl RawAccess for Rc<Fork> {
 #[derive(Debug, Clone, Copy)]
 pub struct ReadonlyFork<'a>(&'a Fork);
 
+impl<'a> AsReadonly for ReadonlyFork<'a> {
+    type Readonly = Self;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        self.clone()
+    }
+}
+
 impl<'a> AsReadonly for &'a Fork {
     type Readonly = ReadonlyFork<'a>;
 
