@@ -45,6 +45,7 @@ pub trait SupervisorInterface {
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// Artifact will be registered in dispatcher if all of validators will send this confirmation.
+    /// This confirmation is sent automatically by the node if deploy succeeds.
     fn confirm_artifact_deploy(
         &self,
         context: CallContext<'_>,

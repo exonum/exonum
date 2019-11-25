@@ -12,6 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Supervisor is an [Exonum][exonum] service capable of the following activities:
+//! - Service artifact deployment;
+//! - Service instances creation;
+//! - Changing consensus configuration;
+//! - Changing service instances configuration.
+//!
+//! More information on the artifact/service lifecycle can be found at the Exonum
+//! [runtime module documentation][runtime-docs].
+//!
+//! Supervisor service has two different operating modes: "simple" and "decentralized".
+//! The difference between modes is in the decision making approach:
+//! - Within decentralized mode, to deploy a service or apply a new configuration, there should
+//!   be no less than (2/3)+1 validator approvals for a decision;
+//! - Within simple mode, any decision will be executed after just 1 validator approval.
+//!
+//! Simple mode can be useful if all the validator nodes are belong to the one network
+//! administrator, or for development purposes.
+//! For a network with a low node confidence, consider using decentralized mode.
+//!
+//! **Interaction:**
+//!
+//! On a transaction level, every request should be signed by a validator **node**. Thus, one is
+//! not able to send requests as transactions. Instead, requests should be sent via private api
+//! endpoints: "deploy-artifact", "propose-config" and "confirm-config".
+//!
+//! Expected format of requests for those endpoints is an serialized protobuf message.
+//!
+//! To deploy an artifact, one (within "simple" mode) or majority (within "decentralized" mode)
+//! of the nodes should receive a [`DeployRequest`] message through API.
+//!
+//! To request a config change, one node should receive a [`ConfigPropose`] message through API.
+//! For "simple" mode no more actions required, and for "decentralized" mode majority of the nodes
+//! should also receive [`ConfigVote`] message with the hash of proposed config.
+//! The node that received original [`ConfigPropose`] message shouldn't vote for a configuration,
+//! the proposal initiator votes for it automatically.
+//!
+//! Service start operation is considered a configuration change as well and follow the same rules.
+//!
+//! [exonum]: https://github.com/exonum/exonum
+//! [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+//! [`DeployRequest`]: struct.DeployRequest.html
+//! [`ConfigPropose`]: struct.ConfigPropose.html
+//! [`ConfigVote`]: struct.ConfigVote.html
+
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+
 pub use self::{
     configure::{Configure, ConfigureCall, CONFIGURE_INTERFACE_NAME},
     errors::Error,
@@ -47,9 +98,15 @@ mod schema;
 mod transactions;
 
 /// Decentralized supervisor.
+///
+/// Within decentralized mode, both deploy requests and configuration change proposals
+/// should be approved by (2/3+1) validators.
 pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
 
 /// Simple supervisor.
+///
+/// Within simple mode, both deploy requests and configuration change proposals require
+/// only one approval from a validator node.
 pub type SimpleSupervisor = Supervisor<mode::Simple>;
 
 /// Returns the `Supervisor` entity name.
@@ -150,6 +207,7 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
     }
 }
 
+/// Supervisor service implementation.
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("transactions::SupervisorInterface"))]
 #[service_factory(
@@ -171,12 +229,15 @@ where
     /// Name of the supervisor service.
     pub const NAME: &'static str = "supervisor";
 
+    /// Creates a new `Supervisor` service object.
     pub fn new() -> Supervisor<Mode> {
         Supervisor {
             phantom: std::marker::PhantomData::<Mode>::default(),
         }
     }
 
+    /// Factory constructor of the `Supervisor` object, taking `&self` as argument.
+    /// Required for `ServiceFactory` trait implementation.
     pub fn construct(&self) -> Box<Self> {
         Box::new(Self::new())
     }

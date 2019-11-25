@@ -30,17 +30,26 @@ use super::{
 /// Service information schema.
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
+    /// Stored deploy requests with confirmations from validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
+    /// Validator confirmations on successful deployments.
     pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
+    /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
+    /// Service instances to be started.
     pub pending_instances: MultisigIndex<T, StartService>,
+    /// Votes for a configuration change.
     pub config_confirms: MultisigIndex<T, Hash>,
+    /// Current pending configuration proposal.
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
+    /// Number of processed configurations. Used to avoid conflicting config proposals.
     pub configuration_number: Entry<T::Base, u64>,
+    /// The next free instance ID for assignment.
     pub vacant_instance_id: Entry<T::Base, InstanceId>,
 }
 
 impl<T: Access> Schema<T> {
+    /// Gets the stored configuration number.
     pub fn get_configuration_number(&self) -> u64 {
         self.configuration_number.get().unwrap_or(0)
     }
@@ -58,12 +67,13 @@ impl<T: Access> Schema<T> {
 }
 
 impl Schema<Prefixed<'_, &Fork>> {
+    /// Increases the stored configuration number.
     pub fn increase_configuration_number(&mut self) {
         let new_configuration_number = self.get_configuration_number() + 1;
         self.configuration_number.set(new_configuration_number);
     }
 
-    /// Assign unique identifier for an instance.
+    /// Assigns an unique identifier for an instance.
     /// Returns `None` if `vacant_instance_id` entry was not initialized.
     pub(crate) fn assign_instance_id(&mut self) -> Option<InstanceId> {
         let id = self.vacant_instance_id.get()?;
