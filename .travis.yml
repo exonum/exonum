@@ -147,6 +147,9 @@ jobs:
     env:
     - PATH=/opt/python/3.7.1/bin:$PATH
     before_install:
+    - sudo apt-get install python3-pip
+    - python3 -V
+    - sudo python3 -m pip install pip
     - sudo sudo python3 -m pip install
     - pip3 install pip --upgrade
     install:
