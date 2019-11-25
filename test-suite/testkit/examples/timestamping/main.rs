@@ -88,6 +88,7 @@ fn main() {
     let service = TimestampingService;
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
+        .with_artifact(service.get_artifact(), ())
         .with_instance(service.get_instance(instance_id, "timestamping", ()))
         .with_rust_service(service)
         .create();

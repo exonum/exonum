@@ -25,7 +25,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::{DefaultInstance, RustRuntime, Transaction},
+        rust::{DefaultInstance, InstanceInfoProvider, RustRuntime, Transaction},
         AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError, ExecutionContext,
         ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
         StateHashAggregator, SUPERVISOR_INSTANCE_ID,
@@ -276,6 +276,7 @@ fn main() {
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
     let supervisor_service = SimpleSupervisor::new();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+        .with_artifact(supervisor_service.get_artifact(), ())
         .with_instance(supervisor_service.default_instance())
         .build();
     let rust_runtime =
