@@ -146,16 +146,14 @@ jobs:
   - name: integration-tests
     before_install:
     - sudo apt-get update
-    - sudo apt-get install python3
-    - sudo apt-get install python3-pip
-    - sudo apt-get install -y python3-setuptools
+    - sudo apt-get install -y python3, python3-pip, python3-setuptools
     install:
     - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
     script:
-    - python3 -m $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests/exonum_tests
+    - python3 -m exonum_tests
     # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
