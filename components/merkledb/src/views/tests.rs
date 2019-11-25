@@ -1001,7 +1001,7 @@ fn valid_name_for_url() {
 }
 
 #[test]
-#[should_panic(expected = "Wrong characters using in name")]
+#[should_panic(expected = "InvalidCharsInName")]
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let fork = db.fork();
