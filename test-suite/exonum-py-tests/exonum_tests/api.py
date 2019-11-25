@@ -61,7 +61,13 @@ class ApiTest(unittest.TestCase):
 
     def test_get_only_non_empty_blocks(self):
         """Tests the `blocks` endpoint. Check response for only non empty blocks"""
-        # TO DO
+
+        for validator_id in range(self.network.validators_count()):
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            blocks_response = client.get_blocks(count=5, skip_empty_blocks=True)
+            self.assertEqual(blocks_response.status_code, 200)
+            self.assertEqual(len(blocks_response.json()['blocks']), 0)
 
     def test_get_last_n_blocks(self):
         """Tests the `blocks` endpoint. Check response for last N blocks"""
@@ -87,7 +93,7 @@ class ApiTest(unittest.TestCase):
 
     def test_get_blocks_with_precommits(self):
         """Tests the `blocks` endpoint. Check response for blocks with precommits"""
-        # TO DO
+        # TODO: Add test after ECR-3875 is implemented
 
     def test_get_n_latest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N latest blocks"""
@@ -120,11 +126,11 @@ class ApiTest(unittest.TestCase):
 
     def test_get_n_earliest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N earliest blocks"""
-        # TO DO
+        # TODO: Add test after ECR-3875 is implemented
 
     def test_get_mix_latest_earliest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N latest and earliest blocks"""
-        # TO DO
+        # TODO: Add test after ECR-3875 is implemented
 
     def test_get_unknown_transaction(self):
         """Tests the `transactions` endpoint. Check response for unknown transaction"""

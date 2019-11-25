@@ -64,11 +64,11 @@ class CryptoAdvancedTest(unittest.TestCase):
                 crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
                 with client.create_subscriber() as subscriber:
                     subscriber.wait_for_new_block()
-                    # fix it later
+                    # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
                     crypto_client.issue(alice_keys, 100)
                     subscriber.wait_for_new_block()
-                    # fix it later
+                    # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
                     alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
                                      ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
@@ -87,11 +87,11 @@ class CryptoAdvancedTest(unittest.TestCase):
                 crypto_client.create_wallet(bob_keys, "Bob" + str(validator_id))
                 with client.create_subscriber() as subscriber:
                     subscriber.wait_for_new_block()
-                    # fix it later
+                    # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
                     crypto_client.transfer(20, alice_keys, bob_keys.public_key.value)
                     subscriber.wait_for_new_block()
-                    # fix it later
+                    # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
                     alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
                                      ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
@@ -203,7 +203,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 tx_response = crypto_client.issue(alice_keys, 100)
                 with client.create_subscriber() as subscriber:
                     subscriber.wait_for_new_block()
-                    # fix it later
+                    # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
                     tx_status = client.get_tx_info(tx_response.json()['tx_hash']).json()['status']['type']
                     self.assertEqual(tx_status, 'service_error')
