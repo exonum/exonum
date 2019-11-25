@@ -119,6 +119,7 @@ impl TestKitApi {
         )
     }
 
+    /// Creates wrapper for Exonum node api.
     pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
         ExonumNodeApi::new(self)
     }
@@ -322,6 +323,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 }
 
 /// A convenience wrapper for Exonum node API to reduce the boilerplate code.
+#[derive(Debug)]
 pub struct ExonumNodeApi<'a> {
     pub inner: &'a TestKitApi,
 }
