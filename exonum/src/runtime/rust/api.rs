@@ -80,9 +80,7 @@ impl<'a> ServiceApiState<'a> {
     }
 }
 
-/// Exonum API builder for the concrete service API [scope].
-///
-/// [scope]: ../../api/struct.ApiScope.html
+/// Exonum API builder for the concrete service API scope.
 #[derive(Debug, Clone)]
 pub struct ServiceApiScope {
     inner: ApiScope,
