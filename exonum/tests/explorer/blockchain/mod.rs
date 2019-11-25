@@ -15,16 +15,13 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{
-        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut,
-        InstanceCollection,
-    },
+    blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
     node::ApiSender,
     runtime::{
-        rust::{CallContext, RustRuntime, Service},
+        rust::{CallContext, InstanceInfoProvider, RustRuntime, Service},
         AnyTx, BlockchainData, InstanceId,
     },
 };
@@ -113,6 +110,8 @@ impl Service for MyService {
     }
 }
 
+impl InstanceInfoProvider for MyService {}
+
 /// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {
     const SEED_PHRASE: &[u8] = b"correct horse battery staple";
@@ -129,13 +128,12 @@ pub fn create_blockchain() -> BlockchainMut {
         ApiSender::closed(),
     );
 
-    let (factory, cfg) = InstanceCollection::new(MyService)
-        .with_instance(SERVICE_ID, "my-service", ())
-        .into();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+    let my_service = MyService;
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
-        .with_service(cfg)
+        .with_artifact(my_service.get_artifact(), ())
+        .with_service(my_service.get_instance(SERVICE_ID, "my-service", ()))
         .build();
+    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(my_service);
     BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
         .build()

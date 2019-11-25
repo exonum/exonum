@@ -371,38 +371,6 @@ pub struct GenesisConfigBuilder {
     builtin_instances: Vec<InstanceInitParams>,
 }
 
-#[derive(Debug)]
-pub struct InstanceConfig {
-    pub artifact_spec: ArtifactSpec,
-    pub instances: Vec<InstanceInitParams>,
-}
-
-impl InstanceConfig {
-    pub fn new(artifact_id: ArtifactId, deploy_args: Vec<u8>) -> Self {
-        let artifact_spec = ArtifactSpec {
-            artifact: artifact_id,
-            payload: deploy_args,
-        };
-        Self {
-            artifact_spec,
-            instances: vec![],
-        }
-    }
-
-    pub fn with_instance(
-        mut self,
-        instance_spec: InstanceSpec,
-        constructor: impl BinaryValue,
-    ) -> Self {
-        assert_eq!(self.artifact_spec.artifact, instance_spec.artifact);
-        self.instances.push(InstanceInitParams {
-            instance_spec,
-            constructor: constructor.into_bytes(),
-        });
-        self
-    }
-}
-
 impl GenesisConfigBuilder {
     pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
         Self {
@@ -421,19 +389,7 @@ impl GenesisConfigBuilder {
         self
     }
 
-    // TODO remove
-    pub fn with_service(mut self, instance_config: InstanceConfig) -> Self {
-        if !instance_config.instances.is_empty() {
-            self.artifacts.insert(
-                instance_config.artifact_spec.artifact,
-                instance_config.artifact_spec.payload,
-            );
-        }
-        self.builtin_instances.extend(instance_config.instances);
-        self
-    }
-
-    pub fn with_service_new(mut self, instance_params: InstanceInitParams) -> Self {
+    pub fn with_service(mut self, instance_params: InstanceInitParams) -> Self {
         self.builtin_instances.push(instance_params);
         self
     }

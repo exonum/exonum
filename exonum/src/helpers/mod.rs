@@ -168,10 +168,15 @@ pub fn create_rust_runtime_and_genesis_config(
     let mut rust_runtime = RustRuntime::new(api_notifier);
     let mut config_builder = GenesisConfigBuilder::with_consensus_config(consensus_config);
 
-    for instance_collection in instances {
-        let (factory, config) = instance_collection.into();
+    for InstanceCollection { factory, instances } in instances {
         rust_runtime = rust_runtime.with_factory(factory);
-        config_builder = config_builder.with_service(config);
+        config_builder = instances
+            .into_iter()
+            .fold(config_builder, |builder, instance| {
+                builder
+                    .with_artifact(instance.instance_spec.artifact.clone(), ())
+                    .with_service(instance)
+            });
     }
 
     (rust_runtime, config_builder.build())

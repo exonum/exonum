@@ -16,7 +16,7 @@
 
 use crate::{
     blockchain::{
-        config::{GenesisConfig, InstanceConfig, InstanceInitParams},
+        config::{GenesisConfig, InstanceInitParams},
         Blockchain, BlockchainMut, Schema,
     },
     merkledb::BinaryValue,
@@ -134,20 +134,6 @@ impl InstanceCollection {
     }
 }
 
-impl From<InstanceCollection> for (Box<dyn ServiceFactory>, InstanceConfig) {
-    fn from(inst: InstanceCollection) -> Self {
-        let artifact_id = inst.factory.artifact_id().into();
-        let resulting_config = inst
-            .instances
-            .into_iter()
-            .fold(InstanceConfig::new(artifact_id, vec![]), |cfg, spec| {
-                cfg.with_instance(spec.instance_spec, spec.constructor)
-            });
-
-        (inst.factory, resulting_config)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use futures::sync::mpsc;
@@ -197,7 +183,7 @@ mod tests {
                 |builder, instance| {
                     builder
                         .with_artifact(instance.instance_spec.artifact.clone(), ())
-                        .with_service_new(instance)
+                        .with_service(instance)
                 },
             )
             .build();
