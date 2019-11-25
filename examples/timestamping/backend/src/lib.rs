@@ -40,8 +40,7 @@ use exonum::{
     crypto::Hash,
     merkledb::{BinaryValue, Snapshot},
     runtime::{
-        api::ServiceApiBuilder,
-        rust::{CallContext, Service},
+        rust::{api::ServiceApiBuilder, CallContext, Service},
         BlockchainData, DispatcherError,
     },
 };
