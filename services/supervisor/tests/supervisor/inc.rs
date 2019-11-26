@@ -18,14 +18,16 @@ use exonum::{
     blockchain::{ExecutionError, InstanceCollection},
     crypto::Hash,
     runtime::{
-        api::{self, ServiceApiBuilder},
-        rust::{CallContext, Service},
+        rust::{
+            api::{self, ServiceApiBuilder},
+            CallContext, Service,
+        },
         BlockchainData, DispatcherError, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     Entry, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
@@ -36,20 +38,13 @@ use exonum_supervisor::Configure;
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
-#[derive(Debug)]
+#[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
     count: Entry<T::Base, u64>,
     params: Entry<T::Base, String>,
 }
 
 impl<T: Access> Schema<T> {
-    pub fn new(access: T) -> Self {
-        Self {
-            count: FromAccess::from_access(access.clone(), "count".into()).unwrap(),
-            params: FromAccess::from_access(access, "params".into()).unwrap(),
-        }
-    }
-
     pub fn count(&self) -> Option<u64> {
         self.count.get()
     }
@@ -150,7 +145,7 @@ impl Configure for IncService {
             "error" => {
                 let error =
                     DispatcherError::malformed_arguments("IncService: Configure error request");
-                return Err(error.into());
+                Err(error)
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -175,7 +170,7 @@ impl Configure for IncService {
             "apply_error" => {
                 let error =
                     DispatcherError::malformed_arguments("IncService: Configure error request");
-                return Err(error.into());
+                Err(error)
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),

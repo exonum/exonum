@@ -16,7 +16,7 @@
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt},
+    access::{Access, AccessExt, AsReadonly},
     Fork, ListIndex, MapIndex, ObjectHash, ProofMapIndex,
 };
 
@@ -100,6 +100,14 @@ impl<T: Access> Schema<T> {
             self.artifacts().object_hash(),
             self.instances().object_hash(),
         ]
+    }
+}
+
+// `AsReadonly` specialization to ensure that we won't leak mutable schema access.
+impl<T: AsReadonly> Schema<T> {
+    /// Readonly set of service instances.
+    pub fn service_instances(&self) -> ProofMapIndex<T::Readonly, String, InstanceState> {
+        self.access.as_readonly().get_proof_map(INSTANCES)
     }
 }
 

@@ -141,7 +141,6 @@ pub use self::{
 
 #[macro_use]
 pub mod rust;
-pub mod api;
 pub mod error;
 
 use futures::Future;

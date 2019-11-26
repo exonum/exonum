@@ -12,6 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Supervisor is an [Exonum][exonum] service capable of the following activities:
+//! - Service artifact deployment;
+//! - Service instances creation;
+//! - Changing consensus configuration;
+//! - Changing service instances configuration.
+//!
+//! More information on the artifact/service lifecycle can be found in the documentation for
+//! the Exonum [runtime module][runtime-docs].
+//!
+//! Supervisor service has two different operating modes: a "simple" mode and a "decentralized" mode.
+//! The difference between modes is in the decision making approach:
+//! - Within the decentralized mode, to deploy a service or apply a new configuration,
+//!  no less than (2/3)+1 validators should reach a consensus;
+//! - Within the simple mode, any decision is executed after a single validator approval.
+//!
+//! The simple mode can be useful if one network administrator manages all the validator nodes
+//! or for testing purposes (e.g., to test service configuration with `TestKit`).
+//! For a network with a low node confidence, consider using the decentralized mode.
+//!
+//! # Interaction
+//!
+//! The intended way to interact with supervisor is the REST API. To be precise, requests should
+//! be sent to the one of the following endpoints: `deploy-artifact`, `propose-config` or
+//! `confirm-config`. Once received, supervisor will convert the request into appropriate
+//! transaction, sign it with the validator keys and broadcast for the rest of the network.
+//!
+//! Key point here is that user **should not** send transactions to the supervisor by himself.
+//!
+//! An expected format of requests for those endpoints is a serialized Protobuf message.
+//!
+//! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
+//! of the nodes should receive a [`DeployRequest`] message through API.
+//!
+//! To request a config change, one node should receive a [`ConfigPropose`] message through API.
+//! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
+//! should also receive [`ConfigVote`] messages with a hash of the proposed configuration.
+//! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
+//! This node votes for the configuration propose automatically.
+//!
+//! The operation of starting a service is treated similarly to a configuration change and follows the same rules.
+//!
+//! [exonum]: https://github.com/exonum/exonum
+//! [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+//! [`DeployRequest`]: struct.DeployRequest.html
+//! [`ConfigPropose`]: struct.ConfigPropose.html
+//! [`ConfigVote`]: struct.ConfigVote.html
+
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+
 pub use self::{
     configure::{Configure, ConfigureCall, CONFIGURE_INTERFACE_NAME},
     errors::Error,
@@ -27,8 +81,7 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto::Hash,
     runtime::{
-        api::ServiceApiBuilder,
-        rust::{AfterCommitContext, CallContext, Service, Transaction},
+        rust::{api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service},
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -46,18 +99,16 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Instance identifier for first deployed service.
-///
-/// By analogy with the privileged ports of the network, we use a range 0..1023 of instance
-/// identifiers for built-in services which can be created only during the blockchain genesis
-/// block creation.
-// TODO: remove [ECR-3851]
-const MAX_BUILTIN_INSTANCE_ID: InstanceId = 1024;
-
 /// Decentralized supervisor.
+///
+/// Within the "decentralized" mode, both deploy requests and configuration change proposals
+/// should be approved by (2/3+1) validators.
 pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
 
 /// Simple supervisor.
+///
+/// Within the "simple" mode, both deploy requests and configuration change proposals require
+/// only one approval from a validator node.
 pub type SimpleSupervisor = Supervisor<mode::Simple>;
 
 /// Returns the `Supervisor` entity name.
@@ -109,7 +160,8 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     start_service.name,
                     start_service.artifact
                 );
-                let id = Schema::new(context.service_data()).assign_instance_id();
+
+                let id = assign_instance_id(context);
                 let (instance_spec, config) = start_service.into_parts(id);
 
                 context
@@ -123,6 +175,41 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
     Ok(())
 }
 
+/// Assigns the instance ID for a new service, initializing the schema `vacant_instance_id`
+/// entry if needed.
+fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
+    let mut schema = Schema::new(context.service_data());
+    match schema.assign_instance_id() {
+        Some(id) => id,
+        None => {
+            // Instance ID entry is not initialized, do it now.
+            // We have to do it lazy, since dispatcher doesn't know the amount
+            // of builtin instances until the genesis block is committed, and
+            // `before_commit` hook is not invoked for services at the genesis
+            // block.
+
+            // ID for the new instance is next to the highest builtin ID to avoid
+            // overlap if builtin identifiers space is sparse.
+            let dispatcher_schema = context.data().for_dispatcher();
+            let builtin_instances = dispatcher_schema.service_instances();
+
+            let new_instance_id = builtin_instances
+                .values()
+                .map(|state| state.spec.id)
+                .max()
+                .unwrap_or(SUPERVISOR_INSTANCE_ID)
+                + 1;
+
+            // We're going to use ID obtained above, so the vacant ID is next to it.
+            let vacant_instance_id = new_instance_id + 1;
+            schema.vacant_instance_id.set(vacant_instance_id);
+
+            new_instance_id
+        }
+    }
+}
+
+/// Supervisor service implementation.
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("transactions::SupervisorInterface"))]
 #[service_factory(
@@ -144,12 +231,15 @@ where
     /// Name of the supervisor service.
     pub const NAME: &'static str = "supervisor";
 
+    /// Creates a new `Supervisor` service object.
     pub fn new() -> Supervisor<Mode> {
         Supervisor {
             phantom: std::marker::PhantomData::<Mode>::default(),
         }
     }
 
+    /// Factory constructor of the `Supervisor` object that takes `&self` as an argument.
+    /// The constructor is required for the `ServiceFactory` trait implementation.
     pub fn construct(&self) -> Box<Self> {
         Box::new(Self::new())
     }
@@ -219,47 +309,42 @@ where
         }
     }
 
+    /// Sends confirmation transaction for unconfirmed deployment requests.
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
-        let schema = Schema::new(context.service_data());
-        let keypair = context.service_keypair;
-        let instance_id = context.instance.id;
-        let core_schema = context.data().for_core();
-        let is_validator = core_schema
-            .validator_id(context.service_keypair.0)
-            .is_some();
+        let service_key = context.service_key();
 
-        // Sends confirmation transaction for unconfirmed deployment requests.
-        let deployments: Vec<_> = schema
-            .pending_deployments
-            .values()
-            .filter(|request| {
-                let confirmation = DeployConfirmation::from(request.clone());
-                !schema
-                    .deploy_confirmations
-                    .confirmed_by(&confirmation, &keypair.0)
-            })
-            .collect();
-        drop(schema);
+        let deployments: Vec<_> = {
+            let schema = Schema::new(context.service_data());
+            schema
+                .pending_deployments
+                .values()
+                .filter(|request| {
+                    let confirmation = DeployConfirmation::from(request.clone());
+                    !schema
+                        .deploy_confirmations
+                        .confirmed_by(&confirmation, &service_key)
+                })
+                .collect()
+        };
 
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-            let keypair = context.service_keypair.clone();
-            let tx_sender = context.transaction_broadcaster();
+            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
 
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
+            // We should deploy the artifact for all nodes, but send confirmations only
+            // if the node is a validator.
             extensions.start_deploy(artifact, spec, move || {
-                if is_validator {
+                if let Some(tx_sender) = tx_sender {
                     log::trace!(
                         "Sending confirmation for deployment request {:?}",
                         unconfirmed_request
                     );
-
-                    let transaction = DeployConfirmation::from(unconfirmed_request);
-                    tx_sender
-                        .broadcast_transaction(transaction.sign(instance_id, keypair.0, &keypair.1))
-                        .map_err(|e| log::error!("Couldn't broadcast transaction {}", e))
-                        .ok();
+                    let confirmation = DeployConfirmation::from(unconfirmed_request);
+                    if let Err(e) = tx_sender.send(confirmation) {
+                        log::error!("Cannot send confirmation: {}", e);
+                    }
                 }
                 Ok(())
             });
