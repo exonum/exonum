@@ -337,7 +337,7 @@ where
         // Set index address name, since metadata itself doesn't know it.
         index_address_from_metadata.name = index_name;
         let this = Self {
-            view: View::new(index_access, index_address_from_metadata.clone()),
+            view: View::new(index_access, index_address_from_metadata),
             metadata,
             index_full_name,
             is_phantom,

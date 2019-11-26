@@ -194,7 +194,3 @@ pub mod proto;
 
 #[cfg(feature = "with-protobuf")]
 use exonum_proto::ProtobufConvert;
-
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;

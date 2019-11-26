@@ -18,17 +18,15 @@ use crate::access::{AccessError, AccessErrorKind};
 use crate::IndexAddress;
 
 /// Validates index name.
-pub fn is_valid_index_full_name<S: AsRef<str>>(name: S) -> bool {
-    name.as_ref()
-        .as_bytes()
+pub fn is_valid_index_full_name(name: &str) -> bool {
+    name.as_bytes()
         .iter()
         .all(|&c| is_allowed_index_name_char(c) || c == b'.')
 }
 
 /// Validates index name prefix, it shouldn't contain the dot.
-pub fn is_valid_index_name_component<S: AsRef<str>>(name: S) -> bool {
-    name.as_ref()
-        .as_bytes()
+pub fn is_valid_index_name_component(name: &str) -> bool {
+    name.as_bytes()
         .iter()
         .copied()
         .all(is_allowed_index_name_char)
@@ -50,30 +48,25 @@ pub fn is_allowed_index_name_char(c: u8) -> bool {
 fn check_valid_name<F>(
     addr: IndexAddress,
     predicate: F,
-    allowed_chars: String,
+    allowed_chars: &'static str,
 ) -> Result<(), AccessError>
 where
-    F: Fn(String) -> bool,
+    F: Fn(&str) -> bool,
 {
-    let name = addr.name.clone();
+    let name = &addr.name;
 
-    if name.starts_with("__") {
+    if name.is_empty() {
         Err(AccessError {
-            addr,
-            kind: AccessErrorKind::ReservedName,
-        })
-    } else if name.is_empty() {
-        Err(AccessError {
-            addr,
             kind: AccessErrorKind::EmptyName,
-        })
-    } else if !predicate(name.clone()) {
-        Err(AccessError {
             addr,
+        })
+    } else if !predicate(name) {
+        Err(AccessError {
             kind: AccessErrorKind::InvalidCharsInName {
-                name,
+                name: name.clone(),
                 allowed_chars,
             },
+            addr,
         })
     } else {
         Ok(())
@@ -82,11 +75,16 @@ where
 
 /// Calls the `is_valid_index_full_name` function with the given index address.
 pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
-    check_valid_name(
-        addr.clone(),
-        is_valid_index_full_name,
-        "a-zA-Z0-9 and _-.".into(),
-    )
+    let addr = addr.clone();
+
+    if addr.name.starts_with("__") {
+        return Err(AccessError {
+            addr,
+            kind: AccessErrorKind::ReservedName,
+        });
+    };
+
+    check_valid_name(addr, is_valid_index_full_name, "a-zA-Z0-9 and _-.")
 }
 
 /// Calls the `is_valid_index_name_component` function with the given
@@ -95,7 +93,7 @@ pub(crate) fn assert_valid_name_component(name: &str) {
     if let Err(access_error) = check_valid_name(
         name.into(),
         is_valid_index_name_component,
-        "a-zA-Z0-9 and _-".into(),
+        "a-zA-Z0-9 and _-",
     ) {
         panic!(access_error.to_string())
     }
@@ -103,6 +101,8 @@ pub(crate) fn assert_valid_name_component(name: &str) {
 
 #[cfg(test)]
 mod test {
+    use assert_matches::assert_matches;
+
     use crate::{
         access::{AccessErrorKind, FromAccess},
         Database, ListIndex, TemporaryDB,
@@ -123,6 +123,6 @@ mod test {
             "\u{441}\u{43f}\u{438}\u{441}\u{43e}\u{43a}".into(),
         )
         .unwrap_err();
-        assert_matches!(e.kind, AccessErrorKind::InvalidCharsInName { .. } );
+        assert_matches!(e.kind, AccessErrorKind::InvalidCharsInName { .. });
     }
 }

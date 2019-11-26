@@ -146,14 +146,14 @@ pub enum AccessErrorKind {
 
     /// Index contains invalid characters.
     #[fail(
-        display = "Invalid characters using in name ({}). Use {}",
+        display = "Invalid characters used in name ({}). Use {}",
         name, allowed_chars
     )]
     InvalidCharsInName {
         /// Name that contains invalid chars.
         name: String,
         /// Characters allowed in name.
-        allowed_chars: String,
+        allowed_chars: &'static str,
     },
 
     /// Custom error.
