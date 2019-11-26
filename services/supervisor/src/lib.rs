@@ -33,9 +33,12 @@
 //!
 //! **Interaction:**
 //!
-//! On a transaction level, every request should be signed by a validator **node**. Thus, one is
-//! not able to send requests as transactions. Instead, requests should be sent via private api
-//! endpoints: "deploy-artifact", "propose-config" and "confirm-config".
+//! The intended way to interact with supervisor is the REST API. To be precise, requests should
+//! be sent to the one of the following endpoints: "deploy-artifact", "propose-config" or
+//! "confirm-config". Once received, supervisor will convert the request into appropriate
+//! transaction, sign it with the validator keys and broadcast for the rest of the network.
+//!
+//! Key point here is that user **should not** send transactions to the supervisor by himself.
 //!
 //! Expected format of requests for those endpoints is an serialized protobuf message.
 //!
