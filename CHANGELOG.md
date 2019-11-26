@@ -461,6 +461,8 @@ Key points:
 
 - `exonum` now has a `python` library for implementing integration tests. (#1516)
 
+- `before_transactions` hook for services was introduced. (#1577)
+
 #### exonum-merkledb
 
 - `ProofListIndex` now implements `truncate()` and `pop()` methods, allowing
