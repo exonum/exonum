@@ -189,13 +189,13 @@ where
         Schema::new(data.for_executing_service()).state_hash()
     }
 
-    fn after_transactions(&self, mut context: CallContext<'_>) {
-        let mut schema = Schema::new(context.service_data());
-        let core_schema = context.data().for_core();
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        let height = core_schema.height();
+    fn before_transactions(&self, context: CallContext<'_>) {
+        // Perform a cleanup for outdated requests.
 
-        // Removes pending deploy requests for which deadline was exceeded.
+        let mut schema = Schema::new(context.service_data());
+        let height = context.data().for_core().height();
+
+        // Remove pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema
             .pending_deployments
             .values()
@@ -213,7 +213,20 @@ where
                 // Remove pending config proposal for which deadline was exceeded.
                 log::trace!("Removed outdated config proposal");
                 schema.pending_proposal.remove();
-            } else if entry.config_propose.actual_from == height.next() {
+            }
+        }
+    }
+
+    fn after_transactions(&self, mut context: CallContext<'_>) {
+        let mut schema = Schema::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        let height = core_schema.height();
+
+        // Check if we should apply a new config.
+        let entry = schema.pending_proposal.get();
+        if let Some(entry) = entry {
+            if entry.config_propose.actual_from == height.next() {
                 // Config should be applied at the next height.
                 if Mode::config_approved(
                     &entry.propose_hash,
@@ -227,7 +240,8 @@ where
 
                     // Remove config from proposals.
                     // If the config update will fail, this entry will be restored due to rollback.
-                    // However, it won't be actual anymore and will be removed at the next height.
+                    // However, it won't be actual anymore and will be removed at the beginning
+                    // of the next height (within `before_transactions` hook).
                     schema.pending_proposal.remove();
                     drop(schema);
 
