@@ -23,7 +23,7 @@
 //!
 //! Supervisor service has two different operating modes: a "simple" mode and a "decentralized" mode.
 //! The difference between modes is in the decision making approach:
-//! - Within the decentralized mode, to deploy a service or apply a new configuration, 
+//! - Within the decentralized mode, to deploy a service or apply a new configuration,
 //!  no less than (2/3)+1 validators should reach a consensus;
 //! - Within the simple mode, any decision is executed after a single validator approval.
 //!
