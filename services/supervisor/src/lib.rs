@@ -125,7 +125,7 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
             // Instance ID entry is not initialized, do it now.
             // We have to do it lazy, since dispatcher doesn't know the amount
             // of builtin instances until the genesis block is committed, and
-            // `before_commit` hook is not invoked for services at the genesis
+            // `after_transactions` hook is not invoked for services at the genesis
             // block.
 
             // ID for the new instance is next to the highest builtin ID to avoid
@@ -189,7 +189,7 @@ where
         Schema::new(data.for_executing_service()).state_hash()
     }
 
-    fn before_commit(&self, mut context: CallContext<'_>) {
+    fn after_transactions(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
@@ -237,7 +237,7 @@ where
                     if update_result.is_err() {
                         // Panic will cause changes to be rolled back.
                         // TODO: Return error instead of panic once the signature
-                        // of `before_commit` will allow it. [ECR-3811]
+                        // of `after_transactions` will allow it. [ECR-3811]
                         panic!("Config update failed")
                     }
                 }

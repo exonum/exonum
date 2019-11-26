@@ -9,7 +9,7 @@ use crate::runtime::{
 
 /// Context for the executed call.
 ///
-/// The call can mean a transaction call, or the `before_commit` hook.
+/// The call can mean a transaction call, or the `after_transactions` hook.
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.

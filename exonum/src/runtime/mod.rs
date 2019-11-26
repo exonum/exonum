@@ -202,7 +202,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// GENESIS ::= (deploy_artifact | start_adding_service commit_service)* after_commit
 /// RESUME ::= (deploy_artifact | commit_service)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= before_transactions* (execute | start_adding_service)* before_commit*
+/// PROPOSAL ::= before_transactions* (execute | start_adding_service)* after_transactions*
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
@@ -216,7 +216,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// - `before_transactions`
 /// - `execute`
-/// - `before_commit`
+/// - `after_transactions`
 /// - `start_adding_service`
 /// - `state_hashes`
 ///
@@ -282,7 +282,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
-    /// The dispatcher does not route transactions and `before_commit` events to the service
+    /// The dispatcher does not route transactions and `after_transactions` events to the service
     /// until after `commit_service()` is called with the same instance spec.
     ///
     /// The runtime should discard the instantiated service instance after completing this method,
@@ -410,7 +410,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Notifies a service stored in this runtime about the end of the block, allowing it
     /// to modify the blockchain state after all transactions in the block are processed.
     ///
-    /// `before_commit` is called for every service active at the beginning of the block
+    /// `after_transactions` is called for every service active at the beginning of the block
     /// (i.e., services instantiated within the block do **not** receive a call) exactly
     /// once for each block. The method is not called for the genesis block.
     ///
@@ -419,7 +419,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// An error or panic returned from this method will lead to the rollback of all changes
     /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
     /// into errors.
-    fn before_commit(
+    fn after_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -486,7 +486,7 @@ pub enum Caller {
 
     /// Call is invoked by one of the blockchain lifecycle events.
     ///
-    /// This kind of authorization is used for `before_transactions`/`before_commit`
+    /// This kind of authorization is used for `before_transactions`/`after_transactions`
     /// calls to the service instances, and for initialization of builtin services.
     Blockchain,
 }
@@ -601,7 +601,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Starts adding a new service instance to the blockchain. The created service is not active
-    /// (i.e., does not process transactions or the `before_commit` hook)
+    /// (i.e., does not process transactions or the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     ///
     /// This method should be called for the exact context passed to the runtime.

@@ -232,7 +232,7 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -558,7 +558,7 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -742,7 +742,7 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,

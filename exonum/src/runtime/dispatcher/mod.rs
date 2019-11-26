@@ -237,12 +237,12 @@ impl Dispatcher {
         }
     }
 
-    /// Calls `before_commit` for all currently active services, isolating each call.
-    pub(crate) fn before_commit(&self, fork: &mut Fork) {
+    /// Calls `after_transactions` for all currently active services, isolating each call.
+    pub(crate) fn after_transactions(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
             if self.runtimes[&info.runtime_id]
-                .before_commit(context, service_id)
+                .after_transactions(context, service_id)
                 .is_ok()
             {
                 fork.flush();

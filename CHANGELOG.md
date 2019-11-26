@@ -50,7 +50,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Services can now use `BlockchainData` and `SnapshotExt` types to access data
   from the blockchain in a more structured manner. (#1523)
 
-- Placeholder for changes due to dynamic services (#9999)
+- `before_commit` hook was renamed to the `after_transactions`. (#1577)
 
 #### exonum-merkledb
 

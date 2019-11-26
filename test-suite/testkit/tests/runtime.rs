@@ -150,7 +150,7 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,

@@ -295,7 +295,7 @@ impl BlockchainMut {
 
         // Skip execution for genesis block.
         if height > Height(0) {
-            self.dispatcher.before_commit(&mut fork);
+            self.dispatcher.after_transactions(&mut fork);
         }
 
         // Get tx & state hash.
