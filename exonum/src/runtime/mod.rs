@@ -282,8 +282,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
-    /// The dispatcher does not route transactions and `after_transactions` events to the service
-    /// until after `commit_service()` is called with the same instance spec.
+    /// The dispatcher does not route transactions and `before_transactions` / `after_transactions`
+    /// events to the service until after `commit_service()` is called with the same instance spec.
     ///
     /// The runtime should discard the instantiated service instance after completing this method,
     /// unless there are compelling reasons to retain it (e.g., creating an instance takes very
@@ -486,7 +486,7 @@ pub enum Caller {
 
     /// Call is invoked by one of the blockchain lifecycle events.
     ///
-    /// This kind of authorization is used for `before_transactions`/`after_transactions`
+    /// This kind of authorization is used for `before_transactions` / `after_transactions`
     /// calls to the service instances, and for initialization of builtin services.
     Blockchain,
 }
