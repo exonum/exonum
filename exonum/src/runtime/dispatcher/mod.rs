@@ -235,7 +235,7 @@ impl Dispatcher {
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
     /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
-    /// calculated for proposal and actually committed block.
+    /// calculated for precommit and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
@@ -248,7 +248,7 @@ impl Dispatcher {
                 fork.rollback();
             }
         }
-        self.activate_pending_entities(fork);
+        self.activate_pending(fork);
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
@@ -273,7 +273,7 @@ impl Dispatcher {
         }
     }
 
-    pub(crate) fn activate_pending_entities(&self, fork: &mut Fork) {
+    pub(crate) fn activate_pending(&self, fork: &Fork) {
         let mut schema = Schema::new(&*fork);
         schema.mark_pending_artifacts_as_active();
         schema.mark_pending_instances_as_active();

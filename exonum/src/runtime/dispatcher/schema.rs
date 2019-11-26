@@ -16,7 +16,7 @@
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, FromAccess},
+    access::{Access, AccessExt, FromAccess},
     Fork, ListIndex, MapIndex, ObjectHash, ProofMapIndex,
 };
 
@@ -37,6 +37,7 @@ const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 // TODO: Add information about implemented interfaces [ECR-3747]
 #[derive(Debug)]
 pub struct Schema<T: Access> {
+    access: T,
     /// Artifacts registry indexed by the artifact name.
     pub artifacts: ProofMapIndex<T::Base, String, ArtifactState>,
     /// Service instances registry indexed by the instance name.
@@ -54,12 +55,18 @@ impl<T: Access> Schema<T> {
     /// Constructs information schema for the given `access`.
     pub(crate) fn new(access: T) -> Self {
         Self {
+            access: access.clone(),
             artifacts: construct(&access, ARTIFACTS),
             instances: construct(&access, INSTANCES),
             instances_by_id: construct(&access, INSTANCE_IDS),
             pending_artifacts: construct(&access, PENDING_ARTIFACTS),
             pending_instances: construct(&access, PENDING_INSTANCES),
         }
+    }
+
+    /// Returns an artifacts registry indexed by the artifact name.
+    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, String, ArtifactState> {
+        self.access.clone().get_proof_map(ARTIFACTS)
     }
 
     /// Returns the information about a service instance by its identifier.

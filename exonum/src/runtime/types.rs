@@ -344,7 +344,7 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 }
 
 /// Status of an artifact deployment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArtifactStatus {
     /// The artifact is pending deployment.
     Pending = 0,
@@ -380,7 +380,7 @@ impl ProtobufConvert for ArtifactStatus {
 }
 
 /// Status of a service instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InstanceStatus {
     /// The service instance is pending deployment.
     Pending = 0,
@@ -425,26 +425,25 @@ pub struct ArtifactState {
     pub status: ArtifactStatus,
 }
 
-impl From<ArtifactState> for (ArtifactStatus, ArtifactSpec) {
-    fn from(v: ArtifactState) -> Self {
-        (v.status, v.spec)
-    }
-}
-
 /// Current state of service instance in dispatcher.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+    Serialize,
+    Deserialize,
+)]
 #[protobuf_convert(source = "schema::runtime::InstanceState")]
 pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
     /// Service instance activity status.
     pub status: InstanceStatus,
-}
-
-impl From<InstanceState> for (InstanceStatus, InstanceSpec) {
-    fn from(v: InstanceState) -> Self {
-        (v.status, v.spec)
-    }
 }
 
 #[test]

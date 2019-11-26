@@ -51,11 +51,11 @@ fn create_block(blockchain: &BlockchainMut) -> Fork {
     Fork::from(patch)
 }
 
-fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
+fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
     // FIXME: Due to during the `create_patch` `before_commit` hook invokes without changes in
     // instances and artifacts, do this call again to mark pending artifacts and instances as
     // active. [ECR-3222]
-    blockchain.dispatcher().activate_pending_entities(&mut fork);
+    blockchain.dispatcher().activate_pending(&fork);
     blockchain
         .commit(
             fork.into_patch(),

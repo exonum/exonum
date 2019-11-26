@@ -48,7 +48,7 @@ use crate::{
 fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
     let is_genesis_block = CoreSchema::new(&*fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
-    dispatcher.activate_pending_entities(fork);
+    dispatcher.activate_pending(fork);
     dispatcher.commit_block(fork);
 
     let block = Block::new(
@@ -635,7 +635,7 @@ impl DeploymentRuntime {
                 and_then: Box::new(|| Box::new(Ok(()).into_future())),
             });
         let mut fork = db.fork();
-        dispatcher.activate_pending_entities(&mut fork);
+        dispatcher.activate_pending(&fork);
         dispatcher.commit_block_and_notify_runtimes(&mut fork);
         db.merge_sync(fork.into_patch()).unwrap();
         (artifact, Self::SPEC.to_vec())
@@ -850,7 +850,7 @@ fn failed_deployment_with_node_restart() {
 
     let mut fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
-    dispatcher.activate_pending_entities(&mut fork);
+    dispatcher.activate_pending(&fork);
     dispatcher.commit_block_and_notify_runtimes(&mut fork);
     db.merge_sync(fork.into_patch()).unwrap();
     assert!(dispatcher.is_artifact_deployed(&artifact));
