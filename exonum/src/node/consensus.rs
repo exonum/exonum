@@ -546,6 +546,10 @@ impl NodeHandler {
 
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
+    ///
+    /// Before adding a transaction into pool, this method calls `BlockchainMut::check_tx` to
+    /// ensure that transaction passes at least basic checks. If `BlockchainMut::check_tx` fails,
+    /// transaction will be considered invalid and thus no further processing will happen.
     pub fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), failure::Error> {
         let hash = msg.object_hash();
 
@@ -556,12 +560,13 @@ impl NodeHandler {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
-        // TODO We have to check transaction correctness.
-
-        // if let Err(e) = self.blockchain.tx_from_raw(msg.payload().clone()) {
-        //     error!("Received invalid transaction {:?}, result: {}", msg, e);
-        //     bail!("Received malicious transaction.")
-        // }
+        if let Err(e) = self.blockchain.check_tx(&msg) {
+            error!(
+                "Received invalid transaction {:?}, result of the pre-check: {}",
+                msg, e
+            );
+            bail!("Received malicious transaction.")
+        }
 
         self.state.tx_cache_mut().insert(hash, msg);
 

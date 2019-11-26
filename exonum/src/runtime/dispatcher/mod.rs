@@ -203,6 +203,21 @@ impl Dispatcher {
         Ok(())
     }
 
+    /// Performs several shallow checks that transaction is correct.
+    ///
+    /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
+    /// executed successfully, but returned `Err(..)` value means that this transaction is
+    /// **obviously** incorrect and should be declined as early as possible.
+    pub(crate) fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+        // Currently the only check is that destination service exists, but later
+        // functionality of this method can be extended.
+        let call_info = &tx.as_ref().call_info;
+        self.runtime_for_service(call_info.instance_id)
+            .ok_or(Error::IncorrectInstanceId)?;
+
+        Ok(())
+    }
+
     // TODO documentation [ECR-3275]
     pub(crate) fn execute(
         &self,
@@ -217,7 +232,7 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let runtime = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(Error::IncorrectRuntime)?;
+            .ok_or(Error::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, &tx.as_ref().arguments)
     }
