@@ -145,12 +145,13 @@ jobs:
   # Integration tests.
   - name: integration-tests
     before_install:
-    - sudo apt-get install software-properties-common
     - sudo add-apt-repository -y ppa:deadsnakes/ppa
     - sudo apt-get update
-    - sudo apt-get install -y python3.6 python3-pip python3-setuptools
+    - sudo apt-get install -y python3.6 python3-pip
     install:
-    - python3.6 -m pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
+    - python3.6 -m pip install --upgrade pip
+    - python3.6 -m pip install setuptools wheel 
+    - python3.6 -m pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests --user
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
