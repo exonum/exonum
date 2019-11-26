@@ -13,6 +13,19 @@
 // limitations under the License.
 
 //! This crate simplifies writing build.rs for exonum and exonum services.
+//!
+//! In build.rs
+//! ```
+//! # use exonum_build::ProtobufGenerator;
+//! #
+//! # fn main() {
+//! #   ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+//! #       .with_input_dir("src/proto")
+//! #       .add_path("src/proto")
+//! #       .with_frequently_used()
+//! #       .generate();
+//! # }
+//! ```
 
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
@@ -31,6 +44,15 @@ use std::{
 };
 
 /// Enum represents various sources of protobuf files.
+///
+/// Crypto sources contains all necessary crypto types used in services and system proto-files.
+/// These types are `Hash`, `PublicKey` and `Signature`.
+///
+/// Exonum sources contains types used in core and in system services such as supervisor.
+///
+/// Common sources currently contains only `BitVec` type used core consesus messages.
+///
+///
 #[derive(Debug, Copy, Clone)]
 pub enum ProtoSources<'a> {
     /// Path to exonum core protobuf files.
