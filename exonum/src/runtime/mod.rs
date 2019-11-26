@@ -202,7 +202,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// GENESIS ::= (deploy_artifact | start_adding_service commit_service)* after_commit
 /// RESUME ::= (deploy_artifact | commit_service)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= (execute | start_adding_service)* before_commit*
+/// PROPOSAL ::= before_transactions* (execute | start_adding_service)* before_commit*
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
@@ -214,6 +214,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// The following methods should return the same result given the same arguments for all nodes
 /// in the blockchain network:
 ///
+/// - `before_transactions`
 /// - `execute`
 /// - `before_commit`
 /// - `start_adding_service`
@@ -387,6 +388,24 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Gets the state hashes of the every available service in the runtime.
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
+
+    /// Notifies a service stored in this runtime about the beginning of the block, allowing it
+    /// to modify the blockchain state before any transaction in the block will be processed.
+    ///
+    /// `before_transactions` is called for every service active at the beginning of the block
+    /// (i.e., services that will be instantiated within the block do **not** receive a call)
+    /// exactly once for each block. The method is not called for the genesis block.
+    ///
+    /// # Return value
+    ///
+    /// An error or panic returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
+    /// into errors.
+    fn before_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError>;
 
     /// Notifies a service stored in this runtime about the end of the block, allowing it
     /// to modify the blockchain state after all transactions in the block are processed.

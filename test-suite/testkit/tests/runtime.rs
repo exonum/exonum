@@ -142,6 +142,14 @@ impl Runtime for TestRuntime {
         StateHashAggregator::default()
     }
 
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn before_commit(
         &self,
         _context: ExecutionContext<'_>,

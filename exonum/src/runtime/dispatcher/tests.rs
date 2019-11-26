@@ -224,6 +224,14 @@ impl Runtime for SampleRuntime {
         StateHashAggregator::default()
     }
 
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn before_commit(
         &self,
         _context: ExecutionContext<'_>,
@@ -542,6 +550,14 @@ impl Runtime for ShutdownRuntime {
         StateHashAggregator::default()
     }
 
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn before_commit(
         &self,
         _context: ExecutionContext<'_>,
@@ -716,6 +732,14 @@ impl Runtime for DeploymentRuntime {
 
     fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
         StateHashAggregator::default()
+    }
+
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
     fn before_commit(

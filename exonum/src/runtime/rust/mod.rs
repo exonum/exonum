@@ -571,6 +571,31 @@ impl Runtime for RustRuntime {
         }
     }
 
+    fn before_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        let instance = self
+            .started_services
+            .get(&instance_id)
+            .expect("`before_transactions` called with non-existing `instance_id`");
+
+        let descriptor = instance.descriptor();
+        let result = catch_panic(|| {
+            let context = CallContext::new(context, descriptor);
+            instance.as_ref().before_transactions(context);
+            Ok(())
+        });
+        if let Err(ref e) = result {
+            error!(
+                "Service \"{}\" `before_transactions` failed with error: {:?}",
+                instance.name, e
+            );
+        }
+        result
+    }
+
     fn before_commit(
         &self,
         context: ExecutionContext<'_>,

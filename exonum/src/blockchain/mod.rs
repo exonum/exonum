@@ -279,6 +279,12 @@ impl BlockchainMut {
         let mut fork = self.fork();
         // Get last hash.
         let last_hash = self.inner.last_hash();
+
+        // Skip execution for genesis block.
+        if height > Height(0) {
+            self.dispatcher.before_transactions(&mut fork);
+        }
+
         // Save & execute transactions.
         for (index, hash) in tx_hashes.iter().enumerate() {
             self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
