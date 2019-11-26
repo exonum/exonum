@@ -47,6 +47,7 @@ Be sure you installed necessary packages:
 - [git](https://git-scm.com/downloads)
 - [Node.js with npm](https://nodejs.org/en/download/)
 - [Rust compiler](https://rustup.rs/)
+- [Exonum launcher](https://github.com/exonum/exonum-launcher)
 
 #### Install and run
 
@@ -115,6 +116,45 @@ exonum-cryptocurrency-advanced run --node-config example/2/node.toml --db-path e
 exonum-cryptocurrency-advanced run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --master-key-pass pass
 
 exonum-cryptocurrency-advanced run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass
+```
+
+Deploy cryptocurrency-advanced service:
+
+```sh
+python3 -m exonum_launcher -i example/cryptocurrency_advanced.yaml
+```
+
+Example of cryptocurrency_advanced.yaml:
+```yaml
+networks:
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8200
+    private-api-port: 8091
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8201
+    private-api-port: 8092
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8202
+    private-api-port: 8093
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8203
+    private-api-port: 8094
+
+deadline_height: 10000
+supervisor_mode: "simple"
+
+artifacts:
+  cryptocurrency:
+    runtime: rust
+    name: "exonum-cryptocurrency-advanced:0.12.0"
+
+instances:
+  crypto:
+    artifact: cryptocurrency
 ```
 
 <!-- markdownlint-enable MD013 -->
