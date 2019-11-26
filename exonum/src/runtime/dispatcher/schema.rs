@@ -20,12 +20,11 @@ use exonum_merkledb::{
     Fork, ListIndex, MapIndex, ObjectHash, ProofMapIndex,
 };
 
-use crate::runtime::{InstanceId, InstanceQuery};
-
-use super::{
-    types::{ArtifactState, ArtifactStatus, InstanceState, InstanceStatus},
-    ArtifactSpec, Error, InstanceSpec,
+use crate::runtime::{
+    ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
 };
+
+use super::{ArtifactSpec, Error, InstanceSpec};
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
 const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";

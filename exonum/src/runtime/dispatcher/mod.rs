@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::{
-    error::Error,
-    schema::Schema,
-    types::{ArtifactState, ArtifactStatus, InstanceState, InstanceStatus},
-};
+pub use self::{error::Error, schema::Schema};
 
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{
@@ -35,7 +31,7 @@ use crate::{
     helpers::ValidateInput,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{InstanceDescriptor, InstanceQuery},
+    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus},
 };
 
 use super::{
@@ -47,7 +43,6 @@ mod error;
 mod schema;
 #[cfg(test)]
 mod tests;
-mod types;
 
 #[derive(Debug)]
 struct ServiceInfo {

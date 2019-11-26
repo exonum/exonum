@@ -29,10 +29,10 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        dispatcher::InstanceStatus,
         error::{ErrorKind, ExecutionError},
         BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema,
-        ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime, StateHashAggregator,
+        ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        StateHashAggregator,
     },
 };
 

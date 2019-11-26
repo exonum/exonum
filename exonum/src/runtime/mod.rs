@@ -131,14 +131,11 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{
-        ArtifactStatus, Dispatcher, Error as DispatcherError, InstanceStatus, Mailbox,
-        Schema as DispatcherSchema,
-    },
+    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{ErrorKind, ExecutionError},
     types::{
-        AnyTx, ArtifactId, ArtifactSpec, CallInfo, InstanceId, InstanceQuery, InstanceSpec,
-        MethodId,
+        AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
+        InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
     },
 };
 

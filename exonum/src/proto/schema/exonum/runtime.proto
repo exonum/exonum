@@ -77,3 +77,23 @@ message ExecutionStatus {
     ExecutionError error = 2;
   }
 }
+
+enum ArtifactStatus {
+    ARTIFACT_PENDING = 0;
+    ARTIFACT_ACTIVE = 1;
+}
+
+enum InstanceStatus {
+    SERVICE_PENDING = 0;
+    SERVICE_ACTIVE = 1;
+}
+
+message ArtifactState {
+    exonum.runtime.ArtifactSpec spec = 1;
+    ArtifactStatus status = 2; 
+}
+
+message InstanceState {
+    exonum.runtime.InstanceSpec spec = 1;
+    InstanceStatus status = 2;
+}
