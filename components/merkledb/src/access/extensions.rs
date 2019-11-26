@@ -46,9 +46,7 @@ pub trait AccessExt: Access {
         I: FromAccess<Self>,
     {
         // We know that `Group` implementation of `Restore` never fails
-        Group::from_access(self, IndexAddress::with_root(name)).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        Group::from_access(self, IndexAddress::with_root(name)).expect("MerkleDB error")
     }
 
     /// Gets an entry index with the specified address.
@@ -61,9 +59,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        Entry::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        Entry::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a list index with the specified address.
@@ -76,9 +72,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ListIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        ListIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a map index with the specified address.
@@ -92,9 +86,7 @@ pub trait AccessExt: Access {
         K: BinaryKey,
         V: BinaryValue,
     {
-        MapIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        MapIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a Merkelized list index with the specified address.
@@ -107,9 +99,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ProofListIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        ProofListIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a Merkelized map index with the specified address.
@@ -123,9 +113,7 @@ pub trait AccessExt: Access {
         K: BinaryKey + ObjectHash,
         V: BinaryValue,
     {
-        ProofMapIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        ProofMapIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Variant of the proof map with keys that can be mapped directly to `ProofPath`.
@@ -140,9 +128,7 @@ pub trait AccessExt: Access {
         V: BinaryValue,
         Raw: ToProofPath<K>,
     {
-        ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a generic proof map. Requires explicit `KeyMode` to be specified.
@@ -176,9 +162,7 @@ pub trait AccessExt: Access {
         V: BinaryValue,
         KeyMode: ToProofPath<K>,
     {
-        ProofMapIndex::<_, _, _, KeyMode>::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        ProofMapIndex::<_, _, _, KeyMode>::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a sparse list index with the specified address.
@@ -191,9 +175,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        SparseListIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        SparseListIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a key set index with the specified address.
@@ -206,9 +188,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryKey,
     {
-        KeySetIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        KeySetIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Gets a value set index with the specified address.
@@ -221,9 +201,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
     {
-        ValueSetIndex::from_access(self, addr.into()).unwrap_or_else(|e| {
-            panic!("MerkleDB error: {}", e);
-        })
+        ValueSetIndex::from_access(self, addr.into()).expect("MerkleDB error")
     }
 
     /// Touches an index at the specified address, asserting that it has a specific type.
