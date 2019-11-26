@@ -18,18 +18,18 @@
 //! - Changing consensus configuration;
 //! - Changing service instances configuration.
 //!
-//! More information on the artifact/service lifecycle can be found at the Exonum
-//! [runtime module documentation][runtime-docs].
+//! More information on the artifact/service lifecycle can be found in the documentation for
+//! the Exonum [runtime module][runtime-docs].
 //!
-//! Supervisor service has two different operating modes: "simple" and "decentralized".
+//! Supervisor service has two different operating modes: a "simple" mode and a "decentralized" mode.
 //! The difference between modes is in the decision making approach:
-//! - Within decentralized mode, to deploy a service or apply a new configuration, there should
-//!   be no less than (2/3)+1 validator approvals for a decision;
-//! - Within simple mode, any decision will be executed after just 1 validator approval.
+//! - Within the decentralized mode, to deploy a service or apply a new configuration, 
+//!  no less than (2/3)+1 validators should reach a consensus;
+//! - Within the simple mode, any decision is executed after a single validator approval.
 //!
-//! Simple mode can be useful if all the validator nodes are belong to the one network
-//! administrator, or for development purposes.
-//! For a network with a low node confidence, consider using decentralized mode.
+//! The simple mode can be useful if one network administrator manages all the validator nodes
+//! or for development purposes.
+//! For a network with a low node confidence, consider using the decentralized mode.
 //!
 //! **Interaction:**
 //!
@@ -40,18 +40,18 @@
 //!
 //! Key point here is that user **should not** send transactions to the supervisor by himself.
 //!
-//! Expected format of requests for those endpoints is an serialized protobuf message.
+//! An expected format of requests for those endpoints is a serialized Protobuf message.
 //!
-//! To deploy an artifact, one (within "simple" mode) or majority (within "decentralized" mode)
+//! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
 //! of the nodes should receive a [`DeployRequest`] message through API.
 //!
 //! To request a config change, one node should receive a [`ConfigPropose`] message through API.
-//! For "simple" mode no more actions required, and for "decentralized" mode majority of the nodes
-//! should also receive [`ConfigVote`] message with the hash of proposed config.
-//! The node that received original [`ConfigPropose`] message shouldn't vote for a configuration,
-//! the proposal initiator votes for it automatically.
+//! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
+//! should also receive [`ConfigVote`] messages with a hash of the proposed configuration.
+//! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
+//! This node votes for the configuration propose automatically.
 //!
-//! Service start operation is considered a configuration change as well and follow the same rules.
+//! The operation of starting a service is treated similarly to a configuration change and follows the same rules.
 //!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
@@ -102,13 +102,13 @@ mod transactions;
 
 /// Decentralized supervisor.
 ///
-/// Within decentralized mode, both deploy requests and configuration change proposals
+/// Within the "decentralized" mode, both deploy requests and configuration change proposals
 /// should be approved by (2/3+1) validators.
 pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
 
 /// Simple supervisor.
 ///
-/// Within simple mode, both deploy requests and configuration change proposals require
+/// Within the "simple" mode, both deploy requests and configuration change proposals require
 /// only one approval from a validator node.
 pub type SimpleSupervisor = Supervisor<mode::Simple>;
 
@@ -239,8 +239,8 @@ where
         }
     }
 
-    /// Factory constructor of the `Supervisor` object, taking `&self` as argument.
-    /// Required for `ServiceFactory` trait implementation.
+    /// Factory constructor of the `Supervisor` object that takes `&self` as an argument.
+    /// The constructor is required for the `ServiceFactory` trait implementation.
     pub fn construct(&self) -> Box<Self> {
         Box::new(Self::new())
     }

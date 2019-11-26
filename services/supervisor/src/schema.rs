@@ -30,7 +30,7 @@ use super::{
 /// Service information schema.
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
-    /// Stored deploy requests with confirmations from validators.
+    /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
     pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
@@ -42,9 +42,9 @@ pub struct Schema<T: Access> {
     pub config_confirms: MultisigIndex<T, Hash>,
     /// Current pending configuration proposal.
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
-    /// Number of processed configurations. Used to avoid conflicting config proposals.
+    /// Number of the processed configurations. Used to avoid conflicting configuration proposals.
     pub configuration_number: Entry<T::Base, u64>,
-    /// The next free instance ID for assignment.
+    /// The following free instance ID for assignment.
     pub vacant_instance_id: Entry<T::Base, InstanceId>,
 }
 
@@ -73,7 +73,7 @@ impl Schema<Prefixed<'_, &Fork>> {
         self.configuration_number.set(new_configuration_number);
     }
 
-    /// Assigns an unique identifier for an instance.
+    /// Assigns a unique identifier for an instance.
     /// Returns `None` if `vacant_instance_id` entry was not initialized.
     pub(crate) fn assign_instance_id(&mut self) -> Option<InstanceId> {
         let id = self.vacant_instance_id.get()?;
