@@ -77,7 +77,7 @@ impl Dispatcher {
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
-        for state in schema.artifacts.values() {
+        for state in schema.artifacts().values() {
             debug_assert_eq!(
                 state.status,
                 ArtifactStatus::Active,
@@ -87,7 +87,7 @@ impl Dispatcher {
                 .wait()?;
         }
         // Restart active service instances.
-        for state in schema.instances.values() {
+        for state in schema.instances().values() {
             debug_assert_eq!(
                 state.status,
                 InstanceStatus::Active,
@@ -273,10 +273,9 @@ impl Dispatcher {
         }
     }
 
+    // Make pending artifacts and instances active.
     pub(crate) fn activate_pending(&self, fork: &Fork) {
-        let mut schema = Schema::new(&*fork);
-        schema.mark_pending_artifacts_as_active();
-        schema.mark_pending_instances_as_active();
+        Schema::new(&*fork).activate_pending()
     }
 
     /// Notifies runtimes about a committed block.
@@ -336,7 +335,7 @@ impl Dispatcher {
 
             InstanceQuery::Name(name) => {
                 // TODO: This may be slow.
-                let id = Schema::new(fork).instances.get(name)?.spec.id;
+                let id = Schema::new(fork).instances().get(name)?.spec.id;
                 Some(InstanceDescriptor { id, name })
             }
         }

@@ -856,10 +856,10 @@ fn failed_deployment_with_node_restart() {
     assert!(dispatcher.is_artifact_deployed(&artifact));
 
     let snapshot = db.snapshot();
-    let (_, status) = DispatcherSchema::new(&snapshot)
+    let state = DispatcherSchema::new(&snapshot)
         .get_artifact(&artifact.name)
         .unwrap();
-    assert_eq!(status, ArtifactStatus::Active);
+    assert_eq!(state.status, ArtifactStatus::Active);
 }
 
 #[test]

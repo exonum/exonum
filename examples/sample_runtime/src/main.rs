@@ -328,12 +328,12 @@ fn main() {
 
         // Get an instance identifier.
         let snapshot = blockchain_ref.snapshot();
-        let (spec, status) = snapshot
+        let state = snapshot
             .for_dispatcher()
             .get_instance(instance_name.as_str())
             .unwrap();
-        assert_eq!(status, InstanceStatus::Active);
-        let instance_id = spec.id;
+        assert_eq!(state.status, InstanceStatus::Active);
+        let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(
