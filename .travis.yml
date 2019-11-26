@@ -150,7 +150,8 @@ jobs:
     - sudo apt-get install -y python3.6 python3-pip
     install:
     - python3.6 -m pip install --upgrade pip
-    - python3.6 -m pip install setuptools wheel 
+    - python3.6 -m pip uninstall protobuf
+    - python3.6 -m pip install --no-binary=protobuf protobuf setuptools wheel --user
     - python3.6 -m pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests --user
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
