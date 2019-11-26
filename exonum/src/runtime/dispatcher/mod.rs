@@ -137,7 +137,7 @@ impl Dispatcher {
         access: &dyn Snapshot,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
         let mut aggregator = HashMap::new();
-        // Insert state hash of Dispatcher schema
+        // Insert state hash of Dispatcher schema.
         aggregator.extend(IndexCoordinates::locate(
             SchemaOrigin::Dispatcher,
             Schema::new(access).state_hash(),

@@ -79,6 +79,7 @@ impl<T: Access> Schema<T> {
     pub fn get_instance<'q>(&self, query: impl Into<InstanceQuery<'q>>) -> Option<InstanceState> {
         let instances = self.instances();
         match query.into() {
+            // TODO It makes sense to indexing by identifiers primary. [ECR-3880]
             InstanceQuery::Id(id) => self
                 .instance_ids()
                 .get(&id)
@@ -136,6 +137,8 @@ impl Schema<&Fork> {
         let mut instance_ids = self.instance_ids();
 
         // Checks that runtime identifier is proper in instance.
+        // TODO It seems that this error cannot be produced by the user code, thus we might
+        // replace error by assertion. [ECR-3743]
         if artifact_id != spec.artifact {
             return Err(Error::IncorrectRuntime);
         }
@@ -168,24 +171,14 @@ impl Schema<&Fork> {
         // Activate pending artifacts.
         let mut artifacts = self.artifacts();
         for spec in &self.pending_artifacts() {
-            artifacts.put(
-                &spec.artifact.name.clone(),
-                ArtifactState {
-                    spec,
-                    status: ArtifactStatus::Active,
-                },
-            );
+            let name = spec.artifact.name.clone();
+            artifacts.put(&name, ArtifactState::new(spec, ArtifactStatus::Active));
         }
         // Activate pending instances.
         let mut instances = self.instances();
         for spec in &self.pending_instances() {
-            instances.put(
-                &spec.name.clone(),
-                InstanceState {
-                    spec,
-                    status: InstanceStatus::Active,
-                },
-            );
+            let name = spec.name.clone();
+            instances.put(&name, InstanceState::new(spec, InstanceStatus::Active));
         }
     }
 

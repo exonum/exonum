@@ -425,6 +425,13 @@ pub struct ArtifactState {
     pub status: ArtifactStatus,
 }
 
+impl ArtifactState {
+    /// Create a new artifact state with the given specification and status.
+    pub fn new(spec: ArtifactSpec, status: ArtifactStatus) -> Self {
+        Self { spec, status }
+    }
+}
+
 /// Current state of service instance in dispatcher.
 #[derive(
     Debug,
@@ -444,6 +451,13 @@ pub struct InstanceState {
     pub spec: InstanceSpec,
     /// Service instance activity status.
     pub status: InstanceStatus,
+}
+
+impl InstanceState {
+    /// Creates a new instance state with the given specification and status.
+    pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
+        Self { spec, status }
+    }
 }
 
 #[test]
