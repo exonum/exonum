@@ -144,18 +144,24 @@ jobs:
     before_install:
     - sudo add-apt-repository -y ppa:deadsnakes/ppa
     - sudo apt-get update
-    - sudo apt-get install -y python3.7 python3-pip
+    - sudo apt-get install -y python3.7 python3-pip python3-venv
     - sccache -V | grep $SCCACHE_VERS || cargo install sccache --vers $SCCACHE_VERS --force
     - export RUSTC_WRAPPER=sccache
     install:
-    - python3.7 -m pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests --user
-    - python3.7 -m pip uninstall -y protobuf
-    - python3.7 -m pip install --no-binary=protobuf protobuf --user
+    - python3.7 -m venv env
+    - source env/bin/activate
+    - pip install pip --upgrade
+    - pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
+    - pip uninstall -y protobuf
+    - pip install --no-binary=protobuf protobuf
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
     script:
     - python3.7 -m exonum_tests
+    after_script:
+    - deactivate
+    - rm -rf env
     # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
