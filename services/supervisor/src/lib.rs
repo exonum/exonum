@@ -28,14 +28,14 @@
 //! - Within the simple mode, any decision is executed after a single validator approval.
 //!
 //! The simple mode can be useful if one network administrator manages all the validator nodes
-//! or for development purposes.
+//! or for testing purposes (e.g., to test service configuration with `TestKit`).
 //! For a network with a low node confidence, consider using the decentralized mode.
 //!
-//! **Interaction:**
+//! # Interaction
 //!
 //! The intended way to interact with supervisor is the REST API. To be precise, requests should
-//! be sent to the one of the following endpoints: "deploy-artifact", "propose-config" or
-//! "confirm-config". Once received, supervisor will convert the request into appropriate
+//! be sent to the one of the following endpoints: `deploy-artifact`, `propose-config` or
+//! `confirm-config`. Once received, supervisor will convert the request into appropriate
 //! transaction, sign it with the validator keys and broadcast for the rest of the network.
 //!
 //! Key point here is that user **should not** send transactions to the supervisor by himself.
