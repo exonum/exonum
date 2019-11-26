@@ -486,8 +486,8 @@ pub enum Caller {
 
     /// Call is invoked by one of the blockchain lifecycle events.
     ///
-    /// This kind of authorization is used for `before_commit` calls to the service instances,
-    /// and for initialization of builtin services.
+    /// This kind of authorization is used for `before_transactions`/`before_commit`
+    /// calls to the service instances, and for initialization of builtin services.
     Blockchain,
 }
 
