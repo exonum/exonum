@@ -178,8 +178,7 @@ pub mod contracts {
     use exonum::{
         crypto::Hash,
         runtime::{
-            api::ServiceApiBuilder,
-            rust::{CallContext, Service},
+            rust::{api::ServiceApiBuilder, CallContext, Service},
             BlockchainData,
         },
     };
@@ -269,7 +268,7 @@ pub mod contracts {
 pub mod api {
     use exonum::{
         crypto::PublicKey,
-        runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+        runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
     };
 
     use crate::schema::{CurrencySchema, Wallet};

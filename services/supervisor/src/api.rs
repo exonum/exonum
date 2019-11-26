@@ -15,12 +15,11 @@
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::Hash,
-    runtime::{
+    runtime::rust::{
         api::{self, ServiceApiBuilder, ServiceApiState},
-        rust::Transaction,
+        Transaction,
     },
 };
-use exonum_merkledb::ObjectHash;
 use failure::Fail;
 
 use super::{
@@ -64,13 +63,13 @@ impl<'a> ApiImpl<'a> {
     fn broadcast_transaction(
         &self,
         transaction: impl Transaction<dyn SupervisorInterface>,
-    ) -> Result<Hash, failure::Error> {
-        let (pub_key, sec_key) = self.0.service_keypair;
-        let signed = transaction.sign(self.0.instance.id, *pub_key, &sec_key);
-
-        let hash = signed.object_hash();
-        self.0.sender().broadcast_transaction(signed)?;
-        Ok(hash)
+    ) -> Result<Hash, api::Error> {
+        let tx_sender = self
+            .0
+            .broadcaster()
+            .ok_or_else(|| api::Error::BadRequest("Node is not a validator".to_owned()))?;
+        let tx_hash = tx_sender.send(transaction)?;
+        Ok(tx_hash)
     }
 }
 

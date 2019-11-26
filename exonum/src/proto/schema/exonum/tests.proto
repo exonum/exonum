@@ -22,8 +22,6 @@ package exonum.tests;
 
 message TimestampTx { bytes data = 1; }
 
-message TxAfterCommit { uint64 height = 1; }
-
 message TxConfig {
   exonum.crypto.PublicKey from = 1;
   bytes config = 2;
