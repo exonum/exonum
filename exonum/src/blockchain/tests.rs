@@ -569,19 +569,17 @@ fn test_dispatcher_already_deployed() {
 
     // Tests that we get an error if we try to deploy already deployed artifact.
     assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
-    let err = blockchain
+    let res = blockchain
         .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
-        .wait()
-        .unwrap_err();
-    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.into());
+        .wait();
+    assert_eq!(res, Err(DispatcherError::ArtifactAlreadyDeployed.into()));
     // Tests that we cannot register artifact twice.
-    let err = execute_transaction(
+    let res = execute_transaction(
         &mut blockchain,
         TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
-    )
-    .unwrap_err();
-    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.into());
+    );
+    assert_eq!(res, Err(DispatcherError::ArtifactAlreadyDeployed.into()));
 }
 
 #[test]
@@ -656,12 +654,11 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(&snapshot)
         .service_instances()
         .contains(&"good-service-24".to_owned()));
-    let err = execute_transaction(
+    let res = execute_transaction(
         &mut blockchain,
         TestAdd { value: 24 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
-    )
-    .unwrap_err();
-    assert_eq!(err, DispatcherError::ArtifactNotDeployed.into());
+    );
+    assert_eq!(res, Err(DispatcherError::ArtifactNotDeployed.into()));
 
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)

@@ -228,6 +228,7 @@ impl Dispatcher {
     ///
     /// Returns errors that occurred during the calls.
     pub(crate) fn before_commit(&self, fork: &mut Fork) -> Vec<(InstanceId, ExecutionError)> {
+        fork.flush();
         self.service_infos
             .iter()
             .filter_map(|(&service_id, info)| {
