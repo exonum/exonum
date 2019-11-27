@@ -68,7 +68,8 @@ where
     ///
     /// Panics if the object cannot be restored.
     pub fn get(&self) -> I {
-        self.try_get().unwrap()
+        self.try_get()
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Tries to restore the object from the database.
