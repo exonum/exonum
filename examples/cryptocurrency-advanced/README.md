@@ -121,40 +121,7 @@ exonum-cryptocurrency-advanced run --node-config example/4/node.toml --db-path e
 Deploy cryptocurrency-advanced service:
 
 ```sh
-python3 -m exonum_launcher -i example/cryptocurrency_advanced.yaml
-```
-
-Example of cryptocurrency_advanced.yaml:
-```yaml
-networks:
-  - host: "127.0.0.1"
-    ssl: false
-    public-api-port: 8200
-    private-api-port: 8091
-  - host: "127.0.0.1"
-    ssl: false
-    public-api-port: 8201
-    private-api-port: 8092
-  - host: "127.0.0.1"
-    ssl: false
-    public-api-port: 8202
-    private-api-port: 8093
-  - host: "127.0.0.1"
-    ssl: false
-    public-api-port: 8203
-    private-api-port: 8094
-
-deadline_height: 10000
-supervisor_mode: "simple"
-
-artifacts:
-  cryptocurrency:
-    runtime: rust
-    name: "exonum-cryptocurrency-advanced:0.12.0"
-
-instances:
-  crypto:
-    artifact: cryptocurrency
+python3 -m exonum_launcher -i ../cryptocurrency_advanced.yaml
 ```
 
 <!-- markdownlint-enable MD013 -->
