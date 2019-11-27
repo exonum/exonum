@@ -20,7 +20,7 @@ use std::{panic, rc::Rc};
 use crate::{
     access::AccessExt,
     db,
-    validation::is_valid_index_full_name,
+    validation::is_valid_identifier,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
     Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
@@ -1010,7 +1010,7 @@ fn invalid_name_panic() {
 
 fn assert_valid_name_url(name: &str) {
     let urlencoded: String = byte_serialize(name.as_bytes()).collect();
-    assert_eq!(is_valid_index_full_name(name), name == urlencoded)
+    assert_eq!(is_valid_identifier(name), name == urlencoded)
 }
 
 fn check_valid_name(name: &str) -> bool {

@@ -198,7 +198,7 @@ pub use self::{
 pub mod api;
 pub mod error;
 
-use exonum_merkledb::{validation::is_valid_index_full_name, Snapshot};
+use exonum_merkledb::{validation::is_valid_identifier, Snapshot};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
@@ -431,7 +431,7 @@ impl RustArtifactId {
         let name = name.as_ref();
         ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
         ensure!(
-            is_valid_index_full_name(name),
+            is_valid_identifier(name),
             "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
         );
         Ok(())

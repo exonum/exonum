@@ -18,7 +18,7 @@ use crate::access::{AccessError, AccessErrorKind};
 use crate::IndexAddress;
 
 /// Validates index name.
-pub fn is_valid_index_full_name(name: &str) -> bool {
+pub fn is_valid_identifier(name: &str) -> bool {
     name.as_bytes()
         .iter()
         .all(|&c| is_allowed_index_name_char(c) || c == b'.')
@@ -84,7 +84,7 @@ pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), Acc
         });
     };
 
-    check_valid_name(addr, is_valid_index_full_name, "a-zA-Z0-9 and _-.")
+    check_valid_name(addr, is_valid_identifier, "a-zA-Z0-9 and _-.")
 }
 
 /// Calls the `is_valid_index_name_component` function with the given
