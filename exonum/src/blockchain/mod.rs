@@ -242,6 +242,7 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
+        // TODO Unify block creation logic [ECR-3879]
         self.dispatcher.before_commit(&mut fork);
         self.dispatcher.commit_block(&mut fork);
         self.merge(fork.into_patch())?;

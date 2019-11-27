@@ -14,7 +14,10 @@
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::exonum_interface;
-use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{
+    access::{Access, AccessExt},
+    BinaryValue, Fork, ObjectHash, Snapshot,
+};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
@@ -44,6 +47,12 @@ use super::{
 const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
+fn block_state_hash(access: impl Access) -> Hash {
+    CoreSchema::new(access)
+        .state_hash_aggregator()
+        .object_hash()
+}
+
 fn create_block(blockchain: &BlockchainMut) -> Fork {
     let height = CoreSchema::new(&blockchain.snapshot()).height();
     let (_, patch) =
@@ -51,11 +60,22 @@ fn create_block(blockchain: &BlockchainMut) -> Fork {
     Fork::from(patch)
 }
 
-fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
+fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
     // FIXME: Due to during the `create_patch` `before_commit` hook invokes without changes in
     // instances and artifacts, do this call again to mark pending artifacts and instances as
     // active. [ECR-3222]
     blockchain.dispatcher().activate_pending(&fork);
+    // Get state hash from the block proposal.
+    fork.flush();
+    let snapshot = fork.snapshot_without_unflushed_changes();
+    let state_hash_in_patch = block_state_hash(snapshot);
+    let dispatcher_state_hashes_before_commit = blockchain
+        .dispatcher()
+        .state_hash(snapshot)
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    // Commit block to the blockchain.
     blockchain
         .commit(
             fork.into_patch(),
@@ -64,6 +84,27 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
             &mut BTreeMap::new(),
         )
         .unwrap();
+    // Make sure that the state hash is the same before and after the block is committed.
+    let snapshot = blockchain.snapshot();
+    let state_hash_in_block = block_state_hash(&snapshot);
+    let dispatcher_state_hashes_after_commit = blockchain
+        .dispatcher()
+        .state_hash(&snapshot)
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    assert_eq!(state_hash_in_block, state_hash_in_patch);
+
+    // Due to the dispatcher uses a list of running service instances in runtime to calculate
+    // state hash, newly committed services get into state hash only after the block committing.
+    // Thus in difference to the `dispatcher_state_hashes_before_commit` the
+    // `dispatcher_state_hashes_after_commit` contains hashes of committed services.
+    // That means that now we can only make sure that state hashes in the
+    // `dispatcher_state_hashes_before_commit` also are contained in the
+    // `dispatcher_state_hashes_after_commit`
+    //
+    // TODO This behavior will be fixed by the task [ECR-3879]
+    assert!(dispatcher_state_hashes_after_commit.starts_with(&dispatcher_state_hashes_before_commit));
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
@@ -290,8 +331,21 @@ impl Service for TestServiceImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        let service_data = data.for_executing_service();
+        vec![
+            service_data
+                .clone()
+                .get_entry::<_, String>("constructor_entry")
+                .object_hash(),
+            service_data
+                .clone()
+                .get_entry::<_, u64>("method_a_entry")
+                .object_hash(),
+            service_data
+                .get_entry::<_, u64>("method_b_entry")
+                .object_hash(),
+        ]
     }
 }
 

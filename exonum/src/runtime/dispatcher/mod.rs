@@ -20,10 +20,7 @@ use futures::{
     Future,
 };
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt, panic,
-};
+use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
     blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
@@ -136,7 +133,7 @@ impl Dispatcher {
         &self,
         access: &dyn Snapshot,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        let mut aggregator = HashMap::new();
+        let mut aggregator = Vec::new();
         // Insert state hash of Dispatcher schema.
         aggregator.extend(IndexCoordinates::locate(
             SchemaOrigin::Dispatcher,
