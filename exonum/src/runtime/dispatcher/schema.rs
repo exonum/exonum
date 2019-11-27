@@ -189,7 +189,7 @@ impl Schema<&Fork> {
     }
 
     /// Takes pending artifacts from queue.
-    pub(super) fn take_pending_artifacts(&mut self) -> impl IntoIterator<Item = ArtifactSpec> {
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<ArtifactSpec> {
         let mut index = self.pending_artifacts();
         let pending_artifacts = index.iter().collect::<Vec<_>>();
         index.clear();
@@ -197,7 +197,7 @@ impl Schema<&Fork> {
     }
 
     /// Takes pending service instances from queue.
-    pub(super) fn take_pending_instances(&mut self) -> impl IntoIterator<Item = InstanceSpec> {
+    pub(super) fn take_pending_instances(&mut self) -> Vec<InstanceSpec> {
         let mut index = self.pending_instances();
         let pending_instances = index.iter().collect::<Vec<_>>();
         index.clear();

@@ -448,7 +448,7 @@ Key points:
 
 - #1555: Update MerkleDB docs
 
-- #1568: Make DispatcherSchema merkelized again [ECR-3810] 
+- #1568: Make DispatcherSchema merkelized again [ECR-3810]
 
 </details>
 <!-- markdownlint-enable no-inline-html -->
