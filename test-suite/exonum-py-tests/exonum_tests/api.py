@@ -18,7 +18,7 @@ class ApiTest(unittest.TestCase):
     def test_health_check(self):
         """Tests the `healthcheck` endpoint."""
 
-        time.sleep(15)
+        time.sleep(10)
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
@@ -73,7 +73,6 @@ class ApiTest(unittest.TestCase):
         """Tests the `blocks` endpoint. Check response for last N blocks"""
 
         number_of_blocks = 5
-        time.sleep(5)
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
