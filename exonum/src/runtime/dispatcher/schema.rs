@@ -43,9 +43,7 @@ pub struct Schema<T: Access> {
 impl<T: Access> Schema<T> {
     /// Constructs information schema for the given `access`.
     pub(crate) fn new(access: T) -> Self {
-        Self {
-            access: access.clone(),
-        }
+        Self { access }
     }
 
     /// Returns an artifacts registry indexed by the artifact name.
@@ -174,7 +172,7 @@ impl Schema<&Fork> {
         Ok(())
     }
 
-    // Make pending artifacts and instances active.
+    /// Make pending artifacts and instances active.
     pub(super) fn activate_pending(&mut self) {
         // Activate pending artifacts.
         let mut artifacts = self.artifacts();

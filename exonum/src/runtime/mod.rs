@@ -392,8 +392,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// to modify the blockchain state after all transactions in the block are processed.
     ///
     /// `before_commit` is called for every service active at the beginning of the block
-    /// (i.e., services instantiated within the block do **not** receive a call) exactly
-    /// once for each block. The method is not called for the genesis block.
+    /// (i.e., services instantiated within the block do **not** receive a call).
     ///
     /// # Return value
     ///

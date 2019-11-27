@@ -104,7 +104,9 @@ fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
     // `dispatcher_state_hashes_after_commit`
     //
     // TODO This behavior will be fixed by the task [ECR-3879]
-    assert!(dispatcher_state_hashes_after_commit.starts_with(&dispatcher_state_hashes_before_commit));
+    assert!(
+        dispatcher_state_hashes_after_commit.starts_with(&dispatcher_state_hashes_before_commit)
+    );
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {

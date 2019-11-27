@@ -85,7 +85,7 @@ impl Dispatcher {
 
     /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
     /// deployed.
-    pub(crate) fn commit_artifact_sync(
+    fn commit_artifact_sync(
         &mut self,
         fork: &Fork,
         artifact: ArtifactId,
