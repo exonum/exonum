@@ -231,7 +231,7 @@ impl Dispatcher {
     /// Calls `before_commit` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
-    /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
+    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
