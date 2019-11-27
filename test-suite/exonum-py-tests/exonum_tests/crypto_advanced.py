@@ -16,7 +16,7 @@ class CryptoAdvancedTest(unittest.TestCase):
 
     def setUp(self):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-        time.sleep(5)
+        time.sleep(3)
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
