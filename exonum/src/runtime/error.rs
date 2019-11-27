@@ -367,7 +367,7 @@ impl ObjectHash for ExecutionStatus {
     }
 }
 
-/// Version of `ExecutionStatus` used in serde serializaiton.
+/// Version of `ExecutionStatus` used in serde serialization.
 #[serde(tag = "type", rename_all = "snake_case")]
 #[derive(Debug, Serialize, Deserialize)]
 enum SerdeExecutionStatus {
