@@ -164,25 +164,20 @@ pub enum AccessErrorKind {
 ///
 /// # Examples
 ///
-/// Component with two inner indexes.
+/// Component with two inner indexes. `FromAccess` is automatically derived using
+/// the `exonum_derive` crate.
 ///
 /// ```
+/// use exonum_derive::FromAccess;
 /// # use exonum_merkledb::{
 /// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
 /// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
 /// # };
+///
+/// #[derive(FromAccess)]
 /// struct InsertOnlyMap<T: Access> {
 ///     map: MapIndex<T::Base, String, String>,
 ///     len: Entry<T::Base, u64>,
-/// }
-///
-/// impl<T: Access> FromAccess<T> for InsertOnlyMap<T> {
-///     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
-///         Ok(Self {
-///             map: FromAccess::from_access(access.clone(), addr.clone().append_name("map"))?,
-///             len: FromAccess::from_access(access, addr.append_name("len"))?,
-///         })
-///     }
 /// }
 ///
 /// impl<T: Access> InsertOnlyMap<T>
@@ -232,12 +227,19 @@ pub trait FromAccess<T: Access>: Sized {
     /// Returns the constructed object. An error should be returned if the object cannot be
     /// constructed.
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
+
+    /// Constructs the object from the root of the `access`.
+    ///
+    /// The default implementation uses `Self::from_access()`.
+    fn from_root(access: T) -> Result<Self, AccessError> {
+        Self::from_access(access, IndexAddress::new())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, TemporaryDB};
+    use crate::{Database, ListIndex, TemporaryDB};
 
     #[test]
     fn prefixed_works() {
@@ -315,5 +317,17 @@ mod tests {
             .get_or_create_view(("bar.fam", &1_u32).into(), IndexType::ProofMap)
             .unwrap();
         assert!(!view.is_phantom());
+    }
+
+    #[test]
+    fn from_root_method() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let prefixed = Prefixed::new("foo", &fork);
+        {
+            let mut list: ListIndex<_, u64> = ListIndex::from_root(prefixed).unwrap();
+            list.extend(vec![1, 2, 3]);
+        }
+        assert_eq!(fork.get_list::<_, u64>("foo").len(), 3);
     }
 }

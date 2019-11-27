@@ -84,7 +84,7 @@ jobs:
     - npm run cspell
     - npm run md
     # Clippy lints.
-    - cargo clippy --all --benches --features "long_benchmarks"
+    - cargo clippy --all --tests --examples --benches --features "long_benchmarks"
     # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc
@@ -126,14 +126,15 @@ jobs:
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
-  # Unit tests.
+  # Unit tests (including test runs for benchmarks).
   - name: unit-test
     script:
-    - cargo test --all
+    - cargo test --all --benches
 
   # Run examples.
   - name: examples
     script:
+    - cargo run -p exonum-sample-runtime
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     # - cargo run -p exonum-testkit --example configuration_change TODO enable after [ECR-3306]

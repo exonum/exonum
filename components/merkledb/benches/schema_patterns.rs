@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use criterion::{black_box, Bencher, Benchmark, Criterion, Throughput};
+use exonum_derive::FromAccess;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
 
@@ -20,7 +21,7 @@ use std::borrow::Cow;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
+    access::{Access, AccessExt, Prefixed, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Group, KeySetIndex, Lazy, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -61,6 +62,7 @@ trait ExecuteTransaction {
         T::Base: RawAccessMut;
 }
 
+#[derive(FromAccess)]
 struct EagerSchema<T: Access> {
     // Accessed once per transaction.
     transactions: MapIndex<T::Base, Hash, Transaction>,
@@ -72,20 +74,6 @@ struct EagerSchema<T: Access> {
     cold_group: Group<T, u64, ProofListIndex<T::Base, u64>>,
     // Accessed once per ~`COLD_DIVISOR` transactions.
     other_cold_index: KeySetIndex<T::Base, u64>,
-}
-
-impl<T: Access> EagerSchema<T> {
-    fn new(access: T) -> Self {
-        Self {
-            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
-            hot_index: FromAccess::from_access(access.clone(), "hot_index".into()).unwrap(),
-            hot_group: FromAccess::from_access(access.clone(), "hot_group".into()).unwrap(),
-            cold_index: FromAccess::from_access(access.clone(), "cold_index".into()).unwrap(),
-            cold_group: FromAccess::from_access(access.clone(), "cold_group".into()).unwrap(),
-            other_cold_index: FromAccess::from_access(access.clone(), "other_cold_index".into())
-                .unwrap(),
-        }
-    }
 }
 
 impl<T: Access> EagerSchema<T>
@@ -131,6 +119,7 @@ impl ExecuteTransaction for EagerStyle {
     }
 }
 
+#[derive(FromAccess)]
 struct LazySchema<T: Access> {
     transactions: MapIndex<T::Base, Hash, Transaction>,
     hot_index: ProofMapIndex<T::Base, u64, Hash>,
@@ -139,20 +128,6 @@ struct LazySchema<T: Access> {
     // groups are already lazy
     cold_group: Group<T, u64, ProofListIndex<T::Base, u64>>,
     other_cold_index: Lazy<T, KeySetIndex<T::Base, u64>>,
-}
-
-impl<T: Access> LazySchema<T> {
-    fn new(access: T) -> Self {
-        Self {
-            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
-            hot_index: FromAccess::from_access(access.clone(), "hot_index".into()).unwrap(),
-            hot_group: FromAccess::from_access(access.clone(), "hot_group".into()).unwrap(),
-            cold_index: FromAccess::from_access(access.clone(), "cold_index".into()).unwrap(),
-            cold_group: FromAccess::from_access(access.clone(), "cold_group".into()).unwrap(),
-            other_cold_index: FromAccess::from_access(access.clone(), "other_cold_index".into())
-                .unwrap(),
-        }
-    }
 }
 
 impl<T: Access> LazySchema<T>

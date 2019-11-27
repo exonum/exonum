@@ -15,7 +15,7 @@
 //! Cryptocurrency database schema.
 
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,
 };
 
@@ -24,7 +24,7 @@ use exonum::crypto::{Hash, PublicKey};
 use crate::{wallet::Wallet, INITIAL_BALANCE};
 
 /// Database schema for the cryptocurrency.
-#[derive(Debug)]
+#[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
@@ -33,14 +33,6 @@ pub struct Schema<T: Access> {
 }
 
 impl<T: Access> Schema<T> {
-    /// Creates a new schema from the database view.
-    pub fn new(access: T) -> Self {
-        Self {
-            wallets: FromAccess::from_access(access.clone(), "wallets".into()).unwrap(),
-            wallet_history: FromAccess::from_access(access, "wallet_history".into()).unwrap(),
-        }
-    }
-
     /// Returns the state hash of cryptocurrency service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.wallets.object_hash()]
