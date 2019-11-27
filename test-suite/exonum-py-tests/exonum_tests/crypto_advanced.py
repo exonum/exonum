@@ -141,6 +141,8 @@ class CryptoAdvancedTest(unittest.TestCase):
                 tx_response = crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
                 with client.create_subscriber() as subscriber:
                     subscriber.wait_for_new_block()
+                    # TODO: Sometimes it fails without time.sleep() [ECR-3876]
+                    time.sleep(2)
                 tx_status = client.get_tx_info(tx_response.json()['tx_hash']).json()['status']['type']
                 self.assertEqual(tx_status, 'success')
                 # create the wallet with the same keys again
