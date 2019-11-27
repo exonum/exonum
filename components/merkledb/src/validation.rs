@@ -73,11 +73,11 @@ where
     }
 }
 
-/// Calls the `is_valid_index_full_name` function with the given index address.
+/// Checks that provided address is valid index full name.
 pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
     let addr = addr.clone();
 
-    if addr.name.starts_with("__") {
+    if addr.name.starts_with("__") && !addr.name.contains('.') {
         return Err(AccessError {
             addr,
             kind: AccessErrorKind::ReservedName,
@@ -117,6 +117,11 @@ mod test {
         assert_matches!(e.kind, AccessErrorKind::EmptyName);
         let e = ListIndex::<_, u32>::from_access(&fork, "__METADATA__".into()).unwrap_err();
         assert_matches!(e.kind, AccessErrorKind::ReservedName);
+        let e = ListIndex::<_, u32>::from_access(&fork, "__system_index".into()).unwrap_err();
+        assert_matches!(e.kind, AccessErrorKind::ReservedName);
+        let e = ListIndex::<_, u32>::from_access(&fork, "__SYSTEM.INDEX__".into());
+        assert!(e.is_ok());
+
         // spell-checker:disable
         let e = ListIndex::<_, u32>::from_access(
             &fork,

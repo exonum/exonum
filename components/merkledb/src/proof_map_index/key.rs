@@ -320,7 +320,6 @@ impl BitsRange for ProofPath {
         self.start_from(self.start() + len)
     }
 
-    // False positive clippy warning.
     fn raw_key(&self) -> &[u8] {
         &self.bytes[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]
     }

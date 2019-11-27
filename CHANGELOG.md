@@ -73,6 +73,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   to derive a constructor for such schemas via `FromAccess` derive macro.
   (#1523, #1562)
 
+- New index name restrictions has been added. (#1558)
+
+  - Dot symbol is not allowed anymore in indexes with prefixed access.
+
+  - Index names starting from `__` are used only for system indexes and
+    forbidden for indexes in user services.
+
 #### exonum-proto
 
 - Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
@@ -452,10 +459,6 @@ Key points:
 
 </details>
 <!-- markdownlint-enable no-inline-html -->
-
-#### exonum-merkledb
-
-- Dot symbol is not allowed anymore in indexes with prefixed access. (#1558)
 
 ### New Features
 
