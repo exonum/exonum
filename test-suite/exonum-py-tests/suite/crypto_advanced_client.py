@@ -18,7 +18,8 @@ class ExonumCryptoAdvancedClient:
 
         self.cryptocurrency_module = ModuleManager.import_service_module(cryptocurrency_service_name, 'service')
         self.types_module = ModuleManager.import_service_module(cryptocurrency_service_name, 'types')
-        self.msg_generator = MessageGenerator(instance_id=1024, artifact_name=cryptocurrency_service_name)
+        instance_id = client.get_instance_id_by_name("crypto")
+        self.msg_generator = MessageGenerator(instance_id=instance_id, artifact_name=cryptocurrency_service_name)
 
     def __enter__(self):
         return self
