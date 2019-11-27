@@ -23,12 +23,17 @@ use exonum_merkledb::ObjectHash;
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
 use crate::{
+    crypto::gen_keypair,
     helpers::{Height, Round, ValidatorId},
     messages::{PrevotesRequest, TransactionsRequest, Verified},
     node::state::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
-    sandbox::{self, compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    runtime::rust::Transaction,
+    sandbox::{
+        self, compute_tx_hash, sandbox_tests_helper::*, timestamping::TimestampingService,
+        timestamping_sandbox,
+    },
 };
 
 /// check scenario:
@@ -1626,6 +1631,37 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
         // !! note that here no tx are expected whereas old tx is received earlier
         .with_tx_hashes(&[])
         .build();
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
+    sandbox.add_time(Duration::from_millis(0));
+}
+
+/// Ignore transactions that fail `BlockchainMut::check_tx`.
+/// Idea of test is to receive incorrect tx (which is expected to be ignored) and
+/// then broadcast prevote without this tx.
+#[test]
+fn handle_tx_ignore_incorrect_tx() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height(&sandbox, &sandbox_state);
+    sandbox.assert_state(Height(2), Round(1));
+
+    // add rounds & become leader
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+    assert!(sandbox.is_leader());
+
+    // Create correct tx, and then sign with the wrong destination.
+    let (pk, sk) = gen_keypair();
+    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
+
+    // Receive that message.
+    sandbox.recv(&incorrect_tx);
+    sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
+
+    // Create propose **without** this tx. It should be accepted, since incorrect tx wasn't processed
+    // due to failed `BlockchainMut::check_tx` validation.
+    let propose = ProposeBuilder::new(&sandbox).with_tx_hashes(&[]).build();
     sandbox.broadcast(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(0));
