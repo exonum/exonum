@@ -19,7 +19,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{CallContext, DefaultInstance, InstanceInfoProvider, Service},
+        rust::{CallContext, DefaultInstance, Service},
         BlockchainData, DispatcherError, InstanceId,
     },
 };
@@ -119,8 +119,6 @@ impl Service for IncService {
         PublicApi::wire(builder);
     }
 }
-
-impl InstanceInfoProvider for IncService {}
 
 impl DefaultInstance for IncService {
     const DEFAULT_INSTANCE_ID: InstanceId = SERVICE_ID;

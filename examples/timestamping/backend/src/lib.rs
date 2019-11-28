@@ -41,7 +41,7 @@ use exonum::{
     merkledb::{BinaryValue, Snapshot},
     runtime::{
         api::ServiceApiBuilder,
-        rust::{CallContext, InstanceInfoProvider, Service},
+        rust::{CallContext, Service},
         BlockchainData, DispatcherError,
     },
 };
@@ -56,8 +56,6 @@ use crate::{
 #[service_dispatcher(implements("TimestampingInterface"))]
 #[service_factory(proto_sources = "proto")]
 pub struct TimestampingService;
-
-impl InstanceInfoProvider for TimestampingService {}
 
 impl Service for TimestampingService {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {

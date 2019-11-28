@@ -124,8 +124,6 @@ impl Service for MarkerService {
     }
 }
 
-impl InstanceInfoProvider for MarkerService {}
-
 fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());
     // Create testkit for network with one validator.

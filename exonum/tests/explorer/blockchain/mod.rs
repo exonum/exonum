@@ -110,8 +110,6 @@ impl Service for MyService {
     }
 }
 
-impl InstanceInfoProvider for MyService {}
-
 /// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {
     const SEED_PHRASE: &[u8] = b"correct horse battery staple";

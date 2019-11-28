@@ -293,8 +293,6 @@ impl Service for TestServiceImpl {
     }
 }
 
-impl InstanceInfoProvider for TestServiceImpl {}
-
 impl DefaultInstance for TestServiceImpl {
     const DEFAULT_INSTANCE_ID: u32 = SERVICE_INSTANCE_ID;
     const DEFAULT_INSTANCE_NAME: &'static str = SERVICE_INSTANCE_NAME;
@@ -645,8 +643,6 @@ impl Service for DependentServiceImpl {
         vec![]
     }
 }
-
-impl InstanceInfoProvider for DependentServiceImpl {}
 
 impl DefaultInstance for DependentServiceImpl {
     const DEFAULT_INSTANCE_ID: u32 = SERVICE_INSTANCE_ID + 1;

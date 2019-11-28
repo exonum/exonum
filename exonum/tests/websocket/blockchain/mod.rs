@@ -84,8 +84,6 @@ pub trait MyServiceInterface {
 #[service_dispatcher(implements("MyServiceInterface"))]
 struct MyService;
 
-impl InstanceInfoProvider for MyService {}
-
 impl MyServiceInterface for MyService {
     fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
         if arg.name.starts_with("Al") {

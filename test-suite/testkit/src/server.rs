@@ -216,8 +216,6 @@ mod tests {
     #[service_dispatcher(implements("SampleServiceInterface"))]
     struct SampleService;
 
-    impl InstanceInfoProvider for SampleService {}
-
     #[exonum_interface]
     trait SampleServiceInterface {
         fn timestamp(

@@ -151,6 +151,8 @@ pub trait InstanceInfoProvider: ServiceFactory {
     }
 }
 
+impl<T> InstanceInfoProvider for T where T: ServiceFactory {}
+
 /// Provides default instance configuration parameters for `ServiceFactory`.
 pub trait DefaultInstance: InstanceInfoProvider {
     /// Default id for a service.

@@ -65,8 +65,6 @@
 //!     }
 //! }
 //!
-//! impl InstanceInfoProvider for TimestampingService {}
-//!
 //! fn main() {
 //!     // Create testkit for network with four validators
 //!     // and add a builtin timestamping service with ID=1.

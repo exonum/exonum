@@ -34,7 +34,7 @@ use crate::{
     proto::schema::tests::*,
     runtime::{
         error::ErrorKind,
-        rust::{CallContext, InstanceInfoProvider, Service, ServiceFactory, Transaction},
+        rust::{CallContext, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
         InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
@@ -205,8 +205,6 @@ impl Service for ServiceGoodImpl {
     }
 }
 
-impl InstanceInfoProvider for ServiceGoodImpl {}
-
 #[exonum_interface(crate = "crate")]
 trait ServicePanic {}
 
@@ -232,8 +230,6 @@ impl Service for ServicePanicImpl {
     }
 }
 
-impl InstanceInfoProvider for ServicePanicImpl {}
-
 #[exonum_interface(crate = "crate")]
 trait ServicePanicStorageError {}
 
@@ -258,8 +254,6 @@ impl Service for ServicePanicStorageErrorImpl {
         panic!(StorageError::new("42"));
     }
 }
-
-impl InstanceInfoProvider for ServicePanicStorageErrorImpl {}
 
 const TX_CHECK_RESULT_SERVICE_ID: InstanceId = 255;
 

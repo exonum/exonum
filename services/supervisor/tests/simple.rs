@@ -21,7 +21,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, DefaultInstance, InstanceInfoProvider, Service},
+        rust::{CallContext, DefaultInstance, Service},
         ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -55,8 +55,6 @@ pub fn sign_config_propose_transaction_by_us(
 #[service_dispatcher(implements("Configure<Params=String>"))]
 #[service_factory(artifact_name = "config-change-test-service")]
 pub struct ConfigChangeService;
-
-impl InstanceInfoProvider for ConfigChangeService {}
 
 impl DefaultInstance for ConfigChangeService {
     const DEFAULT_INSTANCE_ID: InstanceId = 119;

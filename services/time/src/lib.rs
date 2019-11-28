@@ -46,7 +46,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         api::ServiceApiBuilder,
-        rust::{AfterCommitContext, InstanceInfoProvider, Service},
+        rust::{AfterCommitContext, Service},
         BlockchainData,
     },
 };
@@ -119,8 +119,6 @@ impl TimeServiceFactory {
         })
     }
 }
-
-impl InstanceInfoProvider for TimeServiceFactory {}
 
 impl Default for TimeServiceFactory {
     fn default() -> Self {

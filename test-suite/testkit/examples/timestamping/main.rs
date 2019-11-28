@@ -64,8 +64,6 @@ trait TimestampingInterface {
 #[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
-impl InstanceInfoProvider for TimestampingService {}
-
 impl TimestampingInterface for TimestampingService {
     fn timestamp(
         &self,

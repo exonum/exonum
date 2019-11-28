@@ -1226,8 +1226,6 @@ mod tests {
         }
     }
 
-    impl InstanceInfoProvider for TestService {}
-
     fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();
         msg.set_public_key(p_key.to_pb());

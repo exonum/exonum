@@ -49,8 +49,6 @@ trait CommitWatcherInterface {}
 )]
 struct CommitWatcherService(mpsc::UnboundedSender<()>);
 
-impl InstanceInfoProvider for CommitWatcherService {}
-
 impl CommitWatcherService {
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -92,8 +90,6 @@ impl Service for StartCheckerService {
     service_constructor = "StartCheckerServiceFactory::new_instance"
 )]
 struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
-
-impl InstanceInfoProvider for StartCheckerServiceFactory {}
 
 impl StartCheckerServiceFactory {
     fn new_instance(&self) -> Box<dyn Service> {

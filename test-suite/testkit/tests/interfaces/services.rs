@@ -19,7 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::{Hash, PublicKey},
     runtime::{
-        rust::{CallContext, DefaultInstance, InstanceInfoProvider, Service},
+        rust::{CallContext, DefaultInstance, Service},
         BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -105,8 +105,6 @@ impl IssueReceiver for WalletService {
     }
 }
 
-impl InstanceInfoProvider for WalletService {}
-
 impl DefaultInstance for WalletService {
     const DEFAULT_INSTANCE_ID: u32 = Self::ID;
     const DEFAULT_INSTANCE_NAME: &'static str = "wallet";
@@ -149,8 +147,6 @@ impl DepositInterface for DepositService {
             })
     }
 }
-
-impl InstanceInfoProvider for DepositService {}
 
 impl DefaultInstance for DepositService {
     const DEFAULT_INSTANCE_ID: u32 = Self::ID;
@@ -224,8 +220,6 @@ impl Service for AnyCallService {
         vec![]
     }
 }
-
-impl InstanceInfoProvider for AnyCallService {}
 
 impl DefaultInstance for AnyCallService {
     const DEFAULT_INSTANCE_ID: u32 = Self::ID;

@@ -17,7 +17,7 @@ use exonum::{
     helpers::Height,
     runtime::{
         api::{self, ServiceApiBuilder},
-        rust::{CallContext, DefaultInstance, InstanceInfoProvider, Service},
+        rust::{CallContext, DefaultInstance, Service},
         BlockchainData, InstanceId,
     },
 };
@@ -210,8 +210,6 @@ impl Service for CurrencyService {
         CryptocurrencyApi::wire(builder)
     }
 }
-
-impl InstanceInfoProvider for CurrencyService {}
 
 impl DefaultInstance for CurrencyService {
     const DEFAULT_INSTANCE_ID: u32 = SERVICE_ID;

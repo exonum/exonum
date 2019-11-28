@@ -24,7 +24,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         api::{ServiceApiBuilder, ServiceApiState},
-        rust::{CallContext, DefaultInstance, InstanceInfoProvider, Service},
+        rust::{CallContext, DefaultInstance, Service},
         BlockchainData, InstanceId,
     },
 };
@@ -220,8 +220,6 @@ impl CounterApi {
 )]
 #[service_dispatcher(implements("CounterServiceInterface"))]
 pub struct CounterService;
-
-impl InstanceInfoProvider for CounterService {}
 
 impl DefaultInstance for CounterService {
     const DEFAULT_INSTANCE_ID: u32 = SERVICE_ID;

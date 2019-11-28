@@ -114,8 +114,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// #
 /// # impl ExampleInterface for ExampleService {}
 /// #
-/// # impl InstanceInfoProvider for ExampleService {}
-/// #
 /// # fn main() {
 /// let service = ExampleService;
 /// let mut testkit = TestKitBuilder::validator()
