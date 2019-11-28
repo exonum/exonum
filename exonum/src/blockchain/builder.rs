@@ -31,11 +31,11 @@ use crate::{
 #[derive(Debug)]
 pub struct BlockchainBuilder {
     /// Underlying shared blockchain instance.
-    pub blockchain: Blockchain,
+    blockchain: Blockchain,
     /// List of the supported runtimes.
-    pub runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    runtimes: Vec<(u32, Box<dyn Runtime>)>,
     /// Blockchain configuration used to create the genesis block.
-    pub genesis_config: GenesisConfig,
+    genesis_config: GenesisConfig,
 }
 
 impl BlockchainBuilder {
