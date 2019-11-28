@@ -25,7 +25,7 @@ artifacts:
     name: "exonum-time:0.12.0"
   timestamping:
     runtime: rust
-    name: "exonum-timestamping:0.0.0"
+    name: "exonum-timestamping:0.12.0"
 
 instances:
   time:
