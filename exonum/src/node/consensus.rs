@@ -44,7 +44,7 @@ fn into_verified<T: TryFrom<SignedMessage>>(
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+    pub(crate) fn handle_consensus(&mut self, msg: ConsensusMessage) {
         if !self.is_enabled {
             info!(
                 "Ignoring a consensus message {:?} because the node is disabled",
@@ -103,7 +103,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
-    pub fn handle_propose(&mut self, from: PublicKey, msg: &Verified<Propose>) {
+    fn handle_propose(&mut self, from: PublicKey, msg: &Verified<Propose>) {
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.payload().validator)
@@ -238,12 +238,50 @@ impl NodeHandler {
         Ok(())
     }
 
+    /// Checks if propose is correct (doesn't contain invalid transactions), and then
+    /// broadcasts a prevote for this propose.
+    ///
+    /// Returns `true` if majority of prevotes is achieved, and returns `false` otherwise.
+    fn check_propose_and_broadcasat_prevote(&mut self, round: Round, propose_hash: Hash) -> bool {
+        // Do not send a prevote if propose contains incorrect transactions.
+        let propose_state = self.state.propose(&propose_hash).unwrap();
+        if propose_state.has_invalid_txs() {
+            warn!("Denying sending a prevote for a propose with incorrect transactions");
+            self.state.has_majority_prevotes(round, propose_hash)
+        } else {
+            // Propose state is OK, send prevote.
+            self.broadcast_prevote(round, propose_hash)
+        }
+    }
+
+    /// Checks if propose is correct (doesn't contain invalid transactions), and then
+    /// broadcasts a precommit for this propose.
+    fn check_propose_and_broadcast_precommit(
+        &mut self,
+        round: Round,
+        propose_hash: Hash,
+        block_hash: Hash,
+    ) {
+        // Do not send a prevote if propose contains incorrect transactions.
+        let propose_state = self.state.propose(&propose_hash).unwrap();
+        if propose_state.has_invalid_txs() {
+            warn!("Denying sending a precommit for a propose with incorrect transactions");
+        } else {
+            // Propose state is OK, send precommit.
+            self.broadcast_precommit(round, propose_hash, block_hash)
+        }
+    }
+
     /// Executes and commits block. This function is called when node has full propose information.
-    pub fn handle_full_propose(&mut self, hash: Hash, propose_round: Round) {
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the hash from precommit doesn't match the calculated one.
+    fn handle_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == Round::zero() {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
-                self.broadcast_prevote(propose_round, hash);
+                self.check_propose_and_broadcasat_prevote(propose_round, hash);
             } else {
                 // TODO: what if we HAVE prevote for the propose round? (ECR-171)
             }
@@ -280,10 +318,10 @@ impl NodeHandler {
     /// # Panics
     ///
     /// Panics if the received block has incorrect `block_hash`.
-    pub fn handle_full_block(
-        &mut self,
-        msg: &Verified<BlockResponse>,
-    ) -> Result<(), failure::Error> {
+    fn handle_full_block(&mut self, msg: &Verified<BlockResponse>) -> Result<(), failure::Error> {
+        // We suppose that the block doesn't contain incorrect transactions,
+        // since, `self.state` checks for it while creating an `IncompleteBlock`.
+
         let block = msg.payload().block();
         let block_hash = block.object_hash();
 
@@ -315,7 +353,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Verified<Prevote>) {
+    fn handle_prevote(&mut self, from: PublicKey, msg: &Verified<Prevote>) {
         trace!("Handle prevote");
 
         debug_assert_eq!(
@@ -345,7 +383,7 @@ impl NodeHandler {
 
     /// Locks to the propose by calling `lock`. This function is called when node receives
     /// +2/3 pre-votes.
-    pub fn handle_majority_prevotes(&mut self, prevote_round: Round, propose_hash: Hash) {
+    fn handle_majority_prevotes(&mut self, prevote_round: Round, propose_hash: Hash) {
         // Remove request info
         self.remove_request(&RequestData::Prevotes(prevote_round, propose_hash));
         // Lock to propose
@@ -356,12 +394,13 @@ impl NodeHandler {
     }
 
     /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
-    pub fn handle_majority_precommits(
-        &mut self,
-        round: Round,
-        propose_hash: &Hash,
-        block_hash: &Hash,
-    ) {
+    ///
+    /// # Panics
+    ///
+    /// This method panics if:
+    /// - Accepted propose contains transaction(s) considered for which `BlockchainMut::check_tx` failed.
+    /// - Calculated hash of the block doesn't match the hash from precommits.
+    fn handle_majority_precommits(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
         // Check if propose is known.
         if self.state.propose(propose_hash).is_none() {
             self.state
@@ -387,6 +426,16 @@ impl NodeHandler {
             return;
         }
 
+        // Check that propose is valid and should be executed.
+        let propose_state = self.state.propose(propose_hash).unwrap();
+        if propose_state.has_invalid_txs() {
+            panic!(
+                "handle_majority_precommits: propose contains invalid transaction(s). \
+                 Either a node's implementation is incorrect \
+                 or validators majority works incorrectly"
+            );
+        }
+
         // Execute block and get state hash
         let our_block_hash = self.execute(propose_hash);
         assert_eq!(
@@ -400,12 +449,12 @@ impl NodeHandler {
     }
 
     /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
-    pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
+    fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
         for round in prevote_round.iter_to(self.state.round().next()) {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
-                self.broadcast_prevote(round, propose_hash);
+                self.check_propose_and_broadcasat_prevote(round, propose_hash);
             }
 
             // Change lock
@@ -424,7 +473,7 @@ impl NodeHandler {
                 if self.state.is_validator() && !self.state.have_incompatible_prevotes() {
                     // Execute block and get state hash
                     let block_hash = self.execute(&propose_hash);
-                    self.broadcast_precommit(round, propose_hash, block_hash);
+                    self.check_propose_and_broadcast_precommit(round, propose_hash, block_hash);
                     // Commit if has consensus
                     if self.state.has_majority_precommits(round, block_hash) {
                         self.handle_majority_precommits(round, &propose_hash, &block_hash);
@@ -438,7 +487,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
-    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Verified<Precommit>) {
+    fn handle_precommit(&mut self, from: PublicKey, msg: &Verified<Precommit>) {
         trace!("Handle precommit");
 
         debug_assert_eq!(
@@ -475,7 +524,7 @@ impl NodeHandler {
     }
 
     /// Commits block, so new height is achieved.
-    pub fn commit<I: Iterator<Item = Verified<Precommit>>>(
+    fn commit<I: Iterator<Item = Verified<Precommit>>>(
         &mut self,
         block_hash: Hash,
         precommits: I,
@@ -549,26 +598,39 @@ impl NodeHandler {
     ///
     /// Before adding a transaction into pool, this method calls `BlockchainMut::check_tx` to
     /// ensure that transaction passes at least basic checks. If `BlockchainMut::check_tx` fails,
-    /// transaction will be considered invalid and thus no further processing will happen.
-    pub fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), failure::Error> {
+    /// transaction will be considered invalid and not stored to the pool (instead, its hash will
+    /// be stored in the temporary invalid messages set, so we will be able to detect a block/propose
+    /// with an invalid tx later).
+    ///
+    /// # Panics
+    ///
+    /// This function panics if it receives an invalid transaction for an already committed block.
+    pub(crate) fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), failure::Error> {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-
         if contains_transaction(&hash, &schema.transactions(), self.state.tx_cache()) {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
         if let Err(e) = self.blockchain.check_tx(&msg) {
+            // Store transaction as invalid to know it if it'll be included into a proposal.
+            self.state.invalid_txs_mut().insert(msg.object_hash());
+
+            // Since the transaction, despite being incorrect, is received from within the
+            // network, we have to deal with it. We don't consider the transaction unknown
+            // anymore, but we've marked it as incorrect, and if it'll be a part of the block,
+            // we will be able to panic.
+            // Thus, we don't stop the execution here, but just log an error.
             error!(
                 "Received invalid transaction {:?}, result of the pre-check: {}",
                 msg, e
             );
-            bail!("Received malicious transaction.")
+        } else {
+            // Transaction is OK, store it to the cache.
+            self.state.tx_cache_mut().insert(hash, msg);
         }
-
-        self.state.tx_cache_mut().insert(hash, msg);
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
             self.maybe_add_propose_timeout();
@@ -591,7 +653,7 @@ impl NodeHandler {
     }
 
     /// Handles raw transactions.
-    pub fn handle_txs_batch(
+    pub(crate) fn handle_txs_batch(
         &mut self,
         msg: &Verified<TransactionsResponse>,
     ) -> Result<(), failure::Error> {
@@ -618,8 +680,23 @@ impl NodeHandler {
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
-    pub fn handle_incoming_tx(&mut self, msg: Verified<AnyTx>) {
+    pub(crate) fn handle_incoming_tx(&mut self, msg: Verified<AnyTx>) {
         trace!("Handle incoming transaction");
+        // Check transaction before handling it to avoid the broadcasting.
+        // Reaction for an incorrect tx here and in `handle_tx` is different:
+        // here we simply ignore it without notifying the network, but if the
+        // transaction is received from the network, we have to deal with it
+        // and maybe even panic (if most of nodes will approve a block with such a
+        // transaction).
+        if let Err(error) = self.blockchain.check_tx(&msg) {
+            warn!(
+                "Received incorrect transaction from outside of the network; \
+                 skipping it. Info on error: {}",
+                error
+            );
+            return;
+        }
+
         match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),
             Err(e) => error!("{}", e),
@@ -627,7 +704,7 @@ impl NodeHandler {
     }
 
     /// Handle new round, after jump.
-    pub fn handle_new_round(&mut self, height: Height, round: Round) {
+    pub(crate) fn handle_new_round(&mut self, height: Height, round: Round) {
         trace!("Handle new round");
         if height != self.state.height() {
             return;
@@ -649,7 +726,7 @@ impl NodeHandler {
             // Send prevote if we are locked or propose if we are leader
             if let Some(hash) = self.state.locked_propose() {
                 let round = self.state.round();
-                let has_majority_prevotes = self.broadcast_prevote(round, hash);
+                let has_majority_prevotes = self.check_propose_and_broadcasat_prevote(round, hash);
                 if has_majority_prevotes {
                     self.handle_majority_prevotes(round, hash);
                 }
@@ -665,7 +742,7 @@ impl NodeHandler {
     }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
-    pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
+    pub(crate) fn handle_round_timeout(&mut self, height: Height, round: Round) {
         // TODO: Debug asserts? (ECR-171)
         if height != self.state.height() {
             return;
@@ -685,7 +762,7 @@ impl NodeHandler {
     }
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
-    pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+    pub(crate) fn handle_propose_timeout(&mut self, height: Height, round: Round) {
         // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late
@@ -724,7 +801,7 @@ impl NodeHandler {
             let hash = self.state.add_self_propose(propose);
 
             // Send prevote
-            let has_majority_prevotes = self.broadcast_prevote(round, hash);
+            let has_majority_prevotes = self.check_propose_and_broadcasat_prevote(round, hash);
             if has_majority_prevotes {
                 self.handle_majority_prevotes(round, hash);
             }
@@ -759,7 +836,7 @@ impl NodeHandler {
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
-    pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
+    pub(crate) fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
         trace!("HANDLE REQUEST TIMEOUT");
         // FIXME: Check height? (ECR-171)
         if let Some(peer) = self.state.retry(data, peer) {
@@ -813,7 +890,7 @@ impl NodeHandler {
     }
 
     /// Creates block with given transaction and returns its hash and corresponding changes.
-    pub fn create_block(
+    fn create_block(
         &mut self,
         proposer_id: ValidatorId,
         height: Height,
@@ -829,7 +906,7 @@ impl NodeHandler {
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
-    pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
+    fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
         if let Some(hash) = self.state.propose_mut(propose_hash).unwrap().block_hash() {
             return hash;
@@ -859,7 +936,7 @@ impl NodeHandler {
 
     /// Returns `true` if propose and all transactions are known, otherwise requests needed data
     /// and returns `false`.
-    pub fn request_propose_or_txs(&mut self, propose_hash: Hash, key: PublicKey) -> bool {
+    fn request_propose_or_txs(&mut self, propose_hash: Hash, key: PublicKey) -> bool {
         let requested_data = match self.state.propose(&propose_hash) {
             Some(state) => {
                 // Request transactions
@@ -885,7 +962,7 @@ impl NodeHandler {
 
     /// Requests a block for the next height from all peers with a bigger height. Called when the
     /// node tries to catch up with other nodes' height.
-    pub fn request_next_block(&mut self) {
+    pub(crate) fn request_next_block(&mut self) {
         // TODO: Randomize next peer. (ECR-171)
         let heights: Vec<_> = self
             .state
@@ -905,13 +982,13 @@ impl NodeHandler {
     }
 
     /// Removes the specified request from the pending request list.
-    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
+    fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
         // TODO: Clear timeout. (ECR-171)
         self.state.remove_request(data)
     }
 
     /// Broadcasts the `Prevote` message to all peers.
-    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: Hash) -> bool {
+    fn broadcast_prevote(&mut self, round: Round, propose_hash: Hash) -> bool {
         let validator_id = self
             .state
             .validator_id()
@@ -937,7 +1014,7 @@ impl NodeHandler {
     }
 
     /// Broadcasts the `Precommit` message to all peers.
-    pub fn broadcast_precommit(&mut self, round: Round, propose_hash: Hash, block_hash: Hash) {
+    fn broadcast_precommit(&mut self, round: Round, propose_hash: Hash, block_hash: Hash) {
         let validator_id = self
             .state
             .validator_id()
