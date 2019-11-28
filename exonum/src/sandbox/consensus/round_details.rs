@@ -627,6 +627,84 @@ fn handle_precommit_different_block_hash() {
     sandbox.recv(&precommit_3);
 }
 
+/// Scenario for this test is similar to the `handle_precommit_different_block_hash`.
+///
+/// Here, node receives majority of precommits for a block with incorrect tx.
+///
+/// Normally, after receiving all the transactions for a propose, node should send a prevote for it.
+/// In our case, propose contains the incorrect tx, so we expect node **NOT** to vote for it.
+/// Later, when majority of nodes will send precommits (meaning that they agree with propose),
+/// node should panic because it doesn't agree with the block being accepted.
+#[test]
+#[should_panic(expected = "handle_majority_precommits: propose contains")]
+fn handle_precommit_incorrect_txs() {
+    let sandbox = timestamping_sandbox();
+
+    // Create correct tx, and then sign with the wrong destination.
+    let (pk, sk) = gen_keypair();
+    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
+
+    // Create propose.
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[incorrect_tx.object_hash()])
+        .build();
+
+    // Create block.
+    let block = BlockBuilder::new(&sandbox)
+        .with_tx_hash(&compute_tx_hash(&[incorrect_tx.clone()]))
+        .build();
+
+    let precommit_1 = sandbox.create_precommit(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    let precommit_2 = sandbox.create_precommit(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(2)),
+    );
+    let precommit_3 = sandbox.create_precommit(
+        ValidatorId(3),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(3)),
+    );
+
+    sandbox.recv(&precommit_1);
+    sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(1)),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
+    );
+    sandbox.send(
+        sandbox.public_key(ValidatorId(1)),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
+    );
+    sandbox.recv(&propose);
+    sandbox.recv(&incorrect_tx);
+
+    // In normal conditions, here we should sent prevote, but since we consider
+    // the propose to be incorrect, we won't do it.
+
+    // However, majority of nodes decide this propose to be OK.
+    sandbox.recv(&precommit_2);
+    sandbox.recv(&precommit_3);
+
+    // Here majority of precommits is achieved and node should panic.
+}
+
 /// scenario: // HANDLE PRECOMMIT positive scenario with commit
 #[test]
 fn handle_precommit_positive_scenario_commit() {
