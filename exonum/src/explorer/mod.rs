@@ -332,10 +332,6 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`ExecutionError`]: ../runtime/error/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
-///
-/// # Examples
-///
-/// TODO [ECR-3275]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
     content: Verified<AnyTx>,
