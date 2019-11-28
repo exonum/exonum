@@ -48,18 +48,6 @@ impl BlockchainBuilder {
         }
     }
 
-    /// Adds multiple runtimes with the specified identifiers and returns
-    /// a modified `Self` object for further chaining.
-    pub fn with_external_runtimes(
-        mut self,
-        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
-    ) -> Self {
-        for runtime in runtimes {
-            self.runtimes.push(runtime.into());
-        }
-        self
-    }
-
     /// Adds a runtime with the specified identifier and returns a modified `Self` object for
     /// further chaining.
     pub fn with_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {

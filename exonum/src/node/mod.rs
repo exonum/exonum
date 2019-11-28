@@ -960,11 +960,15 @@ impl Node {
             |runtime, factory| runtime.with_factory(factory),
         );
 
-        let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
-            .with_runtime(rust_runtime)
-            .with_external_runtimes(external_runtimes)
+        let mut blockchain_builder =
+            BlockchainBuilder::new(blockchain, genesis_config).with_runtime(rust_runtime);
+        for runtime in external_runtimes {
+            blockchain_builder = blockchain_builder.with_runtime(runtime)
+        }
+        let blockchain = blockchain_builder
             .build()
             .expect("Cannot create dispatcher");
+
         Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
     }
 
