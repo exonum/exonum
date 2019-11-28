@@ -186,15 +186,15 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    api::ArtifactProtobufSpec,
     call_context::CallContext,
     error::Error,
+    runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, DefaultInstance, InstanceInfoProvider, Interface, Service,
-        ServiceDispatcher, ServiceFactory, Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, InstanceInfoProvider, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
     },
 };
 
+pub mod api;
 pub mod error;
 
 use exonum_merkledb::{validation::is_valid_index_name, Snapshot};
@@ -214,16 +214,16 @@ use crate::{
     helpers::Height,
 };
 
+use self::api::ServiceApiBuilder;
 use super::{
-    api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
 
-mod api;
 mod call_context;
+mod runtime_api;
 mod service;
 #[cfg(test)]
 mod tests;
@@ -361,7 +361,7 @@ impl RustRuntime {
                     ApiBuilder::from(builder),
                 )
             })
-            .chain(self::api::endpoints(self))
+            .chain(self::runtime_api::endpoints(self))
             .collect()
     }
 
@@ -592,11 +592,13 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
-        if CoreSchema::new(snapshot).height() == Height(0) {
+        let core_schema = CoreSchema::new(snapshot);
+        if core_schema.height() == Height(0) {
             return;
         }
 
         let blockchain = self.blockchain();
+        let validator_id = core_schema.validator_id(blockchain.service_keypair().0);
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
@@ -604,6 +606,7 @@ impl Runtime for RustRuntime {
                 snapshot,
                 blockchain.service_keypair(),
                 blockchain.sender(),
+                validator_id,
             ));
         }
     }

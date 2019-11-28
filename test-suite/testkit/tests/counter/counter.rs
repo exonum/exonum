@@ -21,17 +21,18 @@ use exonum::{
         ApiBackend,
     },
     crypto::Hash,
-    messages::{AnyTx, Verified},
     runtime::{
-        api::{ServiceApiBuilder, ServiceApiState},
-        rust::{CallContext, DefaultInstance, Service},
+        rust::{
+            api::{ServiceApiBuilder, ServiceApiState},
+            CallContext, DefaultInstance, Service,
+        },
         BlockchainData, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, ObjectHash, Snapshot,
+    Entry, Snapshot,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
@@ -131,14 +132,9 @@ pub struct TransactionResponse {
 struct CounterApi;
 
 impl CounterApi {
-    fn increment(
-        state: &ServiceApiState<'_>,
-        transaction: Verified<AnyTx>,
-    ) -> api::Result<TransactionResponse> {
+    fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
-
-        let tx_hash = transaction.object_hash();
-        state.sender().broadcast_transaction(transaction)?;
+        let tx_hash = state.generic_broadcaster().send(Increment::new(value))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -147,14 +143,9 @@ impl CounterApi {
         Ok(schema.counter.get().unwrap_or_default())
     }
 
-    fn reset(
-        state: &ServiceApiState<'_>,
-        transaction: Verified<AnyTx>,
-    ) -> api::Result<TransactionResponse> {
+    fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
-
-        let tx_hash = transaction.object_hash();
-        state.sender().broadcast_transaction(transaction)?;
+        let tx_hash = state.generic_broadcaster().send(Reset)?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -164,7 +155,7 @@ impl CounterApi {
             .endpoint("count", |state, _query: ()| {
                 Self::count(state.service_data())
             })
-            .endpoint_mut("reset", Self::reset);
+            .endpoint_mut("reset", |state, _query: ()| Self::reset(state));
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {

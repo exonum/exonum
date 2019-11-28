@@ -18,12 +18,14 @@ extern crate assert_matches;
 extern crate pretty_assertions;
 
 use exonum::{
-    api::{node::public::explorer::TransactionQuery, Error as ApiError},
+    api::{
+        node::public::explorer::{TransactionQuery, TransactionResponse},
+        Error as ApiError,
+    },
     blockchain::{ExecutionError, ExecutionErrorKind},
-    crypto::{self, PublicKey},
+    crypto::{self, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    messages::{AnyTx, Verified},
     runtime::{rust::Transaction, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
@@ -32,8 +34,7 @@ use hex::FromHex;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, Increment, Reset, TransactionResponse, ADMIN_KEY, SERVICE_ID,
-    SERVICE_NAME,
+    CounterSchema, CounterService, Increment, Reset, ADMIN_KEY, SERVICE_ID, SERVICE_NAME,
 };
 
 mod counter;
@@ -45,18 +46,13 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn inc_count(api: &TestKitApi, by: u64) -> Verified<AnyTx> {
-    let (pubkey, key) = crypto::gen_keypair();
-    // Create a pre-signed transaction
-    let tx = Increment::new(by).sign(SERVICE_ID, pubkey, &key);
-
+fn inc_count(api: &TestKitApi, by: u64) -> Hash {
     let tx_info: TransactionResponse = api
         .public(ApiKind::Service("counter"))
-        .query(&tx)
+        .query(&by)
         .post("count")
         .unwrap();
-    assert_eq!(tx_info.tx_hash, tx.object_hash());
-    tx
+    tx_info.tx_hash
 }
 
 fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a> {
@@ -133,7 +129,7 @@ fn test_inc_count_with_multiple_transactions() {
         .public(ApiKind::Service("counter"))
         .get("count")
         .unwrap();
-    assert_eq!(counter, 1_000);
+    assert_eq!(counter, 10);
 }
 
 #[test]
@@ -178,15 +174,11 @@ fn test_private_api() {
         .unwrap();
     assert_eq!(counter, 8);
 
-    let (pubkey, key) = crypto::gen_keypair_from_seed(
-        &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
-    );
-    assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-
+    let (pubkey, key) = testkit.us().service_keypair();
     let tx = Reset.sign(SERVICE_ID, pubkey, &key);
     let tx_info: TransactionResponse = api
         .private(ApiKind::Service("counter"))
-        .query(&tx)
+        .query(&())
         .post("reset")
         .unwrap();
     assert_eq!(tx_info.tx_hash, tx.object_hash());
@@ -202,11 +194,9 @@ fn test_private_api() {
 #[test]
 fn test_probe() {
     let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = testkit.us().service_keypair();
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -218,11 +208,7 @@ fn test_probe() {
         .unwrap();
     assert_eq!(counter, 0);
 
-    let other_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(3).sign(SERVICE_ID, pubkey, &key)
-    };
-
+    let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
     let snapshot = testkit.probe_all(txvec![tx.clone(), other_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(8));
@@ -230,7 +216,7 @@ fn test_probe() {
     // Posting a transaction is not enough to change the blockchain!
     let _: TransactionResponse = api
         .public(ApiKind::Service("counter"))
-        .query(&tx)
+        .query(&5)
         .post("count")
         .unwrap();
     let snapshot = testkit.probe(other_tx.clone());
@@ -246,18 +232,10 @@ fn test_probe() {
 fn test_duplicate_tx() {
     let (mut testkit, api) = init_testkit();
 
-    let tx = inc_count(&api, 5);
+    inc_count(&api, 5);
     testkit.create_block();
-    let _: TransactionResponse = api
-        .public(ApiKind::Service("counter"))
-        .query(&tx)
-        .post("count")
-        .unwrap();
-    let _: TransactionResponse = api
-        .public(ApiKind::Service("counter"))
-        .query(&tx)
-        .post("count")
-        .unwrap();
+    inc_count(&api, 5);
+    inc_count(&api, 5);
     testkit.create_block();
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
@@ -338,7 +316,9 @@ fn test_probe_duplicate_tx() {
     //! Checks that committed transactions do not change the blockchain state when probed.
 
     let (mut testkit, api) = init_testkit();
-    let tx = inc_count(&api, 5);
+    inc_count(&api, 5);
+    let (pubkey, key) = testkit.us().service_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -350,8 +330,9 @@ fn test_probe_duplicate_tx() {
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(5));
 
-    // Check the mixed case, when some probed transactions are committed and some are not
-    let other_tx = inc_count(&api, 7);
+    // Check the mixed case when some probed transactions are committed and some are not
+    inc_count(&api, 7);
+    let other_tx = Increment::new(7).sign(SERVICE_ID, pubkey, &key);
     let snapshot = testkit.probe_all(txvec![tx, other_tx]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(12));
@@ -361,10 +342,8 @@ fn test_probe_duplicate_tx() {
 fn test_snapshot_comparison() {
     let (mut testkit, api) = init_testkit();
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
     testkit
         .probe(tx.clone())
         .compare(testkit.snapshot())

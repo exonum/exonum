@@ -24,23 +24,32 @@ use exonum_merkledb::{
 
 use super::{
     multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    StartService, MAX_BUILTIN_INSTANCE_ID,
+    StartService,
 };
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
+    /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
+    /// Validator confirmations on successful deployments.
     pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
+    /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
+    /// Service instances to be started.
     pub pending_instances: MultisigIndex<T, StartService>,
+    /// Votes for a configuration change.
     pub config_confirms: MultisigIndex<T, Hash>,
+    /// Current pending configuration proposal.
     pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
+    /// Number of the processed configurations. Used to avoid conflicting configuration proposals.
     pub configuration_number: Entry<T::Base, u64>,
+    /// The following free instance ID for assignment.
     pub vacant_instance_id: Entry<T::Base, InstanceId>,
 }
 
 impl<T: Access> Schema<T> {
+    /// Gets the stored configuration number.
     pub fn get_configuration_number(&self) -> u64 {
         self.configuration_number.get().unwrap_or(0)
     }
@@ -58,18 +67,17 @@ impl<T: Access> Schema<T> {
 }
 
 impl Schema<Prefixed<'_, &Fork>> {
+    /// Increases the stored configuration number.
     pub fn increase_configuration_number(&mut self) {
-        let new_configuration_number = self.configuration_number.get().unwrap_or(0) + 1;
+        let new_configuration_number = self.get_configuration_number() + 1;
         self.configuration_number.set(new_configuration_number);
     }
 
-    /// Assign unique identifier for an instance.
-    pub(crate) fn assign_instance_id(&mut self) -> InstanceId {
-        let id = self
-            .vacant_instance_id
-            .get()
-            .unwrap_or(MAX_BUILTIN_INSTANCE_ID);
+    /// Assigns a unique identifier for an instance.
+    /// Returns `None` if `vacant_instance_id` entry was not initialized.
+    pub(crate) fn assign_instance_id(&mut self) -> Option<InstanceId> {
+        let id = self.vacant_instance_id.get()?;
         self.vacant_instance_id.set(id + 1);
-        id
+        Some(id)
     }
 }

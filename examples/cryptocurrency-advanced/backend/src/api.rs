@@ -20,7 +20,7 @@ use exonum::{
     blockchain::{BlockProof, IndexCoordinates, SchemaOrigin},
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
-    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+    runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
 use crate::{wallet::Wallet, Schema};
@@ -81,7 +81,7 @@ impl PublicApi {
             .unwrap();
         let to_table = blockchain_schema
             .state_hash_aggregator()
-            .get_proof(SchemaOrigin::Service(state.instance.id).coordinate_for(0));
+            .get_proof(SchemaOrigin::Service(state.instance().id).coordinate_for(0));
         let to_wallet = currency_schema.wallets.get_proof(pub_key);
 
         let wallet_proof = WalletProof {
