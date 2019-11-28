@@ -14,18 +14,25 @@
 
 //! This crate simplifies writing build.rs for exonum and exonum services.
 //!
-//! In build.rs
-//! ```
-//! # use exonum_build::ProtobufGenerator;
-//! #
-//! # fn main() {
-//! #   ProtobufGenerator::with_mod_name("protobuf_mod.rs")
-//! #       .with_input_dir("src/proto")
-//! #       .add_path("src/proto")
-//! #       .with_frequently_used()
-//! #       .generate();
-//! # }
-//! ```
+//! Since protobuf is exonum default serialization format, build.rs is mostly used
+//! to compile protobuf files and generate corresponding code. This code is used later in
+//! exonum core and services.
+//!
+//! All you need to do is call `ProtobufGenerator` with required params, for example see
+//! [`ProtobufGenerator`] docs.
+//!
+//! There are three predefined include paths available to use with `ProtobufGenerator`.
+//! See [`ProtoSources`].
+//!
+//! - Crypto sources: contains all necessary crypto types used in services and system proto-files.
+//! These types are `Hash`, `PublicKey` and `Signature`.
+//!
+//! - Exonum sources: contains types used in core and in system services such as supervisor.
+//!
+//! - Common sources: currently contains only `BitVec` type and its used in core consensus messages.
+//!
+//! [`ProtobufGenerator`]: struct.ProtobufGenerator.html
+//! [`ProtoSources`]: enum.ProtoSources.html
 
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
@@ -44,15 +51,6 @@ use std::{
 };
 
 /// Enum represents various sources of protobuf files.
-///
-/// Crypto sources contains all necessary crypto types used in services and system proto-files.
-/// These types are `Hash`, `PublicKey` and `Signature`.
-///
-/// Exonum sources contains types used in core and in system services such as supervisor.
-///
-/// Common sources currently contains only `BitVec` type used core consesus messages.
-///
-///
 #[derive(Debug, Copy, Clone)]
 pub enum ProtoSources<'a> {
     /// Path to exonum core protobuf files.
@@ -74,15 +72,6 @@ impl<'a> ProtoSources<'a> {
             ProtoSources::Crypto => get_exonum_protobuf_crypto_files_path(),
             ProtoSources::Path(path) => path.to_string(),
         }
-    }
-
-    /// Most frequently used combination of proto dependencies.
-    pub fn frequently_used() -> Vec<Self> {
-        vec![
-            ProtoSources::Exonum,
-            ProtoSources::Crypto,
-            ProtoSources::Common,
-        ]
     }
 }
 
@@ -208,7 +197,6 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 ///
 ///ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
 ///   .with_input_dir("src/proto")
-///   .add_path("src/proto") // Includes usually should contain input_dir.
 ///   .with_crypto()
 ///   .with_common()
 ///   .generate();
@@ -250,21 +238,18 @@ impl<'a> ProtobufGenerator<'a> {
         }
     }
 
-    /// Directory containing input protobuf files.
+    /// Directory containing input protobuf files. This directory is also
+    /// added to includes because in most cases proto files in input directory depends on
+    /// each other.
     pub fn with_input_dir(mut self, path: &'a str) -> Self {
         self.input_dir = path;
+        self.includes.push(ProtoSources::Path(path));
         self
     }
 
     /// Directory containing proto files that will be included.
     pub fn add_path(mut self, path: &'a str) -> Self {
         self.includes.push(ProtoSources::Path(path));
-        self
-    }
-
-    /// Convenience method to specify the most frequently used include directories.
-    pub fn with_frequently_used(mut self) -> Self {
-        self.includes.extend(ProtoSources::frequently_used());
         self
     }
 
