@@ -62,7 +62,7 @@ fn test_after_commit_with_auditor() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
-        .with_rust_service(after_commit_service_instances(service.clone()))
+        .with_rust_service_default(service.clone())
         .create();
 
     for i in 1..5 {

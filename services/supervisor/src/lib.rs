@@ -81,7 +81,10 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto::Hash,
     runtime::{
-        rust::{api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance, Service},
+        rust::{
+            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance,
+            Service,
+        },
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
