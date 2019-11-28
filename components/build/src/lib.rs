@@ -238,16 +238,29 @@ impl<'a> ProtobufGenerator<'a> {
         }
     }
 
-    /// Directory containing input protobuf files. This directory is also
-    /// added to includes because in most cases proto files in input directory depends on
-    /// each other.
+    /// A directory containing input protobuf files.
+    /// For single `mod_name` you can provide only one input directory,
+    /// If proto-files in the input directory have dependencies located in another
+    /// directories, you must specify them using `add_path` method.
+    ///
+    /// Predefined dependencies can be specified using corresponding methods
+    /// `with_common`, `with_crypto`, `with_exonum`.
+    ///
+    /// # Panics
+    ///
+    /// If the input directory is already specified.
     pub fn with_input_dir(mut self, path: &'a str) -> Self {
+        assert!(
+            self.input_dir.is_empty(),
+            "Input directory is already specified"
+        );
         self.input_dir = path;
         self.includes.push(ProtoSources::Path(path));
         self
     }
 
-    /// Directory containing proto files that will be included.
+    /// An additional directory containing dependent proto-files, can be used
+    /// multiple times.
     pub fn add_path(mut self, path: &'a str) -> Self {
         self.includes.push(ProtoSources::Path(path));
         self
