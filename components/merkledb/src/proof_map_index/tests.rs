@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(clippy::too_many_lines)]
+
 use exonum_crypto::{hash, Hash, HashStream, HASH_SIZE};
 use pretty_assertions::assert_eq;
 use rand::{
