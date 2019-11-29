@@ -62,8 +62,9 @@ impl Configure for ConfigChangeService {
     fn verify_config(
         &self,
         _context: CallContext<'_>,
-        _params: Self::Params,
+        params: Self::Params,
     ) -> Result<(), ExecutionError> {
+        println!("Verify config called with params {}", params);
         Ok(())
     }
 
@@ -72,6 +73,7 @@ impl Configure for ConfigChangeService {
         context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
+        println!("Apply config called with params {}", params);
         Schema::new(context.service_data())
             .params
             .set(params.clone());

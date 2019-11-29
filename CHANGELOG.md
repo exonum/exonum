@@ -513,6 +513,7 @@ Key points:
 #### exonum-testkit
 
 - Configuration change example has been moved to `exonum-supervisor` crate. (#1582)
+
 #### exonum-build
 
 - Now input directory is always added to includes to reduce boilerplate
