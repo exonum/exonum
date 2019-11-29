@@ -50,8 +50,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Services can now use `BlockchainData` and `SnapshotExt` types to access data
   from the blockchain in a more structured manner. (#1523)
 
-- Placeholder for changes due to dynamic services (#9999)
-
 #### exonum-merkledb
 
 - Nested proofs for `ProofListIndex` are replaced with a flat
@@ -460,6 +458,10 @@ Key points:
   They are intended to configure restart settings of the HTTP-server (#1536).
 
 - `exonum` now has a `python` library for implementing integration tests. (#1516)
+
+- `BlockchainMut` now has a `check_tx` method used to verify transactions before
+  adding them to the transactions pool. Transactions for which `check_tx` fails
+  are considered invalid and can't be included to the block. (#1579)
 
 #### exonum-merkledb
 
