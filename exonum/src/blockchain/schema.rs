@@ -360,9 +360,9 @@ where
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SchemaOrigin {
-    /// This is a Core schema.
+    /// This is a core schema.
     Core,
-    /// This is a Dispatcher schema.
+    /// This is a dispatcher schema.
     Dispatcher,
     /// Schema belongs to the runtime with the specified ID.
     Runtime(u32),

@@ -272,7 +272,7 @@ impl Dispatcher {
 
     /// Make pending artifacts and instances active.
     pub(crate) fn activate_pending(&self, fork: &Fork) {
-        Schema::new(&*fork).activate_pending()
+        Schema::new(fork).activate_pending()
     }
 
     /// Notifies runtimes about a committed block.
