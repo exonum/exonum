@@ -62,7 +62,7 @@ pub struct TxMarker {
 /// Marker service transactions interface definition.
 #[exonum_interface]
 pub trait MarkerTransactions {
-    /// Transaction, which must be executed no later 
+    /// Transaction, which must be executed no later
     /// than the specified time (field `time`).
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
@@ -91,8 +91,8 @@ impl<T: Access> MarkerSchema<T> {
 
 impl MarkerTransactions for MarkerService {
     fn mark(
-      &self, 
-      context: CallContext<'_>, 
+      &self,
+      context: CallContext<'_>,
       arg: TxMarker
     ) -> Result<(), ExecutionError> {
         let author = context
