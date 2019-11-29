@@ -119,8 +119,8 @@ mod test {
         assert_matches!(e.kind, AccessErrorKind::ReservedName);
         let e = ListIndex::<_, u32>::from_access(&fork, "__system_index".into()).unwrap_err();
         assert_matches!(e.kind, AccessErrorKind::ReservedName);
-        let e = ListIndex::<_, u32>::from_access(&fork, "__SYSTEM.INDEX__".into());
-        assert!(e.is_ok());
+        let res = ListIndex::<_, u32>::from_access(&fork, "__SYSTEM.INDEX__".into());
+        assert!(res.is_ok());
 
         // spell-checker:disable
         let e = ListIndex::<_, u32>::from_access(

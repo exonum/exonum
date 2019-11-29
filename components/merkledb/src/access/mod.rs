@@ -136,7 +136,7 @@ pub enum AccessErrorKind {
     },
 
     /// Index name is reserved. It's forbidden for user to create indexes with names
-    /// starting with `__`.
+    /// starting with `__` and not containing a dot `.`.
     #[fail(display = "Index name is reserved")]
     ReservedName,
 

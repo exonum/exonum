@@ -77,8 +77,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - Dot symbol is not allowed anymore in indexes with prefixed access.
 
-  - Index names starting from `__` are used only for system indexes and
-    forbidden for indexes in user services.
+  - Index names starting from `__` and not containing a dot `.` are reserved and
+    used only for system indexes.
 
 #### exonum-proto
 
