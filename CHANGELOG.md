@@ -510,6 +510,10 @@ Key points:
 
 - Proofs building mechanisms have been heavily refactored. (#1460)
 
+#### exonum-testkit
+
+- Configuration change example has been moved to `exonum-supervisor` crate. (#1582)
+
 #### exonum-build
 
 - Now input directory is always added to includes to reduce boilerplate
