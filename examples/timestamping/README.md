@@ -112,7 +112,14 @@ exonum-timestamping run --node-config example/3/node.toml --db-path example/3/db
 exonum-timestamping run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass
 ```
 
-Deploy cryptocurrency-advanced service:
+Before service deploy make sure that you have pure python implementation of protobuf:
+
+```sh
+pip uninstall protobuf
+pip install --no-binary=protobuf protobuf
+```
+
+Deploy cryptocurrency-advanced service.
 
 ```sh
 python3 -m exonum_launcher -i ../timestamping.yaml

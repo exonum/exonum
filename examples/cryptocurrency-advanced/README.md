@@ -118,6 +118,13 @@ exonum-cryptocurrency-advanced run --node-config example/3/node.toml --db-path e
 exonum-cryptocurrency-advanced run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass
 ```
 
+Before service deploy make sure that you have pure python implementation of protobuf:
+
+```sh
+pip uninstall protobuf
+pip install --no-binary=protobuf protobuf
+```
+
 Deploy cryptocurrency-advanced service:
 
 ```sh
