@@ -209,7 +209,9 @@ impl Dispatcher {
         }
     }
 
-    // TODO documentation [ECR-3275]
+    /// Executes transaction with the specified ID without the fork isolation.
+    ///
+    /// The caller must catch the panics and rollback the changes if panic was happened.
     pub(crate) fn execute(
         &self,
         fork: &mut Fork,

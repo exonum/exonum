@@ -73,7 +73,7 @@ class ProcessManager:
         """Tries to wait until process is terminated, kills it otherwise."""
         self._thread_handle.join(timeout=timeout)
 
-        if self._thread_handle.isAlive() and kill_on_timeout:
+        if self._thread_handle.is_alive() and kill_on_timeout:
             # Process didn't stop, kill it.
             self._kill_process()
             # After process is killed, we can wait thread to stop finally.
