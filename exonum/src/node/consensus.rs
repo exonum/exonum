@@ -320,7 +320,7 @@ impl NodeHandler {
     /// Panics if the received block has incorrect `block_hash`.
     fn handle_full_block(&mut self, msg: &Verified<BlockResponse>) -> Result<(), failure::Error> {
         // We suppose that the block doesn't contain incorrect transactions,
-        // since, `self.state` checks for it while creating an `IncompleteBlock`.
+        // since `self.state` checks for it while creating an `IncompleteBlock`.
 
         let block = msg.payload().block();
         let block_hash = block.object_hash();
@@ -398,7 +398,7 @@ impl NodeHandler {
     /// # Panics
     ///
     /// This method panics if:
-    /// - Accepted propose contains transaction(s) considered for which `BlockchainMut::check_tx` failed.
+    /// - Accepted propose contains transaction(s) for which `BlockchainMut::check_tx` failed.
     /// - Calculated hash of the block doesn't match the hash from precommits.
     fn handle_majority_precommits(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
         // Check if propose is known.

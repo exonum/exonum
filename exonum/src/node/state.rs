@@ -1028,7 +1028,7 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
-    /// - Block contains an transaction that is incorrect.
+    /// - Block contains a transaction that is incorrect.
     pub fn create_incomplete_block<S: RawAccess>(
         &mut self,
         msg: &Verified<BlockResponse>,
