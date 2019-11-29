@@ -206,11 +206,7 @@ impl TestKitBuilder {
     pub fn with_additional_runtime(mut self, runtime: impl Into<RuntimeInstance>) -> Self {
         let runtime = runtime.into();
         if runtime.id == RustRuntime::ID
-            || self
-                .additional_runtimes
-                .iter()
-                .find(|&r| r.id == runtime.id)
-                .is_some()
+            || self.additional_runtimes.iter().any(|r| r.id == runtime.id)
         {
             panic!(
                 "TestkitBuilder already contains runtime with id {}",
