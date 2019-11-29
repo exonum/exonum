@@ -81,6 +81,10 @@
 //!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
+//! Warning: state hash of the block is not affected by services, instantiated within it. The
+//! only exception is the genesis block where object hashes of builtin services are included
+//! to the resulting block state hash. This behavior difference will be unified in next release.
+//!
 //! [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
 //! # Transaction Lifecycle
