@@ -384,8 +384,6 @@ impl TestKit {
     /// #     }
     /// # }
     /// #
-    /// # impl InstanceInfoProvider for ExampleService {}
-    /// #
     /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
     /// # #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
     /// # pub struct ExampleTx {
