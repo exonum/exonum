@@ -17,6 +17,7 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 ```toml
 [dependencies]
 exonum = "0.12.0"
+exonum-cli = "0.12.0"
 exonum-time = "0.12.0"
 ```
 
@@ -24,16 +25,19 @@ Add the time oracle service to the blockchain in the main project file:
 
 ```rust
 extern crate exonum;
+extern crate exonum_cli;
 extern crate exonum_time;
 
-use exonum::helpers::fabric::NodeBuilder;
+use exonum_cli::NodeBuilder;
 use exonum_time::TimeServiceFactory;
+use simple_service::MarkerService; 
 
-fn main() {
+fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service(Box::new(TimeServiceFactory))
-        .run();
+        .with_service(TimeServiceFactory::default())
+        .with_service(MarkerService)
+        .run()
 }
 ```
 
@@ -120,11 +124,16 @@ You can get the time of each validator node in the same manner
 the consolidated time of the system is obtained:
 
 ```rust
-let time_schema = exonum_time::TimeSchema::new(&view);
+// Gets the data of time service instance
+let data = context.data();
+let time_service_data = data
+    .for_service("time_service_name")
+    .expect("No time service data");
+let time_schema = TimeSchema::new(time_service_data);
 // Gets the times of all validators.
-let validators_time = time_schema.validators_time();
+let validators_time = time_schema.time.get();
 // Gets the time of validator with a public key equal to `public_key`.
-let validator_time = time_schema.validators_time().get(&public_key);
+let validator_time = time_schema.validators_times.get(&public_key);
 ```
 
 ## Further Reading
