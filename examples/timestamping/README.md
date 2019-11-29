@@ -119,7 +119,7 @@ pip uninstall protobuf
 pip install --no-binary=protobuf protobuf
 ```
 
-Deploy cryptocurrency-advanced service.
+Deploy timestamping service.
 
 ```sh
 python3 -m exonum_launcher -i ../timestamping.yaml
