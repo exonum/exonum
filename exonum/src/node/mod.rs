@@ -72,7 +72,7 @@ use crate::{
     node::state::SharedConnectList,
     runtime::{
         rust::{RustRuntime, ServiceFactory},
-        Runtime,
+        RuntimeInstance,
     },
 };
 
@@ -940,7 +940,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
+        external_runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
         services: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
         node_cfg: NodeConfig,
         genesis_config: GenesisConfig,
@@ -1193,7 +1193,7 @@ mod tests {
         proto::schema::tests::TxSimple,
         runtime::{
             rust::{CallContext, InstanceInfoProvider, Service, Transaction},
-            BlockchainData, ExecutionError, InstanceId,
+            BlockchainData, ExecutionError, InstanceId, RuntimeInstance,
         },
     };
 
@@ -1252,7 +1252,7 @@ mod tests {
                 .with_instance(service.get_instance(SERVICE_ID, "test-service", ()))
                 .build();
         let services = vec![service.into()];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
 
         let mut node = Node::new(
             db,
@@ -1291,7 +1291,7 @@ mod tests {
     fn test_transaction_without_service() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let (p_key, s_key) = gen_keypair();
 
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1323,7 +1323,7 @@ mod tests {
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
@@ -1342,7 +1342,7 @@ mod tests {
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1365,7 +1365,7 @@ mod tests {
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1389,7 +1389,7 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1415,7 +1415,7 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();

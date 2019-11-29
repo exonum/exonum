@@ -36,7 +36,7 @@ use crate::{
         rust::{DefaultInstance, InstanceInfoProvider},
         BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
         DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
-        StateHashAggregator,
+        StateHashAggregator, WellKnownRuntime,
     },
 };
 
@@ -200,10 +200,8 @@ impl<T: Runtime> Runtime for Inspected<T> {
     }
 }
 
-impl Into<(u32, Box<dyn Runtime>)> for Inspected<RustRuntime> {
-    fn into(self) -> (u32, Box<dyn Runtime>) {
-        (RustRuntime::ID as u32, Box::new(self))
-    }
+impl WellKnownRuntime for Inspected<RustRuntime> {
+    const ID: u32 = RustRuntime::ID;
 }
 
 #[derive(Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]

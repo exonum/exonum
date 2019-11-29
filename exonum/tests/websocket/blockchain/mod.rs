@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, Node},
     runtime::{
         rust::{CallContext, InstanceInfoProvider, Service},
-        BlockchainData, InstanceId, Runtime,
+        BlockchainData, InstanceId, RuntimeInstance,
     },
 };
 use exonum_merkledb::{Snapshot, TemporaryDB};
@@ -116,7 +116,7 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+    let external_runtimes: Vec<RuntimeInstance> = vec![];
     let service = MyService;
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
         .with_artifact(service.get_artifact(), ())

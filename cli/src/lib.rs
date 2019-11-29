@@ -95,7 +95,7 @@ use exonum::{
     node::Node,
     runtime::{
         rust::{DefaultInstance, InstanceInfoProvider, ServiceFactory},
-        Runtime,
+        RuntimeInstance,
     },
 };
 use exonum_supervisor::SimpleSupervisor;
@@ -114,7 +114,7 @@ pub mod password;
 #[derive(Debug, Default)]
 pub struct NodeBuilder {
     services: Vec<Box<dyn ServiceFactory>>,
-    external_runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    external_runtimes: Vec<RuntimeInstance>,
 }
 
 impl NodeBuilder {
@@ -132,7 +132,7 @@ impl NodeBuilder {
     /// Adds a new Runtime to the list of available runtimes.
     ///
     /// Note that you don't have to add a Rust Runtime, since it's included by default.
-    pub fn with_external_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+    pub fn with_external_runtime(mut self, runtime: impl Into<RuntimeInstance>) -> Self {
         self.external_runtimes.push(runtime.into());
         self
     }

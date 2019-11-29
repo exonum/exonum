@@ -21,7 +21,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, InstanceInfoProvider, Service},
-        BlockchainData, Runtime,
+        BlockchainData, RuntimeInstance,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -109,7 +109,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = mpsc::unbounded();
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let service = CommitWatcherService(commit_tx);
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
@@ -162,7 +162,7 @@ fn test_node_run() {
 #[test]
 fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, db, start_times| {
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let service = StartCheckerServiceFactory(start_times);
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())

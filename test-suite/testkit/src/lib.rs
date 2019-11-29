@@ -166,7 +166,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage},
     runtime::{
         rust::{RustRuntime, ServiceFactory},
-        ArtifactId, InstanceId, Runtime, SnapshotExt,
+        ArtifactId, InstanceId, RuntimeInstance, SnapshotExt,
     },
 };
 use futures::{sync::mpsc, Future, Stream};
@@ -244,7 +244,7 @@ impl TestKit {
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
         genesis_config: GenesisConfig,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -854,10 +854,7 @@ impl StoppedTestKit {
     /// (which is also what may happen with real Exonum apps).
     ///
     /// This method will not add the default Rust runtime, so you must do this explicitly.
-    pub fn resume(
-        self,
-        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
-    ) -> TestKit {
+    pub fn resume(self, runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>) -> TestKit {
         TestKit::assemble(
             self.db,
             self.network,

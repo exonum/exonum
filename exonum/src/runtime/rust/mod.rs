@@ -213,6 +213,7 @@ use crate::{
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::Hash,
     helpers::Height,
+    runtime::WellKnownRuntime,
 };
 
 use self::api::ServiceApiBuilder;
@@ -275,8 +276,6 @@ impl AsRef<dyn Service + 'static> for Instance {
 }
 
 impl RustRuntime {
-    /// Rust runtime identifier.
-    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
     /// Rust runtime name.
     pub const NAME: &'static str = "rust";
 
@@ -382,10 +381,8 @@ impl RustRuntime {
     }
 }
 
-impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(r: RustRuntime) -> Self {
-        (RustRuntime::ID as u32, Box::new(r))
-    }
+impl WellKnownRuntime for RustRuntime {
+    const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
 /// The unique identifier of the Rust artifact, containing the name and version of the artifact.
@@ -444,7 +441,7 @@ impl RustArtifactId {
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
         Self {
-            runtime_id: RustRuntime::ID as u32,
+            runtime_id: RustRuntime::ID,
             name: inner.to_string(),
         }
     }

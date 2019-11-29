@@ -28,7 +28,7 @@ use exonum::{
         rust::{DefaultInstance, InstanceInfoProvider, RustRuntime, Transaction},
         AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError, ExecutionContext,
         ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        StateHashAggregator, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -67,9 +67,6 @@ enum SampleRuntimeError {
 }
 
 impl SampleRuntime {
-    /// Runtime identifier for the present runtime.
-    const ID: u32 = 255;
-
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
@@ -214,6 +211,10 @@ impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
     fn from(inner: SampleRuntime) -> Self {
         (SampleRuntime::ID, Box::new(inner))
     }
+}
+
+impl WellKnownRuntime for SampleRuntime {
+    const ID: u32 = 255;
 }
 
 fn node_config() -> NodeConfig {

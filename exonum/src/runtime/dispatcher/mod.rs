@@ -31,13 +31,13 @@ use crate::{
     helpers::ValidateInput,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
+    runtime::{InstanceDescriptor, InstanceQuery, RuntimeInstance},
 };
 
 use super::{
     error::ExecutionError, ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId,
     InstanceSpec, Runtime,
 };
-use crate::runtime::{InstanceDescriptor, InstanceQuery};
 
 mod error;
 mod schema;
@@ -61,10 +61,13 @@ impl Dispatcher {
     /// Creates a new dispatcher with the specified runtimes.
     pub(crate) fn new(
         blockchain: &Blockchain,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = RuntimeInstance>,
     ) -> Self {
         let mut this = Self {
-            runtimes: runtimes.into_iter().collect(),
+            runtimes: runtimes
+                .into_iter()
+                .map(|runtime| (runtime.id, runtime.instance))
+                .collect(),
             service_infos: BTreeMap::new(),
         };
         for runtime in this.runtimes.values_mut() {

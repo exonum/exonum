@@ -16,7 +16,7 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator,
+        Runtime, StateHashAggregator, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -89,9 +89,6 @@ struct TestRuntime {
 }
 
 impl TestRuntime {
-    // Runtime identifier.
-    const ID: u32 = 42;
-
     pub fn with_runtime_tester(tester: Arc<RuntimeTester>) -> Self {
         TestRuntime { tester }
     }
@@ -153,10 +150,8 @@ impl Runtime for TestRuntime {
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
-impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(inner: TestRuntime) -> Self {
-        (TestRuntime::ID, Box::new(inner))
-    }
+impl WellKnownRuntime for TestRuntime {
+    const ID: u32 = 42;
 }
 
 // We assert that:

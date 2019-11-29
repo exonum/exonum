@@ -20,7 +20,7 @@ use crate::{
         Blockchain, BlockchainMut, Schema,
     },
     merkledb::BinaryValue,
-    runtime::{rust::ServiceFactory, Dispatcher, InstanceId, InstanceSpec, Runtime},
+    runtime::{rust::ServiceFactory, Dispatcher, InstanceId, InstanceSpec, RuntimeInstance},
 };
 
 /// The object responsible for the correct Exonum blockchain creation from the components.
@@ -33,7 +33,7 @@ pub struct BlockchainBuilder {
     /// Underlying shared blockchain instance.
     blockchain: Blockchain,
     /// List of the supported runtimes.
-    runtimes: Vec<(u32, Box<dyn Runtime>)>,
+    runtimes: Vec<RuntimeInstance>,
     /// Blockchain configuration used to create the genesis block.
     genesis_config: GenesisConfig,
 }
@@ -50,7 +50,7 @@ impl BlockchainBuilder {
 
     /// Adds a runtime with the specified identifier and returns a modified `Self` object for
     /// further chaining.
-    pub fn with_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
+    pub fn with_runtime(mut self, runtime: impl Into<RuntimeInstance>) -> Self {
         self.runtimes.push(runtime.into());
         self
     }

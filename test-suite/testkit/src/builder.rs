@@ -25,7 +25,7 @@ use exonum::{
     messages::BinaryValue,
     runtime::{
         rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        ArtifactId, Runtime,
+        ArtifactId, RuntimeInstance, WellKnownRuntime,
     },
 };
 use futures::sync::mpsc;
@@ -133,7 +133,7 @@ pub struct TestKitBuilder {
     logger: bool,
     rust_runtime: RustRuntime,
     api_notifier_channel: ApiNotifierChannel,
-    additional_runtimes: HashMap<u32, Box<dyn Runtime>>,
+    additional_runtimes: Vec<RuntimeInstance>,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
 }
@@ -203,13 +203,22 @@ impl TestKitBuilder {
     /// # Panics
     ///
     /// - Panics if builder's instance already contains specified runtime.
-    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
-        let (id, runtime) = runtime.into();
-        if id == RustRuntime::ID as u32 || self.additional_runtimes.contains_key(&id) {
-            panic!("TestkitBuilder already contains runtime with id {}", id);
+    pub fn with_additional_runtime(mut self, runtime: impl Into<RuntimeInstance>) -> Self {
+        let runtime = runtime.into();
+        if runtime.id == RustRuntime::ID
+            || self
+                .additional_runtimes
+                .iter()
+                .find(|&r| r.id == runtime.id)
+                .is_some()
+        {
+            panic!(
+                "TestkitBuilder already contains runtime with id {}",
+                runtime.id
+            );
         }
 
-        self.additional_runtimes.insert(id, runtime);
+        self.additional_runtimes.push(runtime);
         self
     }
 
@@ -242,8 +251,7 @@ impl TestKitBuilder {
             .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
         let genesis = network.genesis_config();
 
-        let (id, runtime) = self.rust_runtime.into();
-        self.additional_runtimes.insert(id, runtime);
+        self.additional_runtimes.push(self.rust_runtime.into());
 
         // Prepare GenesisConfig.
         let genesis_config_builder = self.instances.into_iter().fold(
@@ -264,7 +272,7 @@ impl TestKitBuilder {
             TemporaryDB::new(),
             network,
             genesis_config,
-            self.additional_runtimes.into_iter(),
+            self.additional_runtimes,
             self.api_notifier_channel,
         )
     }
@@ -290,7 +298,7 @@ impl TestKitBuilder {
             logger: false,
             rust_runtime: RustRuntime::new(api_notifier_channel.0.clone()),
             api_notifier_channel,
-            additional_runtimes: HashMap::new(),
+            additional_runtimes: vec![],
             instances: vec![],
             artifacts: HashMap::new(),
         }
