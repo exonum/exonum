@@ -89,6 +89,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Method `protobuf_generate` is now private, use `exonum_build::ProtobufGenerator`
   instead (#1496).
+  
+- Method `ProtobufGenerator::frequently_used` has been removed (#1581).
 
 #### exonum-crypto
 
@@ -511,6 +513,10 @@ Key points:
 #### exonum-testkit
 
 - Configuration change example has been moved to `exonum-supervisor` crate. (#1582)
+#### exonum-build
+
+- Now input directory is always added to includes to reduce boilerplate
+  code. (#1581)
 
 ### Bug Fixes
 

@@ -22,6 +22,5 @@ fn main() {
 
     ProtobufGenerator::with_mod_name("protobuf_mod.rs")
         .with_input_dir("src/proto")
-        .add_path("src/proto")
         .generate();
 }
