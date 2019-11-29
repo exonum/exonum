@@ -508,6 +508,10 @@ Key points:
 
 - Proofs building mechanisms have been heavily refactored. (#1460)
 
+#### exonum-testkit
+
+- Configuration change example has been moved to `exonum-supervisor` crate. (#1582)
+
 ### Bug Fixes
 
 #### exonum
