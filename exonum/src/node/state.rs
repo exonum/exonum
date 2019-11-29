@@ -96,7 +96,7 @@ pub struct State {
     // An in-memory set of transaction hashes, rejected by a node
     // within block.
     //
-    // Those transactions are stored to be known if some node will proposae a block
+    // Those transactions are stored to be known if some node will propose a block
     // with one of them, so node could lookup for it.
     //
     // This set is cleared every block.
@@ -859,7 +859,7 @@ impl State {
             propose_state.unknown_txs.remove(&tx_hash);
 
             if self.invalid_txs.contains(&tx_hash) {
-                // Mark prevote with newly recieved invalid transaction as invalid.
+                // Mark prevote with newly received invalid transaction as invalid.
                 propose_state.valid = false;
             }
 

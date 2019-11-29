@@ -242,7 +242,7 @@ impl NodeHandler {
     /// broadcasts a prevote for this propose.
     ///
     /// Returns `true` if majority of prevotes is achieved, and returns `false` otherwise.
-    fn check_propose_and_broadcasat_prevote(&mut self, round: Round, propose_hash: Hash) -> bool {
+    fn check_propose_and_broadcast_prevote(&mut self, round: Round, propose_hash: Hash) -> bool {
         // Do not send a prevote if propose contains incorrect transactions.
         let propose_state = self.state.propose(&propose_hash).unwrap();
         if propose_state.has_invalid_txs() {
@@ -281,7 +281,7 @@ impl NodeHandler {
         // Send prevote
         if self.state.locked_round() == Round::zero() {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
-                self.check_propose_and_broadcasat_prevote(propose_round, hash);
+                self.check_propose_and_broadcast_prevote(propose_round, hash);
             } else {
                 // TODO: what if we HAVE prevote for the propose round? (ECR-171)
             }
@@ -454,7 +454,7 @@ impl NodeHandler {
         for round in prevote_round.iter_to(self.state.round().next()) {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
-                self.check_propose_and_broadcasat_prevote(round, propose_hash);
+                self.check_propose_and_broadcast_prevote(round, propose_hash);
             }
 
             // Change lock
@@ -726,7 +726,7 @@ impl NodeHandler {
             // Send prevote if we are locked or propose if we are leader
             if let Some(hash) = self.state.locked_propose() {
                 let round = self.state.round();
-                let has_majority_prevotes = self.check_propose_and_broadcasat_prevote(round, hash);
+                let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
                 if has_majority_prevotes {
                     self.handle_majority_prevotes(round, hash);
                 }
@@ -801,7 +801,7 @@ impl NodeHandler {
             let hash = self.state.add_self_propose(propose);
 
             // Send prevote
-            let has_majority_prevotes = self.check_propose_and_broadcasat_prevote(round, hash);
+            let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
             if has_majority_prevotes {
                 self.handle_majority_prevotes(round, hash);
             }
