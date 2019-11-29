@@ -30,7 +30,7 @@ extern crate exonum_time;
 
 use exonum_cli::NodeBuilder;
 use exonum_time::TimeServiceFactory;
-use simple_service::MarkerService; 
+use simple_service::MarkerService;
 
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
@@ -62,7 +62,8 @@ pub struct TxMarker {
 /// Marker service transactions interface definition.
 #[exonum_interface]
 pub trait MarkerTransactions {
-    /// Transaction, which must be executed no later than the specified time (field `time`).
+    /// Transaction, which must be executed no later 
+    /// than the specified time (field `time`).
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
@@ -89,7 +90,11 @@ impl<T: Access> MarkerSchema<T> {
 }
 
 impl MarkerTransactions for MarkerService {
-    fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
+    fn mark(
+      &self, 
+      context: CallContext<'_>, 
+      arg: TxMarker
+    ) -> Result<(), ExecutionError> {
         let author = context
             .caller()
             .author()
