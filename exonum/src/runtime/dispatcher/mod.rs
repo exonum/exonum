@@ -26,7 +26,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
+    blockchain::{Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
     merkledb::BinaryValue,
@@ -34,8 +34,8 @@ use crate::{
 };
 
 use super::{
-    error::ExecutionError, ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId,
-    InstanceSpec, Runtime,
+    error::{ErrorKind, ExecutionError},
+    ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 use crate::runtime::{InstanceDescriptor, InstanceQuery};
 
@@ -226,13 +226,28 @@ impl Dispatcher {
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            if self.runtimes[&info.runtime_id]
-                .before_commit(context, service_id)
-                .is_ok()
-            {
-                fork.flush();
-            } else {
+            let res = self.runtimes[&info.runtime_id].before_commit(context, service_id);
+            if let Err(e) = res {
                 fork.rollback();
+                let height = CoreSchema::new(&*fork).height().next();
+
+                if e.kind == ErrorKind::Unchecked {
+                    log::error!(
+                        "`before_commit` for service {} at {:?} resulted in unchecked error: {:?}",
+                        service_id,
+                        height,
+                        e
+                    );
+                } else {
+                    log::info!(
+                        "`before_commit` for service {} at {:?} failed: {:?}",
+                        service_id,
+                        height,
+                        e
+                    );
+                }
+            } else {
+                fork.flush();
             }
         }
     }

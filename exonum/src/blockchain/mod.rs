@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, TemporaryDB,
 };
-use failure::{format_err, Error};
+use failure::Error;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -258,7 +258,7 @@ impl BlockchainMut {
             .notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
         self.merge(fork.into_patch())?;
 
-        info!(
+        log::info!(
             "GENESIS_BLOCK ====== hash={}",
             self.inner.last_hash().to_hex()
         );
@@ -281,10 +281,7 @@ impl BlockchainMut {
         let last_hash = self.inner.last_hash();
         // Save & execute transactions.
         for (index, hash) in tx_hashes.iter().enumerate() {
-            self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
-                // Execution could fail if the transaction
-                // cannot be deserialized or it isn't in the pool.
-                .expect("Transaction execution error");
+            self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
 
         // Skip execution for genesis block.
@@ -325,7 +322,7 @@ impl BlockchainMut {
             tx_hash,
             state_hash,
         );
-        trace!("execute block = {:?}", block);
+        log::trace!("Executing {:?}", block);
 
         // Calculate block hash.
         let block_hash = block.object_hash();
@@ -344,27 +341,28 @@ impl BlockchainMut {
         index: usize,
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), Error> {
+    ) {
         let schema = Schema::new(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
-            .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
+            .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
         let tx_result = catch_panic(|| self.dispatcher.execute(fork, tx_hash, &transaction));
-        match &tx_result {
-            Ok(_) => {
-                fork.flush();
+        if let Err(ref e) = tx_result {
+            if e.kind == ExecutionErrorKind::Unchecked {
+                log::error!(
+                    "{:?} transaction resulted in unchecked error: {:?}",
+                    transaction,
+                    e
+                );
+            } else {
+                // Checked transaction errors are a regular occurrence. So logging the
+                // whole transaction body is an overkill: the body can be relatively big.
+                log::info!("{:?} transaction execution failed: {:?}", tx_hash, e);
             }
-            Err(e) => {
-                if e.kind == ExecutionErrorKind::Unchecked {
-                    error!("{:?} transaction execution panicked: {:?}", transaction, e);
-                } else {
-                    // Unlike panic, transaction failure is a regular case. So logging the
-                    // whole transaction body is an overkill: the body can be relatively big.
-                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                }
-                fork.rollback();
-            }
+            fork.rollback();
+        } else {
+            fork.flush();
         }
 
         let mut schema = Schema::new(&*fork);
@@ -376,7 +374,6 @@ impl BlockchainMut {
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
-        Ok(())
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
