@@ -14,9 +14,9 @@
 
 //! The set of errors for the Runtime module.
 
-use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_derive::*;
+use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
-use protobuf::Message;
 
 use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 
@@ -26,57 +26,112 @@ use crate::{
     proto::schema::runtime as runtime_proto,
 };
 
-/// Kind of execution error, indicates in which module error occurred.
+/// Kind of execution error, indicates the location of the error.
+///
+/// # Note to Runtime Developers
+///
+/// When should a runtime use different kinds of errors? Here's the guide.
+///
+/// ## `Service` errors
+///
+/// Use `Service` kind if the error has occurred in the service code and it makes sense to notify
+/// users about the error cause and/or its precise kind. These errors are generally raised
+/// if the input data (e.g., the transaction payload) violate certain invariants imposed by the service.
+/// For example, a `Service` error can be raised if the sender of a transfer transaction
+/// in the token service does not have sufficient amount of tokens.
+///
+/// ## `Unchecked` errors
+///
+/// Use `Unchecked` kind if the error has occurred in the service code, and:
+///
+/// - It is caused by the environment (e.g., out-of-memory)
+/// - It should never occur during normal execution (e.g., out-of-bounds indexing, null pointer)
+/// - It otherwise makes no sense to report to users in detail.
+///
+/// This kind of errors generally corresponds to panics in Rust and unchecked exceptions in Java.
+/// `Unchecked` errors are assumed to be reasonably rare by the framework; e.g., they are logged
+/// with a higher priority than other kinds.
+///
+/// Runtime environments can have mechanisms to convert `Unchecked` errors to `Service` ones
+/// (e.g., by catching exceptions in Java or calling [`catch_unwind`] in Rust),
+/// but whether it makes sense heavily depends on the use case.
+///
+/// ## `Dispatcher` errors
+///
+/// Use `Dispatcher` kind if the error has occurred while dispatching the request (i.e., *not*
+/// in the client code). See [`DispatcherError`] for more details.
+///
+/// ## `Runtime` errors
+///
+/// Use `Runtime` kind if the error has occurred in the runtime code and it makes sense to report
+/// the error to the users. A primary example here is artifact deployment: if deployment has failed,
+/// a `Runtime` error can provide more details about the cause.
+///
+/// ## Panics
+///
+/// Panic in the Rust wrapper of the runtime if a fundamental runtime invariant is broken and
+/// continuing node operation is impossible. A panic will not be caught and will lead
+/// to the node termination.
+///
+/// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
+/// [`DispatcherError`]: ../enum.DispatcherError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
-    /// Operation execution has been finished with panic.
-    Panic,
-    /// An error in dispatcher during the execution occurred.
+    /// An unchecked error that has occurred in the service code.
+    ///
+    /// Unlike [`Service`](#variant.Service) errors, unchecked errors do not have a user-defined code.
+    /// Thus, it may be impossible for users to figure out the precise cause of the error;
+    /// they can only use the accompanying error description.
+    Unchecked,
+
+    /// An error in the dispatcher code. For example, the method with the specified ID
+    /// was not found in the service instance.
     Dispatcher {
-        /// Error code, available values ​​can be found in the [description] of the dispatcher's errors.
+        /// Error code. Available values can be found in the [description] of dispatcher errors.
         ///
-        /// [description]: ../dispatcher/error/enum.Error.html
+        /// [description]: ../enum.DispatcherError.html
         code: u8,
     },
-    /// An error in the runtime occurred.
+
+    /// An error in the runtime logic. For example, the runtime could not deploy an artifact.
     Runtime {
-        /// User-defined error code.
-        /// Error codes can have different meanings for the different runtimes.
+        /// Runtime-specific error code.
+        /// Error codes can have different meanings for different runtimes.
         code: u8,
     },
-    /// An error during the service's transaction execution occurred.
+
+    /// An error in the service code reported to the blockchain users.
     Service {
         /// User-defined error code.
-        /// Error codes can have different meanings for the different transactions
-        /// and services.
+        /// Error codes can have different meanings for different services.
         code: u8,
     },
 }
 
 impl ErrorKind {
-    /// Creates panic error.
-    pub fn panic() -> Self {
-        ErrorKind::Panic
+    /// Creates an unchecked error.
+    pub fn unchecked() -> Self {
+        ErrorKind::Unchecked
     }
 
-    /// Creates dispatcher error with the specified code.
+    /// Creates a dispatcher error with the specified code.
     pub fn dispatcher(code: impl Into<u8>) -> Self {
         ErrorKind::Dispatcher { code: code.into() }
     }
 
-    /// Creates runtime error with the specified code.
+    /// Creates a runtime error with the specified code.
     pub fn runtime(code: impl Into<u8>) -> Self {
         ErrorKind::Runtime { code: code.into() }
     }
 
-    /// Creates service error with the specified code.
+    /// Creates a service error with the specified code.
     pub fn service(code: impl Into<u8>) -> Self {
         ErrorKind::Service { code: code.into() }
     }
 
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Panic => (runtime_proto::ErrorKind::PANIC, 0),
+            ErrorKind::Unchecked => (runtime_proto::ErrorKind::UNCHECKED, 0),
             ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
             ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
             ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
@@ -85,9 +140,9 @@ impl ErrorKind {
 
     fn from_raw(kind: runtime_proto::ErrorKind, code: u8) -> Result<Self, failure::Error> {
         let kind = match kind {
-            runtime_proto::ErrorKind::PANIC => {
+            runtime_proto::ErrorKind::UNCHECKED => {
                 ensure!(code == 0, "Error code for panic should be zero");
-                ErrorKind::Panic
+                ErrorKind::Unchecked
             }
             runtime_proto::ErrorKind::DISPATCHER => ErrorKind::Dispatcher { code },
             runtime_proto::ErrorKind::RUNTIME => ErrorKind::Runtime { code },
@@ -100,7 +155,7 @@ impl ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Panic => f.write_str("panic"),
+            ErrorKind::Unchecked => f.write_str("panic"),
             ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
             ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
             ErrorKind::Service { code } => write!(f, "service:{}", code),
@@ -111,7 +166,7 @@ impl Display for ErrorKind {
 /// Result of unsuccessful runtime execution.
 ///
 /// An execution error consists of an error kind and optional description.
-/// The error code affects the blockchain state hash, while the description does not.
+/// The error kind affects the blockchain state hash, while the description does not.
 /// Therefore descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
 ///
@@ -141,22 +196,22 @@ impl Display for ErrorKind {
 /// }
 /// ```
 ///
-/// Deriving errors in runtimes:
+/// Deriving errors for a runtime:
 ///
 /// ```
 /// use exonum_derive::IntoExecutionError;
 ///
-/// // Define runtime specific errors.
+/// /// Runtime-specific errors.
 /// #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 /// #[execution_error(kind = "runtime")]
 /// enum SampleRuntimeError {
-///     /// Incorrect information to call the transaction.
-///     IncorrectCallInfo = 1,
-///     /// Incorrect transaction payload.
-///     IncorrectPayload = 2,
+///     /// Incorrect deployment specification format.
+///     MalformedDeploySpec = 1,
+///     /// Could not compile the artifact.
+///     CompilationFail = 2,
 /// }
 /// ```
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail, BinaryValue)]
 pub struct ExecutionError {
     /// The kind of error that indicates in which module and with which code the error occurred.
     pub kind: ErrorKind,
@@ -167,8 +222,10 @@ pub struct ExecutionError {
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.
 ///
 /// This function will return the result of the closure if the closure does not panic.
-/// If the closure panics, it returns `Err(ExecutionError::panic(cause))`.
-/// This function does not catch `FatalError` panics.
+/// If the closure panics, it returns an `Unchecked` error with the description derived
+/// from the panic object.
+///
+/// `FatalError`s are not caught by this method.
 pub fn catch_panic<F, T>(maybe_panic: F) -> Result<T, ExecutionError>
 where
     F: FnOnce() -> Result<T, ExecutionError>,
@@ -191,7 +248,8 @@ where
 }
 
 impl ExecutionError {
-    /// Creates a new execution error instance with the specified error kind and an optional description.
+    /// Creates a new execution error instance with the specified error kind
+    /// and an optional description.
     pub fn new(kind: ErrorKind, description: impl Into<String>) -> Self {
         Self {
             kind,
@@ -202,29 +260,23 @@ impl ExecutionError {
     /// Creates an execution error from the panic description.
     pub(crate) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
         let any = any.as_ref();
+
         // Tries to get a meaningful description from the given panic.
-        let description = {
-            // Strings
-            if let Some(s) = any.downcast_ref::<&str>() {
-                s.to_string()
-            } else if let Some(s) = any.downcast_ref::<String>() {
-                s.clone()
-            }
-            // std::error::Error
-            else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {
-                error.description().to_string()
-            }
-            // Failure errors
-            else if let Some(error) = any.downcast_ref::<failure::Error>() {
-                error.to_string()
-            }
-            // Other
-            else {
-                String::new()
-            }
+        let description = if let Some(s) = any.downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = any.downcast_ref::<String>() {
+            s.clone()
+        } else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {
+            error.description().to_string()
+        } else if let Some(error) = any.downcast_ref::<failure::Error>() {
+            error.to_string()
+        } else {
+            // Unknown error kind; keep its description empty.
+            String::new()
         };
+
         Self {
-            kind: ErrorKind::Panic,
+            kind: ErrorKind::Unchecked,
             description,
         }
     }
@@ -272,20 +324,6 @@ impl ProtobufConvert for ExecutionError {
     }
 }
 
-impl BinaryValue for ExecutionError {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.to_pb()
-            .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for ExecutionError")
-    }
-
-    fn from_bytes(value: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
-        inner.merge_from_bytes(value.as_ref())?;
-        ProtobufConvert::from_pb(inner)
-    }
-}
-
 // String content (`ExecutionError::description`) is intentionally excluded from the hash
 // calculation because user can be tempted to use error description from a third-party libraries
 // which aren't stable across the versions.
@@ -299,8 +337,8 @@ impl ObjectHash for ExecutionError {
 /// Returns an status of the dispatcher execution.
 /// This result may be either an empty unit type, in case of success,
 /// or an `ExecutionError`, if execution has failed.
-/// Errors consist of an error code and an optional description.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Errors consist of an error kind and an optional description.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, BinaryValue)]
 pub struct ExecutionStatus(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
 
 impl ExecutionStatus {
@@ -344,20 +382,6 @@ impl ProtobufConvert for ExecutionStatus {
     }
 }
 
-impl BinaryValue for ExecutionStatus {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.to_pb()
-            .write_to_bytes()
-            .expect("Failed to serialize in BinaryValue for ExecutionStatus")
-    }
-
-    fn from_bytes(value: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        let mut inner = <Self as ProtobufConvert>::ProtoStruct::new();
-        inner.merge_from_bytes(value.as_ref())?;
-        ProtobufConvert::from_pb(inner)
-    }
-}
-
 impl ObjectHash for ExecutionStatus {
     fn object_hash(&self) -> Hash {
         match &self.0 {
@@ -388,7 +412,7 @@ mod execution_result {
             if let Err(err) = &inner {
                 let description = err.description.clone();
                 match err.kind {
-                    ErrorKind::Panic => ExecutionStatus::Panic { description },
+                    ErrorKind::Unchecked => ExecutionStatus::Panic { description },
                     ErrorKind::Dispatcher { code } => {
                         ExecutionStatus::DispatcherError { code, description }
                     }
@@ -410,7 +434,7 @@ mod execution_result {
             match inner {
                 ExecutionStatus::Success => Ok(()),
                 ExecutionStatus::Panic { description } => {
-                    Err(ExecutionError::new(ErrorKind::Panic, description))
+                    Err(ExecutionError::new(ErrorKind::Unchecked, description))
                 }
                 ExecutionStatus::DispatcherError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Dispatcher { code },
@@ -448,6 +472,8 @@ mod execution_result {
 
 #[cfg(test)]
 mod tests {
+    use exonum_merkledb::BinaryValue;
+    use protobuf::Message;
     use std::panic;
 
     use super::*;
@@ -459,7 +485,7 @@ mod tests {
     #[test]
     fn execution_error_binary_value_round_trip() {
         let values = vec![
-            (ErrorKind::Panic, "AAAA"),
+            (ErrorKind::Unchecked, "AAAA"),
             (ErrorKind::Dispatcher { code: 0 }, ""),
             (ErrorKind::Dispatcher { code: 0 }, "b"),
             (ErrorKind::Runtime { code: 1 }, "c"),
@@ -479,10 +505,10 @@ mod tests {
     }
 
     #[test]
-    fn execution_error_binary_value_panic_with_code() {
+    fn execution_error_binary_value_unchecked_with_code() {
         let bytes = {
             let mut inner = runtime_proto::ExecutionError::default();
-            inner.set_kind(runtime_proto::ErrorKind::PANIC);
+            inner.set_kind(runtime_proto::ErrorKind::UNCHECKED);
             inner.set_code(2);
             inner.write_to_bytes().unwrap()
         };
@@ -513,7 +539,7 @@ mod tests {
     #[test]
     fn execution_result_serde_roundtrip() {
         let values = vec![
-            Err((ErrorKind::Panic, "AAAA")),
+            Err((ErrorKind::Unchecked, "AAAA")),
             Err((ErrorKind::Dispatcher { code: 0 }, "")),
             Err((ErrorKind::Dispatcher { code: 0 }, "b")),
             Err((ErrorKind::Runtime { code: 1 }, "c")),

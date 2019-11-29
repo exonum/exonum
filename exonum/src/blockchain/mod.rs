@@ -356,7 +356,7 @@ impl BlockchainMut {
                 fork.flush();
             }
             Err(e) => {
-                if e.kind == ExecutionErrorKind::Panic {
+                if e.kind == ExecutionErrorKind::Unchecked {
                     error!("{:?} transaction execution panicked: {:?}", transaction, e);
                 } else {
                     // Unlike panic, transaction failure is a regular case. So logging the

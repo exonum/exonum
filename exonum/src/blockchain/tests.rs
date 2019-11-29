@@ -472,7 +472,7 @@ fn error_discards_transaction_changes() {
         Err(ExecutionError::new(ErrorKind::service(0), "")),
         Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
         Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
-        Err(ExecutionError::new(ErrorKind::Panic, "PANIC")),
+        Err(ExecutionError::new(ErrorKind::Unchecked, "PANIC")),
         Ok(()),
     ];
 

@@ -52,7 +52,7 @@ message InstanceSpec {
 
 // The kind of ExecutionError.
 enum ErrorKind {
-  PANIC = 0;
+  UNCHECKED = 0;
   DISPATCHER = 1;
   RUNTIME = 2;
   SERVICE = 3;
