@@ -42,11 +42,8 @@ mod inc;
 mod proto;
 mod utils;
 
-fn artifact_default() -> ArtifactId {
-    ArtifactId {
-        runtime_id: RuntimeIdentifier::Rust as _,
-        name: IncService.artifact_id().to_string(),
-    }
+fn default_artifact() -> ArtifactId {
+    IncService.artifact_id()
 }
 
 fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u64) {
@@ -175,7 +172,7 @@ fn start_service_request(
 }
 
 fn deploy_default(testkit: &mut TestKit) {
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
 
     assert!(!artifact_exists(&api, &artifact.name));
@@ -202,7 +199,7 @@ fn deploy_default(testkit: &mut TestKit) {
 fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
     let api = testkit.api();
     assert!(!service_instance_exists(&api, instance_name));
-    let request = start_service_request(artifact_default(), instance_name, testkit.height().next());
+    let request = start_service_request(default_artifact(), instance_name, testkit.height().next());
     let hash = start_service(&api, request);
     testkit.create_block();
     api.exonum_api().assert_tx_success(hash);
@@ -309,7 +306,7 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     // ... but set Height(0) as a deadline.
     let bad_deadline_height = testkit.height().previous();
 
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
 
     let request = deploy_request(artifact.clone(), bad_deadline_height);
@@ -336,7 +333,7 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     deploy_default(&mut testkit);
 
     let api = testkit.api();
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let instance_name = "inc_test";
     let bad_deadline_height = testkit.height().previous();
     let request = start_service_request(artifact, instance_name, bad_deadline_height);
@@ -359,7 +356,7 @@ fn test_try_run_unregistered_service_instance() {
     // Deliberately missing the DeployRequest step.
 
     let instance_name = "wont_run";
-    let request = start_service_request(artifact_default(), instance_name.to_owned(), Height(1000));
+    let request = start_service_request(default_artifact(), instance_name.to_owned(), Height(1000));
     let hash = start_service(&api, request);
     testkit.create_block();
 
@@ -378,7 +375,8 @@ fn test_bad_artifact_name() {
 
     let bad_artifact = ArtifactId {
         runtime_id: RuntimeIdentifier::Rust as _,
-        name: "does-not-exist:1.0.0".into(),
+        name: "does-not-exist".to_owned(),
+        version: "1.0.0".parse().unwrap(),
     };
     let request = deploy_request(bad_artifact.clone(), testkit.height().next());
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
@@ -408,7 +406,7 @@ fn test_bad_runtime_id() {
 
     let artifact = ArtifactId {
         runtime_id: bad_runtime_id,
-        name: IncService.artifact_id().to_string(),
+        ..IncService.artifact_id()
     };
     let request = deploy_request(artifact.clone(), testkit.height().next());
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
@@ -432,7 +430,7 @@ fn test_empty_service_instance_name() {
     deploy_default(&mut testkit);
 
     let api = testkit.api();
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let empty_instance_name = "";
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, empty_instance_name, deadline_height);
@@ -453,7 +451,7 @@ fn test_bad_service_instance_name() {
     deploy_default(&mut testkit);
 
     let api = testkit.api();
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let bad_instance_name = "\u{2764}";
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, bad_instance_name, deadline_height);
@@ -482,7 +480,7 @@ fn test_start_service_instance_twice() {
         assert!(!service_instance_exists(&api, instance_name));
 
         let deadline = testkit.height().next();
-        let request = start_service_request(artifact_default(), instance_name, deadline);
+        let request = start_service_request(default_artifact(), instance_name, deadline);
         let hash = start_service(&api, request);
         testkit.create_block();
 
@@ -497,7 +495,7 @@ fn test_start_service_instance_twice() {
         let api = testkit.api();
 
         let deadline = testkit.height().next();
-        let request = start_service_request(artifact_default(), instance_name, deadline);
+        let request = start_service_request(default_artifact(), instance_name, deadline);
         let hash = start_service(&api, request);
         testkit.create_block();
 
@@ -522,7 +520,7 @@ fn test_start_two_services_in_one_request() {
     assert!(!service_instance_exists(&api, instance_name_1));
     assert!(!service_instance_exists(&api, instance_name_2));
 
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let deadline = testkit.height().next();
 
     let request_1 = StartService {
@@ -567,7 +565,7 @@ fn test_restart_node_and_start_service_instance() {
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
-    assert!(artifact_exists(&api, &artifact_default().name));
+    assert!(artifact_exists(&api, &default_artifact().name));
 
     let instance_name = "test_basics";
     let (key_pub, key_priv) = crypto::gen_keypair();
@@ -611,7 +609,7 @@ fn test_restart_node_and_start_service_instance() {
 #[test]
 fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
@@ -654,7 +652,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
 #[test]
 fn test_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
@@ -694,7 +692,7 @@ fn test_two_validators() {
         assert!(!service_instance_exists(&api, instance_name));
         // Add two heights to the deadline: one for block with config proposal and one for confirmation.
         let deadline = testkit.height().next().next();
-        let request_start = start_service_request(artifact_default(), instance_name, deadline);
+        let request_start = start_service_request(default_artifact(), instance_name, deadline);
         let propose_hash = request_start.object_hash();
 
         // Send a start instance request from this node.
@@ -734,7 +732,7 @@ fn test_two_validators() {
 fn test_multiple_validators_no_confirmation() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
 
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
 
     assert!(!artifact_exists(&api, &artifact.name));
@@ -768,7 +766,7 @@ fn test_multiple_validators_no_confirmation() {
 fn test_auditor_cant_send_requests() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
 
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
 
     assert!(!artifact_exists(&api, &artifact.name));
@@ -811,7 +809,7 @@ fn test_auditor_cant_send_requests() {
 #[test]
 fn test_auditor_normal_workflow() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
@@ -841,7 +839,7 @@ fn test_auditor_normal_workflow() {
         let api = testkit.api();
         assert!(!service_instance_exists(&api, instance_name));
         let deadline = testkit.height().next();
-        let request_start = start_service_request(artifact_default(), instance_name, deadline);
+        let request_start = start_service_request(default_artifact(), instance_name, deadline);
 
         // Emulate a start instance request from the validator.
         let start_service_tx_hash =
@@ -874,7 +872,7 @@ fn test_auditor_normal_workflow() {
 fn test_multiple_validators_deploy_confirm() {
     let validators_count = 12;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
@@ -910,7 +908,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_majority() {
     let validators_count = 12;
     let byzantine_majority = (validators_count * 2 / 3) + 1;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
@@ -944,7 +942,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     let validators_count = 12;
     let byzantine_minority = validators_count * 2 / 3;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
@@ -985,7 +983,7 @@ fn test_id_assignment() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit);
 
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let deadline = testkit.height().next();
 
     let request_1 = StartService {
@@ -1031,7 +1029,7 @@ fn test_id_assignment_sparse() {
         ))
         .create();
 
-    let artifact = artifact_default();
+    let artifact = default_artifact();
     let deadline = testkit.height().next();
 
     let instance_name = "inc2";

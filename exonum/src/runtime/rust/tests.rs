@@ -298,7 +298,7 @@ impl Service for TestServiceImpl {
 fn basic_rust_runtime() {
     // Create a runtime and a service artifact.
     let (runtime, event_handle) = create_runtime();
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact = TestServiceImpl.artifact_id();
     // Create dummy dispatcher.
     let config = generate_testnet_config(1, 0)[0].clone();
     let mut blockchain = Blockchain::build_for_tests()
@@ -433,7 +433,7 @@ fn basic_rust_runtime() {
 #[test]
 fn rust_runtime_with_builtin_services() {
     let (runtime, event_handle) = create_runtime();
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact: ArtifactId = TestServiceImpl.artifact_id();
     let config = generate_testnet_config(1, 0)[0].clone();
     let spec = InstanceSpec {
         artifact: artifact.clone(),
@@ -515,7 +515,7 @@ fn rust_runtime_with_builtin_services() {
 #[test]
 fn conflicting_service_instances() {
     let (runtime, event_handle) = create_runtime();
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact = TestServiceImpl.artifact_id();
     let config = generate_testnet_config(1, 0)[0].clone();
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(config.consensus.clone())
@@ -636,12 +636,12 @@ fn instance_configs() -> (InstanceConfig, InstanceConfig) {
     let main_spec = InstanceSpec {
         id: SERVICE_INSTANCE_ID,
         name: SERVICE_INSTANCE_NAME.to_owned(),
-        artifact: TestServiceImpl.artifact_id().into(),
+        artifact: TestServiceImpl.artifact_id(),
     };
     let dependent_spec = InstanceSpec {
         id: SERVICE_INSTANCE_ID + 1,
         name: "dependent-service".to_owned(),
-        artifact: DependentServiceImpl.artifact_id().into(),
+        artifact: DependentServiceImpl.artifact_id(),
     };
     let dependent_constructor = Init {
         msg: SERVICE_INSTANCE_NAME.to_owned(),

@@ -18,9 +18,14 @@ use exonum_merkledb::{
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
+use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{borrow::Cow, fmt::Display, str::FromStr};
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 use super::InstanceDescriptor;
 use crate::{helpers::ValidateInput, proto::schema};
@@ -138,16 +143,17 @@ impl AnyTx {
     Ord,
     Serialize,
     Deserialize,
-    ProtobufConvert,
     BinaryValue,
     ObjectHash,
 )]
-#[protobuf_convert(source = "schema::runtime::ArtifactId")]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
-    /// Unique artifact name.
+    /// Artifact name.
     pub name: String,
+    /// Semantic version of the artifact.
+    #[serde(with = "serde_str")]
+    pub version: Version,
 }
 
 impl ArtifactId {
@@ -156,10 +162,12 @@ impl ArtifactId {
     pub fn new(
         runtime_id: impl Into<u32>,
         name: impl Into<String>,
+        version: Version,
     ) -> Result<Self, failure::Error> {
         let artifact = Self {
             runtime_id: runtime_id.into(),
             name: name.into(),
+            version,
         };
         artifact.validate()?;
         Ok(artifact)
@@ -167,11 +175,32 @@ impl ArtifactId {
 
     /// Check that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
-        // Extended version of `exonum_merkledb::is_valid_name` that also allows ':`.
-        name.as_ref().iter().all(|&c| match c {
-            58 => true,
-            c => is_allowed_latin1_char(c),
-        })
+        name.as_ref().iter().copied().all(is_allowed_latin1_char)
+    }
+}
+
+impl ProtobufConvert for ArtifactId {
+    type ProtoStruct = schema::runtime::ArtifactId;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        pb.set_runtime_id(self.runtime_id);
+        pb.set_name(self.name.clone());
+        pb.set_version(self.version.to_string());
+        pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let runtime_id = pb.get_runtime_id();
+        let name = pb.take_name();
+        let version = pb.get_version().parse()?;
+        let this = Self {
+            runtime_id,
+            name,
+            version,
+        };
+        this.validate()?;
+        Ok(this)
     }
 }
 
@@ -182,7 +211,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-.:"
+            "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-."
         );
         Ok(())
     }
@@ -190,18 +219,13 @@ impl ValidateInput for ArtifactId {
 
 impl_binary_key_for_binary_value! { ArtifactId }
 
-impl From<(String, u32)> for ArtifactId {
-    fn from(v: (String, u32)) -> Self {
-        Self {
-            runtime_id: v.1,
-            name: v.0,
-        }
-    }
-}
-
 impl Display for ArtifactId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.runtime_id, self.name)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}:{}:{}",
+            self.runtime_id, self.name, self.version
+        )
     }
 }
 
@@ -209,18 +233,19 @@ impl FromStr for ArtifactId {
     type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.splitn(2, ':').collect::<Vec<_>>();
+        let split = s.splitn(3, ':').collect::<Vec<_>>();
         match &split[..] {
-            [runtime_id, name] => {
+            [runtime_id, name, version] => {
                 let artifact = Self {
                     runtime_id: runtime_id.parse()?,
                     name: name.to_string(),
+                    version: version.parse()?,
                 };
                 artifact.validate()?;
                 Ok(artifact)
             }
             _ => Err(failure::format_err!(
-                "Wrong artifact id format, it should be in form \"runtime_id:artifact_name\""
+                "Wrong `ArtifactId` format, should be in form \"runtime_id:name:version\""
             )),
         }
     }
@@ -253,9 +278,10 @@ pub struct ArtifactSpec {
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///
-    ///  Exonum assigns an ID to the service on instantiation. It is mainly used to route
+    /// Exonum assigns an ID to the service on instantiation. It is mainly used to route
     /// transaction messages belonging to this instance.
     pub id: InstanceId,
+
     /// Unique name of the service instance.
     ///
     /// The name serves as a primary identifier of this service in most operations.
@@ -263,6 +289,7 @@ pub struct InstanceSpec {
     ///
     /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
     pub name: String,
+
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
 }
@@ -354,27 +381,43 @@ pub enum DeployStatus {
 
 #[test]
 fn parse_artifact_id_correct() {
-    "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
-    "1:com.my.java.service.v1".parse::<ArtifactId>().unwrap();
+    let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
+    assert_eq!(artifact_id.runtime_id, 0);
+    assert_eq!(artifact_id.name, "my-service");
+    assert_eq!(artifact_id.version, Version::new(1, 0, 0));
+
+    let artifact_id = "1:com.my.java.service:3.1.5-beta.2"
+        .parse::<ArtifactId>()
+        .unwrap();
+    assert_eq!(artifact_id.runtime_id, 1);
+    assert_eq!(artifact_id.name, "com.my.java.service");
+    assert_eq!(artifact_id.version.major, 3);
+    assert_eq!(artifact_id.version.minor, 1);
+    assert_eq!(artifact_id.version.patch, 5);
 }
 
 #[test]
 fn parse_artifact_id_incorrect_layout() {
     let artifacts = [
-        ("15", "Wrong artifact id format"),
-        ("0:", "Artifact name should not be empty"),
-        (":", "cannot parse integer from empty string"),
-        (":123", "cannot parse integer from empty string"),
-        ("-1:123", "invalid digit found in string"),
-        ("ava:123", "invalid digit found in string"),
+        ("15", "Wrong `ArtifactId` format"),
+        ("0::3.1.0", "Artifact name should not be empty"),
+        (":test:1.0.0", "cannot parse integer from empty string"),
+        ("-1:test:1.0.0", "invalid digit found in string"),
+        ("ava:test:0.0.1", "invalid digit found in string"),
         (
-            "123:I am a service!",
+            "123:I am a service!:1.0.0",
             "Artifact name contains an illegal character",
         ),
         (
-            "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
+            "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}:1.0.0",
             "Artifact name contains an illegal character",
         ),
+        ("1:test:1", "Expected dot"),
+        ("1:test:3.141593", "Expected dot"),
+        ("1:test:what_are_versions", "Error parsing major identifier"),
+        ("1:test:1.x.0", "Error parsing minor identifier"),
+        ("1:test:1.0.x", "Error parsing patch identifier"),
+        ("1:test:1.0.0:garbage", "Extra junk after valid version"),
     ];
 
     for (artifact, expected_err) in &artifacts {
@@ -409,15 +452,15 @@ fn test_instance_spec_validate_incorrect() {
             "Service instance name contains illegal character",
         ),
         (
-            InstanceSpec::new(3, "space service", "1:java.runtime.service"),
+            InstanceSpec::new(3, "space service", "1:java.runtime.service:1.0.0"),
             "Service instance name contains illegal character",
         ),
         (
             InstanceSpec::new(4, "foo_service", ""),
-            "Wrong artifact id format",
+            "Wrong `ArtifactId` format",
         ),
         (
-            InstanceSpec::new(5, "foo_service", ":"),
+            InstanceSpec::new(5, "foo_service", ":test:1.0.0"),
             "cannot parse integer from empty string",
         ),
     ];

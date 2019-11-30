@@ -37,6 +37,7 @@ message AnyTx {
 message ArtifactId {
   uint32 runtime_id = 1;
   string name = 2;
+  string version = 3;
 }
 
 message ArtifactSpec {

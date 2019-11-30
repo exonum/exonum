@@ -21,7 +21,7 @@ use crate::{
     proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
 };
 
-use super::{RustArtifactId, RustRuntime};
+use super::RustRuntime;
 
 /// Artifact Protobuf file sources.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -136,7 +136,7 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         .endpoint("proto-sources", {
             move |query: ProtoSourcesQuery| -> Result<Vec<ProtoSourceFile>, api::Error> {
                 if let Some(artifact_id) = query.artifact {
-                    let artifact_id = artifact_id.parse::<RustArtifactId>()?;
+                    let artifact_id = artifact_id.parse()?;
                     filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
                         api::Error::NotFound(format!(
                             "Unable to find sources for artifact {}",

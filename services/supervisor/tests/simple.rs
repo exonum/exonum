@@ -22,8 +22,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, Service},
-        ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
+        rust::{CallContext, Service, ServiceFactory},
+        BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -374,7 +374,7 @@ fn deploy_service() {
 
     let deadline_height = Height(5);
 
-    let artifact = ArtifactId::new(0_u32, "deployable-test-service:0.1.0").unwrap();
+    let artifact = DeployableService.artifact_id();
     let deploy_request = DeployRequest {
         artifact: artifact.clone(),
         spec: Vec::new(),

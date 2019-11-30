@@ -128,9 +128,9 @@ impl TestDispatcherInterface for TestDispatcherService {
         context.service_data().get_entry("val").set(arg.value);
 
         let artifact = if arg.value == 24 {
-            ServicePanicImpl.artifact_id().into()
+            ServicePanicImpl.artifact_id()
         } else {
-            ServiceGoodImpl.artifact_id().into()
+            ServiceGoodImpl.artifact_id()
         };
         context.start_artifact_registration(artifact, vec![])?;
         if arg.value == 42 {
@@ -161,9 +161,9 @@ impl TestDispatcherInterface for TestDispatcherService {
         };
 
         let artifact = if arg.value == 24 {
-            ServicePanicImpl.artifact_id().into()
+            ServicePanicImpl.artifact_id()
         } else {
-            TestDispatcherService.artifact_id().into()
+            TestDispatcherService.artifact_id()
         };
 
         let instance_name = format!("good-service-{}", arg.value);
@@ -525,7 +525,7 @@ fn test_dispatcher_deploy_good() {
         InstanceCollection::new(ServiceGoodImpl),
     ]);
 
-    let artifact_id = ServiceGoodImpl.artifact_id().into();
+    let artifact_id = ServiceGoodImpl.artifact_id();
 
     // Tests deployment procedure for the available artifact.
     assert!(!blockchain.dispatcher.is_artifact_deployed(&artifact_id));
@@ -563,7 +563,7 @@ fn test_dispatcher_already_deployed() {
         ),
         InstanceCollection::new(ServiceGoodImpl).with_instance(11, "good", ()),
     ]);
-    let artifact_id = ServiceGoodImpl.artifact_id().into();
+    let artifact_id = ServiceGoodImpl.artifact_id();
 
     // Tests that we get an error if we try to deploy already deployed artifact.
     assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
@@ -597,7 +597,7 @@ fn test_dispatcher_register_unavailable() {
         InstanceCollection::new(ServiceGoodImpl),
     ]);
 
-    let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
+    let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id();
     blockchain
         .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])

@@ -16,6 +16,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{Database, Fork, ObjectHash, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
+use semver::Version;
 
 use std::{
     collections::HashMap,
@@ -295,11 +296,13 @@ fn test_dispatcher_simple() {
 
     let rust_artifact = ArtifactId {
         runtime_id: SampleRuntimes::First as u32,
-        name: "first".into(),
+        name: "first".to_owned(),
+        version: "0.5.0".parse().unwrap(),
     };
     let java_artifact = ArtifactId {
         runtime_id: SampleRuntimes::Second as u32,
-        name: "second".into(),
+        name: "second".to_owned(),
+        version: "1.2.1".parse().unwrap(),
     };
 
     // Check if the services are ready for deploy.
@@ -450,7 +453,8 @@ fn test_dispatcher_rust_runtime_no_service() {
             RustRuntime::new(mpsc::channel(0).0),
         )
         .finalize(&blockchain);
-    let rust_artifact = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo:1.0.0").unwrap();
+    let rust_artifact =
+        ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo", Version::new(1, 2, 3)).unwrap();
 
     assert_eq!(
         dispatcher
@@ -611,6 +615,7 @@ impl DeploymentRuntime {
         let artifact = ArtifactId {
             runtime_id: 2,
             name: name.to_owned(),
+            version: Version::new(1, 0, 0),
         };
         self.mailbox_actions
             .lock()
@@ -829,6 +834,7 @@ fn failed_deployment_with_node_restart() {
     let artifact = ArtifactId {
         runtime_id: 2,
         name: "recoverable_after_restart".to_owned(),
+        version: Version::new(1, 0, 0),
     };
     let mut spec = vec![0_u8; 8];
     LittleEndian::write_u64(&mut spec, 100);
