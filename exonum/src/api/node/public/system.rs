@@ -69,11 +69,7 @@ impl DispatcherInfo {
     /// Loads dispatcher information from database.
     pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
         Self {
-            artifacts: schema
-                .artifacts()
-                .values()
-                .map(|spec| spec.artifact)
-                .collect(),
+            artifacts: schema.artifacts().keys().collect(),
             services: schema.service_instances().values().collect(),
         }
     }

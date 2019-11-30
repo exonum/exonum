@@ -76,9 +76,9 @@ impl Dispatcher {
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
-        // Restore information about the deployed services.
-        for ArtifactSpec { artifact, payload } in schema.artifacts().values() {
-            self.deploy_artifact(artifact, payload).wait()?;
+        // Restore information about the deployed service artifacts.
+        for (artifact, state) in &schema.artifacts() {
+            self.deploy_artifact(artifact, state.payload).wait()?;
         }
         // Restart active service instances.
         for instance in schema.service_instances().values() {
@@ -250,9 +250,9 @@ impl Dispatcher {
 
         // Deploy pending artifacts.
         let mut artifacts = schema.pending_artifacts();
-        for spec in artifacts.values() {
-            self.block_until_deployed(spec.artifact.clone(), spec.payload.clone());
-            schema.add_artifact(spec.artifact, spec.payload);
+        for (artifact, spec) in &artifacts {
+            self.block_until_deployed(artifact.clone(), spec.payload.clone());
+            schema.add_artifact(artifact, spec.payload);
         }
 
         // Start pending services.

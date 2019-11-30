@@ -41,7 +41,6 @@ message ArtifactId {
 }
 
 message ArtifactSpec {
-  ArtifactId artifact = 1;
   bytes payload = 2;
 }
 

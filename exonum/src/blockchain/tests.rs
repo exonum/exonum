@@ -540,7 +540,7 @@ fn test_dispatcher_deploy_good() {
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .artifacts()
-        .contains(&artifact_id.name));
+        .contains(&artifact_id));
     execute_transaction(
         &mut blockchain,
         TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
@@ -548,7 +548,7 @@ fn test_dispatcher_deploy_good() {
     let snapshot = blockchain.snapshot();
     assert!(DispatcherSchema::new(&snapshot)
         .artifacts()
-        .contains(&artifact_id.name));
+        .contains(&artifact_id));
     assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
@@ -611,7 +611,7 @@ fn test_dispatcher_register_unavailable() {
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .artifacts()
-        .contains(&artifact_id.name));
+        .contains(&artifact_id));
     assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
     // Tests that an unavailable artifact will not be registered.
     execute_transaction(

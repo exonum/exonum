@@ -44,11 +44,11 @@ impl<T: Access> Schema<T> {
     }
 
     /// Artifacts registry indexed by the artifact name.
-    pub(crate) fn artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
+    pub(crate) fn artifacts(&self) -> MapIndex<T::Base, ArtifactId, ArtifactSpec> {
         self.access.clone().get_map(ARTIFACTS)
     }
 
-    pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, String, ArtifactSpec> {
+    pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, ArtifactId, ArtifactSpec> {
         self.access.clone().get_map(PENDING_ARTIFACTS)
     }
 
@@ -107,13 +107,13 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns information about an artifact by its identifier.
-    pub fn get_artifact(&self, name: &str) -> Option<(ArtifactSpec, DeployStatus)> {
+    pub fn get_artifact(&self, id: &ArtifactId) -> Option<(ArtifactSpec, DeployStatus)> {
         self.artifacts()
-            .get(name)
+            .get(id)
             .map(|spec| (spec, DeployStatus::Active))
             .or_else(|| {
                 self.pending_artifacts()
-                    .get(name)
+                    .get(id)
                     .map(|spec| (spec, DeployStatus::Pending))
             })
     }
@@ -135,20 +135,12 @@ impl Schema<&Fork> {
         spec: Vec<u8>,
     ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts().contains(&artifact.name)
-            || self.pending_artifacts().contains(&artifact.name)
-        {
+        if self.artifacts().contains(&artifact) || self.pending_artifacts().contains(&artifact) {
             return Err(Error::ArtifactAlreadyDeployed);
         }
 
-        let name = artifact.name.clone();
-        self.pending_artifacts().put(
-            &name,
-            ArtifactSpec {
-                artifact,
-                payload: spec,
-            },
-        );
+        self.pending_artifacts()
+            .put(&artifact, ArtifactSpec { payload: spec });
         Ok(())
     }
 
@@ -156,31 +148,20 @@ impl Schema<&Fork> {
     pub(super) fn add_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
         // We use an assertion here since `add_pending_artifact` should have been called
         // with the same params before.
-        debug_assert!(!self.artifacts().contains(&artifact.name));
+        debug_assert!(!self.artifacts().contains(&artifact));
 
-        let name = artifact.name.clone();
-        self.artifacts().put(
-            &name,
-            ArtifactSpec {
-                artifact,
-                payload: spec,
-            },
-        );
+        self.artifacts()
+            .put(&artifact, ArtifactSpec { payload: spec });
     }
 
     /// Adds information about a pending service instance to the schema.
     pub(crate) fn add_pending_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
-        let artifact_id = self
-            .artifacts()
-            .get(&spec.artifact.name)
-            .or_else(|| self.pending_artifacts().get(&spec.artifact.name))
-            .ok_or(Error::ArtifactNotDeployed)?
-            .artifact;
+        // Checks that the artifact is deployed.
+        self.artifacts()
+            .get(&spec.artifact)
+            .or_else(|| self.pending_artifacts().get(&spec.artifact))
+            .ok_or(Error::ArtifactNotDeployed)?;
 
-        // Checks that runtime identifier is proper in instance.
-        if artifact_id != spec.artifact {
-            return Err(Error::IncorrectRuntime);
-        }
         // Checks that instance name doesn't exist.
         if self.service_instances().contains(&spec.name)
             || self.pending_service_instances().contains(&spec.name)

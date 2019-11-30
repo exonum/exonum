@@ -291,6 +291,36 @@ impl Service for TestServiceImpl {
     }
 }
 
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(crate = "crate", implements("TestService"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "test_service",
+    artifact_version = "0.2.0",
+    proto_sources = "crate::proto::schema"
+)]
+pub struct TestServiceImplV2;
+
+impl TestService for TestServiceImplV2 {
+    fn method_a(&self, _context: CallContext<'_>, _arg: TxA) -> Result<(), ExecutionError> {
+        Err(DispatcherError::NoSuchMethod.into())
+    }
+
+    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
+        context
+            .service_data()
+            .get_entry("method_b_entry")
+            .set(arg.value + 42);
+        Ok(())
+    }
+}
+
+impl Service for TestServiceImplV2 {
+    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        vec![]
+    }
+}
+
 /// In this test, we manually instruct the dispatcher to deploy artifacts / create services
 /// instead of using transactions. We still need to create patches using a `BlockchainMut`
 /// in order to properly emulate the blockchain workflow.
@@ -510,6 +540,124 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::AfterCommit(Height(2)),
         ]
     );
+}
+
+#[test]
+fn multiple_service_versions() {
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_available_service(TestServiceImpl)
+        .with_available_service(TestServiceImplV2);
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let mut blockchain = Blockchain::build_for_tests()
+        .into_mut(config.consensus.clone())
+        .with_additional_runtime(runtime)
+        .build()
+        .unwrap();
+
+    let fork = create_block(&blockchain);
+    let artifact = TestServiceImpl.artifact_id();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    let mut fork = create_block(&blockchain);
+    let spec = InstanceSpec {
+        artifact: artifact.clone(),
+        id: SERVICE_INSTANCE_ID,
+        name: SERVICE_INSTANCE_NAME.to_owned(),
+    };
+    let constructor = Init { msg: String::new() };
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
+        .start_adding_service(spec, constructor)
+        .unwrap();
+
+    commit_block(&mut blockchain, fork);
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.get_artifact(&artifact).is_some());
+    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact));
+
+    // Add a newer artifact version.
+    let fork = blockchain.fork();
+    let new_artifact = TestServiceImplV2.artifact_id();
+    assert_ne!(new_artifact, artifact);
+    assert!(schema.get_artifact(&new_artifact).is_none());
+    Dispatcher::commit_artifact(&fork, new_artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    // ...and a service based on the new artifact.
+    let mut fork = blockchain.fork();
+    let spec = InstanceSpec {
+        artifact: new_artifact.clone(),
+        id: SERVICE_INSTANCE_ID + 1,
+        name: "new_service".to_owned(),
+    };
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
+        .start_adding_service(spec, ())
+        .unwrap();
+
+    // Check that both artifact versions are present in the dispatcher schema.
+    commit_block(&mut blockchain, fork);
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.get_artifact(&artifact).is_some());
+    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact));
+    assert!(schema.get_artifact(&new_artifact).is_some());
+    assert!(blockchain.dispatcher().is_artifact_deployed(&new_artifact));
+    assert!(schema.get_instance(SERVICE_INSTANCE_ID).is_some());
+    assert!(schema.get_instance("new_service").is_some());
+
+    // Check that both services are active by calling transactions for them.
+    let mut call_info = CallInfo {
+        instance_id: SERVICE_INSTANCE_ID,
+        method_id: 0,
+    };
+    let payload = TxA { value: 11 }.into_bytes();
+    let caller = Caller::Service {
+        instance_id: SERVICE_INSTANCE_ID,
+    };
+
+    let mut fork = create_block(&blockchain);
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+    call_info.instance_id += 1;
+    let err = blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap_err();
+    // `method_a` is removed from the newer service version.
+    // FIXME: Use a purpose-built error variant.
+    assert_eq!(err, DispatcherError::NoSuchMethod.into());
+
+    {
+        let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_entry(idx_name.as_str());
+        assert_eq!(entry.get(), Some(11));
+        let entry = fork.get_entry::<_, u64>("new_service.method_a_entry");
+        assert!(!entry.exists());
+    }
+
+    call_info.method_id = 1;
+    call_info.instance_id -= 1;
+    let payload = TxB { value: 12 }.into_bytes();
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+    call_info.instance_id += 1;
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+
+    {
+        let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_entry(idx_name.as_str());
+        assert_eq!(entry.get(), Some(12));
+        let entry = fork.get_entry("new_service.method_b_entry");
+        assert_eq!(entry.get(), Some(54)); // 12 + 42
+    }
 }
 
 #[test]

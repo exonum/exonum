@@ -815,7 +815,8 @@ fn failed_deployment_with_node_restart() {
 
     let snapshot = db.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    assert!(schema.get_artifact("recoverable_after_restart").is_none());
+    let artifact = "2:recoverable_after_restart:1.0.0".parse().unwrap();
+    assert!(schema.get_artifact(&artifact).is_none());
     // ^-- Since the node panicked before merging the block, the artifact is forgotten.
 
     // Emulate node restart. The node will obtain the same block with the `commit_artifact`
@@ -831,11 +832,6 @@ fn failed_deployment_with_node_restart() {
         .with_runtime(2, runtime)
         .finalize(&blockchain);
 
-    let artifact = ArtifactId {
-        runtime_id: 2,
-        name: "recoverable_after_restart".to_owned(),
-        version: Version::new(1, 0, 0),
-    };
     let mut spec = vec![0_u8; 8];
     LittleEndian::write_u64(&mut spec, 100);
 
@@ -847,7 +843,7 @@ fn failed_deployment_with_node_restart() {
 
     let snapshot = db.snapshot();
     let (_, status) = DispatcherSchema::new(&snapshot)
-        .get_artifact(&artifact.name)
+        .get_artifact(&artifact)
         .unwrap();
     assert_eq!(status, DeployStatus::Active);
 }

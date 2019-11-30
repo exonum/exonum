@@ -67,7 +67,8 @@ impl CallInfo {
 ///
 /// # Examples
 ///
-/// Create a new signed transaction.
+/// Creates a new signed transaction.
+///
 /// ```
 /// use exonum::{
 ///     crypto,
@@ -86,7 +87,7 @@ impl CallInfo {
 ///             ..CallInfo::default()
 ///         },
 ///         // Transaction payload.
-///         arguments: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
+///         arguments: b"Talk is cheap. Show me the code. – Linus Torvalds".to_vec()
 ///     },
 ///     keypair.0,
 ///     &keypair.1
@@ -114,14 +115,21 @@ impl AnyTx {
 ///
 /// In string representation the artifact identifier is written as follows:
 ///
-/// `{runtime_id}:{artifact_name}`, where `runtime_id` is a [runtime identifier],
-/// and `artifact_name` is a unique name of the artifact.
+/// ```text
+/// {runtime_id}:{artifact_name}:{version}
+/// ```
 ///
-/// Artifact name contains only the following characters: `a-zA-Z0-9` and one of `_-.:`.
+/// where:
+///
+/// - `runtime_id` is a [runtime identifier],
+/// - `artifact_name` is the name of the artifact
+/// - `version` is the artifact semantic version
+///
+/// Artifact name may contain the following characters: `a-zA-Z0-9` and `_-.`.
 ///
 /// [runtime identifier]: enum.RuntimeIdentifier.html
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// # use exonum::runtime::ArtifactId;
@@ -129,7 +137,7 @@ impl AnyTx {
 /// // Typical Rust artifact.
 /// let rust_artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>()?;
 /// // Typical Java artifact.
-/// let java_artifact_id = "1:org.exonum.service.1".parse::<ArtifactId>()?;
+/// let java_artifact_id = "1:com.exonum.service:1.0.0".parse::<ArtifactId>()?;
 /// # Ok(())
 /// # }
 /// ```
@@ -251,12 +259,10 @@ impl FromStr for ArtifactId {
     }
 }
 
-/// Exhaustive artifact specification.
+/// Artifact state.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
 pub struct ArtifactSpec {
-    /// Information uniquely identifying the artifact.
-    pub artifact: ArtifactId,
     /// Runtime-specific artifact payload.
     pub payload: Vec<u8>,
 }
