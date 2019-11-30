@@ -186,7 +186,7 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    call_context::CallContext,
+    call_context::{CallContext, ChildAuthorization},
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{

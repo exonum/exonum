@@ -17,8 +17,12 @@ use exonum_derive::IntoExecutionError;
 /// Common errors emitted by transactions during execution.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
 pub enum Error {
+    /// Wallet not found.
     WalletNotFound = 0,
+    /// Wallet already exists.
     WalletAlreadyExists = 1,
+    /// Wrong interface caller.
     WrongInterfaceCaller = 2,
+    /// Issuer is not authorized.
     UnauthorizedIssuer = 3,
 }
