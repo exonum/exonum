@@ -61,6 +61,7 @@ impl ProtobufConvert for CheckedCall {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "proto::Batch")]
 pub struct Batch {
+    /// Transactions included in the batch.
     pub inner: Vec<AnyTx>,
 }
 
