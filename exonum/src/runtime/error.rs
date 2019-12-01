@@ -14,12 +14,14 @@
 
 //! The set of errors for the Runtime module.
 
+use byteorder::{ByteOrder, LittleEndian};
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
 
 use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 
+use super::InstanceId;
 use crate::{
     blockchain::FatalError,
     crypto::{self, Hash},
@@ -95,6 +97,8 @@ pub enum ErrorKind {
 
     /// An error in the runtime logic. For example, the runtime could not deploy an artifact.
     Runtime {
+        /// Identifier of the runtime that has raised the error.
+        runtime_id: u32,
         /// Runtime-specific error code.
         /// Error codes can have different meanings for different runtimes.
         code: u8,
@@ -102,6 +106,10 @@ pub enum ErrorKind {
 
     /// An error in the service code reported to the blockchain users.
     Service {
+        /// Identifier of the service that has generated the error. If necessary, clients may use
+        /// the dispatcher schema or the `services` endpoint of the node API to find out
+        /// the artifact / version of the service by this ID.
+        instance_id: InstanceId,
         /// User-defined error code.
         /// Error codes can have different meanings for different services.
         code: u8,
@@ -115,38 +123,40 @@ impl ErrorKind {
     }
 
     /// Creates a dispatcher error with the specified code.
-    pub fn dispatcher(code: impl Into<u8>) -> Self {
-        ErrorKind::Dispatcher { code: code.into() }
+    pub(crate) fn dispatcher(code: u8) -> Self {
+        ErrorKind::Dispatcher { code }
     }
 
     /// Creates a runtime error with the specified code.
-    pub fn runtime(code: impl Into<u8>) -> Self {
-        ErrorKind::Runtime { code: code.into() }
-    }
-
-    /// Creates a service error with the specified code.
-    pub fn service(code: impl Into<u8>) -> Self {
-        ErrorKind::Service { code: code.into() }
+    pub fn runtime(runtime_id: u32, code: u8) -> Self {
+        ErrorKind::Runtime { code, runtime_id }
     }
 
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
             ErrorKind::Unchecked => (runtime_proto::ErrorKind::UNCHECKED, 0),
             ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
-            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
+            ErrorKind::Runtime { code, .. } => (runtime_proto::ErrorKind::RUNTIME, code),
+            ErrorKind::Service { code, .. } => (runtime_proto::ErrorKind::SERVICE, code),
         }
     }
 
     fn from_raw(kind: runtime_proto::ErrorKind, code: u8) -> Result<Self, failure::Error> {
+        use runtime_proto::ErrorKind::*;
         let kind = match kind {
-            runtime_proto::ErrorKind::UNCHECKED => {
+            UNCHECKED => {
                 ensure!(code == 0, "Error code for panic should be zero");
                 ErrorKind::Unchecked
             }
-            runtime_proto::ErrorKind::DISPATCHER => ErrorKind::Dispatcher { code },
-            runtime_proto::ErrorKind::RUNTIME => ErrorKind::Runtime { code },
-            runtime_proto::ErrorKind::SERVICE => ErrorKind::Service { code },
+            DISPATCHER => ErrorKind::Dispatcher { code },
+            RUNTIME => ErrorKind::Runtime {
+                code,
+                runtime_id: 0,
+            },
+            SERVICE => ErrorKind::Service {
+                code,
+                instance_id: 0,
+            },
         };
         Ok(kind)
     }
@@ -157,8 +167,10 @@ impl Display for ErrorKind {
         match self {
             ErrorKind::Unchecked => f.write_str("panic"),
             ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
-            ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
-            ErrorKind::Service { code } => write!(f, "service:{}", code),
+            ErrorKind::Runtime { code, runtime_id } => write!(f, "runtime#{}:{}", runtime_id, code),
+            ErrorKind::Service { code, instance_id } => {
+                write!(f, "service#{}:{}", instance_id, code)
+            }
         }
     }
 }
@@ -169,23 +181,26 @@ impl Display for ErrorKind {
 /// The error kind affects the blockchain state hash, while the description does not.
 /// Therefore descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail, BinaryValue)]
+pub struct ExecutionError {
+    /// The kind of error that indicates in which module and with which code the error occurred.
+    pub kind: ErrorKind,
+    /// Optional description which doesn't affect `object_hash`.
+    pub description: String,
+}
+
+/// Trait representing an error type defined in the service code.
 ///
-/// Usually you can implement conversion from your own error type to the `ExecutionError` via
-/// deriving `IntoExecutionError` from `exonum-derive` crate.
-///
-/// This macro implements `From<MyError> for ExecutionError` conversion for the given enum.
-/// Enumeration should have an explicit discriminant for each error kind.
-/// Derives `Display` and `Fail` traits using documentation comments for each error kind.
+/// This trait can be derived from an enum using an eponymous derive macro from the `exonum-derive`
+/// crate.
 ///
 /// # Examples
 ///
-/// Deriving errors in service transactions:
-///
 /// ```
-/// use exonum_derive::IntoExecutionError;
+/// use exonum_derive::ServiceFail;
 ///
 /// /// Error codes emitted by wallet transactions during execution:
-/// #[derive(Debug, IntoExecutionError)]
+/// #[derive(Debug, ServiceFail)]
 /// pub enum Error {
 ///     /// Content hash already exists.
 ///     HashAlreadyExists = 0,
@@ -195,28 +210,79 @@ impl Display for ErrorKind {
 ///     TimeServiceNotFound = 2,
 /// }
 /// ```
-///
-/// Deriving errors for a runtime:
-///
-/// ```
-/// use exonum_derive::IntoExecutionError;
-///
-/// /// Runtime-specific errors.
-/// #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-/// #[execution_error(kind = "runtime")]
-/// enum SampleRuntimeError {
-///     /// Incorrect deployment specification format.
-///     MalformedDeploySpec = 1,
-///     /// Could not compile the artifact.
-///     CompilationFail = 2,
-/// }
-/// ```
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail, BinaryValue)]
-pub struct ExecutionError {
-    /// The kind of error that indicates in which module and with which code the error occurred.
-    pub kind: ErrorKind,
-    /// Optional description which doesn't affect `object_hash`.
-    pub description: String,
+pub trait ServiceFail {
+    /// Extracts the error code.
+    fn code(&self) -> u8;
+
+    /// Extracts the human-readable error description.
+    fn description(self) -> String;
+
+    /// Creates an error with the externally provided description.
+    fn with_description(&self, description: impl Display) -> (u8, String) {
+        (self.code(), description.to_string())
+    }
+
+    /// Converts an error into a generic representation. This is primarily useful to compare
+    /// an error via `assert_eq!` in tests.
+    ///
+    /// This operation is not meant to be overridden.
+    fn for_service(self, instance_id: InstanceId) -> ServiceExecutionError
+    where
+        Self: Sized,
+    {
+        ServiceExecutionError {
+            code: self.code(),
+            instance_id,
+            description: self.description(),
+        }
+    }
+}
+
+impl ServiceFail for (u8, &str) {
+    fn code(&self) -> u8 {
+        self.0
+    }
+
+    fn description(self) -> String {
+        self.1.to_owned()
+    }
+}
+
+impl ServiceFail for (u8, String) {
+    fn code(&self) -> u8 {
+        self.0
+    }
+
+    fn description(self) -> String {
+        self.1
+    }
+}
+
+/// Generalized form of `ServiceFail` produced by the `for_service` method. Can be compared
+/// to `ExecutionError`.
+#[derive(Debug, PartialEq)]
+pub struct ServiceExecutionError {
+    code: u8,
+    instance_id: InstanceId,
+    description: String,
+}
+
+impl PartialEq<ServiceExecutionError> for ExecutionError {
+    fn eq(&self, other: &ServiceExecutionError) -> bool {
+        if let ErrorKind::Service { code, instance_id } = self.kind {
+            code == other.code
+                && instance_id == other.instance_id
+                && self.description == other.description
+        } else {
+            false
+        }
+    }
+}
+
+impl PartialEq<ExecutionError> for ServiceExecutionError {
+    fn eq(&self, other: &ExecutionError) -> bool {
+        other.eq(self)
+    }
 }
 
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.
@@ -311,14 +377,32 @@ impl ProtobufConvert for ExecutionError {
         inner.set_kind(kind);
         inner.set_code(u32::from(code));
         inner.set_description(self.description.clone());
+        match self.kind {
+            ErrorKind::Service { instance_id, .. } => inner.set_instance_id(instance_id),
+            ErrorKind::Runtime { runtime_id, .. } => inner.set_runtime_id(runtime_id),
+            _ => { /* No additional actions required */ }
+        }
         inner
     }
 
+    #[rustfmt::skip] // Formatter mangles `match` operator.
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let kind = pb.get_kind();
         let code = u8::try_from(pb.get_code())?;
+        let mut kind = ErrorKind::from_raw(kind, code)?;
+
+        match kind {
+            ErrorKind::Service { ref mut instance_id, .. } => {
+                *instance_id = pb.get_instance_id();
+            }
+            ErrorKind::Runtime { ref mut runtime_id, .. } => {
+                *runtime_id = pb.get_runtime_id();
+            }
+            _ => { /* No additional actions required */ }
+        }
+
         Ok(Self {
-            kind: ErrorKind::from_raw(kind, code)?,
+            kind,
             description: pb.take_description(),
         })
     }
@@ -330,7 +414,15 @@ impl ProtobufConvert for ExecutionError {
 impl ObjectHash for ExecutionError {
     fn object_hash(&self) -> Hash {
         let (kind, code) = self.kind.into_raw();
-        crypto::hash(&[kind as u8, code])
+        if let ErrorKind::Service { instance_id, .. } = self.kind {
+            let mut buffer = [0; 6];
+            buffer[0] = kind as u8;
+            buffer[1] = code;
+            LittleEndian::write_u32(&mut buffer[2..], instance_id);
+            crypto::hash(&buffer)
+        } else {
+            crypto::hash(&[kind as u8, code])
+        }
     }
 }
 
@@ -395,16 +487,29 @@ impl ObjectHash for ExecutionStatus {
 mod execution_result {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    use super::{ErrorKind, ExecutionError};
+    use super::{ErrorKind, ExecutionError, InstanceId};
 
     #[serde(tag = "type", rename_all = "snake_case")]
     #[derive(Debug, Serialize, Deserialize)]
     enum ExecutionStatus {
         Success,
-        Panic { description: String },
-        DispatcherError { description: String, code: u8 },
-        RuntimeError { description: String, code: u8 },
-        ServiceError { description: String, code: u8 },
+        Panic {
+            description: String,
+        },
+        DispatcherError {
+            description: String,
+            code: u8,
+        },
+        RuntimeError {
+            description: String,
+            code: u8,
+            runtime_id: u32,
+        },
+        ServiceError {
+            description: String,
+            code: u8,
+            instance_id: InstanceId,
+        },
     }
 
     impl From<&Result<(), ExecutionError>> for ExecutionStatus {
@@ -416,12 +521,16 @@ mod execution_result {
                     ErrorKind::Dispatcher { code } => {
                         ExecutionStatus::DispatcherError { code, description }
                     }
-                    ErrorKind::Runtime { code } => {
-                        ExecutionStatus::RuntimeError { code, description }
-                    }
-                    ErrorKind::Service { code } => {
-                        ExecutionStatus::ServiceError { code, description }
-                    }
+                    ErrorKind::Runtime { code, runtime_id } => ExecutionStatus::RuntimeError {
+                        code,
+                        runtime_id,
+                        description,
+                    },
+                    ErrorKind::Service { code, instance_id } => ExecutionStatus::ServiceError {
+                        code,
+                        description,
+                        instance_id,
+                    },
                 }
             } else {
                 ExecutionStatus::Success
@@ -433,19 +542,31 @@ mod execution_result {
         fn from(inner: ExecutionStatus) -> Self {
             match inner {
                 ExecutionStatus::Success => Ok(()),
+
                 ExecutionStatus::Panic { description } => {
                     Err(ExecutionError::new(ErrorKind::Unchecked, description))
                 }
+
                 ExecutionStatus::DispatcherError { description, code } => Err(ExecutionError::new(
                     ErrorKind::Dispatcher { code },
                     description,
                 )),
-                ExecutionStatus::RuntimeError { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Runtime { code },
+
+                ExecutionStatus::RuntimeError {
+                    description,
+                    code,
+                    runtime_id,
+                } => Err(ExecutionError::new(
+                    ErrorKind::Runtime { code, runtime_id },
                     description,
                 )),
-                ExecutionStatus::ServiceError { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Service { code },
+
+                ExecutionStatus::ServiceError {
+                    description,
+                    code,
+                    instance_id,
+                } => Err(ExecutionError::new(
+                    ErrorKind::Service { code, instance_id },
                     description,
                 )),
             }
@@ -488,8 +609,20 @@ mod tests {
             (ErrorKind::Unchecked, "AAAA"),
             (ErrorKind::Dispatcher { code: 0 }, ""),
             (ErrorKind::Dispatcher { code: 0 }, "b"),
-            (ErrorKind::Runtime { code: 1 }, "c"),
-            (ErrorKind::Service { code: 18 }, "ddc"),
+            (
+                ErrorKind::Runtime {
+                    runtime_id: 0,
+                    code: 1,
+                },
+                "c",
+            ),
+            (
+                ErrorKind::Service {
+                    code: 18,
+                    instance_id: 100,
+                },
+                "ddc",
+            ),
         ];
 
         for (kind, description) in values {
@@ -524,16 +657,29 @@ mod tests {
     #[test]
     fn execution_error_object_hash_description() {
         let first_err = ExecutionError {
-            kind: ErrorKind::Service { code: 5 },
+            kind: ErrorKind::Service {
+                code: 5,
+                instance_id: 100,
+            },
             description: "foo".to_owned(),
         };
-
         let second_err = ExecutionError {
-            kind: ErrorKind::Service { code: 5 },
+            kind: ErrorKind::Service {
+                code: 5,
+                instance_id: 100,
+            },
             description: "foo bar".to_owned(),
         };
-
         assert_eq!(first_err.object_hash(), second_err.object_hash());
+
+        let second_err = ExecutionError {
+            kind: ErrorKind::Service {
+                code: 5,
+                instance_id: 101,
+            },
+            description: "foo".to_owned(),
+        };
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
     }
 
     #[test]
@@ -542,8 +688,20 @@ mod tests {
             Err((ErrorKind::Unchecked, "AAAA")),
             Err((ErrorKind::Dispatcher { code: 0 }, "")),
             Err((ErrorKind::Dispatcher { code: 0 }, "b")),
-            Err((ErrorKind::Runtime { code: 1 }, "c")),
-            Err((ErrorKind::Service { code: 18 }, "ddc")),
+            Err((
+                ErrorKind::Runtime {
+                    runtime_id: 0,
+                    code: 1,
+                },
+                "c",
+            )),
+            Err((
+                ErrorKind::Service {
+                    code: 18,
+                    instance_id: 200,
+                },
+                "ddc",
+            )),
             Ok(()),
         ];
 

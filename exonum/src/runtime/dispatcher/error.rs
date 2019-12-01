@@ -14,13 +14,12 @@
 
 //! The set of errors for the Dispatcher module.
 
-use std::fmt::Display;
+use std::fmt;
 
-use super::ExecutionError;
+use super::{ErrorKind, ExecutionError};
 
 /// List of possible dispatcher errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[execution_error(crate = "crate", kind = "dispatcher")]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Error {
     /// Runtime identifier is incorrect in this context.
     IncorrectRuntime = 0,
@@ -50,24 +49,73 @@ pub enum Error {
     MalformedArguments = 12,
 }
 
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::Error::*;
+
+        formatter.write_str(match self {
+            IncorrectRuntime => "Runtime identifier is incorrect in this context",
+            UnknownArtifactId => "Artifact identifier is unknown",
+            ArtifactAlreadyDeployed => "Artifact with the given identifier is already deployed",
+            ArtifactNotDeployed => "Artifact with the given identifier is not deployed",
+            ServiceNameExists => "Specified service name is already used",
+            ServiceIdExists => "Specified service identifier is already used",
+            ServiceNotStarted => "Specified service is not started",
+            IncorrectInstanceId => {
+                "Suitable runtime for the given service instance ID is not found"
+            }
+            NoSuchInterface => "The interface is absent in the service",
+            NoSuchMethod => "The method is absent in the service interface",
+            StackOverflow => "Maximum depth of the call stack has been reached",
+            UnauthorizedCaller => "This caller is not authorized to call this method",
+            MalformedArguments => "Malformed arguments for calling a service interface method",
+        })
+    }
+}
+
+impl From<Error> for ErrorKind {
+    fn from(error: Error) -> Self {
+        ErrorKind::dispatcher(error as u8)
+    }
+}
+
+impl From<Error> for ExecutionError {
+    fn from(error: Error) -> Self {
+        ExecutionError::new(error.into(), error.to_string())
+    }
+}
+
 impl Error {
     /// Create a `NoSuchInterface` error with the specified error message.
-    pub fn no_such_interface(msg: impl Display) -> ExecutionError {
+    pub fn no_such_interface(msg: impl fmt::Display) -> ExecutionError {
         (Error::NoSuchInterface, msg).into()
     }
 
     /// Create a `NoSuchMethod` error with the specified error message.
-    pub fn no_such_method(msg: impl Display) -> ExecutionError {
+    pub fn no_such_method(msg: impl fmt::Display) -> ExecutionError {
         (Error::NoSuchMethod, msg).into()
     }
 
     /// Create an `UnauthorizedCaller` error with the specified error message.
-    pub fn unauthorized_caller(msg: impl Display) -> ExecutionError {
+    pub fn unauthorized_caller(msg: impl fmt::Display) -> ExecutionError {
         (Error::UnauthorizedCaller, msg).into()
     }
 
     /// Create a `MalformedArguments` error with the specified error message.
-    pub fn malformed_arguments(msg: impl Display) -> ExecutionError {
+    pub fn malformed_arguments(msg: impl fmt::Display) -> ExecutionError {
         (Error::MalformedArguments, msg).into()
+    }
+
+    pub(crate) fn stack_overflow(max_depth: usize) -> ExecutionError {
+        let description = format!(
+            "Maximum depth of call stack ({}) has been reached.",
+            max_depth
+        );
+        ExecutionError::new(
+            ErrorKind::Dispatcher {
+                code: Error::StackOverflow as u8,
+            },
+            description,
+        )
     }
 }

@@ -23,18 +23,15 @@ use futures::{sync::mpsc, Future};
 use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
-    blockchain::{
-        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema,
-    },
+    blockchain::{Blockchain, BlockchainMut, ExecutionStatus, InstanceCollection, Schema},
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
-        error::ErrorKind,
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
-        InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
+        ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -89,16 +86,13 @@ trait TestDispatcherInterface {
 struct TestDispatcherService;
 
 impl Service for TestDispatcherService {
-    fn initialize(&self, _context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             let v = TestExecute::from_bytes(params.into()).unwrap();
             if v.value == 42 {
                 panic!("42!");
             } else {
-                return Err(ExecutionError::new(
-                    ExecutionErrorKind::service(0),
-                    "value is not a great answer",
-                ));
+                return Err(context.err((0, "Not a great answer")));
             }
         }
         Ok(())
@@ -469,9 +463,15 @@ fn service_execute_panic_storage_error() {
 #[test]
 fn error_discards_transaction_changes() {
     let statuses = [
-        Err(ExecutionError::new(ErrorKind::service(0), "")),
+        Err(ExecutionError::new(
+            ErrorKind::Service {
+                code: 0,
+                instance_id: 0,
+            },
+            "",
+        )),
         Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
-        Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
+        Err(ExecutionError::new(ErrorKind::runtime(0, 0), "Strange bar")),
         Err(ExecutionError::new(ErrorKind::Unchecked, "PANIC")),
         Ok(()),
     ];
@@ -567,12 +567,11 @@ fn test_dispatcher_already_deployed() {
 
     // Tests that we get an error if we try to deploy already deployed artifact.
     assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
-    let err = blockchain
+    let result = blockchain
         .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
-        .wait()
-        .unwrap_err();
-    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.into());
+        .wait();
+    assert_eq!(result, Err(DispatcherError::ArtifactAlreadyDeployed.into()));
     // Tests that we cannot register artifact twice.
     let result = execute_transaction(
         &mut blockchain,

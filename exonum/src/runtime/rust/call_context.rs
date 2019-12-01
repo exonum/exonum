@@ -3,8 +3,9 @@ use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
-    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+    error::{ErrorKind, ExecutionError, ServiceFail},
+    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
+    InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
 /// Context for the executed call.
@@ -46,6 +47,15 @@ impl<'a> CallContext<'a> {
     /// Returns a descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
+    }
+
+    /// Creates an `ExecutionError` with the specified contents.
+    pub fn err(&self, inner_error: impl ServiceFail) -> ExecutionError {
+        let error_kind = ErrorKind::Service {
+            code: inner_error.code(),
+            instance_id: self.instance.id,
+        };
+        ExecutionError::new(error_kind, inner_error.description())
     }
 
     #[doc(hidden)]

@@ -21,10 +21,10 @@
 extern crate proc_macro;
 
 mod db_traits;
-mod execution_error;
 mod exonum_interface;
 mod service_dispatcher;
 mod service_factory;
+mod service_fail;
 
 use darling::FromMeta;
 use proc_macro::TokenStream;
@@ -218,16 +218,15 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Optional
 ///
-/// * `#[execution_error(crate = "path")]`
+/// ```text
+/// #[execution_error(crate = "path")]
+/// ```
 ///
-/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
-///
-/// * `#[execution_error(kind = "runtime")]`
-///
-/// Error kind has the following values - `service`, `runtime`. The default value is `service`.
-#[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
-pub fn into_execution_error(input: TokenStream) -> TokenStream {
-    execution_error::impl_execution_error(input)
+/// Prefix of the `exonum` crate has two main values - `crate` or `exonum`. The default value
+/// is `exonum`.
+#[proc_macro_derive(ServiceFail, attributes(service_fail))]
+pub fn service_fail(input: TokenStream) -> TokenStream {
+    service_fail::impl_service_fail(input)
 }
 
 pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMeta> {

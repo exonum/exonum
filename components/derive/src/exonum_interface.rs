@@ -182,7 +182,7 @@ impl ExonumService {
                             );
                             #cr::runtime::DispatcherError::malformed_arguments(msg)
                         })?;
-                    self.#name(ctx,arg).map_err(From::from)
+                    self.#name(ctx, arg)
                 }
             }
         };

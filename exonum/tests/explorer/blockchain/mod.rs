@@ -22,7 +22,7 @@ use exonum::{
     node::ApiSender,
     runtime::{
         rust::{CallContext, Service},
-        AnyTx, BlockchainData, InstanceId,
+        AnyTx, BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
@@ -69,16 +69,21 @@ impl Transfer {
     }
 }
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ServiceFail)]
 pub enum Error {
-    /// Not allowed
+    /// Not allowed!
     NotAllowed = 0,
 }
 
 #[exonum_interface]
 pub trait ExplorerTransactions {
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError>;
+
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -91,15 +96,19 @@ pub trait ExplorerTransactions {
 struct MyService;
 
 impl ExplorerTransactions for MyService {
-    fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(Error::NotAllowed)
+            Err(context.err(Error::NotAllowed))
         }
     }
 
-    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
         panic!("oops");
     }
 }

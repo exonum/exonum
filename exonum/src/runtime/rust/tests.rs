@@ -29,10 +29,9 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        error::{ErrorKind, ExecutionError},
-        BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
-        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
-        StateHashAggregator,
+        error::ExecutionError, BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher,
+        DispatcherError, DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox,
+        Runtime, StateHashAggregator,
     },
 };
 
@@ -611,7 +610,7 @@ impl Service for DependentServiceImpl {
             .get_instance(&*init.msg)
             .is_none()
         {
-            return Err(ExecutionError::new(ErrorKind::service(0), "no dependency"));
+            return Err(context.err((0, "no dependency")));
         }
 
         // Check that it is possible to access data of the dependency right away,

@@ -132,7 +132,7 @@
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
-    error::{ErrorKind, ExecutionError},
+    error::{ErrorKind, ExecutionError, ServiceFail},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
         InstanceSpec, MethodId,
@@ -564,13 +564,9 @@ impl<'a> ExecutionContext<'a> {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        if self.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
-            let kind = DispatcherError::StackOverflow;
-            let msg = format!(
-                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
-                ExecutionContext::MAX_CALL_STACK_DEPTH
-            );
-            return Err((kind, msg).into());
+        if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
+            let err = DispatcherError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            return Err(err);
         }
 
         let runtime = self

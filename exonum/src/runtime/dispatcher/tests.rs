@@ -131,12 +131,6 @@ struct SampleRuntime {
     new_service_sender: Sender<(u32, Vec<InstanceId>)>,
 }
 
-#[derive(Debug, IntoExecutionError)]
-#[execution_error(crate = "crate")]
-enum SampleError {
-    Foo = 15,
-}
-
 impl SampleRuntime {
     fn new(
         runtime_type: u32,
@@ -185,6 +179,15 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
+    fn start_adding_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn commit_service(
         &mut self,
         _snapshot: &dyn Snapshot,
@@ -198,15 +201,6 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn start_adding_service(
-        &self,
-        _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
-        _parameters: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
@@ -216,7 +210,11 @@ impl Runtime for SampleRuntime {
         if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
             Ok(())
         } else {
-            Err(SampleError::Foo.into())
+            let kind = ErrorKind::Service {
+                code: 15,
+                instance_id: call_info.instance_id,
+            };
+            Err(ExecutionError::new(kind, "oops"))
         }
     }
 
@@ -351,20 +349,16 @@ fn test_dispatcher_simple() {
     };
 
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-    let err = context
-        .start_adding_service(conflicting_rust_service, vec![])
-        .unwrap_err();
-    assert_eq!(err, DispatcherError::ServiceIdExists.into());
+    let res = context.start_adding_service(conflicting_rust_service, vec![]);
+    assert_eq!(res, Err(DispatcherError::ServiceIdExists.into()));
 
     let conflicting_rust_service = InstanceSpec {
         artifact: rust_artifact.clone(),
         id: RUST_SERVICE_ID + 1,
         name: RUST_SERVICE_NAME.to_owned(),
     };
-    let err = context
-        .start_adding_service(conflicting_rust_service, vec![])
-        .unwrap_err();
-    assert_eq!(err, DispatcherError::ServiceNameExists.into());
+    let res = context.start_adding_service(conflicting_rust_service, vec![]);
+    assert_eq!(res, Err(DispatcherError::ServiceNameExists.into()));
 
     // Activate services / artifacts.
     create_genesis_block(&mut dispatcher, &mut fork);
@@ -455,9 +449,8 @@ fn test_dispatcher_rust_runtime_no_service() {
     assert_eq!(
         dispatcher
             .deploy_artifact(rust_artifact.clone(), vec![])
-            .wait()
-            .expect_err("deploy artifact succeed"),
-        RustRuntimeError::UnableToDeploy.into()
+            .wait(),
+        Err(RustRuntimeError::UnableToDeploy.into())
     );
 
     let mut fork = db.fork();
@@ -468,11 +461,9 @@ fn test_dispatcher_rust_runtime_no_service() {
     };
     assert_eq!(
         ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
-            .start_adding_service(rust_service, vec![])
-            .expect_err("start service succeed"),
-        DispatcherError::ArtifactNotDeployed.into()
+            .start_adding_service(rust_service, vec![]),
+        Err(DispatcherError::ArtifactNotDeployed.into())
     );
-
     create_genesis_block(&mut dispatcher, &mut fork);
     db.merge(fork.into_patch()).unwrap();
 
@@ -636,7 +627,7 @@ impl Runtime for DeploymentRuntime {
         let delay = LittleEndian::read_u64(&spec);
         let delay = Duration::from_millis(delay);
 
-        let error_kind = ErrorKind::runtime(0);
+        let error_kind = ErrorKind::runtime(2, 0);
         let result = match artifact.name.as_str() {
             "good" => Ok(()),
             "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),

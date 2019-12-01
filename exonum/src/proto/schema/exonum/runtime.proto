@@ -67,6 +67,15 @@ message ExecutionError {
   uint32 code = 2;
   // Optional description which doesn't affect `object_hash`.
   string description = 3;
+
+  oneof location {
+    // Instance identifier associated with the error. This field is only set for
+    // `kind == SERVICE`.
+    uint32 instance_id = 4;
+    // Runtime identifier associated with the error. This field is only set for
+    // `kind == RUNTIME`.
+    uint32 runtime_id = 5;
+  }
 }
 
 // Result of runtime execution.
