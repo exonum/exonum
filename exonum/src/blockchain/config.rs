@@ -393,8 +393,8 @@ impl GenesisConfigBuilder {
     }
 
     /// Adds service instance initialization parameters.
-    pub fn with_instance(mut self, instance_params: InstanceInitParams) -> Self {
-        self.builtin_instances.push(instance_params);
+    pub fn with_instance(mut self, instance_params: impl Into<InstanceInitParams>) -> Self {
+        self.builtin_instances.push(instance_params.into());
         self
     }
 

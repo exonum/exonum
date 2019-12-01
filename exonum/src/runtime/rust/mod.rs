@@ -416,6 +416,11 @@ impl RustArtifactId {
         }
     }
 
+    /// Converts into `InstanceSpec` with specified id and name.
+    pub fn into_instance(self, id: InstanceId, name: impl Into<String>) -> InstanceSpec {
+        ArtifactId::from(self).into_instance(id, name)
+    }
+
     /// Checks that the Rust artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();

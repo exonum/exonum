@@ -23,7 +23,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use super::InstanceDescriptor;
-use crate::{helpers::ValidateInput, proto::schema};
+use crate::{blockchain::config::InstanceInitParams, helpers::ValidateInput, proto::schema};
 
 /// Unique service instance identifier.
 ///
@@ -165,6 +165,15 @@ impl ArtifactId {
         Ok(artifact)
     }
 
+    /// Converts into `InstanceSpec` with specified id and name.
+    pub fn into_instance(self, id: InstanceId, name: impl Into<String>) -> InstanceSpec {
+        InstanceSpec {
+            id,
+            name: name.into(),
+            artifact: self,
+        }
+    }
+
     /// Check that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
         // Extended version of `exonum_merkledb::is_valid_name` that also allows ':`.
@@ -247,6 +256,19 @@ pub struct ArtifactSpec {
     pub payload: Vec<u8>,
 }
 
+impl ArtifactSpec {
+    /// Generic constructor.
+    pub fn new(artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
+        Self { artifact, payload: deploy_spec.into_bytes() }
+    }
+}
+
+impl From<ArtifactId> for ArtifactSpec {
+    fn from(artifact: ArtifactId) -> Self {
+        Self { artifact, payload: vec![] }
+    }
+}
+
 /// Exhaustive service instance specification.
 #[derive(
     Debug,
@@ -295,6 +317,14 @@ impl InstanceSpec {
         Ok(spec)
     }
 
+    /// Converts into `InstanceInitParams` with specific constructor.
+    pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
+        InstanceInitParams {
+            instance_spec: self,
+            constructor: constructor.to_bytes(),
+        }
+    }
+
     /// Checks that the instance name contains only allowed characters and is not empty.
     pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();
@@ -330,6 +360,15 @@ impl ValidateInput for InstanceSpec {
 impl Display for InstanceSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}@{}:{}", self.artifact, self.id, self.name)
+    }
+}
+
+impl From<InstanceSpec> for InstanceInitParams {
+    fn from(spec: InstanceSpec) -> Self {
+        Self {
+            instance_spec: spec,
+            constructor: vec![],
+        }
     }
 }
 
