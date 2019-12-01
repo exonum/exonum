@@ -18,7 +18,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{InstanceInfoProvider, Transaction},
+        rust::{ServiceFactory, Transaction},
         InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -165,12 +165,17 @@ pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
 
 pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
+    let artifact = service.artifact_id();
     TestKitBuilder::validator()
         .with_validators(validator_count)
         .with_rust_service_default(DecentralizedSupervisor::new())
-        .with_artifact(service.get_artifact(), ())
-        .with_instance(service.get_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ()))
-        .with_instance(service.get_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ()))
+        .with_artifact(artifact.clone())
+        .with_instance(
+            artifact
+                .clone()
+                .into_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME),
+        )
+        .with_instance(artifact.into_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME))
         .with_rust_service(service)
         .create()
 }

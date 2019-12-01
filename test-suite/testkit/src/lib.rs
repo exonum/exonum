@@ -18,7 +18,7 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{InstanceInfoProvider, Transaction, CallContext, Service}},
+//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, Transaction, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
@@ -69,10 +69,11 @@
 //!     // Create testkit for network with four validators
 //!     // and add a builtin timestamping service with ID=1.
 //!     let service = TimestampingService;
+//!     let artifact = service.artifact_id();
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_artifact(service.get_artifact(), ())
-//!         .with_instance(service.get_instance(SERVICE_ID, "timestamping", ()))
+//!         .with_artifact(artifact.clone())
+//!         .with_instance(artifact.into_instance(SERVICE_ID, "timestamping"))
 //!         .with_rust_service(service)
 //!         .create();
 //!
@@ -155,7 +156,7 @@ use exonum::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
+        config::{GenesisConfig, GenesisConfigBuilder},
         Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
@@ -166,7 +167,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage},
     runtime::{
         rust::{RustRuntime, ServiceFactory},
-        ArtifactId, InstanceId, RuntimeInstance, SnapshotExt,
+        InstanceId, RuntimeInstance, SnapshotExt,
     },
 };
 use futures::{sync::mpsc, Future, Stream};
@@ -230,12 +231,14 @@ impl TestKit {
         constructor: impl BinaryValue,
     ) -> Self {
         let service_factory = service_factory.into();
-        let artifact: ArtifactId = service_factory.artifact_id().clone().into();
-        let instance =
-            InstanceInitParams::new(id, name.into(), artifact.clone(), constructor.into_bytes());
+        let artifact = service_factory.artifact_id();
         TestKitBuilder::validator()
-            .with_artifact(artifact, ())
-            .with_instance(instance)
+            .with_artifact(artifact.clone())
+            .with_instance(
+                artifact
+                    .into_instance(id, name)
+                    .with_constructor(constructor),
+            )
             .with_rust_service(service_factory)
             .create()
     }
@@ -355,7 +358,7 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{BlockchainData, rust::{InstanceInfoProvider, Transaction, CallContext, Service}},
+    /// #     runtime::{BlockchainData, rust::{CallContext, Service, ServiceFactory, Transaction}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;
@@ -395,9 +398,10 @@ impl TestKit {
     /// #
     /// # fn main() {
     /// let service = ExampleService;
+    /// let artifact = service.artifact_id();
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_artifact(service.get_artifact(), ())
-    ///     .with_instance(service.get_instance(SERVICE_ID, "example", ()))
+    ///     .with_artifact(artifact.clone())
+    ///     .with_instance(artifact.into_instance(SERVICE_ID, "example"))
     ///     .with_rust_service(ExampleService)
     ///     .create();
     /// expensive_setup(&mut testkit);

@@ -138,28 +138,8 @@ where
     }
 }
 
-/// Simplifies creation of supplementary entities for `ServiceFactory`.
-pub trait InstanceInfoProvider: ServiceFactory {
-    /// Produces service instance configuration parameters based on service's artifact.
-    fn get_instance(
-        &self,
-        id: InstanceId,
-        name: impl Into<String>,
-        constructor: impl BinaryValue,
-    ) -> InstanceInitParams {
-        InstanceInitParams::new(id, name.into(), self.get_artifact(), constructor)
-    }
-
-    /// Returns service's ArtifactId.
-    fn get_artifact(&self) -> ArtifactId {
-        self.artifact_id().clone().into()
-    }
-}
-
-impl<T> InstanceInfoProvider for T where T: ServiceFactory {}
-
 /// Provides default instance configuration parameters for `ServiceFactory`.
-pub trait DefaultInstance: InstanceInfoProvider {
+pub trait DefaultInstance: ServiceFactory {
     /// Default id for a service.
     const DEFAULT_INSTANCE_ID: InstanceId;
     /// Default name for a service.
@@ -167,11 +147,9 @@ pub trait DefaultInstance: InstanceInfoProvider {
 
     /// Creates default instance configuration parameters for the service.
     fn default_instance(&self) -> InstanceInitParams {
-        self.get_instance(
-            Self::DEFAULT_INSTANCE_ID,
-            Self::DEFAULT_INSTANCE_NAME,
-            vec![],
-        )
+        self.artifact_id()
+            .into_instance(Self::DEFAULT_INSTANCE_ID, Self::DEFAULT_INSTANCE_NAME)
+            .into()
     }
 }
 

@@ -20,7 +20,7 @@ use exonum::{
     helpers,
     node::{ApiSender, Node},
     runtime::{
-        rust::{CallContext, InstanceInfoProvider, Service},
+        rust::{CallContext, Service, ServiceFactory},
         BlockchainData, InstanceId, RuntimeInstance,
     },
 };
@@ -118,9 +118,10 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
 
     let external_runtimes: Vec<RuntimeInstance> = vec![];
     let service = MyService;
+    let artifact = service.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-        .with_artifact(service.get_artifact(), ())
-        .with_instance(service.get_instance(SERVICE_ID, "my-service", ()))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(SERVICE_ID, "my-service"))
         .build();
     let services = vec![service.into()];
 

@@ -94,7 +94,7 @@ use exonum::{
     exonum_merkledb::{Database, RocksDB},
     node::Node,
     runtime::{
-        rust::{DefaultInstance, InstanceInfoProvider, ServiceFactory},
+        rust::{DefaultInstance, ServiceFactory},
         RuntimeInstance,
     },
 };
@@ -144,13 +144,12 @@ impl NodeBuilder {
         let command = Command::from_args();
 
         if let StandardResult::Run(run_config) = command.execute()? {
-            let supervisor = SimpleSupervisor::new();
-
             // Add builtin services to genesis config.
+            let supervisor = SimpleSupervisor::new();
             let genesis_config = GenesisConfigBuilder::with_consensus_config(
                 run_config.node_config.consensus.clone(),
             )
-            .with_artifact(supervisor.get_artifact(), ())
+            .with_artifact(supervisor.artifact_id())
             .with_instance(supervisor.default_instance())
             .build();
 

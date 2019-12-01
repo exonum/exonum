@@ -22,15 +22,14 @@ use exonum::{
     helpers::ValidatorId,
     keys::Keys,
     merkledb::TemporaryDB,
-    messages::BinaryValue,
     runtime::{
         rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        ArtifactId, RuntimeInstance, WellKnownRuntime,
+        ArtifactSpec, RuntimeInstance, WellKnownRuntime,
     },
 };
 use futures::sync::mpsc;
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashSet, net::SocketAddr};
 
 use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 
@@ -91,7 +90,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # use exonum::{
 /// #     blockchain::InstanceCollection,
 /// #     crypto::Hash,
-/// #     runtime::{BlockchainData, rust::{InstanceInfoProvider, Service}},
+/// #     runtime::{BlockchainData, rust::{Service, ServiceFactory}},
 /// # };
 /// #
 /// # const SERVICE_ID: u32 = 1;
@@ -116,9 +115,10 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// #
 /// # fn main() {
 /// let service = ExampleService;
+/// let artifact = service.artifact_id();
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_artifact(service.get_artifact(), ())
-///     .with_instance(service.get_instance(SERVICE_ID, "example", ()))
+///     .with_artifact(artifact.clone())
+///     .with_instance(artifact.into_instance(SERVICE_ID, "example"))
 ///     .with_rust_service(service)
 ///     .with_validators(4)
 ///     .create();
@@ -135,7 +135,7 @@ pub struct TestKitBuilder {
     api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: Vec<RuntimeInstance>,
     instances: Vec<InstanceInitParams>,
-    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    artifacts: HashSet<ArtifactSpec>,
 }
 
 impl TestKitBuilder {
@@ -187,7 +187,7 @@ impl TestKitBuilder {
     /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
     /// artifact and default instance are added implicitly.
     pub fn with_rust_service_default(self, service: impl DefaultInstance) -> Self {
-        self.with_artifact(service.get_artifact(), ())
+        self.with_artifact(service.artifact_id())
             .with_instance(service.default_instance())
             .with_rust_service(service)
     }
@@ -220,17 +220,18 @@ impl TestKitBuilder {
 
     /// Adds instances descriptions to the testkit that will be used for specification of builtin
     /// services of testing blockchain.
-    pub fn with_instance(mut self, instance: InstanceInitParams) -> Self {
-        self.instances.push(instance);
+    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
+        self.instances.push(instance.into());
         self
     }
 
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
-    pub fn with_artifact(mut self, artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
-        self.artifacts
-            .entry(artifact)
-            .or_insert_with(|| deploy_spec.into_bytes());
+    pub fn with_artifact(mut self, artifact: impl Into<ArtifactSpec>) -> Self {
+        let artifact = artifact.into();
+        if !self.artifacts.contains(&artifact) {
+            self.artifacts.insert(artifact);
+        }
         self
     }
 
@@ -258,10 +259,9 @@ impl TestKitBuilder {
         let genesis_config = self
             .artifacts
             .into_iter()
-            .fold(
-                genesis_config_builder,
-                |builder, (artifact, deploy_args)| builder.with_artifact(artifact, deploy_args),
-            )
+            .fold(genesis_config_builder, |builder, artifact| {
+                builder.with_artifact(artifact)
+            })
             .build();
 
         TestKit::assemble(
@@ -296,7 +296,7 @@ impl TestKitBuilder {
             api_notifier_channel,
             additional_runtimes: vec![],
             instances: vec![],
-            artifacts: HashMap::new(),
+            artifacts: HashSet::new(),
         }
     }
 }

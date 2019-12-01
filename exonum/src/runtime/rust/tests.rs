@@ -33,7 +33,6 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::{ErrorKind, ExecutionError},
-        rust::{DefaultInstance, InstanceInfoProvider},
         BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher, DispatcherError,
         DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
         StateHashAggregator, WellKnownRuntime,
@@ -41,7 +40,7 @@ use crate::{
 };
 
 use super::{
-    service::{Service, ServiceFactory},
+    service::{DefaultInstance, Service, ServiceFactory},
     ArtifactId, CallContext, RustRuntime,
 };
 
@@ -441,21 +440,16 @@ fn rust_runtime_with_builtin_services() {
     let (runtime, event_handle) = create_runtime();
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
     let config = generate_testnet_config(1, 0)[0].clone();
-    let spec = InstanceSpec {
-        artifact: artifact.clone(),
-        id: SERVICE_INSTANCE_ID,
-        name: SERVICE_INSTANCE_NAME.to_owned(),
-    };
+    let spec = artifact
+        .clone()
+        .into_instance(SERVICE_INSTANCE_ID, SERVICE_INSTANCE_NAME);
     let constructor = Init {
         msg: "constructor_message".to_owned(),
     };
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
-        .with_artifact(artifact.clone(), ())
-        .with_instance(InstanceInitParams {
-            instance_spec: spec.clone(),
-            constructor: constructor.clone().into_bytes(),
-        })
+        .with_artifact(artifact.clone())
+        .with_instance(spec.clone().with_constructor(constructor.clone()))
         .build();
 
     let mut blockchain = Blockchain::build_for_tests()
@@ -647,13 +641,11 @@ impl DefaultInstance for DependentServiceImpl {
     const DEFAULT_INSTANCE_NAME: &'static str = "dependent-service";
 
     fn default_instance(&self) -> InstanceInitParams {
-        self.get_instance(
-            Self::DEFAULT_INSTANCE_ID,
-            Self::DEFAULT_INSTANCE_NAME,
-            Init {
+        self.artifact_id()
+            .into_instance(Self::DEFAULT_INSTANCE_ID, Self::DEFAULT_INSTANCE_NAME)
+            .with_constructor(Init {
                 msg: SERVICE_INSTANCE_NAME.to_owned(),
-            },
-        )
+            })
     }
 }
 
@@ -666,9 +658,9 @@ fn dependent_builtin_service() {
     let config = generate_testnet_config(1, 0)[0].clone();
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_artifact(main_service.get_artifact(), ())
+        .with_artifact(main_service.artifact_id())
         .with_instance(main_service.default_instance())
-        .with_artifact(dep_service.get_artifact(), ())
+        .with_artifact(dep_service.artifact_id())
         .with_instance(dep_service.default_instance())
         .build();
 
@@ -703,8 +695,8 @@ fn dependent_builtin_service_with_incorrect_order() {
 
     // Error in the service instantiation in the genesis block bubbles up.
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_artifact(main_service.get_artifact(), ())
-        .with_artifact(dep_service.get_artifact(), ())
+        .with_artifact(main_service.artifact_id())
+        .with_artifact(dep_service.artifact_id())
         .with_instance(dep_service.default_instance()) // <-- Incorrect service ordering
         .with_instance(main_service.default_instance())
         .build();
@@ -803,7 +795,7 @@ fn dependent_service_in_successive_block() {
 
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_artifact(main_service.get_artifact(), ())
+        .with_artifact(main_service.artifact_id())
         .with_instance(main_service.default_instance())
         .build();
 

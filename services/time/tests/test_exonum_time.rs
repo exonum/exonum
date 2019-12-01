@@ -23,7 +23,7 @@ use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
     runtime::{
-        rust::{InstanceInfoProvider, Transaction},
+        rust::{ServiceFactory, Transaction},
         InstanceId, SnapshotExt,
     },
 };
@@ -274,9 +274,10 @@ fn test_exonum_time_service_with_7_validators() {
 fn test_mock_provider() {
     let mock_provider = MockTimeProvider::default();
     let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
+    let artifact = time_service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
-        .with_artifact(time_service.get_artifact(), ())
-        .with_instance(time_service.get_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .create();
 
@@ -319,10 +320,11 @@ fn test_mock_provider() {
 #[test]
 fn test_selected_time_less_than_time_in_storage() {
     let time_service = TimeServiceFactory::default();
+    let artifact = time_service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_artifact(time_service.get_artifact(), ())
-        .with_instance(time_service.get_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .with_rust_service_default(SimpleSupervisor::new())
         .create();
@@ -422,10 +424,11 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 
 fn create_testkit_with_validators(validators_count: u16) -> TestKit {
     let time_service = TimeServiceFactory::default();
+    let artifact = time_service.artifact_id();
     TestKitBuilder::validator()
         .with_validators(validators_count)
-        .with_artifact(time_service.get_artifact(), ())
-        .with_instance(time_service.get_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .create()
 }
@@ -482,10 +485,11 @@ fn assert_all_validators_times_eq(
 #[test]
 fn test_endpoint_api() {
     let time_service = TimeServiceFactory::default();
+    let artifact = time_service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_artifact(time_service.get_artifact(), ())
-        .with_instance(time_service.get_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .with_rust_service_default(SimpleSupervisor::new())
         .create();

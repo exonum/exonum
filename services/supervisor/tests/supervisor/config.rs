@@ -19,7 +19,7 @@ use exonum::{
     crypto,
     helpers::{Height, ValidatorId},
     runtime::{
-        rust::{InstanceInfoProvider, Transaction},
+        rust::{ServiceFactory, Transaction},
         InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -466,15 +466,14 @@ fn test_service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
     let keypair = crypto::gen_keypair();
     let fake_supervisor = DecentralizedSupervisor::new();
+    let fake_supervisor_artifact = fake_supervisor.artifact_id();
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_artifact(fake_supervisor.get_artifact(), ())
-        .with_instance(fake_supervisor.get_instance(
-            FAKE_SUPERVISOR_ID,
-            "fake-supervisor",
-            Vec::default(),
-        ))
+        .with_artifact(fake_supervisor_artifact.clone())
+        .with_instance(
+            fake_supervisor_artifact.into_instance(FAKE_SUPERVISOR_ID, "fake-supervisor"),
+        )
         .with_rust_service(fake_supervisor)
         .with_rust_service_default(ConfigChangeService)
         .create();

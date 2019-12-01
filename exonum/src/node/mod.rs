@@ -1192,7 +1192,7 @@ mod tests {
         messages::AnyTx,
         proto::schema::tests::TxSimple,
         runtime::{
-            rust::{CallContext, InstanceInfoProvider, Service, Transaction},
+            rust::{CallContext, Service, Transaction},
             BlockchainData, ExecutionError, InstanceId, RuntimeInstance,
         },
     };
@@ -1246,10 +1246,11 @@ mod tests {
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
         let service = TestService;
+        let artifact = service.artifact_id();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-                .with_artifact(service.get_artifact(), ())
-                .with_instance(service.get_instance(SERVICE_ID, "test-service", ()))
+                .with_artifact(artifact.clone())
+                .with_instance(artifact.into_instance(SERVICE_ID, "test-service"))
                 .build();
         let services = vec![service.into()];
         let external_runtimes: Vec<RuntimeInstance> = vec![];

@@ -22,7 +22,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{InstanceInfoProvider, RustRuntime, ServiceFactory, Transaction},
+        rust::{RustRuntime, ServiceFactory, Transaction},
         ArtifactId, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -1018,13 +1018,14 @@ fn test_id_assignment() {
 fn test_id_assignment_sparse() {
     let max_builtin_id = 100;
     let inc_service = IncService;
+    let inc_service_artifact = inc_service.artifact_id();
 
     // Create testkit with builtin instance with ID 100.
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_rust_service_default(DecentralizedSupervisor::new())
-        .with_artifact(inc_service.get_artifact(), ())
-        .with_instance(inc_service.get_instance(max_builtin_id, "inc", ()))
+        .with_artifact(inc_service_artifact.clone())
+        .with_instance(inc_service_artifact.into_instance(max_builtin_id, "inc"))
         .with_rust_service(inc_service)
         .create();
 

@@ -20,7 +20,7 @@ use exonum::{
     helpers,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
-        rust::{AfterCommitContext, InstanceInfoProvider, Service},
+        rust::{AfterCommitContext, Service, ServiceFactory},
         BlockchainData, RuntimeInstance,
     },
 };
@@ -111,10 +111,11 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
 
         let external_runtimes: Vec<RuntimeInstance> = vec![];
         let service = CommitWatcherService(commit_tx);
+        let artifact = service.artifact_id();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-                .with_artifact(service.get_artifact(), ())
-                .with_instance(service.get_instance(2, "commit-watcher", ()))
+                .with_artifact(artifact.clone())
+                .with_instance(artifact.into_instance(2, "commit-watcher"))
                 .build();
         let services = vec![service.into()];
 
@@ -164,10 +165,11 @@ fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, db, start_times| {
         let external_runtimes: Vec<RuntimeInstance> = vec![];
         let service = StartCheckerServiceFactory(start_times);
+        let artifact = service.artifact_id();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-                .with_artifact(service.get_artifact(), ())
-                .with_instance(service.get_instance(4, "startup-checker", ()))
+                .with_artifact(artifact.clone())
+                .with_instance(artifact.into_instance(4, "startup-checker"))
                 .build();
         let services = vec![service.into()];
 

@@ -174,7 +174,7 @@ pub fn create_rust_runtime_and_genesis_config(
             .into_iter()
             .fold(config_builder, |builder, instance| {
                 builder
-                    .with_artifact(instance.instance_spec.artifact.clone(), ())
+                    .with_artifact(instance.instance_spec.artifact.clone())
                     .with_instance(instance)
             });
     }

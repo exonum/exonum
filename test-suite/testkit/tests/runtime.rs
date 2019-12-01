@@ -15,8 +15,8 @@
 use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator, WellKnownRuntime,
+        ArtifactId, ArtifactSpec, CallInfo, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, Mailbox, Runtime, StateHashAggregator, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -180,7 +180,7 @@ fn test_runtime_factory() {
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()
         .with_additional_runtime(TestRuntime::with_runtime_tester(tester.clone()))
-        .with_artifact(artifact.clone(), deploy_args.clone())
+        .with_artifact(ArtifactSpec::new(artifact.clone(), deploy_args.clone()))
         .with_instance(inst_cfg)
         .create();
 

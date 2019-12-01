@@ -259,13 +259,19 @@ pub struct ArtifactSpec {
 impl ArtifactSpec {
     /// Generic constructor.
     pub fn new(artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
-        Self { artifact, payload: deploy_spec.into_bytes() }
+        Self {
+            artifact,
+            payload: deploy_spec.into_bytes(),
+        }
     }
 }
 
-impl From<ArtifactId> for ArtifactSpec {
-    fn from(artifact: ArtifactId) -> Self {
-        Self { artifact, payload: vec![] }
+impl<T: Into<ArtifactId>> From<T> for ArtifactSpec {
+    fn from(artifact: T) -> Self {
+        Self {
+            artifact: artifact.into(),
+            payload: vec![],
+        }
     }
 }
 

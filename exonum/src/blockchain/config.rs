@@ -21,7 +21,7 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::{
     crypto::PublicKey,
@@ -368,7 +368,7 @@ pub struct GenesisConfigBuilder {
     /// Consensus config.
     consensus_config: ConsensusConfig,
     /// Artifacts specifications for builtin services.
-    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    artifacts: HashSet<ArtifactSpec>,
     /// Instances of builtin services.
     builtin_instances: Vec<InstanceInitParams>,
 }
@@ -378,17 +378,18 @@ impl GenesisConfigBuilder {
     pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
         Self {
             consensus_config,
-            artifacts: HashMap::new(),
+            artifacts: HashSet::new(),
             builtin_instances: vec![],
         }
     }
 
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
-    pub fn with_artifact(mut self, artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
-        self.artifacts
-            .entry(artifact)
-            .or_insert_with(|| deploy_spec.into_bytes());
+    pub fn with_artifact(mut self, artifact: impl Into<ArtifactSpec>) -> Self {
+        let artifact = artifact.into();
+        if !self.artifacts.contains(&artifact) {
+            self.artifacts.insert(artifact);
+        }
         self
     }
 
@@ -400,11 +401,7 @@ impl GenesisConfigBuilder {
 
     /// Produces `GenesisConfig` from collected components.
     pub fn build(self) -> GenesisConfig {
-        let artifacts = self
-            .artifacts
-            .into_iter()
-            .map(|(artifact, payload)| ArtifactSpec { artifact, payload })
-            .collect::<Vec<_>>();
+        let artifacts = self.artifacts.into_iter().collect::<Vec<_>>();
         GenesisConfig {
             consensus_config: self.consensus_config,
             artifacts,

@@ -132,7 +132,7 @@ mod tests {
             config::GenesisConfigBuilder, tests::ServiceGoodImpl as SampleService, ConsensusConfig,
         },
         helpers::{generate_testnet_config, Height},
-        runtime::rust::{InstanceInfoProvider, RustRuntime},
+        runtime::rust::RustRuntime,
     };
 
     #[test]
@@ -155,7 +155,7 @@ mod tests {
     // these are builtin services.
     fn test_finalizing_services(
         services: Vec<Box<dyn ServiceFactory>>,
-        instances: Vec<InstanceInitParams>,
+        instances: Vec<impl Into<InstanceInitParams>>,
     ) {
         let config = generate_testnet_config(1, 0)[0].clone();
         let rust_runtime = services
@@ -169,8 +169,9 @@ mod tests {
             .fold(
                 GenesisConfigBuilder::with_consensus_config(config.consensus),
                 |builder, instance| {
+                    let instance = instance.into();
                     builder
-                        .with_artifact(instance.instance_spec.artifact.clone(), ())
+                        .with_artifact(instance.instance_spec.artifact.clone())
                         .with_instance(instance)
                 },
             )
@@ -187,7 +188,7 @@ mod tests {
     #[should_panic(expected = "already used")]
     fn finalize_duplicate_services() {
         let sample_service = SampleService;
-        let instance = sample_service.get_instance(0, "sample", ());
+        let instance = sample_service.artifact_id().into_instance(0, "sample");
         test_finalizing_services(
             vec![sample_service.into()],
             vec![instance.clone(), instance],
@@ -198,9 +199,10 @@ mod tests {
     #[should_panic(expected = "already used")]
     fn finalize_services_with_duplicate_names() {
         let sample_service = SampleService;
+        let artifact = sample_service.artifact_id();
         let instances = vec![
-            sample_service.get_instance(0, "sample", ()),
-            sample_service.get_instance(1, "sample", ()),
+            artifact.clone().into_instance(0, "sample"),
+            artifact.into_instance(1, "sample"),
         ];
         test_finalizing_services(vec![sample_service.into()], instances);
     }
@@ -209,9 +211,10 @@ mod tests {
     #[should_panic(expected = "already used")]
     fn finalize_services_with_duplicate_ids() {
         let sample_service = SampleService;
+        let artifact = sample_service.artifact_id();
         let instances = vec![
-            sample_service.get_instance(0, "sample", ()),
-            sample_service.get_instance(0, "other-sample", ()),
+            artifact.clone().into_instance(0, "sample"),
+            artifact.into_instance(0, "other-sample"),
         ];
         test_finalizing_services(vec![sample_service.into()], instances);
     }

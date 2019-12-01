@@ -24,7 +24,7 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash},
     runtime::{
-        rust::{CallContext, InstanceInfoProvider, Service, Transaction},
+        rust::{CallContext, Service, ServiceFactory, Transaction},
         BlockchainData, SnapshotExt,
     },
 };
@@ -84,10 +84,11 @@ fn main() {
     let instance_id = 512;
     // Create a testkit for a network with four validators.
     let service = TimestampingService;
+    let artifact = service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_artifact(service.get_artifact(), ())
-        .with_instance(service.get_instance(instance_id, "timestamping", ()))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(instance_id, "timestamping"))
         .with_rust_service(service)
         .create();
     // Create few transactions.

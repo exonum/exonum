@@ -23,7 +23,7 @@ use exonum::{
     helpers::Height,
     messages::Verified,
     runtime::{
-        rust::{InstanceInfoProvider, Transaction},
+        rust::{ServiceFactory, Transaction},
         AnyTx, InstanceId,
     },
 };
@@ -47,19 +47,21 @@ const SERVICE_NAME: &str = "my-timestamping";
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
+    let time_service_artifact = time_service.artifact_id();
     let timestamping = TimestampingService;
+    let timestamping_artifact = timestamping.artifact_id();
     let mut testkit = TestKitBuilder::validator()
-        .with_artifact(time_service.get_artifact(), ())
-        .with_instance(time_service.get_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()))
+        .with_artifact(time_service_artifact.clone())
+        .with_instance(time_service_artifact.into_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME))
         .with_rust_service(time_service)
-        .with_artifact(timestamping.get_artifact(), ())
-        .with_instance(timestamping.get_instance(
-            SERVICE_ID,
-            SERVICE_NAME,
-            Config {
-                time_service_name: TIME_SERVICE_NAME.to_owned(),
-            },
-        ))
+        .with_artifact(timestamping_artifact.clone())
+        .with_instance(
+            timestamping_artifact
+                .into_instance(SERVICE_ID, SERVICE_NAME)
+                .with_constructor(Config {
+                    time_service_name: TIME_SERVICE_NAME.to_owned(),
+                }),
+        )
         .with_rust_service(timestamping)
         .create();
     testkit.create_blocks_until(Height(2)); // TimeService is None if no blocks were forged

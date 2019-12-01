@@ -180,7 +180,7 @@ mod tests {
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::{
-            rust::{CallContext, InstanceInfoProvider, Service, Transaction},
+            rust::{CallContext, Service, ServiceFactory, Transaction},
             BlockchainData,
         },
     };
@@ -245,9 +245,10 @@ mod tests {
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> TestKitApi {
         let service = SampleService;
+        let artifact = service.artifact_id();
         let mut testkit = TestKitBuilder::validator()
-            .with_artifact(service.get_artifact(), ())
-            .with_instance(service.get_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME, ()))
+            .with_artifact(artifact.clone())
+            .with_instance(artifact.into_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME))
             .with_rust_service(service)
             .create();
         testkit.create_blocks_until(height);
