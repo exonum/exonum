@@ -52,9 +52,6 @@ use crate::{
     runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
 };
 
-#[cfg(test)]
-use crate::blockchain::config::GenesisConfigBuilder;
-
 mod block;
 mod builder;
 mod schema;
@@ -152,7 +149,7 @@ impl Blockchain {
     /// this node is the only validator.
     #[cfg(test)]
     pub fn into_mut_with_dummy_config(self) -> BlockchainBuilder {
-        use crate::helpers::generate_testnet_config;
+        use crate::{blockchain::config::GenesisConfigBuilder, helpers::generate_testnet_config};
         use exonum_crypto::KeyPair;
 
         let mut config = generate_testnet_config(1, 0).pop().unwrap();

@@ -963,7 +963,7 @@ impl Node {
         let mut blockchain_builder =
             BlockchainBuilder::new(blockchain, genesis_config).with_runtime(rust_runtime);
         for runtime in external_runtimes {
-            blockchain_builder = blockchain_builder.with_runtime(runtime)
+            blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
         let blockchain = blockchain_builder
             .build()
