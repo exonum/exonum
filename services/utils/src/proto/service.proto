@@ -23,3 +23,7 @@ message CheckedCall {
   string artifact_version = 2;
   exonum.runtime.AnyTx inner = 3;
 }
+
+message Batch {
+  repeated exonum.runtime.AnyTx inner = 1;
+}

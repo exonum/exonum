@@ -7,7 +7,7 @@
     missing_debug_implementations
 )]
 
-pub use self::transactions::{CheckedCall, Error, UtilsInterface};
+pub use self::transactions::{Batch, CheckedCall, Error, UtilsInterface};
 
 pub mod proto;
 mod transactions;

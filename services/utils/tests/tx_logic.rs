@@ -3,13 +3,12 @@
 use exonum::{
     blockchain::InstanceCollection,
     crypto::gen_keypair,
-    merkledb::BinaryValue,
-    runtime::{rust::Transaction, AnyTx, CallInfo, InstanceId, SnapshotExt},
+    runtime::{rust::Transaction, DispatcherError, InstanceId, SnapshotExt},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 use semver::Version;
 
-use exonum_utils_service::{CheckedCall, Error as TxError, UtilsService};
+use exonum_utils_service::{Batch, CheckedCall, Error as TxError, UtilsService};
 
 mod inc;
 use crate::inc::{Inc, IncFactory, IncSchema};
@@ -28,15 +27,12 @@ fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
 }
 
 #[test]
-fn normal_workflow() {
+fn checked_call_normal_workflow() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
     let mut checked_call = CheckedCall {
         artifact_name: IncFactory::ARTIFACT_NAME.to_owned(),
         artifact_version: "1".parse().unwrap(),
-        inner: AnyTx {
-            call_info: CallInfo::new(100, 0),
-            arguments: Inc::new(0).into_bytes(),
-        },
+        inner: Inc::new(0).into_any_tx(100),
     };
 
     // All versions match the installed predicate version.
@@ -77,15 +73,12 @@ fn normal_workflow() {
 }
 
 #[test]
-fn non_existing_service() {
+fn checked_call_for_non_existing_service() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
     let checked_call = CheckedCall {
         artifact_name: IncFactory::ARTIFACT_NAME.to_owned(),
         artifact_version: "1".parse().unwrap(),
-        inner: AnyTx {
-            call_info: CallInfo::new(200, 0),
-            arguments: Inc::new(0).into_bytes(),
-        },
+        inner: Inc::new(0).into_any_tx(200),
     };
     let (pk, sk) = gen_keypair();
     let checked_call = checked_call.sign(UtilsService::DEFAULT_ID, pk, &sk);
@@ -96,15 +89,12 @@ fn non_existing_service() {
 }
 
 #[test]
-fn service_with_mismatched_artifact() {
+fn checked_call_with_mismatched_artifact() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
     let checked_call = CheckedCall {
         artifact_name: "bogus_artifact".to_owned(),
         artifact_version: "1".parse().unwrap(),
-        inner: AnyTx {
-            call_info: CallInfo::new(100, 0),
-            arguments: Inc::new(0).into_bytes(),
-        },
+        inner: Inc::new(0).into_any_tx(100),
     };
     let (pk, sk) = gen_keypair();
     let checked_call = checked_call.sign(UtilsService::DEFAULT_ID, pk, &sk);
@@ -115,15 +105,12 @@ fn service_with_mismatched_artifact() {
 }
 
 #[test]
-fn service_with_mismatched_version() {
+fn checked_call_with_mismatched_version() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
     let mut checked_call = CheckedCall {
         artifact_name: IncFactory::ARTIFACT_NAME.to_owned(),
         artifact_version: "1".parse().unwrap(),
-        inner: AnyTx {
-            call_info: CallInfo::new(100, 0),
-            arguments: Inc::new(0).into_bytes(),
-        },
+        inner: Inc::new(0).into_any_tx(100),
     };
 
     // All versions match the installed predicate version.
@@ -151,4 +138,97 @@ fn service_with_mismatched_version() {
         let err = block[0].status().unwrap_err();
         assert_eq!(*err, TxError::VersionMismatch.into());
     }
+}
+
+#[test]
+fn batch_normal_workflow() {
+    let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
+    let checked_call = CheckedCall {
+        artifact_name: IncFactory::ARTIFACT_NAME.to_owned(),
+        artifact_version: "^1.0.0".parse().unwrap(),
+        inner: Inc::new(0).into_any_tx(100),
+    };
+    let batch = Batch::new()
+        .with_call(Inc::new(0).into_any_tx(100))
+        .with_call(Inc::new(0).into_any_tx(100))
+        .with_call(checked_call.into_any_tx(UtilsService::DEFAULT_ID));
+
+    let (pk, sk) = gen_keypair();
+    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let block = testkit.create_block_with_transaction(batch);
+    block[0].status().unwrap();
+
+    let snapshot = testkit.snapshot();
+    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    assert_eq!(schema.counts.get(&pk), Some(3));
+}
+
+#[test]
+fn batch_with_calls_to_different_services() {
+    let mut testkit = create_testkit(vec![
+        "1.1.3".parse().unwrap(),
+        "2.0.0-rc.0".parse().unwrap(),
+    ]);
+    let inner_batch = Batch::new()
+        .with_call(Inc::new(0).into_any_tx(100))
+        .with_call(Inc::new(0).into_any_tx(101))
+        .with_call(Inc::new(0).into_any_tx(100));
+    let batch = Batch::new()
+        .with_call(Inc::new(1).into_any_tx(100))
+        .with_call(inner_batch.into_any_tx(UtilsService::DEFAULT_ID))
+        .with_call(Inc::new(1).into_any_tx(101));
+
+    let (pk, sk) = gen_keypair();
+    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let block = testkit.create_block_with_transaction(batch);
+    block[0].status().unwrap();
+
+    let snapshot = testkit.snapshot();
+    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    assert_eq!(schema.counts.get(&pk), Some(3));
+    let schema = IncSchema::new(snapshot.for_service(101).unwrap());
+    assert_eq!(schema.counts.get(&pk), Some(2));
+}
+
+#[test]
+fn batch_with_call_to_non_existing_service() {
+    let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
+    let batch = Batch::new()
+        .with_call(Inc::new(0).into_any_tx(100))
+        .with_call(Inc::new(0).into_any_tx(101)) // <- service doesn't exist
+        .with_call(Inc::new(0).into_any_tx(100));
+
+    let (pk, sk) = gen_keypair();
+    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let block = testkit.create_block_with_transaction(batch);
+    let err = block[0].status().unwrap_err();
+    assert_eq!(*err, DispatcherError::IncorrectInstanceId.into());
+
+    let snapshot = testkit.snapshot();
+    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    assert_eq!(schema.counts.get(&pk), None);
+}
+
+#[test]
+fn batch_with_service_error() {
+    let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
+    let checked_call = CheckedCall {
+        artifact_name: "bogus-artifact".to_owned(),
+        artifact_version: "*".parse().unwrap(),
+        inner: Inc::new(0).into_any_tx(100),
+    };
+    let batch = Batch::new()
+        .with_call(Inc::new(0).into_any_tx(100))
+        .with_call(checked_call.into_any_tx(UtilsService::DEFAULT_ID))
+        .with_call(Inc::new(0).into_any_tx(100));
+
+    let (pk, sk) = gen_keypair();
+    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let block = testkit.create_block_with_transaction(batch);
+    let err = block[0].status().unwrap_err();
+    assert_eq!(*err, TxError::ArtifactMismatch.into());
+
+    let snapshot = testkit.snapshot();
+    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    assert_eq!(schema.counts.get(&pk), None);
 }
