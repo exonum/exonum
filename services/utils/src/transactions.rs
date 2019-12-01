@@ -28,7 +28,6 @@ pub struct CheckedCall {
     /// Expected name of the artifact.
     pub artifact_name: String,
     /// Version requirement(s) on the artifact.
-    #[serde(with = "serde_str")]
     pub artifact_version: VersionReq,
     /// The call contents.
     pub inner: AnyTx,
@@ -55,6 +54,39 @@ impl ProtobufConvert for CheckedCall {
             inner,
         })
     }
+}
+
+#[test]
+fn checked_call_in_json() {
+    use exonum::runtime::CallInfo;
+    use serde_json::json;
+
+    let mut checked_call = CheckedCall {
+        artifact_name: "test-artifact".to_string(),
+        artifact_version: "^1.0.0".parse().unwrap(),
+        inner: AnyTx {
+            call_info: CallInfo::new(100, 0),
+            arguments: vec![],
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(&checked_call).unwrap(),
+        json!({
+            "artifact_name": "test-artifact",
+            "artifact_version": "^1.0.0",
+            "inner": checked_call.inner,
+        })
+    );
+
+    checked_call.artifact_version = ">=0.9, <2".parse().unwrap();
+    assert_eq!(
+        serde_json::to_value(&checked_call).unwrap(),
+        json!({
+            "artifact_name": "test-artifact",
+            "artifact_version": ">= 0.9, < 2",
+            "inner": checked_call.inner,
+        })
+    );
 }
 
 /// Transactions executed in a batch.

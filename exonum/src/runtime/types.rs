@@ -160,7 +160,6 @@ pub struct ArtifactId {
     /// Artifact name.
     pub name: String,
     /// Semantic version of the artifact.
-    #[serde(with = "serde_str")]
     pub version: Version,
 }
 
@@ -400,6 +399,29 @@ fn parse_artifact_id_correct() {
     assert_eq!(artifact_id.version.major, 3);
     assert_eq!(artifact_id.version.minor, 1);
     assert_eq!(artifact_id.version.patch, 5);
+}
+
+#[test]
+fn artifact_id_in_json() {
+    let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
+    assert_eq!(
+        serde_json::to_value(artifact_id).unwrap(),
+        json!({
+            "runtime_id": 0,
+            "name": "my-service",
+            "version": "1.0.0",
+        })
+    );
+
+    let artifact_id = "0:my-service:2.0.0-rc.3".parse::<ArtifactId>().unwrap();
+    assert_eq!(
+        serde_json::to_value(artifact_id).unwrap(),
+        json!({
+            "runtime_id": 0,
+            "name": "my-service",
+            "version": "2.0.0-rc.3",
+        })
+    );
 }
 
 #[test]
