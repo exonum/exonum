@@ -112,10 +112,7 @@ impl StartService {
         let dispatcher_data = context.data().for_dispatcher();
 
         // Check that artifact is deployed.
-        if dispatcher_data
-            .get_artifact(self.artifact.name.as_str())
-            .is_none()
-        {
+        if dispatcher_data.get_artifact(&self.artifact).is_none() {
             log::trace!(
                 "Discarded start of service {} from the unknown artifact {}.",
                 &self.name,
@@ -280,7 +277,7 @@ where
         if context
             .data()
             .for_dispatcher()
-            .get_artifact(&deploy.artifact.name)
+            .get_artifact(&deploy.artifact)
             .is_some()
         {
             return Err(Error::AlreadyDeployed.into());
