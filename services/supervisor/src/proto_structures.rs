@@ -32,7 +32,9 @@ use super::{mode::Mode, proto, transactions::SupervisorInterface};
 
 /// Supervisor service configuration (not to be confused with `ConfigPropose`, which
 /// contains core/service configuration change proposal).
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash, Serialize)]
+#[derive(
+    Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize,
+)]
 #[protobuf_convert(source = "proto::Config")]
 pub struct SupervisorConfig {
     /// Supervisor operating mode.

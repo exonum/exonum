@@ -40,6 +40,7 @@ mod config_api;
 mod consensus_config;
 mod inc;
 mod proto;
+mod supervisor_config;
 mod utils;
 
 fn artifact_default() -> ArtifactId {

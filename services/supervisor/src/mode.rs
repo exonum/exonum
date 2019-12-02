@@ -21,18 +21,17 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
-use failure::format_err;
-use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
 
 use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
-use exonum_merkledb::{access::Access, BinaryValue};
+use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
 
 use super::{multisig::MultisigIndex, proto, DeployRequest};
 
 /// Supervisor operating mode.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -41,31 +40,6 @@ pub enum Mode {
     /// sent to **every** validator before it will be executed.
     /// For configs, a byzantine majority of validators should vote for it.
     Decentralized,
-}
-
-impl BinaryValue for Mode {
-    fn to_bytes(&self) -> Vec<u8> {
-        match self {
-            Mode::Simple => vec![proto::SupervisorMode::SIMPLE as u8],
-            Mode::Decentralized => vec![proto::SupervisorMode::DECENTRALIZED as u8],
-        }
-    }
-
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
-        let value = bytes.as_ref();
-        if value.len() != 1 {
-            return Err(format_err!(
-                "Invalid input data length for Mode::from_bytes: expected 1, got {}",
-                value.len()
-            ));
-        }
-
-        match value[0] {
-            value if value == proto::SupervisorMode::SIMPLE as u8 => Ok(Mode::Simple),
-            value if value == proto::SupervisorMode::DECENTRALIZED as u8 => Ok(Mode::Decentralized),
-            value => Err(format_err!("Invalid value for SupervisorMode: {}", value)),
-        }
-    }
 }
 
 impl ProtobufConvert for Mode {

@@ -241,8 +241,12 @@ impl Service for Supervisor {
         use std::borrow::Cow;
 
         // Load configuration from bytes and store it.
-        let config =
-            SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
+        let config = SupervisorConfig::from_bytes(Cow::from(&params)).unwrap_or_else(|err| {
+            // Incorrect config is a critical error for both the service and the
+            // blockchain itself: supervisor can't operate unconfigured, and the
+            // blockchain isn't expected to work without supervisor.
+            panic!("Unable to parse initialization parameters: {}", err);
+        });
 
         let mut schema = Schema::new(context.service_data());
         schema.configuration.set(config);
