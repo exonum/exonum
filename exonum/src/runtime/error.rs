@@ -42,19 +42,20 @@ use crate::{
 /// For example, a `Service` error can be raised if the sender of a transfer transaction
 /// in the token service does not have sufficient amount of tokens.
 ///
-/// ## `Unchecked` errors
+/// ## `Unexpected` errors
 ///
-/// Use `Unchecked` kind if the error has occurred in the service code, and:
+/// Use `Unexpected` kind if the error has occurred in the service code, and at least one
+/// of the following conditions holds:
 ///
-/// - It is caused by the environment (e.g., out-of-memory)
-/// - It should never occur during normal execution (e.g., out-of-bounds indexing, null pointer)
-/// - It otherwise makes no sense to report to users in detail.
+/// - The error is caused by the environment (e.g., out-of-memory)
+/// - The error should never occur during normal execution (e.g., out-of-bounds indexing, null pointer
+///   dereference)
 ///
 /// This kind of errors generally corresponds to panics in Rust and unchecked exceptions in Java.
-/// `Unchecked` errors are assumed to be reasonably rare by the framework; e.g., they are logged
+/// `Unexpected` errors are assumed to be reasonably rare by the framework; e.g., they are logged
 /// with a higher priority than other kinds.
 ///
-/// Runtime environments can have mechanisms to convert `Unchecked` errors to `Service` ones
+/// Runtime environments can have mechanisms to convert `Unexpected` errors to `Service` ones
 /// (e.g., by catching exceptions in Java or calling [`catch_unwind`] in Rust),
 /// but whether it makes sense heavily depends on the use case.
 ///
@@ -65,11 +66,12 @@ use crate::{
 ///
 /// ## `Runtime` errors
 ///
-/// Use `Runtime` kind if the error has occurred in the runtime code and it makes sense to report
-/// the error to the users. A primary example here is artifact deployment: if deployment has failed,
-/// a `Runtime` error can provide more details about the cause.
+/// Use `Runtime` kind if a recoverable error has occurred in the runtime code and
+/// it makes sense to report the error to the users. A primary example here is artifact deployment:
+/// if the deployment has failed due to a reproducible condition (e.g., the artifact
+/// cannot be compiled), a `Runtime` error can provide more details about the cause.
 ///
-/// ## Panics
+/// ## Policy on panics
 ///
 /// Panic in the Rust wrapper of the runtime if a fundamental runtime invariant is broken and
 /// continuing node operation is impossible. A panic will not be caught and will lead
@@ -79,12 +81,12 @@ use crate::{
 /// [`DispatcherError`]: ../enum.DispatcherError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
-    /// An unchecked error that has occurred in the service code.
+    /// An unexpected error that has occurred in the service code.
     ///
-    /// Unlike [`Service`](#variant.Service) errors, unchecked errors do not have a user-defined code.
+    /// Unlike [`Service`](#variant.Service) errors, unexpected errors do not have a user-defined code.
     /// Thus, it may be impossible for users to figure out the precise cause of the error;
     /// they can only use the accompanying error description.
-    Unchecked,
+    Unexpected,
 
     /// An error in the dispatcher code. For example, the method with the specified ID
     /// was not found in the service instance.
@@ -95,7 +97,7 @@ pub enum ErrorKind {
         code: u8,
     },
 
-    /// An error in the runtime logic. For example, the runtime could not deploy an artifact.
+    /// An error in the runtime logic. For example, the runtime could not compile an artifact.
     Runtime {
         /// Identifier of the runtime that has raised the error.
         runtime_id: u32,
@@ -117,9 +119,9 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
-    /// Creates an unchecked error.
-    pub fn unchecked() -> Self {
-        ErrorKind::Unchecked
+    /// Creates an unexpected error.
+    pub fn unexpected() -> Self {
+        ErrorKind::Unexpected
     }
 
     /// Creates a dispatcher error with the specified code.
@@ -134,7 +136,7 @@ impl ErrorKind {
 
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Unchecked => (runtime_proto::ErrorKind::UNCHECKED, 0),
+            ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNCHECKED, 0),
             ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
             ErrorKind::Runtime { code, .. } => (runtime_proto::ErrorKind::RUNTIME, code),
             ErrorKind::Service { code, .. } => (runtime_proto::ErrorKind::SERVICE, code),
@@ -146,7 +148,7 @@ impl ErrorKind {
         let kind = match kind {
             UNCHECKED => {
                 ensure!(code == 0, "Error code for panic should be zero");
-                ErrorKind::Unchecked
+                ErrorKind::Unexpected
             }
             DISPATCHER => ErrorKind::Dispatcher { code },
             RUNTIME => ErrorKind::Runtime {
@@ -165,7 +167,7 @@ impl ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Unchecked => f.write_str("panic"),
+            ErrorKind::Unexpected => f.write_str("panic"),
             ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
             ErrorKind::Runtime { code, runtime_id } => write!(f, "runtime#{}:{}", runtime_id, code),
             ErrorKind::Service { code, instance_id } => {
@@ -348,7 +350,7 @@ impl PartialEq<ExecutionError> for ServiceExecutionError {
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.
 ///
 /// This function will return the result of the closure if the closure does not panic.
-/// If the closure panics, it returns an `Unchecked` error with the description derived
+/// If the closure panics, it returns an `Unexpected` error with the description derived
 /// from the panic object.
 ///
 /// `FatalError`s are not caught by this method.
@@ -402,7 +404,7 @@ impl ExecutionError {
         };
 
         Self {
-            kind: ErrorKind::Unchecked,
+            kind: ErrorKind::Unexpected,
             description,
         }
     }
@@ -573,7 +575,7 @@ mod execution_result {
             if let Err(err) = &inner {
                 let description = err.description.clone();
                 match err.kind {
-                    ErrorKind::Unchecked => ExecutionStatus::Panic { description },
+                    ErrorKind::Unexpected => ExecutionStatus::Panic { description },
                     ErrorKind::Dispatcher { code } => {
                         ExecutionStatus::DispatcherError { code, description }
                     }
@@ -600,7 +602,7 @@ mod execution_result {
                 ExecutionStatus::Success => Ok(()),
 
                 ExecutionStatus::Panic { description } => {
-                    Err(ExecutionError::new(ErrorKind::Unchecked, description))
+                    Err(ExecutionError::new(ErrorKind::Unexpected, description))
                 }
 
                 ExecutionStatus::DispatcherError { description, code } => Err(ExecutionError::new(
@@ -662,7 +664,7 @@ mod tests {
     #[test]
     fn execution_error_binary_value_round_trip() {
         let values = vec![
-            (ErrorKind::Unchecked, "AAAA"),
+            (ErrorKind::Unexpected, "AAAA"),
             (ErrorKind::Dispatcher { code: 0 }, ""),
             (ErrorKind::Dispatcher { code: 0 }, "b"),
             (
@@ -694,7 +696,7 @@ mod tests {
     }
 
     #[test]
-    fn execution_error_binary_value_unchecked_with_code() {
+    fn execution_error_binary_value_unexpected_with_code() {
         let bytes = {
             let mut inner = runtime_proto::ExecutionError::default();
             inner.set_kind(runtime_proto::ErrorKind::UNCHECKED);
@@ -787,7 +789,7 @@ mod tests {
     #[test]
     fn execution_result_serde_roundtrip() {
         let values = vec![
-            Err((ErrorKind::Unchecked, "AAAA")),
+            Err((ErrorKind::Unexpected, "AAAA")),
             Err((ErrorKind::Dispatcher { code: 0 }, "")),
             Err((ErrorKind::Dispatcher { code: 0 }, "b")),
             Err((

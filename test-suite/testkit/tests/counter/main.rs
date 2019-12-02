@@ -870,7 +870,7 @@ fn test_explorer_transaction_statuses() {
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.kind == ExecutionErrorKind::unchecked()
+            Err(ref err) if err.kind == ExecutionErrorKind::unexpected()
                 && err.description == "attempt to add with overflow"
         );
     }
