@@ -23,8 +23,8 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service},
-        ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, ServiceFail,
-        SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, BlockchainData, ExecutionError, InstanceId, ServiceFail, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -113,7 +113,7 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         match params.as_str() {
             "error" => Err(context.malformed_err("Error!")),
@@ -130,7 +130,7 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         context
             .service_data()

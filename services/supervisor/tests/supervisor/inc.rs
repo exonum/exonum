@@ -22,7 +22,7 @@ use exonum::{
             api::{self, ServiceApiBuilder},
             CallContext, Service,
         },
-        BlockchainData, DispatcherError, InstanceId,
+        BlockchainData, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -139,7 +139,7 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         match params.as_ref() {
             "error" => {
@@ -159,7 +159,7 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         Schema::new(context.service_data())
             .params

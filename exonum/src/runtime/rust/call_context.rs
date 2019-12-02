@@ -89,6 +89,18 @@ impl<'a> CallContext<'a> {
         ExecutionError::new(error_kind, inner_error.description())
     }
 
+    /// Creates an `ExecutionError` corresponding to an unauthorized call.
+    pub fn unauthorized_err(&self) -> ExecutionError {
+        let error_kind = DispatcherError::UnauthorizedCaller.into();
+        let description = format!(
+            "Unauthorized call to {method} in service {instance} (interface {interface})",
+            instance = self.instance,
+            interface = self.inner.interface_name,
+            method = self.call_location,
+        );
+        ExecutionError::new(error_kind, description)
+    }
+
     /// Creates an `ExecutionError` corresponding to a malformed argument.
     pub fn malformed_err(&self, details: impl fmt::Display) -> ExecutionError {
         let error_kind = DispatcherError::MalformedArguments.into();

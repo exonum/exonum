@@ -14,7 +14,7 @@
 
 use exonum::{
     helpers::{Height, ValidateInput},
-    runtime::{rust::CallContext, DispatcherError, ExecutionError, InstanceSpec, ServiceFail},
+    runtime::{rust::CallContext, ExecutionError, InstanceSpec, ServiceFail},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -129,7 +129,7 @@ where
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         // Verifies that transaction author is validator.
         context
@@ -194,7 +194,7 @@ where
         let (_, author) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         // Verify that transaction author is a validator.
         let core_schema = context.data().for_core();
@@ -311,7 +311,7 @@ where
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
         core_schema
             .validator_id(author)
             .ok_or_else(|| context.err(Error::UnknownAuthor))?;
