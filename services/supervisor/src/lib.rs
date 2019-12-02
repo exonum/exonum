@@ -78,7 +78,6 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::InstanceCollection,
     crypto::Hash,
     runtime::{
         rust::{
@@ -356,19 +355,6 @@ where
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         api::wire(builder)
-    }
-}
-
-impl<Mode> From<Supervisor<Mode>> for InstanceCollection
-where
-    Mode: mode::SupervisorMode,
-{
-    fn from(service: Supervisor<Mode>) -> Self {
-        InstanceCollection::new(service).with_instance(
-            SUPERVISOR_INSTANCE_ID,
-            Supervisor::<Mode>::NAME,
-            Vec::default(),
-        )
     }
 }
 
