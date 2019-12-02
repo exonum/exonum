@@ -259,18 +259,20 @@ enum CowInstanceDescriptor<'a> {
 impl CowInstanceDescriptor<'_> {
     fn as_ref(&self) -> InstanceDescriptor<'_> {
         match self {
-            Self::Borrowed(descriptor) => *descriptor,
-            Self::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
+            CowInstanceDescriptor::Borrowed(descriptor) => *descriptor,
+            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
         }
     }
 
     fn into_owned(self) -> CowInstanceDescriptor<'static> {
         match self {
-            Self::Borrowed(InstanceDescriptor { id, name }) => CowInstanceDescriptor::Owned {
-                id,
-                name: name.to_owned(),
-            },
-            Self::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
+            CowInstanceDescriptor::Borrowed(InstanceDescriptor { id, name }) => {
+                CowInstanceDescriptor::Owned {
+                    id,
+                    name: name.to_owned(),
+                }
+            }
+            CowInstanceDescriptor::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
         }
     }
 }

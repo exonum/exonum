@@ -191,11 +191,11 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
             // ID for the new instance is next to the highest builtin ID to avoid
             // overlap if builtin identifiers space is sparse.
             let dispatcher_schema = context.data().for_dispatcher();
-            let builtin_instances = dispatcher_schema.running_instances();
+            let builtin_instances = dispatcher_schema.service_instances();
 
             let new_instance_id = builtin_instances
                 .values()
-                .map(|spec| spec.id)
+                .map(|state| state.spec.id)
                 .max()
                 .unwrap_or(SUPERVISOR_INSTANCE_ID)
                 + 1;
