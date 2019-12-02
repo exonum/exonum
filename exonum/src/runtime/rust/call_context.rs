@@ -10,9 +10,14 @@ use crate::runtime::{
     InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
-/// Context for the executed call.
+/// Context for the executed call. The call can mean a transaction call, a `before_commit` hook,
+/// or a service constructor.
 ///
-/// The call can mean a transaction call, or the `before_commit` hook.
+/// Use `*err` methods of the context together with [`ServiceFail`] trait to create errors
+/// in the service code. More complex ways to create errors are rarely required and may not be
+/// forward compatible.
+///
+/// [`ServiceFail`]: ../error/trait.ServiceFail.html
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.
@@ -209,7 +214,7 @@ impl<'a> CallContext<'a> {
 
 /// Local client stub for executing calls to the services. One can obtain a stub by calling
 /// the `CallContext::local_stub` method.
-// TODO: refine
+// TODO: refine stubs (ECR-3910)
 #[doc(hidden)]
 #[derive(Debug)]
 pub struct LocalStub<'a> {

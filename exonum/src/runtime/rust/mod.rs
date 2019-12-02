@@ -40,22 +40,12 @@
 //!         BlockchainData, ExecutionError,
 //!     },
 //! };
-//! use exonum_derive::{
-//!     exonum_interface, BinaryValue, IntoExecutionError,
-//!     ObjectHash, ServiceDispatcher, ServiceFactory
-//! };
+//! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_crypto::Hash;
 //!
 //! // Determine the types of data that will be used in service transactions.
-//!
-//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-//! #[protobuf_convert(source = "doc_tests::Point")]
-//! pub struct Point {
-//!     pub x: i32,
-//!     pub y: i32,
-//! }
 //!
 //! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 //! #[protobuf_convert(source = "doc_tests::CreateWallet")]
@@ -65,9 +55,9 @@
 //!
 //! // You may create service-specific error types.
 //!
-//! #[derive(Debug, IntoExecutionError)]
+//! #[derive(Debug, ServiceFail)]
 //! pub enum Error {
-//!     PointAlreadyExists = 0,
+//!     /// Wallet with the specified owner key already exists.
 //!     WalletAlreadyExists = 1,
 //! }
 //!
@@ -83,13 +73,7 @@
 //!         &self,
 //!         context: CallContext<'_>,
 //!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
-//!     // Also you can use any type which implements `Into<ExecutionError>` for the error.
-//!     fn add_point(
-//!         &self,
-//!         context: CallContext<'_>,
-//!         arg: Point,
-//!     ) -> Result<(), Error>;
+//!     ) -> Result<(), ExecutionError>;
 //! }
 //!
 //! // In order a service could process transactions, you have to implement the
@@ -115,20 +99,11 @@
 //!         // Some business logic...
 //!         Ok(())
 //!     }
-//!
-//!     fn add_point(
-//!         &self,
-//!         _context: CallContext<'_>,
-//!         _arg: Point,
-//!     ) -> Result<(), Error> {
-//!         // Some business logic...
-//!         Ok(())
-//!     }
 //! }
 //!
 //! impl Service for PointService {
 //!     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//!         Vec::new()
+//!         vec![]
 //!     }
 //! }
 //! ```
@@ -176,11 +151,11 @@
 //!
 //! # impl Transactions for StatefulService {}
 //! #
-//! #  impl Service for StatefulService {
-//! #      fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//! #          Vec::new()
-//! #      }
-//! #  }
+//! # impl Service for StatefulService {
+//! #     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//! #         vec![]
+//! #     }
+//! # }
 //! ```
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html

@@ -192,12 +192,14 @@ pub struct ExecutionError {
 /// Trait representing an error type defined in the service code.
 ///
 /// This trait can be derived from an enum using an eponymous derive macro from the `exonum-derive`
-/// crate.
+/// crate. Using an error with the [`CallContext::err`] method is the preferred way to generate
+/// errors in the Rust services.
 ///
 /// # Examples
 ///
 /// ```
-/// use exonum_derive::ServiceFail;
+/// use exonum_derive::*;
+/// # use exonum::runtime::{rust::CallContext, ExecutionError};
 ///
 /// /// Error codes emitted by wallet transactions during execution:
 /// #[derive(Debug, ServiceFail)]
@@ -209,7 +211,62 @@ pub struct ExecutionError {
 ///     /// Time service with the specified name does not exist.
 ///     TimeServiceNotFound = 2,
 /// }
+///
+/// // Using errors in the service code:
+/// # struct Arg { field: String }
+/// # struct MyService;
+/// # trait MyInterface {
+/// #     fn do_something(&self, context: CallContext<'_>, arg: Arg) -> Result<(), ExecutionError>;
+/// # }
+/// impl MyInterface for MyService {
+///     fn do_something(
+///         &self,
+///         context: CallContext<'_>,
+///         arg: Arg,
+///     ) -> Result<(), ExecutionError> {
+///         if arg.field.is_empty() {
+///             return Err(context.err(Error::ConfigParseError));
+///         }
+///         // do other stuff...
+/// #       Ok(())
+///     }
+/// }
 /// ```
+///
+/// [`for_service`] method allows to use errors in testing:
+///
+/// ```no_run
+/// use exonum::runtime::{ExecutionError, InstanceId, ServiceFail};
+/// use exonum_derive::ServiceFail;
+/// # use exonum::explorer::BlockWithTransactions;
+/// # struct Tx;
+/// # struct TestKit;
+/// # impl TestKit {
+/// #     fn create_block_with_transaction(&mut self, tx: Tx)
+/// #         -> BlockWithTransactions { unimplemented!() }
+/// # }
+///
+/// #[derive(Debug, ServiceFail)]
+/// pub enum Error {
+///     /// Content hash already exists.
+///     HashAlreadyExists = 0,
+///     // other variants...
+/// }
+///
+/// // Identifier of the service that will cause an error.
+/// const SERVICE_ID: InstanceId = 100;
+///
+/// let mut testkit: TestKit = // ...
+/// #    TestKit;
+/// let tx = // ...
+/// #    Tx;
+/// let block = testkit.create_block_with_transaction(tx);
+/// let err: &ExecutionError = block[0].status().unwrap_err();
+/// assert_eq!(*err, Error::HashAlreadyExists.for_service(SERVICE_ID));
+/// ```
+///
+/// [`CallContext::err`]: ../rust/struct.CallContext.html#method.err
+/// [`for_service`]: #tymethod.for_service
 pub trait ServiceFail {
     /// Extracts the error code.
     fn code(&self) -> u8;
@@ -217,7 +274,10 @@ pub trait ServiceFail {
     /// Extracts the human-readable error description.
     fn description(self) -> String;
 
-    /// Creates an error with the externally provided description.
+    /// Creates an error with the externally provided description. The output value implements
+    /// `ServiceFail` and thus can be used to create errors during service execution.
+    ///
+    /// This operation is not meant to be overridden.
     fn with_description(&self, description: impl Display) -> (u8, String) {
         (self.code(), description.to_string())
     }
