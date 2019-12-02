@@ -373,6 +373,6 @@ where
 }
 
 impl<Mode: mode::SupervisorMode> DefaultInstance for Supervisor<Mode> {
-    const DEFAULT_INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = Self::NAME;
+    const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
+    const INSTANCE_NAME: &'static str = Self::NAME;
 }

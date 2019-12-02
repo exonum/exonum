@@ -291,8 +291,8 @@ impl Service for TestServiceImpl {
 }
 
 impl DefaultInstance for TestServiceImpl {
-    const DEFAULT_INSTANCE_ID: u32 = SERVICE_INSTANCE_ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = SERVICE_INSTANCE_NAME;
+    const INSTANCE_ID: u32 = SERVICE_INSTANCE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_INSTANCE_NAME;
 }
 
 /// In this test, we manually instruct the dispatcher to deploy artifacts / create services
@@ -637,12 +637,12 @@ impl Service for DependentServiceImpl {
 }
 
 impl DefaultInstance for DependentServiceImpl {
-    const DEFAULT_INSTANCE_ID: u32 = SERVICE_INSTANCE_ID + 1;
-    const DEFAULT_INSTANCE_NAME: &'static str = "dependent-service";
+    const INSTANCE_ID: u32 = SERVICE_INSTANCE_ID + 1;
+    const INSTANCE_NAME: &'static str = "dependent-service";
 
     fn default_instance(&self) -> InstanceInitParams {
         self.artifact_id()
-            .into_instance(Self::DEFAULT_INSTANCE_ID, Self::DEFAULT_INSTANCE_NAME)
+            .into_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
             .with_constructor(Init {
                 msg: SERVICE_INSTANCE_NAME.to_owned(),
             })

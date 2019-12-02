@@ -213,8 +213,8 @@ impl CounterApi {
 pub struct CounterService;
 
 impl DefaultInstance for CounterService {
-    const DEFAULT_INSTANCE_ID: u32 = SERVICE_ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = SERVICE_NAME;
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
 impl Service for CounterService {

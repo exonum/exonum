@@ -119,6 +119,6 @@ impl Service for AfterCommitService {
 }
 
 impl DefaultInstance for AfterCommitService {
-    const DEFAULT_INSTANCE_ID: u32 = SERVICE_ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = SERVICE_NAME;
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

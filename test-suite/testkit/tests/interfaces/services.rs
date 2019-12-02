@@ -106,8 +106,8 @@ impl IssueReceiver for WalletService {
 }
 
 impl DefaultInstance for WalletService {
-    const DEFAULT_INSTANCE_ID: u32 = Self::ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = "wallet";
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "wallet";
 }
 
 #[protobuf_convert(source = "proto::Issue")]
@@ -149,8 +149,8 @@ impl DepositInterface for DepositService {
 }
 
 impl DefaultInstance for DepositService {
-    const DEFAULT_INSTANCE_ID: u32 = Self::ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = "deposit";
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "deposit";
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
@@ -222,6 +222,6 @@ impl Service for AnyCallService {
 }
 
 impl DefaultInstance for AnyCallService {
-    const DEFAULT_INSTANCE_ID: u32 = Self::ID;
-    const DEFAULT_INSTANCE_NAME: &'static str = "any-call";
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "any-call";
 }

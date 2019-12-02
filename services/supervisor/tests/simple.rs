@@ -57,8 +57,8 @@ pub fn sign_config_propose_transaction_by_us(
 pub struct ConfigChangeService;
 
 impl DefaultInstance for ConfigChangeService {
-    const DEFAULT_INSTANCE_ID: InstanceId = 119;
-    const DEFAULT_INSTANCE_NAME: &'static str = "config-change";
+    const INSTANCE_ID: InstanceId = 119;
+    const INSTANCE_NAME: &'static str = "config-change";
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -200,7 +200,7 @@ fn service_config_change() {
     let params = "I am a new parameter".to_owned();
 
     let config_propose = ConfigPropose::new(0, cfg_change_height)
-        .service_config(ConfigChangeService::DEFAULT_INSTANCE_ID, params.clone());
+        .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
     testkit.create_block_with_transaction(sign_config_propose_transaction_by_us(
         &testkit,
@@ -210,7 +210,7 @@ fn service_config_change() {
 
     let actual_params: String = testkit
         .snapshot()
-        .for_service(ConfigChangeService::DEFAULT_INSTANCE_NAME)
+        .for_service(ConfigChangeService::INSTANCE_NAME)
         .unwrap()
         .get_entry("params")
         .get()
@@ -233,7 +233,7 @@ fn incorrect_actual_from_field() {
     testkit.create_blocks_until(cfg_change_height);
 
     let config_propose = ConfigPropose::new(0, cfg_change_height)
-        .service_config(ConfigChangeService::DEFAULT_INSTANCE_ID, params.clone());
+        .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
 
     testkit
         .create_block_with_transaction(sign_config_propose_transaction_by_us(
