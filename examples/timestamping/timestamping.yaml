@@ -1,0 +1,37 @@
+networks:
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8200
+    private-api-port: 8091
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8201
+    private-api-port: 8092
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8202
+    private-api-port: 8093
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8203
+    private-api-port: 8094
+
+deadline_height: 10000
+supervisor_mode: "simple"
+
+artifacts:
+  time:
+    runtime: rust
+    name: "exonum-time:0.12.0"
+  timestamping:
+    runtime: rust
+    name: "exonum-timestamping:0.12.0"
+
+instances:
+  time:
+    artifact: time
+  timestamping:
+    artifact: timestamping
+    config:
+      time_service_name: "time"
+      time_service_id: 2

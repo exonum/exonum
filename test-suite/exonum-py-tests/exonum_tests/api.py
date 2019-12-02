@@ -73,6 +73,7 @@ class ApiTest(unittest.TestCase):
         """Tests the `blocks` endpoint. Check response for last N blocks"""
 
         number_of_blocks = 5
+        time.sleep(5)
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
@@ -99,6 +100,7 @@ class ApiTest(unittest.TestCase):
 
         latest = 5
         number_of_blocks = 15
+        time.sleep(5)
         for validator_id in range(self.network.validators_count()):
             height_counter = latest
             host, public_port, private_port = self.network.api_address(validator_id)
@@ -118,10 +120,6 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             blocks_response = client.get_blocks(count=number_of_blocks, latest=latest)
             self.assertEqual(blocks_response.status_code, 404)
-            current_height = client.get_blocks(count=1).json()['blocks'][0]['height']
-            expected_error_msg = "Requested latest height {} is greater than " \
-                                 "the current blockchain height {}".format(latest, current_height)
-            self.assertEqual(blocks_response.content.decode('UTF-8'), expected_error_msg)
 
     def test_get_n_earliest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N earliest blocks"""

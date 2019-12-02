@@ -20,7 +20,7 @@ use std::{panic, rc::Rc};
 use crate::{
     access::AccessExt,
     db,
-    validation::is_valid_index_name,
+    validation::is_valid_identifier,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},
     Database, DbOptions, Fork, ListIndex, MapIndex, RocksDB, TemporaryDB,
 };
@@ -929,6 +929,7 @@ fn test_metadata_index_wrong_type() {
     // Attempt to create an index with the wrong type (`List` instead of `Map`).
     let snapshot = db.snapshot();
     let err = ListIndex::<_, Vec<u8>>::from_access(&snapshot, "simple".into()).unwrap_err();
+
     assert_matches!(
         err,
         AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }
@@ -1000,7 +1001,7 @@ fn valid_name_for_url() {
 }
 
 #[test]
-#[should_panic(expected = "Wrong characters using in name")]
+#[should_panic(expected = "Invalid characters used in name")]
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -1009,7 +1010,7 @@ fn invalid_name_panic() {
 
 fn assert_valid_name_url(name: &str) {
     let urlencoded: String = byte_serialize(name.as_bytes()).collect();
-    assert_eq!(is_valid_index_name(name), name == urlencoded)
+    assert_eq!(is_valid_identifier(name), name == urlencoded)
 }
 
 fn check_valid_name(name: &str) -> bool {

@@ -46,6 +46,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
   now returns value instead of reference.
+  
+- Dot symbol is not allowed in service names anymore. (#1558)
 
 - Services can now use `BlockchainData` and `SnapshotExt` types to access data
   from the blockchain in a more structured manner. (#1523)
@@ -71,6 +73,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   to derive a constructor for such schemas via `FromAccess` derive macro.
   (#1523, #1562)
 
+- New index name restrictions has been added. (#1558)
+
+  - Dot symbol is not allowed anymore in indexes with prefixed access.
+
+  - Index names starting from `__` and not containing a dot `.` are reserved and
+    used only for system indexes.
+
 #### exonum-proto
 
 - Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
@@ -89,6 +98,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Method `protobuf_generate` is now private, use `exonum_build::ProtobufGenerator`
   instead (#1496).
+  
+- Method `ProtobufGenerator::frequently_used` has been removed (#1581).
 
 #### exonum-crypto
 
@@ -507,6 +518,15 @@ Key points:
   performance improvements for large lists. (#1455)
 
 - Proofs building mechanisms have been heavily refactored. (#1460)
+
+#### exonum-testkit
+
+- Configuration change example has been moved to `exonum-supervisor` crate. (#1582)
+
+#### exonum-build
+
+- Now input directory is always added to includes to reduce boilerplate
+  code. (#1581)
 
 ### Bug Fixes
 

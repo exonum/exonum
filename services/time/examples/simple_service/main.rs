@@ -40,49 +40,18 @@ use std::sync::Arc;
 
 mod proto;
 
-/// Time oracle instance ID.
-const TIME_SERVICE_ID: InstanceId = 112;
-/// Time oracle instance name.
-const TIME_SERVICE_NAME: &str = "time-oracle";
-/// Marker service ID.
-const SERVICE_ID: InstanceId = 128;
-/// Marker service name.
-const SERVICE_NAME: &str = "marker";
-
-/// Marker service database schema.
-#[derive(Debug, FromAccess)]
-pub struct MarkerSchema<T: Access> {
-    marks: ProofMapIndex<T::Base, PublicKey, i32>,
-}
-
-impl<T: Access> MarkerSchema<T> {
-    /// Returns hashes for stored table.
-    fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks.object_hash()]
-    }
-}
-
+/// The argument of the `MarkerInterface::mark` method.
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxMarker")]
-/// Transaction, which must be executed no later than the specified time (field `time`).
 pub struct TxMarker {
     mark: i32,
     time: DateTime<Utc>,
 }
 
-impl TxMarker {
-    fn signed(
-        mark: i32,
-        time: DateTime<Utc>,
-        public_key: &PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        Self { mark, time }.sign(SERVICE_ID, *public_key, secret_key)
-    }
-}
-
+/// Marker service transactions interface definition.
 #[exonum_interface]
-pub trait MarkerInterface {
+pub trait MarkerTransactions {
+    /// Transaction, which must be executed no later than the specified time (field `time`).
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
@@ -92,14 +61,27 @@ pub trait MarkerInterface {
     artifact_version = "0.1.0",
     proto_sources = "proto"
 )]
-#[service_dispatcher(implements("MarkerInterface"))]
+#[service_dispatcher(implements("MarkerTransactions"))]
 struct MarkerService;
 
-impl MarkerInterface for MarkerService {
+/// Marker service database schema.
+#[derive(Debug, FromAccess)]
+pub struct MarkerSchema<T: Access> {
+    pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
+}
+
+impl<T: Access> MarkerSchema<T> {
+    /// Returns hashes for stored table.
+    fn state_hash(&self) -> Vec<Hash> {
+        vec![self.marks.object_hash()]
+    }
+}
+
+impl MarkerTransactions for MarkerService {
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
-        let (_, author) = context
+        let author = context
             .caller()
-            .as_transaction()
+            .author()
             .expect("Wrong `TxMarker` initiator");
 
         let data = context.data();
@@ -121,6 +103,28 @@ impl MarkerInterface for MarkerService {
 impl Service for MarkerService {
     fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         MarkerSchema::new(data.for_executing_service()).state_hash()
+    }
+}
+
+// Several helpers for testkit.
+
+/// Time oracle instance ID.
+const TIME_SERVICE_ID: InstanceId = 112;
+/// Time oracle instance name.
+const TIME_SERVICE_NAME: &str = "time-oracle";
+/// Marker service ID.
+const SERVICE_ID: InstanceId = 128;
+/// Marker service name.
+const SERVICE_NAME: &str = "marker";
+
+impl TxMarker {
+    fn signed(
+        mark: i32,
+        time: DateTime<Utc>,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> Verified<AnyTx> {
+        Self { mark, time }.sign(SERVICE_ID, *public_key, secret_key)
     }
 }
 
