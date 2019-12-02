@@ -30,14 +30,14 @@ use crate::{
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
         error::ExecutionError, BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher,
-        DispatcherError, DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator,
+        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
+        StateHashAggregator,
     },
 };
 
 use super::{
     service::{Service, ServiceFactory},
-    ArtifactId, CallContext, RustRuntime,
+    ArtifactId, CallContext, LocalStub, RustRuntime,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;
@@ -238,11 +238,11 @@ trait TestService {
 pub struct TestServiceImpl;
 
 #[derive(Debug)]
-struct TestServiceClient<'a>(CallContext<'a>);
+struct TestServiceClient<'a>(LocalStub<'a>);
 
-impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
+impl<'a> From<LocalStub<'a>> for TestServiceClient<'a> {
+    fn from(stub: LocalStub<'a>) -> Self {
+        Self(stub)
     }
 }
 
@@ -277,7 +277,7 @@ impl TestService for TestServiceImpl {
 
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(|e| context.malformed_err(e))?;
         context
             .service_data()
             .get_entry("constructor_entry")
@@ -603,7 +603,7 @@ pub struct DependentServiceImpl;
 impl Service for DependentServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         assert_eq!(*context.caller(), Caller::Blockchain);
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(|e| context.malformed_err(e))?;
         if context
             .data()
             .for_dispatcher()

@@ -81,19 +81,12 @@ impl ToTokens for ServiceDispatcher {
                     &self,
                     interface_name: &str,
                     method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::CallContext,
+                    ctx: #cr::runtime::rust::CallContext<'_>,
                     payload: &[u8],
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match interface_name {
                         #( #match_arms )*
-                        other => {
-                            let message = format!(
-                                "Service instance `{}` does not implement a `{}` interface.",
-                                ctx.instance().name,
-                                other
-                            );
-                            Err(#cr::runtime::DispatcherError::no_such_interface(message))
-                        }
+                        other => Err(ctx.no_interface_err()),
                     }
                 }
             }

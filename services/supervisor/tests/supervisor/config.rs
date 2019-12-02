@@ -19,9 +19,7 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{
-        rust::Transaction, DispatcherError, InstanceId, ServiceFail, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{rust::Transaction, InstanceId, ServiceFail, SUPERVISOR_INSTANCE_ID},
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
@@ -386,10 +384,9 @@ fn test_discard_errored_service_config_change() {
     let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
     let block = testkit.create_block_with_transaction(signed_proposal);
     let err = block.transactions[0].status().unwrap_err();
-    assert_eq!(
-        *err,
-        DispatcherError::malformed_arguments("IncService: Configure error request")
-    );
+    assert!(err
+        .description
+        .contains("IncService: Configure error request"));
     assert_eq!(config_propose_entry(&testkit), None);
 }
 

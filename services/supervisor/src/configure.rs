@@ -15,8 +15,8 @@
 //! Configuration interface used by the supervisor to change service configuration.
 
 use exonum::runtime::{
-    rust::{CallContext, Interface},
-    DispatcherError, ExecutionError, MethodId,
+    rust::{CallContext, Interface, LocalStub},
+    ExecutionError, MethodId,
 };
 use exonum_merkledb::BinaryValue;
 
@@ -90,25 +90,17 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         match method {
-            VERIFY_CONFIG_METHOD_ID => self.verify_config(
-                context,
-                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
-            ),
-
-            APPLY_CONFIG_METHOD_ID => self.apply_config(
-                context,
-                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
-            ),
-
-            other => {
-                let kind = DispatcherError::NoSuchMethod;
-                let message = format!(
-                    "Method with ID {} is absent in the 'Configure' interface of the instance `{}`",
-                    other,
-                    context.instance().name,
-                );
-                Err((kind, message)).map_err(From::from)
+            VERIFY_CONFIG_METHOD_ID => {
+                let params = T::from_bytes(payload.into()).map_err(|e| context.malformed_err(e))?;
+                self.verify_config(context, params)
             }
+
+            APPLY_CONFIG_METHOD_ID => {
+                let params = T::from_bytes(payload.into()).map_err(|e| context.malformed_err(e))?;
+                self.apply_config(context, params)
+            }
+
+            _ => Err(context.no_method_err(None)),
         }
     }
 }
@@ -117,10 +109,10 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
 ///
 /// [`Configure`]: trait.Configure.html
 #[derive(Debug)]
-pub struct ConfigureCall<'a>(CallContext<'a>);
+pub struct ConfigureCall<'a>(LocalStub<'a>);
 
-impl<'a> From<CallContext<'a>> for ConfigureCall<'a> {
-    fn from(context: CallContext<'a>) -> Self {
+impl<'a> From<LocalStub<'a>> for ConfigureCall<'a> {
+    fn from(context: LocalStub<'a>) -> Self {
         Self(context)
     }
 }

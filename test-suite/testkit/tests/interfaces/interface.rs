@@ -17,7 +17,7 @@
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, Interface},
+        rust::{CallContext, Interface, LocalStub},
         ExecutionError,
     },
 };
@@ -39,7 +39,7 @@ pub trait IssueReceiver {
     fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
 }
 
-pub struct IssueReceiverClient<'a>(CallContext<'a>);
+pub struct IssueReceiverClient<'a>(LocalStub<'a>);
 
 impl<'a> IssueReceiverClient<'a> {
     pub fn issue(&mut self, arg: Issue) -> Result<(), ExecutionError> {
@@ -47,8 +47,8 @@ impl<'a> IssueReceiverClient<'a> {
     }
 }
 
-impl<'a> From<CallContext<'a>> for IssueReceiverClient<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
+impl<'a> From<LocalStub<'a>> for IssueReceiverClient<'a> {
+    fn from(stub: LocalStub<'a>) -> Self {
+        Self(stub)
     }
 }

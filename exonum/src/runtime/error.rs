@@ -358,16 +358,6 @@ impl Display for ExecutionError {
     }
 }
 
-impl<E, T> From<(E, T)> for ExecutionError
-where
-    T: Display,
-    E: Into<ErrorKind>,
-{
-    fn from(inner: (E, T)) -> Self {
-        Self::new(inner.0.into(), inner.1.to_string())
-    }
-}
-
 impl ProtobufConvert for ExecutionError {
     type ProtoStruct = runtime_proto::ExecutionError;
 

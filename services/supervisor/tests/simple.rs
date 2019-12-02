@@ -116,7 +116,7 @@ impl Configure for ConfigChangeService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
+            "error" => Err(context.malformed_err("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -138,9 +138,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => {
-                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
-            }
+            "apply_error" => Err(context.malformed_err("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }

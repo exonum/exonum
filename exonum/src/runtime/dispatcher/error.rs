@@ -86,26 +86,6 @@ impl From<Error> for ExecutionError {
 }
 
 impl Error {
-    /// Create a `NoSuchInterface` error with the specified error message.
-    pub fn no_such_interface(msg: impl fmt::Display) -> ExecutionError {
-        (Error::NoSuchInterface, msg).into()
-    }
-
-    /// Create a `NoSuchMethod` error with the specified error message.
-    pub fn no_such_method(msg: impl fmt::Display) -> ExecutionError {
-        (Error::NoSuchMethod, msg).into()
-    }
-
-    /// Create an `UnauthorizedCaller` error with the specified error message.
-    pub fn unauthorized_caller(msg: impl fmt::Display) -> ExecutionError {
-        (Error::UnauthorizedCaller, msg).into()
-    }
-
-    /// Create a `MalformedArguments` error with the specified error message.
-    pub fn malformed_arguments(msg: impl fmt::Display) -> ExecutionError {
-        (Error::MalformedArguments, msg).into()
-    }
-
     pub(crate) fn stack_overflow(max_depth: usize) -> ExecutionError {
         let description = format!(
             "Maximum depth of call stack ({}) has been reached.",

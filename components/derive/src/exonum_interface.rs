@@ -175,13 +175,7 @@ impl ExonumService {
                 #id => {
                     let bytes = payload.into();
                     let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(|error_msg| {
-                            let msg = format!(
-                                "Unable to parse argument for the `{}::{}` method. {}",
-                                stringify!(#trait_name), stringify!(#name), error_msg
-                            );
-                            #cr::runtime::DispatcherError::malformed_arguments(msg)
-                        })?;
+                        .map_err(|error_msg| ctx.malformed_err(error_msg))?;
                     self.#name(ctx, arg)
                 }
             }
@@ -194,19 +188,13 @@ impl ExonumService {
 
                 fn dispatch(
                     &self,
-                    ctx: #cr::runtime::rust::CallContext,
+                    ctx: #cr::runtime::rust::CallContext<'_>,
                     method: #cr::runtime::MethodId,
                     payload: &[u8],
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match method {
                         #( #match_arms )*
-                        other => {
-                            let message = format!(
-                                "Method with ID {} is absent in the '{}' interface of the instance `{}`",
-                                other, stringify!(#trait_name), ctx.instance().name,
-                            );
-                            Err(#cr::runtime::DispatcherError::no_such_method(message))
-                        }
+                        _ => Err(ctx.no_method_err(None)),
                     }
                 }
             }

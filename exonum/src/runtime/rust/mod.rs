@@ -186,7 +186,7 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    call_context::CallContext,
+    call_context::{CallContext, LocalStub},
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{
@@ -215,7 +215,7 @@ use crate::{
     helpers::Height,
 };
 
-use self::api::ServiceApiBuilder;
+use self::{api::ServiceApiBuilder, call_context::CallLocation};
 use super::{
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
@@ -441,10 +441,9 @@ impl RustArtifactId {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return Err(Error::IncorrectArtifactId.into());
         }
-        artifact
-            .name
-            .parse()
-            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
+        artifact.name.parse().map_err(|inner| {
+            ExecutionError::new(Error::IncorrectArtifactId.into(), inner.to_string())
+        })
     }
 }
 
@@ -525,7 +524,7 @@ impl Runtime for RustRuntime {
         let instance = self.new_service(spec)?;
         let service = instance.as_ref();
         let descriptor = instance.descriptor();
-        let context = CallContext::new(context, descriptor);
+        let context = CallContext::new(context, descriptor, CallLocation::Constructor);
         catch_panic(|| service.initialize(context, parameters))
     }
 
@@ -552,10 +551,11 @@ impl Runtime for RustRuntime {
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
         let descriptor = instance.descriptor();
+        let id = call_info.method_id;
         instance.as_ref().call(
             context.interface_name,
-            call_info.method_id,
-            CallContext::new(context, descriptor),
+            id,
+            CallContext::new(context, descriptor, CallLocation::Method { id }),
             payload,
         )
     }
@@ -583,7 +583,7 @@ impl Runtime for RustRuntime {
 
         let descriptor = instance.descriptor();
         let result = catch_panic(|| {
-            let context = CallContext::new(context, descriptor);
+            let context = CallContext::new(context, descriptor, CallLocation::BeforeCommit);
             instance.as_ref().before_commit(context);
             Ok(())
         });

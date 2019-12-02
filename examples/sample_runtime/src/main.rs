@@ -156,8 +156,10 @@ impl Runtime for SampleRuntime {
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let service_instance = self.start_service(spec)?;
-        let new_value =
-            u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let new_value = u64::from_bytes(params.into()).map_err(|e| {
+            let error_kind = DispatcherError::MalformedArguments.into();
+            ExecutionError::new(error_kind, e.to_string())
+        })?;
         service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())
