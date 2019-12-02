@@ -430,10 +430,15 @@ impl TestKit {
         // `create_block_with_transactions()` will panic.
         let snapshot = self.snapshot();
         let schema = snapshot.for_core();
-        let uncommitted_txs = transactions.into_iter().filter(|tx| {
-            !schema.transactions().contains(&tx.object_hash())
-                || schema.transactions_pool().contains(&tx.object_hash())
-        });
+        let uncommitted_txs: Vec<_> = transactions
+            .into_iter()
+            .filter(|tx| {
+                self.check_tx(&tx);
+
+                !schema.transactions().contains(&tx.object_hash())
+                    || schema.transactions_pool().contains(&tx.object_hash())
+            })
+            .collect();
 
         self.checkpoint();
         self.create_block_with_transactions(uncommitted_txs);
@@ -518,6 +523,8 @@ impl TestKit {
         let tx_hashes: Vec<_> = txs
             .into_iter()
             .map(|tx| {
+                self.check_tx(&tx);
+
                 let tx_id = tx.object_hash();
                 let tx_not_found = !schema.transactions().contains(&tx_id);
                 let tx_in_pool = schema.transactions_pool().contains(&tx_id);
@@ -593,8 +600,17 @@ impl TestKit {
 
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
+        self.check_tx(&transaction);
+
         self.blockchain
             .add_transactions_into_pool(iter::once(transaction));
+    }
+
+    /// Calls `BlockchainMut::check_tx` and panics on an error.
+    fn check_tx(&self, transaction: &Verified<AnyTx>) {
+        if let Err(error) = self.blockchain.check_tx(&transaction) {
+            panic!("Attempt to add invalid tx in the pool: {}", error);
+        }
     }
 
     /// Checks if transaction can be found in pool

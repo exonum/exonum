@@ -78,7 +78,7 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let runtime = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(DispatcherError::IncorrectRuntime)?;
+            .ok_or(DispatcherError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, arguments)
     }
