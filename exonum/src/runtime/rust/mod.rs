@@ -119,7 +119,7 @@
 //!     fn add_point(
 //!         &self,
 //!         _context: CallContext<'_>,
-//!         _arg: Point
+//!         _arg: Point,
 //!     ) -> Result<(), Error> {
 //!         // Some business logic...
 //!         Ok(())
@@ -441,7 +441,7 @@ impl RustArtifactId {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return Err(Error::IncorrectArtifactId.into());
         }
-        artifact.name.parse().map_err(|inner| {
+        artifact.name.parse().map_err(|inner: failure::Error| {
             ExecutionError::new(Error::IncorrectArtifactId.into(), inner.to_string())
         })
     }
@@ -552,12 +552,14 @@ impl Runtime for RustRuntime {
 
         let descriptor = instance.descriptor();
         let id = call_info.method_id;
-        instance.as_ref().call(
-            context.interface_name,
-            id,
-            CallContext::new(context, descriptor, CallLocation::Method { id }),
-            payload,
-        )
+        catch_panic(|| {
+            instance.as_ref().call(
+                context.interface_name,
+                id,
+                CallContext::new(context, descriptor, CallLocation::Method { id }),
+                payload,
+            )
+        })
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
@@ -582,18 +584,11 @@ impl Runtime for RustRuntime {
             .expect("`before_commit` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
-        let result = catch_panic(|| {
+        catch_panic(|| {
             let context = CallContext::new(context, descriptor, CallLocation::BeforeCommit);
             instance.as_ref().before_commit(context);
             Ok(())
-        });
-        if let Err(ref e) = result {
-            error!(
-                "Service \"{}\" `before_commit` failed with error: {:?}",
-                instance.name, e
-            );
-        }
-        result
+        })
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {

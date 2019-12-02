@@ -48,7 +48,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, Dispatcher},
+    runtime::Dispatcher,
 };
 
 mod block;
@@ -347,7 +347,7 @@ impl BlockchainMut {
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
-        let tx_result = catch_panic(|| self.dispatcher.execute(fork, tx_hash, &transaction));
+        let tx_result = self.dispatcher.execute(fork, tx_hash, &transaction);
         if let Err(ref e) = tx_result {
             if e.kind == ExecutionErrorKind::Unchecked {
                 log::error!(

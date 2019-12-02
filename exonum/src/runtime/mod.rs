@@ -227,9 +227,9 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Handling Panics
 ///
-/// Unless specified in the method docs, a panic in the `Runtime` methods will **not** be caught
+/// A panic in the `Runtime` methods will **not** be caught
 /// and will cause node termination. You may use [`catch_panic`](error/fn.catch_panic.html) method
-/// to catch panics according to panic policy.
+/// to catch panics in the Rust code and convert them to unchecked execution errors.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
@@ -298,7 +298,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The `Runtime` should catch all panics except for `FatalError`s and convert
     /// them into an `ExecutionError`.
     ///
-    /// Returning an error or panicking provides a way for the `Runtime` to signal that
+    /// Returning an error provides a way for the `Runtime` to signal that
     /// service instantiation has failed. As a rule of a thumb, changes made by the method
     /// will be rolled back after such a signal (the exact logic is determined by the supervisor).
     /// Because an error is one of expected / handled outcomes, verifying prerequisites
@@ -375,9 +375,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - If service does not implement an interface, return `NoSuchInterface` error.
     /// - If the interface does not have a method, return `NoSuchMethod` error.
     ///
-    /// An error or panic returned from this method will lead to the rollback of all changes
-    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
-    /// into errors.
+    /// An error returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`.
     fn execute(
         &self,
         context: ExecutionContext<'_>,
@@ -398,8 +397,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// # Return value
     ///
     /// An error or panic returned from this method will lead to the rollback of all changes
-    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
-    /// into errors.
+    /// in the fork enclosed in the `context`.
     fn before_commit(
         &self,
         context: ExecutionContext<'_>,
