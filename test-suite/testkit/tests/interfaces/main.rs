@@ -16,7 +16,7 @@ use exonum::{
     crypto,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError},
+    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError, ServiceFail},
 };
 use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
 
@@ -126,7 +126,7 @@ fn test_deposit_err_issue_without_wallet() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, Error::WalletNotFound.into());
+    assert_eq!(err, Error::WalletNotFound.for_service(WalletService::ID));
 }
 
 #[test]
@@ -204,7 +204,10 @@ fn test_any_call_err_deposit_unauthorized() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, Error::UnauthorizedIssuer.into());
+    assert_eq!(
+        err,
+        Error::UnauthorizedIssuer.for_service(WalletService::ID)
+    );
 }
 
 #[test]

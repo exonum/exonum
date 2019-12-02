@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::runtime::rust::CallContext;
+use exonum::runtime::{rust::CallContext, ExecutionError};
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
 /// Common errors emitted by transactions during execution.
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ServiceFail)]
 pub enum Error {
     /// The sender of the transaction is not among the active validators.
     UnknownSender = 0,
@@ -46,22 +46,25 @@ impl TxTime {
 #[exonum_interface]
 pub trait TimeOracleInterface {
     /// Receives a new time from one of validators.
-    fn time(&self, ctx: CallContext<'_>, arg: TxTime) -> Result<(), Error>;
+    fn time(&self, ctx: CallContext<'_>, arg: TxTime) -> Result<(), ExecutionError>;
 }
 
 impl TimeOracleInterface for TimeService {
-    fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), Error> {
-        let author = context.caller().author().ok_or(Error::UnknownSender)?;
+    fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), ExecutionError> {
+        let author = context
+            .caller()
+            .author()
+            .ok_or_else(|| context.err(Error::UnknownSender))?;
         // Check that the transaction is signed by a validator.
         let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownSender)?;
+            .ok_or_else(|| context.err(Error::UnknownSender))?;
 
         let mut schema = TimeSchema::new(context.service_data());
         schema
             .update_validator_time(author, arg.time)
-            .map_err(|()| Error::ValidatorTimeIsGreater)?;
+            .map_err(|()| context.err(Error::ValidatorTimeIsGreater))?;
 
         let validator_keys = core_schema.consensus_config().validator_keys;
         schema.update_consolidated_time(&validator_keys);

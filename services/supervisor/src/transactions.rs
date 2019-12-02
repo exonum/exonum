@@ -14,7 +14,7 @@
 
 use exonum::{
     helpers::{Height, ValidateInput},
-    runtime::{rust::CallContext, DispatcherError, ExecutionError, InstanceSpec},
+    runtime::{rust::CallContext, DispatcherError, ExecutionError, InstanceSpec, ServiceFail},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -80,34 +80,13 @@ pub trait SupervisorInterface {
     ) -> Result<(), ExecutionError>;
 }
 
-impl ValidateInput for DeployRequest {
-    type Error = ExecutionError;
-
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.artifact
-            .validate()
-            .map_err(|e| (Error::InvalidArtifactId, e).into())
-    }
-}
-
-impl ValidateInput for DeployConfirmation {
-    type Error = ExecutionError;
-
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.artifact
-            .validate()
-            .map_err(|e| (Error::InvalidArtifactId, e).into())
-    }
-}
-
 impl StartService {
     fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
             .validate()
-            .map_err(|e| (Error::InvalidArtifactId, e))?;
+            .map_err(|e| context.err(Error::InvalidArtifactId.with_description(e)))?;
         InstanceSpec::is_valid_name(&self.name)
-            .map_err(|e| (Error::InvalidInstanceName, e))
-            .map_err(ExecutionError::from)?;
+            .map_err(|e| context.err(Error::InvalidInstanceName.with_description(e)))?;
 
         let dispatcher_data = context.data().for_dispatcher();
 
@@ -122,7 +101,7 @@ impl StartService {
                 &self.artifact.name,
             );
 
-            return Err(Error::UnknownArtifact.into());
+            return Err(context.err(Error::UnknownArtifact));
         }
 
         // Check that there is no instance with the same name.
@@ -131,7 +110,7 @@ impl StartService {
                 "Discarded start of the already running instance {}.",
                 &self.name
             );
-            return Err(Error::InstanceExists.into());
+            return Err(context.err(Error::InstanceExists));
         }
 
         Ok(())
@@ -147,9 +126,9 @@ where
         mut context: CallContext<'_>,
         mut propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let (_, author) = context
+        let author = context
             .caller()
-            .as_transaction()
+            .author()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Verifies that transaction author is validator.
@@ -157,7 +136,7 @@ where
             .data()
             .for_core()
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or_else(|| context.err(Error::UnknownAuthor))?;
 
         let current_height = context.data().for_core().height();
 
@@ -167,7 +146,7 @@ where
         }
         // Otherwise verify that the `actual_from` height is in the future.
         else if current_height >= propose.actual_from {
-            return Err(Error::ActualFromIsPast.into());
+            return Err(context.err(Error::ActualFromIsPast));
         }
 
         let mut schema = Schema::new(context.service_data());
@@ -176,7 +155,7 @@ where
         if let Some(proposal) = schema.pending_proposal.get() {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
-                return Err(Error::ConfigProposeExists.into());
+                return Err(context.err(Error::ConfigProposeExists));
             } else {
                 // Proposal is outdated but was not removed (e.g. because of the panic
                 // during config applying), clean it.
@@ -191,7 +170,7 @@ where
 
         // After all the checks verify that configuration number is expected one.
         if propose.configuration_number != schema.get_configuration_number() {
-            return Err(Error::IncorrectConfigurationNumber.into());
+            return Err(context.err(Error::IncorrectConfigurationNumber));
         }
         schema.increase_configuration_number();
 
@@ -221,29 +200,29 @@ where
         let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or_else(|| context.err(Error::UnknownAuthor))?;
 
         let mut schema = Schema::new(context.service_data());
         let entry = schema
             .pending_proposal
             .get()
-            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
+            .ok_or_else(|| context.err(Error::ConfigProposeNotRegistered))?;
 
         // Verifies that this config proposal is registered.
         if entry.propose_hash != vote.propose_hash {
-            return Err(Error::ConfigProposeNotRegistered.into());
+            return Err(context.err(Error::ConfigProposeNotRegistered));
         }
 
         let config_propose = entry.config_propose;
         // Verifies that we didn't reach the deadline height.
         if config_propose.actual_from <= core_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
+            return Err(context.err(Error::DeadlineExceeded));
         }
         if schema
             .config_confirms
             .confirmed_by(&entry.propose_hash, &author)
         {
-            return Err(Error::AttemptToVoteTwice.into());
+            return Err(context.err(Error::AttemptToVoteTwice));
         }
 
         schema.config_confirms.confirm(&vote.propose_hash, author);
@@ -261,20 +240,27 @@ where
         context: CallContext<'_>,
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
-        deploy.validate()?;
+        deploy
+            .artifact
+            .validate()
+            .map_err(|e| context.err(Error::InvalidArtifactId.with_description(e)))?;
+
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < core_schema.height() {
-            return Err(Error::ActualFromIsPast.into());
+            return Err(context.err(Error::ActualFromIsPast));
         }
         let mut schema = Schema::new(context.service_data());
 
         // Verifies that transaction author is validator.
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        let author = context
+            .caller()
+            .author()
+            .ok_or_else(|| context.err(Error::UnknownAuthor))?;
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or_else(|| context.err(Error::UnknownAuthor))?;
 
         // Verifies that the artifact is not deployed yet.
         if context
@@ -283,7 +269,7 @@ where
             .get_artifact(&deploy.artifact.name)
             .is_some()
         {
-            return Err(Error::AlreadyDeployed.into());
+            return Err(context.err(Error::AlreadyDeployed));
         }
 
         // If deployment is already registered, check whether request is initiated
@@ -296,7 +282,7 @@ where
             } else {
                 // Author already confirmed deployment of this artifact,
                 // so it's a duplicate.
-                return Err(Error::DeployRequestAlreadyRegistered.into());
+                return Err(context.err(Error::DeployRequestAlreadyRegistered));
             }
         }
 
@@ -314,25 +300,32 @@ where
         context: CallContext<'_>,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
-        confirmation.validate()?;
+        confirmation
+            .artifact
+            .validate()
+            .map_err(|e| context.err(Error::InvalidArtifactId.with_description(e)))?;
+
         let core_schema = context.data().for_core();
 
         // Verifies that transaction author is validator.
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        let author = context
+            .caller()
+            .author()
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or_else(|| context.err(Error::UnknownAuthor))?;
 
         let mut schema = Schema::new(context.service_data());
         // Verifies that this deployment is registered.
         let deploy_request = schema
             .pending_deployments
             .get(&confirmation.artifact)
-            .ok_or(Error::DeployRequestNotRegistered)?;
+            .ok_or_else(|| context.err(Error::DeployRequestNotRegistered))?;
 
         // Verifies that we didn't reach deadline height.
         if deploy_request.deadline_height < core_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
+            return Err(context.err(Error::DeadlineExceeded));
         }
 
         let confirmations = schema.deploy_confirmations.confirm(&confirmation, author);
@@ -379,24 +372,23 @@ where
                         log::trace!(
                             "Discarded multiple consensus change proposals in one request."
                         );
-                        return Err(Error::MalformedConfigPropose.into());
+                        return Err(context.err(Error::MalformedConfigPropose));
                     }
                     consensus_propose_added = true;
-                    config
-                        .validate()
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                    config.validate().map_err(|e| {
+                        context.err(Error::MalformedConfigPropose.with_description(e))
+                    })?;
                 }
 
                 ConfigChange::Service(config) => {
                     if !service_ids.insert(config.instance_id) {
                         log::trace!("Discarded multiple service change proposals in one request.");
-                        return Err(Error::MalformedConfigPropose.into());
+                        return Err(context.err(Error::MalformedConfigPropose));
                     }
 
                     context
                         .interface::<ConfigureCall<'_>>(config.instance_id)?
-                        .verify_config(config.params.clone())
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                        .verify_config(config.params.clone())?;
                 }
 
                 ConfigChange::StartService(start_service) => {
@@ -404,9 +396,8 @@ where
                         log::trace!(
                             "Discarded multiple instances with the same name in one request."
                         );
-                        return Err(Error::MalformedConfigPropose.into());
+                        return Err(context.err(Error::MalformedConfigPropose));
                     }
-
                     start_service.validate(&context)?;
                 }
             }

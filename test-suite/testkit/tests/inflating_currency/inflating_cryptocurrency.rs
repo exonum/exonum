@@ -20,7 +20,7 @@ use exonum::{
             api::{self, ServiceApiBuilder},
             CallContext, Service,
         },
-        BlockchainData, InstanceId,
+        BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -109,23 +109,31 @@ pub struct Transfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ServiceFail)]
 pub enum Error {
-    /// Dummy
-    Foo = 0,
+    /// Sender and receiver of the transfer are the same.
+    SenderSameAsReceiver = 0,
 }
 
 #[exonum_interface]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError>;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
 }
 
 impl CurrencyInterface for CurrencyService {
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError> {
         let author = context.caller().author().unwrap();
 
         let height = context.data().for_core().height();
@@ -137,11 +145,10 @@ impl CurrencyInterface for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError> {
         let author = context.caller().author().unwrap();
-
         if author == arg.to {
-            return Err(Error::Foo);
+            return Err(context.err(Error::SenderSameAsReceiver));
         }
 
         let height = context.data().for_core().height();

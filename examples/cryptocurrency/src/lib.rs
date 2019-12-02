@@ -146,7 +146,7 @@ pub mod transactions {
 /// Contract errors.
 pub mod errors {
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
-    #[derive(Debug, IntoExecutionError)]
+    #[derive(Debug, ServiceFail)]
     pub enum Error {
         /// Wallet already exists.
         ///
@@ -179,7 +179,7 @@ pub mod contracts {
         crypto::Hash,
         runtime::{
             rust::{api::ServiceApiBuilder, CallContext, Service},
-            BlockchainData,
+            BlockchainData, ExecutionError,
         },
     };
 
@@ -197,9 +197,13 @@ pub mod contracts {
     #[exonum_interface]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+        fn create_wallet(
+            &self,
+            ctx: CallContext<'_>,
+            arg: CreateWallet,
+        ) -> Result<(), ExecutionError>;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: CallContext<'_>, arg: TxTransfer) -> Result<(), Error>;
+        fn transfer(&self, ctx: CallContext<'_>, arg: TxTransfer) -> Result<(), ExecutionError>;
     }
 
     /// Cryptocurrency service implementation.
@@ -209,7 +213,11 @@ pub mod contracts {
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+        fn create_wallet(
+            &self,
+            context: CallContext<'_>,
+            arg: CreateWallet,
+        ) -> Result<(), ExecutionError> {
             let author = context
                 .caller()
                 .author()
@@ -222,22 +230,32 @@ pub mod contracts {
                 schema.wallets.put(&author, wallet);
                 Ok(())
             } else {
-                Err(Error::WalletAlreadyExists)
+                Err(context.err(Error::WalletAlreadyExists))
             }
         }
 
-        fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Result<(), Error> {
+        fn transfer(
+            &self,
+            context: CallContext<'_>,
+            arg: TxTransfer,
+        ) -> Result<(), ExecutionError> {
             let author = context
                 .caller()
                 .author()
                 .expect("Wrong 'TxTransfer' initiator");
             if author == arg.to {
-                return Err(Error::SenderSameAsReceiver);
+                return Err(context.err(Error::SenderSameAsReceiver));
             }
 
             let mut schema = CurrencySchema::new(context.service_data());
-            let sender = schema.wallets.get(&author).ok_or(Error::SenderNotFound)?;
-            let receiver = schema.wallets.get(&arg.to).ok_or(Error::ReceiverNotFound)?;
+            let sender = schema
+                .wallets
+                .get(&author)
+                .ok_or_else(|| context.err(Error::SenderNotFound))?;
+            let receiver = schema
+                .wallets
+                .get(&arg.to)
+                .ok_or_else(|| context.err(Error::ReceiverNotFound))?;
 
             let amount = arg.amount;
             if sender.balance >= amount {
@@ -248,7 +266,7 @@ pub mod contracts {
                 schema.wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
-                Err(Error::InsufficientCurrencyAmount)
+                Err(context.err(Error::InsufficientCurrencyAmount))
             }
         }
     }

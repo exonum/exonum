@@ -25,19 +25,18 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
+        rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError, ErrorKind,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
         StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::IntoExecutionError;
 use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
 use futures::{Future, IntoFuture};
 
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
-    thread,
+    fmt, thread,
     time::Duration,
 };
 
@@ -56,13 +55,36 @@ struct SampleRuntime {
 }
 
 // Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[execution_error(kind = "runtime")]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 enum SampleRuntimeError {
     /// Incorrect information to call transaction.
     IncorrectCallInfo = 1,
     /// Incorrect transaction payload.
     IncorrectPayload = 2,
+}
+
+impl SampleRuntimeError {
+    pub fn with_description(self, description: impl fmt::Display) -> ExecutionError {
+        let error_kind = ErrorKind::runtime(SampleRuntime::ID, self as u8);
+        ExecutionError::new(error_kind, description.to_string())
+    }
+}
+
+impl fmt::Display for SampleRuntimeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::SampleRuntimeError::*;
+        formatter.write_str(match self {
+            IncorrectCallInfo => "Incorrect information to call transaction",
+            IncorrectPayload => "Incorrect transaction payload",
+        })
+    }
+}
+
+impl From<SampleRuntimeError> for ExecutionError {
+    fn from(error: SampleRuntimeError) -> Self {
+        let error_kind = ErrorKind::runtime(SampleRuntime::ID, error as u8);
+        ExecutionError::new(error_kind, error.to_string())
+    }
 }
 
 impl SampleRuntime {
@@ -162,7 +184,7 @@ impl Runtime for SampleRuntime {
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
-                    .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
+                    .map_err(|e| SampleRuntimeError::IncorrectPayload.with_description(e))?;
                 let counter = service.counter.get();
                 println!("Updating counter value to {}", counter + value);
                 service.counter.set(value + counter);
@@ -182,14 +204,11 @@ impl Runtime for SampleRuntime {
 
             // Unknown transaction.
             (interface, method) => {
-                let err = (
-                    SampleRuntimeError::IncorrectCallInfo,
-                    format!(
-                        "Incorrect information to call transaction. {}#{}",
-                        interface, method
-                    ),
-                );
-                Err(err.into())
+                let err = SampleRuntimeError::IncorrectCallInfo.with_description(format!(
+                    "Incorrect information to call transaction. {}#{}",
+                    interface, method
+                ));
+                Err(err)
             }
         }
     }

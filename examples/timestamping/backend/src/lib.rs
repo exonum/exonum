@@ -67,7 +67,7 @@ impl Service for TimestampingService {
             .get_instance(&*config.time_service_name)
             .is_none()
         {
-            return Err(Error::TimeServiceNotFound.into());
+            return Err(context.err(Error::TimeServiceNotFound));
         }
 
         Schema::new(context.service_data()).config.set(config);
