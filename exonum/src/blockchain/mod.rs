@@ -228,8 +228,8 @@ impl BlockchainMut {
     ) -> Result<(), Error> {
         config.validate()?;
         let mut fork = self.fork();
+        // Write genesis configuration to the blockchain.
         Schema::new(&fork).consensus_config_entry().set(config);
-
         // Add service instances.
         for instance_config in initial_services {
             self.dispatcher.add_builtin_service(
@@ -242,6 +242,8 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
+        // TODO Unify block creation logic [ECR-3879]
+        self.dispatcher.before_commit(&mut fork);
         self.dispatcher.commit_block(&mut fork);
         self.merge(fork.into_patch())?;
 
@@ -283,12 +285,10 @@ impl BlockchainMut {
         for (index, hash) in tx_hashes.iter().enumerate() {
             self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
-
-        // Skip execution for genesis block.
+        // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
             self.dispatcher.before_commit(&mut fork);
         }
-
         // Get tx & state hash.
         let schema = Schema::new(&fork);
         let state_hash = {
@@ -313,7 +313,7 @@ impl BlockchainMut {
         };
         let tx_hash = schema.block_transactions(height).object_hash();
 
-        // Create block.
+        // Create block header.
         let block = Block::new(
             proposer_id,
             height,
@@ -450,6 +450,15 @@ impl BlockchainMut {
         }
         db.merge(fork.into_patch())
             .expect("Cannot update transaction pool");
+    }
+
+    /// Performs several shallow checks that transaction is correct.
+    ///
+    /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
+    /// executed successfully, but returned `Err(..)` value means that this transaction is
+    /// **obviously** incorrect and should be declined as early as possible.
+    pub fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+        self.dispatcher.check_tx(tx)
     }
 
     /// Shuts down the dispatcher. This should be the last operation performed on this instance.

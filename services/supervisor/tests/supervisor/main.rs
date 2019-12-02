@@ -69,15 +69,16 @@ fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
 
 fn service_instance_exists(api: &TestKitApi, name: &str) -> bool {
     let services = &api.exonum_api().services().services;
-    services.iter().any(|s| s.name == name)
+    services.iter().any(|s| s.spec.name == name)
 }
 
 fn find_instance_id(api: &TestKitApi, instance_name: &str) -> InstanceId {
     let services = &api.exonum_api().services().services;
     services
         .iter()
-        .find(|service| service.name == instance_name)
+        .find(|service| service.spec.name == instance_name)
         .expect("Can't find the instance")
+        .spec
         .id
 }
 
@@ -446,7 +447,7 @@ fn test_bad_service_instance_name() {
 
     let system_api = api.exonum_api();
     let expected_description =
-        "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-.";
+        "Service instance name (\u{2764}) contains illegal character, use only: a-zA-Z0-9 and one of _-";
     let expected_status = Err(TxError::InvalidInstanceName
         .with_description(expected_description)
         .for_service(SUPERVISOR_INSTANCE_ID));

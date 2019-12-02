@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
-    validation::{is_allowed_latin1_char, is_valid_index_name},
+    validation::{is_allowed_index_name_char, is_valid_index_name_component},
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
@@ -165,12 +165,12 @@ impl ArtifactId {
         Ok(artifact)
     }
 
-    /// Check that the artifact name contains only allowed characters and is not empty.
+    /// Checks that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
-        // Extended version of `exonum_merkledb::is_valid_name` that also allows ':`.
+        // Extended version of `exonum_merkledb::is_valid_name` that also allows '.' and ':'.
         name.as_ref().iter().all(|&c| match c {
-            58 => true,
-            c => is_allowed_latin1_char(c),
+            b'.' | b':' => true,
+            c => is_allowed_index_name_char(c),
         })
     }
 }
@@ -178,11 +178,13 @@ impl ArtifactId {
 impl ValidateInput for ArtifactId {
     type Error = failure::Error;
 
+    /// Checks that the artifact name contains only allowed characters and is not empty.
     fn validate(&self) -> Result<(), Self::Error> {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             Self::is_valid_name(&self.name),
-            "Artifact name contains an illegal character, use only: a-zA-Z0-9 and one of _-.:"
+            "Artifact name ({}) contains an illegal character, use only: a-zA-Z0-9 and one of _-.:",
+            &self.name,
         );
         Ok(())
     }
@@ -261,7 +263,7 @@ pub struct InstanceSpec {
     /// The name serves as a primary identifier of this service in most operations.
     /// It is assigned by the network administrators.
     ///
-    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\.:-_]+`
+    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\:-_]+`
     pub name: String,
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
@@ -292,8 +294,8 @@ impl InstanceSpec {
             "Service instance name should not be empty"
         );
         ensure!(
-            is_valid_index_name(name),
-            "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-."
+            is_valid_index_name_component(name),
+            "Service instance name ({}) contains illegal character, use only: a-zA-Z0-9 and one of _-", name
         );
         Ok(())
     }
@@ -343,13 +345,121 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
     }
 }
 
+/// Status of an artifact deployment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ArtifactStatus {
+    /// The artifact is pending deployment.
+    Pending = 0,
+    /// The artifact has been successfully deployed.
+    Active = 1,
+}
+
+impl Display for ArtifactStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Active => f.write_str("active"),
+            Self::Pending => f.write_str("pending"),
+        }
+    }
+}
+
+impl ProtobufConvert for ArtifactStatus {
+    type ProtoStruct = schema::runtime::ArtifactStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        match self {
+            Self::Active => Self::ProtoStruct::ARTIFACT_ACTIVE,
+            Self::Pending => Self::ProtoStruct::ARTIFACT_PENDING,
+        }
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Ok(match pb {
+            Self::ProtoStruct::ARTIFACT_ACTIVE => Self::Active,
+            Self::ProtoStruct::ARTIFACT_PENDING => Self::Pending,
+        })
+    }
+}
+
 /// Status of a service instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DeployStatus {
-    /// The service instance has been successfully deployed.
-    Active,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InstanceStatus {
     /// The service instance is pending deployment.
-    Pending,
+    Pending = 0,
+    /// The service instance has been successfully deployed.
+    Active = 1,
+}
+
+impl Display for InstanceStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Active => f.write_str("active"),
+            Self::Pending => f.write_str("pending"),
+        }
+    }
+}
+
+impl ProtobufConvert for InstanceStatus {
+    type ProtoStruct = schema::runtime::InstanceStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        match self {
+            Self::Active => Self::ProtoStruct::SERVICE_ACTIVE,
+            Self::Pending => Self::ProtoStruct::SERVICE_PENDING,
+        }
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Ok(match pb {
+            Self::ProtoStruct::SERVICE_ACTIVE => Self::Active,
+            Self::ProtoStruct::SERVICE_PENDING => Self::Pending,
+        })
+    }
+}
+
+/// Current state of artifact in dispatcher.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::runtime::ArtifactState")]
+pub struct ArtifactState {
+    /// Artifact specification.
+    pub spec: ArtifactSpec,
+    /// Artifact deployment status.
+    pub status: ArtifactStatus,
+}
+
+impl ArtifactState {
+    /// Create a new artifact state with the given specification and status.
+    pub fn new(spec: ArtifactSpec, status: ArtifactStatus) -> Self {
+        Self { spec, status }
+    }
+}
+
+/// Current state of service instance in dispatcher.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+    Serialize,
+    Deserialize,
+)]
+#[protobuf_convert(source = "schema::runtime::InstanceState")]
+pub struct InstanceState {
+    /// Service instance specification.
+    pub spec: InstanceSpec,
+    /// Service instance activity status.
+    pub status: InstanceStatus,
+}
+
+impl InstanceState {
+    /// Creates a new instance state with the given specification and status.
+    pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
+        Self { spec, status }
+    }
 }
 
 #[test]
@@ -369,11 +479,11 @@ fn parse_artifact_id_incorrect_layout() {
         ("ava:123", "invalid digit found in string"),
         (
             "123:I am a service!",
-            "Artifact name contains an illegal character",
+            "Artifact name (I am a service!) contains an illegal character",
         ),
         (
             "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!",
-            "Artifact name contains an illegal character",
+            "Artifact name (\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}!) contains an illegal character",
         ),
     ];
 
@@ -406,18 +516,22 @@ fn test_instance_spec_validate_incorrect() {
                 "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
                 "0:my-service:1.0.0"
             ),
-            "Service instance name contains illegal character",
+            "Service instance name (\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}) contains illegal character",
         ),
         (
             InstanceSpec::new(3, "space service", "1:java.runtime.service"),
-            "Service instance name contains illegal character",
+            "Service instance name (space service) contains illegal character",
         ),
         (
-            InstanceSpec::new(4, "foo_service", ""),
+            InstanceSpec::new(4, "dot.service", "1:java.runtime.service"),
+            "Service instance name (dot.service) contains illegal character",
+        ),
+        (
+            InstanceSpec::new(5, "foo_service", ""),
             "Wrong artifact id format",
         ),
         (
-            InstanceSpec::new(5, "foo_service", ":"),
+            InstanceSpec::new(6, "foo_service", ":"),
             "cannot parse integer from empty string",
         ),
     ];

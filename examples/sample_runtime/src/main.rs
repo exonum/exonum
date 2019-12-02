@@ -25,9 +25,9 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError, ErrorKind,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::Transaction, AnyTx, ArtifactId, CallInfo, DispatcherError, ErrorKind,
+        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
+        Runtime, SnapshotExt, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
@@ -349,12 +349,12 @@ fn main() {
 
         // Get an instance identifier.
         let snapshot = blockchain_ref.snapshot();
-        let (spec, status) = snapshot
+        let state = snapshot
             .for_dispatcher()
             .get_instance(instance_name.as_str())
             .unwrap();
-        assert_eq!(status, DeployStatus::Active);
-        let instance_id = spec.id;
+        assert_eq!(state.status, InstanceStatus::Active);
+        let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(

@@ -19,9 +19,14 @@ use exonum_merkledb::ObjectHash;
 use std::time::Duration;
 
 use crate::{
+    crypto::gen_keypair,
     helpers::{Height, Round, ValidatorId},
     node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
-    sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    runtime::rust::Transaction,
+    sandbox::{
+        compute_tx_hash, sandbox_tests_helper::*, timestamping::TimestampingService,
+        timestamping_sandbox,
+    },
 };
 
 /// HANDLE block response
@@ -216,6 +221,108 @@ fn handle_block_response_with_unknown_tx() {
         0,
         sandbox.secret_key(ValidatorId(0)),
     ));
+}
+
+/// - should **NOT** process block if tx is incorrect
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with unknown tx A
+/// - send TransactionsRequest with unknown tx A
+/// - receive TransactionsResponse with tx A
+/// - Figure out that tx A is incorrect
+/// - Node should panic because of committed block with incorrect tx.
+#[test]
+#[should_panic(expected = "Received a block with transaction known as invalid")]
+fn handle_block_response_with_incorrect_tx() {
+    let sandbox = timestamping_sandbox();
+
+    // Create correct tx, and then sign with the wrong destination.
+    let (pk, sk) = gen_keypair();
+    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
+
+    let propose = ProposeBuilder::new(&sandbox).build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_tx_hash(&compute_tx_hash(&[incorrect_tx.clone()]))
+        .with_state_hash(&sandbox.compute_state_hash(&[incorrect_tx.clone()]))
+        .build();
+
+    let precommit_1 = sandbox.create_precommit(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    let precommit_2 = sandbox.create_precommit(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(2)),
+    );
+    let precommit_3 = sandbox.create_precommit(
+        ValidatorId(3),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(3)),
+    );
+
+    sandbox.recv(&sandbox.create_status(
+        sandbox.public_key(ValidatorId(3)),
+        Height(2),
+        block.object_hash(),
+        0,
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &sandbox.create_block_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            Height(1),
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+
+    sandbox.recv(&sandbox.create_block_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        vec![incorrect_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &sandbox.create_transactions_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            vec![incorrect_tx.object_hash()],
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+
+    sandbox.recv(&sandbox.create_transactions_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        vec![incorrect_tx.clone()],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    // Here IncompleteBlock will become complete and since it contains
+    // an incorrect tx, node should panic.
 }
 
 /// HANDLE block response

@@ -14,7 +14,10 @@
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::exonum_interface;
-use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot};
+use exonum_merkledb::{
+    access::{Access, AccessExt},
+    BinaryValue, Fork, ObjectHash, Snapshot,
+};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
@@ -29,8 +32,8 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        error::ExecutionError, BlockchainData, CallInfo, Caller, DeployStatus, Dispatcher,
-        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, Mailbox, Runtime,
+        error::ExecutionError, BlockchainData, CallInfo, Caller, Dispatcher, DispatcherSchema,
+        ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
         StateHashAggregator,
     },
 };
@@ -43,6 +46,12 @@ use super::{
 const SERVICE_INSTANCE_ID: InstanceId = 2;
 const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 
+fn block_state_hash(access: impl Access) -> Hash {
+    CoreSchema::new(access)
+        .state_hash_aggregator()
+        .object_hash()
+}
+
 fn create_block(blockchain: &BlockchainMut) -> Fork {
     let height = CoreSchema::new(&blockchain.snapshot()).height();
     let (_, patch) =
@@ -50,7 +59,17 @@ fn create_block(blockchain: &BlockchainMut) -> Fork {
     Fork::from(patch)
 }
 
-fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
+fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
+    // FIXME: Due to during the `create_patch` `before_commit` hook invokes without changes in
+    // instances and artifacts, do this call again to mark pending artifacts and instances as
+    // active. [ECR-3222]
+    blockchain.dispatcher().activate_pending(&fork);
+    // Get state hash from the block proposal.
+    fork.flush();
+    let snapshot = fork.snapshot_without_unflushed_changes();
+    let state_hash_in_patch = block_state_hash(snapshot);
+
+    // Commit block to the blockchain.
     blockchain
         .commit(
             fork.into_patch(),
@@ -59,6 +78,11 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
             &mut BTreeMap::new(),
         )
         .unwrap();
+
+    // Make sure that the state hash is the same before and after the block is committed.
+    let snapshot = blockchain.snapshot();
+    let state_hash_in_block = block_state_hash(&snapshot);
+    assert_eq!(state_hash_in_block, state_hash_in_patch);
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
@@ -285,8 +309,21 @@ impl Service for TestServiceImpl {
         Ok(())
     }
 
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
+    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+        let service_data = data.for_executing_service();
+        vec![
+            service_data
+                .clone()
+                .get_entry::<_, String>("constructor_entry")
+                .object_hash(),
+            service_data
+                .clone()
+                .get_entry::<_, u64>("method_a_entry")
+                .object_hash(),
+            service_data
+                .get_entry::<_, u64>("method_b_entry")
+                .object_hash(),
+        ]
     }
 }
 
@@ -671,12 +708,12 @@ fn dependent_builtin_service() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance(SERVICE_INSTANCE_ID).unwrap().1,
-        DeployStatus::Active
+        schema.get_instance(SERVICE_INSTANCE_ID).unwrap().status,
+        InstanceStatus::Active
     );
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().1,
-        DeployStatus::Active
+        schema.get_instance("dependent-service").unwrap().status,
+        InstanceStatus::Active
     );
 }
 
@@ -765,8 +802,8 @@ fn dependent_service_in_same_block() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().1,
-        DeployStatus::Active
+        schema.get_instance("dependent-service").unwrap().status,
+        InstanceStatus::Active
     );
 }
 
@@ -798,7 +835,7 @@ fn dependent_service_in_successive_block() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().1,
-        DeployStatus::Active
+        schema.get_instance("dependent-service").unwrap().status,
+        InstanceStatus::Active
     );
 }

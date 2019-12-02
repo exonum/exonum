@@ -52,6 +52,8 @@ class CryptoAdvancedTest(unittest.TestCase):
                 with client.create_subscriber() as subscriber:
                     subscriber.wait_for_new_block()
                 self.assertEqual(crypto_client.get_wallet_info(alice_keys).status_code, 200)
+                # TODO: Sometimes it fails without time.sleep() [ECR-3876]
+                time.sleep(2)
                 alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
                 ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
                 self.assertEqual(alice_balance, 100)
