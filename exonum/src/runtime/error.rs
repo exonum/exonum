@@ -420,6 +420,12 @@ impl ObjectHash for ExecutionError {
             buffer[1] = code;
             LittleEndian::write_u32(&mut buffer[2..], instance_id);
             crypto::hash(&buffer)
+        } else if let ErrorKind::Runtime { runtime_id, .. } = self.kind {
+            let mut buffer = [0; 6];
+            buffer[0] = kind as u8;
+            buffer[1] = code;
+            LittleEndian::write_u32(&mut buffer[2..], runtime_id);
+            crypto::hash(&buffer)
         } else {
             crypto::hash(&[kind as u8, code])
         }
@@ -680,6 +686,52 @@ mod tests {
             description: "foo".to_owned(),
         };
         assert_ne!(first_err.object_hash(), second_err.object_hash());
+    }
+
+    #[test]
+    fn object_hash_for_runtime_errors() {
+        let first_err = ExecutionError {
+            kind: ErrorKind::Runtime {
+                code: 5,
+                runtime_id: 0,
+            },
+            description: "foo".to_owned(),
+        };
+        let second_err = ExecutionError {
+            kind: ErrorKind::Runtime {
+                code: 5,
+                runtime_id: 1,
+            },
+            description: "foo bar".to_owned(),
+        };
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        let second_err = ExecutionError {
+            kind: ErrorKind::Service {
+                code: 5,
+                instance_id: 1,
+            },
+            description: "foo bar".to_owned(),
+        };
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        let second_err = ExecutionError {
+            kind: ErrorKind::Runtime {
+                code: 6,
+                runtime_id: 0,
+            },
+            description: "foo bar".to_owned(),
+        };
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        let second_err = ExecutionError {
+            kind: ErrorKind::Runtime {
+                code: 5,
+                runtime_id: 0,
+            },
+            description: "Description doesn't matter".to_owned(),
+        };
+        assert_eq!(first_err.object_hash(), second_err.object_hash());
     }
 
     #[test]
