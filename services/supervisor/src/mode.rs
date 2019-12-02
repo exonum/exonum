@@ -21,79 +21,110 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
+use failure::format_err;
+
 use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
-use exonum_merkledb::access::Access;
+use exonum_merkledb::{access::Access, BinaryValue};
+use exonum_proto::ProtobufConvert;
 
-use super::{multisig::MultisigIndex, DeployRequest};
+use super::{multisig::MultisigIndex, proto, DeployRequest};
 
-/// Simple supervisor mode: to deploy service one have to send
-/// one request to any of the validators.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Simple;
+/// Supervisor operating mode.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Mode {
+    /// Simple supervisor mode: to deploy service one have to send
+    /// one request to any of the validators.
+    Simple,
+    /// Decentralized supervisor mode: to deploy service a request should be
+    /// sent to **every** validator before it will be executed.
+    /// For configs, a byzantine majority of validators should vote for it.
+    Decentralized,
+}
 
-/// Decentralized supervisor mode: to deploy service a request should be
-/// sent to **every** validator before it will be executed.
-/// For configs, a byzantine majority of validators should vote for it.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Decentralized;
+impl BinaryValue for Mode {
+    fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Mode::Simple => vec![proto::SupervisorMode::SIMPLE as u8],
+            Mode::Decentralized => vec![proto::SupervisorMode::DECENTRALIZED as u8],
+        }
+    }
 
-/// Trait encapsulating the decision making logic of the supervisor.
-pub trait SupervisorMode: std::fmt::Debug + Send + Sync + Copy + 'static {
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+        let value = bytes.as_ref();
+        if value.len() != 1 {
+            return Err(format_err!(
+                "Invalid input data length for Mode::from_bytes: expected 1, got {}",
+                value.len()
+            ));
+        }
+
+        match value[0] {
+            value if value == proto::SupervisorMode::SIMPLE as u8 => Ok(Mode::Simple),
+            value if value == proto::SupervisorMode::DECENTRALIZED as u8 => Ok(Mode::Decentralized),
+            value => Err(format_err!("Invalid value for SupervisorMode: {}", value)),
+        }
+    }
+}
+
+impl ProtobufConvert for Mode {
+    type ProtoStruct = proto::SupervisorMode;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        match self {
+            Mode::Simple => Self::ProtoStruct::SIMPLE,
+            Mode::Decentralized => Self::ProtoStruct::DECENTRALIZED,
+        }
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let result = match pb {
+            Self::ProtoStruct::SIMPLE => Mode::Simple,
+            Self::ProtoStruct::DECENTRALIZED => Mode::Decentralized,
+        };
+
+        Ok(result)
+    }
+}
+
+impl Mode {
     /// Checks whether deploy should be performed within the network.
-    fn deploy_approved<T: Access>(
+    pub fn deploy_approved<T: Access>(
+        &self,
         deploy: &DeployRequest,
         deploy_requests: &MultisigIndex<T, DeployRequest>,
         validators: usize,
-    ) -> bool;
+    ) -> bool {
+        match self {
+            Mode::Simple => {
+                // For simple supervisor request from 1 validator is enough.
+                deploy_requests.confirmations(deploy) >= 1
+            }
+            Mode::Decentralized => {
+                // Approve deploy in case 2/3+1 validators confirmed it.
+                let confirmations = deploy_requests.confirmations(&deploy);
+                confirmations >= byzantine_quorum(validators)
+            }
+        }
+    }
 
     /// Checks whether config can be applied for the network.
-    fn config_approved<T: Access>(
-        config_hash: &Hash,
-        config_confirms: &MultisigIndex<T, Hash>,
-        validators: usize,
-    ) -> bool;
-}
-
-impl SupervisorMode for Simple {
-    fn deploy_approved<T: Access>(
-        deploy: &DeployRequest,
-        deploy_requests: &MultisigIndex<T, DeployRequest>,
-        _validators: usize,
-    ) -> bool {
-        // For simple supervisor request from 1 validator is enough.
-        deploy_requests.confirmations(deploy) >= 1
-    }
-
-    fn config_approved<T: Access>(
-        config_hash: &Hash,
-        config_confirms: &MultisigIndex<T, Hash>,
-        _validators: usize,
-    ) -> bool {
-        config_confirms.confirmations(&config_hash) >= 1
-    }
-}
-
-impl SupervisorMode for Decentralized {
-    fn deploy_approved<T: Access>(
-        deploy: &DeployRequest,
-        deploy_requests: &MultisigIndex<T, DeployRequest>,
-        validators: usize,
-    ) -> bool {
-        let confirmations = deploy_requests.confirmations(&deploy);
-
-        // Approve deploy in case 2/3+1 validators confirmed it.
-        confirmations >= byzantine_quorum(validators)
-    }
-
-    fn config_approved<T: Access>(
+    pub fn config_approved<T: Access>(
+        &self,
         config_hash: &Hash,
         config_confirms: &MultisigIndex<T, Hash>,
         validators: usize,
     ) -> bool {
-        let confirmations = config_confirms.confirmations(&config_hash);
-
-        // Apply pending config in case 2/3+1 validators voted for it.
-        confirmations >= byzantine_quorum(validators)
+        match self {
+            Mode::Simple => {
+                // For simple supervisor one confirmation (from us) is enough.
+                config_confirms.confirmations(&config_hash) >= 1
+            }
+            Mode::Decentralized => {
+                // Apply pending config in case 2/3+1 validators voted for it.
+                let confirmations = config_confirms.confirmations(&config_hash);
+                confirmations >= byzantine_quorum(validators)
+            }
+        }
     }
 }

@@ -25,7 +25,7 @@ use exonum::{
     runtime::{rust::Transaction, InstanceId, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, Snapshot};
-use exonum_supervisor::{ConfigPropose, SimpleSupervisor};
+use exonum_supervisor::{ConfigPropose, Supervisor};
 use exonum_testkit::{ApiKind, InstanceCollection, TestKitApi, TestKitBuilder, TestNode};
 
 use std::{collections::HashMap, iter::FromIterator};
@@ -339,7 +339,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor::builtin_instance(Supervisor::simple_config()))
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -495,7 +495,7 @@ fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_rust_service(TimeServiceInstance)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor::builtin_instance(Supervisor::simple_config()))
         .create();
 
     let mut api = testkit.api();

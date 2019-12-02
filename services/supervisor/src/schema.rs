@@ -24,12 +24,14 @@ use exonum_merkledb::{
 
 use super::{
     multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    StartService,
+    StartService, SupervisorConfig,
 };
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
+    /// Supervisor configuration.
+    pub configuration: Entry<T::Base, SupervisorConfig>,
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
@@ -57,6 +59,7 @@ impl<T: Access> Schema<T> {
     /// Returns hashes for tables with proofs.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
+            self.configuration.object_hash(),
             self.deploy_requests.object_hash(),
             self.deploy_confirmations.object_hash(),
             self.pending_deployments.object_hash(),

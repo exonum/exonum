@@ -71,7 +71,7 @@ pub use self::{
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-        DeployRequest, ServiceConfig, StartService,
+        DeployRequest, ServiceConfig, StartService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -82,11 +82,13 @@ use exonum::{
     crypto::Hash,
     runtime::{
         rust::{api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service},
-        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{BinaryValue, Snapshot};
+
+use mode::Mode;
 
 pub mod mode;
 
@@ -99,21 +101,9 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Decentralized supervisor.
-///
-/// Within the "decentralized" mode, both deploy requests and configuration change proposals
-/// should be approved by (2/3+1) validators.
-pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
-
-/// Simple supervisor.
-///
-/// Within the "simple" mode, both deploy requests and configuration change proposals require
-/// only one approval from a validator node.
-pub type SimpleSupervisor = Supervisor<mode::Simple>;
-
 /// Returns the `Supervisor` entity name.
 pub const fn supervisor_name() -> &'static str {
-    Supervisor::<mode::Decentralized>::NAME
+    Supervisor::NAME
 }
 
 /// Error message emitted when the `Supervisor` is installed as a non-privileged service.
@@ -211,50 +201,65 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
 
 /// Supervisor service implementation.
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(implements("transactions::SupervisorInterface"))]
-#[service_factory(
-    proto_sources = "proto",
-    artifact_name = "exonum-supervisor",
-    service_constructor = "Self::construct"
-)]
-pub struct Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
-    phantom: std::marker::PhantomData<Mode>,
-}
+#[service_dispatcher(implements(
+    "transactions::SupervisorInterface",
+    "Configure<Params = SupervisorConfig>"
+))]
+#[service_factory(proto_sources = "proto", artifact_name = "exonum-supervisor")]
+pub struct Supervisor;
 
-impl<Mode> Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
+impl Supervisor {
     /// Name of the supervisor service.
     pub const NAME: &'static str = "supervisor";
 
-    /// Creates a new `Supervisor` service object.
-    pub fn new() -> Supervisor<Mode> {
-        Supervisor {
-            phantom: std::marker::PhantomData::<Mode>::default(),
+    /// Creates a configuration for a simple `Supervisor`.
+    pub fn simple_config() -> SupervisorConfig {
+        SupervisorConfig { mode: Mode::Simple }
+    }
+
+    /// Creates a configuration for a decentralized `Supervisor`.
+    pub fn decentralized_config() -> SupervisorConfig {
+        SupervisorConfig {
+            mode: Mode::Decentralized,
         }
     }
 
-    /// Factory constructor of the `Supervisor` object that takes `&self` as an argument.
-    /// The constructor is required for the `ServiceFactory` trait implementation.
-    pub fn construct(&self) -> Box<Self> {
-        Box::new(Self::new())
+    /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
+    /// configuration.
+    pub fn builtin_instance(config: SupervisorConfig) -> InstanceCollection {
+        // Creates a supervisor with provided config.
+        InstanceCollection::new(Supervisor).with_instance(
+            SUPERVISOR_INSTANCE_ID,
+            Supervisor::NAME,
+            config.into_bytes(),
+        )
     }
 }
 
-impl<Mode> Service for Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
+impl Service for Supervisor {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+        use std::borrow::Cow;
+
+        // Load configuration from bytes and store it.
+        let config =
+            SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
+
+        let mut schema = Schema::new(context.service_data());
+        schema.configuration.set(config);
+
+        Ok(())
+    }
+
     fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn before_commit(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
+        let configuration = schema
+            .configuration
+            .get()
+            .expect("Supervisor entity was not configured; unable to load configuration");
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();
@@ -279,7 +284,7 @@ where
                 schema.pending_proposal.remove();
             } else if entry.config_propose.actual_from == height.next() {
                 // Config should be applied at the next height.
-                if Mode::config_approved(
+                if configuration.mode.config_approved(
                     &entry.propose_hash,
                     &schema.config_confirms,
                     validator_count,
@@ -356,15 +361,27 @@ where
     }
 }
 
-impl<Mode> From<Supervisor<Mode>> for InstanceCollection
-where
-    Mode: mode::SupervisorMode,
-{
-    fn from(service: Supervisor<Mode>) -> Self {
-        InstanceCollection::new(service).with_instance(
-            SUPERVISOR_INSTANCE_ID,
-            Supervisor::<Mode>::NAME,
-            Vec::default(),
-        )
+impl Configure for Supervisor {
+    type Params = SupervisorConfig;
+
+    fn verify_config(
+        &self,
+        _context: CallContext<'_>,
+        _params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        // If config was decoded, it's OK.
+        Ok(())
+    }
+
+    fn apply_config(
+        &self,
+        context: CallContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.service_data());
+
+        schema.configuration.set(params);
+
+        Ok(())
     }
 }

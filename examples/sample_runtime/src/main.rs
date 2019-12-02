@@ -16,9 +16,7 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{
-        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys,
-    },
+    blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys},
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
@@ -31,7 +29,7 @@ use exonum::{
     },
 };
 use exonum_derive::IntoExecutionError;
-use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
+use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -276,7 +274,7 @@ fn main() {
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
         .with_rust_runtime(
             channel.endpoints.0.clone(),
-            vec![InstanceCollection::from(SimpleSupervisor::new())],
+            vec![Supervisor::builtin_instance(Supervisor::simple_config())],
         )
         .with_additional_runtime(SampleRuntime::default())
         .build()

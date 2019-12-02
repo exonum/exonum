@@ -22,7 +22,7 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    mode, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
+    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
     DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor,
 };
 
@@ -138,10 +138,7 @@ impl StartService {
     }
 }
 
-impl<Mode> SupervisorInterface for Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
+impl SupervisorInterface for Supervisor {
     fn propose_config_change(
         &self,
         mut context: CallContext<'_>,
@@ -269,6 +266,10 @@ where
             return Err(Error::ActualFromIsPast.into());
         }
         let mut schema = Schema::new(context.service_data());
+        let configuration = schema
+            .configuration
+            .get()
+            .expect("Supervisor entity was not configured; unable to load configuration");
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -301,7 +302,10 @@ where
         }
 
         schema.deploy_requests.confirm(&deploy, author);
-        if Mode::deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
+        if configuration
+            .mode
+            .deploy_approved(&deploy, &schema.deploy_requests, validator_count)
+        {
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments.put(&artifact, deploy);
@@ -354,10 +358,7 @@ where
     }
 }
 
-impl<Mode> Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
+impl Supervisor {
     /// Verifies that each change introduced within config proposal is valid.
     fn verify_config_changeset(
         &self,
