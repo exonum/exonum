@@ -265,7 +265,7 @@ pub fn gen_timestamping_tx() -> Verified<AnyTx> {
 
 pub fn gen_unverified_timestamping_tx() -> TimestampTx {
     let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
-    tx_gen.create_unverified()
+    tx_gen.gen_tx_payload()
 }
 
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {

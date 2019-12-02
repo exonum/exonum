@@ -246,7 +246,7 @@ impl NodeHandler {
         // Do not send a prevote if propose contains incorrect transactions.
         let propose_state = self.state.propose(&propose_hash).unwrap();
         if propose_state.has_invalid_txs() {
-            warn!("Denying sending a prevote for a propose with incorrect transactions");
+            warn!("Denying sending a prevote for a propose which contains incorrect transactions");
             self.state.has_majority_prevotes(round, propose_hash)
         } else {
             // Propose state is OK, send prevote.
@@ -262,10 +262,12 @@ impl NodeHandler {
         propose_hash: Hash,
         block_hash: Hash,
     ) {
-        // Do not send a prevote if propose contains incorrect transactions.
+        // Do not send a precommit if propose contains incorrect transactions.
         let propose_state = self.state.propose(&propose_hash).unwrap();
         if propose_state.has_invalid_txs() {
-            warn!("Denying sending a precommit for a propose with incorrect transactions");
+            warn!(
+                "Denying sending a precommit for a propose which contains incorrect transactions"
+            );
         } else {
             // Propose state is OK, send precommit.
             self.broadcast_precommit(round, propose_hash, block_hash)
@@ -389,6 +391,16 @@ impl NodeHandler {
         // Lock to propose
         if self.state.locked_round() < prevote_round && self.state.propose(&propose_hash).is_some()
         {
+            // Check that propose is valid and should be executed.
+            let propose_state = self.state.propose(&propose_hash).unwrap();
+            if propose_state.has_invalid_txs() {
+                panic!(
+                    "handle_majority_prevotes: propose contains invalid transaction(s). \
+                     Either a node's implementation is incorrect \
+                     or validators majority works incorrectly"
+                );
+            }
+
             self.lock(prevote_round, propose_hash);
         }
     }
@@ -600,7 +612,7 @@ impl NodeHandler {
     /// ensure that transaction passes at least basic checks. If `BlockchainMut::check_tx` fails,
     /// transaction will be considered invalid and not stored to the pool (instead, its hash will
     /// be stored in the temporary invalid messages set, so we will be able to detect a block/propose
-    /// with an invalid tx later).
+    /// with an invalid tx later; note that the temporary set is cleared every block).
     ///
     /// # Panics
     ///
@@ -616,6 +628,8 @@ impl NodeHandler {
 
         if let Err(e) = self.blockchain.check_tx(&msg) {
             // Store transaction as invalid to know it if it'll be included into a proposal.
+            // Please note that it **must** happen before calling `check_incomplete_proposes`,
+            // since the latter uses `invalid_txs` to recalculate the validity of proposals.
             self.state.invalid_txs_mut().insert(msg.object_hash());
 
             // Since the transaction, despite being incorrect, is received from within the
@@ -688,6 +702,7 @@ impl NodeHandler {
         // transaction is received from the network, we have to deal with it
         // and maybe even panic (if most of nodes will approve a block with such a
         // transaction).
+        // TODO: Move this check to the `ExplorerApi::add_transaction`. [ECR-3907]
         if let Err(error) = self.blockchain.check_tx(&msg) {
             warn!(
                 "Received incorrect transaction from outside of the network; \

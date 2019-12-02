@@ -100,6 +100,8 @@ pub struct State {
     // with one of them, so node could lookup for it.
     //
     // This set is cleared every block.
+    //
+    // TODO: This may be a vector for DoS attacks by memory exhaustion. [ECR-2067]
     invalid_txs: HashSet<Hash>,
 
     keys: Keys,
@@ -149,7 +151,7 @@ pub struct ProposeState {
     // Whether the message has been saved to the consensus messages' cache or not.
     is_saved: bool,
     // Whether the propose contains invalid transactions or not.
-    valid: bool,
+    is_valid: bool,
 }
 
 /// State of a block.
@@ -340,7 +342,7 @@ impl ProposeState {
 
     /// Returns `true` if there are invalid transactions in the propose.
     pub fn has_invalid_txs(&self) -> bool {
-        !self.valid
+        !self.is_valid
     }
 
     /// Indicates whether Propose has been saved to the consensus messages cache
@@ -860,7 +862,7 @@ impl State {
 
             if self.invalid_txs.contains(&tx_hash) {
                 // Mark prevote with newly received invalid transaction as invalid.
-                propose_state.valid = false;
+                propose_state.is_valid = false;
             }
 
             if propose_state.unknown_txs.is_empty() {
@@ -939,7 +941,7 @@ impl State {
                 // (ECR-1635)
                 is_saved: true,
                 // We expect ourself not to produce invalid proposes.
-                valid: true,
+                is_valid: true,
             },
         );
 
@@ -957,7 +959,7 @@ impl State {
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {
-                let mut valid = true;
+                let mut is_valid = true;
                 let mut unknown_txs = HashSet::new();
                 for hash in &msg.payload().transactions {
                     if self.tx_cache.contains_key(hash) {
@@ -977,7 +979,7 @@ impl State {
                         // we don't stop processing, since we expect this propose to
                         // be declined by the consensus rules.
                         error!("Received propose with transaction known as invalid");
-                        valid = false;
+                        is_valid = false;
                     } else {
                         unknown_txs.insert(*hash);
                     }
@@ -995,7 +997,7 @@ impl State {
                     unknown_txs,
                     block_hash: None,
                     is_saved: false,
-                    valid,
+                    is_valid,
                 }))
             }
         }

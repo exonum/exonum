@@ -1715,10 +1715,10 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
 }
 
 /// Ignore transactions that fail `BlockchainMut::check_tx`.
-/// Idea of test is to receive incorrect tx (which is expected to be ignored) and
+/// Idea of test is to receive invalid tx (which is expected to be ignored) and
 /// then broadcast prevote without this tx.
 #[test]
-fn handle_tx_ignore_incorrect_tx() {
+fn handle_tx_ignore_invalid_tx() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
@@ -1733,13 +1733,24 @@ fn handle_tx_ignore_incorrect_tx() {
     let (pk, sk) = gen_keypair();
     let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
 
-    // Receive that message.
+    // And create one correct tx that **should** be accepted.
+    let correct_tx = gen_timestamping_tx();
+
+    // Receive those messages.
     sandbox.recv(&incorrect_tx);
+    sandbox.assert_tx_cache_len(0);
+
+    sandbox.recv(&correct_tx);
+    sandbox.assert_tx_cache_len(1);
+
     sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
 
-    // Create propose **without** this tx. It should be accepted, since incorrect tx wasn't processed
+    // Create propose **without** this tx (but with correct tx).
+    // It should be accepted, since invalid tx wasn't processed
     // due to failed `BlockchainMut::check_tx` validation.
-    let propose = ProposeBuilder::new(&sandbox).with_tx_hashes(&[]).build();
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[correct_tx.object_hash()])
+        .build();
     sandbox.broadcast(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(0));
