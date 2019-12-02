@@ -190,7 +190,7 @@ pub use self::{
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
+        AfterCommitContext, Broadcaster, BuiltinInstance, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction,
     },
 };

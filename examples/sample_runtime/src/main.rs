@@ -25,7 +25,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory, Transaction},
+        rust::{BuiltinInstance, RustRuntime, ServiceFactory, Transaction},
         AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError, ExecutionContext,
         ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
         StateHashAggregator, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
@@ -278,7 +278,7 @@ fn main() {
     let supervisor_service = SimpleSupervisor::new();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(supervisor_service.artifact_id())
-        .with_instance(supervisor_service.default_instance())
+        .with_instance(supervisor_service.builtin_instance())
         .build();
     let rust_runtime =
         RustRuntime::new(channel.endpoints.0.clone()).with_factory(supervisor_service);

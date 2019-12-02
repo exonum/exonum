@@ -23,7 +23,7 @@ use exonum::{
     keys::Keys,
     merkledb::TemporaryDB,
     runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        rust::{BuiltinInstance, RustRuntime, ServiceFactory},
         ArtifactSpec, RuntimeInstance, WellKnownRuntime,
     },
 };
@@ -186,9 +186,9 @@ impl TestKitBuilder {
 
     /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
     /// artifact and default instance are added implicitly.
-    pub fn with_rust_service_default(self, service: impl DefaultInstance) -> Self {
+    pub fn with_builtin_rust_service(self, service: impl BuiltinInstance) -> Self {
         self.with_artifact(service.artifact_id())
-            .with_instance(service.default_instance())
+            .with_instance(service.builtin_instance())
             .with_rust_service(service)
     }
 

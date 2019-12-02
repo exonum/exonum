@@ -20,7 +20,7 @@ use exonum::{
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
-            CallContext, DefaultInstance, Service,
+            BuiltinInstance, CallContext, Service,
         },
         BlockchainData, DispatcherError, InstanceId,
     },
@@ -122,7 +122,7 @@ impl Service for IncService {
     }
 }
 
-impl DefaultInstance for IncService {
+impl BuiltinInstance for IncService {
     const INSTANCE_ID: InstanceId = SERVICE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

@@ -82,7 +82,7 @@ use exonum::{
     crypto::Hash,
     runtime::{
         rust::{
-            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance,
+            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, BuiltinInstance, CallContext,
             Service,
         },
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
@@ -372,7 +372,7 @@ where
     }
 }
 
-impl<Mode: mode::SupervisorMode> DefaultInstance for Supervisor<Mode> {
+impl<Mode: mode::SupervisorMode> BuiltinInstance for Supervisor<Mode> {
     const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
     const INSTANCE_NAME: &'static str = Self::NAME;
 }

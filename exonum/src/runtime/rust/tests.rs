@@ -40,7 +40,7 @@ use crate::{
 };
 
 use super::{
-    service::{DefaultInstance, Service, ServiceFactory},
+    service::{BuiltinInstance, Service, ServiceFactory},
     ArtifactId, CallContext, RustRuntime,
 };
 
@@ -290,7 +290,7 @@ impl Service for TestServiceImpl {
     }
 }
 
-impl DefaultInstance for TestServiceImpl {
+impl BuiltinInstance for TestServiceImpl {
     const INSTANCE_ID: u32 = SERVICE_INSTANCE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_INSTANCE_NAME;
 }
@@ -636,11 +636,11 @@ impl Service for DependentServiceImpl {
     }
 }
 
-impl DefaultInstance for DependentServiceImpl {
+impl BuiltinInstance for DependentServiceImpl {
     const INSTANCE_ID: u32 = SERVICE_INSTANCE_ID + 1;
     const INSTANCE_NAME: &'static str = "dependent-service";
 
-    fn default_instance(&self) -> InstanceInitParams {
+    fn builtin_instance(&self) -> InstanceInitParams {
         self.artifact_id()
             .into_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
             .with_constructor(Init {
@@ -659,9 +659,9 @@ fn dependent_builtin_service() {
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(main_service.artifact_id())
-        .with_instance(main_service.default_instance())
+        .with_instance(main_service.builtin_instance())
         .with_artifact(dep_service.artifact_id())
-        .with_instance(dep_service.default_instance())
+        .with_instance(dep_service.builtin_instance())
         .build();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)
@@ -697,8 +697,8 @@ fn dependent_builtin_service_with_incorrect_order() {
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(main_service.artifact_id())
         .with_artifact(dep_service.artifact_id())
-        .with_instance(dep_service.default_instance()) // <-- Incorrect service ordering
-        .with_instance(main_service.default_instance())
+        .with_instance(dep_service.builtin_instance()) // <-- Incorrect service ordering
+        .with_instance(main_service.builtin_instance())
         .build();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)
@@ -729,7 +729,7 @@ fn dependent_service_with_no_dependency() {
         .unwrap();
 
     let fork = create_block(&blockchain);
-    let inst = DependentServiceImpl.default_instance();
+    let inst = DependentServiceImpl.builtin_instance();
     Dispatcher::commit_artifact(&fork, inst.instance_spec.artifact.clone(), vec![]).unwrap();
     commit_block(&mut blockchain, fork);
 
@@ -765,8 +765,8 @@ fn dependent_service_in_same_block() {
 
     // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
     let fork = create_block(&blockchain);
-    let main_inst = TestServiceImpl.default_instance();
-    let dep_inst = DependentServiceImpl.default_instance();
+    let main_inst = TestServiceImpl.builtin_instance();
+    let dep_inst = DependentServiceImpl.builtin_instance();
     Dispatcher::commit_artifact(&fork, main_inst.instance_spec.artifact.clone(), vec![]).unwrap();
     Dispatcher::commit_artifact(&fork, dep_inst.instance_spec.artifact.clone(), vec![]).unwrap();
     commit_block(&mut blockchain, fork);
@@ -796,7 +796,7 @@ fn dependent_service_in_successive_block() {
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
         .with_artifact(main_service.artifact_id())
-        .with_instance(main_service.default_instance())
+        .with_instance(main_service.builtin_instance())
         .build();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)
@@ -810,7 +810,7 @@ fn dependent_service_in_successive_block() {
         .unwrap();
 
     let fork = create_block(&blockchain);
-    let dep_spec = DependentServiceImpl.default_instance();
+    let dep_spec = DependentServiceImpl.builtin_instance();
     Dispatcher::commit_artifact(&fork, dep_spec.instance_spec.artifact.clone(), vec![]).unwrap();
     commit_block(&mut blockchain, fork);
 
