@@ -26,7 +26,6 @@ use crate::{
     blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
-    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
     runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };

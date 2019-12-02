@@ -744,8 +744,12 @@ fn test_dispatcher_start_service_rollback() {
 #[test]
 fn test_check_tx() {
     let keypair = crypto::gen_keypair();
-    let blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+    let blockchain = create_blockchain(
+        vec![TestDispatcherService.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
 

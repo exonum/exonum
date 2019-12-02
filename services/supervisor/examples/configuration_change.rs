@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::InstanceCollection,
     helpers::Height,
     messages::Verified,
     runtime::{
-        rust::{CallContext, Service, Transaction},
+        rust::{CallContext, Service, ServiceFactory, Transaction},
         AnyTx, BlockchainData, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -84,14 +83,16 @@ impl Configure for ConfigChangeService {
 
 fn main() {
     let service = ConfigChangeService;
-    let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
+    let artifact = service.artifact_id();
 
     // Create testkit instance with our test service and supervisor.
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_validators(4)
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_builtin_rust_service(DecentralizedSupervisor::new())
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_instance(SERVICE_ID, SERVICE_NAME))
+        .with_rust_service(service)
         .create();
 
     // Firstly, lets change consensus configuration and increase `min_propose_timeout`.

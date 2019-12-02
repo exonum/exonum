@@ -36,6 +36,7 @@ use exonum_merkledb::{
     Snapshot, TemporaryDB,
 };
 use failure::{format_err, Error};
+use futures::Future;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -231,8 +232,10 @@ impl BlockchainMut {
             .set(genesis_config.consensus_config);
 
         for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
-            self.dispatcher
-                .deploy_artifact_sync(&fork, artifact, payload)?;
+            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone())?;
+            if !self.dispatcher.is_artifact_deployed(&artifact) {
+                self.dispatcher.deploy_artifact(artifact, payload).wait()?
+            }
         }
         // Add service instances.
         for inst in genesis_config.builtin_instances {
