@@ -52,7 +52,7 @@ message InstanceSpec {
 
 // The kind of ExecutionError.
 enum ErrorKind {
-  UNCHECKED = 0;
+  UNEXPECTED = 0;
   DISPATCHER = 1;
   RUNTIME = 2;
   SERVICE = 3;
@@ -98,7 +98,7 @@ enum InstanceStatus {
 
 message ArtifactState {
     exonum.runtime.ArtifactSpec spec = 1;
-    ArtifactStatus status = 2; 
+    ArtifactStatus status = 2;
 }
 
 message InstanceState {

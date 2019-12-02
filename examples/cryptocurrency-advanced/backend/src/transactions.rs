@@ -16,7 +16,7 @@
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{rust::CallContext, DispatcherError, ExecutionError},
+    runtime::{rust::CallContext, ExecutionError},
 };
 use exonum_proto::ProtobufConvert;
 
@@ -97,7 +97,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         let mut schema = Schema::new(context.service_data());
 
@@ -128,7 +128,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         let mut schema = Schema::new(context.service_data());
         if let Some(wallet) = schema.wallets.get(&from) {
@@ -148,7 +148,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or_else(|| context.unauthorized_err())?;
 
         let mut schema = Schema::new(context.service_data());
         if schema.wallets.get(&from).is_none() {

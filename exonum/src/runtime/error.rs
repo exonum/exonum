@@ -136,7 +136,7 @@ impl ErrorKind {
 
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNCHECKED, 0),
+            ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
             ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
             ErrorKind::Runtime { code, .. } => (runtime_proto::ErrorKind::RUNTIME, code),
             ErrorKind::Service { code, .. } => (runtime_proto::ErrorKind::SERVICE, code),
@@ -146,7 +146,7 @@ impl ErrorKind {
     fn from_raw(kind: runtime_proto::ErrorKind, code: u8) -> Result<Self, failure::Error> {
         use runtime_proto::ErrorKind::*;
         let kind = match kind {
-            UNCHECKED => {
+            UNEXPECTED => {
                 ensure!(code == 0, "Error code for panic should be zero");
                 ErrorKind::Unexpected
             }
@@ -699,7 +699,7 @@ mod tests {
     fn execution_error_binary_value_unexpected_with_code() {
         let bytes = {
             let mut inner = runtime_proto::ExecutionError::default();
-            inner.set_kind(runtime_proto::ErrorKind::UNCHECKED);
+            inner.set_kind(runtime_proto::ErrorKind::UNEXPECTED);
             inner.set_code(2);
             inner.write_to_bytes().unwrap()
         };
