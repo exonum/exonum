@@ -24,7 +24,7 @@ use failure::Fail;
 
 use super::{
     schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
-    ConfigVote, DeployRequest,
+    ConfigVote, DeployRequest, SupervisorConfig,
 };
 
 /// Private API specification of the supervisor service.
@@ -46,6 +46,9 @@ pub trait PrivateApi {
 
     /// Returns the number of processed configurations.
     fn configuration_number(&self) -> Result<u64, Self::Error>;
+
+    /// Returns an actual supervisor config.
+    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -93,6 +96,15 @@ impl PrivateApi for ApiImpl<'_> {
 
         Ok(configuration_number)
     }
+
+    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
+        let config = Schema::new(self.0.service_data())
+            .configuration
+            .get()
+            .expect("Supervisor entity was not configured; unable to load configuration");
+
+        Ok(config)
+    }
 }
 
 impl PublicApi for ApiImpl<'_> {
@@ -121,6 +133,9 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint("configuration-number", |state, _query: ()| {
             ApiImpl(state).configuration_number()
+        })
+        .endpoint("supervisor-config", |state, _query: ()| {
+            ApiImpl(state).supervisor_config()
         });
     builder
         .public_scope()

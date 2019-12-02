@@ -22,6 +22,7 @@
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
 use failure::format_err;
+use serde_derive::Serialize;
 
 use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
@@ -31,7 +32,7 @@ use exonum_proto::ProtobufConvert;
 use super::{multisig::MultisigIndex, proto, DeployRequest};
 
 /// Supervisor operating mode.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
