@@ -225,6 +225,7 @@ impl BlockchainMut {
     fn create_genesis_block(&mut self, genesis_config: GenesisConfig) -> Result<(), Error> {
         genesis_config.consensus_config.validate()?;
         let mut fork = self.fork();
+        // Write genesis configuration to the blockchain.
         Schema::new(&fork)
             .consensus_config_entry()
             .set(genesis_config.consensus_config);
@@ -233,7 +234,6 @@ impl BlockchainMut {
             self.dispatcher
                 .deploy_artifact_sync(&fork, artifact, payload)?;
         }
-
         // Add service instances.
         for inst in genesis_config.builtin_instances {
             self.dispatcher
@@ -242,6 +242,8 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
+        // TODO Unify block creation logic [ECR-3879]
+        self.dispatcher.before_commit(&mut fork);
         self.dispatcher.commit_block(&mut fork);
         self.merge(fork.into_patch())?;
 
@@ -286,12 +288,10 @@ impl BlockchainMut {
                 // cannot be deserialized or it isn't in the pool.
                 .expect("Transaction execution error");
         }
-
-        // Skip execution for genesis block.
+        // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
             self.dispatcher.before_commit(&mut fork);
         }
-
         // Get tx & state hash.
         let schema = Schema::new(&fork);
         let state_hash = {
@@ -316,7 +316,7 @@ impl BlockchainMut {
         };
         let tx_hash = schema.block_transactions(height).object_hash();
 
-        // Create block.
+        // Create block header.
         let block = Block::new(
             proposer_id,
             height,
@@ -447,6 +447,15 @@ impl BlockchainMut {
         }
         db.merge(fork.into_patch())
             .expect("Cannot update transaction pool");
+    }
+
+    /// Performs several shallow checks that transaction is correct.
+    ///
+    /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
+    /// executed successfully, but returned `Err(..)` value means that this transaction is
+    /// **obviously** incorrect and should be declined as early as possible.
+    pub fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+        self.dispatcher.check_tx(tx)
     }
 
     /// Shuts down the dispatcher. This should be the last operation performed on this instance.

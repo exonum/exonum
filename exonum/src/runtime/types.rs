@@ -401,13 +401,121 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
     }
 }
 
+/// Status of an artifact deployment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ArtifactStatus {
+    /// The artifact is pending deployment.
+    Pending = 0,
+    /// The artifact has been successfully deployed.
+    Active = 1,
+}
+
+impl Display for ArtifactStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Active => f.write_str("active"),
+            Self::Pending => f.write_str("pending"),
+        }
+    }
+}
+
+impl ProtobufConvert for ArtifactStatus {
+    type ProtoStruct = schema::runtime::ArtifactStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        match self {
+            Self::Active => Self::ProtoStruct::ARTIFACT_ACTIVE,
+            Self::Pending => Self::ProtoStruct::ARTIFACT_PENDING,
+        }
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Ok(match pb {
+            Self::ProtoStruct::ARTIFACT_ACTIVE => Self::Active,
+            Self::ProtoStruct::ARTIFACT_PENDING => Self::Pending,
+        })
+    }
+}
+
 /// Status of a service instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DeployStatus {
-    /// The service instance has been successfully deployed.
-    Active,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InstanceStatus {
     /// The service instance is pending deployment.
-    Pending,
+    Pending = 0,
+    /// The service instance has been successfully deployed.
+    Active = 1,
+}
+
+impl Display for InstanceStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Active => f.write_str("active"),
+            Self::Pending => f.write_str("pending"),
+        }
+    }
+}
+
+impl ProtobufConvert for InstanceStatus {
+    type ProtoStruct = schema::runtime::InstanceStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        match self {
+            Self::Active => Self::ProtoStruct::SERVICE_ACTIVE,
+            Self::Pending => Self::ProtoStruct::SERVICE_PENDING,
+        }
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Ok(match pb {
+            Self::ProtoStruct::SERVICE_ACTIVE => Self::Active,
+            Self::ProtoStruct::SERVICE_PENDING => Self::Pending,
+        })
+    }
+}
+
+/// Current state of artifact in dispatcher.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::runtime::ArtifactState")]
+pub struct ArtifactState {
+    /// Artifact specification.
+    pub spec: ArtifactSpec,
+    /// Artifact deployment status.
+    pub status: ArtifactStatus,
+}
+
+impl ArtifactState {
+    /// Create a new artifact state with the given specification and status.
+    pub fn new(spec: ArtifactSpec, status: ArtifactStatus) -> Self {
+        Self { spec, status }
+    }
+}
+
+/// Current state of service instance in dispatcher.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+    Serialize,
+    Deserialize,
+)]
+#[protobuf_convert(source = "schema::runtime::InstanceState")]
+pub struct InstanceState {
+    /// Service instance specification.
+    pub spec: InstanceSpec,
+    /// Service instance activity status.
+    pub status: InstanceStatus,
+}
+
+impl InstanceState {
+    /// Creates a new instance state with the given specification and status.
+    pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
+        Self { spec, status }
+    }
 }
 
 #[test]

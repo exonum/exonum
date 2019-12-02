@@ -70,15 +70,16 @@ fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
 
 fn service_instance_exists(api: &TestKitApi, name: &str) -> bool {
     let services = &api.exonum_api().services().services;
-    services.iter().any(|s| s.name == name)
+    services.iter().any(|s| s.spec.name == name)
 }
 
 fn find_instance_id(api: &TestKitApi, instance_name: &str) -> InstanceId {
     let services = &api.exonum_api().services().services;
     services
         .iter()
-        .find(|service| service.name == instance_name)
+        .find(|service| service.spec.name == instance_name)
         .expect("Can't find the instance")
+        .spec
         .id
 }
 

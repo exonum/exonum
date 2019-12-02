@@ -14,7 +14,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
-use exonum_merkledb::{Database, Fork, ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
 
 use std::{
@@ -34,9 +34,9 @@ use crate::{
     helpers::{Height, ValidatorId},
     node::ApiSender,
     runtime::{
-        dispatcher::{Action, Dispatcher, Mailbox},
+        dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, CallInfo, Caller, DeployStatus, DispatcherError, DispatcherSchema, ErrorKind,
+        ArtifactId, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
         RuntimeIdentifier, StateHashAggregator,
     },
@@ -48,6 +48,7 @@ use crate::{
 fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
     let is_genesis_block = CoreSchema::new(&*fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
+    dispatcher.activate_pending(fork);
     dispatcher.commit_block(fork);
 
     let block = Block::new(
@@ -77,9 +78,22 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let runtime = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(DispatcherError::IncorrectRuntime)?;
+            .ok_or(DispatcherError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, arguments)
+    }
+
+    /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
+    /// deployed.
+    fn commit_artifact_sync(
+        &mut self,
+        fork: &Fork,
+        artifact: ArtifactId,
+        payload: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        Self::commit_artifact(fork, artifact.clone(), payload.to_bytes())?;
+        self.block_until_deployed(artifact, payload.into_bytes());
+        Ok(())
     }
 }
 
@@ -305,10 +319,10 @@ fn test_dispatcher_simple() {
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
     dispatcher
-        .deploy_artifact_sync(&fork, rust_artifact.clone(), vec![])
+        .commit_artifact_sync(&fork, rust_artifact.clone(), vec![])
         .unwrap();
     dispatcher
-        .deploy_artifact_sync(&fork, java_artifact.clone(), vec![])
+        .commit_artifact_sync(&fork, java_artifact.clone(), vec![])
         .unwrap();
 
     // Check if the services are ready for initiation. Note that the artifacts are pending at this
@@ -575,7 +589,7 @@ fn test_shutdown() {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct ArtifactStatus {
+struct ArtifactDeployStatus {
     attempts: usize,
     is_deployed: bool,
 }
@@ -583,7 +597,7 @@ struct ArtifactStatus {
 #[derive(Debug, Default, Clone)]
 struct DeploymentRuntime {
     // Map of artifact names to deploy attempts and the flag for successful deployment.
-    artifacts: Arc<Mutex<HashMap<String, ArtifactStatus>>>,
+    artifacts: Arc<Mutex<HashMap<String, ArtifactDeployStatus>>>,
     mailbox_actions: Arc<Mutex<Vec<Action>>>,
 }
 
@@ -621,6 +635,7 @@ impl DeploymentRuntime {
                 and_then: Box::new(|| Box::new(Ok(()).into_future())),
             });
         let mut fork = db.fork();
+        dispatcher.activate_pending(&fork);
         dispatcher.commit_block_and_notify_runtimes(&mut fork);
         db.merge_sync(fork.into_patch()).unwrap();
         (artifact, Self::SPEC.to_vec())
@@ -835,15 +850,16 @@ fn failed_deployment_with_node_restart() {
 
     let mut fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    dispatcher.activate_pending(&fork);
     dispatcher.commit_block_and_notify_runtimes(&mut fork);
     db.merge_sync(fork.into_patch()).unwrap();
     assert!(dispatcher.is_artifact_deployed(&artifact));
 
     let snapshot = db.snapshot();
-    let (_, status) = DispatcherSchema::new(&snapshot)
+    let state = DispatcherSchema::new(&snapshot)
         .get_artifact(&artifact.name)
         .unwrap();
-    assert_eq!(status, DeployStatus::Active);
+    assert_eq!(state.status, ArtifactStatus::Active);
 }
 
 #[test]

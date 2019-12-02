@@ -464,6 +464,8 @@ Key points:
 
 - #1555: Update MerkleDB docs
 
+- #1568: Make DispatcherSchema merkelized again [ECR-3810]
+
 </details>
 <!-- markdownlint-enable no-inline-html -->
 
@@ -476,6 +478,10 @@ Key points:
   They are intended to configure restart settings of the HTTP-server (#1536).
 
 - `exonum` now has a `python` library for implementing integration tests. (#1516)
+
+- `BlockchainMut` now has a `check_tx` method used to verify transactions before
+  adding them to the transactions pool. Transactions for which `check_tx` fails
+  are considered invalid and can't be included to the block. (#1579)
 
 #### exonum-merkledb
 
