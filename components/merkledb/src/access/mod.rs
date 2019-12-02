@@ -7,10 +7,8 @@ use std::{borrow::Cow, fmt};
 pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
-use crate::{
-    validation::assert_valid_name,
-    views::{IndexAddress, IndexType, ViewWithMetadata},
-};
+use crate::validation::assert_valid_name_component;
+use crate::views::{IndexAddress, IndexType, ViewWithMetadata};
 
 mod extensions;
 
@@ -55,13 +53,7 @@ impl<T: RawAccess> Access for T {
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        ViewWithMetadata::get_or_create(self, &addr, index_type).map_err(|e| AccessError {
-            addr,
-            kind: AccessErrorKind::WrongIndexType {
-                expected: index_type,
-                actual: e.index_type(),
-            },
-        })
+        ViewWithMetadata::get_or_create(self, &addr, index_type)
     }
 }
 
@@ -93,7 +85,7 @@ impl<'a, T: Access> Prefixed<'a, T> {
     /// Will panic if the prefix does not conform to valid names for indexes.
     pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
         let prefix = prefix.into();
-        assert_valid_name(prefix.as_ref());
+        assert_valid_name_component(prefix.as_ref());
         Self { access, prefix }
     }
 }
@@ -141,6 +133,27 @@ pub enum AccessErrorKind {
         expected: IndexType,
         /// Actual index type.
         actual: IndexType,
+    },
+
+    /// Index name is reserved. It's forbidden for user to create indexes with names
+    /// starting with `__` and not containing a dot `.`.
+    #[fail(display = "Index name is reserved")]
+    ReservedName,
+
+    /// Index name is empty.
+    #[fail(display = "Index name must not be empty")]
+    EmptyName,
+
+    /// Index contains invalid characters.
+    #[fail(
+        display = "Invalid characters used in name ({}). Use {}",
+        name, allowed_chars
+    )]
+    InvalidCharsInName {
+        /// Name that contains invalid chars.
+        name: String,
+        /// Characters allowed in name.
+        allowed_chars: &'static str,
     },
 
     /// Custom error.
