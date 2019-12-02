@@ -57,8 +57,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `BuiltinInstance` trait for declaration of builtin services. (#1541)
 
-- Placeholder for changes due to dynamic services (#9999)
-
 #### exonum-merkledb
 
 - Nested proofs for `ProofListIndex` are replaced with a flat
