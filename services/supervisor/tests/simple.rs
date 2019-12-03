@@ -23,8 +23,8 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service},
-        ArtifactId, BlockchainData, ExecutionError, InstanceId, ServiceFail, SnapshotExt,
-        SUPERVISOR_INSTANCE_ID,
+        ArtifactId, BlockchainData, DispatcherError, ExecutionError, ExecutionFail, InstanceId,
+        SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -113,10 +113,10 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(context.malformed_err("Error!")),
+            "error" => Err(DispatcherError::malformed_arguments("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -130,7 +130,7 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         context
             .service_data()
@@ -138,7 +138,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => Err(context.malformed_err("Error!")),
+            "apply_error" => Err(DispatcherError::malformed_arguments("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -295,7 +295,9 @@ fn discard_config_propose_from_auditor() {
     // Verify that transaction failed.
     let api = testkit.api();
     let system_api = api.exonum_api();
-    let expected_status = Err(TxError::UnknownAuthor.for_service(SUPERVISOR_INSTANCE_ID));
+    let expected_status = Err(TxError::UnknownAuthor
+        .to_match()
+        .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(tx_hash, &expected_status);
 
     // Verify that no changes have been applied.

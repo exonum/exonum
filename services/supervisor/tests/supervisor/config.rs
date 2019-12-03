@@ -19,7 +19,7 @@ use exonum::{
     blockchain::InstanceCollection,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{rust::Transaction, InstanceId, ServiceFail, SUPERVISOR_INSTANCE_ID},
+    runtime::{rust::Transaction, ExecutionFail, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
@@ -40,7 +40,9 @@ fn test_multiple_consensus_change_proposes() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::MalformedConfigPropose.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::MalformedConfigPropose
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -248,7 +250,9 @@ fn test_send_confirmation_by_initiator() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::AttemptToVoteTwice.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::AttemptToVoteTwice
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -268,7 +272,9 @@ fn test_propose_config_change_by_incorrect_validator() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::UnknownAuthor.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::UnknownAuthor
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -303,7 +309,9 @@ fn test_confirm_config_by_incorrect_validator() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::UnknownAuthor.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::UnknownAuthor
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -334,7 +342,9 @@ fn test_try_confirm_non_existing_proposal() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::ConfigProposeNotRegistered.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::ConfigProposeNotRegistered
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -407,7 +417,9 @@ fn test_discard_panicked_service_config_change() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::MalformedConfigPropose.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::MalformedConfigPropose
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -426,7 +438,9 @@ fn test_incorrect_actual_from_field() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::ActualFromIsPast.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::ActualFromIsPast
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -464,7 +478,9 @@ fn test_another_configuration_change_proposal() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::ConfigProposeExists.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::ConfigProposeExists
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 
     let signed_txs = build_confirmation_transactions(&testkit, proposal_hash, initiator_id);
@@ -509,7 +525,12 @@ fn test_service_config_discard_fake_supervisor() {
     );
     let block = testkit.create_block_with_transaction(tx);
     let err = block.transactions[0].status().unwrap_err();
-    assert_eq!(*err, Error::UnknownAuthor.for_service(FAKE_SUPERVISOR_ID));
+    assert_eq!(
+        *err,
+        Error::UnknownAuthor
+            .to_match()
+            .for_service(FAKE_SUPERVISOR_ID)
+    );
 }
 
 #[test]
@@ -708,7 +729,9 @@ fn test_services_config_discard_multiple_configs() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::MalformedConfigPropose.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::MalformedConfigPropose
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -770,7 +793,9 @@ fn test_discard_incorrect_configuration_number() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::IncorrectConfigurationNumber.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::IncorrectConfigurationNumber
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
     assert_eq!(config_propose_entry(&testkit), None);
 
@@ -822,7 +847,9 @@ fn test_discard_incorrect_configuration_number() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        Error::IncorrectConfigurationNumber.for_service(SUPERVISOR_INSTANCE_ID)
+        Error::IncorrectConfigurationNumber
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }

@@ -15,7 +15,7 @@
 use exonum_derive::*;
 
 /// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ServiceFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
 pub enum Error {
     /// Artifact has been already deployed.
     AlreadyDeployed = 0,

@@ -109,7 +109,7 @@ pub struct Transfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-#[derive(Debug, ServiceFail)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Sender and receiver of the transfer are the same.
     SenderSameAsReceiver = 0,
@@ -148,7 +148,7 @@ impl CurrencyInterface for CurrencyService {
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError> {
         let author = context.caller().author().unwrap();
         if author == arg.to {
-            return Err(context.err(Error::SenderSameAsReceiver));
+            return Err(Error::SenderSameAsReceiver.into());
         }
 
         let height = context.data().for_core().height();

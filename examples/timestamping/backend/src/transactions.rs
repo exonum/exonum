@@ -14,7 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::{rust::CallContext, ExecutionError};
+use exonum::runtime::{rust::CallContext, DispatcherError, ExecutionError};
 use exonum_proto::ProtobufConvert;
 use exonum_time::schema::TimeSchema;
 
@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, ServiceFail)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Content hash already exists.
     HashAlreadyExists = 0,
@@ -59,7 +59,7 @@ impl TimestampingInterface for TimestampingService {
         let (tx_hash, _) = context
             .caller()
             .as_transaction()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
         let config = schema.config.get().expect("Can't read service config");
@@ -67,15 +67,15 @@ impl TimestampingInterface for TimestampingService {
         let data = context.data();
         let time_service_data = data
             .for_service(config.time_service_name.as_str())
-            .ok_or_else(|| context.err(Error::TimeServiceNotFound))?;
+            .ok_or(Error::TimeServiceNotFound)?;
         let time = TimeSchema::new(time_service_data)
             .time
             .get()
-            .ok_or_else(|| context.err(Error::TimeServiceNotFound))?;
+            .ok_or(Error::TimeServiceNotFound)?;
 
         let hash = &arg.content.content_hash;
         if schema.timestamps.get(hash).is_some() {
-            Err(context.err(Error::HashAlreadyExists))
+            Err(Error::HashAlreadyExists.into())
         } else {
             trace!("Timestamp added: {:?}", arg);
             let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);

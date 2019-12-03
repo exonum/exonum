@@ -21,7 +21,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
-    runtime::{rust::Transaction, InstanceId, ServiceFail, SnapshotExt},
+    runtime::{rust::Transaction, ExecutionFail, InstanceId, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, Snapshot};
 use exonum_supervisor::{ConfigPropose, SimpleSupervisor};
@@ -397,7 +397,7 @@ fn test_creating_transaction_is_not_validator() {
     let block = testkit.create_block_with_transaction(tx);
     assert_eq!(
         *block[0].status().unwrap_err(),
-        Error::UnknownSender.for_service(INSTANCE_ID)
+        Error::UnknownSender.to_match().for_service(INSTANCE_ID)
     );
 
     let snapshot = testkit.snapshot();
@@ -431,7 +431,9 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let block = testkit.create_block_with_transaction(tx1);
     assert_eq!(
         *block[0].status().unwrap_err(),
-        Error::ValidatorTimeIsGreater.for_service(INSTANCE_ID),
+        Error::ValidatorTimeIsGreater
+            .to_match()
+            .for_service(INSTANCE_ID),
     );
 
     let snapshot = testkit.snapshot();

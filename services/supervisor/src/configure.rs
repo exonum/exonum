@@ -16,7 +16,7 @@
 
 use exonum::runtime::{
     rust::{CallContext, Interface, LocalStub},
-    ExecutionError, MethodId,
+    DispatcherError, ExecutionError, MethodId,
 };
 use exonum_merkledb::BinaryValue;
 
@@ -91,16 +91,18 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
     ) -> Result<(), ExecutionError> {
         match method {
             VERIFY_CONFIG_METHOD_ID => {
-                let params = T::from_bytes(payload.into()).map_err(|e| context.malformed_err(e))?;
+                let params =
+                    T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?;
                 self.verify_config(context, params)
             }
 
             APPLY_CONFIG_METHOD_ID => {
-                let params = T::from_bytes(payload.into()).map_err(|e| context.malformed_err(e))?;
+                let params =
+                    T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?;
                 self.apply_config(context, params)
             }
 
-            _ => Err(context.no_method_err(None)),
+            _ => Err(DispatcherError::NoSuchMethod.into()),
         }
     }
 }

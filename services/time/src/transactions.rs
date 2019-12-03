@@ -19,7 +19,7 @@ use exonum_proto::ProtobufConvert;
 use crate::{proto, schema::TimeSchema, TimeService};
 
 /// Common errors emitted by transactions during execution.
-#[derive(Debug, ServiceFail)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// The sender of the transaction is not among the active validators.
     UnknownSender = 0,
@@ -51,20 +51,17 @@ pub trait TimeOracleInterface {
 
 impl TimeOracleInterface for TimeService {
     fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), ExecutionError> {
-        let author = context
-            .caller()
-            .author()
-            .ok_or_else(|| context.err(Error::UnknownSender))?;
+        let author = context.caller().author().ok_or(Error::UnknownSender)?;
         // Check that the transaction is signed by a validator.
         let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
-            .ok_or_else(|| context.err(Error::UnknownSender))?;
+            .ok_or(Error::UnknownSender)?;
 
         let mut schema = TimeSchema::new(context.service_data());
         schema
             .update_validator_time(author, arg.time)
-            .map_err(|()| context.err(Error::ValidatorTimeIsGreater))?;
+            .map_err(|()| Error::ValidatorTimeIsGreater)?;
 
         let validator_keys = core_schema.consensus_config().validator_keys;
         schema.update_consolidated_time(&validator_keys);

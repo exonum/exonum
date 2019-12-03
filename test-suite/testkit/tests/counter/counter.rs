@@ -88,7 +88,7 @@ impl Increment {
     }
 }
 
-#[derive(Debug, ServiceFail)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Adding zero does nothing!
     AddingZero = 0,
@@ -106,7 +106,7 @@ pub trait CounterServiceInterface {
 impl CounterServiceInterface for CounterService {
     fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError> {
         if arg.by == 0 {
-            return Err(context.err(Error::AddingZero));
+            return Err(Error::AddingZero.into());
         }
 
         let mut schema = CounterSchema::new(context.service_data());

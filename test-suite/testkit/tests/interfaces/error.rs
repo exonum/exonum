@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_derive::ServiceFail;
+use exonum_derive::ExecutionFail;
 
 /// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ServiceFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
 pub enum Error {
     WalletNotFound = 0,
     WalletAlreadyExists = 1,

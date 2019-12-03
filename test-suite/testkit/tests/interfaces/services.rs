@@ -70,11 +70,11 @@ impl WalletInterface for WalletService {
         let owner = context
             .caller()
             .author()
-            .ok_or_else(|| context.err(Error::WrongInterfaceCaller))?;
+            .ok_or(Error::WrongInterfaceCaller)?;
         let mut schema = WalletSchema::new(context.service_data());
 
         if schema.wallets.contains(&owner) {
-            return Err(context.err(Error::WalletAlreadyExists));
+            return Err(Error::WalletAlreadyExists.into());
         }
         schema.wallets.put(
             &owner,
@@ -92,16 +92,13 @@ impl IssueReceiver for WalletService {
         let instance_id = context
             .caller()
             .as_service()
-            .ok_or_else(|| context.err(Error::WrongInterfaceCaller))?;
+            .ok_or(Error::WrongInterfaceCaller)?;
         if instance_id != DepositService::ID {
-            return Err(context.err(Error::UnauthorizedIssuer));
+            return Err(Error::UnauthorizedIssuer.into());
         }
 
         let mut schema = WalletSchema::new(context.service_data());
-        let mut wallet = schema
-            .wallets
-            .get(&arg.to)
-            .ok_or_else(|| context.err(Error::WalletNotFound))?;
+        let mut wallet = schema.wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
         wallet.balance += arg.amount;
         schema.wallets.put(&arg.to, wallet);
         Ok(())

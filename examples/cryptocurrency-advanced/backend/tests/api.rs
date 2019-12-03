@@ -125,8 +125,13 @@ fn test_transfer_from_nonexisting_wallet() {
         &json!({
             "type": "service_error",
             "code": 1,
-            "instance_id": SERVICE_ID,
-            "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`."
+            "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
         }),
     );
 
@@ -164,8 +169,13 @@ fn test_transfer_to_nonexisting_wallet() {
         &json!({
             "type": "service_error",
             "code": 2,
-            "instance_id": SERVICE_ID,
-            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`."
+            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
         }),
     );
 
@@ -198,8 +208,13 @@ fn test_transfer_overcharge() {
         &json!({
             "type": "service_error",
             "code": 3,
-            "instance_id": SERVICE_ID,
-            "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`."
+            "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
         }),
     );
 

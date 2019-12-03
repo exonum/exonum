@@ -14,6 +14,7 @@ description = "Minimal Exonum blockchain example implementing a simple runtime."
 futures = "0.1.25"
 
 exonum = { version = "0.12.0", path = "../../exonum" }
+exonum-derive = { version = "0.12.0", path = "../../components/derive" }
 exonum-merkledb = { version = "0.12.0", path = "../../components/merkledb" }
 exonum-supervisor = { version = "0.12.0", path = "../../services/supervisor" }
 protobuf-convert = "0.2.0"

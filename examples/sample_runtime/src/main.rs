@@ -25,18 +25,19 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, DispatcherError, ErrorKind,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
-        Runtime, SnapshotExt, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::Transaction, AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext,
+        ExecutionError, ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        SnapshotExt, StateHashAggregator, SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_derive::*;
 use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
 use futures::{Future, IntoFuture};
 
 use std::{
     cell::Cell,
     collections::btree_map::{BTreeMap, Entry},
-    fmt, thread,
+    thread,
     time::Duration,
 };
 
@@ -55,36 +56,13 @@ struct SampleRuntime {
 }
 
 // Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[execution_fail(kind = "runtime")]
 enum SampleRuntimeError {
     /// Incorrect information to call transaction.
     IncorrectCallInfo = 1,
     /// Incorrect transaction payload.
     IncorrectPayload = 2,
-}
-
-impl SampleRuntimeError {
-    pub fn with_description(self, description: impl fmt::Display) -> ExecutionError {
-        let error_kind = ErrorKind::runtime(SampleRuntime::ID, self as u8);
-        ExecutionError::new(error_kind, description.to_string())
-    }
-}
-
-impl fmt::Display for SampleRuntimeError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::SampleRuntimeError::*;
-        formatter.write_str(match self {
-            IncorrectCallInfo => "Incorrect information to call transaction",
-            IncorrectPayload => "Incorrect transaction payload",
-        })
-    }
-}
-
-impl From<SampleRuntimeError> for ExecutionError {
-    fn from(error: SampleRuntimeError) -> Self {
-        let error_kind = ErrorKind::runtime(SampleRuntime::ID, error as u8);
-        ExecutionError::new(error_kind, error.to_string())
-    }
 }
 
 impl SampleRuntime {
@@ -156,10 +134,8 @@ impl Runtime for SampleRuntime {
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let service_instance = self.start_service(spec)?;
-        let new_value = u64::from_bytes(params.into()).map_err(|e| {
-            let error_kind = DispatcherError::MalformedArguments.into();
-            ExecutionError::new(error_kind, e.to_string())
-        })?;
+        let new_value =
+            u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())

@@ -146,7 +146,7 @@ pub mod transactions {
 /// Contract errors.
 pub mod errors {
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
-    #[derive(Debug, ServiceFail)]
+    #[derive(Debug, ExecutionFail)]
     pub enum Error {
         /// Wallet already exists.
         ///
@@ -230,7 +230,7 @@ pub mod contracts {
                 schema.wallets.put(&author, wallet);
                 Ok(())
             } else {
-                Err(context.err(Error::WalletAlreadyExists))
+                Err(Error::WalletAlreadyExists.into())
             }
         }
 
@@ -244,18 +244,12 @@ pub mod contracts {
                 .author()
                 .expect("Wrong 'TxTransfer' initiator");
             if author == arg.to {
-                return Err(context.err(Error::SenderSameAsReceiver));
+                return Err(Error::SenderSameAsReceiver.into());
             }
 
             let mut schema = CurrencySchema::new(context.service_data());
-            let sender = schema
-                .wallets
-                .get(&author)
-                .ok_or_else(|| context.err(Error::SenderNotFound))?;
-            let receiver = schema
-                .wallets
-                .get(&arg.to)
-                .ok_or_else(|| context.err(Error::ReceiverNotFound))?;
+            let sender = schema.wallets.get(&author).ok_or(Error::SenderNotFound)?;
+            let receiver = schema.wallets.get(&arg.to).ok_or(Error::ReceiverNotFound)?;
 
             let amount = arg.amount;
             if sender.balance >= amount {
@@ -266,7 +260,7 @@ pub mod contracts {
                 schema.wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
-                Err(context.err(Error::InsufficientCurrencyAmount))
+                Err(Error::InsufficientCurrencyAmount.into())
             }
         }
     }

@@ -41,7 +41,7 @@ use exonum::{
     merkledb::{BinaryValue, Snapshot},
     runtime::{
         rust::{api::ServiceApiBuilder, CallContext, Service},
-        BlockchainData,
+        BlockchainData, DispatcherError,
     },
 };
 
@@ -58,7 +58,8 @@ pub struct TimestampingService;
 
 impl Service for TimestampingService {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let config = Config::from_bytes(params.into()).map_err(|e| context.malformed_err(e))?;
+        let config =
+            Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
 
         if context
             .data()
@@ -66,7 +67,7 @@ impl Service for TimestampingService {
             .get_instance(&*config.time_service_name)
             .is_none()
         {
-            return Err(context.err(Error::TimeServiceNotFound));
+            return Err(Error::TimeServiceNotFound.into());
         }
 
         Schema::new(context.service_data()).config.set(config);

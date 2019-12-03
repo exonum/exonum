@@ -21,7 +21,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{RustRuntime, ServiceFactory, Transaction},
-        ArtifactId, InstanceId, RuntimeIdentifier, ServiceFail, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, ExecutionFail, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_supervisor::{
@@ -322,7 +322,9 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
     let system_api = api.exonum_api();
-    let expected_status = Err(TxError::ActualFromIsPast.for_service(SUPERVISOR_INSTANCE_ID));
+    let expected_status = Err(TxError::ActualFromIsPast
+        .to_match()
+        .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(hash, &expected_status);
 }
 
@@ -340,7 +342,9 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_status = Err(TxError::ActualFromIsPast.for_service(SUPERVISOR_INSTANCE_ID));
+    let expected_status = Err(TxError::ActualFromIsPast
+        .to_match()
+        .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(hash, &expected_status);
 }
 
@@ -357,7 +361,9 @@ fn test_try_run_unregistered_service_instance() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_status = Err(TxError::UnknownArtifact.for_service(SUPERVISOR_INSTANCE_ID));
+    let expected_status = Err(TxError::UnknownArtifact
+        .to_match()
+        .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(hash, &expected_status);
 }
 
@@ -427,7 +433,8 @@ fn test_empty_service_instance_name() {
 
     let system_api = api.exonum_api();
     let expected_status = Err(TxError::InvalidInstanceName
-        .with_description("Service instance name should not be empty")
+        .to_match()
+        .with_description_containing("Service instance name should not be empty")
         .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(hash, &expected_status);
 }
@@ -450,6 +457,7 @@ fn test_bad_service_instance_name() {
         "Service instance name (\u{2764}) contains illegal character, use only: a-zA-Z0-9 and one of _-";
     let expected_status = Err(TxError::InvalidInstanceName
         .with_description(expected_description)
+        .to_match()
         .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(hash, &expected_status);
 }
@@ -486,7 +494,9 @@ fn test_start_service_instance_twice() {
         testkit.create_block();
 
         let system_api = api.exonum_api();
-        let expected_status = Err(TxError::InstanceExists.for_service(SUPERVISOR_INSTANCE_ID));
+        let expected_status = Err(TxError::InstanceExists
+            .to_match()
+            .for_service(SUPERVISOR_INSTANCE_ID));
         system_api.assert_tx_status(hash, &expected_status);
     }
 }
@@ -777,7 +787,9 @@ fn test_auditor_cant_send_requests() {
     system_api.assert_tx_success(deploy_artifact_validator_tx_hash);
 
     // ... but the auditor's request is failed as expected.
-    let expected_status = Err(TxError::UnknownAuthor.for_service(SUPERVISOR_INSTANCE_ID));
+    let expected_status = Err(TxError::UnknownAuthor
+        .to_match()
+        .for_service(SUPERVISOR_INSTANCE_ID));
     system_api.assert_tx_status(deploy_request_from_auditor.object_hash(), &expected_status);
 }
 
@@ -937,8 +949,9 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     testkit.add_tx(confirmation.clone());
     testkit.create_block();
 
-    let expected_status =
-        Err(TxError::DeployRequestNotRegistered.for_service(SUPERVISOR_INSTANCE_ID));
+    let expected_status = Err(TxError::DeployRequestNotRegistered
+        .to_match()
+        .for_service(SUPERVISOR_INSTANCE_ID));
     api.exonum_api()
         .assert_tx_status(confirmation.object_hash(), &expected_status);
 }

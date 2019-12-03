@@ -32,7 +32,7 @@ use exonum::{
     crypto::Hash,
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::error::ServiceExecutionError,
+    runtime::error::ExecutionErrorMatch,
 };
 
 use crate::TestKit;
@@ -338,7 +338,7 @@ impl<'a> ExonumNodeApi<'a> {
     pub fn assert_tx_status(
         &self,
         tx_hash: Hash,
-        expected_status: &Result<(), ServiceExecutionError>,
+        expected_status: &Result<(), ExecutionErrorMatch>,
     ) {
         let info: serde_json::Value = self
             .inner

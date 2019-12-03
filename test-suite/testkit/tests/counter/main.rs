@@ -26,7 +26,7 @@ use exonum::{
     crypto::{self, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    runtime::{rust::Transaction, ServiceFail, SnapshotExt},
+    runtime::{rust::Transaction, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{
@@ -866,7 +866,7 @@ fn test_explorer_transaction_statuses() {
         assert!(statuses[0].is_ok());
         assert_eq!(
             *statuses[1].as_ref().unwrap_err(),
-            (0, "Adding zero does nothing!").for_service(SERVICE_ID)
+            ExecutionError::service(0, "Adding zero does nothing!").to_match()
         );
         assert_matches!(
             statuses[2],

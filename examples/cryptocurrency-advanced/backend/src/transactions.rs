@@ -16,14 +16,14 @@
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{rust::CallContext, ExecutionError},
+    runtime::{rust::CallContext, DispatcherError, ExecutionError},
 };
 use exonum_proto::ProtobufConvert;
 
 use super::{proto, schema::Schema, CryptocurrencyService};
 
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, ServiceFail)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Wallet already exists.
     ///
@@ -97,26 +97,20 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
 
         let to = arg.to;
         let amount = arg.amount;
         if from == to {
-            return Err(context.err(Error::SenderSameAsReceiver));
+            return Err(Error::SenderSameAsReceiver.into());
         }
 
-        let sender = schema
-            .wallets
-            .get(&from)
-            .ok_or_else(|| context.err(Error::SenderNotFound))?;
-        let receiver = schema
-            .wallets
-            .get(&to)
-            .ok_or_else(|| context.err(Error::ReceiverNotFound))?;
+        let sender = schema.wallets.get(&from).ok_or(Error::SenderNotFound)?;
+        let receiver = schema.wallets.get(&to).ok_or(Error::ReceiverNotFound)?;
         if sender.balance < amount {
-            Err(context.err(Error::InsufficientCurrencyAmount))
+            Err(Error::InsufficientCurrencyAmount.into())
         } else {
             schema.decrease_wallet_balance(sender, amount, tx_hash);
             schema.increase_wallet_balance(receiver, amount, tx_hash);
@@ -128,7 +122,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
         if let Some(wallet) = schema.wallets.get(&from) {
@@ -136,7 +130,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
         } else {
-            Err(context.err(Error::ReceiverNotFound))
+            Err(Error::ReceiverNotFound.into())
         }
     }
 
@@ -148,7 +142,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
         if schema.wallets.get(&from).is_none() {
@@ -156,7 +150,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             schema.create_wallet(&from, name, tx_hash);
             Ok(())
         } else {
-            Err(context.err(Error::WalletAlreadyExists))
+            Err(Error::WalletAlreadyExists.into())
         }
     }
 }

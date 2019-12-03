@@ -22,7 +22,7 @@ use exonum::{
             api::{self, ServiceApiBuilder},
             CallContext, Service,
         },
-        BlockchainData, InstanceId,
+        BlockchainData, DispatcherError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -139,12 +139,12 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_ref() {
             "error" => {
                 let details = "IncService: Configure error request";
-                Err(context.malformed_err(details))
+                Err(DispatcherError::malformed_arguments(details))
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -159,7 +159,7 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or_else(|| context.unauthorized_err())?;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         Schema::new(context.service_data())
             .params
@@ -168,7 +168,7 @@ impl Configure for IncService {
         match params.as_str() {
             "apply_error" => {
                 let details = "IncService: Configure error request";
-                Err(context.malformed_err(details))
+                Err(DispatcherError::malformed_arguments(details))
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
