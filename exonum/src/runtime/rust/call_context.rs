@@ -24,39 +24,15 @@ pub struct CallContext<'a> {
     inner: ExecutionContext<'a>,
     /// ID of the executing service.
     instance: InstanceDescriptor<'a>,
-    /// Call location.
-    call_location: CallLocation,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CallLocation {
-    Method { id: MethodId },
-    Constructor,
-    BeforeCommit,
-}
-
-impl fmt::Display for CallLocation {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CallLocation::Method { id } => write!(formatter, "method #{}", id),
-            CallLocation::Constructor => formatter.write_str("constructor"),
-            CallLocation::BeforeCommit => formatter.write_str("before_commit hook"),
-        }
-    }
 }
 
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
-    pub(crate) fn new(
-        context: ExecutionContext<'a>,
-        instance: InstanceDescriptor<'a>,
-        call_location: CallLocation,
-    ) -> Self {
+    pub(crate) fn new(context: ExecutionContext<'a>, instance: InstanceDescriptor<'a>) -> Self {
         Self {
             inner: context,
             instance,
-            call_location,
         }
     }
 
@@ -84,63 +60,34 @@ impl<'a> CallContext<'a> {
     pub fn err(&self, inner_error: impl ServiceFail) -> ExecutionError {
         let error_kind = ErrorKind::Service {
             code: inner_error.code(),
-            instance_id: self.instance.id,
         };
         ExecutionError::new(error_kind, inner_error.description())
     }
 
     /// Creates an `ExecutionError` corresponding to an unauthorized call.
     pub fn unauthorized_err(&self) -> ExecutionError {
-        let error_kind = DispatcherError::UnauthorizedCaller.into();
-        let description = format!(
-            "Unauthorized call to {method} in service {instance} (interface {interface})",
-            instance = self.instance,
-            interface = self.inner.interface_name,
-            method = self.call_location,
-        );
-        ExecutionError::new(error_kind, description)
+        DispatcherError::UnauthorizedCaller.into()
     }
 
     /// Creates an `ExecutionError` corresponding to a malformed argument.
     pub fn malformed_err(&self, details: impl fmt::Display) -> ExecutionError {
         let error_kind = DispatcherError::MalformedArguments.into();
-        let description = format!(
-            "Unable to parse argument for {method} in service {instance} \
-             (interface `{interface}`): {details}",
-            instance = self.instance,
-            interface = self.inner.interface_name,
-            method = self.call_location,
-            details = details,
-        );
-        ExecutionError::new(error_kind, description)
+        ExecutionError::new(error_kind, details.to_string())
     }
 
     /// Creates an `ExecutionError` corresponding to an unimplemented interface.
     pub fn no_interface_err(&self) -> ExecutionError {
-        let error_kind = DispatcherError::NoSuchInterface.into();
-        let description = format!(
-            "Service {instance} does not implement `{interface}`",
-            instance = self.instance,
-            interface = self.inner.interface_name,
-        );
-        ExecutionError::new(error_kind, description)
+        DispatcherError::NoSuchInterface.into()
     }
 
     /// Creates an `ExecutionError` corresponding to a missing or unimplemented method.
     pub fn no_method_err(&self, details: Option<&str>) -> ExecutionError {
-        let error_kind = DispatcherError::NoSuchMethod.into();
-        let mut description = format!(
-            "{method} is absent in the `{interface}` interface of the service {instance}",
-            instance = self.instance,
-            interface = self.inner.interface_name,
-            method = self.call_location,
-        );
+        let mut err = ExecutionError::from(DispatcherError::NoSuchMethod);
         if let Some(details) = details {
-            description.push_str(": ");
-            description.push_str(details);
+            err.description.push_str(": ");
+            err.description.push_str(details);
         }
-
-        ExecutionError::new(error_kind, description)
+        err
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]

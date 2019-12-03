@@ -69,6 +69,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
 
 impl Dispatcher {
     /// Similar to `Dispatcher::execute()`, but accepts universal `caller` and `call_info`.
+    #[cfg(test)]
     pub(crate) fn call(
         &self,
         fork: &mut Fork,
@@ -76,7 +77,7 @@ impl Dispatcher {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        let runtime = self
+        let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
@@ -224,10 +225,7 @@ impl Runtime for SampleRuntime {
         if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
             Ok(())
         } else {
-            let kind = ErrorKind::Service {
-                code: 15,
-                instance_id: call_info.instance_id,
-            };
+            let kind = ErrorKind::Service { code: 15 };
             Err(ExecutionError::new(kind, "oops"))
         }
     }
@@ -642,7 +640,7 @@ impl Runtime for DeploymentRuntime {
         let delay = LittleEndian::read_u64(&spec);
         let delay = Duration::from_millis(delay);
 
-        let error_kind = ErrorKind::runtime(2, 0);
+        let error_kind = ErrorKind::runtime(0);
         let result = match artifact.name.as_str() {
             "good" => Ok(()),
             "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),

@@ -68,14 +68,30 @@ message ExecutionError {
   // Optional description which doesn't affect `object_hash`.
   string description = 3;
 
-  oneof location {
-    // Instance identifier associated with the error. This field is only set for
-    // `kind == SERVICE`.
-    uint32 instance_id = 4;
-    // Runtime identifier associated with the error. This field is only set for
-    // `kind == RUNTIME`.
-    uint32 runtime_id = 5;
+  oneof runtime {
+    // Runtime identifier associated with the error.
+    uint32 runtime_id = 4;
+    // The runtime associated with the error is unknown.
+    google.protobuf.Empty no_runtime_id = 5;
   }
+
+  oneof call_info {
+    CallSite call_site = 6;
+    google.protobuf.Empty no_call_site = 7;
+  }
+}
+
+message CallSite {
+  enum Type {
+    METHOD = 0;
+    CONSTRUCTOR = 1;
+    BEFORE_COMMIT = 2;
+  }
+
+  Type call_type = 1;
+  uint32 instance_id = 2;
+  uint32 method_id = 3;
+  string interface = 4;
 }
 
 // Result of runtime execution.

@@ -136,7 +136,7 @@
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
-    error::{ErrorKind, ExecutionError, ServiceFail},
+    error::{CallSite, CallType, ErrorKind, ExecutionError, ServiceFail},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
         InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
@@ -571,12 +571,22 @@ impl<'a> ExecutionContext<'a> {
             return Err(err);
         }
 
-        let runtime = self
+        let (runtime_id, runtime) = self
             .dispatcher
             .runtime_for_service(call_info.instance_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
         let reborrowed = self.reborrow_with_interface(interface_name);
-        runtime.execute(reborrowed, call_info, arguments)
+        runtime
+            .execute(reborrowed, call_info, arguments)
+            .map_err(|err| {
+                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                    instance_id: call_info.instance_id,
+                    call_type: CallType::Method {
+                        interface: interface_name.to_owned(),
+                        id: call_info.method_id,
+                    },
+                })
+            })
     }
 
     /// Starts adding a new service instance to the blockchain. The created service is not active
@@ -595,7 +605,15 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
-        runtime.start_adding_service(self.reborrow(), &spec, constructor.into_bytes())?;
+        runtime
+            .start_adding_service(self.reborrow(), &spec, constructor.into_bytes())
+            .map_err(|err| {
+                err.set_runtime_id(spec.artifact.runtime_id)
+                    .set_call_site(|| CallSite {
+                        instance_id: spec.id,
+                        call_type: CallType::Constructor,
+                    })
+            })?;
 
         // Add service instance to the dispatcher schema.
         DispatcherSchema::new(&*self.fork)

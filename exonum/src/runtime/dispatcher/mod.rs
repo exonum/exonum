@@ -32,7 +32,7 @@ use crate::{
 };
 
 use super::{
-    error::{ErrorKind, ExecutionError},
+    error::{CallSite, CallType, ErrorKind, ExecutionError},
     ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
@@ -238,11 +238,21 @@ impl Dispatcher {
             hash: tx_id,
         };
         let call_info = &tx.as_ref().call_info;
-        let runtime = self
+        let (runtime_id, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
-        runtime.execute(context, call_info, &tx.as_ref().arguments)
+        runtime
+            .execute(context, call_info, &tx.as_ref().arguments)
+            .map_err(|err| {
+                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                    instance_id: call_info.instance_id,
+                    call_type: CallType::Method {
+                        interface: String::new(),
+                        id: call_info.method_id,
+                    },
+                })
+            })
     }
 
     /// Calls `before_commit` for all currently active services, isolating each call.
@@ -251,26 +261,32 @@ impl Dispatcher {
     /// indices of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
-        for (&service_id, info) in &self.service_infos {
+        for (&instance_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            let res = self.runtimes[&info.runtime_id].before_commit(context, service_id);
-            if let Err(e) = res {
+            let res = self.runtimes[&info.runtime_id].before_commit(context, instance_id);
+            if let Err(err) = res {
+                let err = err
+                    .set_runtime_id(info.runtime_id)
+                    .set_call_site(|| CallSite {
+                        instance_id,
+                        call_type: CallType::BeforeCommit,
+                    });
                 fork.rollback();
                 let height = CoreSchema::new(&*fork).height().next();
 
-                if e.kind == ErrorKind::Unexpected {
+                if err.kind == ErrorKind::Unexpected {
                     log::error!(
                         "`before_commit` for service {} at {:?} resulted in unchecked error: {:?}",
-                        service_id,
+                        instance_id,
                         height,
-                        e
+                        err
                     );
                 } else {
                     log::info!(
                         "`before_commit` for service {} at {:?} failed: {:?}",
-                        service_id,
+                        instance_id,
                         height,
-                        e
+                        err
                     );
                 }
             } else {
@@ -344,10 +360,13 @@ impl Dispatcher {
 
     /// Looks up the runtime for the specified service instance. Returns a reference to
     /// the runtime, or `None` if the service with the specified instance ID does not exist.
-    pub(crate) fn runtime_for_service(&self, instance_id: InstanceId) -> Option<&dyn Runtime> {
+    pub(crate) fn runtime_for_service(
+        &self,
+        instance_id: InstanceId,
+    ) -> Option<(u32, &dyn Runtime)> {
         let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
-        Some(runtime)
+        Some((*runtime_id, runtime))
     }
 
     /// Returns the service matching the specified query.

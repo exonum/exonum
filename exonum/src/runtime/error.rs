@@ -14,14 +14,13 @@
 
 //! The set of errors for the Runtime module.
 
-use byteorder::{ByteOrder, LittleEndian};
 use exonum_derive::*;
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
 use std::{any::Any, convert::TryFrom, fmt::Display, panic};
 
-use super::InstanceId;
+use super::{InstanceId, MethodId};
 use crate::{
     blockchain::FatalError,
     crypto::{self, Hash},
@@ -99,8 +98,6 @@ pub enum ErrorKind {
 
     /// An error in the runtime logic. For example, the runtime could not compile an artifact.
     Runtime {
-        /// Identifier of the runtime that has raised the error.
-        runtime_id: u32,
         /// Runtime-specific error code.
         /// Error codes can have different meanings for different runtimes.
         code: u8,
@@ -108,10 +105,6 @@ pub enum ErrorKind {
 
     /// An error in the service code reported to the blockchain users.
     Service {
-        /// Identifier of the service that has generated the error. If necessary, clients may use
-        /// the dispatcher schema or the `services` endpoint of the node API to find out
-        /// the artifact / version of the service by this ID.
-        instance_id: InstanceId,
         /// User-defined error code.
         /// Error codes can have different meanings for different services.
         code: u8,
@@ -130,16 +123,16 @@ impl ErrorKind {
     }
 
     /// Creates a runtime error with the specified code.
-    pub fn runtime(runtime_id: u32, code: u8) -> Self {
-        ErrorKind::Runtime { code, runtime_id }
+    pub fn runtime(code: u8) -> Self {
+        ErrorKind::Runtime { code }
     }
 
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
             ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
             ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
-            ErrorKind::Runtime { code, .. } => (runtime_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code, .. } => (runtime_proto::ErrorKind::SERVICE, code),
+            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
+            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
         }
     }
 
@@ -151,14 +144,8 @@ impl ErrorKind {
                 ErrorKind::Unexpected
             }
             DISPATCHER => ErrorKind::Dispatcher { code },
-            RUNTIME => ErrorKind::Runtime {
-                code,
-                runtime_id: 0,
-            },
-            SERVICE => ErrorKind::Service {
-                code,
-                instance_id: 0,
-            },
+            RUNTIME => ErrorKind::Runtime { code },
+            SERVICE => ErrorKind::Service { code },
         };
         Ok(kind)
     }
@@ -169,26 +156,10 @@ impl Display for ErrorKind {
         match self {
             ErrorKind::Unexpected => f.write_str("panic"),
             ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
-            ErrorKind::Runtime { code, runtime_id } => write!(f, "runtime#{}:{}", runtime_id, code),
-            ErrorKind::Service { code, instance_id } => {
-                write!(f, "service#{}:{}", instance_id, code)
-            }
+            ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
+            ErrorKind::Service { code } => write!(f, "service:{}", code),
         }
     }
-}
-
-/// Result of unsuccessful runtime execution.
-///
-/// An execution error consists of an error kind and optional description.
-/// The error kind affects the blockchain state hash, while the description does not.
-/// Therefore descriptions are mostly used for developer purposes, not for interaction of
-/// the system with users.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail, BinaryValue)]
-pub struct ExecutionError {
-    /// The kind of error that indicates in which module and with which code the error occurred.
-    pub kind: ErrorKind,
-    /// Optional description which doesn't affect `object_hash`.
-    pub description: String,
 }
 
 /// Trait representing an error type defined in the service code.
@@ -331,9 +302,11 @@ pub struct ServiceExecutionError {
 
 impl PartialEq<ServiceExecutionError> for ExecutionError {
     fn eq(&self, other: &ServiceExecutionError) -> bool {
-        if let ErrorKind::Service { code, instance_id } = self.kind {
+        if let ErrorKind::Service { code } = self.kind {
             code == other.code
-                && instance_id == other.instance_id
+                && self
+                    .call_site()
+                    .map_or(false, |site| site.instance_id == other.instance_id)
                 && self.description == other.description
         } else {
             false
@@ -375,6 +348,22 @@ where
     }
 }
 
+/// Result of unsuccessful runtime execution.
+///
+/// An execution error consists of an error kind and optional description.
+/// The error kind affects the blockchain state hash, while the description does not.
+/// Therefore descriptions are mostly used for developer purposes, not for interaction of
+/// the system with users.
+#[derive(Clone, Debug, PartialEq, Fail, BinaryValue)]
+pub struct ExecutionError {
+    /// The kind of error that indicates in which module and with which code the error occurred.
+    pub kind: ErrorKind,
+    /// Optional description which doesn't affect `object_hash`.
+    pub description: String,
+    runtime_id: Option<u32>,
+    call_site: Option<CallSite>,
+}
+
 impl ExecutionError {
     /// Creates a new execution error instance with the specified error kind
     /// and an optional description.
@@ -382,11 +371,13 @@ impl ExecutionError {
         Self {
             kind,
             description: description.into(),
+            runtime_id: None,
+            call_site: None,
         }
     }
 
     /// Creates an execution error from the panic description.
-    pub(crate) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+    fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
         let any = any.as_ref();
 
         // Tries to get a meaningful description from the given panic.
@@ -403,15 +394,35 @@ impl ExecutionError {
             String::new()
         };
 
-        Self {
-            kind: ErrorKind::Unexpected,
-            description,
+        Self::new(ErrorKind::Unexpected, description)
+    }
+
+    pub fn runtime_id(&self) -> Option<u32> {
+        self.runtime_id
+    }
+
+    pub(super) fn set_runtime_id(mut self, runtime_id: u32) -> Self {
+        if self.runtime_id.is_none() {
+            self.runtime_id = Some(runtime_id);
         }
+        self
+    }
+
+    pub fn call_site(&self) -> Option<&CallSite> {
+        self.call_site.as_ref()
+    }
+
+    pub(super) fn set_call_site(mut self, call_site: impl FnOnce() -> CallSite) -> Self {
+        if self.call_site.is_none() {
+            self.call_site = Some(call_site());
+        }
+        self
     }
 }
 
 impl Display for ExecutionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // FIXME: use call info
         write!(
             f,
             "An execution error `{}` occurred with description: {}",
@@ -429,33 +440,47 @@ impl ProtobufConvert for ExecutionError {
         inner.set_kind(kind);
         inner.set_code(u32::from(code));
         inner.set_description(self.description.clone());
-        match self.kind {
-            ErrorKind::Service { instance_id, .. } => inner.set_instance_id(instance_id),
-            ErrorKind::Runtime { runtime_id, .. } => inner.set_runtime_id(runtime_id),
-            _ => { /* No additional actions required */ }
+
+        if let Some(runtime_id) = self.runtime_id {
+            inner.set_runtime_id(runtime_id);
+        } else {
+            inner.set_no_runtime_id(Default::default());
+        }
+
+        if let Some(ref call_site) = self.call_site {
+            inner.set_call_site(call_site.to_pb());
+        } else {
+            inner.set_no_call_site(Default::default());
         }
         inner
     }
 
-    #[rustfmt::skip] // Formatter mangles `match` operator.
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let kind = pb.get_kind();
         let code = u8::try_from(pb.get_code())?;
-        let mut kind = ErrorKind::from_raw(kind, code)?;
+        let kind = ErrorKind::from_raw(kind, code)?;
 
-        match kind {
-            ErrorKind::Service { ref mut instance_id, .. } => {
-                *instance_id = pb.get_instance_id();
-            }
-            ErrorKind::Runtime { ref mut runtime_id, .. } => {
-                *runtime_id = pb.get_runtime_id();
-            }
-            _ => { /* No additional actions required */ }
-        }
+        let runtime_id = if pb.has_no_runtime_id() {
+            None
+        } else if pb.has_runtime_id() {
+            Some(pb.get_runtime_id())
+        } else {
+            bail!("No runtime info or no_runtime_id marker");
+        };
+
+        let call_site = if pb.has_no_call_site() {
+            None
+        } else if pb.has_call_site() {
+            Some(CallSite::from_pb(pb.take_call_site())?)
+        } else {
+            bail!("No call site info or no_call_site marker");
+        };
 
         Ok(Self {
             kind,
             description: pb.take_description(),
+            runtime_id,
+            call_site,
         })
     }
 }
@@ -465,23 +490,71 @@ impl ProtobufConvert for ExecutionError {
 // which aren't stable across the versions.
 impl ObjectHash for ExecutionError {
     fn object_hash(&self) -> Hash {
-        let (kind, code) = self.kind.into_raw();
-        if let ErrorKind::Service { instance_id, .. } = self.kind {
-            let mut buffer = [0; 6];
-            buffer[0] = kind as u8;
-            buffer[1] = code;
-            LittleEndian::write_u32(&mut buffer[2..], instance_id);
-            crypto::hash(&buffer)
-        } else if let ErrorKind::Runtime { runtime_id, .. } = self.kind {
-            let mut buffer = [0; 6];
-            buffer[0] = kind as u8;
-            buffer[1] = code;
-            LittleEndian::write_u32(&mut buffer[2..], runtime_id);
-            crypto::hash(&buffer)
-        } else {
-            crypto::hash(&[kind as u8, code])
-        }
+        let error_with_empty_description = Self {
+            kind: self.kind,
+            description: String::new(),
+            runtime_id: self.runtime_id,
+            call_site: self.call_site.clone(),
+        };
+        crypto::hash(&error_with_empty_description.into_bytes())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
+pub struct CallSite {
+    pub instance_id: InstanceId,
+    #[serde(flatten)]
+    pub call_type: CallType,
+}
+
+impl ProtobufConvert for CallSite {
+    type ProtoStruct = runtime_proto::CallSite;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        use runtime_proto::CallSite_Type::*;
+
+        let mut pb = Self::ProtoStruct::new();
+        pb.set_instance_id(self.instance_id);
+        match &self.call_type {
+            CallType::Constructor => pb.set_call_type(CONSTRUCTOR),
+            CallType::Method { interface, id } => {
+                pb.set_call_type(METHOD);
+                pb.set_interface(interface.clone());
+                pb.set_method_id(*id);
+            }
+            CallType::BeforeCommit => pb.set_call_type(BEFORE_COMMIT),
+        }
+        pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        use runtime_proto::CallSite_Type::*;
+
+        let call_type = match pb.get_call_type() {
+            CONSTRUCTOR => CallType::Constructor,
+            BEFORE_COMMIT => CallType::BeforeCommit,
+            METHOD => CallType::Method {
+                interface: pb.take_interface(),
+                id: pb.get_method_id(),
+            },
+        };
+        Ok(Self {
+            instance_id: pb.get_instance_id(),
+            call_type,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "call_type", rename_all = "snake_case")]
+pub enum CallType {
+    Constructor,
+    Method {
+        interface: String,
+        #[serde(rename = "method_id")]
+        id: MethodId,
+    },
+    BeforeCommit,
 }
 
 /// Returns an status of the dispatcher execution.
@@ -543,91 +616,97 @@ impl ObjectHash for ExecutionStatus {
 
 /// More convenient serde layout for the `ExecutionResult`.
 mod execution_result {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+    use std::convert::TryFrom;
 
-    use super::{ErrorKind, ExecutionError, InstanceId};
+    use super::{CallSite, ErrorKind, ExecutionError};
 
-    #[serde(tag = "type", rename_all = "snake_case")]
     #[derive(Debug, Serialize, Deserialize)]
-    enum ExecutionStatus {
+    #[serde(rename_all = "snake_case")]
+    enum ExecutionType {
         Success,
-        Panic {
-            description: String,
-        },
-        DispatcherError {
-            description: String,
-            code: u8,
-        },
-        RuntimeError {
-            description: String,
-            code: u8,
-            runtime_id: u32,
-        },
-        ServiceError {
-            description: String,
-            code: u8,
-            instance_id: InstanceId,
-        },
+        UnexpectedError,
+        DispatcherError,
+        RuntimeError,
+        ServiceError,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct ExecutionStatus {
+        #[serde(rename = "type")]
+        typ: ExecutionType,
+        #[serde(skip_serializing_if = "String::is_empty", default)]
+        description: String,
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        code: Option<u8>,
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        runtime_id: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none", default)]
+        call_site: Option<CallSite>,
     }
 
     impl From<&Result<(), ExecutionError>> for ExecutionStatus {
         fn from(inner: &Result<(), ExecutionError>) -> Self {
             if let Err(err) = &inner {
-                let description = err.description.clone();
-                match err.kind {
-                    ErrorKind::Unexpected => ExecutionStatus::Panic { description },
-                    ErrorKind::Dispatcher { code } => {
-                        ExecutionStatus::DispatcherError { code, description }
-                    }
-                    ErrorKind::Runtime { code, runtime_id } => ExecutionStatus::RuntimeError {
-                        code,
-                        runtime_id,
-                        description,
-                    },
-                    ErrorKind::Service { code, instance_id } => ExecutionStatus::ServiceError {
-                        code,
-                        description,
-                        instance_id,
-                    },
+                let (typ, code) = match err.kind {
+                    ErrorKind::Unexpected => (ExecutionType::UnexpectedError, None),
+                    ErrorKind::Dispatcher { code } => (ExecutionType::DispatcherError, Some(code)),
+                    ErrorKind::Runtime { code } => (ExecutionType::RuntimeError, Some(code)),
+                    ErrorKind::Service { code } => (ExecutionType::ServiceError, Some(code)),
+                };
+
+                ExecutionStatus {
+                    typ,
+                    description: err.description.clone(),
+                    code,
+                    runtime_id: err.runtime_id,
+                    call_site: err.call_site.clone(),
                 }
             } else {
-                ExecutionStatus::Success
+                ExecutionStatus {
+                    typ: ExecutionType::Success,
+                    description: String::new(),
+                    code: None,
+                    runtime_id: None,
+                    call_site: None,
+                }
             }
         }
     }
 
-    impl From<ExecutionStatus> for Result<(), ExecutionError> {
-        fn from(inner: ExecutionStatus) -> Self {
-            match inner {
-                ExecutionStatus::Success => Ok(()),
+    impl TryFrom<ExecutionStatus> for Result<(), ExecutionError> {
+        type Error = &'static str;
 
-                ExecutionStatus::Panic { description } => {
-                    Err(ExecutionError::new(ErrorKind::Unexpected, description))
-                }
+        fn try_from(inner: ExecutionStatus) -> Result<Self, Self::Error> {
+            Ok(if let ExecutionType::Success = inner.typ {
+                Ok(())
+            } else {
+                let kind = match inner.typ {
+                    ExecutionType::UnexpectedError => {
+                        if inner.code != None {
+                            return Err("Code specified for an unexpected error");
+                        }
+                        ErrorKind::Unexpected
+                    }
+                    ExecutionType::DispatcherError => ErrorKind::Dispatcher {
+                        code: inner.code.ok_or("No code specified")?,
+                    },
+                    ExecutionType::RuntimeError => ErrorKind::Runtime {
+                        code: inner.code.ok_or("No code specified")?,
+                    },
+                    ExecutionType::ServiceError => ErrorKind::Service {
+                        code: inner.code.ok_or("No code specified")?,
+                    },
+                    ExecutionType::Success => unreachable!(),
+                };
 
-                ExecutionStatus::DispatcherError { description, code } => Err(ExecutionError::new(
-                    ErrorKind::Dispatcher { code },
-                    description,
-                )),
-
-                ExecutionStatus::RuntimeError {
-                    description,
-                    code,
-                    runtime_id,
-                } => Err(ExecutionError::new(
-                    ErrorKind::Runtime { code, runtime_id },
-                    description,
-                )),
-
-                ExecutionStatus::ServiceError {
-                    description,
-                    code,
-                    instance_id,
-                } => Err(ExecutionError::new(
-                    ErrorKind::Service { code, instance_id },
-                    description,
-                )),
-            }
+                Err(ExecutionError {
+                    kind,
+                    description: inner.description,
+                    runtime_id: inner.runtime_id,
+                    call_site: inner.call_site,
+                })
+            })
         }
     }
 
@@ -645,7 +724,8 @@ mod execution_result {
     where
         D: Deserializer<'a>,
     {
-        ExecutionStatus::deserialize(deserializer).map(From::from)
+        ExecutionStatus::deserialize(deserializer)
+            .and_then(|status| TryFrom::try_from(status).map_err(D::Error::custom))
     }
 }
 
@@ -667,28 +747,33 @@ mod tests {
             (ErrorKind::Unexpected, "AAAA"),
             (ErrorKind::Dispatcher { code: 0 }, ""),
             (ErrorKind::Dispatcher { code: 0 }, "b"),
-            (
-                ErrorKind::Runtime {
-                    runtime_id: 0,
-                    code: 1,
-                },
-                "c",
-            ),
-            (
-                ErrorKind::Service {
-                    code: 18,
-                    instance_id: 100,
-                },
-                "ddc",
-            ),
+            (ErrorKind::Runtime { code: 1 }, "c"),
+            (ErrorKind::Service { code: 18 }, "ddc"),
         ];
 
         for (kind, description) in values {
-            let err = ExecutionError {
-                kind,
-                description: description.to_owned(),
-            };
+            let mut err = ExecutionError::new(kind, description.to_owned());
+            let bytes = err.to_bytes();
+            let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
+            assert_eq!(err, err2);
 
+            err.runtime_id = Some(1);
+            let bytes = err.to_bytes();
+            let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
+            assert_eq!(err, err2);
+
+            err.call_site = Some(CallSite {
+                instance_id: 100,
+                call_type: CallType::Constructor,
+            });
+            let bytes = err.to_bytes();
+            let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
+            assert_eq!(err, err2);
+
+            err.call_site.as_mut().unwrap().call_type = CallType::Method {
+                interface: "exonum.Configure".to_owned(),
+                id: 1,
+            };
             let bytes = err.to_bytes();
             let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
             assert_eq!(err, err2);
@@ -714,76 +799,154 @@ mod tests {
 
     #[test]
     fn execution_error_object_hash_description() {
-        let first_err = ExecutionError {
-            kind: ErrorKind::Service {
-                code: 5,
-                instance_id: 100,
-            },
-            description: "foo".to_owned(),
-        };
-        let second_err = ExecutionError {
-            kind: ErrorKind::Service {
-                code: 5,
-                instance_id: 100,
-            },
-            description: "foo bar".to_owned(),
-        };
+        let mut first_err = ExecutionError::new(ErrorKind::Service { code: 5 }, "foo".to_owned());
+        let second_err = ExecutionError::new(ErrorKind::Service { code: 5 }, "foo bar".to_owned());
         assert_eq!(first_err.object_hash(), second_err.object_hash());
 
-        let second_err = ExecutionError {
-            kind: ErrorKind::Service {
-                code: 5,
-                instance_id: 101,
+        let second_err = ExecutionError::new(ErrorKind::Service { code: 6 }, "foo".to_owned());
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        let mut second_err = first_err.clone();
+        second_err.runtime_id = Some(0);
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+        first_err.runtime_id = Some(0);
+        assert_eq!(first_err.object_hash(), second_err.object_hash());
+        first_err.runtime_id = Some(1);
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        let mut second_err = first_err.clone();
+        second_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Constructor,
+        });
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        first_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Constructor,
+        });
+        assert_eq!(first_err.object_hash(), second_err.object_hash());
+
+        second_err.call_site = Some(CallSite {
+            instance_id: 101,
+            call_type: CallType::Constructor,
+        });
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        second_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::BeforeCommit,
+        });
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        second_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Method {
+                interface: String::new(),
+                id: 0,
             },
-            description: "foo".to_owned(),
-        };
+        });
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        first_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Method {
+                interface: String::new(),
+                id: 0,
+            },
+        });
+        assert_eq!(first_err.object_hash(), second_err.object_hash());
+
+        second_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Method {
+                interface: String::new(),
+                id: 1,
+            },
+        });
+        assert_ne!(first_err.object_hash(), second_err.object_hash());
+
+        second_err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Method {
+                interface: "foo".to_owned(),
+                id: 0,
+            },
+        });
         assert_ne!(first_err.object_hash(), second_err.object_hash());
     }
 
     #[test]
-    fn object_hash_for_runtime_errors() {
-        let first_err = ExecutionError {
-            kind: ErrorKind::Runtime {
-                code: 5,
-                runtime_id: 0,
-            },
-            description: "foo".to_owned(),
-        };
-        let second_err = ExecutionError {
-            kind: ErrorKind::Runtime {
-                code: 5,
-                runtime_id: 1,
-            },
-            description: "foo bar".to_owned(),
-        };
-        assert_ne!(first_err.object_hash(), second_err.object_hash());
+    fn execution_result_serde_presentation() {
+        let result = ExecutionStatus(Ok(()));
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            json!({ "type": "success" })
+        );
 
-        let second_err = ExecutionError {
-            kind: ErrorKind::Service {
-                code: 5,
-                instance_id: 1,
-            },
-            description: "foo bar".to_owned(),
-        };
-        assert_ne!(first_err.object_hash(), second_err.object_hash());
+        let result = ExecutionStatus(Err(ExecutionError {
+            kind: ErrorKind::Unexpected,
+            description: "Some error".to_owned(),
+            runtime_id: None,
+            call_site: None,
+        }));
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            json!({
+                "type": "unexpected_error",
+                "description": "Some error",
+            })
+        );
 
-        let second_err = ExecutionError {
-            kind: ErrorKind::Runtime {
-                code: 6,
-                runtime_id: 0,
-            },
-            description: "foo bar".to_owned(),
-        };
-        assert_ne!(first_err.object_hash(), second_err.object_hash());
+        let result = ExecutionStatus(Err(ExecutionError {
+            kind: ErrorKind::Service { code: 3 },
+            description: String::new(),
+            runtime_id: Some(1),
+            call_site: Some(CallSite {
+                instance_id: 100,
+                call_type: CallType::Constructor,
+            }),
+        }));
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            json!({
+                "type": "service_error",
+                "code": 3,
+                "runtime_id": 1,
+                "call_site": {
+                    "instance_id": 100,
+                    "call_type": "constructor",
+                }
+            })
+        );
 
-        let second_err = ExecutionError {
-            kind: ErrorKind::Runtime {
-                code: 5,
-                runtime_id: 0,
-            },
-            description: "Description doesn't matter".to_owned(),
-        };
-        assert_eq!(first_err.object_hash(), second_err.object_hash());
+        let result = ExecutionStatus(Err(ExecutionError {
+            kind: ErrorKind::Dispatcher { code: 8 },
+            description: "!".to_owned(),
+            runtime_id: Some(0),
+            call_site: Some(CallSite {
+                instance_id: 100,
+                call_type: CallType::Method {
+                    interface: "exonum.Configure".to_owned(),
+                    id: 1,
+                },
+            }),
+        }));
+        assert_eq!(
+            serde_json::to_value(result).unwrap(),
+            json!({
+                "type": "dispatcher_error",
+                "description": "!",
+                "code": 8,
+                "runtime_id": 0,
+                "call_site": {
+                    "instance_id": 100,
+                    "call_type": "method",
+                    "interface": "exonum.Configure",
+                    "method_id": 1,
+                }
+            })
+        );
     }
 
     #[test]
@@ -792,31 +955,49 @@ mod tests {
             Err((ErrorKind::Unexpected, "AAAA")),
             Err((ErrorKind::Dispatcher { code: 0 }, "")),
             Err((ErrorKind::Dispatcher { code: 0 }, "b")),
-            Err((
-                ErrorKind::Runtime {
-                    runtime_id: 0,
-                    code: 1,
-                },
-                "c",
-            )),
-            Err((
-                ErrorKind::Service {
-                    code: 18,
-                    instance_id: 200,
-                },
-                "ddc",
-            )),
+            Err((ErrorKind::Runtime { code: 1 }, "c")),
+            Err((ErrorKind::Service { code: 18 }, "ddc")),
             Ok(()),
         ];
 
         for value in values {
-            let res = ExecutionStatus(value.map_err(|(kind, description)| ExecutionError {
-                kind,
-                description: description.to_owned(),
-            }));
-            let body = serde_json::to_string_pretty(&res).unwrap();
-            let res2 = serde_json::from_str(&body).unwrap();
+            let mut res =
+                ExecutionStatus(value.map_err(|(kind, description)| {
+                    ExecutionError::new(kind, description.to_owned())
+                }));
+            let json = serde_json::to_string_pretty(&res).unwrap();
+            let res2 = serde_json::from_str(&json).unwrap();
             assert_eq!(res, res2);
+
+            if let Err(err) = res.0.as_mut() {
+                err.runtime_id = Some(1);
+                let json = serde_json::to_string_pretty(&res).unwrap();
+                let res2 = serde_json::from_str(&json).unwrap();
+                assert_eq!(res, res2);
+            }
+
+            if let Err(err) = res.0.as_mut() {
+                err.call_site = Some(CallSite {
+                    instance_id: 1_000,
+                    call_type: CallType::BeforeCommit,
+                });
+                let json = serde_json::to_string_pretty(&res).unwrap();
+                let res2 = serde_json::from_str(&json).unwrap();
+                assert_eq!(res, res2);
+            }
+
+            if let Err(err) = res.0.as_mut() {
+                err.call_site = Some(CallSite {
+                    instance_id: 1_000,
+                    call_type: CallType::Method {
+                        interface: "exonum.Configure".to_owned(),
+                        id: 1,
+                    },
+                });
+                let json = serde_json::to_string_pretty(&res).unwrap();
+                let res2 = serde_json::from_str(&json).unwrap();
+                assert_eq!(res, res2);
+            }
         }
     }
 

@@ -296,10 +296,7 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                let error_kind = ErrorKind::Service {
-                    code: 15,
-                    instance_id: CRYPTOCURRENCY_SERVICE_ID,
-                };
+                let error_kind = ErrorKind::Service { code: 15 };
                 Err(ExecutionError::new(error_kind, ""))
             }
         }

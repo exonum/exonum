@@ -190,7 +190,7 @@ use crate::{
     helpers::Height,
 };
 
-use self::{api::ServiceApiBuilder, call_context::CallLocation};
+use self::api::ServiceApiBuilder;
 use super::{
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
@@ -499,7 +499,7 @@ impl Runtime for RustRuntime {
         let instance = self.new_service(spec)?;
         let service = instance.as_ref();
         let descriptor = instance.descriptor();
-        let context = CallContext::new(context, descriptor, CallLocation::Constructor);
+        let context = CallContext::new(context, descriptor);
         catch_panic(|| service.initialize(context, parameters))
     }
 
@@ -531,7 +531,7 @@ impl Runtime for RustRuntime {
             instance.as_ref().call(
                 context.interface_name,
                 id,
-                CallContext::new(context, descriptor, CallLocation::Method { id }),
+                CallContext::new(context, descriptor),
                 payload,
             )
         })
@@ -560,7 +560,7 @@ impl Runtime for RustRuntime {
 
         let descriptor = instance.descriptor();
         catch_panic(|| {
-            let context = CallContext::new(context, descriptor, CallLocation::BeforeCommit);
+            let context = CallContext::new(context, descriptor);
             instance.as_ref().before_commit(context);
             Ok(())
         })

@@ -16,7 +16,7 @@
 
 use std::fmt;
 
-use crate::runtime::{ErrorKind, ExecutionError, RuntimeIdentifier};
+use crate::runtime::{ErrorKind, ExecutionError};
 
 /// List of possible Rust runtime errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -46,7 +46,7 @@ impl fmt::Display for Error {
 
 impl From<Error> for ErrorKind {
     fn from(error: Error) -> Self {
-        ErrorKind::runtime(RuntimeIdentifier::Rust as u32, error as u8)
+        ErrorKind::runtime(error as u8)
     }
 }
 

@@ -463,15 +463,9 @@ fn service_execute_panic_storage_error() {
 #[test]
 fn error_discards_transaction_changes() {
     let statuses = [
-        Err(ExecutionError::new(
-            ErrorKind::Service {
-                code: 0,
-                instance_id: 0,
-            },
-            "",
-        )),
+        Err(ExecutionError::new(ErrorKind::Service { code: 0 }, "")),
         Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
-        Err(ExecutionError::new(ErrorKind::runtime(0, 0), "Strange bar")),
+        Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
         Err(ExecutionError::new(ErrorKind::Unexpected, "PANIC")),
         Ok(()),
     ];
