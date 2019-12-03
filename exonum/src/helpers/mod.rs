@@ -159,6 +159,7 @@ pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
 }
 
+// TODO: Separate creation of RustRuntime and GenesisConfig. [ECR-3913]
 /// Creates and initializes RustRuntime and GenesisConfig with information from collection of InstanceCollection.
 pub fn create_rust_runtime_and_genesis_config(
     api_notifier: mpsc::Sender<UpdateEndpoints>,

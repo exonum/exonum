@@ -254,6 +254,7 @@ impl TestKitBuilder {
 
         self.additional_runtimes.push(self.rust_runtime.into());
 
+        // TODO: Parametrize TestKitBuilder with GenesisConfig on creation to prevent code duplication [ECR-3913].
         // Prepare GenesisConfig.
         let genesis_config_builder = self.instances.into_iter().fold(
             GenesisConfigBuilder::with_consensus_config(genesis),

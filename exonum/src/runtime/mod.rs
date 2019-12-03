@@ -448,6 +448,7 @@ pub trait WellKnownRuntime: Runtime {
     const ID: u32;
 }
 
+// TODO: Rethink visibility [ECR-3913]
 #[derive(Debug)]
 /// Instance of [`Runtime`] with corresponding ID.
 pub struct RuntimeInstance {
