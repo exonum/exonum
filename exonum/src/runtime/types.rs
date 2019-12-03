@@ -387,8 +387,8 @@ pub enum ArtifactStatus {
 impl Display for ArtifactStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Active => f.write_str("active"),
-            Self::Pending => f.write_str("pending"),
+            ArtifactStatus::Active => f.write_str("active"),
+            ArtifactStatus::Pending => f.write_str("pending"),
         }
     }
 }
@@ -398,15 +398,15 @@ impl ProtobufConvert for ArtifactStatus {
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            Self::Active => Self::ProtoStruct::ARTIFACT_ACTIVE,
-            Self::Pending => Self::ProtoStruct::ARTIFACT_PENDING,
+            ArtifactStatus::Active => schema::runtime::ArtifactStatus::ARTIFACT_ACTIVE,
+            ArtifactStatus::Pending => schema::runtime::ArtifactStatus::ARTIFACT_PENDING,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(match pb {
-            Self::ProtoStruct::ARTIFACT_ACTIVE => Self::Active,
-            Self::ProtoStruct::ARTIFACT_PENDING => Self::Pending,
+            schema::runtime::ArtifactStatus::ARTIFACT_ACTIVE => ArtifactStatus::Active,
+            schema::runtime::ArtifactStatus::ARTIFACT_PENDING => ArtifactStatus::Pending,
         })
     }
 }
@@ -423,8 +423,8 @@ pub enum InstanceStatus {
 impl Display for InstanceStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Active => f.write_str("active"),
-            Self::Pending => f.write_str("pending"),
+            InstanceStatus::Active => f.write_str("active"),
+            InstanceStatus::Pending => f.write_str("pending"),
         }
     }
 }
@@ -434,15 +434,15 @@ impl ProtobufConvert for InstanceStatus {
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            Self::Active => Self::ProtoStruct::SERVICE_ACTIVE,
-            Self::Pending => Self::ProtoStruct::SERVICE_PENDING,
+            InstanceStatus::Active => schema::runtime::InstanceStatus::SERVICE_ACTIVE,
+            InstanceStatus::Pending => schema::runtime::InstanceStatus::SERVICE_PENDING,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(match pb {
-            Self::ProtoStruct::SERVICE_ACTIVE => Self::Active,
-            Self::ProtoStruct::SERVICE_PENDING => Self::Pending,
+            schema::runtime::InstanceStatus::SERVICE_ACTIVE => InstanceStatus::Active,
+            schema::runtime::InstanceStatus::SERVICE_PENDING => InstanceStatus::Pending,
         })
     }
 }
