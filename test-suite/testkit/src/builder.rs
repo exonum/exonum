@@ -225,7 +225,7 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds an artifact with no deploy argument. Does nothing in case artifact witр given id is
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
     /// already added.
     pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
         self.with_parametric_artifact(artifact, ())

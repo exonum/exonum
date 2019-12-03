@@ -165,7 +165,7 @@ impl ArtifactId {
         Ok(artifact)
     }
 
-    /// Converts into `InstanceInitParams` with givan id, name and empty constructor.
+    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
     pub fn into_default_instance(
         self,
         id: InstanceId,
