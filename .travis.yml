@@ -172,7 +172,7 @@ jobs:
 
   # Check compatibility with Rust 1.36.
   - name: 1.36-compat
-    rust: 1.36
+    rust: 1.36.0
     script:
     - cargo check --all --benches --tests --bins --examples --features "long_benchmarks"
 
