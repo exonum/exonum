@@ -95,7 +95,7 @@ use exonum::{
     node::Node,
     runtime::{
         rust::{BuiltinInstance, ServiceFactory},
-        RuntimeInstance,
+        RuntimeInstance, WellKnownRuntime,
     },
 };
 use exonum_supervisor::SimpleSupervisor;
@@ -132,7 +132,7 @@ impl NodeBuilder {
     /// Adds a new Runtime to the list of available runtimes.
     ///
     /// Note that you don't have to add a Rust Runtime, since it's included by default.
-    pub fn with_external_runtime(mut self, runtime: impl Into<RuntimeInstance>) -> Self {
+    pub fn with_external_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         self.external_runtimes.push(runtime.into());
         self
     }
