@@ -52,12 +52,14 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
     let timestamping_artifact = timestamping.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_artifact(time_service_artifact.clone())
-        .with_instance(time_service_artifact.into_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME))
+        .with_instance(
+            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
+        )
         .with_rust_service(time_service)
         .with_artifact(timestamping_artifact.clone())
         .with_instance(
             timestamping_artifact
-                .into_instance(SERVICE_ID, SERVICE_NAME)
+                .into_default_instance(SERVICE_ID, SERVICE_NAME)
                 .with_constructor(Config {
                     time_service_name: TIME_SERVICE_NAME.to_owned(),
                 }),

@@ -91,7 +91,7 @@ fn main() {
         .with_validators(4)
         .with_default_rust_service(DecentralizedSupervisor::new())
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(SERVICE_ID, SERVICE_NAME))
+        .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
         .with_rust_service(service)
         .create();
 

@@ -210,7 +210,7 @@ use std::{
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{Blockchain, Schema as CoreSchema},
+    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     crypto::Hash,
     helpers::Height,
     runtime::WellKnownRuntime,
@@ -416,9 +416,13 @@ impl RustArtifactId {
         }
     }
 
-    /// Converts into `InstanceSpec` with specified id and name.
-    pub fn into_instance(self, id: InstanceId, name: impl Into<String>) -> InstanceSpec {
-        ArtifactId::from(self).into_instance(id, name)
+    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    pub fn into_default_instance(
+        self,
+        id: InstanceId,
+        name: impl Into<String>,
+    ) -> InstanceInitParams {
+        InstanceInitParams::new(id, name, self.into(), ())
     }
 
     /// Checks that the Rust artifact name contains only allowed characters and is not empty.

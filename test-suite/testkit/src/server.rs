@@ -248,7 +248,9 @@ mod tests {
         let artifact = service.artifact_id();
         let mut testkit = TestKitBuilder::validator()
             .with_artifact(artifact.clone())
-            .with_instance(artifact.into_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME))
+            .with_instance(
+                artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
+            )
             .with_rust_service(service)
             .create();
         testkit.create_blocks_until(height);

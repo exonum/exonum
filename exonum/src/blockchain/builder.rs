@@ -188,7 +188,9 @@ mod tests {
     #[should_panic(expected = "already used")]
     fn finalize_duplicate_services() {
         let sample_service = SampleService;
-        let instance = sample_service.artifact_id().into_instance(0, "sample");
+        let instance = sample_service
+            .artifact_id()
+            .into_default_instance(0, "sample");
         test_finalizing_services(
             vec![sample_service.into()],
             vec![instance.clone(), instance],
@@ -201,8 +203,8 @@ mod tests {
         let sample_service = SampleService;
         let artifact = sample_service.artifact_id();
         let instances = vec![
-            artifact.clone().into_instance(0, "sample"),
-            artifact.into_instance(1, "sample"),
+            artifact.clone().into_default_instance(0, "sample"),
+            artifact.into_default_instance(1, "sample"),
         ];
         test_finalizing_services(vec![sample_service.into()], instances);
     }
@@ -213,8 +215,8 @@ mod tests {
         let sample_service = SampleService;
         let artifact = sample_service.artifact_id();
         let instances = vec![
-            artifact.clone().into_instance(0, "sample"),
-            artifact.into_instance(0, "other-sample"),
+            artifact.clone().into_default_instance(0, "sample"),
+            artifact.into_default_instance(0, "other-sample"),
         ];
         test_finalizing_services(vec![sample_service.into()], instances);
     }

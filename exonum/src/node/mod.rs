@@ -1250,7 +1250,7 @@ mod tests {
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
                 .with_artifact(artifact.clone())
-                .with_instance(artifact.into_instance(SERVICE_ID, "test-service"))
+                .with_instance(artifact.into_default_instance(SERVICE_ID, "test-service"))
                 .build();
         let services = vec![service.into()];
         let external_runtimes: Vec<RuntimeInstance> = vec![];

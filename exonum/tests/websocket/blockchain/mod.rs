@@ -121,7 +121,7 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
     let artifact = service.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(SERVICE_ID, "my-service"))
+        .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();
     let services = vec![service.into()];
 

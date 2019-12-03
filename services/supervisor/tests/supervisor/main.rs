@@ -1026,7 +1026,7 @@ fn test_id_assignment_sparse() {
         .with_logger()
         .with_default_rust_service(DecentralizedSupervisor::new())
         .with_artifact(inc_service_artifact.clone())
-        .with_instance(inc_service_artifact.into_instance(max_builtin_id, "inc"))
+        .with_instance(inc_service_artifact.into_default_instance(max_builtin_id, "inc"))
         .with_rust_service(inc_service)
         .create();
 

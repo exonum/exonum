@@ -277,7 +277,7 @@ fn test_mock_provider() {
     let artifact = time_service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
+        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .create();
 
@@ -324,7 +324,7 @@ fn test_selected_time_less_than_time_in_storage() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
+        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .with_default_rust_service(SimpleSupervisor::new())
         .create();
@@ -428,7 +428,7 @@ fn create_testkit_with_validators(validators_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_validators(validators_count)
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
+        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .create()
 }
@@ -489,7 +489,7 @@ fn test_endpoint_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(INSTANCE_ID, INSTANCE_NAME))
+        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
         .with_default_rust_service(SimpleSupervisor::new())
         .create();

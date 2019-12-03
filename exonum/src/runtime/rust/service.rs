@@ -148,8 +148,7 @@ pub trait DefaultInstance: ServiceFactory {
     /// Creates default instance configuration parameters for the service.
     fn default_instance(&self) -> InstanceInitParams {
         self.artifact_id()
-            .into_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
-            .into()
+            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
     }
 }
 

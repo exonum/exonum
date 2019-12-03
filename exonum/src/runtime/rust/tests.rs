@@ -477,16 +477,16 @@ fn rust_runtime_with_builtin_services() {
     let (runtime, event_handle) = create_runtime();
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
     let config = generate_testnet_config(1, 0)[0].clone();
-    let spec = artifact
+    let init_params = artifact
         .clone()
-        .into_instance(SERVICE_INSTANCE_ID, SERVICE_INSTANCE_NAME);
+        .into_default_instance(SERVICE_INSTANCE_ID, SERVICE_INSTANCE_NAME);
     let constructor = Init {
         msg: "constructor_message".to_owned(),
     };
 
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
         .with_artifact(artifact.clone())
-        .with_instance(spec.clone().with_constructor(constructor.clone()))
+        .with_instance(init_params.clone().with_constructor(constructor.clone()))
         .build();
 
     let mut blockchain = Blockchain::build_for_tests()
@@ -501,8 +501,11 @@ fn rust_runtime_with_builtin_services() {
         vec![
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact.clone(), vec![]),
-            RuntimeEvent::StartAdding(spec.clone(), constructor.clone().into_bytes()),
-            RuntimeEvent::CommitService(None, spec.clone()),
+            RuntimeEvent::StartAdding(
+                init_params.clone().instance_spec,
+                constructor.clone().into_bytes()
+            ),
+            RuntimeEvent::CommitService(None, init_params.clone().instance_spec),
             RuntimeEvent::AfterCommit(Height(0)),
         ]
     );
@@ -534,7 +537,7 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact, vec![]),
             // `Runtime::start_adding_service` is never called for the same service
-            RuntimeEvent::CommitService(Some(Height(1)), spec),
+            RuntimeEvent::CommitService(Some(Height(1)), init_params.instance_spec),
             // `Runtime::after_commit` is never called for the same block
             RuntimeEvent::Resume,
         ]
@@ -679,7 +682,7 @@ impl DefaultInstance for DependentServiceImpl {
 
     fn default_instance(&self) -> InstanceInitParams {
         self.artifact_id()
-            .into_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
             .with_constructor(Init {
                 msg: SERVICE_INSTANCE_NAME.to_owned(),
             })

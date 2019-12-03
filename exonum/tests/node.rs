@@ -115,7 +115,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
                 .with_artifact(artifact.clone())
-                .with_instance(artifact.into_instance(2, "commit-watcher"))
+                .with_instance(artifact.into_default_instance(2, "commit-watcher"))
                 .build();
         let services = vec![service.into()];
 
@@ -169,7 +169,7 @@ fn test_node_restart_regression() {
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
                 .with_artifact(artifact.clone())
-                .with_instance(artifact.into_instance(4, "startup-checker"))
+                .with_instance(artifact.into_default_instance(4, "startup-checker"))
                 .build();
         let services = vec![service.into()];
 

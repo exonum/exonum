@@ -360,6 +360,14 @@ impl InstanceInitParams {
             constructor: constructor.into_bytes(),
         }
     }
+
+    /// Converts into `InstanceInitParams` with specific constructor.
+    pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
+        InstanceInitParams {
+            instance_spec: self.instance_spec,
+            constructor: constructor.to_bytes(),
+        }
+    }
 }
 
 /// Creates `GenesisConfig` from components.
@@ -404,8 +412,8 @@ impl GenesisConfigBuilder {
     }
 
     /// Adds service instance initialization parameters.
-    pub fn with_instance(mut self, instance_params: impl Into<InstanceInitParams>) -> Self {
-        self.builtin_instances.push(instance_params.into());
+    pub fn with_instance(mut self, instance_params: InstanceInitParams) -> Self {
+        self.builtin_instances.push(instance_params);
         self
     }
 
@@ -581,14 +589,14 @@ mod tests {
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
             .with_artifact(artifact1.clone())
             .with_parametric_artifact(artifact2.clone(), vec![1_u8, 2, 3])
-            .with_instance(artifact1.clone().into_instance(1, "art1_inst1"))
+            .with_instance(artifact1.clone().into_default_instance(1, "art1_inst1"))
             .with_instance(
                 artifact1
                     .clone()
-                    .into_instance(2, "art1_inst2")
+                    .into_default_instance(2, "art1_inst2")
                     .with_constructor(vec![4_u8, 5, 6]),
             )
-            .with_instance(artifact2.clone().into_instance(1, "art2_inst1"))
+            .with_instance(artifact2.clone().into_default_instance(1, "art2_inst1"))
             .build();
 
         assert_eq!(genesis_config.consensus_config, consensus);

@@ -22,7 +22,11 @@ fn main() {
     // TODO Fix testkit work
     let service = CryptocurrencyService;
     TestKitBuilder::validator()
-        .with_instance(service.artifact_id().into_instance(1, "cryptocurrency"))
+        .with_instance(
+            service
+                .artifact_id()
+                .into_default_instance(1, "cryptocurrency"),
+        )
         .with_rust_service(service)
         .serve(
             "0.0.0.0:8000".parse().unwrap(),

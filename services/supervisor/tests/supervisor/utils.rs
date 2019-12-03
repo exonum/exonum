@@ -173,9 +173,9 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
         .with_instance(
             artifact
                 .clone()
-                .into_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME),
+                .into_default_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME),
         )
-        .with_instance(artifact.into_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME))
+        .with_instance(artifact.into_default_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME))
         .with_rust_service(service)
         .create()
 }

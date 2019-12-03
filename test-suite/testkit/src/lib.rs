@@ -73,7 +73,7 @@
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
 //!         .with_artifact(artifact.clone())
-//!         .with_instance(artifact.into_instance(SERVICE_ID, "timestamping"))
+//!         .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
 //!         .with_rust_service(service)
 //!         .create();
 //!
@@ -236,7 +236,7 @@ impl TestKit {
             .with_artifact(artifact.clone())
             .with_instance(
                 artifact
-                    .into_instance(id, name)
+                    .into_default_instance(id, name)
                     .with_constructor(constructor),
             )
             .with_rust_service(service_factory)
@@ -401,7 +401,7 @@ impl TestKit {
     /// let artifact = service.artifact_id();
     /// let mut testkit = TestKitBuilder::validator()
     ///     .with_artifact(artifact.clone())
-    ///     .with_instance(artifact.into_instance(SERVICE_ID, "example"))
+    ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
     ///     .with_rust_service(ExampleService)
     ///     .create();
     /// expensive_setup(&mut testkit);

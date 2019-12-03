@@ -88,7 +88,7 @@ fn main() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_artifact(artifact.clone())
-        .with_instance(artifact.into_instance(instance_id, "timestamping"))
+        .with_instance(artifact.into_default_instance(instance_id, "timestamping"))
         .with_rust_service(service)
         .create();
     // Create few transactions.

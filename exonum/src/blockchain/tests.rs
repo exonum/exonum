@@ -383,7 +383,7 @@ fn handling_tx_panic_error() {
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
     let (pk, sec_key) = crypto::gen_keypair();
@@ -442,7 +442,7 @@ fn handling_tx_panic_storage_error() {
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, IDX_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, IDX_NAME)],
     );
 
     let (pk, sec_key) = crypto::gen_keypair();
@@ -476,7 +476,7 @@ fn service_execute_good() {
         vec![ServiceGoodImpl.into()],
         vec![ServiceGoodImpl
             .artifact_id()
-            .into_instance(3, "service_good")],
+            .into_default_instance(3, "service_good")],
     );
     assert_service_execute(&mut blockchain);
 }
@@ -487,7 +487,7 @@ fn service_execute_panic() {
         vec![ServicePanicImpl.into()],
         vec![ServicePanicImpl
             .artifact_id()
-            .into_instance(4, "service_panic")],
+            .into_default_instance(4, "service_panic")],
     );
     assert_service_execute_panic(&mut blockchain);
 }
@@ -499,7 +499,7 @@ fn service_execute_panic_storage_error() {
         vec![ServicePanicStorageErrorImpl.into()],
         vec![ServicePanicStorageErrorImpl
             .artifact_id()
-            .into_instance(5, "service_panic")],
+            .into_default_instance(5, "service_panic")],
     );
     assert_service_execute_panic(&mut blockchain);
 }
@@ -519,7 +519,7 @@ fn error_discards_transaction_changes() {
         vec![TxResultCheckService.into()],
         vec![TxResultCheckService
             .artifact_id()
-            .into_instance(TX_CHECK_RESULT_SERVICE_ID, "check_result")],
+            .into_default_instance(TX_CHECK_RESULT_SERVICE_ID, "check_result")],
     );
     let db = TemporaryDB::new();
 
@@ -562,7 +562,7 @@ fn test_dispatcher_deploy_good() {
         vec![TestDispatcherService.into(), ServiceGoodImpl.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
     let artifact_id = ServiceGoodImpl.artifact_id().into();
@@ -600,8 +600,10 @@ fn test_dispatcher_already_deployed() {
         vec![
             TestDispatcherService
                 .artifact_id()
-                .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME),
-            ServiceGoodImpl.artifact_id().into_instance(11, "good"),
+                .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME),
+            ServiceGoodImpl
+                .artifact_id()
+                .into_default_instance(11, "good"),
         ],
     );
 
@@ -634,7 +636,7 @@ fn test_dispatcher_register_unavailable() {
         vec![TestDispatcherService.into(), ServiceGoodImpl.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
     let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
@@ -667,7 +669,7 @@ fn test_dispatcher_start_service_good() {
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
     // Tests start service for the good service.
     let snapshot = blockchain.snapshot();
@@ -692,7 +694,7 @@ fn test_dispatcher_start_service_rollback() {
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
     // Tests that a service with an unregistered artifact will not be started.
@@ -748,7 +750,7 @@ fn test_check_tx() {
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
-            .into_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);

@@ -472,7 +472,7 @@ fn test_service_config_discard_fake_supervisor() {
         .with_validators(1)
         .with_artifact(fake_supervisor_artifact.clone())
         .with_instance(
-            fake_supervisor_artifact.into_instance(FAKE_SUPERVISOR_ID, "fake-supervisor"),
+            fake_supervisor_artifact.into_default_instance(FAKE_SUPERVISOR_ID, "fake-supervisor"),
         )
         .with_rust_service(fake_supervisor)
         .with_default_rust_service(ConfigChangeService)

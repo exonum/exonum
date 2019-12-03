@@ -118,7 +118,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// let artifact = service.artifact_id();
 /// let mut testkit = TestKitBuilder::validator()
 ///     .with_artifact(artifact.clone())
-///     .with_instance(artifact.into_instance(SERVICE_ID, "example"))
+///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
 ///     .with_rust_service(service)
 ///     .with_validators(4)
 ///     .create();
