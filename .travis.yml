@@ -33,6 +33,7 @@ addons:
     - pkg-config
     - powershell
     - protobuf-compiler
+    - python3-venv
     - unzip
     - zlib1g-dev
 
@@ -142,24 +143,18 @@ jobs:
 
   # Integration tests.
   - name: integration-tests
-    before_install:
-    - sudo add-apt-repository -y ppa:deadsnakes/ppa
-    - sudo apt-get update
-    - sudo apt-get install -y python3.6 python3-pip python3-venv
-    - sccache -V | grep $SCCACHE_VERS || cargo install sccache --vers $SCCACHE_VERS --force
-    - export RUSTC_WRAPPER=sccache
     install:
-    - python3.6 -m venv env
+    - python3 -m venv env
     - source env/bin/activate
-    - pip install pip --upgrade
-    - pip install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
-    - pip uninstall -y protobuf
-    - pip install --no-binary=protobuf protobuf
+    - pip3 install pip --upgrade
+    - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
+    - pip3 uninstall -y protobuf
+    - pip3 install --no-binary=protobuf protobuf
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
     script:
-    - python3.6 -m exonum_tests
+    - python3 -m exonum_tests -v
     after_script:
     - deactivate
     - rm -rf env
