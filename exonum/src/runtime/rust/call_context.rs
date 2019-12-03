@@ -1,23 +1,14 @@
 use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
-use std::fmt;
-
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
-    error::{ErrorKind, ExecutionError, ServiceFail},
-    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
+    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
 /// Context for the executed call. The call can mean a transaction call, a `before_commit` hook,
 /// or a service constructor.
-///
-/// Use `*err` methods of the context together with [`ServiceFail`] trait to create errors
-/// in the service code. More complex ways to create errors are rarely required and may not be
-/// forward compatible.
-///
-/// [`ServiceFail`]: ../error/trait.ServiceFail.html
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.
@@ -54,40 +45,6 @@ impl<'a> CallContext<'a> {
     /// Returns a descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
-    }
-
-    /// Creates an `ExecutionError` with the specified contents.
-    pub fn err(&self, inner_error: impl ServiceFail) -> ExecutionError {
-        let error_kind = ErrorKind::Service {
-            code: inner_error.code(),
-        };
-        ExecutionError::new(error_kind, inner_error.description())
-    }
-
-    /// Creates an `ExecutionError` corresponding to an unauthorized call.
-    pub fn unauthorized_err(&self) -> ExecutionError {
-        DispatcherError::UnauthorizedCaller.into()
-    }
-
-    /// Creates an `ExecutionError` corresponding to a malformed argument.
-    pub fn malformed_err(&self, details: impl fmt::Display) -> ExecutionError {
-        let error_kind = DispatcherError::MalformedArguments.into();
-        ExecutionError::new(error_kind, details.to_string())
-    }
-
-    /// Creates an `ExecutionError` corresponding to an unimplemented interface.
-    pub fn no_interface_err(&self) -> ExecutionError {
-        DispatcherError::NoSuchInterface.into()
-    }
-
-    /// Creates an `ExecutionError` corresponding to a missing or unimplemented method.
-    pub fn no_method_err(&self, details: Option<&str>) -> ExecutionError {
-        let mut err = ExecutionError::from(DispatcherError::NoSuchMethod);
-        if let Some(details) = details {
-            err.description.push_str(": ");
-            err.description.push_str(details);
-        }
-        err
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]

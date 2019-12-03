@@ -175,7 +175,7 @@ impl ExonumService {
                 #id => {
                     let bytes = payload.into();
                     let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(|error_msg| ctx.malformed_err(error_msg))?;
+                        .map_err(#cr::runtime::DispatcherError::malformed_arguments)?;
                     self.#name(ctx, arg)
                 }
             }
@@ -194,7 +194,7 @@ impl ExonumService {
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match method {
                         #( #match_arms )*
-                        _ => Err(ctx.no_method_err(None)),
+                        _ => Err(#cr::runtime::DispatcherError::NoSuchMethod.into()),
                     }
                 }
             }

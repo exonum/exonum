@@ -32,9 +32,9 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        error::ExecutionError, BlockchainData, CallInfo, Caller, Dispatcher, DispatcherSchema,
-        ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        StateHashAggregator,
+        error::ExecutionError, BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError,
+        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
+        Runtime, StateHashAggregator,
     },
 };
 
@@ -301,7 +301,7 @@ impl TestService for TestServiceImpl {
 
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let init = Init::from_bytes(params.into()).map_err(|e| context.malformed_err(e))?;
+        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         context
             .service_data()
             .get_entry("constructor_entry")
@@ -640,14 +640,14 @@ pub struct DependentServiceImpl;
 impl Service for DependentServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         assert_eq!(*context.caller(), Caller::Blockchain);
-        let init = Init::from_bytes(params.into()).map_err(|e| context.malformed_err(e))?;
+        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         if context
             .data()
             .for_dispatcher()
             .get_instance(&*init.msg)
             .is_none()
         {
-            return Err(context.err((0, "no dependency")));
+            return Err(ExecutionError::service(0, "no dependency"));
         }
 
         // Check that it is possible to access data of the dependency right away,

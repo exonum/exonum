@@ -31,7 +31,7 @@ use crate::{
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
-        ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        ExecutionError, ExecutionFail, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -86,13 +86,13 @@ trait TestDispatcherInterface {
 struct TestDispatcherService;
 
 impl Service for TestDispatcherService {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(&self, _context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             let v = TestExecute::from_bytes(params.into()).unwrap();
             if v.value == 42 {
                 panic!("42!");
             } else {
-                return Err(context.err((0, "Not a great answer")));
+                return Err(ExecutionError::service(0, "Not a great answer"));
             }
         }
         Ok(())
@@ -464,7 +464,10 @@ fn service_execute_panic_storage_error() {
 fn error_discards_transaction_changes() {
     let statuses = [
         Err(ExecutionError::new(ErrorKind::Service { code: 0 }, "")),
-        Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
+        Err(ExecutionError::new(
+            ErrorKind::Dispatcher { code: 5 },
+            "Foo",
+        )),
         Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
         Err(ExecutionError::new(ErrorKind::Unexpected, "PANIC")),
         Ok(()),
@@ -572,8 +575,11 @@ fn test_dispatcher_already_deployed() {
         TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     assert_eq!(
-        result.0,
-        Err(DispatcherError::ArtifactAlreadyDeployed.into())
+        result.0.unwrap_err(),
+        DispatcherError::ArtifactAlreadyDeployed
+            .to_match()
+            .in_runtime(0)
+            .for_service(TEST_SERVICE_ID)
     );
 }
 

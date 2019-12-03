@@ -36,9 +36,9 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
-        RuntimeIdentifier, StateHashAggregator,
+        ArtifactId, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema, ErrorKind,
+        ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec, MethodId,
+        Runtime, RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -471,10 +471,16 @@ fn test_dispatcher_rust_runtime_no_service() {
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
+
+    let err = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
+        .start_adding_service(rust_service, vec![])
+        .unwrap_err();
     assert_eq!(
-        ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
-            .start_adding_service(rust_service, vec![]),
-        Err(DispatcherError::ArtifactNotDeployed.into())
+        err,
+        DispatcherError::ArtifactNotDeployed
+            .to_match()
+            .for_service(RUST_SERVICE_ID)
+            .in_call(CallType::Constructor)
     );
     create_genesis_block(&mut dispatcher, &mut fork);
     db.merge(fork.into_patch()).unwrap();

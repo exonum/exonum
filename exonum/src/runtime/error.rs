@@ -18,7 +18,12 @@ use exonum_derive::*;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
-use std::{any::Any, convert::TryFrom, fmt::Display, panic};
+use std::{
+    any::Any,
+    convert::TryFrom,
+    fmt::{self, Display},
+    panic,
+};
 
 use super::{InstanceId, MethodId};
 use crate::{
@@ -111,15 +116,11 @@ pub enum ErrorKind {
     },
 }
 
+// FIXME: consider removing constructors
 impl ErrorKind {
     /// Creates an unexpected error.
     pub fn unexpected() -> Self {
         ErrorKind::Unexpected
-    }
-
-    /// Creates a dispatcher error with the specified code.
-    pub(crate) fn dispatcher(code: u8) -> Self {
-        ErrorKind::Dispatcher { code }
     }
 
     /// Creates a runtime error with the specified code.
@@ -175,7 +176,7 @@ impl Display for ErrorKind {
 /// # use exonum::runtime::{rust::CallContext, ExecutionError};
 ///
 /// /// Error codes emitted by wallet transactions during execution:
-/// #[derive(Debug, ServiceFail)]
+/// #[derive(Debug, ExecutionFail)]
 /// pub enum Error {
 ///     /// Content hash already exists.
 ///     HashAlreadyExists = 0,
@@ -198,7 +199,7 @@ impl Display for ErrorKind {
 ///         arg: Arg,
 ///     ) -> Result<(), ExecutionError> {
 ///         if arg.field.is_empty() {
-///             return Err(context.err(Error::ConfigParseError));
+///             return Err(Error::ConfigParseError.into());
 ///         }
 ///         // do other stuff...
 /// #       Ok(())
@@ -209,8 +210,8 @@ impl Display for ErrorKind {
 /// [`for_service`] method allows to use errors in testing:
 ///
 /// ```no_run
-/// use exonum::runtime::{ExecutionError, InstanceId, ServiceFail};
-/// use exonum_derive::ServiceFail;
+/// use exonum::runtime::{ExecutionError, InstanceId, ExecutionFail};
+/// use exonum_derive::ExecutionFail;
 /// # use exonum::explorer::BlockWithTransactions;
 /// # struct Tx;
 /// # struct TestKit;
@@ -219,7 +220,7 @@ impl Display for ErrorKind {
 /// #         -> BlockWithTransactions { unimplemented!() }
 /// # }
 ///
-/// #[derive(Debug, ServiceFail)]
+/// #[derive(Debug, ExecutionFail)]
 /// pub enum Error {
 ///     /// Content hash already exists.
 ///     HashAlreadyExists = 0,
@@ -240,83 +241,150 @@ impl Display for ErrorKind {
 ///
 /// [`CallContext::err`]: ../rust/struct.CallContext.html#method.err
 /// [`for_service`]: #tymethod.for_service
-pub trait ServiceFail {
-    /// Extracts the error code.
-    fn code(&self) -> u8;
+pub trait ExecutionFail {
+    /// Extracts the error kind.
+    fn kind(&self) -> ErrorKind;
 
     /// Extracts the human-readable error description.
-    fn description(self) -> String;
+    fn description(&self) -> String;
 
     /// Creates an error with the externally provided description. The output value implements
-    /// `ServiceFail` and thus can be used to create errors during service execution.
+    /// `ExecutionFail` and thus can be used to create errors during service execution.
     ///
     /// This operation is not meant to be overridden.
-    fn with_description(&self, description: impl Display) -> (u8, String) {
-        (self.code(), description.to_string())
+    fn with_description(&self, description: impl Display) -> ExecutionError {
+        ExecutionError::new(self.kind(), description.to_string())
     }
 
     /// Converts an error into a generic representation. This is primarily useful to compare
     /// an error via `assert_eq!` in tests.
     ///
     /// This operation is not meant to be overridden.
-    fn for_service(self, instance_id: InstanceId) -> ServiceExecutionError
+    fn to_match(&self) -> ExecutionErrorMatch {
+        ExecutionErrorMatch::new(self.kind(), self.description())
+    }
+}
+
+/// Matcher for `ExecutionError`s that can have some fields not specified. Can be compared to
+/// an `ExceptionError`.
+#[derive(Debug)]
+pub struct ExecutionErrorMatch {
+    kind: ErrorKind,
+    description: StringMatch,
+    runtime_id: Option<u32>,
+    instance_id: Option<InstanceId>,
+    call_type: Option<CallType>,
+}
+
+impl ExecutionErrorMatch {
+    fn new(kind: ErrorKind, description: String) -> Self {
+        Self {
+            kind,
+            description: StringMatch::Exact(description),
+            runtime_id: None,
+            instance_id: None,
+            call_type: None,
+        }
+    }
+
+    /// Accepts an error with any description.
+    pub fn with_any_description(mut self) -> Self {
+        self.description = StringMatch::Any;
+        self
+    }
+
+    /// Accepts an error with any description containing the specified string.
+    pub fn with_description_containing(mut self, pat: impl Into<String>) -> Self {
+        self.description = StringMatch::Contains(pat.into());
+        self
+    }
+
+    /// Accepts an error with any description matching the specified closure.
+    pub fn with_description_matching<P>(mut self, pat: P) -> Self
     where
-        Self: Sized,
+        P: Fn(&str) -> bool + 'static,
     {
-        ServiceExecutionError {
-            code: self.code(),
-            instance_id,
-            description: self.description(),
-        }
+        self.description = StringMatch::Generic(Box::new(pat));
+        self
+    }
+
+    /// Accepts an error that has occurred in a runtime with the specified ID.
+    pub fn in_runtime(mut self, runtime_id: u32) -> Self {
+        self.runtime_id = Some(runtime_id);
+        self
+    }
+
+    /// Accepts an error that has occurred in a service with the specified ID.
+    pub fn for_service(mut self, instance_id: InstanceId) -> Self {
+        self.instance_id = Some(instance_id);
+        self
+    }
+
+    /// Accepts an error that has occurred in a call of the specified format.
+    pub fn in_call(mut self, call_type: CallType) -> Self {
+        self.call_type = Some(call_type);
+        self
     }
 }
 
-impl ServiceFail for (u8, &str) {
-    fn code(&self) -> u8 {
-        self.0
-    }
-
-    fn description(self) -> String {
-        self.1.to_owned()
-    }
-}
-
-impl ServiceFail for (u8, String) {
-    fn code(&self) -> u8 {
-        self.0
-    }
-
-    fn description(self) -> String {
-        self.1
-    }
-}
-
-/// Generalized form of `ServiceFail` produced by the `for_service` method. Can be compared
-/// to `ExecutionError`.
-#[derive(Debug, PartialEq)]
-pub struct ServiceExecutionError {
-    code: u8,
-    instance_id: InstanceId,
-    description: String,
-}
-
-impl PartialEq<ServiceExecutionError> for ExecutionError {
-    fn eq(&self, other: &ServiceExecutionError) -> bool {
-        if let ErrorKind::Service { code } = self.kind {
-            code == other.code
-                && self
-                    .call_site()
-                    .map_or(false, |site| site.instance_id == other.instance_id)
-                && self.description == other.description
-        } else {
-            false
-        }
+impl PartialEq<ExecutionErrorMatch> for ExecutionError {
+    fn eq(&self, error_match: &ExecutionErrorMatch) -> bool {
+        let kind_matches = self.kind == error_match.kind;
+        let runtime_matches = match (error_match.runtime_id, self.runtime_id) {
+            (None, _) => true,
+            (Some(match_id), Some(id)) => match_id == id,
+            _ => false,
+        };
+        let instance_matches = match (error_match.instance_id, &self.call_site) {
+            (None, _) => true,
+            (Some(match_id), Some(CallSite { instance_id, .. })) => match_id == *instance_id,
+            _ => false,
+        };
+        let call_type_matches = match (&error_match.call_type, &self.call_site) {
+            (None, _) => true,
+            (Some(match_type), Some(CallSite { call_type, .. })) => match_type == call_type,
+            _ => false,
+        };
+        kind_matches
+            && runtime_matches
+            && instance_matches
+            && call_type_matches
+            && error_match.description.matches(&self.description)
     }
 }
 
-impl PartialEq<ExecutionError> for ServiceExecutionError {
+impl PartialEq<ExecutionError> for ExecutionErrorMatch {
     fn eq(&self, other: &ExecutionError) -> bool {
         other.eq(self)
+    }
+}
+
+enum StringMatch {
+    Any,
+    Exact(String),
+    Contains(String),
+    Generic(Box<dyn Fn(&str) -> bool>),
+}
+
+impl fmt::Debug for StringMatch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StringMatch::Any => formatter.write_str("Any"),
+            StringMatch::Exact(s) => formatter.debug_tuple("Exact").field(s).finish(),
+            StringMatch::Contains(s) => formatter.debug_tuple("Contains").field(s).finish(),
+            StringMatch::Generic(_) => formatter.debug_tuple("Generic").field(&"_").finish(),
+        }
+    }
+}
+
+impl StringMatch {
+    fn matches(&self, s: &str) -> bool {
+        match self {
+            StringMatch::Any => true,
+            StringMatch::Exact(ref_str) => ref_str == s,
+            StringMatch::Contains(needle) => s.contains(needle),
+            StringMatch::Generic(match_fn) => match_fn(s),
+        }
     }
 }
 
@@ -376,6 +444,11 @@ impl ExecutionError {
         }
     }
 
+    /// Creates an execution error for use in service code.
+    pub fn service(code: u8, description: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Service { code }, description)
+    }
+
     /// Creates an execution error from the panic description.
     fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
         let any = any.as_ref();
@@ -397,6 +470,14 @@ impl ExecutionError {
         Self::new(ErrorKind::Unexpected, description)
     }
 
+    /// Converts an error to a matcher. The matcher expect the exact kind and description
+    /// of this error, and does not check any other error fields.
+    pub fn to_match(&self) -> ExecutionErrorMatch {
+        ExecutionErrorMatch::new(self.kind, self.description.clone())
+    }
+
+    /// Returns the ID of a runtime in which this error has occurred. If the runtime is not known,
+    /// returns `None`.
     pub fn runtime_id(&self) -> Option<u32> {
         self.runtime_id
     }
@@ -408,6 +489,7 @@ impl ExecutionError {
         self
     }
 
+    /// Returns the call site of the error.
     pub fn call_site(&self) -> Option<&CallSite> {
         self.call_site.as_ref()
     }
@@ -500,9 +582,15 @@ impl ObjectHash for ExecutionError {
     }
 }
 
+/// Site of a call where an `ExecutionError` may occur.
+///
+/// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
+/// or in the service code, depending on the `kind` of the error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
 pub struct CallSite {
+    /// ID of the service instance that has generated an error.
     pub instance_id: InstanceId,
+    /// Type of a call.
     #[serde(flatten)]
     pub call_type: CallType,
 }
@@ -545,15 +633,23 @@ impl ProtobufConvert for CallSite {
     }
 }
 
+/// Type of a call to a service.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
 pub enum CallType {
+    /// Service constructor.
     Constructor,
+    /// Service method.
     Method {
+        /// Name of the interface defining the method. This field is empty for the default service
+        /// interface.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
         interface: String,
+        /// Numeric ID of the method.
         #[serde(rename = "method_id")]
         id: MethodId,
     },
+    /// Hook executing after processing transactions in a block.
     BeforeCommit,
 }
 
@@ -999,6 +1095,87 @@ mod tests {
                 assert_eq!(res, res2);
             }
         }
+    }
+
+    #[test]
+    #[allow(clippy::cognitive_complexity)] // More test code is fine
+    fn execution_error_matching() {
+        let mut error = ExecutionError {
+            kind: ErrorKind::Unexpected,
+            description: "Panic!".to_string(),
+            runtime_id: None,
+            call_site: None,
+        };
+        let mut matcher = ExecutionErrorMatch {
+            kind: ErrorKind::Unexpected,
+            description: StringMatch::Any,
+            runtime_id: None,
+            instance_id: None,
+            call_type: None,
+        };
+        assert_eq!(error, matcher);
+
+        // Check various description types.
+        matcher.description = StringMatch::Exact("Panic!".to_owned());
+        assert_eq!(error, matcher);
+        matcher.description = StringMatch::Exact("Panic".to_owned());
+        assert_ne!(error, matcher);
+        matcher.description = StringMatch::Contains("nic!".to_owned());
+        assert_eq!(error, matcher);
+        matcher.description = StringMatch::Contains("nic?".to_owned());
+        assert_ne!(error, matcher);
+        matcher.description = StringMatch::Generic(Box::new(|s| s.eq_ignore_ascii_case("panic!")));
+        assert_eq!(error, matcher);
+
+        // Check `runtime_id` matching.
+        error.runtime_id = Some(1);
+        assert_eq!(error, matcher);
+        matcher.runtime_id = Some(0);
+        assert_ne!(error, matcher);
+        matcher.runtime_id = Some(1);
+        assert_eq!(error, matcher);
+
+        // Check `instance_id` matching.
+        error.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Constructor,
+        });
+        assert_eq!(error, matcher);
+        matcher.instance_id = Some(99);
+        assert_ne!(error, matcher);
+        matcher.instance_id = Some(100);
+        assert_eq!(error, matcher);
+
+        // Check `call_type` matching.
+        matcher.call_type = Some(CallType::BeforeCommit);
+        assert_ne!(error, matcher);
+        matcher.call_type = Some(CallType::Constructor);
+        assert_eq!(error, matcher);
+
+        error.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Method {
+                interface: "exonum.Configure".to_owned(),
+                id: 1,
+            },
+        });
+        matcher.call_type = None;
+        assert_eq!(error, matcher);
+        matcher.call_type = Some(CallType::Method {
+            interface: "exonum.Configure".to_owned(),
+            id: 0,
+        });
+        assert_ne!(error, matcher);
+        matcher.call_type = Some(CallType::Method {
+            interface: "exonum.v2.Configure".to_owned(),
+            id: 1,
+        });
+        assert_ne!(error, matcher);
+        matcher.call_type = Some(CallType::Method {
+            interface: "exonum.Configure".to_owned(),
+            id: 1,
+        });
+        assert_eq!(error, matcher);
     }
 
     #[test]

@@ -14,44 +14,15 @@
 
 //! The set of specific for the Rust runtime implementation errors.
 
-use std::fmt;
-
-use crate::runtime::{ErrorKind, ExecutionError};
+use exonum_derive::ExecutionFail;
 
 /// List of possible Rust runtime errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[execution_fail(crate = "crate", kind = "runtime")]
 pub enum Error {
     /// Unable to parse artifact identifier or specified artifact has non-empty spec.
     IncorrectArtifactId = 0,
     /// Unable to deploy artifact with the specified identifier, it is not listed
     /// among available artifacts.
     UnableToDeploy = 1,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::Error::*;
-
-        formatter.write_str(match self {
-            IncorrectArtifactId => {
-                "Unable to parse artifact identifier or specified artifact has non-empty spec"
-            }
-            UnableToDeploy => {
-                "Unable to deploy artifact with the specified identifier, it is not listed \
-                 among available artifacts"
-            }
-        })
-    }
-}
-
-impl From<Error> for ErrorKind {
-    fn from(error: Error) -> Self {
-        ErrorKind::runtime(error as u8)
-    }
-}
-
-impl From<Error> for ExecutionError {
-    fn from(error: Error) -> Self {
-        ExecutionError::new(error.into(), error.to_string())
-    }
 }

@@ -14,7 +14,7 @@
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
 use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Variant};
 
@@ -24,25 +24,39 @@ use super::{find_meta_attrs, CratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
-struct ServiceFailAttrs {
+struct ExecutionFailAttrs {
     #[darling(rename = "crate")]
     cr: CratePath,
+    kind: String,
 }
 
-impl Default for ServiceFailAttrs {
+impl Default for ExecutionFailAttrs {
     fn default() -> Self {
         Self {
             cr: CratePath::default(),
+            kind: "Service".to_owned(),
         }
     }
 }
 
-impl TryFrom<&[Attribute]> for ServiceFailAttrs {
+impl TryFrom<&[Attribute]> for ExecutionFailAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_meta_attrs("service_fail", args)
-            .map(|meta| Self::from_nested_meta(&meta))
+        find_meta_attrs("execution_fail", args)
+            .map(|meta| {
+                Self::from_nested_meta(&meta).and_then(|mut attrs| match attrs.kind.as_str() {
+                    "service" | "runtime" | "dispatcher" => {
+                        attrs.kind[..1].make_ascii_uppercase();
+                        Ok(attrs)
+                    }
+                    _ => {
+                        let msg = "ExecutionFail: Unsupported error kind. Use one of \
+                                   \"service\", \"runtime\", or \"dispatcher\"";
+                        Err(darling::Error::custom(msg))
+                    }
+                })
+            })
             .unwrap_or_else(|| Ok(Self::default()))
     }
 }
@@ -58,13 +72,13 @@ impl ParsedVariant {
     fn from_variant(variant: &Variant) -> Self {
         assert!(
             variant.fields.iter().len() == 0,
-            "ServiceFail: Each enum variant should not have fields inside."
+            "ExecutionFail: Each enum variant should not have fields inside."
         );
         let discriminant = variant
             .discriminant
             .clone()
             .expect(
-                "ServiceFail: Each enum variant should have an explicit discriminant declaration",
+                "ExecutionFail: Each enum variant should have an explicit discriminant declaration",
             )
             .1;
         // TODO parse discriminant.
@@ -130,19 +144,19 @@ impl ParsedVariant {
 }
 
 #[derive(Debug)]
-struct ServiceFail {
+struct ExecutionFail {
     name: Ident,
     variants: Vec<ParsedVariant>,
-    attrs: ServiceFailAttrs,
+    attrs: ExecutionFailAttrs,
 }
 
-impl FromDeriveInput for ServiceFail {
+impl FromDeriveInput for ExecutionFail {
     fn from_derive_input(input: &DeriveInput) -> Result<Self, darling::Error> {
-        let attrs = ServiceFailAttrs::try_from(input.attrs.as_ref())?;
+        let attrs = ExecutionFailAttrs::try_from(input.attrs.as_ref())?;
         let data = match &input.data {
             Data::Enum(enum_data) => enum_data,
             _ => {
-                let msg = "`ServiceFail` can only be implemented for enums";
+                let msg = "`ExecutionFail` can only be implemented for enums";
                 return Err(darling::Error::unsupported_shape(msg));
             }
         };
@@ -163,7 +177,7 @@ impl FromDeriveInput for ServiceFail {
     }
 }
 
-impl ServiceFail {
+impl ExecutionFail {
     fn implement_display(&self) -> impl ToTokens {
         let name = &self.name;
         let match_arms = self.variants.iter().map(|variant| {
@@ -185,44 +199,62 @@ impl ServiceFail {
 
     fn implement_service_fail(&self) -> impl ToTokens {
         let name = &self.name;
+        let kind = Ident::new(&self.attrs.kind, Span::call_site());
         let cr = &self.attrs.cr;
         let match_arms = self.variants.iter().map(|variant| {
             let ident = &variant.ident;
             let id = &variant.id;
-            quote!(#name::#ident => #id,)
+            quote!(#name::#ident => #cr::runtime::error::ErrorKind::#kind { code: #id },)
         });
 
         quote! {
-            impl #cr::runtime::error::ServiceFail for #name {
-                fn code(&self) -> u8 {
+            impl #cr::runtime::error::ExecutionFail for #name {
+                fn kind(&self) -> #cr::runtime::error::ErrorKind {
                     match self {
                         #( #match_arms )*
                     }
                 }
 
-                fn description(self) -> String {
+                fn description(&self) -> String {
                     self.to_string()
+                }
+            }
+        }
+    }
+
+    fn implement_into_execution_error(&self) -> impl ToTokens {
+        let name = &self.name;
+        let cr = &self.attrs.cr;
+        let module = quote!(#cr::runtime::error);
+        quote! {
+            impl From<#name> for #module::ExecutionError {
+                fn from(inner: #name) -> Self {
+                    let kind = #module::ExecutionFail::kind(&inner);
+                    let description = #module::ExecutionFail::description(&inner);
+                    #module::ExecutionError::new(kind, description)
                 }
             }
         }
     }
 }
 
-impl ToTokens for ServiceFail {
+impl ToTokens for ExecutionFail {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let display_impl = self.implement_display();
         let service_fail_impl = self.implement_service_fail();
+        let into_execution_error_impl = self.implement_into_execution_error();
 
         tokens.extend(quote! {
             #display_impl
             #service_fail_impl
+            #into_execution_error_impl
         })
     }
 }
 
-pub fn impl_service_fail(input: TokenStream) -> TokenStream {
-    let input = ServiceFail::from_derive_input(&syn::parse(input).unwrap())
-        .unwrap_or_else(|e| panic!("ServiceFail: {}", e));
+pub fn impl_execution_fail(input: TokenStream) -> TokenStream {
+    let input = ExecutionFail::from_derive_input(&syn::parse(input).unwrap())
+        .unwrap_or_else(|e| panic!("ExecutionFail: {}", e));
     let tokens = quote!(#input);
     tokens.into()
 }

@@ -55,7 +55,7 @@
 //!
 //! // You may create service-specific error types.
 //!
-//! #[derive(Debug, ServiceFail)]
+//! #[derive(Debug, ExecutionFail)]
 //! pub enum Error {
 //!     /// Wallet with the specified owner key already exists.
 //!     WalletAlreadyExists = 1,
@@ -193,7 +193,7 @@ use crate::{
 use self::api::ServiceApiBuilder;
 use super::{
     dispatcher::{self, Mailbox},
-    error::{catch_panic, ExecutionError},
+    error::{catch_panic, ExecutionError, ExecutionFail},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
@@ -416,9 +416,10 @@ impl RustArtifactId {
         if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
             return Err(Error::IncorrectArtifactId.into());
         }
-        artifact.name.parse().map_err(|inner: failure::Error| {
-            ExecutionError::new(Error::IncorrectArtifactId.into(), inner.to_string())
-        })
+        artifact
+            .name
+            .parse()
+            .map_err(|inner| Error::IncorrectArtifactId.with_description(inner))
     }
 }
 
