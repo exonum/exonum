@@ -37,9 +37,9 @@ mod services;
 fn testkit_with_interfaces() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_builtin_rust_service(WalletService)
-        .with_builtin_rust_service(DepositService)
-        .with_builtin_rust_service(AnyCallService)
+        .with_default_rust_service(WalletService)
+        .with_default_rust_service(DepositService)
+        .with_default_rust_service(AnyCallService)
         .create()
 }
 

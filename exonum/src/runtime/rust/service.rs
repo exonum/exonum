@@ -139,14 +139,14 @@ where
 }
 
 /// Provides default instance configuration parameters for `ServiceFactory`.
-pub trait BuiltinInstance: ServiceFactory {
+pub trait DefaultInstance: ServiceFactory {
     /// Default id for a service.
     const INSTANCE_ID: InstanceId;
     /// Default name for a service.
     const INSTANCE_NAME: &'static str;
 
     /// Creates default instance configuration parameters for the service.
-    fn builtin_instance(&self) -> InstanceInitParams {
+    fn default_instance(&self) -> InstanceInitParams {
         self.artifact_id()
             .into_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
             .into()

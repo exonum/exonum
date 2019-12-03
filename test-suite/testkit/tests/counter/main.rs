@@ -717,7 +717,7 @@ fn test_explorer_single_block() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_builtin_rust_service(CounterService)
+        .with_default_rust_service(CounterService)
         .create();
 
     assert_eq!(testkit.majority_count(), 3);

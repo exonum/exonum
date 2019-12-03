@@ -39,7 +39,7 @@ mod proto;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_builtin_rust_service(CurrencyService)
+        .with_default_rust_service(CurrencyService)
         .create()
 }
 

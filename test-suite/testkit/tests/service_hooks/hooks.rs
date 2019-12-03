@@ -19,7 +19,7 @@ use exonum::{
     crypto::Hash,
     helpers::Height,
     runtime::{
-        rust::{AfterCommitContext, BuiltinInstance, CallContext, Service},
+        rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
         BlockchainData, InstanceId,
     },
 };
@@ -118,7 +118,7 @@ impl Service for AfterCommitService {
     }
 }
 
-impl BuiltinInstance for AfterCommitService {
+impl DefaultInstance for AfterCommitService {
     const INSTANCE_ID: u32 = SERVICE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

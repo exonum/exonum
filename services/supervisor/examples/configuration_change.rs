@@ -89,7 +89,7 @@ fn main() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_validators(4)
-        .with_builtin_rust_service(DecentralizedSupervisor::new())
+        .with_default_rust_service(DecentralizedSupervisor::new())
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_instance(SERVICE_ID, SERVICE_NAME))
         .with_rust_service(service)

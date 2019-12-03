@@ -18,7 +18,7 @@ use exonum::{
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
-            BuiltinInstance, CallContext, Service,
+            CallContext, DefaultInstance, Service,
         },
         BlockchainData, InstanceId,
     },
@@ -213,7 +213,7 @@ impl Service for CurrencyService {
     }
 }
 
-impl BuiltinInstance for CurrencyService {
+impl DefaultInstance for CurrencyService {
     const INSTANCE_ID: u32 = SERVICE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

@@ -94,7 +94,7 @@ use exonum::{
     exonum_merkledb::{Database, RocksDB},
     node::Node,
     runtime::{
-        rust::{BuiltinInstance, ServiceFactory},
+        rust::{DefaultInstance, ServiceFactory},
         RuntimeInstance, WellKnownRuntime,
     },
 };
@@ -150,7 +150,7 @@ impl NodeBuilder {
                 run_config.node_config.consensus.clone(),
             )
             .with_artifact(supervisor.artifact_id())
-            .with_instance(supervisor.builtin_instance())
+            .with_instance(supervisor.default_instance())
             .build();
 
             let mut services: Vec<Box<dyn ServiceFactory>> = vec![supervisor.into()];

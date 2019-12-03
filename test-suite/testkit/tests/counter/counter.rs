@@ -24,7 +24,7 @@ use exonum::{
     runtime::{
         rust::{
             api::{ServiceApiBuilder, ServiceApiState},
-            BuiltinInstance, CallContext, Service,
+            CallContext, DefaultInstance, Service,
         },
         BlockchainData, InstanceId,
     },
@@ -212,7 +212,7 @@ impl CounterApi {
 #[service_dispatcher(implements("CounterServiceInterface"))]
 pub struct CounterService;
 
-impl BuiltinInstance for CounterService {
+impl DefaultInstance for CounterService {
     const INSTANCE_ID: u32 = SERVICE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

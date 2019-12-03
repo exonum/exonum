@@ -475,7 +475,7 @@ fn test_service_config_discard_fake_supervisor() {
             fake_supervisor_artifact.into_instance(FAKE_SUPERVISOR_ID, "fake-supervisor"),
         )
         .with_rust_service(fake_supervisor)
-        .with_builtin_rust_service(ConfigChangeService)
+        .with_default_rust_service(ConfigChangeService)
         .create();
 
     let params = "I am a new parameter".to_owned();

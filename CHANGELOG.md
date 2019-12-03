@@ -55,7 +55,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `GenesisConfig` is extracted into separate entity. `BlockchainBuilder`, `Node`
  and `Testkit` explicitly accepts it during creation. (#1541)
 
-- Added `BuiltinInstance` trait for declaration of builtin services. (#1541)
+- Added `DefaultInstance` trait for declaration of builtin services. (#1541)
 
 #### exonum-merkledb
 
