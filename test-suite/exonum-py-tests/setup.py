@@ -2,7 +2,7 @@
 """Setup Script for the Exonum Python Integration Tests."""
 import setuptools
 
-INSTALL_REQUIRES = ["exonum-launcher==0.1.2"]
+INSTALL_REQUIRES = ["exonum-launcher==0.1.3"]
 
 PYTHON_REQUIRES = ">=3.6"
 
