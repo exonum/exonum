@@ -14,26 +14,29 @@
 
 //! Information schema for the runtime dispatcher.
 
+use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt},
-    AsReadonly, Fork, MapIndex,
+    access::{Access, AccessExt, AsReadonly},
+    Fork, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofMapIndex,
+};
+
+use crate::runtime::{
+    ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
 };
 
 use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
-use crate::runtime::{DeployStatus, InstanceId, InstanceQuery};
 
-const ARTIFACTS: &str = "core.dispatcher.artifacts";
-const PENDING_ARTIFACTS: &str = "core.dispatcher.pending_artifacts";
-const SERVICE_INSTANCES: &str = "core.dispatcher.service_instances";
-const PENDING_INSTANCES: &str = "core.dispatcher.pending_service_instances";
-const INSTANCE_IDS: &str = "core.dispatcher.service_instance_ids";
-const PENDING_INSTANCE_IDS: &str = "core.dispatcher.pending_instance_ids";
+const ARTIFACTS: &str = "dispatcher_artifacts";
+const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
+const INSTANCES: &str = "dispatcher_instances";
+const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
+const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
 // TODO: Add information about implemented interfaces [ECR-3747]
-#[derive(Debug, Clone)]
-pub struct Schema<T> {
+#[derive(Debug)]
+pub struct Schema<T: Access> {
     access: T,
 }
 
@@ -43,87 +46,66 @@ impl<T: Access> Schema<T> {
         Self { access }
     }
 
-    /// Artifacts registry indexed by the artifact name.
-    pub(crate) fn artifacts(&self) -> MapIndex<T::Base, ArtifactId, ArtifactSpec> {
-        self.access.clone().get_map(ARTIFACTS)
+    /// Returns an artifacts registry indexed by the artifact name.
+    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, ArtifactId, ArtifactState> {
+        self.access.clone().get_proof_map(ARTIFACTS)
     }
 
-    pub(super) fn pending_artifacts(&self) -> MapIndex<T::Base, ArtifactId, ArtifactSpec> {
-        self.access.clone().get_map(PENDING_ARTIFACTS)
+    /// Returns a service instances registry indexed by the instance name.
+    pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, String, InstanceState> {
+        self.access.clone().get_proof_map(INSTANCES)
     }
 
-    /// Set of launched service instances.
-    // TODO Get rid of data duplication in information schema. [ECR-3222]
-    pub(crate) fn service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.clone().get_map(SERVICE_INSTANCES)
-    }
-
-    /// Set of pending service instances.
-    // TODO Get rid of data duplication in information schema. [ECR-3222]
-    pub(super) fn pending_service_instances(&self) -> MapIndex<T::Base, String, InstanceSpec> {
-        self.access.clone().get_map(PENDING_INSTANCES)
-    }
-
-    /// Identifiers of launched service instances.
-    fn service_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
+    /// Returns a lookup table to map instance ID with the instance name.
+    fn instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
         self.access.clone().get_map(INSTANCE_IDS)
     }
 
-    /// Identifiers of pending service instances.
-    fn pending_instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
-        self.access.clone().get_map(PENDING_INSTANCE_IDS)
+    /// Returns a pending artifacts queue used to notify the runtime about artifacts
+    /// to be deployed.
+    fn pending_artifacts(&self) -> KeySetIndex<T::Base, ArtifactId> {
+        self.access.clone().get_key_set(PENDING_ARTIFACTS)
+    }
+
+    /// Returns a pending instances queue used to notify the runtime about service instances
+    /// to be committed.
+    fn pending_instances(&self) -> ListIndex<T::Base, InstanceSpec> {
+        self.access.clone().get_list(PENDING_INSTANCES)
     }
 
     /// Returns the information about a service instance by its identifier.
-    pub fn get_instance<'q>(
-        &self,
-        query: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceSpec, DeployStatus)> {
+    pub fn get_instance<'q>(&self, query: impl Into<InstanceQuery<'q>>) -> Option<InstanceState> {
+        let instances = self.instances();
         match query.into() {
-            InstanceQuery::Id(id) => {
-                if let Some(instance_name) = self.service_instance_ids().get(&id) {
-                    self.service_instances()
-                        .get(&instance_name)
-                        .map(|spec| (spec, DeployStatus::Active))
-                } else if let Some(instance_name) = self.pending_instance_ids().get(&id) {
-                    self.pending_service_instances()
-                        .get(&instance_name)
-                        .map(|spec| (spec, DeployStatus::Pending))
-                } else {
-                    None
-                }
-            }
+            // TODO It makes sense to indexing by identifiers primary. [ECR-3880]
+            InstanceQuery::Id(id) => self
+                .instance_ids()
+                .get(&id)
+                .and_then(|instance_name| instances.get(&instance_name)),
 
-            InstanceQuery::Name(instance_name) => self
-                .service_instances()
-                .get(instance_name)
-                .map(|spec| (spec, DeployStatus::Active))
-                .or_else(|| {
-                    self.pending_service_instances()
-                        .get(instance_name)
-                        .map(|spec| (spec, DeployStatus::Pending))
-                }),
+            InstanceQuery::Name(instance_name) => instances.get(instance_name),
         }
     }
 
     /// Returns information about an artifact by its identifier.
-    pub fn get_artifact(&self, id: &ArtifactId) -> Option<(ArtifactSpec, DeployStatus)> {
-        self.artifacts()
-            .get(id)
-            .map(|spec| (spec, DeployStatus::Active))
-            .or_else(|| {
-                self.pending_artifacts()
-                    .get(id)
-                    .map(|spec| (spec, DeployStatus::Pending))
-            })
+    pub fn get_artifact(&self, name: &ArtifactId) -> Option<ArtifactState> {
+        self.artifacts().get(name)
+    }
+
+    /// Returns hashes for tables with proofs.
+    pub(crate) fn state_hash(&self) -> Vec<Hash> {
+        vec![
+            self.artifacts().object_hash(),
+            self.instances().object_hash(),
+        ]
     }
 }
 
 // `AsReadonly` specialization to ensure that we won't leak mutable schema access.
 impl<T: AsReadonly> Schema<T> {
-    /// Readonly set of launched service instances.
-    pub fn running_instances(&self) -> MapIndex<T::Readonly, String, InstanceSpec> {
-        self.access.as_readonly().get_map(SERVICE_INSTANCES)
+    /// Readonly set of service instances.
+    pub fn service_instances(&self) -> ProofMapIndex<T::Readonly, String, InstanceState> {
+        self.access.as_readonly().get_proof_map(INSTANCES)
     }
 }
 
@@ -132,65 +114,101 @@ impl Schema<&Fork> {
     pub(super) fn add_pending_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: Vec<u8>,
+        spec: ArtifactSpec,
     ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts().contains(&artifact) || self.pending_artifacts().contains(&artifact) {
+        if self.artifacts().contains(&artifact) {
             return Err(Error::ArtifactAlreadyDeployed);
         }
-
-        self.pending_artifacts()
-            .put(&artifact, ArtifactSpec { payload: spec });
+        // Add artifact to registry with pending status.
+        self.artifacts().put(
+            &artifact,
+            ArtifactState {
+                spec,
+                status: ArtifactStatus::Pending,
+            },
+        );
+        // Add artifact to pending artifacts queue.
+        self.pending_artifacts().insert(artifact);
         Ok(())
-    }
-
-    /// Add artifact specification to the set of the deployed artifacts.
-    pub(super) fn add_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
-        // We use an assertion here since `add_pending_artifact` should have been called
-        // with the same params before.
-        debug_assert!(!self.artifacts().contains(&artifact));
-
-        self.artifacts()
-            .put(&artifact, ArtifactSpec { payload: spec });
     }
 
     /// Adds information about a pending service instance to the schema.
     pub(crate) fn add_pending_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
-        // Checks that the artifact is deployed.
         self.artifacts()
             .get(&spec.artifact)
-            .or_else(|| self.pending_artifacts().get(&spec.artifact))
             .ok_or(Error::ArtifactNotDeployed)?;
 
+        let mut instances = self.instances();
+        let mut instance_ids = self.instance_ids();
+
         // Checks that instance name doesn't exist.
-        if self.service_instances().contains(&spec.name)
-            || self.pending_service_instances().contains(&spec.name)
-        {
+        if instances.contains(&spec.name) {
             return Err(Error::ServiceNameExists);
         }
         // Checks that instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
-        if self.service_instance_ids().contains(&spec.id)
-            || self.pending_instance_ids().contains(&spec.id)
-        {
+        if instance_ids.contains(&spec.id) {
             return Err(Error::ServiceIdExists);
         }
 
         let id = spec.id;
         let name = spec.name.clone();
-        self.pending_service_instances().put(&name, spec);
-        self.pending_instance_ids().put(&id, name);
+        instances.put(
+            &name,
+            InstanceState {
+                spec: spec.clone(),
+                status: InstanceStatus::Pending,
+            },
+        );
+        instance_ids.put(&id, name);
+        self.pending_instances().push(spec);
         Ok(())
     }
 
-    /// Adds information about started service instance to the schema.
-    pub(super) fn add_service(&mut self, spec: InstanceSpec) {
-        debug_assert!(!self.service_instances().contains(&spec.name));
-        debug_assert!(!self.service_instance_ids().contains(&spec.id));
+    /// Make pending artifacts and instances active.
+    pub(super) fn activate_pending(&mut self) {
+        // Activate pending artifacts.
+        let mut artifacts = self.artifacts();
+        for artifact in &self.pending_artifacts() {
+            let mut state = artifacts
+                .get(&artifact)
+                .expect("Artifact marked as pending is not saved in `artifacts`");
+            state.status = ArtifactStatus::Active;
+            artifacts.put(&artifact, state);
+        }
 
-        let id = spec.id;
-        let name = spec.name.clone();
-        self.service_instances().put(&name, spec);
-        self.service_instance_ids().put(&id, name);
+        // Activate pending instances.
+        let mut instances = self.instances();
+        for spec in &self.pending_instances() {
+            let name = spec.name.clone();
+            instances.put(&name, InstanceState::new(spec, InstanceStatus::Active));
+        }
+    }
+
+    /// Takes pending artifacts from queue.
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, ArtifactSpec)> {
+        let mut index = self.pending_artifacts();
+        let artifacts = self.artifacts();
+        let pending_artifacts = index
+            .iter()
+            .map(|artifact| {
+                let spec = artifacts
+                    .get(&artifact)
+                    .expect("Artifact marked as pending is not saved in `artifacts`")
+                    .spec;
+                (artifact, spec)
+            })
+            .collect();
+        index.clear();
+        pending_artifacts
+    }
+
+    /// Takes pending service instances from queue.
+    pub(super) fn take_pending_instances(&mut self) -> Vec<InstanceSpec> {
+        let mut index = self.pending_instances();
+        let pending_instances = index.iter().collect::<Vec<_>>();
+        index.clear();
+        pending_instances
     }
 }

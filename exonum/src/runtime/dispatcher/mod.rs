@@ -20,10 +20,7 @@ use futures::{
     Future,
 };
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt, panic,
-};
+use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
     blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
@@ -31,13 +28,13 @@ use crate::{
     helpers::ValidateInput,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
+    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus},
 };
 
 use super::{
     error::ExecutionError, ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId,
     InstanceSpec, Runtime,
 };
-use crate::runtime::{InstanceDescriptor, InstanceQuery};
 
 mod error;
 mod schema;
@@ -76,13 +73,23 @@ impl Dispatcher {
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
-        // Restore information about the deployed service artifacts.
-        for (artifact, state) in &schema.artifacts() {
-            self.deploy_artifact(artifact, state.payload).wait()?;
+        // Restore information about the deployed services.
+        for (artifact, state) in schema.artifacts().iter() {
+            debug_assert_eq!(
+                state.status,
+                ArtifactStatus::Active,
+                "BUG: Artifact should not be in pending state."
+            );
+            self.deploy_artifact(artifact, state.spec.payload).wait()?;
         }
         // Restart active service instances.
-        for instance in schema.service_instances().values() {
-            self.start_service(snapshot, &instance)?;
+        for state in schema.instances().values() {
+            debug_assert_eq!(
+                state.status,
+                InstanceStatus::Active,
+                "BUG: Service instance should not be in pending state."
+            );
+            self.start_service(snapshot, &state.spec)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
@@ -105,13 +112,15 @@ impl Dispatcher {
         &mut self,
         fork: &mut Fork,
         spec: InstanceSpec,
-        artifact_spec: impl BinaryValue,
+        artifact_payload: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // Register service artifact in the runtime.
         // TODO Write test for such situations [ECR-3222]
         if !self.is_artifact_deployed(&spec.artifact) {
-            self.deploy_artifact_sync(fork, spec.artifact.clone(), artifact_spec)?;
+            Self::commit_artifact(fork, spec.artifact.clone(), artifact_payload.to_bytes())?;
+            // Wait until the artifact is ready to instantiate the service instances.
+            self.block_until_deployed(spec.artifact.clone(), artifact_payload.into_bytes());
         }
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
@@ -123,8 +132,13 @@ impl Dispatcher {
         &self,
         access: &dyn Snapshot,
     ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        let mut aggregator = HashMap::new();
-        // Inserts state hashes for the runtimes.
+        let mut aggregator = Vec::new();
+        // Insert state hash of Dispatcher schema.
+        aggregator.extend(IndexCoordinates::locate(
+            SchemaOrigin::Dispatcher,
+            Schema::new(access).state_hash(),
+        ));
+        // Insert state hashes for the runtimes.
         for (runtime_id, runtime) in &self.runtimes {
             let state = runtime.state_hashes(access);
             aggregator.extend(
@@ -156,7 +170,7 @@ impl Dispatcher {
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            Either::A(runtime.deploy_artifact(artifact.clone(), payload))
+            Either::A(runtime.deploy_artifact(artifact, payload))
         } else {
             Either::B(future::err(Error::IncorrectRuntime.into()))
         }
@@ -170,17 +184,18 @@ impl Dispatcher {
     pub(crate) fn commit_artifact(
         fork: &Fork,
         artifact: ArtifactId,
-        spec: Vec<u8>,
+        payload: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
-        Schema::new(fork).add_pending_artifact(artifact, spec)?;
-        Ok(())
+        Schema::new(fork)
+            .add_pending_artifact(artifact, ArtifactSpec { payload })
+            .map_err(From::from)
     }
 
-    fn block_until_deployed(&mut self, artifact: ArtifactId, spec: Vec<u8>) {
+    fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
-            self.deploy_artifact(artifact.clone(), spec)
+            self.deploy_artifact(artifact, payload)
                 .wait()
                 .unwrap_or_else(|e| {
                     // In this case artifact deployment error is fatal because there are
@@ -190,20 +205,24 @@ impl Dispatcher {
         }
     }
 
-    /// Deploys an artifact synchronously, i.e., blocking until the artifact is deployed.
-    pub(crate) fn deploy_artifact_sync(
-        &mut self,
-        fork: &Fork,
-        artifact: ArtifactId,
-        spec: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        let spec = spec.into_bytes();
-        Self::commit_artifact(fork, artifact.clone(), spec.clone())?;
-        self.block_until_deployed(artifact, spec);
+    /// Performs several shallow checks that transaction is correct.
+    ///
+    /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
+    /// executed successfully, but returned `Err(..)` value means that this transaction is
+    /// **obviously** incorrect and should be declined as early as possible.
+    pub(crate) fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+        // Currently the only check is that destination service exists, but later
+        // functionality of this method can be extended.
+        let call_info = &tx.as_ref().call_info;
+        self.runtime_for_service(call_info.instance_id)
+            .ok_or(Error::IncorrectInstanceId)?;
+
         Ok(())
     }
 
-    // TODO documentation [ECR-3275]
+    /// Executes transaction with the specified ID without the fork isolation.
+    ///
+    /// The caller must catch the panics and rollback the changes if panic was happened.
     pub(crate) fn execute(
         &self,
         fork: &mut Fork,
@@ -217,12 +236,16 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let runtime = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(Error::IncorrectRuntime)?;
+            .ok_or(Error::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, &tx.as_ref().arguments)
     }
 
     /// Calls `before_commit` for all currently active services, isolating each call.
+    ///
+    /// Changes the status of pending artifacts and services to active in the merkelized
+    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
+    /// calculated for precommit and actually committed block.
     pub(crate) fn before_commit(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
@@ -235,6 +258,7 @@ impl Dispatcher {
                 fork.rollback();
             }
         }
+        self.activate_pending(fork);
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
@@ -246,24 +270,22 @@ impl Dispatcher {
         // `Runtime::start_service()` calls.
         fork.flush();
         let snapshot = fork.snapshot_without_unflushed_changes();
+
+        // Block futures with pending deployments.
         let mut schema = Schema::new(&*fork);
-
-        // Deploy pending artifacts.
-        let mut artifacts = schema.pending_artifacts();
-        for (artifact, spec) in &artifacts {
-            self.block_until_deployed(artifact.clone(), spec.payload.clone());
-            schema.add_artifact(artifact, spec.payload);
+        for (artifact, spec) in schema.take_pending_artifacts() {
+            self.block_until_deployed(artifact, spec.payload);
         }
-
         // Start pending services.
-        let mut services = schema.pending_service_instances();
-        for spec in services.values() {
+        for spec in schema.take_pending_instances() {
             self.start_service(snapshot, &spec)
-                .expect("Cannot add service");
-            schema.add_service(spec);
+                .expect("Cannot start service");
         }
-        artifacts.clear();
-        services.clear();
+    }
+
+    /// Make pending artifacts and instances active.
+    pub(crate) fn activate_pending(&self, fork: &Fork) {
+        Schema::new(fork).activate_pending()
     }
 
     /// Notifies runtimes about a committed block.
@@ -323,7 +345,7 @@ impl Dispatcher {
 
             InstanceQuery::Name(name) => {
                 // TODO: This may be slow.
-                let id = Schema::new(fork).service_instances().get(name)?.id;
+                let id = Schema::new(fork).instances().get(name)?.spec.id;
                 Some(InstanceDescriptor { id, name })
             }
         }

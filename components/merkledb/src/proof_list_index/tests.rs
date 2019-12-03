@@ -14,6 +14,8 @@
 
 // spell-checker:ignore upup
 
+#![allow(clippy::too_many_lines)]
+
 use exonum_crypto::Hash;
 use rand::{thread_rng, Rng};
 use serde_json::{self, json};

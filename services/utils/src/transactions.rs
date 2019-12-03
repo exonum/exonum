@@ -1,13 +1,15 @@
 //! Transaction logic for `UtilsService`.
 
-use exonum::runtime::{rust::CallContext, AnyTx, DeployStatus, ExecutionError};
+use exonum::runtime::{
+    rust::{CallContext, ChildAuthorization},
+    AnyTx, ExecutionError, InstanceStatus,
+};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
 use semver::VersionReq;
 use serde_derive::*;
 
 use crate::{proto, UtilsService};
-use exonum::runtime::rust::ChildAuthorization;
 
 /// Errors of the `UtilsService`.
 #[derive(Debug, Clone, Copy, IntoExecutionError)]
@@ -144,16 +146,18 @@ impl UtilsInterface for UtilsService {
     ) -> Result<(), ExecutionError> {
         let instance_id = arg.inner.call_info.instance_id;
         let dispatcher_schema = context.data().for_dispatcher();
-        let (state, status) = dispatcher_schema
+        let state = dispatcher_schema
             .get_instance(instance_id)
             .ok_or(Error::NoService)?;
-        if status != DeployStatus::Active {
+        if state.status != InstanceStatus::Active {
             return Err(Error::ServiceIsNotActive.into());
         }
-        if arg.artifact_name != state.artifact.name {
+
+        let artifact = &state.spec.artifact;
+        if arg.artifact_name != artifact.name {
             return Err(Error::ArtifactMismatch.into());
         }
-        if !arg.artifact_version.matches(&state.artifact.version) {
+        if !arg.artifact_version.matches(&artifact.version) {
             return Err(Error::VersionMismatch.into());
         }
 

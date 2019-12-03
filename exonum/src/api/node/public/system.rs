@@ -20,7 +20,7 @@ use crate::{
     api::{node::SharedNodeState, ApiScope},
     blockchain::{Blockchain, Schema},
     helpers::user_agent,
-    runtime::{ArtifactId, DispatcherSchema, InstanceSpec, SnapshotExt},
+    runtime::{ArtifactId, DispatcherSchema, InstanceState, SnapshotExt},
 };
 
 /// Information about the current state of the node memory pool.
@@ -62,7 +62,7 @@ pub struct DispatcherInfo {
     /// List of deployed artifacts.
     pub artifacts: Vec<ArtifactId>,
     /// List of services.
-    pub services: Vec<InstanceSpec>,
+    pub services: Vec<InstanceState>,
 }
 
 impl DispatcherInfo {
@@ -70,7 +70,7 @@ impl DispatcherInfo {
     pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
         Self {
             artifacts: schema.artifacts().keys().collect(),
-            services: schema.service_instances().values().collect(),
+            services: schema.instances().values().collect(),
         }
     }
 }

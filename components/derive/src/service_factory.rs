@@ -20,15 +20,9 @@ use syn::{DeriveInput, Generics, Ident, Path};
 
 use super::CratePath;
 
-fn is_allowed_latin1_char(c: u8) -> bool {
+fn is_allowed_artifact_name_char(c: u8) -> bool {
     match c {
-          48..=57   // 0..9
-        | 65..=90   // A..Z
-        | 97..=122  // a..z
-        | 45..=46   // -.
-        | 95        // _
-        | 58        // :
-          => true,
+        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-'..=b'.' | b'_' | b':' => true,
         _ => false,
     }
 }
@@ -39,7 +33,10 @@ fn is_allowed_latin1_char(c: u8) -> bool {
 ///
 /// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`, `.`, ':'
 fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
-    name.as_ref().iter().copied().all(is_allowed_latin1_char)
+    name.as_ref()
+        .iter()
+        .copied()
+        .all(is_allowed_artifact_name_char)
 }
 
 #[derive(Debug, FromDeriveInput)]
