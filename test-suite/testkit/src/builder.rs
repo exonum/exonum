@@ -29,7 +29,7 @@ use exonum::{
 };
 use futures::sync::mpsc;
 
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 
@@ -135,7 +135,7 @@ pub struct TestKitBuilder {
     api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: Vec<RuntimeInstance>,
     instances: Vec<InstanceInitParams>,
-    artifacts: HashSet<ArtifactSpec>,
+    artifacts: Vec<ArtifactSpec>,
 }
 
 impl TestKitBuilder {
@@ -228,9 +228,13 @@ impl TestKitBuilder {
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
     pub fn with_artifact(mut self, artifact: impl Into<ArtifactSpec>) -> Self {
-        let artifact = artifact.into();
-        if !self.artifacts.contains(&artifact) {
-            self.artifacts.insert(artifact);
+        let artifact_spec = artifact.into();
+        if !self
+            .artifacts
+            .iter()
+            .any(|spec| spec.artifact == artifact_spec.artifact)
+        {
+            self.artifacts.push(artifact_spec);
         }
         self
     }
@@ -296,7 +300,7 @@ impl TestKitBuilder {
             api_notifier_channel,
             additional_runtimes: vec![],
             instances: vec![],
-            artifacts: HashSet::new(),
+            artifacts: vec![],
         }
     }
 }

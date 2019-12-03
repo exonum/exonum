@@ -368,7 +368,7 @@ pub struct GenesisConfigBuilder {
     /// Consensus config.
     consensus_config: ConsensusConfig,
     /// Artifacts specifications for builtin services.
-    artifacts: HashSet<ArtifactSpec>,
+    artifacts: Vec<ArtifactSpec>,
     /// Instances of builtin services.
     builtin_instances: Vec<InstanceInitParams>,
 }
@@ -378,7 +378,7 @@ impl GenesisConfigBuilder {
     pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
         Self {
             consensus_config,
-            artifacts: HashSet::new(),
+            artifacts: vec![],
             builtin_instances: vec![],
         }
     }
@@ -386,9 +386,13 @@ impl GenesisConfigBuilder {
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
     pub fn with_artifact(mut self, artifact: impl Into<ArtifactSpec>) -> Self {
-        let artifact = artifact.into();
-        if !self.artifacts.contains(&artifact) {
-            self.artifacts.insert(artifact);
+        let artifact_spec = artifact.into();
+        if !self
+            .artifacts
+            .iter()
+            .any(|spec| spec.artifact == artifact_spec.artifact)
+        {
+            self.artifacts.push(artifact_spec);
         }
         self
     }
@@ -556,5 +560,64 @@ mod tests {
         for (cfg, expected_msg) in &cases {
             assert_err_contains(cfg.validate().unwrap_err(), expected_msg);
         }
+    }
+
+    #[test]
+    fn genesis_config_creation() {
+        let consensus = gen_consensus_config();
+        let artifact1 = ArtifactId::new(42_u32, "test_artifact1").unwrap();
+        let artifact2 = ArtifactId::new(42_u32, "test_artifact2").unwrap();
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
+            .with_artifact(artifact1.clone())
+            .with_artifact(ArtifactSpec::new(artifact2.clone(), vec![1_u8, 2, 3]))
+            .with_instance(artifact1.clone().into_instance(1, "art1_inst1"))
+            .with_instance(
+                artifact1
+                    .clone()
+                    .into_instance(2, "art1_inst2")
+                    .with_constructor(vec![4_u8, 5, 6]),
+            )
+            .with_instance(artifact2.clone().into_instance(1, "art2_inst1"))
+            .build();
+
+        assert_eq!(genesis_config.consensus_config, consensus);
+        assert_eq!(genesis_config.artifacts.len(), 2);
+        assert_eq!(
+            genesis_config.artifacts[0],
+            ArtifactSpec::new(artifact1.clone(), ())
+        );
+        assert_eq!(
+            genesis_config.artifacts[1],
+            ArtifactSpec::new(artifact2.clone(), vec![1_u8, 2, 3])
+        );
+        assert_eq!(genesis_config.builtin_instances.len(), 3);
+        assert_eq!(
+            genesis_config.builtin_instances[0],
+            InstanceInitParams::new(1, "art1_inst1", artifact1.clone(), ())
+        );
+        assert_eq!(
+            genesis_config.builtin_instances[1],
+            InstanceInitParams::new(2, "art1_inst2", artifact1.clone(), vec![4_u8, 5, 6])
+        );
+        assert_eq!(
+            genesis_config.builtin_instances[2],
+            InstanceInitParams::new(1, "art2_inst1", artifact2.clone(), ())
+        );
+    }
+
+    #[test]
+    fn genesis_config_check_artifacts_duplication() {
+        let consensus = gen_consensus_config();
+        let artifact = ArtifactId::new(42_u32, "test_artifact").unwrap();
+        let correct_payload = vec![1_u8, 2, 3];
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus)
+            .with_artifact(ArtifactSpec::new(artifact.clone(), correct_payload.clone()))
+            .with_artifact(ArtifactSpec::new(artifact, vec![4_u8, 5, 6]))
+            .build();
+
+        assert_eq!(genesis_config.artifacts.len(), 1);
+        assert_eq!(genesis_config.artifacts[0].payload, correct_payload);
     }
 }
