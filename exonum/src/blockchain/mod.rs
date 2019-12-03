@@ -233,9 +233,7 @@ impl BlockchainMut {
 
         for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
             Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone())?;
-            if !self.dispatcher.is_artifact_deployed(&artifact) {
-                self.dispatcher.deploy_artifact(artifact, payload).wait()?
-            }
+            self.dispatcher.deploy_artifact(artifact, payload).wait()?
         }
         // Add service instances.
         for inst in genesis_config.builtin_instances {
