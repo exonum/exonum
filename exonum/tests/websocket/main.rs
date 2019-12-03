@@ -360,7 +360,7 @@ fn test_subscribe() {
 
     // Set blocks filter.
     let filters = serde_json::to_string(
-        &json!({"type": "set-subscriptions", "payload": [{ "type": "blocks" }]}),
+        &json!({ "type": "set-subscriptions", "payload": [{ "type": "blocks" }]}),
     )
     .unwrap();
     client.send_message(&OwnedMessage::Text(filters)).unwrap();
@@ -369,7 +369,7 @@ fn test_subscribe() {
     let resp_text = recv_text_msg(&mut client).unwrap();
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
-        json!({"result": "success"})
+        json!({ "result": "success" })
     );
 
     // Get one message and check that it is text.

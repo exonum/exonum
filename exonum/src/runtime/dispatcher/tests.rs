@@ -646,7 +646,7 @@ impl Runtime for DeploymentRuntime {
         let delay = LittleEndian::read_u64(&spec);
         let delay = Duration::from_millis(delay);
 
-        let error_kind = ErrorKind::runtime(0);
+        let error_kind = ErrorKind::Runtime { code: 0 };
         let result = match artifact.name.as_str() {
             "good" => Ok(()),
             "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),

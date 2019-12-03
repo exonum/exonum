@@ -69,7 +69,7 @@ impl Transfer {
     }
 }
 
-#[derive(Debug, ServiceFail)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Not allowed!
     NotAllowed = 0,
@@ -98,13 +98,13 @@ struct MyService;
 impl ExplorerTransactions for MyService {
     fn create_wallet(
         &self,
-        context: CallContext<'_>,
+        _context: CallContext<'_>,
         arg: CreateWallet,
     ) -> Result<(), ExecutionError> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(context.err(Error::NotAllowed))
+            Err(Error::NotAllowed.into())
         }
     }
 

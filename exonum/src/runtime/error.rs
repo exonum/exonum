@@ -116,18 +116,7 @@ pub enum ErrorKind {
     },
 }
 
-// FIXME: consider removing constructors
 impl ErrorKind {
-    /// Creates an unexpected error.
-    pub fn unexpected() -> Self {
-        ErrorKind::Unexpected
-    }
-
-    /// Creates a runtime error with the specified code.
-    pub fn runtime(code: u8) -> Self {
-        ErrorKind::Runtime { code }
-    }
-
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
             ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
@@ -166,8 +155,7 @@ impl Display for ErrorKind {
 /// Trait representing an error type defined in the service code.
 ///
 /// This trait can be derived from an enum using an eponymous derive macro from the `exonum-derive`
-/// crate. Using an error with the [`CallContext::err`] method is the preferred way to generate
-/// errors in the Rust services.
+/// crate. Using such errors is the preferred way to generate errors in Rust services.
 ///
 /// # Examples
 ///
@@ -207,7 +195,7 @@ impl Display for ErrorKind {
 /// }
 /// ```
 ///
-/// [`for_service`] method allows to use errors in testing:
+/// [`to_match`] method allows to use errors in testing:
 ///
 /// ```no_run
 /// use exonum::runtime::{ExecutionError, InstanceId, ExecutionFail};
@@ -236,11 +224,11 @@ impl Display for ErrorKind {
 /// #    Tx;
 /// let block = testkit.create_block_with_transaction(tx);
 /// let err: &ExecutionError = block[0].status().unwrap_err();
-/// assert_eq!(*err, Error::HashAlreadyExists.for_service(SERVICE_ID));
+/// let matcher = Error::HashAlreadyExists.to_match();
+/// assert_eq!(*err, matcher.for_service(SERVICE_ID));
 /// ```
 ///
-/// [`CallContext::err`]: ../rust/struct.CallContext.html#method.err
-/// [`for_service`]: #tymethod.for_service
+/// [`to_match`]: #tymethod.to_match
 pub trait ExecutionFail {
     /// Extracts the error kind.
     fn kind(&self) -> ErrorKind;
@@ -259,14 +247,17 @@ pub trait ExecutionFail {
     /// Converts an error into a generic representation. This is primarily useful to compare
     /// an error via `assert_eq!` in tests.
     ///
+    /// The converted error has kind and description set to the values returned by the corresponding
+    /// methods of this trait. The call site information (e.g., the instance ID) is not set.
+    ///
     /// This operation is not meant to be overridden.
     fn to_match(&self) -> ExecutionErrorMatch {
         ExecutionErrorMatch::new(self.kind(), self.description())
     }
 }
 
-/// Matcher for `ExecutionError`s that can have some fields not specified. Can be compared to
-/// an `ExceptionError`.
+/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
+/// an `ExceptionError`; the unspecified fields will match any value in the error.
 #[derive(Debug)]
 pub struct ExecutionErrorMatch {
     kind: ErrorKind,

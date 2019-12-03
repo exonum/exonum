@@ -120,7 +120,7 @@ fn test_explorer_basics() {
     let tx_info = block.transaction(0).unwrap();
     let err = tx_info.status().unwrap_err();
     assert_eq!(err.kind, ErrorKind::Service { code: 0 });
-    assert_eq!(err.description, "Not allowed");
+    assert_eq!(err.description, "Not allowed!");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
@@ -133,7 +133,13 @@ fn test_explorer_basics() {
             "status": {
                 "type": "service_error",
                 "code": 0,
-                "description": "Not allowed",
+                "description": "Not allowed!",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 0,
+                },
             },
             "time": tx_info.time(),
         })
@@ -153,8 +159,14 @@ fn test_explorer_basics() {
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
-                "type": "panic",
+                "type": "unexpected_error",
                 "description": "oops",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 1,
+                },
             },
             "time": tx_info.time(),
         })
