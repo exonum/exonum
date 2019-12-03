@@ -243,7 +243,7 @@ impl Service for Supervisor {
         // Load configuration from bytes and store it.
         let config = SupervisorConfig::from_bytes(Cow::from(&params)).unwrap_or_else(|err| {
             // Incorrect config is a critical error for both the service and the
-            // blockchain itself: supervisor can't operate unconfigured, and the
+            // blockchain itself: supervisor can't operate not configured, and the
             // blockchain isn't expected to work without supervisor.
             panic!("Unable to parse initialization parameters: {}", err);
         });

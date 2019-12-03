@@ -14,7 +14,7 @@
 
 //! Tests for the `Supervisor` service configuration, including
 //! `Supervisor` service initialization, using `Configure` interface
-//! and API endpoints assotiated with configuration.
+//! and API endpoints associated with configuration.
 
 use exonum::{
     blockchain::InstanceCollection,
