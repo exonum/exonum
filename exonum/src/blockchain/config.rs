@@ -21,7 +21,7 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     crypto::PublicKey,
@@ -368,7 +368,7 @@ pub struct GenesisConfigBuilder {
     /// Consensus config.
     consensus_config: ConsensusConfig,
     /// Artifacts specifications for builtin services.
-    artifacts: Vec<ArtifactSpec>,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
     /// Instances of builtin services.
     builtin_instances: Vec<InstanceInitParams>,
 }
@@ -378,22 +378,28 @@ impl GenesisConfigBuilder {
     pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
         Self {
             consensus_config,
-            artifacts: vec![],
+            artifacts: HashMap::new(),
             builtin_instances: vec![],
         }
     }
 
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
+    /// already added.
+    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
+        self.with_parametric_artifact(artifact, ())
+    }
+
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
-    pub fn with_artifact(mut self, artifact: impl Into<ArtifactSpec>) -> Self {
-        let artifact_spec = artifact.into();
-        if !self
-            .artifacts
-            .iter()
-            .any(|spec| spec.artifact == artifact_spec.artifact)
-        {
-            self.artifacts.push(artifact_spec);
-        }
+    pub fn with_parametric_artifact(
+        mut self,
+        artifact: impl Into<ArtifactId>,
+        payload: impl BinaryValue,
+    ) -> Self {
+        let artifact = artifact.into();
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| payload.into_bytes());
         self
     }
 
@@ -405,7 +411,11 @@ impl GenesisConfigBuilder {
 
     /// Produces `GenesisConfig` from collected components.
     pub fn build(self) -> GenesisConfig {
-        let artifacts = self.artifacts.into_iter().collect::<Vec<_>>();
+        let artifacts = self
+            .artifacts
+            .into_iter()
+            .map(|(artifact, payload)| ArtifactSpec { artifact, payload })
+            .collect::<Vec<_>>();
         GenesisConfig {
             consensus_config: self.consensus_config,
             artifacts,
@@ -570,7 +580,7 @@ mod tests {
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
             .with_artifact(artifact1.clone())
-            .with_artifact(ArtifactSpec::new(artifact2.clone(), vec![1_u8, 2, 3]))
+            .with_parametric_artifact(artifact2.clone(), vec![1_u8, 2, 3])
             .with_instance(artifact1.clone().into_instance(1, "art1_inst1"))
             .with_instance(
                 artifact1
@@ -583,27 +593,7 @@ mod tests {
 
         assert_eq!(genesis_config.consensus_config, consensus);
         assert_eq!(genesis_config.artifacts.len(), 2);
-        assert_eq!(
-            genesis_config.artifacts[0],
-            ArtifactSpec::new(artifact1.clone(), ())
-        );
-        assert_eq!(
-            genesis_config.artifacts[1],
-            ArtifactSpec::new(artifact2.clone(), vec![1_u8, 2, 3])
-        );
         assert_eq!(genesis_config.builtin_instances.len(), 3);
-        assert_eq!(
-            genesis_config.builtin_instances[0],
-            InstanceInitParams::new(1, "art1_inst1", artifact1.clone(), ())
-        );
-        assert_eq!(
-            genesis_config.builtin_instances[1],
-            InstanceInitParams::new(2, "art1_inst2", artifact1.clone(), vec![4_u8, 5, 6])
-        );
-        assert_eq!(
-            genesis_config.builtin_instances[2],
-            InstanceInitParams::new(1, "art2_inst1", artifact2.clone(), ())
-        );
     }
 
     #[test]
@@ -613,8 +603,8 @@ mod tests {
         let correct_payload = vec![1_u8, 2, 3];
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus)
-            .with_artifact(ArtifactSpec::new(artifact.clone(), correct_payload.clone()))
-            .with_artifact(ArtifactSpec::new(artifact, vec![4_u8, 5, 6]))
+            .with_parametric_artifact(artifact.clone(), correct_payload.clone())
+            .with_parametric_artifact(artifact, vec![4_u8, 5, 6])
             .build();
 
         assert_eq!(genesis_config.artifacts.len(), 1);

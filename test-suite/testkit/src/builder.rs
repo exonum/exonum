@@ -21,15 +21,15 @@ use exonum::{
     crypto,
     helpers::ValidatorId,
     keys::Keys,
-    merkledb::TemporaryDB,
+    merkledb::{BinaryValue, TemporaryDB},
     runtime::{
         rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        ArtifactSpec, RuntimeInstance, WellKnownRuntime,
+        ArtifactId, RuntimeInstance, WellKnownRuntime,
     },
 };
 use futures::sync::mpsc;
 
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 
@@ -135,7 +135,7 @@ pub struct TestKitBuilder {
     api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: Vec<RuntimeInstance>,
     instances: Vec<InstanceInitParams>,
-    artifacts: Vec<ArtifactSpec>,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
 }
 
 impl TestKitBuilder {
@@ -225,17 +225,23 @@ impl TestKitBuilder {
         self
     }
 
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact witр given id is
+    /// already added.
+    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
+        self.with_parametric_artifact(artifact, ())
+    }
+
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
-    pub fn with_artifact(mut self, artifact: impl Into<ArtifactSpec>) -> Self {
-        let artifact_spec = artifact.into();
-        if !self
-            .artifacts
-            .iter()
-            .any(|spec| spec.artifact == artifact_spec.artifact)
-        {
-            self.artifacts.push(artifact_spec);
-        }
+    pub fn with_parametric_artifact(
+        mut self,
+        artifact: impl Into<ArtifactId>,
+        payload: impl BinaryValue,
+    ) -> Self {
+        let artifact = artifact.into();
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| payload.into_bytes());
         self
     }
 
@@ -264,8 +270,8 @@ impl TestKitBuilder {
         let genesis_config = self
             .artifacts
             .into_iter()
-            .fold(genesis_config_builder, |builder, artifact| {
-                builder.with_artifact(artifact)
+            .fold(genesis_config_builder, |builder, (artifact, payload)| {
+                builder.with_parametric_artifact(artifact, payload)
             })
             .build();
 
@@ -301,7 +307,7 @@ impl TestKitBuilder {
             api_notifier_channel,
             additional_runtimes: vec![],
             instances: vec![],
-            artifacts: vec![],
+            artifacts: HashMap::new(),
         }
     }
 }

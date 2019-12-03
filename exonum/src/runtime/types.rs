@@ -268,15 +268,6 @@ impl ArtifactSpec {
     }
 }
 
-impl<T: Into<ArtifactId>> From<T> for ArtifactSpec {
-    fn from(artifact: T) -> Self {
-        Self {
-            artifact: artifact.into(),
-            payload: vec![],
-        }
-    }
-}
-
 /// Exhaustive service instance specification.
 #[derive(
     Debug,
