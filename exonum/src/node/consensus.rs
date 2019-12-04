@@ -859,7 +859,7 @@ impl NodeHandler {
 
             if !self.is_enabled {
                 trace!(
-                    "Do not send a request {:?} because the node is paused.",
+                    "Not sending a request {:?} because the node is paused.",
                     data
                 );
                 return;
@@ -987,7 +987,7 @@ impl NodeHandler {
     /// node tries to catch up with other nodes' height.
     pub(crate) fn request_next_block(&mut self) {
         if !self.is_enabled {
-            trace!("Do not send a request for the next block because the node is paused.",);
+            trace!("Not sending a request for the next block because the node is paused.",);
             return;
         }
 
