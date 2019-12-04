@@ -14,10 +14,9 @@
 
 use exonum::{
     helpers::Height,
-    messages::Verified,
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
