@@ -19,7 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, Service},
+        rust::{CallContext, DefaultInstance, Service},
         CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -101,6 +101,11 @@ impl IssueReceiver for WalletService {
     }
 }
 
+impl DefaultInstance for WalletService {
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "wallet";
+}
+
 #[protobuf_convert(source = "proto::Issue")]
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TxIssue {
@@ -133,6 +138,11 @@ impl DepositInterface for DepositService {
                 amount: arg.amount,
             })
     }
+}
+
+impl DefaultInstance for DepositService {
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "deposit";
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
@@ -198,3 +208,8 @@ impl AnyCall for AnyCallService {
 }
 
 impl Service for AnyCallService {}
+
+impl DefaultInstance for AnyCallService {
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "any-call";
+}

@@ -20,20 +20,16 @@ pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NA
 
 use exonum::{explorer::BlockchainExplorer, helpers::Height, runtime::rust::Transaction};
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use exonum_testkit::{InstanceCollection, TestKitBuilder};
+use exonum_testkit::TestKitBuilder;
 
 mod hooks;
 mod proto;
-
-fn after_commit_service_instances(factory: AfterCommitService) -> InstanceCollection {
-    InstanceCollection::new(factory).with_instance(SERVICE_ID, SERVICE_NAME, ())
-}
 
 #[test]
 fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(after_commit_service_instances(service.clone()))
+        .with_default_rust_service(service.clone())
         .create();
 
     // Check that `after_commit` invoked on the correct height.
@@ -60,12 +56,39 @@ fn test_after_commit() {
     assert!(expected_block_sizes);
 }
 
+/// An auditor should not broadcast transactions.
+#[test]
+fn test_after_commit_with_auditor() {
+    let service = AfterCommitService::new();
+    let mut testkit = TestKitBuilder::auditor()
+        .with_validators(2)
+        .with_default_rust_service(service.clone())
+        .create();
+
+    for i in 1..5 {
+        let block = testkit.create_block();
+        assert!(block.is_empty());
+        assert_eq!(service.counter() as u64, i);
+
+        let blockchain = testkit.blockchain();
+        let keypair = blockchain.service_keypair();
+        let tx = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
+        assert!(!testkit.is_tx_in_pool(&tx.object_hash()));
+    }
+
+    service.switch_to_generic_broadcast();
+    for i in 0..5 {
+        let block = testkit.create_block();
+        let expected_block_len = if i == 0 { 0 } else { 1 };
+        assert_eq!(block.len(), expected_block_len);
+    }
+}
+
 #[test]
 fn restart_testkit() {
-    let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_rust_service(after_commit_service_instances(service.clone()))
+        .with_default_rust_service(AfterCommitService::new())
         .create();
     testkit.create_blocks_until(Height(5));
 
@@ -73,9 +96,7 @@ fn restart_testkit() {
     assert_eq!(stopped.height(), Height(5));
     assert_eq!(stopped.network().validators().len(), 3);
     let service = AfterCommitService::new();
-    let runtime = stopped
-        .rust_runtime()
-        .with_available_service(service.clone());
+    let runtime = stopped.rust_runtime().with_factory(service.clone());
     let mut testkit = stopped.resume(vec![runtime]);
     for _ in 0..3 {
         testkit.create_block();
@@ -108,7 +129,7 @@ fn restart_testkit() {
 #[test]
 fn tx_pool_is_retained_on_restart() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(after_commit_service_instances(AfterCommitService::new()))
+        .with_default_rust_service(AfterCommitService::new())
         .create();
 
     let tx_hashes: Vec<_> = (100..105)
@@ -126,7 +147,7 @@ fn tx_pool_is_retained_on_restart() {
     let stopped = testkit.stop();
     let runtime = stopped
         .rust_runtime()
-        .with_available_service(AfterCommitService::new());
+        .with_factory(AfterCommitService::new());
     let testkit = stopped.resume(vec![runtime]);
     assert!(tx_hashes
         .iter()

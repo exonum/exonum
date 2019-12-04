@@ -15,7 +15,6 @@
 use bit_vec::BitVec;
 use exonum_keys::Keys;
 use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, SystemInfo, TemporaryDB};
-use exonum_proto::impl_binary_value_for_pb_message;
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -41,7 +40,10 @@ use crate::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
-    helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
+    helpers::{
+        create_rust_runtime_and_genesis_config, user_agent, Height, Milliseconds, Round,
+        ValidatorId,
+    },
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -1145,9 +1147,13 @@ fn sandbox_with_services_uninitialized(
         service_keys[0].clone(),
         ApiSender(api_channel.0.clone()),
     );
+
+    let (rust_runtime, genesis_config) =
+        create_rust_runtime_and_genesis_config(mpsc::channel(1).0, genesis, services);
+
     let blockchain = blockchain
-        .into_mut(genesis)
-        .with_rust_runtime(mpsc::channel(1).0, services)
+        .into_mut(genesis_config)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap();
 
@@ -1250,71 +1256,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::BinaryValue;
-
-    use crate::{
-        blockchain::ExecutionError,
-        crypto::{gen_keypair_from_seed, Seed},
-        proto::schema::tests::TxAfterCommit,
-        runtime::{
-            rust::{AfterCommitContext, CallContext, Service, Transaction},
-            AnyTx, InstanceId,
-        },
-        sandbox::sandbox_tests_helper::{add_one_height, SandboxState},
-    };
-
     use super::*;
-
-    #[exonum_interface(crate = "crate")]
-    pub trait AfterCommitInterface {
-        fn after_commit(
-            &self,
-            context: CallContext<'_>,
-            arg: TxAfterCommit,
-        ) -> Result<(), ExecutionError>;
-    }
-
-    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-    #[service_dispatcher(crate = "crate", implements("AfterCommitInterface"))]
-    #[service_factory(
-        crate = "crate",
-        artifact_name = "after_commit",
-        artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema"
-    )]
-    pub struct AfterCommitService;
-
-    impl AfterCommitInterface for AfterCommitService {
-        fn after_commit(
-            &self,
-            _context: CallContext<'_>,
-            _arg: TxAfterCommit,
-        ) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-    }
-
-    impl Service for AfterCommitService {
-        fn after_commit(&self, context: AfterCommitContext<'_>) {
-            let tx = TxAfterCommit::new_with_height(context.height());
-            context.broadcast_signed_transaction(tx);
-        }
-    }
-
-    impl AfterCommitService {
-        pub const ID: InstanceId = 2;
-    }
-
-    impl TxAfterCommit {
-        pub fn new_with_height(height: Height) -> Verified<AnyTx> {
-            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            let mut payload_tx = TxAfterCommit::new();
-            payload_tx.set_height(height.0);
-            payload_tx.sign(AfterCommitService::ID, keypair.0, &keypair.1)
-        }
-    }
-
-    impl_binary_value_for_pb_message! { TxAfterCommit }
 
     #[test]
     fn test_sandbox_init() {
@@ -1486,28 +1428,5 @@ mod tests {
         ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
-    }
-
-    // TODO move to testkit [ECR-3251]
-    #[test]
-    fn test_sandbox_service_after_commit() {
-        let sandbox = SandboxBuilder::new()
-            .with_services(vec![
-                InstanceCollection::new(TimestampingService).with_instance(
-                    TimestampingService::ID,
-                    "timestamping",
-                    (),
-                ),
-                InstanceCollection::new(AfterCommitService).with_instance(
-                    AfterCommitService::ID,
-                    "after-commit",
-                    (),
-                ),
-            ])
-            .build();
-        let state = SandboxState::new();
-        add_one_height(&sandbox, &state);
-        let tx = TxAfterCommit::new_with_height(Height(1));
-        sandbox.broadcast(&tx);
     }
 }

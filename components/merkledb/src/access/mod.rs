@@ -7,10 +7,8 @@ use std::{borrow::Cow, fmt};
 pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
-use crate::{
-    validation::assert_valid_name,
-    views::{IndexAddress, IndexType, ViewWithMetadata},
-};
+use crate::validation::assert_valid_name_component;
+use crate::views::{IndexAddress, IndexType, ViewWithMetadata};
 
 mod extensions;
 
@@ -55,13 +53,7 @@ impl<T: RawAccess> Access for T {
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        ViewWithMetadata::get_or_create(self, &addr, index_type).map_err(|e| AccessError {
-            addr,
-            kind: AccessErrorKind::WrongIndexType {
-                expected: index_type,
-                actual: e.index_type(),
-            },
-        })
+        ViewWithMetadata::get_or_create(self, &addr, index_type)
     }
 }
 
@@ -93,7 +85,7 @@ impl<'a, T: Access> Prefixed<'a, T> {
     /// Will panic if the prefix does not conform to valid names for indexes.
     pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
         let prefix = prefix.into();
-        assert_valid_name(prefix.as_ref());
+        assert_valid_name_component(prefix.as_ref());
         Self { access, prefix }
     }
 }
@@ -143,6 +135,27 @@ pub enum AccessErrorKind {
         actual: IndexType,
     },
 
+    /// Index name is reserved. It's forbidden for user to create indexes with names
+    /// starting with `__` and not containing a dot `.`.
+    #[fail(display = "Index name is reserved")]
+    ReservedName,
+
+    /// Index name is empty.
+    #[fail(display = "Index name must not be empty")]
+    EmptyName,
+
+    /// Index contains invalid characters.
+    #[fail(
+        display = "Invalid characters used in name ({}). Use {}",
+        name, allowed_chars
+    )]
+    InvalidCharsInName {
+        /// Name that contains invalid chars.
+        name: String,
+        /// Characters allowed in name.
+        allowed_chars: &'static str,
+    },
+
     /// Custom error.
     #[fail(display = "{}", _0)]
     Custom(#[fail(cause)] Error),
@@ -164,25 +177,20 @@ pub enum AccessErrorKind {
 ///
 /// # Examples
 ///
-/// Component with two inner indexes.
+/// Component with two inner indexes. `FromAccess` is automatically derived using
+/// the `exonum_derive` crate.
 ///
 /// ```
+/// use exonum_derive::FromAccess;
 /// # use exonum_merkledb::{
 /// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
 /// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
 /// # };
+///
+/// #[derive(FromAccess)]
 /// struct InsertOnlyMap<T: Access> {
 ///     map: MapIndex<T::Base, String, String>,
 ///     len: Entry<T::Base, u64>,
-/// }
-///
-/// impl<T: Access> FromAccess<T> for InsertOnlyMap<T> {
-///     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
-///         Ok(Self {
-///             map: FromAccess::from_access(access.clone(), addr.clone().append_name("map"))?,
-///             len: FromAccess::from_access(access, addr.append_name("len"))?,
-///         })
-///     }
 /// }
 ///
 /// impl<T: Access> InsertOnlyMap<T>
@@ -232,12 +240,19 @@ pub trait FromAccess<T: Access>: Sized {
     /// Returns the constructed object. An error should be returned if the object cannot be
     /// constructed.
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError>;
+
+    /// Constructs the object from the root of the `access`.
+    ///
+    /// The default implementation uses `Self::from_access()`.
+    fn from_root(access: T) -> Result<Self, AccessError> {
+        Self::from_access(access, IndexAddress::default())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, TemporaryDB};
+    use crate::{Database, ListIndex, TemporaryDB};
 
     #[test]
     fn prefixed_works() {
@@ -315,5 +330,17 @@ mod tests {
             .get_or_create_view(("bar.fam", &1_u32).into(), IndexType::ProofMap)
             .unwrap();
         assert!(!view.is_phantom());
+    }
+
+    #[test]
+    fn from_root_method() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let prefixed = Prefixed::new("foo", &fork);
+        {
+            let mut list: ListIndex<_, u64> = ListIndex::from_root(prefixed).unwrap();
+            list.extend(vec![1, 2, 3]);
+        }
+        assert_eq!(fork.get_list::<_, u64>("foo").len(), 3);
     }
 }

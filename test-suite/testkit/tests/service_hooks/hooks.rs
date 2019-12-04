@@ -18,7 +18,7 @@ use exonum::{
     blockchain::ExecutionError,
     helpers::Height,
     runtime::{
-        rust::{AfterCommitContext, CallContext, Service},
+        rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
         InstanceId,
     },
 };
@@ -87,6 +87,10 @@ impl AfterCommitService {
         self.counter.load(Ordering::SeqCst)
     }
 
+    pub fn switch_to_generic_broadcast(&self) {
+        self.counter.store(100_000, Ordering::SeqCst);
+    }
+
     pub fn new_instance(&self) -> Box<dyn Service> {
         Box::new(self.clone())
     }
@@ -94,8 +98,21 @@ impl AfterCommitService {
 
 impl Service for AfterCommitService {
     fn after_commit(&self, context: AfterCommitContext<'_>) {
-        self.counter.fetch_add(1, Ordering::SeqCst);
+        let counter = self.counter.fetch_add(1, Ordering::SeqCst);
+
+        // Test both validator-specific and generic sending.
         let tx = TxAfterCommit::new(context.height());
-        context.broadcast_transaction(tx);
+        if counter < 10_000 {
+            if let Some(broadcast) = context.broadcaster() {
+                broadcast.send(tx).ok();
+            }
+        } else {
+            context.generic_broadcaster().send(tx).ok();
+        }
     }
+}
+
+impl DefaultInstance for AfterCommitService {
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

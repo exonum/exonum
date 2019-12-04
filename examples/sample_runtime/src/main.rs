@@ -17,7 +17,7 @@
 
 use exonum::{
     blockchain::{
-        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys,
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys,
     },
     helpers::Height,
     keys::Keys,
@@ -25,8 +25,9 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, DeployStatus, DispatcherError,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox, Runtime, SnapshotExt,
+        rust::{DefaultInstance, RustRuntime, ServiceFactory, Transaction},
+        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -66,9 +67,6 @@ enum SampleRuntimeError {
 }
 
 impl SampleRuntime {
-    /// Runtime identifier for the present runtime.
-    const ID: u32 = 255;
-
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
@@ -211,6 +209,10 @@ impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
+impl WellKnownRuntime for SampleRuntime {
+    const ID: u32 = 255;
+}
+
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
@@ -261,7 +263,7 @@ fn main() {
 
     let db = TemporaryDB::new();
     let node_cfg = node_config();
-    let genesis = node_cfg.consensus.clone();
+    let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
     let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
@@ -269,12 +271,16 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
-    let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
-        .with_rust_runtime(
-            channel.endpoints.0.clone(),
-            vec![InstanceCollection::from(SimpleSupervisor::new())],
-        )
-        .with_additional_runtime(SampleRuntime::default())
+    let supervisor_service = SimpleSupervisor::new();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+        .with_artifact(supervisor_service.artifact_id())
+        .with_instance(supervisor_service.default_instance())
+        .build();
+    let rust_runtime =
+        RustRuntime::new(channel.endpoints.0.clone()).with_factory(supervisor_service);
+    let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
+        .with_runtime(rust_runtime)
+        .with_runtime(SampleRuntime::default())
         .build()
         .unwrap();
 
@@ -324,12 +330,12 @@ fn main() {
 
         // Get an instance identifier.
         let snapshot = blockchain_ref.snapshot();
-        let (spec, status) = snapshot
+        let state = snapshot
             .for_dispatcher()
             .get_instance(instance_name.as_str())
             .unwrap();
-        assert_eq!(status, DeployStatus::Active);
-        let instance_id = spec.id;
+        assert_eq!(state.status, InstanceStatus::Active);
+        let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender
             .broadcast_transaction(Verified::from_value(

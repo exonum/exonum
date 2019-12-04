@@ -54,8 +54,8 @@ use crate::{
         ApiAccess, ApiAggregator,
     },
     blockchain::{
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection, Schema,
-        ValidatorKeys,
+        config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        Schema, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     events::{
@@ -70,7 +70,10 @@ use crate::{
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     node::state::SharedConnectList,
-    runtime::Runtime,
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        RuntimeInstance,
+    },
 };
 
 mod basic;
@@ -829,7 +832,7 @@ impl ApiSender {
             .map_err(into_failure)
     }
 
-    /// Broadcast transaction to other node.
+    /// Broadcast transaction to other nodes in the blockchain network.
     pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
@@ -937,9 +940,10 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        external_runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
-        services: impl IntoIterator<Item = InstanceCollection>,
+        external_runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
+        services: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
         node_cfg: NodeConfig,
+        genesis_config: GenesisConfig,
         config_file_path: Option<String>,
     ) -> Self {
         node_cfg
@@ -951,11 +955,20 @@ impl Node {
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
-        let blockchain = BlockchainBuilder::new(blockchain, node_cfg.consensus.clone())
-            .with_rust_runtime(channel.endpoints.0.clone(), services)
-            .with_external_runtimes(external_runtimes)
+        let rust_runtime = services.into_iter().fold(
+            RustRuntime::new(channel.endpoints.0.clone()),
+            |runtime, factory| runtime.with_factory(factory),
+        );
+
+        let mut blockchain_builder =
+            BlockchainBuilder::new(blockchain, genesis_config).with_runtime(rust_runtime);
+        for runtime in external_runtimes {
+            blockchain_builder = blockchain_builder.with_runtime(runtime);
+        }
+        let blockchain = blockchain_builder
             .build()
             .expect("Cannot create dispatcher");
+
         Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
     }
 
@@ -1172,7 +1185,7 @@ mod tests {
     use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
     use crate::{
-        blockchain::Schema,
+        blockchain::{config::GenesisConfigBuilder, Schema},
         crypto::gen_keypair,
         events::EventHandler,
         helpers,
@@ -1180,7 +1193,7 @@ mod tests {
         proto::schema::tests::TxSimple,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            ExecutionError, InstanceId,
+            ExecutionError, InstanceId, RuntimeInstance,
         },
     };
 
@@ -1228,14 +1241,24 @@ mod tests {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let services = vec![InstanceCollection::new(TestService).with_instance(
-            SERVICE_ID,
-            "test-service",
-            (),
-        )];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let service = TestService;
+        let artifact = service.artifact_id();
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+                .with_artifact(artifact.clone())
+                .with_instance(artifact.into_default_instance(SERVICE_ID, "test-service"))
+                .build();
+        let services = vec![service.into()];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
 
-        let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
+        let mut node = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1265,12 +1288,21 @@ mod tests {
     fn test_transaction_without_service() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let (p_key, s_key) = gen_keypair();
 
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
 
-        let mut node = Node::new(db, external_runtimes, services, node_cfg, None);
+        let mut node = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
 
         let tx = create_simple_tx(p_key, &s_key);
 
@@ -1288,9 +1320,18 @@ mod tests {
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
-        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
+        let _ = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
     }
 
     #[test]
@@ -1298,13 +1339,22 @@ mod tests {
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = 0;
-        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
+        let _ = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
     }
 
     #[test]
@@ -1312,13 +1362,22 @@ mod tests {
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
         let services = vec![];
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = 0;
-        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
+        let _ = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
     }
 
     #[test]
@@ -1327,7 +1386,7 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1335,7 +1394,16 @@ mod tests {
             .mempool
             .events_pool_capacity
             .internal_events_capacity = accidental_large_value;
-        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
+        let _ = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
     }
 
     #[test]
@@ -1344,7 +1412,7 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
+        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1352,6 +1420,15 @@ mod tests {
             .mempool
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
-        let _ = Node::new(db, external_runtimes, services, node_cfg, None);
+        let genesis_config =
+            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
+        let _ = Node::new(
+            db,
+            external_runtimes,
+            services,
+            node_cfg,
+            genesis_config,
+            None,
+        );
     }
 }

@@ -101,16 +101,23 @@ impl TimestampingTxGenerator {
             secret_key: keypair.1,
         }
     }
+
+    /// Generates not signed `TimestampTx`.
+    pub fn gen_tx_payload(&mut self) -> TimestampTx {
+        let mut data = vec![0; self.data_size];
+        self.rand.fill_bytes(&mut data);
+        let mut tx = TimestampTx::new();
+        tx.set_data(data);
+
+        tx
+    }
 }
 
 impl Iterator for TimestampingTxGenerator {
     type Item = Verified<AnyTx>;
 
     fn next(&mut self) -> Option<Verified<AnyTx>> {
-        let mut data = vec![0; self.data_size];
-        self.rand.fill_bytes(&mut data);
-        let mut buf = TimestampTx::new();
-        buf.set_data(data);
-        Some(buf.sign(TimestampingService::ID, self.public_key, &self.secret_key))
+        let tx = self.gen_tx_payload();
+        Some(tx.sign(TimestampingService::ID, self.public_key, &self.secret_key))
     }
 }

@@ -20,7 +20,7 @@ use exonum::{
     blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
-    runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+    runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
 use crate::{wallet::Wallet, Schema};

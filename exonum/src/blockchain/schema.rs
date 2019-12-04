@@ -52,7 +52,7 @@ define_names!(
     PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
-    CONSENSUS_CONFIG => "consensus.config";
+    CONSENSUS_CONFIG => "consensus_config";
 );
 
 /// Transaction location in a block.

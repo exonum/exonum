@@ -106,6 +106,8 @@ pub trait RawAccess: Clone {
 /// This is a marker trait that is used as a bound for mutable operations on indexes.
 /// It can be used in the same way for high-level database objects:
 ///
+/// # Example
+///
 /// ```
 /// use exonum_merkledb::{access::{Access, RawAccessMut}, ListIndex, MapIndex};
 ///

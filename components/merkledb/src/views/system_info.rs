@@ -1,10 +1,20 @@
 use exonum_crypto::Hash;
 
-use super::{metadata::IndexesPool, AsReadonly, RawAccess};
-use crate::{access::AccessExt, Fork, ObjectHash, ProofMapIndex};
+use super::{metadata::IndexesPool, AsReadonly, IndexType, RawAccess, ViewWithMetadata};
+use crate::{Fork, IndexAddress, ObjectHash, ProofMapIndex};
 
 /// Name of the state aggregator proof map.
 pub(super) const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
+
+fn get_state_aggregator<T: RawAccess>(access: T) -> ProofMapIndex<T, String, Hash> {
+    let view = ViewWithMetadata::get_or_create_unchecked(
+        access,
+        &IndexAddress::from_root(STATE_AGGREGATOR),
+        IndexType::ProofMap,
+    )
+    .expect("Internal MerkleDB failure while aggregating state");
+    ProofMapIndex::new(view)
+}
 
 /// System-wide information about the database.
 ///
@@ -71,10 +81,7 @@ impl<T: RawAccess> SystemInfo<T> {
     ///
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_hash(&self) -> Hash {
-        self.0
-            .clone()
-            .get_proof_map::<_, String, Hash>(STATE_AGGREGATOR)
-            .object_hash()
+        get_state_aggregator(self.0.clone()).object_hash()
     }
 }
 
@@ -86,7 +93,7 @@ impl<T: RawAccess + AsReadonly> SystemInfo<T> {
     ///
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
-        self.0.as_readonly().get_proof_map(STATE_AGGREGATOR)
+        get_state_aggregator(self.0.as_readonly())
     }
 }
 
@@ -96,7 +103,7 @@ impl SystemInfo<&Fork> {
         &mut self,
         entries: impl IntoIterator<Item = (String, Hash)>,
     ) {
-        let mut state_aggregator = self.0.get_proof_map(STATE_AGGREGATOR);
+        let mut state_aggregator = get_state_aggregator(self.0);
         for (index_name, hash) in entries {
             state_aggregator.put(&index_name, hash);
         }
@@ -106,7 +113,7 @@ impl SystemInfo<&Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, TemporaryDB};
 
     #[test]
     fn index_count_is_correct() {

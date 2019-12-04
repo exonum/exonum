@@ -31,8 +31,7 @@ pub mod transactions;
 pub mod wallet;
 
 use exonum::runtime::{
-    api::ServiceApiBuilder,
-    rust::{CallContext, Service},
+    rust::{api::ServiceApiBuilder, CallContext, Service},
     ExecutionError,
 };
 

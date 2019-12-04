@@ -24,7 +24,11 @@ use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 use super::{
     system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
 };
-use crate::{validation::assert_valid_name, BinaryValue};
+use crate::{
+    access::{AccessError, AccessErrorKind},
+    validation::check_index_valid_full_name,
+    BinaryValue,
+};
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
@@ -389,17 +393,26 @@ where
 {
     /// Gets an index with the specified address and type. Creates an index if it is not present
     /// in the storage.
-    ///
-    /// # Return value
-    ///
-    /// Returns `Err(Self)` if the index is in the storage and has a type different from
-    /// the one provided as an argument.
     pub(crate) fn get_or_create(
         index_access: T,
         index_address: &IndexAddress,
         index_type: IndexType,
-    ) -> Result<Self, Self> {
-        assert_valid_name(index_address.name());
+    ) -> Result<Self, AccessError> {
+        check_index_valid_full_name(index_address)?;
+        Self::get_or_create_unchecked(index_access, index_address, index_type)
+    }
+
+    /// Gets an index with the specified address and type. Unlike `get_or_create`, this method
+    /// does not check if the name of the index is reserved.
+    ///
+    /// # Safety
+    ///
+    /// This method should only be used to create system indexes within this crate.
+    pub(crate) fn get_or_create_unchecked(
+        index_access: T,
+        index_address: &IndexAddress,
+        index_type: IndexType,
+    ) -> Result<Self, AccessError> {
         // Actual name.
         let index_name = index_address.name.clone();
         // Full name for internal usage.
@@ -435,7 +448,13 @@ where
         if real_index_type == index_type {
             Ok(this)
         } else {
-            Err(this)
+            Err(AccessError {
+                addr: index_address.clone(),
+                kind: AccessErrorKind::WrongIndexType {
+                    expected: index_type,
+                    actual: real_index_type,
+                },
+            })
         }
     }
 

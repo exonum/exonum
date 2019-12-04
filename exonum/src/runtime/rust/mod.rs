@@ -28,20 +28,177 @@
 //! [`ServiceFactory`][ServiceFactory] trait. The trait creates service instances and provides
 //! information about the artifact.
 //!
+//! # Examples
+//!
+//! ## Minimal complete example of an Exonum service definition.
+//!
+//! ```
+//! use exonum::{
+//!     proto::schema::doc_tests,
+//!     runtime::{
+//!         rust::{CallContext, Service},
+//!         BlockchainData, ExecutionError,
+//!     },
+//! };
+//! use exonum_derive::{
+//!     exonum_interface, BinaryValue, IntoExecutionError,
+//!     ObjectHash, ServiceDispatcher, ServiceFactory
+//! };
+//! use exonum_merkledb::Snapshot;
+//! use exonum_proto::ProtobufConvert;
+//! use exonum_crypto::Hash;
+//!
+//! // Determine the types of data that will be used in service transactions.
+//!
+//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+//! #[protobuf_convert(source = "doc_tests::Point")]
+//! pub struct Point {
+//!     pub x: i32,
+//!     pub y: i32,
+//! }
+//!
+//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+//! #[protobuf_convert(source = "doc_tests::CreateWallet")]
+//! pub struct CreateWallet {
+//!     pub name: String,
+//! }
+//!
+//! // You may create service-specific error types.
+//!
+//! #[derive(Debug, IntoExecutionError)]
+//! pub enum Error {
+//!     PointAlreadyExists = 0,
+//!     WalletAlreadyExists = 1,
+//! }
+//!
+//! // Define the transaction interface for your service by creating a trait with
+//! // the following attribute and method signatures.
+//! // This attribute implements `Interface` trait for this trait and `Transaction`
+//! // trait for each argument.
+//! #[exonum_interface]
+//! pub trait Transactions {
+//!     // Each method of the trait should have a signature of the following format. The argument
+//!     // should implement the `BinaryValue` trait.
+//!     fn create_wallet(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: CreateWallet,
+//!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
+//!     // Also you can use any type which implements `Into<ExecutionError>` for the error.
+//!     fn add_point(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: Point,
+//!     ) -> Result<(), Error>;
+//! }
+//!
+//! // In order a service could process transactions, you have to implement the
+//! // `ServiceDispatcher` trait, which can be derived using the corresponding macro.
+//! // To explain to the runtime how to create instances of this service, you have to implement
+//! // the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
+//! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+//! // Declare that the service implements the `Transactions` interface that was presented above.
+//! #[service_dispatcher(implements("Transactions"))]
+//! // By default the macro uses the crate name and version to provide an artifact ID for this
+//! // service factory. You should only provide a path to the generated Protobuf schema.
+//! #[service_factory(proto_sources = "exonum::proto::schema")]
+//! pub struct PointService;
+//!
+//! // Do not forget to implement the `Transactions` and `Service` traits for the service.
+//!
+//! impl Transactions for PointService {
+//!     fn create_wallet(
+//!         &self,
+//!         _context: CallContext<'_>,
+//!         _arg: CreateWallet,
+//!     ) -> Result<(), ExecutionError> {
+//!         // Some business logic...
+//!         Ok(())
+//!     }
+//!
+//!     fn add_point(
+//!         &self,
+//!         _context: CallContext<'_>,
+//!         _arg: Point
+//!     ) -> Result<(), Error> {
+//!         // Some business logic...
+//!         Ok(())
+//!     }
+//! }
+//!
+//! impl Service for PointService {
+//!     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//!         Vec::new()
+//!     }
+//! }
+//! ```
+//!
+//! ## Stateful Service Definition
+//!
+//! Beware of stateful services in production, use this functionality only for debugging and
+//! prototyping.
+//!
+//! ```
+//! use exonum::runtime::{rust::Service, BlockchainData};
+//! use exonum_crypto::Hash;
+//! use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+//! use exonum_merkledb::Snapshot;
+//!
+//! #  #[exonum_interface]
+//! #  pub trait Transactions {}
+//!
+//! // If your service has a state, for example, for debugging purposes, then you can
+//! // use a separate structure for the service.
+//!
+//! #[derive(Debug, Default, ServiceDispatcher)]
+//! #[service_dispatcher(implements("Transactions"))]
+//! pub struct StatefulService {
+//!     state: u64,
+//! }
+//!
+//! #[derive(Debug, ServiceFactory)]
+//! #[service_factory(
+//!     // In this case you have to specify the service constructor explicitly.
+//!     service_constructor = "Self::new_instance",
+//!     proto_sources = "exonum::proto::schema",
+//!     // To specify the artifact name and/or version explicitly you have to use the
+//!     // following attributes.
+//!     artifact_name = "stateful",
+//!     artifact_version = "1.0.0",
+//! )]
+//! pub struct StatefulServiceFactory;
+//!
+//! impl StatefulServiceFactory {
+//!     fn new_instance(&self) -> Box<dyn Service> {
+//!         Box::new(StatefulService::default())
+//!     }
+//! }
+//!
+//! # impl Transactions for StatefulService {}
+//! #
+//! #  impl Service for StatefulService {
+//! #      fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//! #          Vec::new()
+//! #      }
+//! #  }
+//! ```
+//!
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    api::ArtifactProtobufSpec,
     call_context::CallContext,
     error::Error,
+    runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, Interface, Service, ServiceDispatcher, ServiceFactory, Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
+        ServiceFactory, Transaction,
     },
 };
 
+pub mod api;
 pub mod error;
 
-use exonum_merkledb::{validation::is_valid_index_name, Snapshot};
+use exonum_merkledb::{validation::is_valid_identifier, Snapshot};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
@@ -53,20 +210,21 @@ use std::{
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{Blockchain, Schema as CoreSchema},
+    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     helpers::Height,
+    runtime::WellKnownRuntime,
 };
 
+use self::api::ServiceApiBuilder;
 use super::{
-    api::ServiceApiBuilder,
     dispatcher::{self, Mailbox},
     error::{catch_panic, ExecutionError},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier,
 };
 
-mod api;
 mod call_context;
+mod runtime_api;
 mod service;
 #[cfg(test)]
 mod tests;
@@ -112,8 +270,6 @@ impl AsRef<dyn Service + 'static> for Instance {
 }
 
 impl RustRuntime {
-    /// Rust runtime identifier.
-    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
     /// Rust runtime name.
     pub const NAME: &'static str = "rust";
 
@@ -136,20 +292,13 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
-    /// Adds a new service factory to the runtime.
-    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    /// Adds a new service factory to the runtime and returns
+    /// a modified `RustRuntime` object for further chaining.
+    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
-    }
-
-    /// Adds a new service factory to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
-        self.add_service_factory(service_factory.into());
         self
     }
 
@@ -206,7 +355,7 @@ impl RustRuntime {
                     ApiBuilder::from(builder),
                 )
             })
-            .chain(self::api::endpoints(self))
+            .chain(self::runtime_api::endpoints(self))
             .collect()
     }
 
@@ -226,10 +375,8 @@ impl RustRuntime {
     }
 }
 
-impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(r: RustRuntime) -> Self {
-        (RustRuntime::ID as u32, Box::new(r))
-    }
+impl WellKnownRuntime for RustRuntime {
+    const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
 /// The unique identifier of the Rust artifact, containing the name and version of the artifact.
@@ -263,12 +410,21 @@ impl RustArtifactId {
         }
     }
 
+    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    pub fn into_default_instance(
+        self,
+        id: InstanceId,
+        name: impl Into<String>,
+    ) -> InstanceInitParams {
+        InstanceInitParams::new(id, name, self.into(), ())
+    }
+
     /// Checks that the Rust artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();
         ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
         ensure!(
-            is_valid_index_name(name),
+            is_valid_identifier(name),
             "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
         );
         Ok(())
@@ -288,7 +444,7 @@ impl RustArtifactId {
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
         Self {
-            runtime_id: RustRuntime::ID as u32,
+            runtime_id: RustRuntime::ID,
             name: inner.to_string(),
         }
     }
@@ -426,11 +582,13 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
 
         // By convention, services don't handle `after_commit()` on the genesis block.
-        if CoreSchema::new(snapshot).height() == Height(0) {
+        let core_schema = CoreSchema::new(snapshot);
+        if core_schema.height() == Height(0) {
             return;
         }
 
         let blockchain = self.blockchain();
+        let validator_id = core_schema.validator_id(blockchain.service_keypair().0);
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
@@ -438,6 +596,7 @@ impl Runtime for RustRuntime {
                 snapshot,
                 blockchain.service_keypair(),
                 blockchain.sender(),
+                validator_id,
             ));
         }
     }

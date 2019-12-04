@@ -23,12 +23,17 @@ use exonum_merkledb::ObjectHash;
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
 use crate::{
+    crypto::gen_keypair,
     helpers::{Height, Round, ValidatorId},
     messages::{PrevotesRequest, TransactionsRequest, Verified},
     node::state::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
-    sandbox::{self, compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    runtime::rust::Transaction,
+    sandbox::{
+        self, compute_tx_hash, sandbox_tests_helper::*, timestamping::TimestampingService,
+        timestamping_sandbox,
+    },
 };
 
 /// check scenario:
@@ -620,6 +625,84 @@ fn handle_precommit_different_block_hash() {
     sandbox.recv(&precommit_2);
     // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
+}
+
+/// Scenario for this test is similar to the `handle_precommit_different_block_hash`.
+///
+/// Here, node receives majority of precommits for a block with incorrect tx.
+///
+/// Normally, after receiving all the transactions for a propose, node should send a prevote for it.
+/// In our case, propose contains the incorrect tx, so we expect node **NOT** to vote for it.
+/// Later, when majority of nodes will send precommits (meaning that they agree with propose),
+/// node should panic because it doesn't agree with the block being accepted.
+#[test]
+#[should_panic(expected = "handle_majority_precommits: propose contains")]
+fn handle_precommit_incorrect_txs() {
+    let sandbox = timestamping_sandbox();
+
+    // Create correct tx, and then sign with the wrong destination.
+    let (pk, sk) = gen_keypair();
+    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
+
+    // Create propose.
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[incorrect_tx.object_hash()])
+        .build();
+
+    // Create block.
+    let block = BlockBuilder::new(&sandbox)
+        .with_tx_hash(&compute_tx_hash(&[incorrect_tx.clone()]))
+        .build();
+
+    let precommit_1 = sandbox.create_precommit(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    let precommit_2 = sandbox.create_precommit(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(2)),
+    );
+    let precommit_3 = sandbox.create_precommit(
+        ValidatorId(3),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(3)),
+    );
+
+    sandbox.recv(&precommit_1);
+    sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(1)),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
+    );
+    sandbox.send(
+        sandbox.public_key(ValidatorId(1)),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
+    );
+    sandbox.recv(&propose);
+    sandbox.recv(&incorrect_tx);
+
+    // In normal conditions, here we should sent prevote, but since we consider
+    // the propose to be incorrect, we won't do it.
+
+    // However, majority of nodes decide this propose to be OK.
+    sandbox.recv(&precommit_2);
+    sandbox.recv(&precommit_3);
+
+    // Here majority of precommits is achieved and node should panic.
 }
 
 /// scenario: // HANDLE PRECOMMIT positive scenario with commit
@@ -1625,6 +1708,48 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
         //.with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this received tx
         // !! note that here no tx are expected whereas old tx is received earlier
         .with_tx_hashes(&[])
+        .build();
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
+    sandbox.add_time(Duration::from_millis(0));
+}
+
+/// Ignore transactions that fail `BlockchainMut::check_tx`.
+/// Idea of test is to receive invalid tx (which is expected to be ignored) and
+/// then broadcast prevote without this tx.
+#[test]
+fn handle_tx_ignore_invalid_tx() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height(&sandbox, &sandbox_state);
+    sandbox.assert_state(Height(2), Round(1));
+
+    // add rounds & become leader
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+    assert!(sandbox.is_leader());
+
+    // Create correct tx, and then sign with the wrong destination.
+    let (pk, sk) = gen_keypair();
+    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
+
+    // And create one correct tx that **should** be accepted.
+    let correct_tx = gen_timestamping_tx();
+
+    // Receive those messages.
+    sandbox.recv(&incorrect_tx);
+    sandbox.assert_tx_cache_len(0);
+
+    sandbox.recv(&correct_tx);
+    sandbox.assert_tx_cache_len(1);
+
+    sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
+
+    // Create propose **without** this tx (but with correct tx).
+    // It should be accepted, since invalid tx wasn't processed
+    // due to failed `BlockchainMut::check_tx` validation.
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[correct_tx.object_hash()])
         .build();
     sandbox.broadcast(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));

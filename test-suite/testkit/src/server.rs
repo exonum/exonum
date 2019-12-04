@@ -179,7 +179,7 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::rust::{CallContext, Service, Transaction},
+        runtime::rust::{CallContext, Service, ServiceFactory, Transaction},
     };
     use exonum_merkledb::ObjectHash;
     use exonum_proto::ProtobufConvert;
@@ -187,7 +187,7 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::{proto, InstanceCollection, TestKitApi, TestKitBuilder};
+    use crate::{proto, TestKitApi, TestKitBuilder};
 
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
@@ -237,12 +237,14 @@ mod tests {
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> TestKitApi {
+        let service = SampleService;
+        let artifact = service.artifact_id();
         let mut testkit = TestKitBuilder::validator()
-            .with_rust_service(InstanceCollection::new(SampleService).with_instance(
-                TIMESTAMP_SERVICE_ID,
-                TIMESTAMP_SERVICE_NAME,
-                (),
-            ))
+            .with_artifact(artifact.clone())
+            .with_instance(
+                artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
+            )
+            .with_rust_service(service)
             .create();
         testkit.create_blocks_until(height);
         // Process incoming events in background.

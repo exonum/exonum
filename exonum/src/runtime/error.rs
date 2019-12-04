@@ -115,6 +115,47 @@ impl Display for ErrorKind {
 /// Therefore descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
 ///
+/// Usually you can implement conversion from your own error type to the `ExecutionError` via
+/// deriving `IntoExecutionError` from `exonum-derive` crate.
+///
+/// This macro implements `From<MyError> for ExecutionError` conversion for the given enum.
+/// Enumeration should have an explicit discriminant for each error kind.
+/// Derives `Display` and `Fail` traits using documentation comments for each error kind.
+///
+/// # Examples
+///
+/// Deriving errors in service transactions:
+///
+/// ```
+/// use exonum_derive::IntoExecutionError;
+///
+/// /// Error codes emitted by wallet transactions during execution:
+/// #[derive(Debug, IntoExecutionError)]
+/// pub enum Error {
+///     /// Content hash already exists.
+///     HashAlreadyExists = 0,
+///     /// Unable to parse the service configuration.
+///     ConfigParseError = 1,
+///     /// Time service with the specified name does not exist.
+///     TimeServiceNotFound = 2,
+/// }
+/// ```
+///
+/// Deriving errors in runtimes:
+///
+/// ```
+/// use exonum_derive::IntoExecutionError;
+///
+/// // Define runtime specific errors.
+/// #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
+/// #[execution_error(kind = "runtime")]
+/// enum SampleRuntimeError {
+///     /// Incorrect information to call the transaction.
+///     IncorrectCallInfo = 1,
+///     /// Incorrect transaction payload.
+///     IncorrectPayload = 2,
+/// }
+/// ```
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Fail)]
 pub struct ExecutionError {
     /// The kind of error that indicates in which module and with which code the error occurred.

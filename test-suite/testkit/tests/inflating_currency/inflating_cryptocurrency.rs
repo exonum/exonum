@@ -16,16 +16,15 @@ use exonum::{
     crypto::PublicKey,
     helpers::Height,
     runtime::{
-        api::{self, ServiceApiBuilder},
-        rust::{CallContext, Service},
+        rust::{
+            api::{self, ServiceApiBuilder},
+            CallContext, DefaultInstance, Service,
+        },
         InstanceId,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{
-    access::{Access, FromAccess},
-    MapIndex,
-};
+use exonum_merkledb::{access::Access, MapIndex};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -78,18 +77,12 @@ impl Wallet {
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
+#[derive(FromAccess)]
 pub struct CurrencySchema<T: Access> {
     pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
 }
 
 impl<T: Access> CurrencySchema<T> {
-    /// Creates a new schema instance.
-    pub fn new(access: T) -> Self {
-        Self {
-            wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
-        }
-    }
-
     /// Gets a specific wallet from the storage.
     pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets.get(pub_key)
@@ -214,4 +207,9 @@ impl Service for CurrencyService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
     }
+}
+
+impl DefaultInstance for CurrencyService {
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

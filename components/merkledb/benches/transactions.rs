@@ -14,15 +14,15 @@
 
 use criterion::{AxisScale, Bencher, Criterion, PlotConfiguration, Throughput};
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
+use exonum_derive::FromAccess;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use serde_derive::*;
 
 use std::{borrow::Cow, collections::HashMap, fmt};
 
 use exonum_merkledb::{
-    access::{Access, FromAccess},
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    access::Access, impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group,
+    ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -202,23 +202,12 @@ impl Transaction {
     }
 }
 
+#[derive(FromAccess)]
 struct Schema<T: Access> {
     transactions: MapIndex<T::Base, Hash, Transaction>,
     blocks: ListIndex<T::Base, Hash>,
     wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
     wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
-}
-
-impl<T: Access> Schema<T> {
-    fn new(access: T) -> Self {
-        Self {
-            transactions: FromAccess::from_access(access.clone(), "transactions".into()).unwrap(),
-            blocks: FromAccess::from_access(access.clone(), "blocks".into()).unwrap(),
-            wallets: FromAccess::from_access(access.clone(), "wallets".into()).unwrap(),
-            wallet_history: FromAccess::from_access(access.clone(), "wallet_history".into())
-                .unwrap(),
-        }
-    }
 }
 
 impl<'a> Schema<&'a Fork> {

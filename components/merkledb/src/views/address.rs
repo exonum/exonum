@@ -33,7 +33,7 @@ pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 /// // Using an address within an index family:
 /// let list = fork.get_list::<_, String>(("index", &3_u32));
 /// // Using `IndexAddress` explicitly:
-/// let addr = IndexAddress::new("data").append_key(&vec![1, 2, 3]);
+/// let addr = IndexAddress::from_root("data").append_key(&vec![1, 2, 3]);
 /// let set = fork.get_value_set::<_, u64>(addr);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
@@ -44,7 +44,7 @@ pub struct IndexAddress {
 
 impl IndexAddress {
     /// Creates new `IndexAddress` with the specified name.
-    pub fn new<S: Into<String>>(root: S) -> Self {
+    pub fn from_root<S: Into<String>>(root: S) -> Self {
         Self {
             name: root.into(),
             id_in_group: None,
@@ -68,7 +68,7 @@ impl IndexAddress {
     ///
     /// ```
     /// # use exonum_merkledb::IndexAddress;
-    /// let addr = IndexAddress::new("foo");
+    /// let addr = IndexAddress::from_root("foo");
     /// let prefixed = addr.prepend_name("prefix");
     /// assert_eq!(prefixed.name(), "prefix.foo");
     /// ```
@@ -92,7 +92,7 @@ impl IndexAddress {
     ///
     /// ```
     /// # use exonum_merkledb::IndexAddress;
-    /// let addr = IndexAddress::new("foo");
+    /// let addr = IndexAddress::from_root("foo");
     /// let suffixed = addr.append_name("suffix");
     /// assert_eq!(suffixed.name(), "foo.suffix");
     /// ```
@@ -139,13 +139,13 @@ impl IndexAddress {
 
 impl<'a> From<&'a str> for IndexAddress {
     fn from(name: &'a str) -> Self {
-        Self::new(name)
+        Self::from_root(name)
     }
 }
 
 impl From<String> for IndexAddress {
     fn from(name: String) -> Self {
-        Self::new(name)
+        Self::from_root(name)
     }
 }
 

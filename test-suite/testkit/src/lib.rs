@@ -18,7 +18,7 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{Transaction, CallContext, Service}},
+//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, Transaction, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
@@ -66,12 +66,13 @@
 //! fn main() {
 //!     // Create testkit for network with four validators
 //!     // and add a builtin timestamping service with ID=1.
+//!     let service = TimestampingService;
+//!     let artifact = service.artifact_id();
 //!     let mut testkit = TestKitBuilder::validator()
 //!         .with_validators(4)
-//!         .with_rust_service(
-//!             InstanceCollection::new(TimestampingService)
-//!                 .with_instance(SERVICE_ID, "timestamping", ())
-//!         )
+//!         .with_artifact(artifact.clone())
+//!         .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
+//!         .with_rust_service(service)
 //!         .create();
 //!
 //!     // Create few transactions.
@@ -119,7 +120,7 @@
 //! }
 //! ```
 
-//#![warn(missing_debug_implementations, missing_docs)]
+#![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
 #[cfg_attr(test, macro_use)]
@@ -149,16 +150,23 @@ use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
         manager::UpdateEndpoints,
-        ApiAccess,
+        node::SharedNodeState,
+        ApiAccess, ApiAggregator,
     },
-    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceConfig},
+    blockchain::{
+        config::{GenesisConfig, GenesisConfigBuilder},
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+    },
     crypto::{self, Hash},
     explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{rust::ServiceFactory, InstanceId, Runtime, SnapshotExt},
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        InstanceId, RuntimeInstance, SnapshotExt,
+    },
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
@@ -175,9 +183,6 @@ use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
 };
-use exonum::api::node::SharedNodeState;
-use exonum::api::ApiAggregator;
-use exonum::runtime::rust::RustRuntime;
 
 #[macro_use]
 mod macros;
@@ -223,21 +228,24 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
+        let service_factory = service_factory.into();
+        let artifact = service_factory.artifact_id();
         TestKitBuilder::validator()
-            .with_rust_service(InstanceCollection::new(service_factory).with_instance(
-                id,
-                name,
-                constructor,
-            ))
+            .with_artifact(artifact.clone())
+            .with_instance(
+                artifact
+                    .into_default_instance(id, name)
+                    .with_constructor(constructor),
+            )
+            .with_rust_service(service_factory)
             .create()
     }
 
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
-        genesis: ConsensusConfig,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
-        instances: impl IntoIterator<Item = InstanceConfig>,
+        genesis_config: GenesisConfig,
+        runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -251,13 +259,12 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let mut builder = BlockchainBuilder::new(blockchain, genesis);
-        for runtime in runtimes {
-            builder = builder.with_additional_runtime(runtime);
-        }
-
-        let blockchain = builder
-            .with_builtin_instances(instances)
+        let blockchain = runtimes
+            .into_iter()
+            .fold(
+                BlockchainBuilder::new(blockchain, genesis_config),
+                |builder, runtime| builder.with_runtime(runtime),
+            )
             .build()
             .expect("Unable to create blockchain instance");
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
@@ -349,7 +356,7 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{BlockchainData, rust::{Transaction, CallContext, Service}},
+    /// #     runtime::{BlockchainData, rust::{CallContext, Service, ServiceFactory, Transaction}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;
@@ -385,11 +392,12 @@ impl TestKit {
     /// # fn assert_something_about(_: &TestKit) {}
     /// #
     /// # fn main() {
+    /// let service = ExampleService;
+    /// let artifact = service.artifact_id();
     /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_rust_service(
-    ///         InstanceCollection::new(ExampleService)
-    ///            .with_instance(SERVICE_ID, "example", ())
-    ///     )
+    ///     .with_artifact(artifact.clone())
+    ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
+    ///     .with_rust_service(ExampleService)
     ///     .create();
     /// expensive_setup(&mut testkit);
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
@@ -425,10 +433,15 @@ impl TestKit {
         // `create_block_with_transactions()` will panic.
         let snapshot = self.snapshot();
         let schema = snapshot.for_core();
-        let uncommitted_txs = transactions.into_iter().filter(|tx| {
-            !schema.transactions().contains(&tx.object_hash())
-                || schema.transactions_pool().contains(&tx.object_hash())
-        });
+        let uncommitted_txs: Vec<_> = transactions
+            .into_iter()
+            .filter(|tx| {
+                self.check_tx(&tx);
+
+                !schema.transactions().contains(&tx.object_hash())
+                    || schema.transactions_pool().contains(&tx.object_hash())
+            })
+            .collect();
 
         self.checkpoint();
         self.create_block_with_transactions(uncommitted_txs);
@@ -513,6 +526,8 @@ impl TestKit {
         let tx_hashes: Vec<_> = txs
             .into_iter()
             .map(|tx| {
+                self.check_tx(&tx);
+
                 let tx_id = tx.object_hash();
                 let tx_not_found = !schema.transactions().contains(&tx_id);
                 let tx_in_pool = schema.transactions_pool().contains(&tx_id);
@@ -588,8 +603,17 @@ impl TestKit {
 
     /// Adds transaction into persistent pool.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
+        self.check_tx(&transaction);
+
         self.blockchain
             .add_transactions_into_pool(iter::once(transaction));
+    }
+
+    /// Calls `BlockchainMut::check_tx` and panics on an error.
+    fn check_tx(&self, transaction: &Verified<AnyTx>) {
+        if let Err(error) = self.blockchain.check_tx(&transaction) {
+            panic!("Attempt to add invalid tx in the pool: {}", error);
+        }
     }
 
     /// Checks if transaction can be found in pool
@@ -802,7 +826,7 @@ impl TestKit {
 /// let runtime = stopped.rust_runtime();
 /// let service = AfterCommitService::new();
 /// let mut testkit = stopped.resume(vec![
-///     runtime.with_available_service(service.clone())
+///     runtime.with_factory(service.clone())
 /// ]);
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
@@ -841,18 +865,14 @@ impl StoppedTestKit {
     /// (which is also what may happen with real Exonum apps).
     ///
     /// This method will not add the default Rust runtime, so you must do this explicitly.
-    pub fn resume(
-        self,
-        runtimes: impl IntoIterator<Item = impl Into<(u32, Box<dyn Runtime>)>>,
-    ) -> TestKit {
+    pub fn resume(self, runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>) -> TestKit {
         TestKit::assemble(
             self.db,
             self.network,
             // TODO make consensus config optional [ECR-3222]
-            ConsensusConfig::default(),
+            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
             runtimes.into_iter().map(|x| x.into()),
             // In this context, it is not possible to add new service instances.
-            vec![],
             self.api_notifier_channel,
         )
     }

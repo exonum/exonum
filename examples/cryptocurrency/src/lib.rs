@@ -40,10 +40,7 @@ pub mod proto;
 /// Persistent data.
 pub mod schema {
     use exonum::crypto::PublicKey;
-    use exonum_merkledb::{
-        access::{Access, FromAccess, Prefixed},
-        MapIndex,
-    };
+    use exonum_merkledb::{access::Access, MapIndex};
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -90,24 +87,10 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
-    #[derive(Debug)]
+    #[derive(Debug, FromAccess)]
     pub struct CurrencySchema<T: Access> {
         /// Correspondence of public keys of users to account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
-    }
-
-    /// Declare the layout of data managed by the service. An instance of [`MapIndex`] is used
-    /// to keep wallets in the storage. Index values are serialized [`Wallet`] structs.
-    ///
-    /// [`MapIndex`]: https://exonum.com/doc/version/latest/architecture/storage#mapindex
-    /// [`Wallet`]: struct.Wallet.html
-    impl<'a, T: Access> CurrencySchema<Prefixed<'a, T>> {
-        /// Creates a new schema instance.
-        pub fn new(access: Prefixed<'a, T>) -> Self {
-            Self {
-                wallets: FromAccess::from_access(access, "wallets".into()).unwrap(),
-            }
-        }
     }
 }
 
@@ -182,10 +165,7 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::runtime::{
-        api::ServiceApiBuilder,
-        rust::{CallContext, Service},
-    };
+    use exonum::runtime::rust::{api::ServiceApiBuilder, CallContext, Service};
 
     use crate::{
         api::CryptocurrencyApi,
@@ -268,7 +248,7 @@ pub mod contracts {
 pub mod api {
     use exonum::{
         crypto::PublicKey,
-        runtime::api::{self, ServiceApiBuilder, ServiceApiState},
+        runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
     };
 
     use crate::schema::{CurrencySchema, Wallet};

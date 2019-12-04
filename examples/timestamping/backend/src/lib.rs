@@ -39,8 +39,7 @@ use exonum::{
     blockchain::ExecutionError,
     merkledb::BinaryValue,
     runtime::{
-        api::ServiceApiBuilder,
-        rust::{CallContext, Service},
+        rust::{api::ServiceApiBuilder, CallContext, Service},
         DispatcherError,
     },
 };

@@ -22,16 +22,17 @@ use exonum::{
     },
     blockchain::{IndexProof, ValidatorKeys},
     crypto::Hash,
-    messages::{AnyTx, Verified},
     runtime::{
-        api::{ServiceApiBuilder, ServiceApiState},
-        rust::{CallContext, Service},
+        rust::{
+            api::{ServiceApiBuilder, ServiceApiState},
+            CallContext, DefaultInstance, Service,
+        },
         InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     ObjectHash, ProofEntry,
 };
 use exonum_proto::ProtobufConvert;
@@ -48,16 +49,9 @@ pub const SERVICE_ID: InstanceId = 2;
 /// "correct horse battery staple" brainwallet pubkey in Ed25519 with a SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
 
+#[derive(FromAccess)]
 pub struct CounterSchema<T: Access> {
     pub counter: ProofEntry<T::Base, u64>,
-}
-
-impl<T: Access> CounterSchema<T> {
-    pub fn new(access: T) -> Self {
-        Self {
-            counter: FromAccess::from_access(access, "counter".into()).unwrap(),
-        }
-    }
 }
 
 impl<T> CounterSchema<T>
@@ -199,14 +193,9 @@ impl CounterWithProof {
 struct CounterApi;
 
 impl CounterApi {
-    fn increment(
-        state: &ServiceApiState<'_>,
-        transaction: Verified<AnyTx>,
-    ) -> api::Result<TransactionResponse> {
+    fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
-
-        let tx_hash = transaction.object_hash();
-        state.sender().broadcast_transaction(transaction)?;
+        let tx_hash = state.generic_broadcaster().send(Increment::new(value))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -227,14 +216,9 @@ impl CounterApi {
         })
     }
 
-    fn reset(
-        state: &ServiceApiState<'_>,
-        transaction: Verified<AnyTx>,
-    ) -> api::Result<TransactionResponse> {
+    fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
-
-        let tx_hash = transaction.object_hash();
-        state.sender().broadcast_transaction(transaction)?;
+        let tx_hash = state.generic_broadcaster().send(Reset)?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -244,7 +228,7 @@ impl CounterApi {
             .endpoint("count", |state, _query: ()| {
                 Self::count(state.service_data())
             })
-            .endpoint_mut("reset", Self::reset);
+            .endpoint_mut("reset", |state, _query: ()| Self::reset(state));
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {
@@ -306,6 +290,11 @@ impl CounterApi {
 )]
 #[service_dispatcher(implements("CounterServiceInterface"))]
 pub struct CounterService;
+
+impl DefaultInstance for CounterService {
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
+}
 
 impl Service for CounterService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

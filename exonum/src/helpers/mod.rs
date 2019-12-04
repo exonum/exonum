@@ -17,8 +17,6 @@
 pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
 
 pub mod config;
-#[doc(hidden)] // TODO Reimplement as part of the Supervisor service [ECR-3823]
-pub mod multisig;
 pub mod user_agent;
 
 use env_logger::Builder;
@@ -27,12 +25,18 @@ use log::SetLoggerError;
 use std::path::{Component, Path, PathBuf};
 
 use crate::{
-    blockchain::{ConsensusConfig, Schema, ValidatorKeys},
+    api::manager::UpdateEndpoints,
+    blockchain::{
+        config::{GenesisConfig, GenesisConfigBuilder},
+        ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+    },
     crypto::gen_keypair,
     exonum_merkledb::Fork,
     node::{ConnectListConfig, NodeConfig},
+    runtime::rust::RustRuntime,
 };
 use exonum_keys::Keys;
+use futures::sync::mpsc;
 
 mod types;
 
@@ -153,6 +157,30 @@ pub fn clear_consensus_messages_cache(fork: &Fork) {
 /// Returns sufficient number of votes for the given validators number.
 pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
+}
+
+// TODO: Separate creation of RustRuntime and GenesisConfig. [ECR-3913]
+/// Creates and initializes RustRuntime and GenesisConfig with information from collection of InstanceCollection.
+pub fn create_rust_runtime_and_genesis_config(
+    api_notifier: mpsc::Sender<UpdateEndpoints>,
+    consensus_config: ConsensusConfig,
+    instances: impl IntoIterator<Item = InstanceCollection>,
+) -> (RustRuntime, GenesisConfig) {
+    let mut rust_runtime = RustRuntime::new(api_notifier);
+    let mut config_builder = GenesisConfigBuilder::with_consensus_config(consensus_config);
+
+    for InstanceCollection { factory, instances } in instances {
+        rust_runtime = rust_runtime.with_factory(factory);
+        config_builder = instances
+            .into_iter()
+            .fold(config_builder, |builder, instance| {
+                builder
+                    .with_artifact(instance.instance_spec.artifact.clone())
+                    .with_instance(instance)
+            });
+    }
+
+    (rust_runtime, config_builder.build())
 }
 
 #[test]

@@ -186,7 +186,7 @@ fn test_query_state_hash() {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
 
-        let proof = sandbox.get_proof_to_index("core.consensus.config");
+        let proof = sandbox.get_proof_to_index("core.consensus_config");
         let proof = proof.check_against_hash(state_hash).unwrap();
         assert_ne!(configs_rh, Hash::zero());
         assert_eq!(
@@ -194,7 +194,7 @@ fn test_query_state_hash() {
                 .entries()
                 .map(|(k, v)| (k.as_str(), v))
                 .collect::<Vec<_>>(),
-            vec![("core.consensus.config", &configs_rh)]
+            vec![("core.consensus_config", &configs_rh)]
         );
 
         let proof = sandbox.get_proof_to_index("timestamping.first");

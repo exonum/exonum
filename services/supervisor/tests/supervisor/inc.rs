@@ -15,16 +15,18 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ExecutionError, InstanceCollection},
+    blockchain::ExecutionError,
     runtime::{
-        api::{self, ServiceApiBuilder},
-        rust::{CallContext, Service},
+        rust::{
+            api::{self, ServiceApiBuilder},
+            CallContext, DefaultInstance, Service,
+        },
         DispatcherError, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
+    access::{Access, RawAccessMut},
     Entry,
 };
 use exonum_proto::ProtobufConvert;
@@ -35,20 +37,13 @@ use exonum_supervisor::Configure;
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
-#[derive(Debug)]
+#[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
     count: Entry<T::Base, u64>,
     params: Entry<T::Base, String>,
 }
 
 impl<T: Access> Schema<T> {
-    pub fn new(access: T) -> Self {
-        Self {
-            count: FromAccess::from_access(access.clone(), "count".into()).unwrap(),
-            params: FromAccess::from_access(access, "params".into()).unwrap(),
-        }
-    }
-
     pub fn count(&self) -> Option<u64> {
         self.count.get()
     }
@@ -122,10 +117,9 @@ impl Service for IncService {
     }
 }
 
-impl From<IncService> for InstanceCollection {
-    fn from(instance: IncService) -> Self {
-        InstanceCollection::new(instance).with_instance(SERVICE_ID, SERVICE_NAME, Vec::default())
-    }
+impl DefaultInstance for IncService {
+    const INSTANCE_ID: InstanceId = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
 impl Configure for IncService {

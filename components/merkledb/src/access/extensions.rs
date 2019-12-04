@@ -18,19 +18,18 @@ use crate::{
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// // Since `Access` is implemented for `&Fork` rather than `Fork`, it is necessary
-/// // to use `fork` or `(&fork)` when using the `AccessExt` methods:
+/// // Extension methods can be used on `Fork`s:
 /// {
 ///     let mut list: ListIndex<_, String> = fork.get_list("list");
 ///     list.push("foo".to_owned());
 /// }
-/// // ...same with snapshots:
+/// // ...and on `Snapshot`s:
 /// let snapshot = db.snapshot();
-/// assert!((&snapshot)
+/// assert!(snapshot
 ///     .get_map::<_, u64, String>("map")
 ///     .get(&0)
 ///     .is_none());
-/// // ...but with `ReadonlyFork`, no wrapping is necessary.
+/// // ...and on `ReadonlyFork`s:
 /// let list = fork.readonly().get_list::<_, String>("list");
 /// assert_eq!(list.len(), 1);
 /// ```
@@ -46,8 +45,8 @@ pub trait AccessExt: Access {
         K: BinaryKey + ?Sized,
         I: FromAccess<Self>,
     {
-        // We know that `Group` implementation of `Restore` never fails
-        Group::from_access(self, IndexAddress::new(name)).unwrap()
+        Group::from_access(self, IndexAddress::from_root(name))
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets an entry index with the specified address.
@@ -60,7 +59,7 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        Entry::from_access(self, addr.into()).unwrap()
+        Entry::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a hashed entry index with the specified address.
@@ -86,7 +85,8 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ListIndex::from_access(self, addr.into()).unwrap()
+        ListIndex::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a map index with the specified address.
@@ -100,7 +100,7 @@ pub trait AccessExt: Access {
         K: BinaryKey,
         V: BinaryValue,
     {
-        MapIndex::from_access(self, addr.into()).unwrap()
+        MapIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a Merkelized list index with the specified address.
@@ -113,7 +113,8 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        ProofListIndex::from_access(self, addr.into()).unwrap()
+        ProofListIndex::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a Merkelized map index with the specified address.
@@ -127,7 +128,8 @@ pub trait AccessExt: Access {
         K: BinaryKey + ObjectHash,
         V: BinaryValue,
     {
-        ProofMapIndex::from_access(self, addr.into()).unwrap()
+        ProofMapIndex::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Variant of the proof map with keys that can be mapped directly to `ProofPath`.
@@ -142,26 +144,26 @@ pub trait AccessExt: Access {
         V: BinaryValue,
         Raw: ToProofPath<K>,
     {
-        ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into()).unwrap()
+        ProofMapIndex::<_, _, _, Raw>::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
-    /// Generic variant of the proof map. Requires implicit `KeyMode` to be constructed.
+    /// Gets a generic proof map. Requires explicit `KeyMode` to be specified.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
-    ///     proof_map_index::{Raw, Hashed}};
-    /// use exonum_crypto::PublicKey;
-    ///
+    /// # use exonum_merkledb::{
+    /// #     access::AccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
+    /// #     RawProofMapIndex,
+    /// # };
+    /// # use exonum_crypto::PublicKey;
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
-    ///
     /// // Hashed variant for keys implementing `ObjectHash`.
-    /// let hashed_map: ProofMapIndex<&Fork, u32, u32, Hashed> = fork.get_generic_proof_map("hashed");
-    ///
+    /// let hashed_map: ProofMapIndex<_, u32, u32> = fork.get_generic_proof_map("hashed");
     /// // Raw variant for keys that can be mapped directly to `ProofPath`.
-    /// let raw_map: ProofMapIndex<&Fork, PublicKey, u32, Raw> = fork.get_generic_proof_map("raw");
+    /// let raw_map: RawProofMapIndex<_, PublicKey, u32> = fork.get_generic_proof_map("raw");
     /// ```
     ///
     /// # Panics
@@ -177,7 +179,8 @@ pub trait AccessExt: Access {
         V: BinaryValue,
         KeyMode: ToProofPath<K>,
     {
-        ProofMapIndex::<_, _, _, KeyMode>::from_access(self, addr.into()).unwrap()
+        ProofMapIndex::<_, _, _, KeyMode>::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a sparse list index with the specified address.
@@ -190,7 +193,8 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue,
     {
-        SparseListIndex::from_access(self, addr.into()).unwrap()
+        SparseListIndex::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a key set index with the specified address.
@@ -203,7 +207,8 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryKey,
     {
-        KeySetIndex::from_access(self, addr.into()).unwrap()
+        KeySetIndex::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a value set index with the specified address.
@@ -216,7 +221,8 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
     {
-        ValueSetIndex::from_access(self, addr.into()).unwrap()
+        ValueSetIndex::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Touches an index at the specified address, asserting that it has a specific type.

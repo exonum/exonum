@@ -99,8 +99,8 @@ fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
 ) -> Option<Prefixed<'static, T>> {
-    let (spec, _) = DispatcherSchema::new(access.clone()).get_instance(id)?;
-    Some(Prefixed::new(spec.name, access))
+    let state = DispatcherSchema::new(access.clone()).get_instance(id)?;
+    Some(Prefixed::new(state.spec.name, access))
 }
 
 /// Extension trait for `Snapshot` allowing to access blockchain data in a more structured way.

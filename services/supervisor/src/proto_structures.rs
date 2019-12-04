@@ -110,7 +110,7 @@ pub struct ServiceConfig {
     BinaryValue,
     ObjectHash,
 )]
-#[protobuf_convert(source = "proto::ConfigChange")]
+#[protobuf_convert(source = "proto::ConfigChange", rename(case = "snake_case"))]
 pub enum ConfigChange {
     /// New consensus config.
     Consensus(ConsensusConfig),

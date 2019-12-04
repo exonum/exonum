@@ -59,7 +59,7 @@
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
-//! of column families; see `new_in_family` constructor in the built-in index types.
+//! of [`Group`]s or keyed [`IndexAddress`]es.
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
@@ -130,6 +130,8 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 //! [`state_aggregator`]: struct.SystemInfo.html#method.state_aggregator
+//! [`Group`]: struct.Group.html
+//! [`IndexAddress`]: struct.IndexAddress.html
 
 #![warn(
     missing_debug_implementations,
@@ -170,7 +172,7 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{IndexAddress, IndexType, ResolvedAddress, SystemInfo},
+    views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress, SystemInfo},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'

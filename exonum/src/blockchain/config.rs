@@ -21,13 +21,14 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
-    messages::SIGNED_MESSAGE_MIN_SIZE,
-    proto::schema::blockchain,
+    messages::{BinaryValue, SIGNED_MESSAGE_MIN_SIZE},
+    proto::schema::{blockchain, runtime},
+    runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };
 
 use exonum_proto::ProtobufConvert;
@@ -40,8 +41,7 @@ use exonum_proto::ProtobufConvert;
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
-    /// Service key is used for services, for example, the configuration
-    /// updater service, the anchoring service, etc.
+    /// Service key is used to sign transactions broadcast by the services.
     pub service_key: PublicKey,
 }
 
@@ -295,6 +295,143 @@ impl ValidateInput for ConsensusConfig {
     }
 }
 
+/// Genesis config parameters.
+///
+/// Information from this entity get saved to the genesis block.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "runtime::GenesisConfig")]
+pub struct GenesisConfig {
+    /// Blockchain configuration used to create the genesis block.
+    pub consensus_config: ConsensusConfig,
+
+    /// Artifacts specification of builtin services.
+    pub artifacts: Vec<ArtifactSpec>,
+
+    /// List of services with its configuration parameters that are created directly in the genesis block.
+    pub builtin_instances: Vec<InstanceInitParams>,
+}
+
+/// Represents data that is required for initialization of service instance.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "runtime::InstanceInitParams")]
+pub struct InstanceInitParams {
+    /// Wrapped `InstanceSpec`.
+    pub instance_spec: InstanceSpec,
+    /// Constructor argument for specific `InstanceSpec`.
+    pub constructor: Vec<u8>,
+}
+
+impl InstanceInitParams {
+    /// Generic constructor.
+    pub fn new(
+        id: InstanceId,
+        name: impl Into<String>,
+        artifact: ArtifactId,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        InstanceInitParams {
+            instance_spec: InstanceSpec {
+                id,
+                name: name.into(),
+                artifact,
+            },
+            constructor: constructor.into_bytes(),
+        }
+    }
+
+    /// Converts into `InstanceInitParams` with specific constructor.
+    pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
+        InstanceInitParams {
+            instance_spec: self.instance_spec,
+            constructor: constructor.to_bytes(),
+        }
+    }
+}
+
+/// Creates `GenesisConfig` from components.
+#[derive(Debug)]
+pub struct GenesisConfigBuilder {
+    /// Consensus config.
+    consensus_config: ConsensusConfig,
+    /// Artifacts specifications for builtin services.
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    /// Instances of builtin services.
+    builtin_instances: Vec<InstanceInitParams>,
+}
+
+impl GenesisConfigBuilder {
+    /// Creates a new builder instance based on the `ConsensusConfig`.
+    pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
+        Self {
+            consensus_config,
+            artifacts: HashMap::new(),
+            builtin_instances: vec![],
+        }
+    }
+
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
+    /// already added.
+    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
+        self.with_parametric_artifact(artifact, ())
+    }
+
+    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
+    /// given id is already added.
+    pub fn with_parametric_artifact(
+        mut self,
+        artifact: impl Into<ArtifactId>,
+        payload: impl BinaryValue,
+    ) -> Self {
+        let artifact = artifact.into();
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| payload.into_bytes());
+        self
+    }
+
+    /// Adds service instance initialization parameters.
+    pub fn with_instance(mut self, instance_params: InstanceInitParams) -> Self {
+        self.builtin_instances.push(instance_params);
+        self
+    }
+
+    /// Produces `GenesisConfig` from collected components.
+    pub fn build(self) -> GenesisConfig {
+        let artifacts = self
+            .artifacts
+            .into_iter()
+            .map(|(artifact, payload)| ArtifactSpec { artifact, payload })
+            .collect::<Vec<_>>();
+        GenesisConfig {
+            consensus_config: self.consensus_config,
+            artifacts,
+            builtin_instances: self.builtin_instances,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Display;
@@ -441,5 +578,44 @@ mod tests {
         for (cfg, expected_msg) in &cases {
             assert_err_contains(cfg.validate().unwrap_err(), expected_msg);
         }
+    }
+
+    #[test]
+    fn genesis_config_creation() {
+        let consensus = gen_consensus_config();
+        let artifact1 = ArtifactId::new(42_u32, "test_artifact1").unwrap();
+        let artifact2 = ArtifactId::new(42_u32, "test_artifact2").unwrap();
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
+            .with_artifact(artifact1.clone())
+            .with_parametric_artifact(artifact2.clone(), vec![1_u8, 2, 3])
+            .with_instance(artifact1.clone().into_default_instance(1, "art1_inst1"))
+            .with_instance(
+                artifact1
+                    .clone()
+                    .into_default_instance(2, "art1_inst2")
+                    .with_constructor(vec![4_u8, 5, 6]),
+            )
+            .with_instance(artifact2.clone().into_default_instance(1, "art2_inst1"))
+            .build();
+
+        assert_eq!(genesis_config.consensus_config, consensus);
+        assert_eq!(genesis_config.artifacts.len(), 2);
+        assert_eq!(genesis_config.builtin_instances.len(), 3);
+    }
+
+    #[test]
+    fn genesis_config_check_artifacts_duplication() {
+        let consensus = gen_consensus_config();
+        let artifact = ArtifactId::new(42_u32, "test_artifact").unwrap();
+        let correct_payload = vec![1_u8, 2, 3];
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus)
+            .with_parametric_artifact(artifact.clone(), correct_payload.clone())
+            .with_parametric_artifact(artifact, vec![4_u8, 5, 6])
+            .build();
+
+        assert_eq!(genesis_config.artifacts.len(), 1);
+        assert_eq!(genesis_config.artifacts[0].payload, correct_payload);
     }
 }

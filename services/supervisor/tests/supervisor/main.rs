@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum::{
     api,
@@ -70,15 +70,16 @@ fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
 
 fn service_instance_exists(api: &TestKitApi, name: &str) -> bool {
     let services = &api.exonum_api().services().services;
-    services.iter().any(|s| s.name == name)
+    services.iter().any(|s| s.spec.name == name)
 }
 
 fn find_instance_id(api: &TestKitApi, instance_name: &str) -> InstanceId {
     let services = &api.exonum_api().services().services;
     services
         .iter()
-        .find(|service| service.name == instance_name)
+        .find(|service| service.spec.name == instance_name)
         .expect("Can't find the instance")
+        .spec
         .id
 }
 
@@ -215,16 +216,16 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .create()
 }
 
 fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .with_validators(n)
         .create()
 }
@@ -236,26 +237,24 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .with_validators(1)
         .create()
 }
 
 fn testkit_with_inc_service_and_static_instance() -> TestKit {
-    let service = IncService;
-    let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_default_rust_service(IncService)
         .create()
 }
 
 fn add_available_services(runtime: RustRuntime) -> RustRuntime {
     runtime
-        .with_available_service(IncService)
-        .with_available_service(DecentralizedSupervisor::new())
+        .with_factory(IncService)
+        .with_factory(DecentralizedSupervisor::new())
 }
 
 /// Just test that the Inc service works as intended.
@@ -462,7 +461,7 @@ fn test_bad_service_instance_name() {
 
     let system_api = api.exonum_api();
     let expected_description =
-        "Service instance name contains illegal character, use only: a-zA-Z0-9 and one of _-.";
+        "Service instance name (\u{2764}) contains illegal character, use only: a-zA-Z0-9 and one of _-";
     let expected_status = Err(ExecutionError {
         kind: ExecutionErrorKind::Service { code: 7 },
         description: expected_description.into(),
@@ -554,8 +553,8 @@ fn test_start_two_services_in_one_request() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .create();
     deploy_default(&mut testkit);
 
@@ -971,4 +970,83 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     });
     api.exonum_api()
         .assert_tx_status(confirmation.object_hash(), &expected_status.into());
+}
+
+/// Checks that service IDs are assigned sequentially starting from the
+/// ID next to max builtin ID.
+#[test]
+fn test_id_assignment() {
+    let max_builtin_id = SUPERVISOR_INSTANCE_ID;
+
+    // Deploy inc service & start two instances.
+    let instance_name_1 = "inc";
+    let instance_name_2 = "inc2";
+    let mut testkit = testkit_with_inc_service();
+    deploy_default(&mut testkit);
+
+    let artifact = artifact_default();
+    let deadline = testkit.height().next();
+
+    let request_1 = StartService {
+        artifact: artifact.clone(),
+        name: instance_name_1.into(),
+        config: Vec::default(),
+    };
+    let request_2 = StartService {
+        artifact: artifact.clone(),
+        name: instance_name_2.into(),
+        config: Vec::default(),
+    };
+
+    let request = ConfigPropose::new(0, deadline)
+        .start_service(request_1)
+        .start_service(request_2);
+
+    let api = testkit.api();
+    start_service(&api, request);
+    testkit.create_block();
+
+    // Check that new instances have IDs 1 and 2.
+    let api = testkit.api();
+    assert_eq!(find_instance_id(&api, instance_name_1), max_builtin_id + 1);
+    assert_eq!(find_instance_id(&api, instance_name_2), max_builtin_id + 2);
+}
+
+/// Checks that if builtin IDs space is sparse (here we have `Supervisor` with ID 0 and
+/// `IncService` with ID 100), the ID for the new service will be next to the max
+/// builtin ID (101 in our case).
+#[test]
+fn test_id_assignment_sparse() {
+    let max_builtin_id = 100;
+    let inc_service = IncService;
+    let inc_service_artifact = inc_service.artifact_id();
+
+    // Create testkit with builtin instance with ID 100.
+    let mut testkit = TestKitBuilder::validator()
+        .with_logger()
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_artifact(inc_service_artifact.clone())
+        .with_instance(inc_service_artifact.into_default_instance(max_builtin_id, "inc"))
+        .with_rust_service(inc_service)
+        .create();
+
+    let artifact = artifact_default();
+    let deadline = testkit.height().next();
+
+    let instance_name = "inc2";
+    let request = StartService {
+        artifact: artifact.clone(),
+        name: instance_name.into(),
+        config: Vec::default(),
+    };
+
+    let request = ConfigPropose::new(0, deadline).start_service(request);
+
+    let api = testkit.api();
+    start_service(&api, request);
+    testkit.create_block();
+
+    // Check that new instance has ID 101.
+    let api = testkit.api();
+    assert_eq!(find_instance_id(&api, instance_name), max_builtin_id + 1);
 }
