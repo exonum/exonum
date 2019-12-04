@@ -395,7 +395,7 @@ fn test_discard_errored_service_config_change() {
     let block = testkit.create_block_with_transaction(signed_proposal);
     let err = block.transactions[0].status().unwrap_err();
     assert!(err
-        .description
+        .description()
         .contains("IncService: Configure error request"));
     assert_eq!(config_propose_entry(&testkit), None);
 }

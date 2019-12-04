@@ -430,10 +430,8 @@ where
 // ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
 // by the caller. It is useful for roundtrip tests, though.
 pub struct ExecutionError {
-    /// The kind of error that indicates in which module and with which code the error occurred.
-    pub kind: ErrorKind,
-    /// Optional description which doesn't affect `object_hash`.
-    pub description: String,
+    kind: ErrorKind,
+    description: String,
     runtime_id: Option<u32>,
     call_site: Option<CallSite>,
 }
@@ -480,6 +478,16 @@ impl ExecutionError {
     /// of this error, and does not check any other error fields.
     pub fn to_match(&self) -> ExecutionErrorMatch {
         ExecutionErrorMatch::new(self.kind, self.description.clone())
+    }
+
+    /// The kind of error that indicates in which module and with which code the error occurred.
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
+    }
+
+    /// Human-readable error description. May be empty.
+    pub fn description(&self) -> &str {
+        &self.description
     }
 
     /// Returns the ID of a runtime in which this error has occurred. If the runtime is not known,

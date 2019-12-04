@@ -274,7 +274,7 @@ impl Dispatcher {
                 fork.rollback();
                 let height = CoreSchema::new(&*fork).height().next();
 
-                if err.kind == ErrorKind::Unexpected {
+                if err.kind() == ErrorKind::Unexpected {
                     log::error!(
                         "`before_commit` for service {} at {:?} resulted in unchecked error: {:?}",
                         instance_id,
