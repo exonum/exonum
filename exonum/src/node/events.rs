@@ -81,7 +81,6 @@ impl NodeHandler {
                     self.api_state().set_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_enabled {
-                        self.add_timeouts();
                         self.request_next_block();
                     }
                 }
@@ -92,13 +91,6 @@ impl NodeHandler {
     }
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
-        if !self.is_enabled {
-            info!(
-                "Ignoring a timeout {:?} because the node is disabled",
-                timeout
-            );
-            return;
-        }
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
