@@ -52,6 +52,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Services can now use `BlockchainData` and `SnapshotExt` types to access data
   from the blockchain in a more structured manner. (#1523)
 
+- `GenesisConfig` is extracted into separate entity. `BlockchainBuilder`, `Node`
+ and `Testkit` explicitly accepts it during creation. (#1541)
+
+- Added `DefaultInstance` trait for declaration of builtin services. (#1541)
+
 #### exonum-merkledb
 
 - Nested proofs for `ProofListIndex` are replaced with a flat

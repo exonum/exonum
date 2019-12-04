@@ -18,7 +18,7 @@ use exonum::{
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
-            CallContext, Service,
+            CallContext, DefaultInstance, Service,
         },
         BlockchainData, ExecutionError, InstanceId,
     },
@@ -218,4 +218,9 @@ impl Service for CurrencyService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
     }
+}
+
+impl DefaultInstance for CurrencyService {
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

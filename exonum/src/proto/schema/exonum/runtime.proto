@@ -18,6 +18,7 @@ package exonum.runtime;
 
 option java_package = "com.exonum.core.messages";
 
+import "blockchain.proto";
 import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.
@@ -48,6 +49,17 @@ message InstanceSpec {
   uint32 id = 1;
   string name = 2;
   ArtifactId artifact = 3;
+}
+
+message InstanceInitParams {
+  InstanceSpec instance_spec = 1;
+  bytes constructor = 2;
+}
+
+message GenesisConfig {
+  exonum.Config consensus_config = 1;
+  repeated ArtifactSpec artifacts = 2;
+  repeated InstanceInitParams builtin_instances = 3;
 }
 
 // The kind of ExecutionError.

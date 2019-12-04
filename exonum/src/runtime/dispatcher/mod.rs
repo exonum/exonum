@@ -26,9 +26,8 @@ use crate::{
     blockchain::{Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
-    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus},
+    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
 use super::{
@@ -58,10 +57,13 @@ impl Dispatcher {
     /// Creates a new dispatcher with the specified runtimes.
     pub(crate) fn new(
         blockchain: &Blockchain,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = RuntimeInstance>,
     ) -> Self {
         let mut this = Self {
-            runtimes: runtimes.into_iter().collect(),
+            runtimes: runtimes
+                .into_iter()
+                .map(|runtime| (runtime.id, runtime.instance))
+                .collect(),
             service_infos: BTreeMap::new(),
         };
         for runtime in this.runtimes.values_mut() {
@@ -113,16 +115,8 @@ impl Dispatcher {
         &mut self,
         fork: &mut Fork,
         spec: InstanceSpec,
-        artifact_payload: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        // Register service artifact in the runtime.
-        // TODO Write test for such situations [ECR-3222]
-        if !self.is_artifact_deployed(&spec.artifact) {
-            Self::commit_artifact(fork, spec.artifact.clone(), artifact_payload.to_bytes())?;
-            // Wait until the artifact is ready to instantiate the service instances.
-            self.block_until_deployed(spec.artifact.clone(), artifact_payload.into_bytes());
-        }
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;

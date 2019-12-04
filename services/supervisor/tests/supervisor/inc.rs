@@ -15,12 +15,12 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ExecutionError, InstanceCollection},
+    blockchain::ExecutionError,
     crypto::Hash,
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
-            CallContext, Service,
+            CallContext, DefaultInstance, Service,
         },
         BlockchainData, DispatcherError, InstanceId,
     },
@@ -122,10 +122,9 @@ impl Service for IncService {
     }
 }
 
-impl From<IncService> for InstanceCollection {
-    fn from(instance: IncService) -> Self {
-        InstanceCollection::new(instance).with_instance(SERVICE_ID, SERVICE_NAME, Vec::default())
-    }
+impl DefaultInstance for IncService {
+    const INSTANCE_ID: InstanceId = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
 impl Configure for IncService {

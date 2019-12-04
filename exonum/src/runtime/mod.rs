@@ -440,6 +440,31 @@ impl<T: Runtime> From<T> for Box<dyn Runtime> {
     }
 }
 
+/// Specifies system identifier for a [`Runtime`].
+pub trait WellKnownRuntime: Runtime {
+    /// Identifier of this runtime.
+    const ID: u32;
+}
+
+// TODO: Rethink visibility [ECR-3913]
+#[derive(Debug)]
+/// Instance of [`Runtime`] with corresponding ID.
+pub struct RuntimeInstance {
+    /// Identifier of this runtime.
+    pub id: u32,
+    /// Instance of [`Runtime`].
+    pub instance: Box<dyn Runtime>,
+}
+
+impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
+    fn from(runtime: T) -> Self {
+        RuntimeInstance {
+            id: T::ID,
+            instance: runtime.into(),
+        }
+    }
+}
+
 /// An accessory structure that aggregates root object hashes of the service
 /// information schemas of the runtime with the root hash of the runtime information schema itself.
 #[derive(Debug, PartialEq, Default)]

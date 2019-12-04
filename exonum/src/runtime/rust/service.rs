@@ -22,6 +22,7 @@ use std::{
 };
 
 use crate::{
+    blockchain::config::InstanceInitParams,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::Verified,
@@ -134,6 +135,20 @@ where
 {
     fn from(factory: T) -> Self {
         Box::new(factory) as Self
+    }
+}
+
+/// Provides default instance configuration parameters for `ServiceFactory`.
+pub trait DefaultInstance: ServiceFactory {
+    /// Default id for a service.
+    const INSTANCE_ID: InstanceId;
+    /// Default name for a service.
+    const INSTANCE_NAME: &'static str;
+
+    /// Creates default instance configuration parameters for the service.
+    fn default_instance(&self) -> InstanceInitParams {
+        self.artifact_id()
+            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
     }
 }
 
