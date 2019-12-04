@@ -468,7 +468,10 @@ fn error_discards_transaction_changes() {
             ErrorKind::Dispatcher { code: 5 },
             "Foo",
         )),
-        Err(ExecutionError::new(ErrorKind::Runtime { code: 0 }, "Strange bar")),
+        Err(ExecutionError::new(
+            ErrorKind::Runtime { code: 0 },
+            "Strange bar",
+        )),
         Err(ExecutionError::new(ErrorKind::Unexpected, "PANIC")),
         Ok(()),
     ];
