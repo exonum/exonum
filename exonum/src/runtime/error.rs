@@ -382,10 +382,12 @@ impl From<&ExecutionError> for SerdeExecutionStatus {
     fn from(err: &ExecutionError) -> Self {
         let description = err.description.clone();
         match err.kind {
-            ErrorKind::Panic => Self::Panic { description },
-            ErrorKind::Dispatcher { code } => Self::DispatcherError { code, description },
-            ErrorKind::Runtime { code } => Self::RuntimeError { code, description },
-            ErrorKind::Service { code } => Self::ServiceError { code, description },
+            ErrorKind::Panic => SerdeExecutionStatus::Panic { description },
+            ErrorKind::Dispatcher { code } => {
+                SerdeExecutionStatus::DispatcherError { code, description }
+            }
+            ErrorKind::Runtime { code } => SerdeExecutionStatus::RuntimeError { code, description },
+            ErrorKind::Service { code } => SerdeExecutionStatus::ServiceError { code, description },
         }
     }
 }
@@ -395,7 +397,7 @@ impl From<&Result<(), ExecutionError>> for SerdeExecutionStatus {
         if let Err(err) = &inner {
             Self::from(err)
         } else {
-            Self::Success
+            SerdeExecutionStatus::Success
         }
     }
 }

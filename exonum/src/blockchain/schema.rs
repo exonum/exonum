@@ -400,19 +400,19 @@ impl ProtobufConvert for CallLocation {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            Self::Transaction { index } => pb.set_transaction(*index),
-            Self::BeforeCommit { id } => pb.set_before_commit(*id),
+            CallLocation::Transaction { index } => pb.set_transaction(*index),
+            CallLocation::BeforeCommit { id } => pb.set_before_commit(*id),
         }
         pb
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         if pb.has_transaction() {
-            Ok(Self::Transaction {
+            Ok(CallLocation::Transaction {
                 index: pb.get_transaction(),
             })
         } else if pb.has_before_commit() {
-            Ok(Self::BeforeCommit {
+            Ok(CallLocation::BeforeCommit {
                 id: pb.get_before_commit(),
             })
         } else {
@@ -424,12 +424,12 @@ impl ProtobufConvert for CallLocation {
 impl CallLocation {
     /// Creates a location corresponding to a transaction.
     pub fn transaction(index: u64) -> Self {
-        Self::Transaction { index }
+        CallLocation::Transaction { index }
     }
 
     /// Creates a location corresponding to a `before_commit` call.
     pub fn before_commit(id: InstanceId) -> Self {
-        Self::BeforeCommit { id }
+        CallLocation::BeforeCommit { id }
     }
 }
 
@@ -438,8 +438,8 @@ impl_binary_key_for_binary_value!(CallLocation);
 impl fmt::Display for CallLocation {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
-            Self::BeforeCommit { id } => {
+            CallLocation::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
+            CallLocation::BeforeCommit { id } => {
                 write!(formatter, "`before_commit` for service with ID {}", id)
             }
         }
