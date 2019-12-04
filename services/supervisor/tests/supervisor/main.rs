@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum::{
     api,
@@ -216,16 +216,16 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .create()
 }
 
 fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .with_validators(n)
         .create()
 }
@@ -237,26 +237,24 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .with_validators(1)
         .create()
 }
 
 fn testkit_with_inc_service_and_static_instance() -> TestKit {
-    let service = IncService;
-    let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_default_rust_service(IncService)
         .create()
 }
 
 fn add_available_services(runtime: RustRuntime) -> RustRuntime {
     runtime
-        .with_available_service(IncService)
-        .with_available_service(DecentralizedSupervisor::new())
+        .with_factory(IncService)
+        .with_factory(DecentralizedSupervisor::new())
 }
 
 /// Just test that the Inc service works as intended.
@@ -555,8 +553,8 @@ fn test_start_two_services_in_one_request() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(IncService)
         .create();
     deploy_default(&mut testkit);
 
@@ -1020,16 +1018,16 @@ fn test_id_assignment() {
 #[test]
 fn test_id_assignment_sparse() {
     let max_builtin_id = 100;
+    let inc_service = IncService;
+    let inc_service_artifact = inc_service.artifact_id();
 
     // Create testkit with builtin instance with ID 100.
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(InstanceCollection::new(IncService).with_instance(
-            max_builtin_id,
-            "inc",
-            (),
-        ))
+        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_artifact(inc_service_artifact.clone())
+        .with_instance(inc_service_artifact.into_default_instance(max_builtin_id, "inc"))
+        .with_rust_service(inc_service)
         .create();
 
     let artifact = artifact_default();

@@ -40,7 +40,10 @@ use crate::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
-    helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
+    helpers::{
+        create_rust_runtime_and_genesis_config, user_agent, Height, Milliseconds, Round,
+        ValidatorId,
+    },
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -1151,9 +1154,13 @@ fn sandbox_with_services_uninitialized(
         service_keys[0].clone(),
         ApiSender(api_channel.0.clone()),
     );
+
+    let (rust_runtime, genesis_config) =
+        create_rust_runtime_and_genesis_config(mpsc::channel(1).0, genesis, services);
+
     let blockchain = blockchain
-        .into_mut(genesis)
-        .with_rust_runtime(mpsc::channel(1).0, services)
+        .into_mut(genesis_config)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap();
 

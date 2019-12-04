@@ -23,7 +23,7 @@ pub use crate::runtime::{
 
 pub use self::{
     block::{Block, BlockProof},
-    builder::{BlockchainBuilder, InstanceCollection, InstanceConfig},
+    builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},
 };
@@ -36,6 +36,7 @@ use exonum_merkledb::{
     Snapshot, TemporaryDB,
 };
 use failure::{format_err, Error};
+use futures::Future;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -44,11 +45,12 @@ use std::{
 };
 
 use crate::{
+    blockchain::config::GenesisConfig,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, Dispatcher},
+    runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
 };
 
 mod block;
@@ -140,7 +142,7 @@ impl Blockchain {
     /// Starts promotion into a mutable blockchain instance that can be used to process
     /// transactions and create blocks.
     #[cfg(test)]
-    pub fn into_mut(self, genesis_config: ConsensusConfig) -> BlockchainBuilder {
+    pub fn into_mut(self, genesis_config: GenesisConfig) -> BlockchainBuilder {
         BlockchainBuilder::new(self, genesis_config)
     }
 
@@ -148,12 +150,13 @@ impl Blockchain {
     /// this node is the only validator.
     #[cfg(test)]
     pub fn into_mut_with_dummy_config(self) -> BlockchainBuilder {
-        use crate::helpers::generate_testnet_config;
+        use crate::{blockchain::config::GenesisConfigBuilder, helpers::generate_testnet_config};
         use exonum_crypto::KeyPair;
 
         let mut config = generate_testnet_config(1, 0).pop().unwrap();
         config.keys.service = KeyPair::from(self.service_keypair.clone());
-        self.into_mut(config.consensus)
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+        self.into_mut(genesis_config)
     }
 
     /// Returns reference to the transactions sender.
@@ -220,24 +223,22 @@ impl BlockchainMut {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    // TODO: extract genesis block into separate struct [ECR-3750]
-    fn create_genesis_block(
-        &mut self,
-        config: ConsensusConfig,
-        initial_services: Vec<InstanceConfig>,
-    ) -> Result<(), Error> {
-        config.validate()?;
+    fn create_genesis_block(&mut self, genesis_config: GenesisConfig) -> Result<(), Error> {
+        genesis_config.consensus_config.validate()?;
         let mut fork = self.fork();
         // Write genesis configuration to the blockchain.
-        Schema::new(&fork).consensus_config_entry().set(config);
+        Schema::new(&fork)
+            .consensus_config_entry()
+            .set(genesis_config.consensus_config);
+
+        for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
+            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone())?;
+            self.dispatcher.deploy_artifact(artifact, payload).wait()?
+        }
         // Add service instances.
-        for instance_config in initial_services {
-            self.dispatcher.add_builtin_service(
-                &mut fork,
-                instance_config.instance_spec,
-                instance_config.artifact_spec.unwrap_or_default(),
-                instance_config.constructor,
-            )?;
+        for inst in genesis_config.builtin_instances {
+            self.dispatcher
+                .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
         }
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,

@@ -17,12 +17,11 @@
 //! decision-making algorithm, the tests affect only this aspect.
 
 use exonum::{
-    blockchain::InstanceCollection,
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, Service},
+        rust::{CallContext, DefaultInstance, Service},
         ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -57,19 +56,9 @@ pub fn sign_config_propose_transaction_by_us(
 #[service_factory(artifact_name = "config-change-test-service")]
 pub struct ConfigChangeService;
 
-impl ConfigChangeService {
-    pub const INSTANCE_ID: InstanceId = 119;
-    pub const INSTANCE_NAME: &'static str = "config-change";
-}
-
-impl From<ConfigChangeService> for InstanceCollection {
-    fn from(instance: ConfigChangeService) -> Self {
-        InstanceCollection::new(instance).with_instance(
-            ConfigChangeService::INSTANCE_ID,
-            ConfigChangeService::INSTANCE_NAME,
-            vec![],
-        )
-    }
+impl DefaultInstance for ConfigChangeService {
+    const INSTANCE_ID: InstanceId = 119;
+    const INSTANCE_NAME: &'static str = "config-change";
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -80,12 +69,6 @@ pub struct DeployableService;
 impl Service for DeployableService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
-    }
-}
-
-impl From<DeployableService> for InstanceCollection {
-    fn from(instance: DeployableService) -> Self {
-        InstanceCollection::new(instance)
     }
 }
 
@@ -162,7 +145,7 @@ fn change_consensus_config_with_one_confirmation() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(SimpleSupervisor::new())
         .create();
 
     let cfg_change_height = Height(5);
@@ -209,8 +192,8 @@ fn change_consensus_config_with_one_confirmation() {
 fn service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
-        .with_rust_service(ConfigChangeService)
+        .with_default_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(ConfigChangeService)
         .create();
 
     let cfg_change_height = Height(5);
@@ -240,8 +223,8 @@ fn service_config_change() {
 fn incorrect_actual_from_field() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
-        .with_rust_service(ConfigChangeService)
+        .with_default_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(ConfigChangeService)
         .create();
 
     let cfg_change_height = Height(5);
@@ -267,7 +250,7 @@ fn incorrect_actual_from_field() {
 fn discard_config_propose_from_auditor() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(SimpleSupervisor::new())
         .create();
 
     let cfg_change_height = Height(5);
@@ -314,7 +297,7 @@ fn discard_config_propose_from_auditor() {
 fn test_send_proposal_with_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(SimpleSupervisor::new())
         .create();
 
     let old_validators = testkit.network().validators();
@@ -368,7 +351,7 @@ fn test_send_proposal_with_api() {
 #[test]
 fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(SimpleSupervisor::new())
         .with_rust_service(DeployableService)
         .create();
 
@@ -410,7 +393,7 @@ fn actual_from_is_zero() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_default_rust_service(SimpleSupervisor::new())
         .create();
 
     // Change height set to 0
