@@ -567,11 +567,12 @@ fn test_dispatcher_already_deployed() {
 
     // Tests that we get an error if we try to deploy already deployed artifact.
     assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
-    let result = blockchain
+    let err = blockchain
         .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
-        .wait();
-    assert_eq!(result, Err(DispatcherError::ArtifactAlreadyDeployed.into()));
+        .wait()
+        .unwrap_err();
+    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.to_match());
     // Tests that we cannot register artifact twice.
     let result = execute_transaction(
         &mut blockchain,
@@ -702,13 +703,11 @@ fn test_check_tx() {
         .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
-
-    assert_eq!(blockchain.check_tx(&correct_tx), Ok(()));
+    blockchain.check_tx(&correct_tx).unwrap();
 
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
-
     assert_eq!(
-        blockchain.check_tx(&incorrect_tx),
-        Err(DispatcherError::IncorrectInstanceId.into())
+        blockchain.check_tx(&incorrect_tx).unwrap_err(),
+        DispatcherError::IncorrectInstanceId.to_match()
     );
 }

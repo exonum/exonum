@@ -409,11 +409,26 @@ where
 
 /// Result of unsuccessful runtime execution.
 ///
-/// An execution error consists of an error kind and optional description.
-/// The error kind affects the blockchain state hash, while the description does not.
+/// An execution error consists of:
+///
+/// - an [error kind][`ErrorKind`]
+/// - call information (runtime ID and, if appropriate, [`CallSite`] where the error has occurred)
+/// - an optional description
+///
+/// Call information is added by the core automatically; it is impossible to add from the service
+/// code. It *is* possible to inspect the call info for an error that was returned by a service
+/// though.
+///
+/// The error kind and call info affect the blockchain state hash, while the description does not.
 /// Therefore descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
-#[derive(Clone, Debug, PartialEq, Fail, BinaryValue)]
+///
+/// [`ErrorKind`]: enum.ErrorKind.html
+/// [`CallSite`]: struct.CallSite.html
+#[derive(Clone, Debug, Fail, BinaryValue)]
+#[cfg_attr(test, derive(PartialEq))]
+// ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
+// by the caller. It is useful for roundtrip tests, though.
 pub struct ExecutionError {
     /// The kind of error that indicates in which module and with which code the error occurred.
     pub kind: ErrorKind,
@@ -644,11 +659,11 @@ pub enum CallType {
     BeforeCommit,
 }
 
-/// Returns an status of the dispatcher execution.
+/// Status of a call execution in a way it is stored in the blockchain.
 /// This result may be either an empty unit type, in case of success,
 /// or an `ExecutionError`, if execution has failed.
-/// Errors consist of an error kind and an optional description.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, BinaryValue)]
+#[derive(Clone, Debug, Serialize, Deserialize, BinaryValue)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ExecutionStatus(#[serde(with = "execution_result")] pub Result<(), ExecutionError>);
 
 impl ExecutionStatus {

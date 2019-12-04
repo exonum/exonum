@@ -76,7 +76,7 @@ fn test_explorer_basics() {
     assert_eq!(block.len(), 1);
     let tx_info = block.transaction(0).unwrap();
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-    assert_eq!(tx_info.status(), Ok(()));
+    tx_info.status().unwrap();
     assert_eq!(tx_info.content(), &tx_alice);
     assert_eq!(
         tx_info.content().object_hash(),
@@ -338,7 +338,7 @@ fn test_transaction_iterator() {
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let block = explorer.block(Height(1)).unwrap();
     for tx in &block {
-        assert_eq!(tx.status(), Ok(()));
+        tx.status().unwrap();
     }
     for (i, tx) in block.iter().enumerate() {
         let raw_tx = tx.content();

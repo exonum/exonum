@@ -361,16 +361,20 @@ fn test_dispatcher_simple() {
     };
 
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-    let res = context.start_adding_service(conflicting_rust_service, vec![]);
-    assert_eq!(res, Err(DispatcherError::ServiceIdExists.into()));
+    let err = context
+        .start_adding_service(conflicting_rust_service, vec![])
+        .unwrap_err();
+    assert_eq!(err, DispatcherError::ServiceIdExists.to_match());
 
     let conflicting_rust_service = InstanceSpec {
         artifact: rust_artifact.clone(),
         id: RUST_SERVICE_ID + 1,
         name: RUST_SERVICE_NAME.to_owned(),
     };
-    let res = context.start_adding_service(conflicting_rust_service, vec![]);
-    assert_eq!(res, Err(DispatcherError::ServiceNameExists.into()));
+    let err = context
+        .start_adding_service(conflicting_rust_service, vec![])
+        .unwrap_err();
+    assert_eq!(err, DispatcherError::ServiceNameExists.to_match());
 
     // Activate services / artifacts.
     create_genesis_block(&mut dispatcher, &mut fork);
@@ -461,8 +465,9 @@ fn test_dispatcher_rust_runtime_no_service() {
     assert_eq!(
         dispatcher
             .deploy_artifact(rust_artifact.clone(), vec![])
-            .wait(),
-        Err(RustRuntimeError::UnableToDeploy.into())
+            .wait()
+            .unwrap_err(),
+        RustRuntimeError::UnableToDeploy.to_match()
     );
 
     let mut fork = db.fork();
