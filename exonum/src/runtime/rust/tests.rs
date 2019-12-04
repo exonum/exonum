@@ -26,7 +26,7 @@ use std::{
 
 use crate::{
     blockchain::{
-        config::{GenesisConfigBuilder, InstanceInitParams},
+        config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainMut, Schema as CoreSchema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
@@ -213,6 +213,14 @@ pub struct Init {
     msg: String,
 }
 
+impl Default for Init {
+    fn default() -> Self {
+        Self {
+            msg: "constructor_message".to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
 struct TxA {
@@ -260,7 +268,7 @@ impl TestService for TestServiceImpl {
     fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
         context
             .service_data()
-            .get_entry("method_a_entry")
+            .get_proof_entry("method_a_entry")
             .set(arg.value);
         // Test calling one service from another.
         context
@@ -273,9 +281,20 @@ impl TestService for TestServiceImpl {
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
         context
             .service_data()
-            .get_entry("method_b_entry")
+            .get_proof_entry("method_b_entry")
             .set(arg.value);
         Ok(())
+    }
+}
+
+impl TestServiceImpl {
+    fn genesis_config() -> GenesisConfig {
+        let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+        let config = generate_testnet_config(1, 0)[0].clone();
+        GenesisConfigBuilder::with_consensus_config(config.consensus)
+            .with_artifact(artifact)
+            .with_instance(TestServiceImpl.default_instance())
+            .build()
     }
 }
 
@@ -284,7 +303,7 @@ impl Service for TestServiceImpl {
         let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
         context
             .service_data()
-            .get_entry("constructor_entry")
+            .get_proof_entry("constructor_entry")
             .set(init.msg);
         Ok(())
     }
@@ -293,6 +312,12 @@ impl Service for TestServiceImpl {
 impl DefaultInstance for TestServiceImpl {
     const INSTANCE_ID: u32 = SERVICE_INSTANCE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_INSTANCE_NAME;
+
+    fn default_instance(&self) -> InstanceInitParams {
+        self.artifact_id()
+            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+            .with_constructor(Init::default())
+    }
 }
 
 /// In this test, we manually instruct the dispatcher to deploy artifacts / create services
@@ -342,9 +367,7 @@ fn basic_rust_runtime() {
         id: SERVICE_INSTANCE_ID,
         name: SERVICE_INSTANCE_NAME.to_owned(),
     };
-    let constructor = Init {
-        msg: "constructor_message".to_owned(),
-    };
+    let constructor = Init::default();
 
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
@@ -353,8 +376,8 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.constructor_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.get_entry(idx_name.as_str());
-        assert_eq!(entry.get(), Some("constructor_message".to_owned()));
+        let entry = fork.get_proof_entry(idx_name.as_str());
+        assert_eq!(entry.get(), Some(Init::default().msg));
     }
     commit_block(&mut blockchain, fork);
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
@@ -387,10 +410,10 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.get_entry(idx_name.as_str());
+        let entry = fork.get_proof_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.get_entry(idx_name.as_str());
+        let entry = fork.get_proof_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_A_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -421,7 +444,7 @@ fn basic_rust_runtime() {
 
     {
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.get_entry(idx_name.as_str());
+        let entry = fork.get_proof_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(ARG_B_VALUE));
     }
     commit_block(&mut blockchain, fork);
@@ -438,20 +461,7 @@ fn basic_rust_runtime() {
 #[test]
 fn rust_runtime_with_builtin_services() {
     let (runtime, event_handle) = create_runtime();
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
-    let config = generate_testnet_config(1, 0)[0].clone();
-    let init_params = artifact
-        .clone()
-        .into_default_instance(SERVICE_INSTANCE_ID, SERVICE_INSTANCE_NAME);
-    let constructor = Init {
-        msg: "constructor_message".to_owned(),
-    };
-
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus.clone())
-        .with_artifact(artifact.clone())
-        .with_instance(init_params.clone().with_constructor(constructor.clone()))
-        .build();
-
+    let genesis_config = TestServiceImpl::genesis_config();
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config.clone())
         .with_runtime(runtime)
@@ -459,16 +469,15 @@ fn rust_runtime_with_builtin_services() {
         .unwrap();
 
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
+    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let instance_spec = TestServiceImpl.default_instance().instance_spec;
     assert_eq!(
         events,
         vec![
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact.clone(), vec![]),
-            RuntimeEvent::StartAdding(
-                init_params.clone().instance_spec,
-                constructor.clone().into_bytes()
-            ),
-            RuntimeEvent::CommitService(None, init_params.clone().instance_spec),
+            RuntimeEvent::StartAdding(instance_spec.clone(), Init::default().into_bytes()),
+            RuntimeEvent::CommitService(None, instance_spec.clone()),
             RuntimeEvent::AfterCommit(Height(0)),
         ]
     );
@@ -500,7 +509,7 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact, vec![]),
             // `Runtime::start_adding_service` is never called for the same service
-            RuntimeEvent::CommitService(Some(Height(1)), init_params.instance_spec),
+            RuntimeEvent::CommitService(Some(Height(1)), instance_spec),
             // `Runtime::after_commit` is never called for the same block
             RuntimeEvent::Resume,
         ]
@@ -516,6 +525,31 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::AfterCommit(Height(2)),
         ]
     );
+}
+
+#[test]
+fn state_aggregation() {
+    let runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(TestServiceImpl);
+    let genesis_config = TestServiceImpl::genesis_config();
+    let blockchain = Blockchain::build_for_tests()
+        .into_mut(genesis_config)
+        .with_runtime(runtime)
+        .build()
+        .unwrap();
+
+    // The constructor entry has been written to; `method_*` `ProofEntry`s are empty.
+    let snapshot = blockchain.snapshot();
+    let expected_indexes = vec![
+        "core.consensus_config",
+        "dispatcher_artifacts",
+        "dispatcher_instances",
+        "test_service_name.constructor_entry",
+    ];
+    let actual_indexes: Vec<_> = SystemInfo::new(&snapshot)
+        .state_aggregator()
+        .keys()
+        .collect();
+    assert_eq!(actual_indexes, expected_indexes);
 }
 
 #[test]
@@ -541,9 +575,7 @@ fn conflicting_service_instances() {
         id: SERVICE_INSTANCE_ID,
         name: SERVICE_INSTANCE_NAME.to_owned(),
     };
-    let constructor = Init {
-        msg: "constructor_message".to_owned(),
-    };
+    let constructor = Init::default();
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
         .start_adding_service(spec.clone(), constructor.clone())
@@ -628,7 +660,7 @@ impl Service for DependentServiceImpl {
             .for_service(&*init.msg)
             .expect("Dependency exists, but its data does not");
         assert!(dependency_data
-            .get_entry::<_, String>("constructor_entry")
+            .get_proof_entry::<_, String>("constructor_entry")
             .exists());
 
         Ok(())
@@ -791,12 +823,7 @@ fn dependent_service_in_same_block() {
 fn dependent_service_in_successive_block() {
     let main_service = TestServiceImpl;
     let dep_service = DependentServiceImpl;
-
-    let config = generate_testnet_config(1, 0)[0].clone();
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
-        .with_artifact(main_service.artifact_id())
-        .with_instance(main_service.default_instance())
-        .build();
+    let genesis_config = TestServiceImpl::genesis_config();
 
     let runtime = RustRuntime::new(mpsc::channel(1).0)
         .with_factory(main_service)
