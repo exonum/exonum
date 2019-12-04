@@ -18,7 +18,7 @@ git clone https://github.com/exonum/exonum-launcher.git .venv/exonum-launcher
 pip install pip --upgrade
 # Install dependencies from github-provided exonum-launcher (so we can get latest changes without release).
 pip install -r .venv/exonum-launcher/requirements.txt
-# Install exonum-launcher itself from the cloned repo as well.
+# Install exonum-launcher itself from the cloned repository as well.
 pip install -e .venv/exonum-launcher
 # Install integration tests.
 pip install -e test-suite/exonum-py-tests --no-binary=protobuf protobuf
