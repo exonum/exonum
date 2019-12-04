@@ -23,7 +23,7 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.1"}},
           # We aren't testing initialization here.
           "instances": {},
         }
@@ -45,7 +45,7 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "test-service:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "test-service:0.13.0-rc.1"}},
           # We aren't testing initialization here.
           "instances": {},
         }
@@ -68,7 +68,7 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 0,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.1"}},
           # We aren't testing initialization here.
           "instances": {},
         }
@@ -91,7 +91,7 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.1"}},
           "instances": {"crypto": {"artifact": "cryptocurrency"}},
         }
 
@@ -118,7 +118,7 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.1"}},
           "instances": {"": {"artifact": "cryptocurrency"}},
         }
 
@@ -157,7 +157,7 @@ class DevDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.1"}},
           # We aren't testing initialization here.
           "instances": {},
         }
@@ -179,7 +179,7 @@ class DevDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.1"}},
           "instances": {"crypto": {"artifact": "cryptocurrency"}},
         }
 
