@@ -1,6 +1,6 @@
 [package]
 name = "exonum-merkledb"
-version = "0.13.0-rc.1"
+version = "0.13.0-rc.2"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -19,8 +19,8 @@ bincode = "1.1"
 byteorder = "1.3"
 chrono = "0.4.6"
 enum-primitive-derive = "0.1"
-exonum-crypto = { path = "../crypto", version = "0.13.0-rc.1", features = ["with-serde"]}
-exonum-proto = { path = "../proto", version = "0.13.0-rc.1", optional = true }
+exonum-crypto = { path = "../crypto", version = "0.13.0-rc.2", features = ["with-serde"]}
+exonum-proto = { path = "../proto", version = "0.13.0-rc.2", optional = true }
 failure = "0.1"
 hex = "0.4"
 leb128 = "0.2"
@@ -39,7 +39,7 @@ protobuf = { version = "2.8.1", features = ["with-serde"], optional = true }
 [dev-dependencies]
 assert_matches = "1.3.0"
 criterion = "0.3"
-exonum-derive = { version = "0.13.0-rc.1", path = "../derive" }
+exonum-derive = { version = "0.13.0-rc.2", path = "../derive" }
 rand = "0.7"
 proptest = "0.9"
 modifier = "0.1"
@@ -65,4 +65,4 @@ rocksdb_bzip2 = ["rocksdb/bzip2"]
 name = "blockchain"
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.1", path = "../build" }
+exonum-build = { version = "0.13.0-rc.2", path = "../build" }
