@@ -16,7 +16,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 git clone https://github.com/exonum/exonum-launcher.git .venv/exonum-launcher
 pip install pip --upgrade
-# Install dependencies from github-provided exonum-launcher (so we can get latest changes without release).
+# Install dependencies from github-provided exonum-launcher
+# (so we can get latest changes without release).
 pip install -r .venv/exonum-launcher/requirements.txt
 # Install exonum-launcher itself from the cloned repository as well.
 pip install -e .venv/exonum-launcher
