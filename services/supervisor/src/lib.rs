@@ -12,6 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Supervisor is an [Exonum][exonum] service capable of the following activities:
+//! - Service artifact deployment;
+//! - Service instances creation;
+//! - Changing consensus configuration;
+//! - Changing service instances configuration.
+//!
+//! More information on the artifact/service lifecycle can be found in the documentation for
+//! the Exonum [runtime module][runtime-docs].
+//!
+//! Supervisor service has two different operating modes: a "simple" mode and a "decentralized" mode.
+//! The difference between modes is in the decision making approach:
+//! - Within the decentralized mode, to deploy a service or apply a new configuration,
+//!  no less than (2/3)+1 validators should reach a consensus;
+//! - Within the simple mode, any decision is executed after a single validator approval.
+//!
+//! The simple mode can be useful if one network administrator manages all the validator nodes
+//! or for testing purposes (e.g., to test service configuration with `TestKit`).
+//! For a network with a low node confidence, consider using the decentralized mode.
+//!
+//! # Interaction
+//!
+//! The intended way to interact with supervisor is the REST API. To be precise, requests should
+//! be sent to the one of the following endpoints: `deploy-artifact`, `propose-config` or
+//! `confirm-config`. Once received, supervisor will convert the request into appropriate
+//! transaction, sign it with the validator keys and broadcast for the rest of the network.
+//!
+//! Key point here is that user **should not** send transactions to the supervisor by himself.
+//!
+//! An expected format of requests for those endpoints is a serialized Protobuf message.
+//!
+//! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
+//! of the nodes should receive a [`DeployRequest`] message through API.
+//!
+//! To request a config change, one node should receive a [`ConfigPropose`] message through API.
+//! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
+//! should also receive [`ConfigVote`] messages with a hash of the proposed configuration.
+//! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
+//! This node votes for the configuration propose automatically.
+//!
+//! The operation of starting a service is treated similarly to a configuration change and follows the same rules.
+//!
+//! [exonum]: https://github.com/exonum/exonum
+//! [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+//! [`DeployRequest`]: struct.DeployRequest.html
+//! [`ConfigPropose`]: struct.ConfigPropose.html
+//! [`ConfigVote`]: struct.ConfigVote.html
+
+#![deny(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+
 pub use self::{
     configure::{Configure, ConfigureCall, CONFIGURE_INTERFACE_NAME},
     errors::Error,
@@ -24,10 +78,13 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::{ExecutionError, InstanceCollection},
+    blockchain::ExecutionError,
     crypto::Hash,
     runtime::{
-        rust::{api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service},
+        rust::{
+            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance,
+            Service,
+        },
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -46,9 +103,15 @@ mod schema;
 mod transactions;
 
 /// Decentralized supervisor.
+///
+/// Within the "decentralized" mode, both deploy requests and configuration change proposals
+/// should be approved by (2/3+1) validators.
 pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
 
 /// Simple supervisor.
+///
+/// Within the "simple" mode, both deploy requests and configuration change proposals require
+/// only one approval from a validator node.
 pub type SimpleSupervisor = Supervisor<mode::Simple>;
 
 /// Returns the `Supervisor` entity name.
@@ -136,11 +199,11 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
             // ID for the new instance is next to the highest builtin ID to avoid
             // overlap if builtin identifiers space is sparse.
             let dispatcher_schema = context.data().for_dispatcher();
-            let builtin_instances = dispatcher_schema.running_instances();
+            let builtin_instances = dispatcher_schema.service_instances();
 
             let new_instance_id = builtin_instances
                 .values()
-                .map(|spec| spec.id)
+                .map(|state| state.spec.id)
                 .max()
                 .unwrap_or(SUPERVISOR_INSTANCE_ID)
                 + 1;
@@ -154,6 +217,7 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
     }
 }
 
+/// Supervisor service implementation.
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("transactions::SupervisorInterface"))]
 #[service_factory(
@@ -175,12 +239,15 @@ where
     /// Name of the supervisor service.
     pub const NAME: &'static str = "supervisor";
 
+    /// Creates a new `Supervisor` service object.
     pub fn new() -> Supervisor<Mode> {
         Supervisor {
             phantom: std::marker::PhantomData::<Mode>::default(),
         }
     }
 
+    /// Factory constructor of the `Supervisor` object that takes `&self` as an argument.
+    /// The constructor is required for the `ServiceFactory` trait implementation.
     pub fn construct(&self) -> Box<Self> {
         Box::new(Self::new())
     }
@@ -291,15 +358,7 @@ where
     }
 }
 
-impl<Mode> From<Supervisor<Mode>> for InstanceCollection
-where
-    Mode: mode::SupervisorMode,
-{
-    fn from(service: Supervisor<Mode>) -> Self {
-        InstanceCollection::new(service).with_instance(
-            SUPERVISOR_INSTANCE_ID,
-            Supervisor::<Mode>::NAME,
-            Vec::default(),
-        )
-    }
+impl<Mode: mode::SupervisorMode> DefaultInstance for Supervisor<Mode> {
+    const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
+    const INSTANCE_NAME: &'static str = Self::NAME;
 }

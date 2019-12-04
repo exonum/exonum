@@ -7,16 +7,13 @@ branches:
   - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
   # Branch names endings with "-release" (for example "0.9.0-release").
   - /-release$/
-  # Dynamic services branch
-  - dynamic_services
 
 addons:
   apt:
     sources:
-    - sourceline: 'ppa:exonum/rocksdb'
     - sourceline: 'ppa:maarten-fonville/protobuf'
     - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
-    - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/16.04/prod xenial main'
+    - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/18.04/prod bionic main'
       key_url: https://packages.microsoft.com/keys/microsoft.asc
     packages:
     - binutils-dev
@@ -29,13 +26,14 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb5.17
+    - librocksdb-dev
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
     - pkg-config
     - powershell
     - protobuf-compiler
+    - python3-venv
     - unzip
     - zlib1g-dev
 
@@ -50,7 +48,7 @@ cache:
   - $HOME/.local
   - $HOME/.kcov
 
-dist: xenial
+dist: bionic
 sudo: required
 
 env:
@@ -69,6 +67,8 @@ before_install:
 
 
 jobs:
+  allow_failures:
+  - name: integration-tests
   include:
   # Formatting & other lints.
   - name: lints
@@ -140,20 +140,41 @@ jobs:
     - cargo run -p exonum-sample-runtime
     - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
-    # - cargo run -p exonum-testkit --example configuration_change TODO enable after [ECR-3306]
+    - cargo run -p exonum-supervisor --example configuration_change
     - cargo run -p exonum-time --example simple_service
 
   # Integration tests.
   - name: integration-tests
     install:
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    - pip3 install pip --upgrade
+    # Clone exonum-launcher to get a current master instead of release version.
+    - git clone https://github.com/exonum/exonum-launcher.git .venv/exonum-launcher
+    # Install dependencies from github-provided exonum-launcher (so we can get latest changes without release).
+    - pip3 install -r .venv/exonum-launcher/requirements.txt
+    # Install exonum-launcher itself from the cloned repo as well.
+    - pip3 install -e .venv/exonum-launcher
+    # Install integration tests.
+    - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests --no-binary=protobuf protobuf
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
     script:
-    - echo "TODO"
+    - python3 -m exonum_tests -v
+    after_script:
+    - deactivate
+    - rm -rf .venv
     # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
+
+  # Check compatibility with Rust 1.36.
+  - name: 1.36-compat
+    rust: 1.36.0
+    script:
+    - cargo check --all --benches --tests --bins --examples --features "long_benchmarks"
 
 notifications:
   webhooks:

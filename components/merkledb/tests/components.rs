@@ -89,8 +89,8 @@ fn embedded_components() {
     // Check that the indexes are laid out as expected.
     assert_eq!(fork.get_entry("count").get(), Some(4_u64));
     assert_eq!(
-        fork.get_proof_map::<_, _, u64>("generic.inner")
-            .get(&"!".to_owned())
+        fork.get_proof_map::<_, String, u64>("generic.inner")
+            .get("!")
             .unwrap(),
         42
     );

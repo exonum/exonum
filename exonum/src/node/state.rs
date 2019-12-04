@@ -92,6 +92,18 @@ pub struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
+
+    // An in-memory set of transaction hashes, rejected by a node
+    // within block.
+    //
+    // Those transactions are stored to be known if some node will propose a block
+    // with one of them, so node could lookup for it.
+    //
+    // This set is cleared every block.
+    //
+    // TODO: This may be a vector for DoS attacks by memory exhaustion. [ECR-2067]
+    invalid_txs: HashSet<Hash>,
+
     keys: Keys,
 }
 
@@ -138,6 +150,8 @@ pub struct ProposeState {
     block_hash: Option<Hash>,
     // Whether the message has been saved to the consensus messages' cache or not.
     is_saved: bool,
+    // Whether the propose contains invalid transactions or not.
+    is_valid: bool,
 }
 
 /// State of a block.
@@ -326,6 +340,11 @@ impl ProposeState {
         !self.unknown_txs.is_empty()
     }
 
+    /// Returns `true` if there are invalid transactions in the propose.
+    pub fn has_invalid_txs(&self) -> bool {
+        !self.is_valid
+    }
+
     /// Indicates whether Propose has been saved to the consensus messages cache
     pub fn is_saved(&self) -> bool {
         self.is_saved
@@ -481,6 +500,8 @@ impl State {
             incomplete_block: None,
 
             tx_cache: BTreeMap::new(),
+
+            invalid_txs: HashSet::default(),
 
             keys,
         }
@@ -812,6 +833,7 @@ impl State {
         }
         self.requests.clear(); // FIXME: Clear all timeouts. (ECR-171)
         self.incomplete_block = None;
+        self.invalid_txs.clear();
     }
 
     /// Returns a list of queued consensus messages.
@@ -837,6 +859,12 @@ impl State {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
+
+            if self.invalid_txs.contains(&tx_hash) {
+                // Mark prevote with newly received invalid transaction as invalid.
+                propose_state.is_valid = false;
+            }
+
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().payload().round()));
             }
@@ -852,8 +880,16 @@ impl State {
     ///
     /// - transaction isn't contained in the unknown transactions list of block
     /// - transaction isn't a part of block
+    ///
+    /// # Panics
+    ///
+    /// Panics if transaction for incomplete block is known as invalid.
     pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
         if let Some(ref mut incomplete_block) = self.incomplete_block {
+            if self.invalid_txs.contains(&tx_hash) {
+                panic!("Received a block with transaction known as invalid");
+            }
+
             incomplete_block.unknown_txs.remove(&tx_hash);
             if incomplete_block.unknown_txs.is_empty() {
                 return Some(incomplete_block.clone());
@@ -904,6 +940,8 @@ impl State {
                 // saving a propose to the cache. Think about making this approach less error-prone.
                 // (ECR-1635)
                 is_saved: true,
+                // We expect ourself not to produce invalid proposes.
+                is_valid: true,
             },
         );
 
@@ -921,6 +959,7 @@ impl State {
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {
+                let mut is_valid = true;
                 let mut unknown_txs = HashSet::new();
                 for hash in &msg.payload().transactions {
                     if self.tx_cache.contains_key(hash) {
@@ -935,6 +974,12 @@ impl State {
                                  committed transaction"
                             )
                         }
+                    } else if self.invalid_txs.contains(hash) {
+                        // If the propose contains an invalid transaction,
+                        // we don't stop processing, since we expect this propose to
+                        // be declined by the consensus rules.
+                        error!("Received propose with transaction known as invalid");
+                        is_valid = false;
                     } else {
                         unknown_txs.insert(*hash);
                     }
@@ -952,6 +997,7 @@ impl State {
                     unknown_txs,
                     block_hash: None,
                     is_saved: false,
+                    is_valid,
                 }))
             }
         }
@@ -984,6 +1030,7 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
+    /// - Block contains a transaction that is incorrect.
     pub fn create_incomplete_block<S: RawAccess>(
         &mut self,
         msg: &Verified<BlockResponse>,
@@ -1001,6 +1048,8 @@ impl State {
                          committed transaction"
                     )
                 }
+            } else if self.invalid_txs.contains(hash) {
+                panic!("Received a block with transaction known as invalid")
             } else {
                 unknown_txs.insert(*hash);
             }
@@ -1223,5 +1272,15 @@ impl State {
     /// Returns mutable reference to the transactions cache.
     pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
         &mut self.tx_cache
+    }
+
+    /// Returns reference to the invalid transactions cache.
+    pub fn invalid_txs(&self) -> &HashSet<Hash> {
+        &self.invalid_txs
+    }
+
+    /// Returns mutable reference to the invalid transactions cache.
+    pub fn invalid_txs_mut(&mut self) -> &mut HashSet<Hash> {
+        &mut self.invalid_txs
     }
 }

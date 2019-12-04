@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::{
-    timestamping::{TimestampingTxGenerator, DATA_SIZE},
+    timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
 
@@ -256,6 +256,11 @@ pub fn try_add_round_with_transactions(
 pub fn gen_timestamping_tx() -> Verified<AnyTx> {
     let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
     tx_gen.next().unwrap()
+}
+
+pub fn gen_unverified_timestamping_tx() -> TimestampTx {
+    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
+    tx_gen.gen_tx_payload()
 }
 
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {

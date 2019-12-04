@@ -190,15 +190,15 @@ pub use self::{
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, Broadcaster, Interface, Service, ServiceDispatcher, ServiceFactory,
-        Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
+        ServiceFactory, Transaction,
     },
 };
 
 pub mod api;
 pub mod error;
 
-use exonum_merkledb::{validation::is_valid_index_name, Snapshot};
+use exonum_merkledb::{validation::is_valid_identifier, Snapshot};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use semver::Version;
 
@@ -210,9 +210,10 @@ use std::{
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{Blockchain, Schema as CoreSchema},
+    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     crypto::Hash,
     helpers::Height,
+    runtime::WellKnownRuntime,
 };
 
 use self::api::ServiceApiBuilder;
@@ -275,8 +276,6 @@ impl AsRef<dyn Service + 'static> for Instance {
 }
 
 impl RustRuntime {
-    /// Rust runtime identifier.
-    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
     /// Rust runtime name.
     pub const NAME: &'static str = "rust";
 
@@ -299,20 +298,13 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
-    /// Adds a new service factory to the runtime.
-    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    /// Adds a new service factory to the runtime and returns
+    /// a modified `RustRuntime` object for further chaining.
+    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
-    }
-
-    /// Adds a new service factory to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
-        self.add_service_factory(service_factory.into());
         self
     }
 
@@ -389,10 +381,8 @@ impl RustRuntime {
     }
 }
 
-impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(r: RustRuntime) -> Self {
-        (RustRuntime::ID as u32, Box::new(r))
-    }
+impl WellKnownRuntime for RustRuntime {
+    const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
 /// The unique identifier of the Rust artifact, containing the name and version of the artifact.
@@ -426,12 +416,21 @@ impl RustArtifactId {
         }
     }
 
+    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    pub fn into_default_instance(
+        self,
+        id: InstanceId,
+        name: impl Into<String>,
+    ) -> InstanceInitParams {
+        InstanceInitParams::new(id, name, self.into(), ())
+    }
+
     /// Checks that the Rust artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();
         ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
         ensure!(
-            is_valid_index_name(name),
+            is_valid_identifier(name),
             "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
         );
         Ok(())
@@ -451,7 +450,7 @@ impl RustArtifactId {
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
         Self {
-            runtime_id: RustRuntime::ID as u32,
+            runtime_id: RustRuntime::ID,
             name: inner.to_string(),
         }
     }

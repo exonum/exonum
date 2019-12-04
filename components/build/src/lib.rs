@@ -12,7 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate simplifies writing build.rs for exonum and exonum services.
+//! This crate simplifies writing build.rs for Exonum and Exonum services.
+//!
+//! Since protobuf is exonum default serialization format, build.rs is mostly used
+//! to compile protobuf files and generate a corresponding code. This code is used later in
+//! the Exonum core and services.
+//!
+//! All you need to do is to call `ProtobufGenerator` with required params, for an example see
+//! [`ProtobufGenerator`] docs.
+//!
+//! There are three predefined sets of protobuf sources available for use.
+//! See [`ProtoSources`].
+//!
+//! - Crypto sources: contains all the necessary crypto types used in services and system proto-files.
+//! These types are `Hash`, `PublicKey` and `Signature`.
+//!
+//! - Exonum sources: contains types used in core and in system services such as supervisor.
+//!
+//! - Common sources: currently contains only `BitVec` type and it is used in the core consensus messages.
+//!
+//! [`ProtobufGenerator`]: struct.ProtobufGenerator.html
+//! [`ProtoSources`]: enum.ProtoSources.html
 
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
@@ -52,15 +72,6 @@ impl<'a> ProtoSources<'a> {
             ProtoSources::Crypto => get_exonum_protobuf_crypto_files_path(),
             ProtoSources::Path(path) => path.to_string(),
         }
-    }
-
-    /// Most frequently used combination of proto dependencies.
-    pub fn frequently_used() -> Vec<Self> {
-        vec![
-            ProtoSources::Exonum,
-            ProtoSources::Crypto,
-            ProtoSources::Common,
-        ]
     }
 }
 
@@ -186,7 +197,6 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 ///
 ///ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
 ///   .with_input_dir("src/proto")
-///   .add_path("src/proto") // Includes usually should contain input_dir.
 ///   .with_crypto()
 ///   .with_common()
 ///   .generate();
@@ -228,21 +238,31 @@ impl<'a> ProtobufGenerator<'a> {
         }
     }
 
-    /// Directory containing input protobuf files.
+    /// A directory containing input protobuf files.
+    /// For single `mod_name` you can provide only one input directory,
+    /// If proto-files in the input directory have dependencies located in another
+    /// directories, you must specify them using `add_path` method.
+    ///
+    /// Predefined dependencies can be specified using corresponding methods
+    /// `with_common`, `with_crypto`, `with_exonum`.
+    ///
+    /// # Panics
+    ///
+    /// If the input directory is already specified.
     pub fn with_input_dir(mut self, path: &'a str) -> Self {
+        assert!(
+            self.input_dir.is_empty(),
+            "Input directory is already specified"
+        );
         self.input_dir = path;
-        self
-    }
-
-    /// Directory containing proto files that will be included.
-    pub fn add_path(mut self, path: &'a str) -> Self {
         self.includes.push(ProtoSources::Path(path));
         self
     }
 
-    /// Convenience method to specify the most frequently used include directories.
-    pub fn with_frequently_used(mut self) -> Self {
-        self.includes.extend(ProtoSources::frequently_used());
+    /// An additional directory containing dependent proto-files, can be used
+    /// multiple times.
+    pub fn add_path(mut self, path: &'a str) -> Self {
+        self.includes.push(ProtoSources::Path(path));
         self
     }
 

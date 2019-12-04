@@ -28,7 +28,6 @@ fn gen_proto_files() {
 
     ProtobufGenerator::with_mod_name("protobuf_mod.rs")
         .with_input_dir("src/proto")
-        .add_path("src/proto")
         .with_crypto()
         .generate();
 }

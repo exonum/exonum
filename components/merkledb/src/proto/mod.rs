@@ -188,7 +188,7 @@ mod tests {
         proof.clear_proof();
         proof.set_entries(RepeatedField::from_vec(vec![entry]));
 
-        let res = MapProof::<PublicKey, u8>::from_pb(proof.clone());
+        let res = MapProof::<PublicKey, u8>::from_pb(proof);
         assert!(res.unwrap_err().to_string().contains("malformed message"));
     }
 
@@ -239,5 +239,53 @@ mod tests {
             checked_proof.index_hash(),
             proof.check().unwrap().index_hash()
         );
+    }
+
+    #[test]
+    fn invalid_list_proof_key() {
+        let mut proof = proto::ListProof::new();
+        let mut key = proto::ProofListKey::new();
+        key.set_index(2_u64.pow(56));
+
+        let mut hashed_entry = proto::HashedEntry::new();
+        hashed_entry.set_key(key.clone());
+
+        proof.set_proof(RepeatedField::from_vec(vec![hashed_entry]));
+
+        let de_proof = ListProof::<u8>::from_pb(proof.clone());
+        assert!(de_proof
+            .unwrap_err()
+            .to_string()
+            .contains("index is out of range"));
+
+        key.set_index(1);
+        key.set_height(59);
+        let mut hashed_entry = proto::HashedEntry::new();
+        hashed_entry.set_key(key);
+
+        proof.set_proof(RepeatedField::from_vec(vec![hashed_entry]));
+
+        let de_proof = ListProof::<u8>::from_pb(proof);
+        assert!(de_proof
+            .unwrap_err()
+            .to_string()
+            .contains("height is out of range"));
+    }
+
+    #[test]
+    fn invalid_list_proof_hashed_entry() {
+        let mut proof = proto::ListProof::new();
+        let mut hashed_entry = proto::HashedEntry::new();
+
+        let mut hash = types::Hash::new();
+        hash.set_data(vec![0_u8; 31]);
+        hashed_entry.set_hash(hash);
+        proof.set_proof(RepeatedField::from_vec(vec![hashed_entry]));
+
+        let de_proof = ListProof::<u8>::from_pb(proof);
+        assert!(de_proof
+            .unwrap_err()
+            .to_string()
+            .contains("Wrong Hash size"));
     }
 }
