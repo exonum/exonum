@@ -1,6 +1,6 @@
 [package]
 name = "exonum-cli"
-version = "0.13.0-rc.1"
+version = "0.13.0-rc.2"
 authors = ["The Exonum Team <contact@exonum.com>"]
 edition = "2018"
 homepage = "https://exonum.com/"
@@ -12,8 +12,8 @@ categories = ["command-line-interface", "configuration"]
 description = "Helper crate for secure and convenient configuration of the Exonum nodes."
 
 [dependencies]
-exonum = { version = "0.13.0-rc.1", path = "../exonum" }
-exonum-supervisor = { version = "0.13.0-rc.1", path = "../services/supervisor" }
+exonum = { version = "0.13.0-rc.2", path = "../exonum" }
+exonum-supervisor = { version = "0.13.0-rc.2", path = "../services/supervisor" }
 structopt = "0.3.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"

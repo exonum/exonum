@@ -18,7 +18,7 @@ RUN curl -sL https://deb.nodesource.com/setup_8.x | bash \
   && apt-get install -y nodejs
 
 WORKDIR /usr/src
-RUN git clone --branch v0.13.0-rc.1 https://github.com/exonum/exonum.git \
+RUN git clone --branch v0.13.0-rc.2 https://github.com/exonum/exonum.git \
   && mv /root/.cargo/bin/* /usr/bin \
   && cd exonum/examples/cryptocurrency-advanced/backend \
   && cargo update && cargo install --path . \

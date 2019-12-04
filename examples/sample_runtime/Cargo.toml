@@ -1,6 +1,6 @@
 [package]
 name = "exonum-sample-runtime"
-version = "0.13.0-rc.1"
+version = "0.13.0-rc.2"
 authors = ["The Exonum Team <contact@exonum.com>"]
 edition = "2018"
 homepage = "https://exonum.com/"
@@ -13,8 +13,8 @@ description = "Minimal Exonum blockchain example implementing a simple runtime."
 [dependencies]
 futures = "0.1.25"
 
-exonum = { version = "0.13.0-rc.1", path = "../../exonum" }
-exonum-derive = { version = "0.13.0-rc.1", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.1", path = "../../components/merkledb" }
-exonum-supervisor = { version = "0.13.0-rc.1", path = "../../services/supervisor" }
+exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
+exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
+exonum-supervisor = { version = "0.13.0-rc.2", path = "../../services/supervisor" }
 protobuf-convert = "0.2.0"

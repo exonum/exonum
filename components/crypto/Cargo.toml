@@ -1,6 +1,6 @@
 [package]
 name = "exonum-crypto"
-version = "0.13.0-rc.1"
+version = "0.13.0-rc.2"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -26,7 +26,7 @@ failure = "0.1.5"
 toml = "0.5.0"
 uuid = "0.8"
 exonum_sodiumoxide = { version = "0.0.23", optional = true}
-exonum-proto = { path = "../proto", version = "0.13.0-rc.1", optional = true}
+exonum-proto = { path = "../proto", version = "0.13.0-rc.2", optional = true}
 protobuf = { version = "2.8.1", features = ["with-serde"] }
 bit-vec = "0.6.1"
 
@@ -40,4 +40,4 @@ with-protobuf = ["exonum-proto"]
 with-serde = []
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.1", path = "../build" }
+exonum-build = { version = "0.13.0-rc.2", path = "../build" }
