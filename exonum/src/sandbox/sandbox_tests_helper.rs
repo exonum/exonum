@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::{
-    timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
 
@@ -258,9 +258,9 @@ pub fn gen_timestamping_tx() -> Verified<AnyTx> {
     tx_gen.next().unwrap()
 }
 
-pub fn gen_unverified_timestamping_tx() -> TimestampTx {
-    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
-    tx_gen.gen_tx_payload()
+pub fn gen_incorrect_tx() -> Verified<AnyTx> {
+    let mut tx_gen = TimestampingTxGenerator::for_incorrect_service(DATA_SIZE);
+    tx_gen.next().unwrap()
 }
 
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {

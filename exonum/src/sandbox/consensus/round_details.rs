@@ -24,16 +24,12 @@ use exonum_merkledb::ObjectHash;
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
 use crate::{
-    crypto::gen_keypair,
     helpers::{Height, Round, ValidatorId},
     messages::{PrevotesRequest, TransactionsRequest, Verified},
     node::state::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
-    runtime::rust::Transaction,
-    sandbox::{
-        self, sandbox_tests_helper::*, timestamping::TimestampingService, timestamping_sandbox,
-    },
+    sandbox::{self, sandbox_tests_helper::*, timestamping_sandbox},
 };
 
 /// check scenario:
@@ -629,10 +625,8 @@ fn handle_precommit_different_block_hash() {
 fn handle_precommit_incorrect_txs() {
     let sandbox = timestamping_sandbox();
 
-    // Create correct tx, and then sign with the wrong destination.
-    let (pk, sk) = gen_keypair();
-    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
-
+    // Create a transaction for a non-existing service.
+    let incorrect_tx = gen_incorrect_tx();
     // Create propose.
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[incorrect_tx.object_hash()])
@@ -1699,10 +1693,8 @@ fn handle_tx_ignore_invalid_tx() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
     assert!(sandbox.is_leader());
 
-    // Create correct tx, and then sign with the wrong destination.
-    let (pk, sk) = gen_keypair();
-    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
-
+    // Create a transaction to the non-existing service.
+    let incorrect_tx = gen_incorrect_tx();
     // And create one correct tx that **should** be accepted.
     let correct_tx = gen_timestamping_tx();
 

@@ -19,11 +19,9 @@ use exonum_merkledb::ObjectHash;
 use std::time::Duration;
 
 use crate::{
-    crypto::gen_keypair,
     helpers::{Height, Round, ValidatorId},
     node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
-    runtime::rust::Transaction,
-    sandbox::{sandbox_tests_helper::*, timestamping::TimestampingService, timestamping_sandbox},
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 
 /// Handle block response:
@@ -224,8 +222,7 @@ fn handle_block_response_with_incorrect_tx() {
     let sandbox = timestamping_sandbox();
 
     // Create correct tx, and then sign with the wrong destination.
-    let (pk, sk) = gen_keypair();
-    let incorrect_tx = gen_unverified_timestamping_tx().sign(TimestampingService::ID + 1, pk, &sk);
+    let incorrect_tx = gen_incorrect_tx();
     let propose = ProposeBuilder::new(&sandbox).build();
     let block = sandbox.create_block(&[incorrect_tx.clone()]);
 
