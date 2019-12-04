@@ -119,11 +119,17 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(TRANSACTIONS)
     }
 
-    /// Returns a table that represents a map with a key-value pair of a transaction
-    /// hash and execution result.
+    /// Returns a record of errors that occurred during execution of a particular block.
     ///
-    /// This method can be used to retrieve a proof that a certain transaction
-    /// result is present in the blockchain.
+    /// This method can be used to retrieve a proof that execution of a certain transaction
+    /// ended up with a particular status. Since the number of transaction in a block is
+    /// mentioned in the block header, a proof of absence of an error for a transaction
+    /// with a particular index means that it was executed successfully.
+    ///
+    /// Similarly, execution errors of the `before_commit` hook can be proven to external clients.
+    /// Discerning successful execution from a non-existing service requires prior knowledge
+    /// though.
+    // TODO: Retain historic information about services [ECR-3922]
     pub fn call_errors(
         &self,
         block_height: Height,
@@ -357,9 +363,23 @@ where
 }
 
 /// Location of an isolated call within a block.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, BinaryValue, ObjectHash,
-)]
+///
+/// Exonum isolates execution of the transactions included into the the block,
+/// and `before_commit` hooks that are executed for each active service after all transactions.
+/// If an isolated call ends with an error, all changes to the blockchain state made within a call
+/// are rolled back.
+///
+/// `CallLocation`s are ordered in the same way the corresponding calls would be performed within
+/// a block:
+///
+/// ```rust
+/// # use exonum::blockchain::CallLocation;
+/// assert!(CallLocation::transaction(0) < CallLocation::transaction(1));
+/// assert!(CallLocation::transaction(1) < CallLocation::before_commit(0));
+/// assert!(CallLocation::before_commit(0) < CallLocation::before_commit(1));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)] // builtin traits
+#[derive(Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CallLocation {
     /// Call of a transaction within the block.

@@ -23,7 +23,7 @@ use serde::{Serialize, Serializer};
 
 use std::{
     cell::{Ref, RefCell},
-    collections::{Bound, HashMap},
+    collections::{BTreeMap, Bound},
     fmt,
     ops::{Index, RangeBounds},
     slice,
@@ -304,7 +304,7 @@ impl BlockWithTransactions {
     }
 
     /// Returns errors converted into a map. Note that this is potentially a costly operation.
-    pub fn error_map(&self) -> HashMap<CallLocation, &ExecutionError> {
+    pub fn error_map(&self) -> BTreeMap<CallLocation, &ExecutionError> {
         self.errors.iter().map(|e| (e.location, &e.error)).collect()
     }
 }

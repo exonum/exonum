@@ -94,9 +94,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// act similarly on different nodes. In other words, the service should only use data available
     /// in the provided `CallContext`.
     ///
-    /// The order of invoking the `before_commit` method is an implementation detail. Effectively,
-    /// this means that services must not rely on a particular ordering of `Service::before_commit`
-    /// invocations.
+    /// Services should not rely on a particular ordering of `Service::before_commit` invocations.
     fn before_commit(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }

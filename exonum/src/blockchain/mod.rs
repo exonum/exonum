@@ -293,10 +293,10 @@ impl BlockchainMut {
         // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
             let errors = self.dispatcher.before_commit(&mut fork);
-            let mut call_results = Schema::new(&fork).call_errors(height);
+            let mut call_errors = Schema::new(&fork).call_errors(height);
             for (service_id, error) in errors {
                 let location = CallLocation::before_commit(service_id);
-                call_results.put(&location, error);
+                call_errors.put(&location, error);
             }
         }
         // Get tx & state hash.

@@ -28,7 +28,7 @@ use exonum::{
 };
 use serde_json::json;
 
-use std::{collections::HashMap, iter};
+use std::{collections::BTreeMap, iter};
 
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
@@ -165,8 +165,8 @@ fn main() {
     }
     // In this block, two errors correspond to 2nd and 3rd transactions. Originally, errors
     // are stored in a `Vec` for serialization reasons, but they can be converted
-    // into a `HashMap` with a builtin method.
-    let errors: HashMap<_, _> = block.error_map();
+    // into a `BTreeMap` with a builtin method.
+    let errors: BTreeMap<_, _> = block.error_map();
     assert_eq!(errors.len(), 2);
     assert_eq!(
         errors[&CallLocation::transaction(1)].description,
