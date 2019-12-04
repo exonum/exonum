@@ -208,6 +208,7 @@ uuids
 validator
 validator's
 validators
+venv
 walkdir
 websockets
 whitelisted
