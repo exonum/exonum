@@ -144,7 +144,7 @@ impl ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Unexpected => f.write_str("panic"),
+            ErrorKind::Unexpected => f.write_str("unexpected"),
             ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
             ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
             ErrorKind::Service { code } => write!(f, "service:{}", code),
@@ -517,13 +517,33 @@ impl ExecutionError {
 }
 
 impl Display for ExecutionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // FIXME: use call info
-        write!(
-            f,
-            "An execution error `{}` occurred with description: {}",
-            self.kind, self.description
-        )
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref call_site) = self.call_site {
+            write!(
+                formatter,
+                "Execution error `{kind}` occurred in {site}",
+                kind = self.kind,
+                site = call_site
+            )?;
+        } else if let Some(runtime_id) = self.runtime_id {
+            write!(
+                formatter,
+                "Execution error `{kind}` occurred in runtime {id}",
+                kind = self.kind,
+                id = runtime_id
+            )?;
+        } else {
+            write!(
+                formatter,
+                "Execution error `{kind}` occurred",
+                kind = self.kind
+            )?;
+        }
+
+        if !self.description.is_empty() {
+            write!(formatter, ": {}", self.description)?;
+        }
+        Ok(())
     }
 }
 
@@ -609,6 +629,16 @@ pub struct CallSite {
     pub call_type: CallType,
 }
 
+impl fmt::Display for CallSite {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{} of service {}",
+            self.call_type, self.instance_id
+        )
+    }
+}
+
 impl ProtobufConvert for CallSite {
     type ProtoStruct = runtime_proto::CallSite;
 
@@ -665,6 +695,21 @@ pub enum CallType {
     },
     /// Hook executing after processing transactions in a block.
     BeforeCommit,
+}
+
+impl fmt::Display for CallType {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CallType::Constructor => formatter.write_str("constructor"),
+            CallType::Method { interface, id } if interface.is_empty() => {
+                write!(formatter, "method {}", id)
+            }
+            CallType::Method { interface, id } => {
+                write!(formatter, "{}::(method {})", interface, id)
+            }
+            CallType::BeforeCommit => formatter.write_str("before_commit hook"),
+        }
+    }
 }
 
 /// Status of a call execution in a way it is stored in the blockchain.
@@ -984,6 +1029,49 @@ mod tests {
             },
         });
         assert_ne!(first_err.object_hash(), second_err.object_hash());
+    }
+
+    #[test]
+    fn execution_error_display() {
+        let mut err = ExecutionError {
+            kind: ErrorKind::Service { code: 3 },
+            description: String::new(),
+            runtime_id: Some(1),
+            call_site: Some(CallSite {
+                instance_id: 100,
+                call_type: CallType::Constructor,
+            }),
+        };
+        let err_string = err.to_string();
+        assert!(err_string.contains("Execution error `service:3`"));
+        assert!(err_string.contains("in constructor of service 100"));
+        assert!(!err_string.ends_with(": ")); // Empty description should not be output
+
+        err.description = "Error description!".to_owned();
+        assert!(err.to_string().ends_with(": Error description!"));
+
+        err.call_site = Some(CallSite {
+            instance_id: 200,
+            call_type: CallType::Method {
+                interface: "exonum.Configure".to_owned(),
+                id: 0,
+            },
+        });
+        assert!(err
+            .to_string()
+            .contains("in exonum.Configure::(method 0) of service 200"));
+
+        err.call_site = Some(CallSite {
+            instance_id: 300,
+            call_type: CallType::Method {
+                interface: String::new(),
+                id: 2,
+            },
+        });
+        assert!(err.to_string().contains("in method 2 of service 300"));
+
+        err.call_site = None;
+        assert!(err.to_string().contains("in runtime 1"));
     }
 
     #[test]
