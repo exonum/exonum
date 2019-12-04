@@ -161,7 +161,7 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    call_context::{CallContext, LocalStub},
+    call_context::CallContext,
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{

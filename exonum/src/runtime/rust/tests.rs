@@ -43,7 +43,7 @@ use crate::{
 
 use super::{
     service::{DefaultInstance, Service, ServiceFactory},
-    ArtifactId, CallContext, LocalStub, RustRuntime,
+    ArtifactId, CallContext, RustRuntime,
 };
 
 const SERVICE_INSTANCE_ID: InstanceId = 2;
@@ -261,11 +261,11 @@ trait TestService {
 pub struct TestServiceImpl;
 
 #[derive(Debug)]
-struct TestServiceClient<'a>(LocalStub<'a>);
+struct TestServiceClient<'a>(CallContext<'a>);
 
-impl<'a> From<LocalStub<'a>> for TestServiceClient<'a> {
-    fn from(stub: LocalStub<'a>) -> Self {
-        Self(stub)
+impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
+    fn from(context: CallContext<'a>) -> Self {
+        Self(context)
     }
 }
 

@@ -33,8 +33,8 @@ use crate::{
     proto::schema::tests::*,
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
-        ErrorKind, ExecutionFail, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
+        ExecutionError, ExecutionFail, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 

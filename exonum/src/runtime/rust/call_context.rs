@@ -47,18 +47,34 @@ impl<'a> CallContext<'a> {
         self.instance
     }
 
+    /// Invokes an arbitrary method in the context.
+    #[doc(hidden)]
+    pub fn call(
+        &mut self,
+        interface_name: impl AsRef<str>,
+        method_id: MethodId,
+        arguments: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        let call_info = CallInfo {
+            instance_id: self.instance.id,
+            method_id,
+        };
+        self.inner
+            .call(interface_name.as_ref(), &call_info, &arguments.into_bytes())
+    }
+
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
     #[doc(hidden)]
-    pub fn local_stub<'s>(
+    pub fn call_context<'s>(
         &'s mut self,
         called_id: impl Into<InstanceQuery<'s>>,
-    ) -> Result<LocalStub<'s>, ExecutionError> {
+    ) -> Result<CallContext<'s>, ExecutionError> {
         let descriptor = self
             .inner
             .dispatcher
             .get_service(self.inner.fork, called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
-        Ok(LocalStub {
+        Ok(CallContext {
             inner: self.inner.child_context(self.instance.id),
             instance: descriptor,
         })
@@ -69,9 +85,9 @@ impl<'a> CallContext<'a> {
     #[doc(hidden)]
     pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
     where
-        T: From<LocalStub<'s>>,
+        T: From<CallContext<'s>>,
     {
-        self.local_stub(called).map(Into::into)
+        self.call_context(called).map(Into::into)
     }
 
     /// Provides writeable access to core schema.
@@ -125,35 +141,5 @@ impl<'a> CallContext<'a> {
         self.inner
             .child_context(self.instance.id)
             .start_adding_service(instance_spec, constructor)
-    }
-}
-
-/// Local client stub for executing calls to the services. One can obtain a stub by calling
-/// the `CallContext::local_stub` method.
-// TODO: refine stubs (ECR-3910)
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct LocalStub<'a> {
-    inner: ExecutionContext<'a>,
-    instance: InstanceDescriptor<'a>,
-}
-
-impl LocalStub<'_> {
-    /// Invokes an arbitrary method in the stub.
-    pub fn call(
-        &mut self,
-        interface_name: impl AsRef<str>,
-        method_id: MethodId,
-        arguments: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        let call_info = CallInfo {
-            instance_id: self.instance.id,
-            method_id,
-        };
-        self.inner.call(
-            interface_name.as_ref(),
-            &call_info,
-            arguments.into_bytes().as_ref(),
-        )
     }
 }

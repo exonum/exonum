@@ -189,7 +189,7 @@ impl AnyCallService {
 
 impl AnyCall for AnyCallService {
     fn call_any(&self, mut context: CallContext<'_>, tx: TxAnyCall) -> Result<(), ExecutionError> {
-        context.local_stub(tx.call_info.instance_id)?.call(
+        context.call_context(tx.call_info.instance_id)?.call(
             tx.interface_name,
             tx.call_info.method_id,
             tx.args,
@@ -205,7 +205,7 @@ impl AnyCall for AnyCallService {
             return Ok(());
         }
 
-        context.local_stub(context.instance().id)?.call(
+        context.call_context(context.instance().id)?.call(
             "",
             1,
             TxRecursiveCall {

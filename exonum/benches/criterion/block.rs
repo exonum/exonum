@@ -393,7 +393,7 @@ mod foreign_interface_call {
         merkledb::ObjectHash,
         messages::Verified,
         runtime::{
-            rust::{CallContext, Interface, LocalStub, Service, Transaction},
+            rust::{CallContext, Interface, Service, Transaction},
             AnyTx, BlockchainData, InstanceId,
         },
     };
@@ -436,7 +436,7 @@ mod foreign_interface_call {
     }
 
     #[derive(Debug)]
-    pub struct ForeignInterfaceClient<'a>(LocalStub<'a>);
+    pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
 
     impl<'a> ForeignInterfaceClient<'a> {
         fn timestamp(&mut self, arg: SelfTx) -> Result<(), ExecutionError> {
@@ -444,8 +444,8 @@ mod foreign_interface_call {
         }
     }
 
-    impl<'a> From<LocalStub<'a>> for ForeignInterfaceClient<'a> {
-        fn from(context: LocalStub<'a>) -> Self {
+    impl<'a> From<CallContext<'a>> for ForeignInterfaceClient<'a> {
+        fn from(context: CallContext<'a>) -> Self {
             Self(context)
         }
     }

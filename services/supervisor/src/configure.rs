@@ -15,7 +15,7 @@
 //! Configuration interface used by the supervisor to change service configuration.
 
 use exonum::runtime::{
-    rust::{CallContext, Interface, LocalStub},
+    rust::{CallContext, Interface},
     DispatcherError, ExecutionError, MethodId,
 };
 use exonum_merkledb::BinaryValue;
@@ -111,10 +111,10 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
 ///
 /// [`Configure`]: trait.Configure.html
 #[derive(Debug)]
-pub struct ConfigureCall<'a>(LocalStub<'a>);
+pub struct ConfigureCall<'a>(CallContext<'a>);
 
-impl<'a> From<LocalStub<'a>> for ConfigureCall<'a> {
-    fn from(context: LocalStub<'a>) -> Self {
+impl<'a> From<CallContext<'a>> for ConfigureCall<'a> {
+    fn from(context: CallContext<'a>) -> Self {
         Self(context)
     }
 }
