@@ -95,14 +95,16 @@ use exonum::{
     node::Node,
     runtime::{rust::ServiceFactory, Runtime},
 };
-use exonum_supervisor::Supervisor;
+use exonum_supervisor::{mode::Mode as SupervisorMode, Supervisor};
 
 use std::sync::Arc;
 
 use crate::command::{Command, ExonumCommand, StandardResult};
+use crate::config_manager::DefaultConfigManager;
 
 pub mod command;
 pub mod config;
+pub mod config_manager;
 pub mod io;
 pub mod password;
 
@@ -126,9 +128,13 @@ impl NodeBuilder {
         self
     }
 
-    fn builtin_services(&self) -> Vec<InstanceCollection> {
+    fn builtin_services(supervisor_mode: SupervisorMode) -> Vec<InstanceCollection> {
         // Supervisor service is enabled by default.
-        vec![Supervisor::builtin_instance(Supervisor::simple_config())]
+        let supervisor_service = match supervisor_mode {
+            SupervisorMode::Simple => Supervisor::simple_config(),
+            SupervisorMode::Decentralized => Supervisor::decentralized_config(),
+        };
+        vec![Supervisor::builtin_instance(supervisor_service)]
     }
 
     /// Adds a new Runtime to the list of available runtimes.
@@ -145,25 +151,28 @@ impl NodeBuilder {
     pub fn run(self) -> Result<(), failure::Error> {
         let command = Command::from_args();
 
-        let services = self
-            .builtin_services()
-            .into_iter()
-            .chain(self.services.into_iter().map(InstanceCollection::new));
-
         let runtimes = self.external_runtimes;
 
         if let StandardResult::Run(run_config) = command.execute()? {
-            let db_options = &run_config.node_config.database;
+            let services = Self::builtin_services(
+                run_config.node_config.public_config.general.supervisor_mode,
+            )
+            .into_iter()
+            .chain(self.services.into_iter().map(InstanceCollection::new));
+
+            let db_options = &run_config.node_config.private_config.database;
             let database: Arc<dyn Database> =
                 Arc::new(RocksDB::open(run_config.db_path, db_options)?);
 
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
+            let config_manager = Box::new(DefaultConfigManager::new(node_config_path));
+
             let node = Node::new(
                 database,
                 runtimes,
                 services,
-                run_config.node_config,
-                Some(node_config_path),
+                run_config.node_config.into(),
+                Some(config_manager),
             );
 
             node.run()

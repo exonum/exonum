@@ -29,9 +29,11 @@ use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
 
 use super::{multisig::MultisigIndex, proto, DeployRequest};
+use failure::{self, format_err};
+use std::str::FromStr;
 
 /// Supervisor operating mode.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -40,6 +42,27 @@ pub enum Mode {
     /// sent to **every** validator before it will be executed.
     /// For configs, a byzantine majority of validators should vote for it.
     Decentralized,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Self::Simple
+    }
+}
+
+impl FromStr for Mode {
+    type Err = failure::Error;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "simple" => Ok(Self::Simple),
+            "decentralized" => Ok(Self::Decentralized),
+            _ => Err(format_err!(
+                "Invalid supervisor mode: {}. Could be 'simple' or 'decentralized'",
+                input
+            )),
+        }
+    }
 }
 
 impl ProtobufConvert for Mode {
@@ -101,5 +124,32 @@ impl Mode {
                 confirmations >= byzantine_quorum(validators)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Mode;
+    use std::str::FromStr;
+
+    #[test]
+    fn simple_mode_from_str() {
+        let input = "simple";
+        let mode = Mode::from_str(input).unwrap();
+        assert_eq!(mode, Mode::Simple);
+    }
+
+    #[test]
+    fn decentralized_mode_from_str() {
+        let input = "decentralized";
+        let mode = Mode::from_str(input).unwrap();
+        assert_eq!(mode, Mode::Decentralized);
+    }
+
+    #[test]
+    fn invalid_mode_from_str() {
+        let input = "invalid_mode";
+        let err = Mode::from_str(input).unwrap_err();
+        assert!(err.to_string().contains("Invalid supervisor mode"));
     }
 }

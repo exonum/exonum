@@ -31,7 +31,7 @@ use std::{
 
 use crate::{
     command::{ExonumCommand, StandardResult},
-    config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig},
+    config::{NodePrivateConfig, NodePublicConfig},
     io::{load_config_file, save_config_file},
     password::{PassInputMethod, Passphrase, PassphraseUsage},
 };
@@ -124,7 +124,7 @@ impl GenerateConfig {
 
 impl ExonumCommand for GenerateConfig {
     fn execute(self) -> Result<StandardResult, Error> {
-        let common_config: CommonConfigTemplate = load_config_file(self.common_config.clone())?;
+        let common_config: NodePublicConfig = load_config_file(&self.common_config)?;
 
         let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
         let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
@@ -145,21 +145,23 @@ impl ExonumCommand for GenerateConfig {
             consensus_key: keys.consensus_pk(),
             service_key: keys.service_pk(),
         };
-        let node_pub_config = NodePublicConfig {
-            address: self.peer_address.to_string(),
-            validator_keys,
-        };
-        let shared_config = SharedConfig {
-            node: node_pub_config,
-            common: common_config,
+        let public_config = NodePublicConfig {
+            validator_keys: Some(validator_keys),
+            ..common_config
         };
         // Save public config separately.
-        save_config_file(&shared_config, &public_config_path)?;
+        save_config_file(&public_config, &public_config_path)?;
 
         let private_config = NodePrivateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
             master_key_path: master_key_path.clone(),
+            api: Default::default(),
+            network: Default::default(),
+            mempool: Default::default(),
+            database: Default::default(),
+            thread_pool_size: Default::default(),
+            connect_list: Default::default(),
             keys,
         };
 

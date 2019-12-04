@@ -12,16 +12,17 @@ categories = ["command-line-interface", "configuration"]
 description = "Helper crate for secure and convenient configuration of the Exonum nodes."
 
 [dependencies]
-exonum = { version = "0.12.0", path = "../exonum" }
-exonum-supervisor = { version = "0.12.0", path = "../services/supervisor" }
-structopt = "0.3.1"
-serde = "1.0.101"
-serde_derive = "1.0.101"
+exonum = { version = "0.12", path = "../exonum" }
+exonum-supervisor = { version = "0.12", path = "../services/supervisor" }
+structopt = "0.3"
+log = "0.4"
+serde = "1.0"
+serde_derive = "1.0"
 failure = "0.1"
 zeroize = "0.9"
 rpassword = "4.0"
 toml = "0.5"
 
 [dev-dependencies]
-pretty_assertions = "0.6.1"
-tempfile = "3.1.0"
+pretty_assertions = "0.6"
+tempfile = "3.1"

@@ -17,17 +17,17 @@
 
 use exonum::{
     blockchain::ConsensusConfig,
-    node::{ConnectInfo, ConnectListConfig, NodeApiConfig, NodeConfig},
+    node::{ConnectInfo, ConnectListConfig, NodeApiConfig},
 };
 use failure::{bail, format_err, Error};
 use serde_derive::{Deserialize, Serialize};
+use structopt::StructOpt;
 
 use std::{collections::BTreeMap, net::SocketAddr, path::PathBuf};
-use structopt::StructOpt;
 
 use crate::{
     command::{ExonumCommand, StandardResult},
-    config::{CommonConfigTemplate, NodePrivateConfig, NodePublicConfig, SharedConfig},
+    config::{NodeConfig, NodePrivateConfig, NodePublicConfig},
     io::{load_config_file, save_config_file},
 };
 
@@ -63,33 +63,36 @@ pub struct Finalize {
 }
 
 struct ValidatedConfigs {
-    common: CommonConfigTemplate,
+    common: NodePublicConfig,
     public_configs: Vec<NodePublicConfig>,
 }
 
 impl Finalize {
-    fn validate_configs(public_configs: Vec<SharedConfig>) -> Result<ValidatedConfigs, Error> {
+    fn validate_configs(public_configs: Vec<NodePublicConfig>) -> Result<ValidatedConfigs, Error> {
         let mut map = BTreeMap::new();
         let mut config_iter = public_configs.into_iter();
         let first = config_iter
             .next()
             .ok_or_else(|| format_err!("Expected at least one config in PUBLIC_CONFIGS"))?;
-        let common = first.common;
-        map.insert(first.node.validator_keys.consensus_key, first.node);
+        map.insert(first.validator_keys.unwrap().consensus_key, first.clone());
 
         for config in config_iter {
-            if common != config.common {
-                bail!("Found config with different common part.");
+            if first.consensus != config.consensus || first.general != config.general {
+                bail!(
+                    "Found config with different common part. {:?} != {:?}",
+                    first,
+                    config
+                );
             };
             if map
-                .insert(config.node.validator_keys.consensus_key, config.node)
+                .insert(config.validator_keys.unwrap().consensus_key, config.clone())
                 .is_some()
             {
                 bail!("Found duplicate consensus keys in PUBLIC_CONFIGS");
             }
         }
         Ok(ValidatedConfigs {
-            common,
+            common: first,
             public_configs: map.values().cloned().collect(),
         })
     }
@@ -101,11 +104,11 @@ impl Finalize {
         let peers = public_configs
             .iter()
             .filter(|config| {
-                config.validator_keys.consensus_key != secret_config.keys.consensus_pk()
+                config.validator_keys.unwrap().consensus_key != secret_config.keys.consensus_pk()
             })
             .map(|config| ConnectInfo {
-                public_key: config.validator_keys.consensus_key,
-                address: config.address.clone(),
+                public_key: config.validator_keys.unwrap().consensus_key,
+                address: secret_config.external_address.clone(),
             })
             .collect();
 
@@ -116,7 +119,7 @@ impl Finalize {
 impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
         let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
-        let public_configs: Vec<SharedConfig> = self
+        let public_configs: Vec<NodePublicConfig> = self
             .public_configs
             .into_iter()
             .map(load_config_file)
@@ -137,33 +140,39 @@ impl ExonumCommand for Finalize {
         }
 
         let consensus = ConsensusConfig {
-            validator_keys: public_configs.iter().map(|c| c.validator_keys).collect(),
-            ..common.consensus.clone()
+            validator_keys: public_configs
+                .iter()
+                .flat_map(|c| c.validator_keys.clone())
+                .collect(),
+            ..common.consensus
         };
 
         let connect_list = Self::create_connect_list_config(&public_configs, &secret_config);
 
-        let config = {
-            NodeConfig {
+        let config = NodeConfig {
+            private_config: NodePrivateConfig {
                 listen_address: secret_config.listen_address,
                 external_address: secret_config.external_address,
-                network: Default::default(),
-                consensus,
+                master_key_path: secret_config.master_key_path,
                 api: NodeApiConfig {
                     public_api_address: self.public_api_address,
                     private_api_address: self.private_api_address,
                     public_allow_origin,
                     private_allow_origin,
-                    ..Default::default()
+                    ..secret_config.api
                 },
-                mempool: Default::default(),
-                services_configs: Default::default(),
-                database: Default::default(),
+                network: secret_config.network,
+                mempool: secret_config.mempool,
+                database: secret_config.database,
+                thread_pool_size: secret_config.thread_pool_size,
                 connect_list,
-                thread_pool_size: Default::default(),
-                master_key_path: secret_config.master_key_path,
                 keys: secret_config.keys,
-            }
+            },
+            public_config: NodePublicConfig {
+                consensus,
+                general: common.general,
+                validator_keys: None,
+            },
         };
 
         save_config_file(&config, &self.output_config_path)?;
