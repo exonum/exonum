@@ -464,6 +464,8 @@ Key points:
 
 - #1568: Make DispatcherSchema merkelized again [ECR-3810]
 
+- #1592: Fix node freeze after re-enabling consensus [ERC-3111]
+
 </details>
 <!-- markdownlint-enable no-inline-html -->
 

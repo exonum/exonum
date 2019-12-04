@@ -46,7 +46,7 @@ impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     pub(crate) fn handle_consensus(&mut self, msg: ConsensusMessage) {
         if !self.is_enabled {
-            info!(
+            trace!(
                 "Ignoring a consensus message {:?} because the node is disabled",
                 msg
             );
@@ -857,6 +857,14 @@ impl NodeHandler {
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
+            if !self.is_enabled {
+                trace!(
+                    "Not sending a request {:?} because the node is paused.",
+                    data
+                );
+                return;
+            }
+
             let message: SignedMessage = match *data {
                 RequestData::Propose(propose_hash) => self
                     .sign_message(ProposeRequest::new(peer, self.state.height(), propose_hash))
@@ -978,6 +986,11 @@ impl NodeHandler {
     /// Requests a block for the next height from all peers with a bigger height. Called when the
     /// node tries to catch up with other nodes' height.
     pub(crate) fn request_next_block(&mut self) {
+        if !self.is_enabled {
+            trace!("Not sending a request for the next block because the node is paused.",);
+            return;
+        }
+
         // TODO: Randomize next peer. (ECR-171)
         let heights: Vec<_> = self
             .state
