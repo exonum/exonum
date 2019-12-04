@@ -78,10 +78,12 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::InstanceCollection,
     crypto::Hash,
     runtime::{
-        rust::{api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service},
+        rust::{
+            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance,
+            Service,
+        },
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -356,15 +358,7 @@ where
     }
 }
 
-impl<Mode> From<Supervisor<Mode>> for InstanceCollection
-where
-    Mode: mode::SupervisorMode,
-{
-    fn from(service: Supervisor<Mode>) -> Self {
-        InstanceCollection::new(service).with_instance(
-            SUPERVISOR_INSTANCE_ID,
-            Supervisor::<Mode>::NAME,
-            Vec::default(),
-        )
-    }
+impl<Mode: mode::SupervisorMode> DefaultInstance for Supervisor<Mode> {
+    const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
+    const INSTANCE_NAME: &'static str = Self::NAME;
 }
