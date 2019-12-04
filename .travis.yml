@@ -162,13 +162,13 @@ jobs:
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
     script:
     - python3 -m exonum_tests -v
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency && cargo build --example demo
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    - cd $TRAVIS_BUILD_DIR
     after_script:
     - deactivate
     - rm -rf .venv
-    # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
-    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
 
   # Check compatibility with Rust 1.36.
   - name: 1.36-compat
