@@ -26,6 +26,7 @@ use crate::{
 };
 
 #[test]
+#[ignore = "TODO: Refine consensus enable/disable logic [ECR-3927]"]
 fn test_disable_and_enable() {
     let mut sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();

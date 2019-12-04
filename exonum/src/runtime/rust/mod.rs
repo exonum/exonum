@@ -621,6 +621,10 @@ impl Runtime for RustRuntime {
 #[test]
 fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service:1.0.0").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-alpha").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-alpha.1").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-rc").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-rc.1").unwrap();
 }
 
 #[test]
