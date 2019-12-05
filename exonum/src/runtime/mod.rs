@@ -138,7 +138,7 @@ pub use self::{
     dispatcher::{
         ActiveServices, Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema,
     },
-    error::{ErrorKind, ExecutionError},
+    error::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
         InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
@@ -234,9 +234,9 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Handling Panics
 ///
-/// Unless specified in the method docs, a panic in the `Runtime` methods will **not** be caught
+/// A panic in the `Runtime` methods will **not** be caught
 /// and will cause node termination. You may use [`catch_panic`](error/fn.catch_panic.html) method
-/// to catch panics according to panic policy.
+/// to catch panics in the Rust code and convert them to unchecked execution errors.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
@@ -305,7 +305,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The `Runtime` should catch all panics except for `FatalError`s and convert
     /// them into an `ExecutionError`.
     ///
-    /// Returning an error or panicking provides a way for the `Runtime` to signal that
+    /// Returning an error provides a way for the `Runtime` to signal that
     /// service instantiation has failed. As a rule of a thumb, changes made by the method
     /// will be rolled back after such a signal (the exact logic is determined by the supervisor).
     /// Because an error is one of expected / handled outcomes, verifying prerequisites
@@ -382,9 +382,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - If service does not implement an interface, return `NoSuchInterface` error.
     /// - If the interface does not have a method, return `NoSuchMethod` error.
     ///
-    /// An error or panic returned from this method will lead to the rollback of all changes
-    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
-    /// into errors.
+    /// An error returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`.
     fn execute(
         &self,
         context: ExecutionContext<'_>,
@@ -423,8 +422,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// # Return value
     ///
     /// An error or panic returned from this method will lead to the rollback of all changes
-    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
-    /// into errors.
+    /// in the fork enclosed in the `context`.
     fn after_transactions(
         &self,
         context: ExecutionContext<'_>,
@@ -614,21 +612,28 @@ impl<'a> ExecutionContext<'a> {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        if self.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
-            let kind = DispatcherError::StackOverflow;
-            let msg = format!(
-                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
-                ExecutionContext::MAX_CALL_STACK_DEPTH
-            );
-            return Err((kind, msg).into());
+        if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
+            let err = DispatcherError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            return Err(err);
         }
 
-        let runtime = self
+        let (runtime_id, runtime) = self
             .dispatcher
             .runtime_for_service(call_info.instance_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
         let reborrowed = self.reborrow_with_interface(interface_name);
-        runtime.execute(reborrowed, call_info, arguments)
+        runtime
+            .execute(reborrowed, call_info, arguments)
+            .map_err(|mut err| {
+                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                    instance_id: call_info.instance_id,
+                    call_type: CallType::Method {
+                        interface: interface_name.to_owned(),
+                        id: call_info.method_id,
+                    },
+                });
+                err
+            })
     }
 
     /// Starts adding a new service instance to the blockchain. The created service is not active
@@ -647,7 +652,16 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
-        runtime.start_adding_service(self.reborrow(), &spec, constructor.into_bytes())?;
+        runtime
+            .start_adding_service(self.reborrow(), &spec, constructor.into_bytes())
+            .map_err(|mut err| {
+                err.set_runtime_id(spec.artifact.runtime_id)
+                    .set_call_site(|| CallSite {
+                        instance_id: spec.id,
+                        call_type: CallType::Constructor,
+                    });
+                err
+            })?;
 
         // Add service instance to the dispatcher schema.
         DispatcherSchema::new(&*self.fork)

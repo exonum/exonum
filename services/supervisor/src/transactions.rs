@@ -14,7 +14,7 @@
 
 use exonum::{
     helpers::{Height, ValidateInput},
-    runtime::{rust::CallContext, DispatcherError, ExecutionError, InstanceSpec},
+    runtime::{rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -60,7 +60,8 @@ pub trait SupervisorInterface {
     /// The configuration application rules depend on the `Supervisor` mode, e.g. confirmations
     /// are not required for the `Simple` mode, and for `Decentralized` mode (2/3+1) confirmations
     /// are required.
-    /// Note: only one proposal at time is possible.
+    ///
+    /// **Note:** only one proposal at time is possible.
     fn propose_config_change(
         &self,
         context: CallContext<'_>,
@@ -80,34 +81,13 @@ pub trait SupervisorInterface {
     ) -> Result<(), ExecutionError>;
 }
 
-impl ValidateInput for DeployRequest {
-    type Error = ExecutionError;
-
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.artifact
-            .validate()
-            .map_err(|e| (Error::InvalidArtifactId, e).into())
-    }
-}
-
-impl ValidateInput for DeployConfirmation {
-    type Error = ExecutionError;
-
-    fn validate(&self) -> Result<(), Self::Error> {
-        self.artifact
-            .validate()
-            .map_err(|e| (Error::InvalidArtifactId, e).into())
-    }
-}
-
 impl StartService {
     fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
             .validate()
-            .map_err(|e| (Error::InvalidArtifactId, e))?;
+            .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
         InstanceSpec::is_valid_name(&self.name)
-            .map_err(|e| (Error::InvalidInstanceName, e))
-            .map_err(ExecutionError::from)?;
+            .map_err(|e| Error::InvalidInstanceName.with_description(e))?;
 
         let dispatcher_data = context.data().for_dispatcher();
 
@@ -147,9 +127,9 @@ where
         mut context: CallContext<'_>,
         mut propose: ConfigPropose,
     ) -> Result<(), ExecutionError> {
-        let (_, author) = context
+        let author = context
             .caller()
-            .as_transaction()
+            .author()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         // Verifies that transaction author is validator.
@@ -227,7 +207,7 @@ where
         let entry = schema
             .pending_proposal
             .get()
-            .ok_or_else(|| Error::ConfigProposeNotRegistered)?;
+            .ok_or(Error::ConfigProposeNotRegistered)?;
 
         // Verifies that this config proposal is registered.
         if entry.propose_hash != vote.propose_hash {
@@ -261,7 +241,11 @@ where
         context: CallContext<'_>,
         deploy: DeployRequest,
     ) -> Result<(), ExecutionError> {
-        deploy.validate()?;
+        deploy
+            .artifact
+            .validate()
+            .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
+
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         // Verifies that we doesn't reach deadline height.
@@ -314,11 +298,18 @@ where
         context: CallContext<'_>,
         confirmation: DeployConfirmation,
     ) -> Result<(), ExecutionError> {
-        confirmation.validate()?;
+        confirmation
+            .artifact
+            .validate()
+            .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
+
         let core_schema = context.data().for_core();
 
         // Verifies that transaction author is validator.
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        let author = context
+            .caller()
+            .author()
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
@@ -384,7 +375,7 @@ where
                     consensus_propose_added = true;
                     config
                         .validate()
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                        .map_err(|e| Error::MalformedConfigPropose.with_description(e))?;
                 }
 
                 ConfigChange::Service(config) => {
@@ -395,8 +386,7 @@ where
 
                     context
                         .interface::<ConfigureCall<'_>>(config.instance_id)?
-                        .verify_config(config.params.clone())
-                        .map_err(|e| (Error::MalformedConfigPropose, e))?;
+                        .verify_config(config.params.clone())?;
                 }
 
                 ConfigChange::StartService(start_service) => {
@@ -406,7 +396,6 @@ where
                         );
                         return Err(Error::MalformedConfigPropose.into());
                     }
-
                     start_service.validate(&context)?;
                 }
             }

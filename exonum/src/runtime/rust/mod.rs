@@ -40,22 +40,12 @@
 //!         BlockchainData, ExecutionError,
 //!     },
 //! };
-//! use exonum_derive::{
-//!     exonum_interface, BinaryValue, IntoExecutionError,
-//!     ObjectHash, ServiceDispatcher, ServiceFactory
-//! };
+//! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_crypto::Hash;
 //!
 //! // Determine the types of data that will be used in service transactions.
-//!
-//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-//! #[protobuf_convert(source = "doc_tests::Point")]
-//! pub struct Point {
-//!     pub x: i32,
-//!     pub y: i32,
-//! }
 //!
 //! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 //! #[protobuf_convert(source = "doc_tests::CreateWallet")]
@@ -65,9 +55,9 @@
 //!
 //! // You may create service-specific error types.
 //!
-//! #[derive(Debug, IntoExecutionError)]
+//! #[derive(Debug, ExecutionFail)]
 //! pub enum Error {
-//!     PointAlreadyExists = 0,
+//!     /// Wallet with the specified owner key already exists.
 //!     WalletAlreadyExists = 1,
 //! }
 //!
@@ -83,13 +73,7 @@
 //!         &self,
 //!         context: CallContext<'_>,
 //!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
-//!     // Also you can use any type which implements `Into<ExecutionError>` for the error.
-//!     fn add_point(
-//!         &self,
-//!         context: CallContext<'_>,
-//!         arg: Point,
-//!     ) -> Result<(), Error>;
+//!     ) -> Result<(), ExecutionError>;
 //! }
 //!
 //! // In order a service could process transactions, you have to implement the
@@ -115,20 +99,11 @@
 //!         // Some business logic...
 //!         Ok(())
 //!     }
-//!
-//!     fn add_point(
-//!         &self,
-//!         _context: CallContext<'_>,
-//!         _arg: Point
-//!     ) -> Result<(), Error> {
-//!         // Some business logic...
-//!         Ok(())
-//!     }
 //! }
 //!
 //! impl Service for PointService {
 //!     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//!         Vec::new()
+//!         vec![]
 //!     }
 //! }
 //! ```
@@ -176,11 +151,11 @@
 //!
 //! # impl Transactions for StatefulService {}
 //! #
-//! #  impl Service for StatefulService {
-//! #      fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//! #          Vec::new()
-//! #      }
-//! #  }
+//! # impl Service for StatefulService {
+//! #     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
+//! #         vec![]
+//! #     }
+//! # }
 //! ```
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
@@ -219,7 +194,7 @@ use crate::{
 use self::api::ServiceApiBuilder;
 use super::{
     dispatcher::{self, Mailbox},
-    error::{catch_panic, ExecutionError},
+    error::{catch_panic, ExecutionError, ExecutionFail},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
 };
@@ -443,7 +418,7 @@ impl RustArtifactId {
         artifact
             .name
             .parse()
-            .map_err(|inner| (Error::IncorrectArtifactId, inner).into())
+            .map_err(|inner| Error::IncorrectArtifactId.with_description(inner))
     }
 }
 
@@ -551,12 +526,15 @@ impl Runtime for RustRuntime {
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
         let descriptor = instance.descriptor();
-        instance.as_ref().call(
-            context.interface_name,
-            call_info.method_id,
-            CallContext::new(context, descriptor),
-            payload,
-        )
+        let id = call_info.method_id;
+        catch_panic(|| {
+            instance.as_ref().call(
+                context.interface_name,
+                id,
+                CallContext::new(context, descriptor),
+                payload,
+            )
+        })
     }
 
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
@@ -581,18 +559,11 @@ impl Runtime for RustRuntime {
             .expect("`before_transactions` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
-        let result = catch_panic(|| {
+        catch_panic(|| {
             let context = CallContext::new(context, descriptor);
             instance.as_ref().before_transactions(context);
             Ok(())
-        });
-        if let Err(ref e) = result {
-            error!(
-                "Service \"{}\" `before_transactions` failed with error: {:?}",
-                instance.name, e
-            );
-        }
-        result
+        })
     }
 
     fn after_transactions(
@@ -606,18 +577,11 @@ impl Runtime for RustRuntime {
             .expect("`after_transactions` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
-        let result = catch_panic(|| {
+        catch_panic(|| {
             let context = CallContext::new(context, descriptor);
             instance.as_ref().after_transactions(context);
             Ok(())
-        });
-        if let Err(ref e) = result {
-            error!(
-                "Service \"{}\" `after_transactions` failed with error: {:?}",
-                instance.name, e
-            );
-        }
-        result
+        })
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {

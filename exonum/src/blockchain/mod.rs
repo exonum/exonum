@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, TemporaryDB,
 };
-use failure::{format_err, Error};
+use failure::Error;
 use futures::Future;
 
 use std::{
@@ -50,7 +50,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
+    runtime::{ArtifactSpec, Dispatcher},
 };
 
 mod block;
@@ -263,7 +263,7 @@ impl BlockchainMut {
             .notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
         self.merge(fork.into_patch())?;
 
-        info!(
+        log::info!(
             "GENESIS_BLOCK ====== hash={}",
             self.inner.last_hash().to_hex()
         );
@@ -274,7 +274,7 @@ impl BlockchainMut {
     /// Then collects the resulting changes from the current storage state and returns them
     /// with the hash of the resulting block.
     pub fn create_patch(
-        &mut self,
+        &self,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
@@ -290,10 +290,7 @@ impl BlockchainMut {
 
         // Save & execute transactions.
         for (index, hash) in tx_hashes.iter().enumerate() {
-            self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
-                // Execution could fail if the transaction
-                // cannot be deserialized or it isn't in the pool.
-                .expect("Transaction execution error");
+            self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
         // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
@@ -301,7 +298,7 @@ impl BlockchainMut {
         }
 
         let block = self.create_block_header(proposer_id, height, tx_hashes);
-        trace!("execute block = {:?}", block);
+        log::trace!("execute block = {:?}", block);
 
         // Calculate block hash.
         let block_hash = block.object_hash();
@@ -314,7 +311,7 @@ impl BlockchainMut {
     }
 
     fn create_block_header(
-        &mut self,
+        &self,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
@@ -357,7 +354,7 @@ impl BlockchainMut {
             last_hash,
             tx_hash,
             state_hash,
-            entries,
+            entries
         )
     }
 
@@ -368,29 +365,13 @@ impl BlockchainMut {
         index: usize,
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), Error> {
+    ) {
         let schema = Schema::new(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
-            .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
+            .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
-        let tx_result = catch_panic(|| self.dispatcher.execute(fork, tx_hash, &transaction));
-        match &tx_result {
-            Ok(_) => {
-                fork.flush();
-            }
-            Err(e) => {
-                if e.kind == ExecutionErrorKind::Panic {
-                    error!("{:?} transaction execution panicked: {:?}", transaction, e);
-                } else {
-                    // Unlike panic, transaction failure is a regular case. So logging the
-                    // whole transaction body is an overkill: the body can be relatively big.
-                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                }
-                fork.rollback();
-            }
-        }
-
+        let tx_result = self.dispatcher.execute(fork, tx_hash, &transaction);
         let mut schema = Schema::new(&*fork);
         schema
             .transaction_results()
@@ -400,7 +381,6 @@ impl BlockchainMut {
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
-        Ok(())
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),

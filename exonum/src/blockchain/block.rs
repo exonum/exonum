@@ -229,13 +229,13 @@ mod tests {
     #[test]
     fn block_object_hash() {
         let block_without_entries = create_block(vec![]);
-        let hash = block_without_entries.object_hash();
+        let hash_without_entries = block_without_entries.object_hash();
 
         let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
 
         let block_with_entries = create_block(vec![entry]);
-        let hash_with_entries = block_without_entries.object_hash();
+        let hash_with_entries = block_with_entries.object_hash();
 
-        assert_ne!(hash, hash_with_entries);
+        assert_ne!(hash_without_entries, hash_with_entries);
     }
 }
