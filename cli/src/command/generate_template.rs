@@ -44,7 +44,7 @@ pub struct GenerateTemplate {
 
 impl ExonumCommand for GenerateTemplate {
     fn execute(self) -> Result<StandardResult, Error> {
-        let supervisor_mode = self.supervisor_mode.unwrap_or(SupervisorMode::Simple);
+        let supervisor_mode = self.supervisor_mode.unwrap_or_default();
         let config = NodePublicConfig {
             consensus: Default::default(),
             general: GeneralConfig {
