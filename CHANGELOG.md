@@ -5,6 +5,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking changes
+
+#### exonum
+
+- `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
+### New features
+
+#### exonum
+
+- `before_transactions` hook for services was introduced. (#1577)
+
 ## 0.13.0-rc.2 - 2019-12-04
 
 ### Breaking changes
