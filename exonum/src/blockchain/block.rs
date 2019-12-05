@@ -58,10 +58,11 @@ pub struct Block {
     /// Hash of the blockchain state after applying transactions in the block.
     pub state_hash: Hash,
 
+    /// TODO: add doc
     pub entries: Vec<BlockHeaderEntry>,
 }
 
-/// TODO: contains all the random stuff
+/// TODO: add doc
 #[derive(
     Clone,
     PartialEq,
@@ -77,20 +78,21 @@ pub struct Block {
 )]
 #[protobuf_convert(source = "proto::BlockHeaderEntry")]
 pub struct BlockHeaderEntry {
+    /// TODO: add doc
     pub key: String,
+    /// TODO: add doc
     pub value: Vec<u8>,
 }
 
+/// TODO: add doc
 impl BlockHeaderEntry {
-    pub fn from<T>(key: String, value: T)  -> Self
-        where T: BinaryValue
+    /// TODO: add doc
+    pub fn from<T>(key: String, value: T) -> Self
+    where
+        T: BinaryValue,
     {
         let value = value.to_bytes();
-
-        Self {
-            key,
-            value,
-        }
+        Self { key, value }
     }
 }
 
@@ -140,10 +142,6 @@ impl Block {
     pub fn state_hash(&self) -> &Hash {
         &self.state_hash
     }
-
-    pub fn add_entry(&mut self, entry: BlockHeaderEntry) {
-        self.entries.push(entry);
-    }
 }
 
 /// Block with its `Precommit` messages.
@@ -165,9 +163,12 @@ pub struct BlockProof {
 mod tests {
     use super::*;
     use crate::crypto::hash;
+    use crate::merkledb::ObjectHash;
 
     #[test]
-    fn test_block() {
+    fn block() {
+        let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
+
         let proposer_id = ValidatorId(1024);
         let txs = [4, 5, 6];
         let height = Height(123_345);
@@ -175,8 +176,6 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-
-        let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
 
         let block = Block::new(
             proposer_id,
@@ -195,8 +194,48 @@ mod tests {
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
         assert_eq!(block.entries, vec![entry]);
+
+        // json roundtrip
         let json_str = ::serde_json::to_string(&block).unwrap();
         let block1: Block = ::serde_json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);
+
+        // protobuf roundtrip
+        let pb = block.to_pb();
+        let de_block: Block = ProtobufConvert::from_pb(pb).unwrap();
+        assert_eq!(block, de_block);
+    }
+
+    fn create_block(entries: Vec<BlockHeaderEntry>) -> Block {
+        let proposer_id = ValidatorId(1024);
+        let txs = [4, 5, 6];
+        let height = Height(123_345);
+        let prev_hash = hash(&[1, 2, 3]);
+        let tx_hash = hash(&txs);
+        let tx_count = txs.len() as u32;
+        let state_hash = hash(&[7, 8, 9]);
+
+        Block::new(
+            proposer_id,
+            height,
+            tx_count,
+            prev_hash,
+            tx_hash,
+            state_hash,
+            entries,
+        )
+    }
+
+    #[test]
+    fn block_object_hash() {
+        let block_without_entries = create_block(vec![]);
+        let hash = block_without_entries.object_hash();
+
+        let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
+
+        let block_with_entries = create_block(vec![entry]);
+        let hash_with_entries = block_without_entries.object_hash();
+
+        assert_ne!(hash, hash_with_entries);
     }
 }

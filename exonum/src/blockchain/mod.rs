@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockProof},
+    block::{Block, BlockHeaderEntry, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},
@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, TemporaryDB,
 };
-use failure::{format_err, Error, };
+use failure::{format_err, Error};
 use futures::Future;
 
 use std::{
@@ -52,8 +52,6 @@ use crate::{
     node::ApiSender,
     runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
 };
-use crate::blockchain::block::BlockHeaderEntry;
-use crate::runtime::ActiveServices;
 
 mod block;
 mod builder;
@@ -276,7 +274,7 @@ impl BlockchainMut {
     /// Then collects the resulting changes from the current storage state and returns them
     /// with the hash of the resulting block.
     pub fn create_patch(
-        &self,
+        &mut self,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
@@ -284,8 +282,6 @@ impl BlockchainMut {
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
-        // Get last hash.
-        let last_hash = self.inner.last_hash();
 
         // Skip execution for genesis block.
         if height > Height(0) {
@@ -303,7 +299,31 @@ impl BlockchainMut {
         if height > Height(0) {
             self.dispatcher.after_transactions(&mut fork);
         }
-        // Get tx & state hash.
+
+        let block = self.create_block_header(proposer_id, height, tx_hashes);
+        trace!("execute block = {:?}", block);
+
+        // Calculate block hash.
+        let block_hash = block.object_hash();
+        // Update height.
+        let schema = Schema::new(&fork);
+        schema.block_hashes_by_height().push(block_hash);
+        // Save block.
+        schema.blocks().put(&block_hash, block);
+        (block_hash, fork.into_patch())
+    }
+
+    fn create_block_header(
+        &mut self,
+        proposer_id: ValidatorId,
+        height: Height,
+        tx_hashes: &[Hash],
+    ) -> Block {
+        let fork = self.fork();
+
+        // Get last hash.
+        let last_hash = self.inner.last_hash();
+
         let schema = Schema::new(&fork);
         let state_hash = {
             let mut sum_table = schema.state_hash_aggregator();
@@ -327,37 +347,18 @@ impl BlockchainMut {
         };
         let tx_hash = schema.block_transactions(height).object_hash();
 
-        let services = self.dispatcher.get_active_services();
-
-        info!("active services {:?}", services);
-
-        let services = ActiveServices {
-            services,
-        };
-
         // Add list of started services to block header.
-        let block_header_entry = BlockHeaderEntry::from("active_services".to_owned(), services);
+        let entries = self.dispatcher.get_block_header_entries();
 
-        // Create block header.
-        let block = Block::new(
+        Block::new(
             proposer_id,
             height,
             tx_hashes.len() as u32,
             last_hash,
             tx_hash,
             state_hash,
-            vec![block_header_entry],
-        );
-        trace!("execute block = {:?}", block);
-
-        // Calculate block hash.
-        let block_hash = block.object_hash();
-        // Update height.
-        let schema = Schema::new(&fork);
-        schema.block_hashes_by_height().push(block_hash);
-        // Save block.
-        schema.blocks().put(&block_hash, block);
-        (block_hash, fork.into_patch())
+            entries,
+        )
     }
 
     fn execute_transaction(

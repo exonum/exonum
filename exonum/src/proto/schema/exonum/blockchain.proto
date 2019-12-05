@@ -36,8 +36,9 @@ message BlockHeaderEntry {
 }
 
 message ServiceInfo {
-  uint32 runtime_id = 1;
-  string name = 2;
+  uint32 instance_id = 1;
+  uint32 runtime_id = 2;
+  string name = 3;
 }
 
 message ActiveServices {

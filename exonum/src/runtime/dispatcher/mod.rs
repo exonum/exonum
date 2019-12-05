@@ -25,11 +25,11 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    proto,
-    blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
+    blockchain::{BlockHeaderEntry, Blockchain, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
+    proto,
     runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
@@ -43,17 +43,21 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
+/// TODO: add doc
 #[derive(Debug, Clone, ProtobufConvert)]
 #[protobuf_convert(source = "proto::ServiceInfo")]
 pub struct ServiceInfo {
+    instance_id: InstanceId,
     runtime_id: u32,
-    pub name: String,
+    name: String,
 }
 
+/// TODO: add doc
 #[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "proto::ActiveServices")]
 pub struct ActiveServices {
-    pub services: Vec<ServiceInfo>
+    /// TODO: add doc
+    pub services: Vec<ServiceInfo>,
 }
 
 /// A collection of `Runtime`s capable of modifying the blockchain state.
@@ -354,8 +358,18 @@ impl Dispatcher {
         Some(runtime)
     }
 
-    pub(crate) fn get_active_services<'s>(&'s self) -> Vec<ServiceInfo> {
-        self.service_infos.values().cloned().collect()
+    fn get_active_services<'s>(&'s self) -> ActiveServices {
+        ActiveServices {
+            services: self.service_infos.values().cloned().collect(),
+        }
+    }
+
+    /// TODO: add doc
+    pub fn get_block_header_entries(&self) -> Vec<BlockHeaderEntry> {
+        // Active services
+        let entry =
+            BlockHeaderEntry::from("active_services".to_owned(), self.get_active_services());
+        vec![entry]
     }
 
     /// Returns the service matching the specified query.
@@ -402,6 +416,7 @@ impl Dispatcher {
         self.service_infos.insert(
             instance.id,
             ServiceInfo {
+                instance_id: instance.id,
                 runtime_id: instance.artifact.runtime_id,
                 name: instance.name.to_owned(),
             },
