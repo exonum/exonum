@@ -5,6 +5,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking changes
+
+#### exonum-supervisor
+
+- `Supervisor` structure isn't generic anymore. (#1587)
+
+### New features
+
+#### exonum-supervisor
+
+- `Supervisor` service now can has initial configuration and implements
+  `Configure` interface. (#1587)
+
 ## 0.13.0-rc.2 - 2019-12-04
 
 ### Breaking changes
