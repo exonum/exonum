@@ -218,9 +218,33 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Executes transaction with the specified ID without the fork isolation.
-    ///
-    /// The caller must catch the panics and rollback the changes if panic was happened.
+    fn report_error(
+        err: &ExecutionError,
+        fork: &Fork,
+        instance_id: InstanceId,
+        call_type: &CallType, // FIXME: Use `CallLocation` here once #1576 is landed
+    ) {
+        let height = CoreSchema::new(fork).height().next();
+        if err.kind() == ErrorKind::Unexpected {
+            log::error!(
+                "{} for service {} at {:?} resulted in unexpected error: {:?}",
+                call_type,
+                instance_id,
+                height,
+                err
+            );
+        } else {
+            log::info!(
+                "{} for service {} at {:?} failed: {:?}",
+                call_type,
+                instance_id,
+                height,
+                err
+            );
+        }
+    }
+
+    /// Executes transaction with the specified ID with fork isolation.
     pub(crate) fn execute(
         &self,
         fork: &mut Fork,
@@ -236,20 +260,28 @@ impl Dispatcher {
             .runtime_for_service(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
-        runtime
-            .execute(context, call_info, &tx.as_ref().arguments)
-            .map_err(|err| {
-                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                    instance_id: call_info.instance_id,
-                    call_type: CallType::Method {
-                        interface: String::new(),
-                        id: call_info.method_id,
-                    },
-                })
-            })
+
+        let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);
+        if let Err(ref mut err) = res {
+            fork.rollback();
+
+            let call_type = CallType::Method {
+                interface: String::new(),
+                id: call_info.method_id,
+            };
+            err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                instance_id: call_info.instance_id,
+                call_type: call_type.clone(),
+            });
+            Self::report_error(err, fork, call_info.instance_id, &call_type);
+        } else {
+            fork.flush();
+        }
+        res
     }
 
     /// Calls service hooks of the specified type for all active services.
+    // FIXME: Use `CallLocation` instead of `CallType` once #1576 is landed
     fn call_service_hooks(&self, fork: &mut Fork, call_type: CallType) {
         for (&instance_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
@@ -259,38 +291,19 @@ impl Dispatcher {
                 _ => unreachable!(),
             };
 
-            let res = call_fn(
+            let mut res = call_fn(
                 self.runtimes[&info.runtime_id].as_ref(),
                 context,
                 instance_id,
             );
-            if let Err(err) = res {
+            if let Err(ref mut err) = res {
                 fork.rollback();
-                let err = err
-                    .set_runtime_id(info.runtime_id)
+                err.set_runtime_id(info.runtime_id)
                     .set_call_site(|| CallSite {
                         instance_id,
                         call_type: call_type.clone(),
                     });
-
-                let height = CoreSchema::new(&*fork).height().next();
-                if err.kind() == ErrorKind::Unexpected {
-                    log::error!(
-                        "{} for service {} at {:?} resulted in unchecked error: {:?}",
-                        call_type,
-                        instance_id,
-                        height,
-                        err
-                    );
-                } else {
-                    log::info!(
-                        "{} for service {} at {:?} failed: {:?}",
-                        call_type,
-                        instance_id,
-                        height,
-                        err
-                    );
-                }
+                Self::report_error(err, fork, instance_id, &call_type);
             } else {
                 fork.flush();
             }

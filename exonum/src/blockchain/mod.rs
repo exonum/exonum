@@ -357,29 +357,6 @@ impl BlockchainMut {
         fork.flush();
 
         let tx_result = self.dispatcher.execute(fork, tx_hash, &transaction);
-        if let Err(ref err) = tx_result {
-            if err.kind() == ExecutionErrorKind::Unexpected {
-                log::error!(
-                    "{:?} transaction at {:?} resulted in unchecked error: {:?}",
-                    transaction,
-                    height,
-                    err
-                );
-            } else {
-                // Checked transaction errors are a regular occurrence. So logging the
-                // whole transaction body is an overkill: the body can be relatively big.
-                log::info!(
-                    "{:?} transaction execution at {:?} failed: {:?}",
-                    tx_hash,
-                    height,
-                    err
-                );
-            }
-            fork.rollback();
-        } else {
-            fork.flush();
-        }
-
         let mut schema = Schema::new(&*fork);
         schema
             .transaction_results()

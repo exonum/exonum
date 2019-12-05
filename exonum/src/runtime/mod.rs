@@ -622,14 +622,15 @@ impl<'a> ExecutionContext<'a> {
         let reborrowed = self.reborrow_with_interface(interface_name);
         runtime
             .execute(reborrowed, call_info, arguments)
-            .map_err(|err| {
+            .map_err(|mut err| {
                 err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
                     instance_id: call_info.instance_id,
                     call_type: CallType::Method {
                         interface: interface_name.to_owned(),
                         id: call_info.method_id,
                     },
-                })
+                });
+                err
             })
     }
 
@@ -651,12 +652,13 @@ impl<'a> ExecutionContext<'a> {
             .ok_or(DispatcherError::IncorrectRuntime)?;
         runtime
             .start_adding_service(self.reborrow(), &spec, constructor.into_bytes())
-            .map_err(|err| {
+            .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite {
                         instance_id: spec.id,
                         call_type: CallType::Constructor,
-                    })
+                    });
+                err
             })?;
 
         // Add service instance to the dispatcher schema.
