@@ -156,7 +156,7 @@ impl Display for ErrorKind {
     }
 }
 
-/// Trait representing an error type defined in the service code.
+/// Trait representing an error type defined in the service or runtime code.
 ///
 /// This trait can be derived from an enum using an eponymous derive macro from the `exonum-derive`
 /// crate. Using such errors is the preferred way to generate errors in Rust services.
