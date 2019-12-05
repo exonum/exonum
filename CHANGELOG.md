@@ -23,7 +23,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-supervisor
 
-- `Supervisor` service now can has initial configuration and implements
+- `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
 
 ## 0.13.0-rc.2 - 2019-12-04
