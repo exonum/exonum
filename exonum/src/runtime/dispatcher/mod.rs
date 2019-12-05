@@ -26,9 +26,8 @@ use crate::{
     blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
-    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus},
+    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
 use super::{
@@ -58,10 +57,13 @@ impl Dispatcher {
     /// Creates a new dispatcher with the specified runtimes.
     pub(crate) fn new(
         blockchain: &Blockchain,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = RuntimeInstance>,
     ) -> Self {
         let mut this = Self {
-            runtimes: runtimes.into_iter().collect(),
+            runtimes: runtimes
+                .into_iter()
+                .map(|runtime| (runtime.id, runtime.instance))
+                .collect(),
             service_infos: BTreeMap::new(),
         };
         for runtime in this.runtimes.values_mut() {
@@ -113,16 +115,8 @@ impl Dispatcher {
         &mut self,
         fork: &mut Fork,
         spec: InstanceSpec,
-        artifact_payload: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        // Register service artifact in the runtime.
-        // TODO Write test for such situations [ECR-3222]
-        if !self.is_artifact_deployed(&spec.artifact) {
-            Self::commit_artifact(fork, spec.artifact.clone(), artifact_payload.to_bytes())?;
-            // Wait until the artifact is ready to instantiate the service instances.
-            self.block_until_deployed(spec.artifact.clone(), artifact_payload.into_bytes());
-        }
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;
@@ -245,16 +239,31 @@ impl Dispatcher {
         runtime.execute(context, call_info, &tx.as_ref().arguments)
     }
 
-    /// Calls `before_commit` for all currently active services, isolating each call.
+    /// Calls `before_transactions` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
     /// indices of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
-    pub(crate) fn before_commit(&self, fork: &mut Fork) {
+    pub(crate) fn before_transactions(&self, fork: &mut Fork) {
         for (&service_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
             if self.runtimes[&info.runtime_id]
-                .before_commit(context, service_id)
+                .before_transactions(context, service_id)
+                .is_ok()
+            {
+                fork.flush();
+            } else {
+                fork.rollback();
+            }
+        }
+    }
+
+    /// Calls `after_transactions` for all currently active services, isolating each call.
+    pub(crate) fn after_transactions(&self, fork: &mut Fork) {
+        for (&service_id, info) in &self.service_infos {
+            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
+            if self.runtimes[&info.runtime_id]
+                .after_transactions(context, service_id)
                 .is_ok()
             {
                 fork.flush();

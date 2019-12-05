@@ -15,13 +15,13 @@
 //! Simplified node emulation for testing websockets.
 
 use exonum::{
-    blockchain::InstanceCollection,
+    blockchain::config::GenesisConfigBuilder,
     crypto::{Hash, PublicKey},
     helpers,
     node::{ApiSender, Node},
     runtime::{
-        rust::{CallContext, Service},
-        BlockchainData, InstanceId, Runtime,
+        rust::{CallContext, Service, ServiceFactory},
+        BlockchainData, InstanceId, RuntimeInstance,
     },
 };
 use exonum_merkledb::{Snapshot, TemporaryDB};
@@ -116,15 +116,21 @@ pub fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let external_runtimes: Vec<(u32, Box<dyn Runtime>)> = vec![];
-    let services =
-        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
+    let external_runtimes: Vec<RuntimeInstance> = vec![];
+    let service = MyService;
+    let artifact = service.artifact_id();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
+        .build();
+    let services = vec![service.into()];
 
     let node = Node::new(
         TemporaryDB::new(),
         external_runtimes,
         services,
         node_cfg,
+        genesis_config,
         None,
     );
 

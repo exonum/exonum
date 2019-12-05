@@ -261,9 +261,19 @@ impl Service for Supervisor {
 
     fn before_transactions(&self, context: CallContext<'_>) {
         // Perform a cleanup for outdated requests.
+
         let mut schema = Schema::new(context.service_data());
+<<<<<<< HEAD
+        let configuration = schema
+            .configuration
+            .get()
+            .expect("Supervisor entity was not configured; unable to load configuration");
         let core_schema = context.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();
+=======
+        let height = context.data().for_core().height();
+>>>>>>> master
 
         // Remove pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema
@@ -289,10 +299,6 @@ impl Service for Supervisor {
 
     fn after_transactions(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
-        let configuration = schema
-            .configuration
-            .get()
-            .expect("Supervisor entity was not configured; unable to load configuration");
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();

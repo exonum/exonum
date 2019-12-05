@@ -17,8 +17,8 @@
 //! and API endpoints associated with configuration.
 
 use exonum::{
-    blockchain::InstanceCollection,
-    runtime::{SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    blockchain::config::InstanceInitParams,
+    runtime::{rust::ServiceFactory, InstanceSpec, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::BinaryValue;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
@@ -47,7 +47,9 @@ fn assert_supervisor_config(testkit: &TestKit, config: SupervisorConfig) {
 fn initial_configuration() {
     // Check for simple mode.
     let testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
         .create();
     assert_supervisor_config(
         &testkit,
@@ -58,7 +60,9 @@ fn initial_configuration() {
 
     // Check for decentralized mode.
     let testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor::builtin_instance(
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(
             Supervisor::decentralized_config(),
         ))
         .create();
@@ -75,12 +79,20 @@ fn initial_configuration() {
 #[should_panic(expected = "Unable to parse initialization parameters")]
 fn incorrect_configuration() {
     let incorrect_config = vec![0x12, 0x34]; // Obviously incorrect config.
+    let instance_spec = InstanceSpec {
+        id: SUPERVISOR_INSTANCE_ID,
+        name: Supervisor::NAME.into(),
+        artifact: Supervisor.artifact_id().into(),
+    };
+    let incorrect_instance = InstanceInitParams {
+        instance_spec,
+        constructor: incorrect_config,
+    };
+
     let _testkit = TestKitBuilder::validator()
-        .with_rust_service(InstanceCollection::new(Supervisor).with_instance(
-            SUPERVISOR_INSTANCE_ID,
-            Supervisor::NAME,
-            incorrect_config,
-        ))
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(incorrect_instance)
         .create();
 
     // By this moment, genesis block should be created and node is expected to panic.
@@ -90,7 +102,9 @@ fn incorrect_configuration() {
 #[test]
 fn configure_call() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
         .create();
 
     // Change config to decentralized.
@@ -123,7 +137,9 @@ fn configure_call() {
 #[test]
 fn supervisor_config_api() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
         .create();
     assert_eq!(
         testkit
@@ -138,7 +154,9 @@ fn supervisor_config_api() {
 
     // Check for decentralized mode.
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor::builtin_instance(
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(
             Supervisor::decentralized_config(),
         ))
         .create();

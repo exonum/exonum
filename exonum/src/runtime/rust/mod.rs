@@ -190,8 +190,8 @@ pub use self::{
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, Broadcaster, Interface, Service, ServiceDispatcher, ServiceFactory,
-        Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
+        ServiceFactory, Transaction,
     },
 };
 
@@ -210,9 +210,10 @@ use std::{
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{Blockchain, Schema as CoreSchema},
+    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     crypto::Hash,
     helpers::Height,
+    runtime::WellKnownRuntime,
 };
 
 use self::api::ServiceApiBuilder;
@@ -275,8 +276,6 @@ impl AsRef<dyn Service + 'static> for Instance {
 }
 
 impl RustRuntime {
-    /// Rust runtime identifier.
-    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
     /// Rust runtime name.
     pub const NAME: &'static str = "rust";
 
@@ -299,20 +298,13 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
-    /// Adds a new service factory to the runtime.
-    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    /// Adds a new service factory to the runtime and returns
+    /// a modified `RustRuntime` object for further chaining.
+    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
-    }
-
-    /// Adds a new service factory to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
-        self.add_service_factory(service_factory.into());
         self
     }
 
@@ -389,10 +381,8 @@ impl RustRuntime {
     }
 }
 
-impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(r: RustRuntime) -> Self {
-        (RustRuntime::ID as u32, Box::new(r))
-    }
+impl WellKnownRuntime for RustRuntime {
+    const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
 /// The unique identifier of the Rust artifact, containing the name and version of the artifact.
@@ -426,6 +416,15 @@ impl RustArtifactId {
         }
     }
 
+    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    pub fn into_default_instance(
+        self,
+        id: InstanceId,
+        name: impl Into<String>,
+    ) -> InstanceInitParams {
+        InstanceInitParams::new(id, name, self.into(), ())
+    }
+
     /// Checks that the Rust artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();
@@ -451,7 +450,7 @@ impl RustArtifactId {
 impl From<RustArtifactId> for ArtifactId {
     fn from(inner: RustArtifactId) -> Self {
         Self {
-            runtime_id: RustRuntime::ID as u32,
+            runtime_id: RustRuntime::ID,
             name: inner.to_string(),
         }
     }
@@ -571,7 +570,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(
+    fn before_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -579,17 +578,42 @@ impl Runtime for RustRuntime {
         let instance = self
             .started_services
             .get(&instance_id)
-            .expect("`before_commit` called with non-existing `instance_id`");
+            .expect("`before_transactions` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
         let result = catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_commit(context);
+            instance.as_ref().before_transactions(context);
             Ok(())
         });
         if let Err(ref e) = result {
             error!(
-                "Service \"{}\" `before_commit` failed with error: {:?}",
+                "Service \"{}\" `before_transactions` failed with error: {:?}",
+                instance.name, e
+            );
+        }
+        result
+    }
+
+    fn after_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        let instance = self
+            .started_services
+            .get(&instance_id)
+            .expect("`after_transactions` called with non-existing `instance_id`");
+
+        let descriptor = instance.descriptor();
+        let result = catch_panic(|| {
+            let context = CallContext::new(context, descriptor);
+            instance.as_ref().after_transactions(context);
+            Ok(())
+        });
+        if let Err(ref e) = result {
+            error!(
+                "Service \"{}\" `after_transactions` failed with error: {:?}",
                 instance.name, e
             );
         }
@@ -623,6 +647,10 @@ impl Runtime for RustRuntime {
 #[test]
 fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service:1.0.0").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-alpha").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-alpha.1").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-rc").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-rc.1").unwrap();
 }
 
 #[test]

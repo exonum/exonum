@@ -22,22 +22,21 @@ use exonum::{
     merkledb::{access::Access, ObjectHash, ProofMapIndex, Snapshot},
     messages::Verified,
     runtime::{
-        rust::{CallContext, Service, Transaction},
+        rust::{CallContext, Service, ServiceFactory, Transaction},
         AnyTx, BlockchainData, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use exonum_testkit::{InstanceCollection, TestKitBuilder};
+use exonum_testkit::TestKitBuilder;
 use serde_derive::*;
-
-use std::sync::Arc;
 
 use exonum_time::{
     schema::TimeSchema,
     time_provider::{MockTimeProvider, TimeProvider},
     TimeServiceFactory,
 };
+use std::sync::Arc;
 
 mod proto;
 
@@ -132,18 +131,21 @@ impl TxMarker {
 fn main() {
     let mock_provider = Arc::new(MockTimeProvider::default());
     // Create testkit for network with one validator.
+    let time_service =
+        TimeServiceFactory::with_provider(mock_provider.clone() as Arc<dyn TimeProvider>);
+    let time_service_artifact = time_service.artifact_id();
+    let marker_service = MarkerService;
+    let marker_service_artifact = marker_service.artifact_id();
+
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(
-            InstanceCollection::new(TimeServiceFactory::with_provider(
-                mock_provider.clone() as Arc<dyn TimeProvider>
-            ))
-            .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ()),
+        .with_artifact(time_service_artifact.clone())
+        .with_instance(
+            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
         )
-        .with_rust_service(InstanceCollection::new(MarkerService).with_instance(
-            SERVICE_ID,
-            SERVICE_NAME,
-            (),
-        ))
+        .with_rust_service(time_service)
+        .with_artifact(marker_service_artifact.clone())
+        .with_instance(marker_service_artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
+        .with_rust_service(marker_service)
         .create();
 
     mock_provider.set_time(Utc.timestamp(10, 0));

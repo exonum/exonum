@@ -206,7 +206,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// GENESIS ::= (deploy_artifact | start_adding_service commit_service)* after_commit
 /// RESUME ::= (deploy_artifact | commit_service)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= (execute | start_adding_service)* before_commit*
+/// PROPOSAL ::= before_transactions* (execute | start_adding_service)* after_transactions*
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
@@ -218,8 +218,9 @@ impl From<RuntimeIdentifier> for u32 {
 /// The following methods should return the same result given the same arguments for all nodes
 /// in the blockchain network:
 ///
+/// - `before_transactions`
 /// - `execute`
-/// - `before_commit`
+/// - `after_transactions`
 /// - `start_adding_service`
 /// - `state_hashes`
 ///
@@ -285,8 +286,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
-    /// The dispatcher does not route transactions and `before_commit` events to the service
-    /// until after `commit_service()` is called with the same instance spec.
+    /// The dispatcher does not route transactions and `before_transactions` / `after_transactions`
+    /// events to the service until after `commit_service()` is called with the same instance spec.
     ///
     /// The runtime should discard the instantiated service instance after completing this method,
     /// unless there are compelling reasons to retain it (e.g., creating an instance takes very
@@ -392,10 +393,28 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Gets the state hashes of the every available service in the runtime.
     fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
 
+    /// Notifies a service stored in this runtime about the beginning of the block, allowing it
+    /// to modify the blockchain state before any transaction in the block will be processed.
+    ///
+    /// `before_transactions` is called for every service active at the beginning of the block
+    /// (i.e., services that will be instantiated within the block do **not** receive a call)
+    /// exactly once for each block. The method is not called for the genesis block.
+    ///
+    /// # Return value
+    ///
+    /// An error or panic returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
+    /// into errors.
+    fn before_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError>;
+
     /// Notifies a service stored in this runtime about the end of the block, allowing it
     /// to modify the blockchain state after all transactions in the block are processed.
     ///
-    /// `before_commit` is called for every service active at the beginning of the block
+    /// `after_transactions` is called for every service active at the beginning of the block
     /// (i.e., services instantiated within the block do **not** receive a call) exactly
     /// once for each block.
     ///
@@ -404,7 +423,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// An error or panic returned from this method will lead to the rollback of all changes
     /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
     /// into errors.
-    fn before_commit(
+    fn after_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -442,6 +461,31 @@ impl<T: Runtime> From<T> for Box<dyn Runtime> {
     }
 }
 
+/// Specifies system identifier for a [`Runtime`].
+pub trait WellKnownRuntime: Runtime {
+    /// Identifier of this runtime.
+    const ID: u32;
+}
+
+// TODO: Rethink visibility [ECR-3913]
+#[derive(Debug)]
+/// Instance of [`Runtime`] with corresponding ID.
+pub struct RuntimeInstance {
+    /// Identifier of this runtime.
+    pub id: u32,
+    /// Instance of [`Runtime`].
+    pub instance: Box<dyn Runtime>,
+}
+
+impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
+    fn from(runtime: T) -> Self {
+        RuntimeInstance {
+            id: T::ID,
+            instance: runtime.into(),
+        }
+    }
+}
+
 /// An accessory structure that aggregates root object hashes of the service
 /// information schemas of the runtime with the root hash of the runtime information schema itself.
 #[derive(Debug, PartialEq, Default)]
@@ -471,8 +515,8 @@ pub enum Caller {
 
     /// Call is invoked by one of the blockchain lifecycle events.
     ///
-    /// This kind of authorization is used for `before_commit` calls to the service instances,
-    /// and for initialization of builtin services.
+    /// This kind of authorization is used for `before_transactions` / `after_transactions`
+    /// calls to the service instances, and for initialization of builtin services.
     Blockchain,
 }
 
@@ -586,7 +630,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Starts adding a new service instance to the blockchain. The created service is not active
-    /// (i.e., does not process transactions or the `before_commit` hook)
+    /// (i.e., does not process transactions or the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     ///
     /// This method should be called for the exact context passed to the runtime.
