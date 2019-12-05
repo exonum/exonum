@@ -236,6 +236,8 @@ impl BlockchainMut {
             self.dispatcher.deploy_artifact(artifact, payload).wait()?
         }
         // Add service instances.
+        // Note that `before_transactions` will not be invoked for services, since
+        // they are added within block (and don't appear from nowhere).
         for inst in genesis_config.builtin_instances {
             self.dispatcher
                 .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
@@ -244,7 +246,7 @@ impl BlockchainMut {
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
         // TODO Unify block creation logic [ECR-3879]
-        self.dispatcher.before_commit(&mut fork);
+        self.dispatcher.after_transactions(&mut fork);
         self.dispatcher.commit_block(&mut fork);
         self.merge(fork.into_patch())?;
 
@@ -282,13 +284,19 @@ impl BlockchainMut {
         let mut fork = self.fork();
         // Get last hash.
         let last_hash = self.inner.last_hash();
+
+        // Skip execution for genesis block.
+        if height > Height(0) {
+            self.dispatcher.before_transactions(&mut fork);
+        }
+
         // Save & execute transactions.
         for (index, hash) in tx_hashes.iter().enumerate() {
             self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
         // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
-            self.dispatcher.before_commit(&mut fork);
+            self.dispatcher.after_transactions(&mut fork);
         }
         // Get tx & state hash.
         let schema = Schema::new(&fork);

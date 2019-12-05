@@ -7,8 +7,10 @@ use crate::runtime::{
     InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
 };
 
-/// Context for the executed call. The call can mean a transaction call, a `before_commit` hook,
-/// or a service constructor.
+/// Context for the executed call.
+///
+/// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
+/// or the service constructor invocation.
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.

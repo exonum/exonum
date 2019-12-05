@@ -249,15 +249,28 @@ impl Dispatcher {
             })
     }
 
-    /// Calls `before_commit` for all currently active services, isolating each call.
+    /// Calls `before_transactions` for all currently active services, isolating each call.
+    pub(crate) fn before_transactions(&self, fork: &mut Fork) {
+        for (&instance_id, info) in &self.service_infos {
+            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
+            let res = self.runtimes[&info.runtime_id].before_transactions(context, instance_id);
+            if res.is_err() {
+                fork.rollback();
+            } else {
+                fork.flush();
+            }
+        }
+    }
+
+    /// Calls `after_transactions` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
     /// indices of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
-    pub(crate) fn before_commit(&self, fork: &mut Fork) {
+    pub(crate) fn after_transactions(&self, fork: &mut Fork) {
         for (&instance_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            let res = self.runtimes[&info.runtime_id].before_commit(context, instance_id);
+            let res = self.runtimes[&info.runtime_id].after_transactions(context, instance_id);
             if let Err(err) = res {
                 let err = err
                     .set_runtime_id(info.runtime_id)
@@ -270,14 +283,14 @@ impl Dispatcher {
 
                 if err.kind() == ErrorKind::Unexpected {
                     log::error!(
-                        "`before_commit` for service {} at {:?} resulted in unchecked error: {:?}",
+                        "`after_transactions` hook for service {} at {:?} resulted in unchecked error: {:?}",
                         instance_id,
                         height,
                         err
                     );
                 } else {
                     log::info!(
-                        "`before_commit` for service {} at {:?} failed: {:?}",
+                        "`after_transactions` hook for service {} at {:?} failed: {:?}",
                         instance_id,
                         height,
                         err

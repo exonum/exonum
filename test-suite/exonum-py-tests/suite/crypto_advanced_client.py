@@ -9,11 +9,11 @@ class ExonumCryptoAdvancedClient:
 
     def __init__(self, client: ExonumClient):
         self.client = client
-        cryptocurrency_service_name = 'exonum-cryptocurrency-advanced:0.12.0'
+        cryptocurrency_service_name = 'exonum-cryptocurrency-advanced:0.13.0-rc.2'
         self.loader = client.protobuf_loader()
         self.loader.initialize()
         self.loader.load_main_proto_files()
-        self.loader.load_service_proto_files(runtime_id=0, service_name='exonum-supervisor:0.12.0')
+        self.loader.load_service_proto_files(runtime_id=0, service_name='exonum-supervisor:0.13.0-rc.2')
         self.loader.load_service_proto_files(runtime_id=0, service_name=cryptocurrency_service_name)
 
         self.cryptocurrency_module = ModuleManager.import_service_module(cryptocurrency_service_name, 'service')

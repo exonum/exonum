@@ -548,7 +548,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(
+    fn before_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -556,12 +556,30 @@ impl Runtime for RustRuntime {
         let instance = self
             .started_services
             .get(&instance_id)
-            .expect("`before_commit` called with non-existing `instance_id`");
+            .expect("`before_transactions` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
         catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_commit(context);
+            instance.as_ref().before_transactions(context);
+            Ok(())
+        })
+    }
+
+    fn after_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        let instance = self
+            .started_services
+            .get(&instance_id)
+            .expect("`after_transactions` called with non-existing `instance_id`");
+
+        let descriptor = instance.descriptor();
+        catch_panic(|| {
+            let context = CallContext::new(context, descriptor);
+            instance.as_ref().after_transactions(context);
             Ok(())
         })
     }
@@ -593,6 +611,10 @@ impl Runtime for RustRuntime {
 #[test]
 fn parse_rust_artifact_id_correct() {
     RustArtifactId::from_str("my-service:1.0.0").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-alpha").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-alpha.1").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-rc").unwrap();
+    RustArtifactId::from_str("my-service:1.0.0-rc.1").unwrap();
 }
 
 #[test]

@@ -102,14 +102,18 @@ fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
 enum RuntimeEvent {
     Initialize,
     Resume,
+    BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
     StartAdding(InstanceSpec, Vec<u8>),
     CommitService(Option<Height>, InstanceSpec),
-    BeforeCommit(Height, InstanceId),
+    AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
     Shutdown,
 }
 
+/// Test runtime wrapper logging all the events (as `RuntimeEvent`) happening within it.
+/// Other than logging, it just redirects all the calls to the inner runtime.
+/// Used to test that workflow invariants are respected.
 #[derive(Debug, Clone)]
 struct Inspected<T> {
     inner: T,
@@ -194,7 +198,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.inner.state_hashes(snapshot)
     }
 
-    fn before_commit(
+    fn before_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: u32,
@@ -203,8 +207,21 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.events
             .lock()
             .unwrap()
-            .push(RuntimeEvent::BeforeCommit(height, instance_id));
-        self.inner.before_commit(context, instance_id)
+            .push(RuntimeEvent::BeforeTransactions(height, instance_id));
+        self.inner.after_transactions(context, instance_id)
+    }
+
+    fn after_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: u32,
+    ) -> Result<(), ExecutionError> {
+        let height = CoreSchema::new(&*context.fork).height();
+        self.events
+            .lock()
+            .unwrap()
+            .push(RuntimeEvent::AfterTransactions(height, instance_id));
+        self.inner.after_transactions(context, instance_id)
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
@@ -394,8 +411,8 @@ fn basic_rust_runtime() {
     }
     commit_block(&mut blockchain, fork);
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
-    // The service is not active at the beginning of the block, so `before_commit`
-    // should not be called for it.
+    // The service is not active at the beginning of the block, so `after_transactions`
+    // and `before_transactions` should not be called for it.
     assert_eq!(
         events,
         vec![
@@ -434,7 +451,8 @@ fn basic_rust_runtime() {
     assert_eq!(
         events,
         vec![
-            RuntimeEvent::BeforeCommit(Height(2), SERVICE_INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(2), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(2), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
@@ -465,7 +483,8 @@ fn basic_rust_runtime() {
     assert_eq!(
         events,
         vec![
-            RuntimeEvent::BeforeCommit(Height(3), SERVICE_INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(3), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(3), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(4)),
         ]
     );
@@ -515,7 +534,8 @@ fn rust_runtime_with_builtin_services() {
     assert_eq!(
         events,
         vec![
-            RuntimeEvent::BeforeCommit(Height(0), SERVICE_INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(0), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(0), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(1)),
         ]
     );
@@ -548,7 +568,8 @@ fn rust_runtime_with_builtin_services() {
     assert_eq!(
         events,
         vec![
-            RuntimeEvent::BeforeCommit(Height(1), SERVICE_INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(1), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(1), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(2)),
         ]
     );

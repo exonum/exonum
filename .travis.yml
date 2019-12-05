@@ -146,24 +146,29 @@ jobs:
   # Integration tests.
   - name: integration-tests
     install:
-    - python3 -m venv env
-    - source env/bin/activate
+    - python3 -m venv .venv
+    - source .venv/bin/activate
     - pip3 install pip --upgrade
-    - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests
-    - pip3 uninstall -y protobuf
-    - pip3 install --no-binary=protobuf protobuf
+    # Clone exonum-launcher to get a current master instead of release version.
+    - git clone https://github.com/exonum/exonum-launcher.git .venv/exonum-launcher
+    # Install dependencies from github-provided exonum-launcher (so we can get latest changes without release).
+    - pip3 install -r .venv/exonum-launcher/requirements.txt
+    # Install exonum-launcher itself from the cloned repo as well.
+    - pip3 install -e .venv/exonum-launcher
+    # Install integration tests.
+    - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests --no-binary=protobuf protobuf
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
     script:
     - python3 -m exonum_tests -v
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency && cargo build --example demo
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    - cd $TRAVIS_BUILD_DIR
     after_script:
     - deactivate
-    - rm -rf env
-    # TODO Add stage for integration tests instead of this ad-hoc implementation. [ECR-3308]
-    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-    # - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    # - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
+    - rm -rf .venv
 
   # Check compatibility with Rust 1.36.
   - name: 1.36-compat
