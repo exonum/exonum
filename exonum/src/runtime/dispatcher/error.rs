@@ -53,11 +53,13 @@ pub enum Error {
 }
 
 impl Error {
-    /// Creates a `MalformedArguments` error with the user-provided details.
-    pub fn malformed_arguments(details: impl Display) -> ExecutionError {
+    /// Creates a `MalformedArguments` error with the user-provided error cause.
+    /// The cause does not need to include the error location; this information is added
+    /// by the framework automatically.
+    pub fn malformed_arguments(cause: impl Display) -> ExecutionError {
         let description = format!(
             "Malformed arguments for calling a service interface method: {}",
-            details
+            cause
         );
         Error::MalformedArguments.with_description(description)
     }
