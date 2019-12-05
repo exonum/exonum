@@ -21,7 +21,7 @@
 extern crate proc_macro;
 
 mod db_traits;
-mod execution_error;
+mod execution_fail;
 mod exonum_interface;
 mod service_dispatcher;
 mod service_factory;
@@ -209,7 +209,9 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
 }
 
-/// Implements `From<MyError> for ExecutionError` conversion for the given enum.
+/// Implements `ExecutionFail` trait for the given enum. Additionally,
+/// `From<MyEnum> for ExecutionError` conversion is implemented, allowing to use errors
+/// in the service code.
 ///
 /// Enumeration should have an explicit discriminant for each error kind.
 /// Derives `Display` and `Fail` traits using documentation comments for each error kind.
@@ -218,16 +220,22 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ## Optional
 ///
-/// * `#[execution_error(crate = "path")]`
+/// ```text
+/// #[execution_fail(crate = "path")]
+/// ```
 ///
-/// Prefix of the `exonum` crate has two main values - "crate" or "exonum". The default value is "exonum".
+/// Prefix of the `exonum` crate has two main values - `crate` or `exonum`. The default value
+/// is `exonum`.
 ///
-/// * `#[execution_error(kind = "runtime")]`
+/// ```text
+/// #[execution_fail(kind = "runtime")]
+/// ```
 ///
-/// Error kind has the following values - `service`, `runtime`. The default value is `service`.
-#[proc_macro_derive(IntoExecutionError, attributes(execution_error))]
-pub fn into_execution_error(input: TokenStream) -> TokenStream {
-    execution_error::impl_execution_error(input)
+/// Error kind with the following possible values: `service`, `runtime`. The default value is
+/// `service`.
+#[proc_macro_derive(ExecutionFail, attributes(execution_fail))]
+pub fn execution_fail(input: TokenStream) -> TokenStream {
+    execution_fail::impl_execution_fail(input)
 }
 
 pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMeta> {

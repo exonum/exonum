@@ -25,17 +25,16 @@ use std::{collections::BTreeMap, panic, sync::Mutex};
 use crate::{
     blockchain::{
         config::{GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, Schema,
+        Blockchain, BlockchainMut, ExecutionStatus, Schema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
     proto::schema::tests::*,
     runtime::{
-        error::ErrorKind,
         rust::{CallContext, RustRuntime, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
-        InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
+        ExecutionError, ExecutionFail, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -96,10 +95,7 @@ impl Service for TestDispatcherService {
             if v.value == 42 {
                 panic!("42!");
             } else {
-                return Err(ExecutionError::new(
-                    ExecutionErrorKind::service(0),
-                    "value is not a great answer",
-                ));
+                return Err(ExecutionError::service(0, "Not a great answer"));
             }
         }
         Ok(())
@@ -507,10 +503,16 @@ fn service_execute_panic_storage_error() {
 #[test]
 fn error_discards_transaction_changes() {
     let statuses = [
-        Err(ExecutionError::new(ErrorKind::service(0), "")),
-        Err(ExecutionError::new(ErrorKind::dispatcher(5), "Foo")),
-        Err(ExecutionError::new(ErrorKind::runtime(0), "Strange bar")),
-        Err(ExecutionError::new(ErrorKind::Panic, "PANIC")),
+        Err(ExecutionError::new(ErrorKind::Service { code: 0 }, "")),
+        Err(ExecutionError::new(
+            ErrorKind::Dispatcher { code: 5 },
+            "Foo",
+        )),
+        Err(ExecutionError::new(
+            ErrorKind::Runtime { code: 0 },
+            "Strange bar",
+        )),
+        Err(ExecutionError::new(ErrorKind::Unexpected, "PANIC")),
         Ok(()),
     ];
 
@@ -616,15 +618,18 @@ fn test_dispatcher_already_deployed() {
         .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap_err();
-    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.into());
+    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.to_match());
     // Tests that we cannot register artifact twice.
     let result = execute_transaction(
         &mut blockchain,
         TestDeploy { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     );
     assert_eq!(
-        result.0,
-        Err(DispatcherError::ArtifactAlreadyDeployed.into())
+        result.0.unwrap_err(),
+        DispatcherError::ArtifactAlreadyDeployed
+            .to_match()
+            .in_runtime(0)
+            .for_service(TEST_SERVICE_ID)
     );
 }
 
@@ -754,13 +759,11 @@ fn test_check_tx() {
     );
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
-
-    assert_eq!(blockchain.check_tx(&correct_tx), Ok(()));
+    blockchain.check_tx(&correct_tx).unwrap();
 
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
-
     assert_eq!(
-        blockchain.check_tx(&incorrect_tx),
-        Err(DispatcherError::IncorrectInstanceId.into())
+        blockchain.check_tx(&incorrect_tx).unwrap_err(),
+        DispatcherError::IncorrectInstanceId.to_match()
     );
 }

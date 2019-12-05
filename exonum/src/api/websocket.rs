@@ -84,7 +84,7 @@ impl TransactionFilter {
 }
 
 /// Summary about a particular transaction in the blockchain (without transaction content).
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransactionSummary {
     /// Transaction identifier.
     pub tx_hash: Hash,

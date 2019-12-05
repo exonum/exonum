@@ -16,7 +16,7 @@ use exonum::{
     crypto,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError},
+    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError, ExecutionFail},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -114,7 +114,12 @@ fn test_deposit_err_issue_without_wallet() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, Error::WalletNotFound.into());
+    assert_eq!(
+        err,
+        Error::WalletNotFound
+            .to_match()
+            .for_service(WalletService::ID)
+    );
 }
 
 #[test]
@@ -192,7 +197,12 @@ fn test_any_call_err_deposit_unauthorized() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, Error::UnauthorizedIssuer.into());
+    assert_eq!(
+        err,
+        Error::UnauthorizedIssuer
+            .to_match()
+            .for_service(WalletService::ID)
+    );
 }
 
 #[test]
@@ -211,7 +221,7 @@ fn test_any_call_err_unknown_instance() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::IncorrectInstanceId.into());
+    assert_eq!(err, DispatcherError::IncorrectInstanceId.to_match());
 }
 
 #[test]
@@ -233,7 +243,7 @@ fn test_any_call_err_unknown_interface() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::NoSuchInterface.into());
+    assert_eq!(err, DispatcherError::NoSuchInterface.to_match());
 }
 
 #[test]
@@ -259,7 +269,7 @@ fn test_any_call_err_unknown_method() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::NoSuchMethod.into());
+    assert_eq!(err, DispatcherError::NoSuchMethod.to_match());
 }
 
 #[test]
@@ -286,7 +296,12 @@ fn test_any_call_err_wrong_arg() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::MalformedArguments.into());
+    assert_eq!(
+        err,
+        DispatcherError::MalformedArguments
+            .to_match()
+            .with_description_containing("Utf8Error")
+    );
 }
 
 #[test]
@@ -306,5 +321,10 @@ fn test_any_call_panic_recursion_limit() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::StackOverflow.into());
+    assert_eq!(
+        err,
+        DispatcherError::StackOverflow
+            .to_match()
+            .with_description_containing("Maximum depth of call stack (256)")
+    );
 }
