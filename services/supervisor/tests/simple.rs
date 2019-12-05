@@ -22,7 +22,8 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service},
-        ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
+        ArtifactId, BlockchainData, DispatcherError, ErrorMatch, ExecutionError, InstanceId,
+        SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -30,7 +31,8 @@ use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, SimpleSupervisor,
+    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema,
+    SimpleSupervisor,
 };
 
 pub fn sign_config_propose_transaction(
@@ -97,7 +99,7 @@ impl Configure for ConfigChangeService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
+            "error" => Err(DispatcherError::malformed_arguments("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -119,9 +121,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => {
-                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
-            }
+            "apply_error" => Err(DispatcherError::malformed_arguments("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -278,11 +278,9 @@ fn discard_config_propose_from_auditor() {
     // Verify that transaction failed.
     let api = testkit.api();
     let system_api = api.exonum_api();
-    let expected_status = Err(exonum::blockchain::ExecutionError {
-        kind: exonum::blockchain::ExecutionErrorKind::Service { code: 1 },
-        description: "Transaction author is not a validator.".into(),
-    });
-    system_api.assert_tx_status(tx_hash, &expected_status.into());
+    let expected_err =
+        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+    system_api.assert_tx_status(tx_hash, Err(&expected_err));
 
     // Verify that no changes have been applied.
     let new_validators = testkit.network().validators();

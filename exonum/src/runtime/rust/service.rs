@@ -87,6 +87,18 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// [3]: ../../blockchain/struct.Schema.html#method.state_hash_aggregator
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash>;
 
+    /// Performs storage operations on behalf of the service before processing any transaction
+    /// in the block.
+    ///
+    /// Any changes of the storage state will affect `state_hash`, which means this method must
+    /// act similarly on different nodes. In other words, the service should only use data available
+    /// in the provided `CallContext`.
+    ///
+    /// The order of invoking the `before_transactions` method is an implementation detail.
+    /// Effectively, this means that services must not rely on a particular ordering
+    /// of `Service::before_transactions` invocations.
+    fn before_transactions(&self, _context: CallContext<'_>) {}
+
     /// Performs storage operations on behalf of the service before committing the block.
     /// The default implementation does nothing and returns `Ok(())`.
     ///
@@ -95,7 +107,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// in the provided `CallContext`.
     ///
     /// Services should not rely on a particular ordering of `Service::before_commit` invocations.
-    fn before_commit(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 

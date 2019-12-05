@@ -838,15 +838,14 @@ fn test_explorer_transaction_statuses() {
 
     fn check_statuses(statuses: &[Result<(), ExecutionError>]) {
         assert!(statuses[0].is_ok());
-        assert_matches!(
-            statuses[1],
-            Err(ref err) if err.kind == ExecutionErrorKind::service(0)
-                && err.description == "Adding zero does nothing!"
+        assert_eq!(
+            *statuses[1].as_ref().unwrap_err(),
+            ExecutionError::service(0, "Adding zero does nothing!").to_match()
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.kind == ExecutionErrorKind::panic()
-                && err.description == "attempt to add with overflow"
+            Err(ref err) if err.kind() == ExecutionErrorKind::Unexpected
+                && err.description() == "attempt to add with overflow"
         );
     }
 
@@ -862,12 +861,12 @@ fn test_explorer_transaction_statuses() {
     let errors = block.error_map();
     assert_eq!(errors.len(), 2);
     assert_eq!(
-        errors[&CallLocation::transaction(1)].description,
+        errors[&CallLocation::transaction(1)].description(),
         "Adding zero does nothing!"
     );
     assert_eq!(
-        errors[&CallLocation::transaction(2)].kind,
-        ExecutionErrorKind::Panic
+        errors[&CallLocation::transaction(2)].kind(),
+        ExecutionErrorKind::Unexpected
     );
 
     // Check status proofs for transactions.
@@ -881,15 +880,15 @@ fn test_explorer_transaction_statuses() {
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
-        proof.entries().next().unwrap().1.description,
+        proof.entries().next().unwrap().1.description(),
         "Adding zero does nothing!"
     );
     let proof = block_info.error_proof(CallLocation::transaction(2));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
-        proof.entries().next().unwrap().1.kind,
-        ExecutionErrorKind::Panic
+        proof.entries().next().unwrap().1.kind(),
+        ExecutionErrorKind::Unexpected
     );
 
     // Now, the same statuses retrieved via explorer web API.
@@ -923,7 +922,7 @@ fn test_explorer_with_before_commit_error() {
     let errors = block.error_map();
     assert_eq!(errors.len(), 1);
     assert!(errors[&CallLocation::before_commit(SERVICE_ID)]
-        .description
+        .description()
         .contains("What's the question?"));
     assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
 

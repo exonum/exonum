@@ -88,7 +88,7 @@ impl Increment {
     }
 }
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Adding zero does nothing!
     AddingZero = 0,
@@ -100,15 +100,15 @@ pub enum Error {
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error>;
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError>;
 
-    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), Error>;
+    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), ExecutionError>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error> {
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError> {
         if arg.by == 0 {
-            return Err(Error::AddingZero);
+            return Err(Error::AddingZero.into());
         }
 
         let mut schema = CounterSchema::new(context.service_data());
@@ -116,7 +116,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), Error> {
+    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), ExecutionError> {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -224,7 +224,7 @@ impl Service for CounterService {
         vec![]
     }
 
-    fn before_commit(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         let schema = CounterSchema::new(context.service_data());
         if schema.counter.get() == Some(42) {
             Err(Error::AnswerToTheUltimateQuestion.into())

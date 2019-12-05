@@ -149,7 +149,13 @@ fn main() {
             "status": {
                 "type": "service_error",
                 "code": 0,
-                "description": "Not allowed",
+                "description": "Not allowed!",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 0,
+                },
             },
             // Other fields...
             "content": serde_json::to_value(erroneous_tx.content()).unwrap(),
@@ -169,12 +175,12 @@ fn main() {
     let errors: BTreeMap<_, _> = block.error_map();
     assert_eq!(errors.len(), 2);
     assert_eq!(
-        errors[&CallLocation::transaction(1)].description,
-        "Not allowed"
+        errors[&CallLocation::transaction(1)].description(),
+        "Not allowed!"
     );
     assert_eq!(
-        errors[&CallLocation::transaction(2)].kind,
-        ExecutionErrorKind::Panic
+        errors[&CallLocation::transaction(2)].kind(),
+        ExecutionErrorKind::Unexpected
     );
 
     // It is possible to extract a proof of a transaction error using `BlockInfo`. The proof is tied
@@ -184,14 +190,24 @@ fn main() {
         .check_against_hash(block_info.header().error_hash)
         .unwrap();
     let (_, error) = proof.entries().next().unwrap();
-    assert_eq!(error.description, "Not allowed");
+    assert_eq!(error.description(), "Not allowed");
 
-    // JSON for panicking transactions
+    // JSON for a transaction with a panic in service code (termed "unexpected errors"
+    // for compatibility with other runtimes).
     let panicked_tx = explorer.block(Height(1)).unwrap().transaction(2).unwrap();
     assert_eq!(
         serde_json::to_value(&panicked_tx).unwrap(),
         json!({
-            "status": { "type": "panic", "description": "oops" },
+            "status": {
+                "type": "unexpected_error",
+                "description": "oops",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 1,
+                },
+            },
             // Other fields...
             "content": serde_json::to_value(panicked_tx.content()).unwrap(),
             "location": panicked_tx.location(),
