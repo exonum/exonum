@@ -22,7 +22,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service},
-        ArtifactId, BlockchainData, DispatcherError, ExecutionError, ExecutionFail, InstanceId,
+        ArtifactId, BlockchainData, DispatcherError, ErrorMatch, ExecutionError, InstanceId,
         SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -278,10 +278,9 @@ fn discard_config_propose_from_auditor() {
     // Verify that transaction failed.
     let api = testkit.api();
     let system_api = api.exonum_api();
-    let expected_status = Err(TxError::UnknownAuthor
-        .to_match()
-        .for_service(SUPERVISOR_INSTANCE_ID));
-    system_api.assert_tx_status(tx_hash, &expected_status);
+    let expected_err =
+        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+    system_api.assert_tx_status(tx_hash, Err(&expected_err));
 
     // Verify that no changes have been applied.
     let new_validators = testkit.network().validators();

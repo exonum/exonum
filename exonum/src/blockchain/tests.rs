@@ -34,7 +34,7 @@ use crate::{
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
-        ExecutionError, ExecutionFail, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        ErrorMatch, ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -618,7 +618,10 @@ fn test_dispatcher_already_deployed() {
         .deploy_artifact(artifact_id.clone(), vec![])
         .wait()
         .unwrap_err();
-    assert_eq!(err, DispatcherError::ArtifactAlreadyDeployed.to_match());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::ArtifactAlreadyDeployed)
+    );
     // Tests that we cannot register artifact twice.
     let result = execute_transaction(
         &mut blockchain,
@@ -626,8 +629,7 @@ fn test_dispatcher_already_deployed() {
     );
     assert_eq!(
         result.0.unwrap_err(),
-        DispatcherError::ArtifactAlreadyDeployed
-            .to_match()
+        ErrorMatch::from_fail(&DispatcherError::ArtifactAlreadyDeployed)
             .in_runtime(0)
             .for_service(TEST_SERVICE_ID)
     );
@@ -764,6 +766,6 @@ fn test_check_tx() {
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
     assert_eq!(
         blockchain.check_tx(&incorrect_tx).unwrap_err(),
-        DispatcherError::IncorrectInstanceId.to_match()
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
     );
 }

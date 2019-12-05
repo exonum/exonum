@@ -198,11 +198,28 @@ impl Display for ErrorKind {
 ///     }
 /// }
 /// ```
+pub trait ExecutionFail {
+    /// Extracts the error kind.
+    fn kind(&self) -> ErrorKind;
+
+    /// Extracts the human-readable error description.
+    fn description(&self) -> String;
+
+    /// Creates an error with an externally provided description. The default implementation
+    /// takes the `description` as is; implementations can redefine this to wrap it in
+    /// an error-specific wrapper.
+    fn with_description(&self, description: impl Display) -> ExecutionError {
+        ExecutionError::new(self.kind(), description.to_string())
+    }
+}
+
+/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
+/// an `ExceptionError`, e.g., in tests. The unspecified fields will match any value in the error.
 ///
-/// [`to_match`] method allows to use errors in testing:
+/// # Examples
 ///
 /// ```no_run
-/// use exonum::runtime::{ExecutionError, InstanceId, ExecutionFail};
+/// use exonum::runtime::{ExecutionError, InstanceId, ErrorMatch};
 /// use exonum_derive::ExecutionFail;
 /// # use exonum::explorer::BlockWithTransactions;
 /// # struct Tx;
@@ -228,42 +245,12 @@ impl Display for ErrorKind {
 /// #    Tx;
 /// let block = testkit.create_block_with_transaction(tx);
 /// let err: &ExecutionError = block[0].status().unwrap_err();
-/// let matcher = Error::HashAlreadyExists.to_match();
-/// assert_eq!(*err, matcher.for_service(SERVICE_ID));
+/// let matcher = ErrorMatch::from_fail(&Error::HashAlreadyExists)
+///     .for_service(SERVICE_ID);
+/// assert_eq!(*err, matcher);
 /// ```
-///
-/// [`to_match`]: #tymethod.to_match
-pub trait ExecutionFail {
-    /// Extracts the error kind.
-    fn kind(&self) -> ErrorKind;
-
-    /// Extracts the human-readable error description.
-    fn description(&self) -> String;
-
-    /// Creates an error with the externally provided description. The output value implements
-    /// `ExecutionFail` and thus can be used to create errors during service execution.
-    ///
-    /// This operation is not meant to be overridden.
-    fn with_description(&self, description: impl Display) -> ExecutionError {
-        ExecutionError::new(self.kind(), description.to_string())
-    }
-
-    /// Converts an error into a generic representation. This is primarily useful to compare
-    /// an error via `assert_eq!` in tests.
-    ///
-    /// The converted error has kind and description set to the values returned by the corresponding
-    /// methods of this trait. The call site information (e.g., the instance ID) is not set.
-    ///
-    /// This operation is not meant to be overridden.
-    fn to_match(&self) -> ExecutionErrorMatch {
-        ExecutionErrorMatch::new(self.kind(), self.description())
-    }
-}
-
-/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
-/// an `ExceptionError`; the unspecified fields will match any value in the error.
 #[derive(Debug)]
-pub struct ExecutionErrorMatch {
+pub struct ErrorMatch {
     kind: ErrorKind,
     description: StringMatch,
     runtime_id: Option<u32>,
@@ -271,7 +258,18 @@ pub struct ExecutionErrorMatch {
     call_type: Option<CallType>,
 }
 
-impl ExecutionErrorMatch {
+impl ErrorMatch {
+    /// Creates a matcher from the provided error.
+    ///
+    /// The converted error has a kind and description set to the values returned
+    /// by the corresponding methods of the [`ExecutionFail`] trait. The call site information
+    /// (e.g., the instance ID) is not set.
+    ///
+    /// [`ExecutionFail`]: trait.ExecutionFail.html
+    pub fn from_fail<F: ExecutionFail + ?Sized>(fail: &F) -> Self {
+        Self::new(fail.kind(), fail.description())
+    }
+
     fn new(kind: ErrorKind, description: String) -> Self {
         Self {
             kind,
@@ -322,8 +320,8 @@ impl ExecutionErrorMatch {
     }
 }
 
-impl PartialEq<ExecutionErrorMatch> for ExecutionError {
-    fn eq(&self, error_match: &ExecutionErrorMatch) -> bool {
+impl PartialEq<ErrorMatch> for ExecutionError {
+    fn eq(&self, error_match: &ErrorMatch) -> bool {
         let kind_matches = self.kind == error_match.kind;
         let runtime_matches = match (error_match.runtime_id, self.runtime_id) {
             (None, _) => true,
@@ -348,7 +346,7 @@ impl PartialEq<ExecutionErrorMatch> for ExecutionError {
     }
 }
 
-impl PartialEq<ExecutionError> for ExecutionErrorMatch {
+impl PartialEq<ExecutionError> for ErrorMatch {
     fn eq(&self, other: &ExecutionError) -> bool {
         other.eq(self)
     }
@@ -480,8 +478,8 @@ impl ExecutionError {
 
     /// Converts an error to a matcher. The matcher expect the exact kind and description
     /// of this error, and does not check any other error fields.
-    pub fn to_match(&self) -> ExecutionErrorMatch {
-        ExecutionErrorMatch::new(self.kind, self.description.clone())
+    pub fn to_match(&self) -> ErrorMatch {
+        ErrorMatch::new(self.kind, self.description.clone())
     }
 
     /// The kind of error that indicates in which module and with which code the error occurred.
