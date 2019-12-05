@@ -27,6 +27,21 @@ message Block {
   exonum.crypto.Hash prev_hash = 4;
   exonum.crypto.Hash tx_hash = 5;
   exonum.crypto.Hash state_hash = 6;
+  repeated BlockHeaderEntry entries = 7;
+}
+
+message BlockHeaderEntry {
+  string key = 1;
+  bytes value = 2;
+}
+
+message ServiceInfo {
+  uint32 runtime_id = 1;
+  string name = 2;
+}
+
+message ActiveServices {
+  repeated ServiceInfo services = 1;
 }
 
 message TxLocation {

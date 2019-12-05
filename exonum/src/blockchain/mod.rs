@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, TemporaryDB,
 };
-use failure::{format_err, Error};
+use failure::{format_err, Error, };
 use futures::Future;
 
 use std::{
@@ -52,6 +52,8 @@ use crate::{
     node::ApiSender,
     runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
 };
+use crate::blockchain::block::BlockHeaderEntry;
+use crate::runtime::ActiveServices;
 
 mod block;
 mod builder;
@@ -325,6 +327,17 @@ impl BlockchainMut {
         };
         let tx_hash = schema.block_transactions(height).object_hash();
 
+        let services = self.dispatcher.get_active_services();
+
+        info!("active services {:?}", services);
+
+        let services = ActiveServices {
+            services,
+        };
+
+        // Add list of started services to block header.
+        let block_header_entry = BlockHeaderEntry::from("active_services".to_owned(), services);
+
         // Create block header.
         let block = Block::new(
             proposer_id,
@@ -333,6 +346,7 @@ impl BlockchainMut {
             last_hash,
             tx_hash,
             state_hash,
+            vec![block_header_entry],
         );
         trace!("execute block = {:?}", block);
 

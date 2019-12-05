@@ -14,6 +14,8 @@
 
 pub use self::{error::Error, schema::Schema};
 
+use exonum_proto::ProtobufConvert;
+
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{
     future::{self, Either},
@@ -23,6 +25,7 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
+    proto,
     blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
     crypto::Hash,
     helpers::ValidateInput,
@@ -40,10 +43,17 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug)]
-struct ServiceInfo {
+#[derive(Debug, Clone, ProtobufConvert)]
+#[protobuf_convert(source = "proto::ServiceInfo")]
+pub struct ServiceInfo {
     runtime_id: u32,
-    name: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "proto::ActiveServices")]
+pub struct ActiveServices {
+    pub services: Vec<ServiceInfo>
 }
 
 /// A collection of `Runtime`s capable of modifying the blockchain state.
@@ -342,6 +352,10 @@ impl Dispatcher {
         let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
         Some(runtime)
+    }
+
+    pub(crate) fn get_active_services<'s>(&'s self) -> Vec<ServiceInfo> {
+        self.service_infos.values().cloned().collect()
     }
 
     /// Returns the service matching the specified query.

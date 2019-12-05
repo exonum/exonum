@@ -131,6 +131,7 @@ fn test_block() {
         crypto::hash(&[1]),
         crypto::hash(&txs),
         crypto::hash(&[3]),
+        Vec::new(),
     );
 
     let precommits = vec![

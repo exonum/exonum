@@ -17,7 +17,7 @@
 use failure::Error;
 
 pub use self::schema::{
-    blockchain::{Block, TxLocation},
+    blockchain::{Block, TxLocation, BlockHeaderEntry, ServiceInfo, ActiveServices},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,

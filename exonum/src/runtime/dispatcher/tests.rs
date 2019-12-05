@@ -58,6 +58,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
         Hash::zero(),
         Hash::zero(),
         Hash::zero(),
+        Vec::new(),
     );
     let block_hash = block.object_hash();
     let schema = CoreSchema::new(&*fork);

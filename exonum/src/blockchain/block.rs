@@ -19,6 +19,7 @@ use crate::{
     messages::{Precommit, Verified},
     proto,
 };
+use exonum_merkledb::BinaryValue;
 
 /// Exonum block header data structure.
 ///
@@ -56,6 +57,41 @@ pub struct Block {
     pub tx_hash: Hash,
     /// Hash of the blockchain state after applying transactions in the block.
     pub state_hash: Hash,
+
+    pub entries: Vec<BlockHeaderEntry>,
+}
+
+/// TODO: contains all the random stuff
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Ord,
+    PartialOrd,
+    Debug,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
+#[protobuf_convert(source = "proto::BlockHeaderEntry")]
+pub struct BlockHeaderEntry {
+    pub key: String,
+    pub value: Vec<u8>,
+}
+
+impl BlockHeaderEntry {
+    pub fn from<T>(key: String, value: T)  -> Self
+        where T: BinaryValue
+    {
+        let value = value.to_bytes();
+
+        Self {
+            key,
+            value,
+        }
+    }
 }
 
 impl Block {
@@ -67,6 +103,7 @@ impl Block {
         prev_hash: Hash,
         tx_hash: Hash,
         state_hash: Hash,
+        entries: Vec<BlockHeaderEntry>,
     ) -> Self {
         Self {
             proposer_id,
@@ -75,6 +112,7 @@ impl Block {
             prev_hash,
             tx_hash,
             state_hash,
+            entries,
         }
     }
     /// Identifier of the leader node which has proposed the block.
@@ -101,6 +139,10 @@ impl Block {
     /// Hash of the blockchain state after applying transactions in the block.
     pub fn state_hash(&self) -> &Hash {
         &self.state_hash
+    }
+
+    pub fn add_entry(&mut self, entry: BlockHeaderEntry) {
+        self.entries.push(entry);
     }
 }
 
@@ -133,6 +175,9 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
+
+        let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
+
         let block = Block::new(
             proposer_id,
             height,
@@ -140,6 +185,7 @@ mod tests {
             prev_hash,
             tx_hash,
             state_hash,
+            vec![entry.clone()],
         );
 
         assert_eq!(block.proposer_id(), proposer_id);
@@ -148,6 +194,7 @@ mod tests {
         assert_eq!(block.prev_hash(), &prev_hash);
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
+        assert_eq!(block.entries, vec![entry]);
         let json_str = ::serde_json::to_string(&block).unwrap();
         let block1: Block = ::serde_json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);
