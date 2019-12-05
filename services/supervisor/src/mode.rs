@@ -47,15 +47,15 @@ impl ProtobufConvert for Mode {
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            Mode::Simple => Self::ProtoStruct::SIMPLE,
-            Mode::Decentralized => Self::ProtoStruct::DECENTRALIZED,
+            Mode::Simple => proto::SupervisorMode::SIMPLE,
+            Mode::Decentralized => proto::SupervisorMode::DECENTRALIZED,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let result = match pb {
-            Self::ProtoStruct::SIMPLE => Mode::Simple,
-            Self::ProtoStruct::DECENTRALIZED => Mode::Decentralized,
+            proto::SupervisorMode::SIMPLE => Mode::Simple,
+            proto::SupervisorMode::DECENTRALIZED => Mode::Decentralized,
         };
 
         Ok(result)
