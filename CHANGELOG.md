@@ -5,6 +5,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+### Breaking changes
+
+#### exonum
+
+- `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
+### New features
+
+#### exonum
+
+- `before_transactions` hook for services was introduced. (#1577)
+
 ## 0.13.0-rc.2 - 2019-12-04
 
 ### Breaking changes
@@ -54,7 +66,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Services can now use `BlockchainData` and `SnapshotExt` types to access data
   from the blockchain in a more structured manner. (#1523)
 
-- `before_commit` hook was renamed to the `after_transactions`. (#1577)
 - `GenesisConfig` is extracted into separate entity. `BlockchainBuilder`, `Node`
  and `Testkit` explicitly accepts it during creation. (#1541)
 
@@ -482,7 +493,6 @@ Key points:
 
 - `exonum` now has a `python` library for implementing integration tests. (#1516)
 
-- `before_transactions` hook for services was introduced. (#1577)
 - `BlockchainMut` now has a `check_tx` method used to verify transactions before
   adding them to the transactions pool. Transactions for which `check_tx` fails
   are considered invalid and can't be included to the block. (#1579)
