@@ -63,9 +63,10 @@ fn create_block(blockchain: &BlockchainMut) -> Fork {
 }
 
 fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
-    // FIXME: Due to during the `create_patch` `before_commit` hook invokes without changes in
-    // instances and artifacts, do this call again to mark pending artifacts and instances as
-    // active. [ECR-3222]
+    // Since `BlockchainMut::create_patch` invocation in `create_block` does not use transactions,
+    // the `after_transactions` hook does not change artifact / service statuses. Thus, we need to call
+    // `activate_pending` manually.
+    // FIXME: Fix this behavior [ECR-3222]
     blockchain.dispatcher().activate_pending(&fork);
     // Get state hash from the block proposal.
     fork.flush();

@@ -249,48 +249,43 @@ impl Dispatcher {
             })
     }
 
-    /// Calls `before_transactions` for all currently active services, isolating each call.
-    pub(crate) fn before_transactions(&self, fork: &mut Fork) {
+    /// Calls service hooks of the specified type for all active services.
+    fn call_service_hooks(&self, fork: &mut Fork, call_type: CallType) {
         for (&instance_id, info) in &self.service_infos {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            let res = self.runtimes[&info.runtime_id].before_transactions(context, instance_id);
-            if res.is_err() {
-                fork.rollback();
-            } else {
-                fork.flush();
-            }
-        }
-    }
+            let call_fn = match &call_type {
+                CallType::BeforeTransactions => Runtime::before_transactions,
+                CallType::AfterTransactions => Runtime::after_transactions,
+                _ => unreachable!(),
+            };
 
-    /// Calls `after_transactions` for all currently active services, isolating each call.
-    ///
-    /// Changes the status of pending artifacts and services to active in the merkelized
-    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
-    /// calculated for precommit and actually committed block.
-    pub(crate) fn after_transactions(&self, fork: &mut Fork) {
-        for (&instance_id, info) in &self.service_infos {
-            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            let res = self.runtimes[&info.runtime_id].after_transactions(context, instance_id);
+            let res = call_fn(
+                self.runtimes[&info.runtime_id].as_ref(),
+                context,
+                instance_id,
+            );
             if let Err(err) = res {
+                fork.rollback();
                 let err = err
                     .set_runtime_id(info.runtime_id)
                     .set_call_site(|| CallSite {
                         instance_id,
-                        call_type: CallType::BeforeCommit,
+                        call_type: call_type.clone(),
                     });
-                fork.rollback();
-                let height = CoreSchema::new(&*fork).height().next();
 
+                let height = CoreSchema::new(&*fork).height().next();
                 if err.kind() == ErrorKind::Unexpected {
                     log::error!(
-                        "`after_transactions` hook for service {} at {:?} resulted in unchecked error: {:?}",
+                        "{} for service {} at {:?} resulted in unchecked error: {:?}",
+                        call_type,
                         instance_id,
                         height,
                         err
                     );
                 } else {
                     log::info!(
-                        "`after_transactions` hook for service {} at {:?} failed: {:?}",
+                        "{} for service {} at {:?} failed: {:?}",
+                        call_type,
                         instance_id,
                         height,
                         err
@@ -300,6 +295,20 @@ impl Dispatcher {
                 fork.flush();
             }
         }
+    }
+
+    /// Calls `before_transactions` for all currently active services, isolating each call.
+    pub(crate) fn before_transactions(&self, fork: &mut Fork) {
+        self.call_service_hooks(fork, CallType::BeforeTransactions);
+    }
+
+    /// Calls `after_transactions` for all currently active services, isolating each call.
+    ///
+    /// Changes the status of pending artifacts and services to active in the merkelized
+    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
+    /// calculated for precommit and actually committed block.
+    pub(crate) fn after_transactions(&self, fork: &mut Fork) {
+        self.call_service_hooks(fork, CallType::AfterTransactions);
         self.activate_pending(fork);
     }
 

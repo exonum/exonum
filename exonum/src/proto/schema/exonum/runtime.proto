@@ -93,16 +93,27 @@ message ExecutionError {
   }
 }
 
+// Call site associated with an error.
 message CallSite {
   enum Type {
+    // Service method.
     METHOD = 0;
+    // Service constructor.
     CONSTRUCTOR = 1;
-    BEFORE_COMMIT = 2;
+    // Hook executing before processing transactions in a block.
+    BEFORE_TRANSACTIONS = 2;
+    // Hook executing after processing transactions in a block.
+    AFTER_TRANSACTIONS = 3;
   }
 
+  // Type of the call.
   Type call_type = 1;
+  // Identifier of the service being called.
   uint32 instance_id = 2;
+  // Numeric ID of the method. Set only for `call_type == METHOD`.
   uint32 method_id = 3;
+  // Name of the interface defining the method. This field is empty for the default service
+  // interface. Set only for `call_type == METHOD`.
   string interface = 4;
 }
 

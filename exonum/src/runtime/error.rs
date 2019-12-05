@@ -654,7 +654,8 @@ impl ProtobufConvert for CallSite {
                 pb.set_interface(interface.clone());
                 pb.set_method_id(*id);
             }
-            CallType::BeforeCommit => pb.set_call_type(BEFORE_COMMIT),
+            CallType::BeforeTransactions => pb.set_call_type(BEFORE_TRANSACTIONS),
+            CallType::AfterTransactions => pb.set_call_type(AFTER_TRANSACTIONS),
         }
         pb
     }
@@ -664,7 +665,8 @@ impl ProtobufConvert for CallSite {
 
         let call_type = match pb.get_call_type() {
             CONSTRUCTOR => CallType::Constructor,
-            BEFORE_COMMIT => CallType::BeforeCommit,
+            BEFORE_TRANSACTIONS => CallType::BeforeTransactions,
+            AFTER_TRANSACTIONS => CallType::AfterTransactions,
             METHOD => CallType::Method {
                 interface: pb.take_interface(),
                 id: pb.get_method_id(),
@@ -693,8 +695,10 @@ pub enum CallType {
         #[serde(rename = "method_id")]
         id: MethodId,
     },
+    /// Hook executing before processing transactions in a block.
+    BeforeTransactions,
     /// Hook executing after processing transactions in a block.
-    BeforeCommit,
+    AfterTransactions,
 }
 
 impl fmt::Display for CallType {
@@ -707,7 +711,8 @@ impl fmt::Display for CallType {
             CallType::Method { interface, id } => {
                 write!(formatter, "{}::(method {})", interface, id)
             }
-            CallType::BeforeCommit => formatter.write_str("before_commit hook"),
+            CallType::BeforeTransactions => formatter.write_str("before_transactions hook"),
+            CallType::AfterTransactions => formatter.write_str("after_transactions hook"),
         }
     }
 }
@@ -990,7 +995,7 @@ mod tests {
 
         second_err.call_site = Some(CallSite {
             instance_id: 100,
-            call_type: CallType::BeforeCommit,
+            call_type: CallType::AfterTransactions,
         });
         assert_ne!(first_err.object_hash(), second_err.object_hash());
 
@@ -1177,7 +1182,7 @@ mod tests {
             if let Err(err) = res.0.as_mut() {
                 err.call_site = Some(CallSite {
                     instance_id: 1_000,
-                    call_type: CallType::BeforeCommit,
+                    call_type: CallType::AfterTransactions,
                 });
                 let json = serde_json::to_string_pretty(&res).unwrap();
                 let res2 = serde_json::from_str(&json).unwrap();
@@ -1249,7 +1254,7 @@ mod tests {
         assert_eq!(error, matcher);
 
         // Check `call_type` matching.
-        matcher.call_type = Some(CallType::BeforeCommit);
+        matcher.call_type = Some(CallType::AfterTransactions);
         assert_ne!(error, matcher);
         matcher.call_type = Some(CallType::Constructor);
         assert_eq!(error, matcher);
