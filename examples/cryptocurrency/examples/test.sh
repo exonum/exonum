@@ -92,8 +92,7 @@ function check-request {
 function check-create-tx {
     if [[ \
       ( `echo $3 | jq .type` == \"committed\" ) && \
-      ( `echo $3 | jq .content.debug.name` == "\"$1\"" ) && \
-      ( `echo $3 | jq ".content.message == $2"` == "true") \
+      ( `echo $3 | jq ".content == $2"` == "true") \
     ]]; then
         echo "OK, got expected TxCreateWallet for user $1"
     else
@@ -110,7 +109,7 @@ function check-create-tx {
 function check-transfer-tx {
     if [[ \
       ( `echo $2 | jq .type` == \"committed\" ) && \
-      ( `echo $2 | jq ".content.message == $1"` == "true" ) \
+      ( `echo $2 | jq ".content == $1"` == "true" ) \
     ]]; then
         echo "OK, got expected TxTransfer between wallets"
     else
@@ -124,37 +123,41 @@ launch-server
 
 echo "Creating a wallet for Alice..."
 create-wallet create-wallet-1.json
-check-transaction 75a9d956
+check-transaction de7283a8
 
 echo "Creating a wallet for Bob..."
 create-wallet create-wallet-2.json
-check-transaction 7a09053a
+check-transaction 34f33f36
+
+sleep 5
+
 echo "Transferring funds from Alice to Bob"
 transfer transfer-funds.json
-check-transaction ae3afbe3
+check-transaction 60750247
+
 echo "Waiting until transactions are committed..."
-sleep 7
+sleep 3
 
 echo "Retrieving info on all wallets..."
 RESP=`curl $BASE_URL/wallets 2>/dev/null`
 # Wallet records in the response are deterministically ordered by increasing
 # public key. As Alice's pubkey is lexicographically lesser than Bob's, it it possible to
 # determine his wallet as .[0] and hers as .[1].
-check-request "Alice" 85 "`echo $RESP | jq .[0]`"
-check-request "Bob" 115 "`echo $RESP | jq .[1]`"
+check-request "Bob" 105 "`echo $RESP | jq .[0]`"
+check-request "Alice" 95 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallet?pub_key=114e49a764813f2e92609d103d90f23dc5b7e94e74b3e08134c1272441614bd9 2>/dev/null`
-check-request "Alice" 85 "$RESP"
+RESP=`curl $BASE_URL/wallet?pub_key=763cd266f3f6b6d5746f67477ed39c74c7249991ebbe34446d176fc81b36a41e 2>/dev/null`
+check-request "Alice" 95 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
-TXID=75a9d95694f22823ae01a6feafb3d4e27b55b83bd6897aa581456ea5da382dde
+TXID=de7283a8c2a49c476ec91681e795181d9846a5bbce6488d4313a8300b34b4d48
 RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
 EXP=`cat create-wallet-1.json | jq ".tx_body"`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
-TXID=ae3afbe35f1bfd102daea2f3f72884f04784a10aabe9d726749b1188a6b9fe9b
+TXID=6075024770778476b80d4fe880c408f3df4c3df04bff6d2ae81ae1e415449840
 RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
 EXP=`cat transfer-funds.json | jq ".tx_body"`
 check-transfer-tx "$EXP" "$RESP"

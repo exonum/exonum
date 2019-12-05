@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This lint is triggered in ranged access to `ProofPath`, because
+// `PROOF_PATH_KEY_POS` is currently equal to 1. If we turn on this lint,
+// the statements like `inner[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]`
+// will be less clear.
+#![allow(clippy::range_plus_one)]
+
 use std::{
     cmp::{min, Ordering},
     io::{Cursor, Write},
@@ -66,12 +72,12 @@ pub struct Hashed;
 pub struct Raw;
 
 /// Trait defining key transforming function used to transform key to `ProofPath`.
-pub trait ToProofPath<K> {
+pub trait ToProofPath<K: ?Sized> {
     /// Transforms key to `ProofPath`.
     fn transform_key(key: &K) -> ProofPath;
 }
 
-impl<K: ObjectHash> ToProofPath<K> for Hashed {
+impl<K: ObjectHash + ?Sized> ToProofPath<K> for Hashed {
     fn transform_key(key: &K) -> ProofPath {
         ProofPath::from_bytes(key.object_hash())
     }

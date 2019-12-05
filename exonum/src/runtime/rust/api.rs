@@ -16,6 +16,7 @@
 
 pub use crate::api::{Error, FutureResult, Result};
 
+use exonum_crypto::PublicKey;
 use exonum_merkledb::{access::Prefixed, Snapshot};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
@@ -60,6 +61,11 @@ impl<'a> ServiceApiState<'a> {
     /// Returns readonly access to the data of the executing service.
     pub fn service_data(&'a self) -> Prefixed<&dyn Snapshot> {
         self.data().for_executing_service()
+    }
+
+    /// Returns the service key of this node.
+    pub fn service_key(&self) -> PublicKey {
+        self.broadcaster.keypair().0
     }
 
     /// Returns information about the executing service.

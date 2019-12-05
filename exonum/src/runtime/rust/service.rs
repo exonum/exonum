@@ -22,6 +22,7 @@ use std::{
 };
 
 use crate::{
+    blockchain::config::InstanceInitParams,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     messages::Verified,
@@ -149,6 +150,20 @@ where
     }
 }
 
+/// Provides default instance configuration parameters for `ServiceFactory`.
+pub trait DefaultInstance: ServiceFactory {
+    /// Default id for a service.
+    const INSTANCE_ID: InstanceId;
+    /// Default name for a service.
+    const INSTANCE_NAME: &'static str;
+
+    /// Creates default instance configuration parameters for the service.
+    fn default_instance(&self) -> InstanceInitParams {
+        self.artifact_id()
+            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+    }
+}
+
 /// Transaction specification for a specific service interface method.
 pub trait Transaction<Svc: ?Sized>: BinaryValue {
     /// Identifier of the service interface required for the call.
@@ -271,18 +286,20 @@ enum CowInstanceDescriptor<'a> {
 impl CowInstanceDescriptor<'_> {
     fn as_ref(&self) -> InstanceDescriptor<'_> {
         match self {
-            Self::Borrowed(descriptor) => *descriptor,
-            Self::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
+            CowInstanceDescriptor::Borrowed(descriptor) => *descriptor,
+            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
         }
     }
 
     fn into_owned(self) -> CowInstanceDescriptor<'static> {
         match self {
-            Self::Borrowed(InstanceDescriptor { id, name }) => CowInstanceDescriptor::Owned {
-                id,
-                name: name.to_owned(),
-            },
-            Self::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
+            CowInstanceDescriptor::Borrowed(InstanceDescriptor { id, name }) => {
+                CowInstanceDescriptor::Owned {
+                    id,
+                    name: name.to_owned(),
+                }
+            }
+            CowInstanceDescriptor::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
         }
     }
 }

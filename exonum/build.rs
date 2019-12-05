@@ -1,6 +1,6 @@
 // spell-checker:ignore rustc
 
-use exonum_build::{ProtoSources, ProtobufGenerator};
+use exonum_build::ProtobufGenerator;
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
@@ -35,24 +35,8 @@ fn main() {
 
     create_path_to_protobuf_schema_env();
 
-    let crypto_protos = ProtoSources::Path("../components/crypto/src/proto/schema");
-    let common_protos = ProtoSources::Path("../components/proto/src/proto");
-
-    // Exonum crypto.
-    ProtobufGenerator::with_mod_name("exonum_crypto_proto_mod.rs")
-        .with_input_dir(&crypto_protos.path())
-        .add_path(&crypto_protos.path())
-        .generate();
-
-    // Exonum proto.
-    ProtobufGenerator::with_mod_name("exonum_common_proto_mod.rs")
-        .with_input_dir(&common_protos.path())
-        .add_path(&common_protos.path())
-        .generate();
-
     ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
         .with_input_dir("src/proto/schema/exonum")
-        .add_path("src/proto/schema/exonum")
         .with_crypto()
         .with_common()
         .generate();

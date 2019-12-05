@@ -81,6 +81,10 @@
 //!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
+//! Warning: state hash of the block is not affected by services, instantiated within it. The
+//! only exception is the genesis block where object hashes of builtin services are included
+//! to the resulting block state hash. This behavior difference will be unified in next release.
+//!
 //! [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
 //! # Transaction Lifecycle
@@ -134,8 +138,8 @@ pub use self::{
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{ErrorKind, ExecutionError},
     types::{
-        AnyTx, ArtifactId, ArtifactSpec, CallInfo, DeployStatus, InstanceId, InstanceQuery,
-        InstanceSpec, MethodId,
+        AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
+        InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
     },
 };
 
@@ -412,7 +416,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// `after_transactions` is called for every service active at the beginning of the block
     /// (i.e., services instantiated within the block do **not** receive a call) exactly
-    /// once for each block. The method is not called for the genesis block.
+    /// once for each block.
     ///
     /// # Return value
     ///
@@ -454,6 +458,31 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 impl<T: Runtime> From<T> for Box<dyn Runtime> {
     fn from(value: T) -> Self {
         Box::new(value)
+    }
+}
+
+/// Specifies system identifier for a [`Runtime`].
+pub trait WellKnownRuntime: Runtime {
+    /// Identifier of this runtime.
+    const ID: u32;
+}
+
+// TODO: Rethink visibility [ECR-3913]
+#[derive(Debug)]
+/// Instance of [`Runtime`] with corresponding ID.
+pub struct RuntimeInstance {
+    /// Identifier of this runtime.
+    pub id: u32,
+    /// Instance of [`Runtime`].
+    pub instance: Box<dyn Runtime>,
+}
+
+impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
+    fn from(runtime: T) -> Self {
+        RuntimeInstance {
+            id: T::ID,
+            instance: runtime.into(),
+        }
     }
 }
 

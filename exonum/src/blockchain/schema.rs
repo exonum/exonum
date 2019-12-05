@@ -56,7 +56,7 @@ define_names!(
     PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
-    CONSENSUS_CONFIG => "consensus.config";
+    CONSENSUS_CONFIG => "consensus_config";
 );
 
 /// Transaction location in a block.
@@ -360,8 +360,10 @@ where
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SchemaOrigin {
-    /// This is a Core schema.
+    /// This is a core schema.
     Core,
+    /// This is a dispatcher schema.
+    Dispatcher,
     /// Schema belongs to the runtime with the specified ID.
     Runtime(u32),
     /// This is a service schema with the specified instance ID.
@@ -378,6 +380,7 @@ impl SchemaOrigin {
     fn origin_label(self) -> OriginLabel {
         match self {
             SchemaOrigin::Core => OriginLabel::Core,
+            SchemaOrigin::Dispatcher => OriginLabel::Dispatcher,
             SchemaOrigin::Runtime { .. } => OriginLabel::Runtime,
             SchemaOrigin::Service { .. } => OriginLabel::Service,
         }
@@ -389,6 +392,7 @@ impl SchemaOrigin {
             SchemaOrigin::Service(instance_id) => instance_id,
             SchemaOrigin::Runtime(runtime_id) => runtime_id,
             SchemaOrigin::Core => 0,
+            SchemaOrigin::Dispatcher => 1,
         }
     }
 }
@@ -397,8 +401,10 @@ impl SchemaOrigin {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(u16)]
 pub enum OriginLabel {
-    /// Origin label for Core schemas.
+    /// Origin label for Core schema.
     Core = 0,
+    /// Origin label for Dispatcher schema.
+    Dispatcher = 1,
     /// Origin label for runtime schemas.
     Runtime = 2,
     /// Origin label for service schemas.

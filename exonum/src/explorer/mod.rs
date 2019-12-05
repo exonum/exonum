@@ -332,10 +332,6 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`ExecutionError`]: ../runtime/error/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
-///
-/// # Examples
-///
-/// TODO [ECR-3275]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
     content: Verified<AnyTx>,
@@ -401,52 +397,36 @@ impl CommittedTransaction {
 ///
 /// Use of the custom type parameter for deserialization:
 ///
-/// ```ignore [ECR-3275]
-/// # extern crate exonum;
-/// use std::borrow::Cow;
-/// # #[macro_use] extern crate exonum_derive;
-/// # #[macro_use] extern crate serde_json;
-/// # #[macro_use] extern crate serde_derive;
-/// # use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
-/// # use exonum::crypto::{PublicKey, Signature};
-/// # use exonum::explorer::TransactionInfo;
+/// ```
+/// use exonum::{explorer::TransactionInfo, proto::schema::doc_tests};
+/// use exonum_derive::{BinaryValue, ObjectHash};
+/// use exonum_proto::ProtobufConvert;
+/// use serde_json::json;
 ///
-/// #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-/// #[service_factory(pb = "exonum::proto::schema::doc_tests::CreateWallet")]
-/// struct CreateWallet {
-///     name: String,
+/// /// Service transaction content.
+/// #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+/// #[protobuf_convert(source = "doc_tests::CreateWallet")]
+/// pub struct CreateWallet {
+///     pub name: String,
 /// }
 ///
-/// #[derive(Debug, Clone, Serialize, Deserialize, TransactionSet)]
-/// enum Transactions {
-///    CreateWallet(CreateWallet),
-///     // Other transaction types...
-/// }
-///
-/// # impl Transaction for CreateWallet {
-/// #     fn execute(&self, _: TransactionContext) -> ExecutionResult { Ok(()) }
-/// # }
+/// // Other service related code...
 ///
 /// # fn main() {
-/// # let message = "5b9de7f26b2a12ad46616ba0c9b9d251a6b1a3f1a2df7e\
-/// #                    ae37032861caa4ddac0000000000005b9de7f26b2a12ad\
-/// #                    46616ba0c9b9d251a6b1a3f1a2df7eae37032861caa4dd\
-/// #                    ac2800000005000000416c69636574556b9b7172b7072c\
-/// #                    75444e7c2018200c824b2f856c4e45d4536f3e96204faf\
-/// #                    bd13ee2afe16feeec8e320aaa093260525081af27e57d2\
-/// #                    e4e6ba44e284416f0f";
+/// #    let message = "0a180a160a0012120a1054657374207472616e73616374696f6e12220a20\
+/// #                   927d23ecd2a2b31f6693f668b3112acafdf1e954bbeb82d364fb46aa3cd5\
+/// #                   99ed1a420a402c0ce24d15c6407193ac765b6fc74a1504990ae5812ec4e4\
+/// #                   0070c5de66896abf06e2d9c742d232a34c4e5d41a575e91d44292bc8ab00\
+/// #                   c4ce71acb5d8a985c602";
 ///
-/// let json = json!({
-///     "type": "in-pool",
-///     "content": {
-///         "message": // ...
-/// #                    message
-///     }
-/// });
+///     let json = json!({
+///         "type": "in-pool",
+///         "content": message
+///     });
 ///
-/// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
-/// assert!(parsed.is_in_pool());
-/// # } // main
+///     let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
+///     assert!(parsed.is_in_pool());
+/// # }
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
