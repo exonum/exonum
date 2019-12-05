@@ -142,8 +142,8 @@ Key points of this feature are the following:
   For details see the [`Runtime` trait docs][runtime-trait] and the
   [`sample_runtime` example][sample-runtime].
 
-  [runtime-trait]: https://docs.rs/exonum/0.13.0/exonum/runtime/trait.Runtime.html
-  [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13/examples/sample_runtime
+  [runtime-trait]: https://docs.rs/exonum/0.13.0-rc.2/exonum/runtime/trait.Runtime.html
+  [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13.0-rc.2/examples/sample_runtime
 
 - Services are not statically tied to the compiled binary anymore. There is
   support of adding new service types (aka artifacts) dynamically and starting new
@@ -151,7 +151,7 @@ Key points of this feature are the following:
 
   For details see [`runtime` module docs][runtime-docs].
 
-  [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+  [runtime-docs]: https://docs.rs/exonum/0.13.0-rc.2/exonum/runtime/index.html
 
 - Services now can have initialization parameters, provided within service start
   procedure.
@@ -162,7 +162,7 @@ Key points of this feature are the following:
   capable of not only changing configuration, but of deploying and starting
   services as well. For details see [`supervisor` service][supervisor].
 
-  [supervisor]: https://github.com/exonum/exonum/tree/v0.13/services/supervisor
+  [supervisor]: https://github.com/exonum/exonum/tree/v0.13.0-rc.2/services/supervisor
 
 #### Migration Guide
 
@@ -171,7 +171,7 @@ So to make the changes apparent, compare the `Cryptocurrency` example service ve
 for [0.12.1][crypt-0-12] and [0.13.0][crypt-0-13] releases.
 
 [crypt-0-12]: https://github.com/exonum/exonum/blob/v0.12.1/examples/cryptocurrency/
-[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13/examples/cryptocurrency/
+[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13.0-rc.2/examples/cryptocurrency/
 
 Key points:
 
