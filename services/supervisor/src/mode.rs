@@ -46,7 +46,7 @@ pub enum Mode {
 
 impl Default for Mode {
     fn default() -> Self {
-        Self::Simple
+        Mode::Simple
     }
 }
 
@@ -55,8 +55,8 @@ impl FromStr for Mode {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
-            "simple" => Ok(Self::Simple),
-            "decentralized" => Ok(Self::Decentralized),
+            "simple" => Ok(Mode::Simple),
+            "decentralized" => Ok(Mode::Decentralized),
             _ => Err(format_err!(
                 "Invalid supervisor mode: {}. Could be 'simple' or 'decentralized'",
                 input
