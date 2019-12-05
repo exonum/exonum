@@ -23,7 +23,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use super::InstanceDescriptor;
-use crate::{helpers::ValidateInput, proto::schema};
+use crate::{blockchain::config::InstanceInitParams, helpers::ValidateInput, proto::schema};
 
 /// Unique service instance identifier.
 ///
@@ -165,6 +165,15 @@ impl ArtifactId {
         Ok(artifact)
     }
 
+    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    pub fn into_default_instance(
+        self,
+        id: InstanceId,
+        name: impl Into<String>,
+    ) -> InstanceInitParams {
+        InstanceInitParams::new(id, name, self, ())
+    }
+
     /// Checks that the artifact name contains only allowed characters and is not empty.
     fn is_valid_name(name: impl AsRef<[u8]>) -> bool {
         // Extended version of `exonum_merkledb::is_valid_name` that also allows '.' and ':'.
@@ -229,13 +238,34 @@ impl FromStr for ArtifactId {
 }
 
 /// Exhaustive artifact specification.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
 #[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
     pub artifact: ArtifactId,
     /// Runtime-specific artifact payload.
     pub payload: Vec<u8>,
+}
+
+impl ArtifactSpec {
+    /// Generic constructor.
+    pub fn new(artifact: ArtifactId, deploy_spec: impl BinaryValue) -> Self {
+        Self {
+            artifact,
+            payload: deploy_spec.into_bytes(),
+        }
+    }
 }
 
 /// Exhaustive service instance specification.

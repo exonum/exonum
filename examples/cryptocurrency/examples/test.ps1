@@ -46,7 +46,7 @@ function Check-CreateTx ($tx) {
   $error = $False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
-    if (($respJson.type -ne 'committed') -or ($respJson.content.debug.name -ne $tx.name)) {
+    if ($respJson.type -ne 'committed') {
       $error = $True;
     }
   } else {
@@ -83,12 +83,12 @@ function Main () {
     @{
       name = 'Alice';
       json = "$wd/create-wallet-1.json";
-      hash = '75a9d95694f22823ae01a6feafb3d4e27b55b83bd6897aa581456ea5da382dde';
+      hash = 'de7283a8c2a49c476ec91681e795181d9846a5bbce6488d4313a8300b34b4d48';
     },
     @{
       name = 'Bob';
       json = "$wd/create-wallet-2.json";
-      hash = '7a09053aa590704332b7a18f552150caa8b6e4f777afa4005d169038f481b7f7';
+      hash = '34f33f3667e7f63a1d67cfeeed264f0d6bd50919c5c0cbc4dc857c2858a9fee7';
     }
   );
 
@@ -111,7 +111,7 @@ function Main () {
   }
 
   echo 'Transferring tokens between Alice and Bob...';
-  $transferHash = 'ae3afbe35f1bfd102daea2f3f72884f04784a10aabe9d726749b1188a6b9fe9b';
+  $transferHash = '6075024770778476b80d4fe880c408f3df4c3df04bff6d2ae81ae1e415449840';
   $hash = Transfer("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
@@ -125,12 +125,12 @@ function Main () {
   # Wallet records in the response are deterministically ordered by increasing
   # public key. As Alice's pubkey is lexicographically lesser than Bob's, it is possible to
   # determine his wallet as .[0] and hers as .[1].
-  Check-Wallet $resp[0] 'Alice' '85';
-  Check-Wallet $resp[1] 'Bob' '115';
+  Check-Wallet $resp[0] 'Bob' '105';
+  Check-Wallet $resp[1] 'Alice' '95';
   echo "Retrieving info on Alice's wallet...";
-  $pubkey = '114e49a764813f2e92609d103d90f23dc5b7e94e74b3e08134c1272441614bd9';
+  $pubkey = '763cd266f3f6b6d5746f67477ed39c74c7249991ebbe34446d176fc81b36a41e';
   $resp = (Invoke-WebRequest "$BASE_URL/wallet?pub_key=$pubkey").Content | ConvertFrom-Json;
-  Check-Wallet $resp 'Alice' '85';
+  Check-Wallet $resp 'Alice' '95';
 }
 
 Compile-Server;

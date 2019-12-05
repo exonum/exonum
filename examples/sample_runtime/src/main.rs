@@ -16,16 +16,19 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys},
+    blockchain::{
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys,
+    },
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext,
-        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::{RustRuntime, ServiceFactory, Transaction},
+        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError, InstanceId,
+        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, StateHashAggregator,
+        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::IntoExecutionError;
@@ -64,9 +67,6 @@ enum SampleRuntimeError {
 }
 
 impl SampleRuntime {
-    /// Runtime identifier for the present runtime.
-    const ID: u32 = 255;
-
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
@@ -213,6 +213,10 @@ impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
     }
 }
 
+impl WellKnownRuntime for SampleRuntime {
+    const ID: u32 = 255;
+}
+
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
@@ -263,7 +267,7 @@ fn main() {
 
     let db = TemporaryDB::new();
     let node_cfg = node_config();
-    let genesis = node_cfg.consensus.clone();
+    let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
     let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
@@ -271,12 +275,14 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
-    let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
-        .with_rust_runtime(
-            channel.endpoints.0.clone(),
-            vec![Supervisor::builtin_instance(Supervisor::simple_config())],
-        )
-        .with_additional_runtime(SampleRuntime::default())
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .build();
+    let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
+    let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
+        .with_runtime(rust_runtime)
+        .with_runtime(SampleRuntime::default())
         .build()
         .unwrap();
 

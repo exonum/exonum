@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+## 0.13.0-rc.2 - 2019-12-04
+
 ### Breaking changes
 
 #### exonum
@@ -51,6 +53,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Services can now use `BlockchainData` and `SnapshotExt` types to access data
   from the blockchain in a more structured manner. (#1523)
+
+- `GenesisConfig` is extracted into separate entity. `BlockchainBuilder`, `Node`
+ and `Testkit` explicitly accepts it during creation. (#1541)
+
+- Added `DefaultInstance` trait for declaration of builtin services. (#1541)
 
 #### exonum-merkledb
 
@@ -458,6 +465,8 @@ Key points:
 - #1555: Update MerkleDB docs
 
 - #1568: Make DispatcherSchema merkelized again [ECR-3810]
+
+- #1592: Fix node freeze after re-enabling consensus [ERC-3111]
 
 </details>
 <!-- markdownlint-enable no-inline-html -->

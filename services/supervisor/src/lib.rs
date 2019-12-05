@@ -78,10 +78,13 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::InstanceCollection,
+    blockchain::config::InstanceInitParams,
     crypto::Hash,
     runtime::{
-        rust::{api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service},
+        rust::{
+            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
+            ServiceFactory as ServiceFactoryTrait,
+        },
         BlockchainData, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -226,13 +229,11 @@ impl Supervisor {
 
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
-    pub fn builtin_instance(config: SupervisorConfig) -> InstanceCollection {
-        // Creates a supervisor with provided config.
-        InstanceCollection::new(Supervisor).with_instance(
-            SUPERVISOR_INSTANCE_ID,
-            Supervisor::NAME,
-            config.into_bytes(),
-        )
+    pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
+        Supervisor
+            .artifact_id()
+            .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
+            .with_constructor(config)
     }
 }
 

@@ -29,9 +29,7 @@ use exonum::{
     runtime::{rust::Transaction, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{
-    txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
-};
+use exonum_testkit::{txvec, ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use hex::FromHex;
 use serde_json::{json, Value};
 
@@ -719,11 +717,7 @@ fn test_explorer_single_block() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_rust_service(InstanceCollection::new(CounterService).with_instance(
-            SERVICE_ID,
-            SERVICE_NAME,
-            (),
-        ))
+        .with_default_rust_service(CounterService)
         .create();
 
     assert_eq!(testkit.majority_count(), 3);

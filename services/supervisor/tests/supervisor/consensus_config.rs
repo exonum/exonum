@@ -15,7 +15,7 @@
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
-use exonum::helpers::ValidatorId;
+use exonum::{helpers::ValidatorId, runtime::rust::ServiceFactory};
 
 use crate::utils::*;
 use exonum_supervisor::Supervisor;
@@ -24,7 +24,9 @@ use exonum_supervisor::Supervisor;
 fn test_add_nodes_to_validators() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_rust_service(Supervisor::builtin_instance(
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::builtin_instance(
             Supervisor::decentralized_config(),
         ))
         .create();

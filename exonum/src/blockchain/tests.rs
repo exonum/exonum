@@ -24,7 +24,8 @@ use std::{collections::BTreeMap, panic, sync::Mutex};
 
 use crate::{
     blockchain::{
-        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, InstanceCollection, Schema,
+        config::{GenesisConfigBuilder, InstanceInitParams},
+        Blockchain, BlockchainMut, ExecutionErrorKind, ExecutionStatus, Schema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
@@ -32,7 +33,7 @@ use crate::{
     proto::schema::tests::*,
     runtime::{
         error::ErrorKind,
-        rust::{CallContext, Service, ServiceFactory, Transaction},
+        rust::{CallContext, RustRuntime, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ExecutionError,
         InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
@@ -343,22 +344,47 @@ fn execute_transaction(blockchain: &mut BlockchainMut, tx: Verified<AnyTx>) -> E
         .unwrap()
 }
 
-fn create_blockchain(instances: impl IntoIterator<Item = InstanceCollection>) -> BlockchainMut {
+fn create_blockchain(
+    services: Vec<Box<dyn ServiceFactory>>,
+    instances: Vec<impl Into<InstanceInitParams>>,
+) -> BlockchainMut {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
-    let api_notifier = mpsc::channel(0).0;
+
+    let rust_runtime = services
+        .into_iter()
+        .fold(RustRuntime::new(mpsc::channel(0).0), |runtime, factory| {
+            runtime.with_factory(factory)
+        });
+
+    let genesis_config = instances
+        .into_iter()
+        .fold(
+            GenesisConfigBuilder::with_consensus_config(config.consensus),
+            |builder, instance| {
+                let instance = instance.into();
+                builder
+                    .with_artifact(instance.instance_spec.artifact.clone())
+                    .with_instance(instance)
+            },
+        )
+        .build();
 
     Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed())
-        .into_mut(config.consensus)
-        .with_rust_runtime(api_notifier, instances)
+        .into_mut(genesis_config)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap()
 }
 
 #[test]
 fn handling_tx_panic_error() {
-    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
 
     let (pk, sec_key) = crypto::gen_keypair();
     let tx_ok1 = TestExecute { value: 3 }.sign(TEST_SERVICE_ID, pk, &sec_key);
@@ -412,9 +438,12 @@ fn handling_tx_panic_error() {
 #[test]
 #[should_panic]
 fn handling_tx_panic_storage_error() {
-    let mut blockchain =
-        create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-            .with_instance(TEST_SERVICE_ID, IDX_NAME, ())]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, IDX_NAME)],
+    );
 
     let (pk, sec_key) = crypto::gen_keypair();
     let tx_ok1 = TestExecute { value: 3 }.sign(TEST_SERVICE_ID, pk, &sec_key);
@@ -443,26 +472,35 @@ fn handling_tx_panic_storage_error() {
 
 #[test]
 fn service_execute_good() {
-    let mut blockchain = create_blockchain(vec![
-        InstanceCollection::new(ServiceGoodImpl).with_instance(3, "service_good", ())
-    ]);
+    let mut blockchain = create_blockchain(
+        vec![ServiceGoodImpl.into()],
+        vec![ServiceGoodImpl
+            .artifact_id()
+            .into_default_instance(3, "service_good")],
+    );
     assert_service_execute(&mut blockchain);
 }
 
 #[test]
 fn service_execute_panic() {
-    let mut blockchain = create_blockchain(vec![
-        InstanceCollection::new(ServicePanicImpl).with_instance(4, "service_panic", ())
-    ]);
+    let mut blockchain = create_blockchain(
+        vec![ServicePanicImpl.into()],
+        vec![ServicePanicImpl
+            .artifact_id()
+            .into_default_instance(4, "service_panic")],
+    );
     assert_service_execute_panic(&mut blockchain);
 }
 
 #[test]
 #[should_panic]
 fn service_execute_panic_storage_error() {
-    let mut blockchain =
-        create_blockchain(vec![InstanceCollection::new(ServicePanicStorageErrorImpl)
-            .with_instance(5, "service_panic", ())]);
+    let mut blockchain = create_blockchain(
+        vec![ServicePanicStorageErrorImpl.into()],
+        vec![ServicePanicStorageErrorImpl
+            .artifact_id()
+            .into_default_instance(5, "service_panic")],
+    );
     assert_service_execute_panic(&mut blockchain);
 }
 
@@ -477,8 +515,12 @@ fn error_discards_transaction_changes() {
     ];
 
     let (pk, sec_key) = crypto::gen_keypair();
-    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TxResultCheckService)
-        .with_instance(TX_CHECK_RESULT_SERVICE_ID, "check_result", ())]);
+    let mut blockchain = create_blockchain(
+        vec![TxResultCheckService.into()],
+        vec![TxResultCheckService
+            .artifact_id()
+            .into_default_instance(TX_CHECK_RESULT_SERVICE_ID, "check_result")],
+    );
     let db = TemporaryDB::new();
 
     for (index, status) in statuses.iter().enumerate() {
@@ -516,14 +558,12 @@ fn error_discards_transaction_changes() {
 #[test]
 fn test_dispatcher_deploy_good() {
     let keypair = crypto::gen_keypair();
-    let mut blockchain = create_blockchain(vec![
-        InstanceCollection::new(TestDispatcherService).with_instance(
-            TEST_SERVICE_ID,
-            TEST_SERVICE_NAME,
-            (),
-        ),
-        InstanceCollection::new(ServiceGoodImpl),
-    ]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into(), ServiceGoodImpl.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
 
     let artifact_id = ServiceGoodImpl.artifact_id().into();
 
@@ -555,14 +595,18 @@ fn test_dispatcher_deploy_good() {
 #[test]
 fn test_dispatcher_already_deployed() {
     let keypair = crypto::gen_keypair();
-    let mut blockchain = create_blockchain(vec![
-        InstanceCollection::new(TestDispatcherService).with_instance(
-            TEST_SERVICE_ID,
-            TEST_SERVICE_NAME,
-            (),
-        ),
-        InstanceCollection::new(ServiceGoodImpl).with_instance(11, "good", ()),
-    ]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into(), ServiceGoodImpl.into()],
+        vec![
+            TestDispatcherService
+                .artifact_id()
+                .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME),
+            ServiceGoodImpl
+                .artifact_id()
+                .into_default_instance(11, "good"),
+        ],
+    );
+
     let artifact_id = ServiceGoodImpl.artifact_id().into();
 
     // Tests that we get an error if we try to deploy already deployed artifact.
@@ -588,14 +632,12 @@ fn test_dispatcher_already_deployed() {
 #[should_panic(expected = "Unable to deploy registered artifact")]
 fn test_dispatcher_register_unavailable() {
     let keypair = crypto::gen_keypair();
-    let mut blockchain = create_blockchain(vec![
-        InstanceCollection::new(TestDispatcherService).with_instance(
-            TEST_SERVICE_ID,
-            TEST_SERVICE_NAME,
-            (),
-        ),
-        InstanceCollection::new(ServiceGoodImpl),
-    ]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into(), ServiceGoodImpl.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
 
     let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
     blockchain
@@ -623,8 +665,12 @@ fn test_dispatcher_register_unavailable() {
 #[test]
 fn test_dispatcher_start_service_good() {
     let keypair = crypto::gen_keypair();
-    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
     // Tests start service for the good service.
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
@@ -644,8 +690,12 @@ fn test_dispatcher_start_service_good() {
 #[test]
 fn test_dispatcher_start_service_rollback() {
     let keypair = crypto::gen_keypair();
-    let mut blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+    let mut blockchain = create_blockchain(
+        vec![TestDispatcherService.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
 
     // Tests that a service with an unregistered artifact will not be started.
     let snapshot = blockchain.snapshot();
@@ -696,8 +746,12 @@ fn test_dispatcher_start_service_rollback() {
 #[test]
 fn test_check_tx() {
     let keypair = crypto::gen_keypair();
-    let blockchain = create_blockchain(vec![InstanceCollection::new(TestDispatcherService)
-        .with_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME, ())]);
+    let blockchain = create_blockchain(
+        vec![TestDispatcherService.into()],
+        vec![TestDispatcherService
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
 
