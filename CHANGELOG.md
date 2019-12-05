@@ -7,11 +7,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### exonum
+
+- `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
 
 ### New features
+
+#### exonum
+
+- `before_transactions` hook for services was introduced. (#1577)
 
 #### exonum-supervisor
 

@@ -570,7 +570,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn before_commit(
+    fn before_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -578,17 +578,42 @@ impl Runtime for RustRuntime {
         let instance = self
             .started_services
             .get(&instance_id)
-            .expect("`before_commit` called with non-existing `instance_id`");
+            .expect("`before_transactions` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
         let result = catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_commit(context);
+            instance.as_ref().before_transactions(context);
             Ok(())
         });
         if let Err(ref e) = result {
             error!(
-                "Service \"{}\" `before_commit` failed with error: {:?}",
+                "Service \"{}\" `before_transactions` failed with error: {:?}",
+                instance.name, e
+            );
+        }
+        result
+    }
+
+    fn after_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        let instance = self
+            .started_services
+            .get(&instance_id)
+            .expect("`after_transactions` called with non-existing `instance_id`");
+
+        let descriptor = instance.descriptor();
+        let result = catch_panic(|| {
+            let context = CallContext::new(context, descriptor);
+            instance.as_ref().after_transactions(context);
+            Ok(())
+        });
+        if let Err(ref e) = result {
+            error!(
+                "Service \"{}\" `after_transactions` failed with error: {:?}",
                 instance.name, e
             );
         }

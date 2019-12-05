@@ -198,7 +198,7 @@ impl Service for ServiceGoodImpl {
         vec![]
     }
 
-    fn before_commit(&self, context: CallContext<'_>) {
+    fn after_transactions(&self, context: CallContext<'_>) {
         let mut index = context.service_data().get_list("val");
         index.push(1);
     }
@@ -224,7 +224,7 @@ impl Service for ServicePanicImpl {
         vec![]
     }
 
-    fn before_commit(&self, _context: CallContext<'_>) {
+    fn after_transactions(&self, _context: CallContext<'_>) {
         panic!("42");
     }
 }
@@ -249,7 +249,7 @@ impl Service for ServicePanicStorageErrorImpl {
         vec![]
     }
 
-    fn before_commit(&self, _context: CallContext<'_>) {
+    fn after_transactions(&self, _context: CallContext<'_>) {
         panic!(StorageError::new("42"));
     }
 }
