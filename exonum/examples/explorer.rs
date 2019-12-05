@@ -18,7 +18,7 @@
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{BlockchainMut, CallLocation, ExecutionErrorKind},
+    blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -175,17 +175,17 @@ fn main() {
     let errors: BTreeMap<_, _> = block.error_map();
     assert_eq!(errors.len(), 2);
     assert_eq!(
-        errors[&CallLocation::transaction(1)].description(),
+        errors[&CallInBlock::transaction(1)].description(),
         "Not allowed!"
     );
     assert_eq!(
-        errors[&CallLocation::transaction(2)].kind(),
+        errors[&CallInBlock::transaction(2)].kind(),
         ExecutionErrorKind::Unexpected
     );
 
     // It is possible to extract a proof of a transaction error using `BlockInfo`. The proof is tied
     // to the `error_hash` mentioned in the block header.
-    let proof: MapProof<_, _> = block_info.error_proof(CallLocation::transaction(1));
+    let proof: MapProof<_, _> = block_info.error_proof(CallInBlock::transaction(1));
     let proof = proof
         .check_against_hash(block_info.header().error_hash)
         .unwrap();

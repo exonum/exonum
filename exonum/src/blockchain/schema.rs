@@ -126,14 +126,14 @@ impl<T: Access> Schema<T> {
     /// mentioned in the block header, a proof of absence of an error for a transaction
     /// with a particular index means that it was executed successfully.
     ///
-    /// Similarly, execution errors of the `before_commit` hook can be proven to external clients.
-    /// Discerning successful execution from a non-existing service requires prior knowledge
+    /// Similarly, execution errors of the `before_transactions` / `after_transactions` hooks can be proven
+    /// to external clients. Discerning successful execution from a non-existing service requires prior knowledge
     /// though.
     // TODO: Retain historic information about services [ECR-3922]
     pub fn call_errors(
         &self,
         block_height: Height,
-    ) -> ProofMapIndex<T::Base, CallLocation, ExecutionError> {
+    ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
         self.access
             .clone()
             .get_proof_map((CALL_ERRORS, &block_height.0))
@@ -146,7 +146,7 @@ impl<T: Access> Schema<T> {
             return None;
         }
 
-        let call_location = CallLocation::transaction(location.position_in_block as u64);
+        let call_location = CallInBlock::transaction(location.position_in_block as u64);
         Some(
             match self.call_errors(location.block_height).get(&call_location) {
                 None => Ok(()),
@@ -365,55 +365,74 @@ where
 /// Location of an isolated call within a block.
 ///
 /// Exonum isolates execution of the transactions included into the the block,
-/// and `before_commit` hooks that are executed for each active service after all transactions.
+/// and `before_transactions` / `after_transactions` hooks that are executed for each active service.
 /// If an isolated call ends with an error, all changes to the blockchain state made within a call
 /// are rolled back.
 ///
-/// `CallLocation`s are ordered in the same way the corresponding calls would be performed within
-/// a block:
+/// `CallInBlock` objects are ordered in the same way the corresponding calls would be performed
+/// within a block:
 ///
 /// ```rust
-/// # use exonum::blockchain::CallLocation;
-/// assert!(CallLocation::transaction(0) < CallLocation::transaction(1));
-/// assert!(CallLocation::transaction(1) < CallLocation::before_commit(0));
-/// assert!(CallLocation::before_commit(0) < CallLocation::before_commit(1));
+/// # use exonum::blockchain::CallInBlock;
+/// assert!(CallInBlock::before_transactions(3) < CallInBlock::transaction(0));
+/// assert!(CallInBlock::transaction(0) < CallInBlock::transaction(1));
+/// assert!(CallInBlock::transaction(1) < CallInBlock::after_transactions(0));
+/// assert!(CallInBlock::after_transactions(0) < CallInBlock::after_transactions(1));
 /// ```
+///
+/// # See also
+///
+/// Not to be confused with [`CallSite`], which provides information about a call in which
+/// an error may occur. Since Exonum services may call each other's methods, `CallSite` is
+/// richer than `CallInBlock`.
+///
+/// [`CallSite`]: ../runtime/error/struct.CallSite.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)] // builtin traits
 #[derive(Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum CallLocation {
+pub enum CallInBlock {
+    /// Call of `before_transactions` hook in a service.
+    BeforeTransactions {
+        /// Numerical service identifier.
+        id: InstanceId,
+    },
     /// Call of a transaction within the block.
     Transaction {
         /// Zero-based transaction index.
         index: u64,
     },
-    /// Call of `before_commit` hook in a service.
-    BeforeCommit {
+    /// Call of `after_transactions` hook in a service.
+    AfterTransactions {
         /// Numerical service identifier.
         id: InstanceId,
     },
 }
 
-impl ProtobufConvert for CallLocation {
-    type ProtoStruct = pb_blockchain::CallLocation;
+impl ProtobufConvert for CallInBlock {
+    type ProtoStruct = pb_blockchain::CallInBlock;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            CallLocation::Transaction { index } => pb.set_transaction(*index),
-            CallLocation::BeforeCommit { id } => pb.set_before_commit(*id),
+            CallInBlock::BeforeTransactions { id } => pb.set_before_transactions(*id),
+            CallInBlock::Transaction { index } => pb.set_transaction(*index),
+            CallInBlock::AfterTransactions { id } => pb.set_after_transactions(*id),
         }
         pb
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        if pb.has_transaction() {
-            Ok(CallLocation::Transaction {
+        if pb.has_before_transactions() {
+            Ok(CallInBlock::BeforeTransactions {
+                id: pb.get_before_transactions(),
+            })
+        } else if pb.has_transaction() {
+            Ok(CallInBlock::Transaction {
                 index: pb.get_transaction(),
             })
-        } else if pb.has_before_commit() {
-            Ok(CallLocation::BeforeCommit {
-                id: pb.get_before_commit(),
+        } else if pb.has_after_transactions() {
+            Ok(CallInBlock::AfterTransactions {
+                id: pb.get_after_transactions(),
             })
         } else {
             Err(format_err!("Invalid location format"))
@@ -421,26 +440,36 @@ impl ProtobufConvert for CallLocation {
     }
 }
 
-impl CallLocation {
-    /// Creates a location corresponding to a transaction.
-    pub fn transaction(index: u64) -> Self {
-        CallLocation::Transaction { index }
+impl CallInBlock {
+    /// Creates a location corresponding to a `before_transactions` call.
+    pub fn before_transactions(id: InstanceId) -> Self {
+        CallInBlock::BeforeTransactions { id }
     }
 
-    /// Creates a location corresponding to a `before_commit` call.
-    pub fn before_commit(id: InstanceId) -> Self {
-        CallLocation::BeforeCommit { id }
+    /// Creates a location corresponding to a transaction.
+    pub fn transaction(index: u64) -> Self {
+        CallInBlock::Transaction { index }
+    }
+
+    /// Creates a location corresponding to a `after_transactions` call.
+    pub fn after_transactions(id: InstanceId) -> Self {
+        CallInBlock::AfterTransactions { id }
     }
 }
 
-impl_binary_key_for_binary_value!(CallLocation);
+impl_binary_key_for_binary_value!(CallInBlock);
 
-impl fmt::Display for CallLocation {
+impl fmt::Display for CallInBlock {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CallLocation::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
-            CallLocation::BeforeCommit { id } => {
-                write!(formatter, "`before_commit` for service with ID {}", id)
+            CallInBlock::BeforeTransactions { id } => write!(
+                formatter,
+                "`before_transactions` for service with ID {}",
+                id
+            ),
+            CallInBlock::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
+            CallInBlock::AfterTransactions { id } => {
+                write!(formatter, "`after_transactions` for service with ID {}", id)
             }
         }
     }
@@ -450,16 +479,16 @@ impl fmt::Display for CallLocation {
 fn location_json_serialization() {
     use serde_json::json;
 
-    let location = CallLocation::transaction(1);
+    let location = CallInBlock::transaction(1);
     assert_eq!(
         serde_json::to_value(location).unwrap(),
         json!({ "type": "transaction", "index": 1 })
     );
 
-    let location = CallLocation::before_commit(1_000);
+    let location = CallInBlock::after_transactions(1_000);
     assert_eq!(
         serde_json::to_value(location).unwrap(),
-        json!({ "type": "before_commit", "id": 1_000 })
+        json!({ "type": "after_transactions", "id": 1_000 })
     );
 }
 

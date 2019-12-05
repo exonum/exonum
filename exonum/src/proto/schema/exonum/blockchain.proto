@@ -35,10 +35,18 @@ message TxLocation {
   uint64 position_in_block = 2;
 }
 
-message CallLocation {
+// Location of an isolated call within a block.
+message CallInBlock {
   oneof call {
+    // Call of a transaction within the block. The value is the zero-based
+    // transaction index.
     uint64 transaction = 1;
-    uint32 before_commit = 2;
+    // Call of `before_transactions` hook in a service. The value is
+    // the service identifier.
+    uint32 before_transactions = 2;
+    // Call of `after_transactions` hook in a service. The value is
+    // the service identifier.
+    uint32 after_transactions = 3;
   }
 }
 

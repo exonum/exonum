@@ -57,7 +57,8 @@ pub struct Block {
     /// Hash of the blockchain state after applying transactions in the block.
     pub state_hash: Hash,
     /// Root hash of the Merkle Patricia tree of the erroneous calls performed within the block.
-    /// These calls can include transactions and/or `before_commit` hooks for services.
+    /// These calls can include transactions, `before_transactions` and/or `after_transactions` hooks
+    /// for services.
     pub error_hash: Hash,
 }
 

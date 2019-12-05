@@ -16,7 +16,7 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
 use exonum::{
-    blockchain::CallLocation,
+    blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
     runtime::{
@@ -591,7 +591,7 @@ fn test_service_config_discard_single_apply_error() {
     let err = snapshot
         .for_core()
         .call_errors(testkit.height())
-        .get(&CallLocation::before_commit(SUPERVISOR_INSTANCE_ID))
+        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
         .unwrap();
     assert!(err.description().contains("IncService: Configure error"));
 
@@ -627,7 +627,7 @@ fn test_service_config_discard_single_apply_panic() {
     let err = snapshot
         .for_core()
         .call_errors(testkit.height())
-        .get(&CallLocation::before_commit(SUPERVISOR_INSTANCE_ID))
+        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
         .unwrap();
     assert!(err.description().contains("Configure panic"));
 

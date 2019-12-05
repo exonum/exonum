@@ -31,7 +31,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, CallLocation, ExecutionError, ExecutionStatus, Schema, TxLocation},
+    blockchain::{Block, CallInBlock, ExecutionError, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
     messages::{AnyTx, Precommit, Verified},
@@ -157,10 +157,7 @@ impl<'a> BlockInfo<'a> {
     /// proof will not contain entries. To distinguish between two cases, one can inspect
     /// the number of transactions in the block or IDs of the active services when the block
     /// was executed.
-    pub fn error_proof(
-        &self,
-        call_location: CallLocation,
-    ) -> MapProof<CallLocation, ExecutionError> {
+    pub fn error_proof(&self, call_location: CallInBlock) -> MapProof<CallInBlock, ExecutionError> {
         self.explorer
             .schema
             .call_errors(self.header.height)
@@ -268,7 +265,7 @@ pub struct BlockWithTransactions {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorWithLocation {
     /// Location of the error.
-    pub location: CallLocation,
+    pub location: CallInBlock,
     /// Error data.
     #[serde(with = "execution_error")]
     pub error: ExecutionError,
@@ -304,7 +301,7 @@ impl BlockWithTransactions {
     }
 
     /// Returns errors converted into a map. Note that this is potentially a costly operation.
-    pub fn error_map(&self) -> BTreeMap<CallLocation, &ExecutionError> {
+    pub fn error_map(&self) -> BTreeMap<CallInBlock, &ExecutionError> {
         self.errors.iter().map(|e| (e.location, &e.error)).collect()
     }
 }

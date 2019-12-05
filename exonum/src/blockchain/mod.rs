@@ -25,7 +25,7 @@ pub use self::{
     block::{Block, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
-    schema::{CallLocation, IndexCoordinates, Schema, SchemaOrigin, TxLocation},
+    schema::{CallInBlock, IndexCoordinates, Schema, SchemaOrigin, TxLocation},
 };
 
 pub mod config;
@@ -287,7 +287,11 @@ impl BlockchainMut {
 
         // Skip execution for genesis block.
         if height > Height(0) {
-            self.dispatcher.before_transactions(&mut fork);
+            let errors = self.dispatcher.before_transactions(&mut fork);
+            let mut call_errors = Schema::new(&fork).call_errors(height);
+            for (location, error) in errors {
+                call_errors.put(&location, error);
+            }
         }
 
         // Save & execute transactions.
@@ -299,8 +303,7 @@ impl BlockchainMut {
         if height > Height(0) {
             let errors = self.dispatcher.after_transactions(&mut fork);
             let mut call_errors = Schema::new(&fork).call_errors(height);
-            for (service_id, error) in errors {
-                let location = CallLocation::before_commit(service_id);
+            for (location, error) in errors {
                 call_errors.put(&location, error);
             }
         }
@@ -365,13 +368,15 @@ impl BlockchainMut {
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
-        let tx_result = self.dispatcher.execute(fork, tx_hash, &transaction);
+        let tx_result = self
+            .dispatcher
+            .execute(fork, tx_hash, index as u64, &transaction);
         let mut schema = Schema::new(&*fork);
 
         if let Err(e) = tx_result {
             schema
                 .call_errors(height)
-                .put(&CallLocation::transaction(index as u64), e);
+                .put(&CallInBlock::transaction(index as u64), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);

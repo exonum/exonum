@@ -18,7 +18,7 @@ use exonum::{
         node::public::explorer::{TransactionQuery, TransactionResponse},
         Error as ApiError,
     },
-    blockchain::{CallLocation, ExecutionError, ExecutionErrorKind},
+    blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind},
     crypto::{self, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
@@ -811,10 +811,10 @@ fn test_explorer_transaction_info() {
         .check_against_hash(block.header().tx_hash)
         .is_ok());
 
-    let proof = block.error_proof(CallLocation::transaction(0));
+    let proof = block.error_proof(CallInBlock::transaction(0));
     let proof = proof.check_against_hash(block.header().error_hash).unwrap();
     let (&call_location, status) = proof.all_entries().next().unwrap();
-    assert_eq!(call_location, CallLocation::transaction(0));
+    assert_eq!(call_location, CallInBlock::transaction(0));
     assert!(status.is_none());
 }
 
@@ -861,11 +861,11 @@ fn test_explorer_transaction_statuses() {
     let errors = block.error_map();
     assert_eq!(errors.len(), 2);
     assert_eq!(
-        errors[&CallLocation::transaction(1)].description(),
+        errors[&CallInBlock::transaction(1)].description(),
         "Adding zero does nothing!"
     );
     assert_eq!(
-        errors[&CallLocation::transaction(2)].kind(),
+        errors[&CallInBlock::transaction(2)].kind(),
         ExecutionErrorKind::Unexpected
     );
 
@@ -873,17 +873,17 @@ fn test_explorer_transaction_statuses() {
     let snapshot = testkit.snapshot();
     let explorer = BlockchainExplorer::new(&snapshot);
     let block_info = explorer.block(testkit.height()).unwrap();
-    let proof = block_info.error_proof(CallLocation::transaction(0));
+    let proof = block_info.error_proof(CallInBlock::transaction(0));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 0);
-    let proof = block_info.error_proof(CallLocation::transaction(1));
+    let proof = block_info.error_proof(CallInBlock::transaction(1));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
         proof.entries().next().unwrap().1.description(),
         "Adding zero does nothing!"
     );
-    let proof = block_info.error_proof(CallLocation::transaction(2));
+    let proof = block_info.error_proof(CallInBlock::transaction(2));
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
@@ -911,7 +911,7 @@ fn test_explorer_transaction_statuses() {
 }
 
 #[test]
-fn test_explorer_with_before_commit_error() {
+fn test_explorer_with_after_transactions_error() {
     let (mut testkit, _) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
     let tx1 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
@@ -921,7 +921,7 @@ fn test_explorer_with_before_commit_error() {
     let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
     let errors = block.error_map();
     assert_eq!(errors.len(), 1);
-    assert!(errors[&CallLocation::before_commit(SERVICE_ID)]
+    assert!(errors[&CallInBlock::after_transactions(SERVICE_ID)]
         .description()
         .contains("What's the question?"));
     assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
