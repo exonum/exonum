@@ -190,7 +190,7 @@ fn main() {
         .check_against_hash(block_info.header().error_hash)
         .unwrap();
     let (_, error) = proof.entries().next().unwrap();
-    assert_eq!(error.description(), "Not allowed");
+    assert_eq!(error.description(), "Not allowed!");
 
     // JSON for a transaction with a panic in service code (termed "unexpected errors"
     // for compatibility with other runtimes).

@@ -94,7 +94,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// act similarly on different nodes. In other words, the service should only use data available
     /// in the provided `CallContext`.
     ///
-    /// Services should not rely on a particular ordering of `Service::beforer_transactions`
+    /// Services should not rely on a particular ordering of `Service::before_transactions`
     /// invocations.
     fn before_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
