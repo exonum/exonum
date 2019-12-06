@@ -128,9 +128,9 @@ impl RocksDB {
                 // Write changes to the column family with each key prefixed by the ID of the
                 // resolved address.
 
-                // We assume that typical key sizes are less than `64 - 8 = 56` bytes,
+                // We assume that typical key sizes are less than `1_024 - ID_SIZE = 1_016` bytes,
                 // so that they fit into stack.
-                let mut buffer: SmallVec<[u8; 64]> = SmallVec::new();
+                let mut buffer: SmallVec<[u8; 1_024]> = SmallVec::new();
                 buffer.extend_from_slice(&id_bytes);
 
                 for (key, change) in changes.into_data() {
@@ -223,9 +223,9 @@ impl Database for RocksDB {
 }
 
 impl Snapshot for RocksDBSnapshot {
-    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self.db.cf_handle(&name.name) {
-            match self.snapshot.get_cf(cf, name.keyed(key)) {
+    fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
+        if let Some(cf) = self.db.cf_handle(&resolved_addr.name) {
+            match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
                 Ok(value) => value.map(|v| v.to_vec()),
                 Err(e) => panic!(e),
             }
@@ -247,7 +247,7 @@ impl<'a> Iterator for RocksDBIterator<'a> {
 
         let (key, value) = self.iter.next()?;
         if let Some(ref prefix) = self.prefix {
-            if &key[..8] != prefix {
+            if &key[..ID_SIZE] != prefix {
                 self.ended = true;
                 return None;
             }
@@ -255,7 +255,7 @@ impl<'a> Iterator for RocksDBIterator<'a> {
 
         self.key = Some(key);
         let key = if self.prefix.is_some() {
-            &self.key.as_ref()?[8..]
+            &self.key.as_ref()?[ID_SIZE..]
         } else {
             &self.key.as_ref()?[..]
         };

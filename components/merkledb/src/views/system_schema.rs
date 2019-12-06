@@ -21,24 +21,24 @@ fn get_state_aggregator<T: RawAccess>(access: T) -> ProofMapIndex<T, String, Has
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::AccessExt, Database, ObjectHash, TemporaryDB, SystemInfo};
+/// # use exonum_merkledb::{access::AccessExt, Database, ObjectHash, TemporaryDB, SystemSchema};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
 /// fork.get_map(("plain_map", &1)).put(&1_u8, "so plain".to_owned());
 /// fork.get_map(("plain_map", &2)).put(&2_u8, "s0 plane".to_owned());
 ///
-/// let system_info = SystemInfo::new(&fork);
-/// assert_eq!(system_info.index_count(), 3);
+/// let system_schema = SystemSchema::new(&fork);
+/// assert_eq!(system_schema.index_count(), 3);
 /// // ^-- The database may also contain system indexes.
 ///
 /// let patch = fork.into_patch();
-/// let state_hash = SystemInfo::new(&patch).state_hash();
+/// let state_hash = SystemSchema::new(&patch).state_hash();
 /// // ^-- State hash of the entire database including changes in the `patch`.
 /// db.merge(patch).unwrap();
 ///
 /// let snapshot = db.snapshot();
-/// let aggregator = SystemInfo::new(&snapshot).state_aggregator();
+/// let aggregator = SystemSchema::new(&snapshot).state_aggregator();
 /// assert_eq!(aggregator.object_hash(), state_hash);
 /// assert_eq!(aggregator.keys().collect::<Vec<_>>(), vec!["list".to_owned()]);
 /// // ^-- No other aggregated indexes so far.
@@ -54,12 +54,12 @@ fn get_state_aggregator<T: RawAccess>(access: T) -> ProofMapIndex<T, String, Has
 /// proof.check_against_hash(state_hash).unwrap();
 /// ```
 #[derive(Debug, Clone, Copy)]
-pub struct SystemInfo<T>(T);
+pub struct SystemSchema<T>(T);
 
-impl<T: RawAccess> SystemInfo<T> {
+impl<T: RawAccess> SystemSchema<T> {
     /// Creates an instance based on the specified `access`.
     pub fn new(access: T) -> Self {
-        SystemInfo(access)
+        SystemSchema(access)
     }
 
     /// Returns the total number of indexes in the storage. This information is always up to date
@@ -85,7 +85,7 @@ impl<T: RawAccess> SystemInfo<T> {
     }
 }
 
-impl<T: RawAccess + AsReadonly> SystemInfo<T> {
+impl<T: RawAccess + AsReadonly> SystemSchema<T> {
     /// Returns the state aggregator of the database. The aggregator is up to date for `Snapshot`s
     /// (including `Patch`es), but is generally stale for `Fork`s.
     ///
@@ -97,7 +97,7 @@ impl<T: RawAccess + AsReadonly> SystemInfo<T> {
     }
 }
 
-impl SystemInfo<&Fork> {
+impl SystemSchema<&Fork> {
     /// Updates state hash of the database.
     pub(crate) fn update_state_aggregator(
         &mut self,
@@ -119,34 +119,34 @@ mod tests {
     fn index_count_is_correct() {
         let db = TemporaryDB::new();
         let snapshot = db.snapshot();
-        assert_eq!(SystemInfo::new(&snapshot).index_count(), 0);
+        assert_eq!(SystemSchema::new(&snapshot).index_count(), 0);
 
         let fork = db.fork();
         fork.get_list("list").push(1_u32);
-        assert_eq!(SystemInfo::new(&fork).index_count(), 1);
+        assert_eq!(SystemSchema::new(&fork).index_count(), 1);
         fork.get_map(("map", &0_u8)).put(&1_u32, "!".to_owned());
-        let info = SystemInfo::new(&fork);
-        assert_eq!(info.index_count(), 2);
+        let system_schema = SystemSchema::new(&fork);
+        assert_eq!(system_schema.index_count(), 2);
         fork.get_map(("map", &1_u8)).put(&1_u32, "!".to_owned());
-        assert_eq!(info.index_count(), 3);
+        assert_eq!(system_schema.index_count(), 3);
 
         fork.get_map(("map", &0_u8)).put(&2_u32, "!".to_owned());
-        assert_eq!(SystemInfo::new(&fork).index_count(), 3);
+        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
         fork.get_list("list").push(5_u32);
-        assert_eq!(SystemInfo::new(&fork).index_count(), 3);
+        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
 
         db.merge_sync(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        assert_eq!(SystemInfo::new(&snapshot).index_count(), 3);
+        assert_eq!(SystemSchema::new(&snapshot).index_count(), 3);
 
         let fork = db.fork();
         fork.get_list("list").push(1_u32);
-        assert_eq!(SystemInfo::new(&fork).index_count(), 3);
+        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
         fork.get_list("other_list").push(1_u32);
-        assert_eq!(SystemInfo::new(&fork).index_count(), 4);
-        assert_eq!(SystemInfo::new(fork.readonly()).index_count(), 4);
+        assert_eq!(SystemSchema::new(&fork).index_count(), 4);
+        assert_eq!(SystemSchema::new(fork.readonly()).index_count(), 4);
 
-        assert_eq!(SystemInfo::new(&snapshot).index_count(), 3);
+        assert_eq!(SystemSchema::new(&snapshot).index_count(), 3);
     }
 
     fn initial_changes(fork: &Fork) {
@@ -177,8 +177,8 @@ mod tests {
         initial_changes(&fork);
 
         let patch = fork.into_patch();
-        let info = SystemInfo::new(&patch);
-        let aggregator = info.state_aggregator();
+        let system_schema = SystemSchema::new(&patch);
+        let aggregator = system_schema.state_aggregator();
         assert_eq!(
             aggregator.keys().collect::<Vec<_>>(),
             vec!["entry".to_owned(), "list".to_owned(), "map".to_owned()]
@@ -195,7 +195,7 @@ mod tests {
             aggregator.get(&"map".to_owned()).unwrap(),
             patch.get_proof_map::<_, i32, String>("map").object_hash()
         );
-        assert_eq!(aggregator.object_hash(), info.state_hash());
+        assert_eq!(aggregator.object_hash(), system_schema.state_hash());
     }
 
     #[test]
@@ -208,8 +208,8 @@ mod tests {
         further_changes(&fork);
 
         let patch = fork.into_patch();
-        let info = SystemInfo::new(&patch);
-        let aggregator = info.state_aggregator();
+        let system_schema = SystemSchema::new(&patch);
+        let aggregator = system_schema.state_aggregator();
         let expected_index_names = vec![
             "another_map".to_owned(),
             "entry".to_owned(),
@@ -225,12 +225,12 @@ mod tests {
             aggregator.get(&"map".to_owned()).unwrap(),
             patch.get_proof_map::<_, i32, String>("map").object_hash()
         );
-        assert_eq!(aggregator.object_hash(), info.state_hash());
+        assert_eq!(aggregator.object_hash(), system_schema.state_hash());
         db.merge_sync(patch).unwrap();
 
         let snapshot = db.snapshot();
-        let info = SystemInfo::new(&snapshot);
-        let aggregator = info.state_aggregator();
+        let system_schema = SystemSchema::new(&snapshot);
+        let aggregator = system_schema.state_aggregator();
         assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
         assert_eq!(
             aggregator.get(&"list".to_owned()).unwrap(),
@@ -242,6 +242,6 @@ mod tests {
                 .get_proof_map::<_, i32, String>("map")
                 .object_hash()
         );
-        assert_eq!(aggregator.object_hash(), info.state_hash());
+        assert_eq!(aggregator.object_hash(), system_schema.state_hash());
     }
 }

@@ -8,7 +8,7 @@ use proptest::{
 use std::{collections::HashSet, iter::FromIterator};
 
 use exonum_merkledb::{
-    access::AccessExt, Database, IndexAddress, ObjectHash, Patch, SystemInfo, TemporaryDB,
+    access::AccessExt, Database, IndexAddress, ObjectHash, Patch, SystemSchema, TemporaryDB,
 };
 
 const ACTIONS_MAX_LEN: usize = 50;
@@ -90,9 +90,9 @@ fn check_patch(patch: &Patch) -> TestCaseResult {
     const MAP_NAMES: &[&str] = &["map", "other_map", "another_map", "prefixed.map"];
     const ENTRY_NAMES: &[&str] = &["entry", "other_entry"];
 
-    let system_info = SystemInfo::new(patch);
-    let state_hash = system_info.state_hash();
-    let aggregator = system_info.state_aggregator();
+    let system_schema = SystemSchema::new(patch);
+    let state_hash = system_schema.state_hash();
+    let aggregator = system_schema.state_aggregator();
     prop_assert_eq!(state_hash, aggregator.object_hash());
 
     let mut absent_lists: HashSet<_> = HashSet::from_iter(LIST_NAMES.iter().map(|s| s.to_string()));

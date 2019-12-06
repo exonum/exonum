@@ -22,7 +22,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
 use super::{
-    system_info::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
+    system_schema::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
 };
 use crate::{
     access::{AccessError, AccessErrorKind},
@@ -408,7 +408,7 @@ where
     /// # Safety
     ///
     /// This method should only be used to create system indexes within this crate.
-    pub(crate) fn get_or_create_unchecked(
+    pub(super) fn get_or_create_unchecked(
         index_access: T,
         index_address: &IndexAddress,
         index_type: IndexType,

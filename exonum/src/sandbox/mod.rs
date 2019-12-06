@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, SystemInfo, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, SystemSchema, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -763,7 +763,7 @@ impl Sandbox {
 
     pub fn get_proof_to_index(&self, index_name: &str) -> MapProof<String, Hash> {
         let snapshot = self.blockchain().snapshot();
-        SystemInfo::new(&snapshot)
+        SystemSchema::new(&snapshot)
             .state_aggregator()
             .get_proof(index_name.to_owned())
     }

@@ -85,7 +85,7 @@
 //! # State aggregation
 //!
 //! Database automatically aggregates its contents into a single `state_hash`, which commits
-//! to the entire Merkelized database contents. This is used in Exonum to achieve
+//! to the entire Merkelized database contents. For example, this is used in [Exonum] to achieve
 //! consensus as to the database state.
 //!
 //! The `state_hash` of the database is the hash of [`state_aggregator`], a system `ProofMapIndex`
@@ -96,10 +96,10 @@
 //! - Index has a matching type (`ProofListIndex`, `ProofMapIndex`, or `ProofEntry`)
 //! - Index is not a part of a group, i.e., its address does not contain the `bytes` part
 //!
-//! The aggregation is updated fully automatically when a `Fork` is converted into a `Patch`.
+//! The aggregation is automatically updated when a `Fork` is converted into a `Patch`.
 //! Thus, `Snapshot`s (including `Patch`es!) are always consistent with respect
 //! to the aggregated state; the index hashes in the `state_aggregator` match their actual values.
-//! Predictably, this is **not** the case for `Fork`s, in which `state_aggregator` may be stale.
+//! This is **not** the case for `Fork`s, in which `state_aggregator` may be stale.
 //!
 //! [`Database`]: trait.Database.html
 //! [`RocksDB`]: struct.RocksDB.html
@@ -132,6 +132,7 @@
 //! [`state_aggregator`]: struct.SystemInfo.html#method.state_aggregator
 //! [`Group`]: struct.Group.html
 //! [`IndexAddress`]: struct.IndexAddress.html
+//! [Exonum]: https://exonum.com/
 
 #![warn(
     missing_debug_implementations,
@@ -172,7 +173,7 @@ pub use self::{
     sparse_list_index::SparseListIndex,
     value_set_index::ValueSetIndex,
     values::BinaryValue,
-    views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress, SystemInfo},
+    views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress, SystemSchema},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'

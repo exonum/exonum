@@ -33,7 +33,7 @@ pub mod config;
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
-    Snapshot, SystemInfo, TemporaryDB,
+    Snapshot, SystemSchema, TemporaryDB,
 };
 use failure::Error;
 use futures::Future;
@@ -310,7 +310,7 @@ impl BlockchainMut {
         let error_hash = schema.call_errors(height).object_hash();
         let tx_hash = schema.block_transactions(height).object_hash();
         let patch = fork.into_patch();
-        let state_hash = SystemInfo::new(&patch).state_hash();
+        let state_hash = SystemSchema::new(&patch).state_hash();
 
         // Create block.
         let block = Block {

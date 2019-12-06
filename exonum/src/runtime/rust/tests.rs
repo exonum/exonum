@@ -14,7 +14,7 @@
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::exonum_interface;
-use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemInfo};
+use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemSchema};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
@@ -61,7 +61,7 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
     blockchain.dispatcher().activate_pending(&fork);
     // Get state hash from the block proposal.
     let patch = fork.into_patch();
-    let state_hash_in_patch = SystemInfo::new(&patch).state_hash();
+    let state_hash_in_patch = SystemSchema::new(&patch).state_hash();
 
     // Commit block to the blockchain.
     blockchain
@@ -70,7 +70,7 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
 
     // Make sure that the state hash is the same before and after the block is committed.
     let snapshot = blockchain.snapshot();
-    let state_hash_in_block = SystemInfo::new(&snapshot).state_hash();
+    let state_hash_in_block = SystemSchema::new(&snapshot).state_hash();
     assert_eq!(state_hash_in_block, state_hash_in_patch);
 }
 
@@ -567,7 +567,7 @@ fn state_aggregation() {
         "dispatcher_instances",
         "test_service_name.constructor_entry",
     ];
-    let actual_indexes: Vec<_> = SystemInfo::new(&snapshot)
+    let actual_indexes: Vec<_> = SystemSchema::new(&snapshot)
         .state_aggregator()
         .keys()
         .collect();

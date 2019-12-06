@@ -24,7 +24,7 @@ use crate::{
     BinaryValue, ObjectHash,
 };
 
-/// A Merkelized index that may only contain one element.
+/// A hashed index that may only contain one element.
 ///
 /// You can add an element to this index and check whether it exists. A value
 /// should implement [`BinaryValue`] and [`ObjectHash`] traits. Unlike [`Entry`],

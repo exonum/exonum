@@ -223,9 +223,9 @@ impl From<RuntimeIdentifier> for u32 {
 /// - `after_transactions`
 /// - `start_adding_service`
 ///
-/// All these methods should also produce the same changes
-/// to the storage via provided `ExecutionContext`. Discrepancy in node behavior within
-/// these methods may lead to a consensus failure.
+/// All these methods should also produce the same changes to the storage via
+/// the provided `ExecutionContext`. Discrepancy in node behavior within these methods may lead
+/// to a consensus failure.
 ///
 /// The other `Runtime` methods may execute logic specific to the node.
 ///

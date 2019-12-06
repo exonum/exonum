@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{
     access::{AsReadonly, Prefixed, RawAccess},
-    Snapshot, SystemInfo,
+    Snapshot, SystemSchema,
 };
 
 use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery};
@@ -85,7 +85,7 @@ impl BlockchainData<'_, &dyn Snapshot> {
         let block_proof = core_schema.block_and_precommits(height).unwrap();
 
         let full_index_name = [self.service_instance.name, ".", index_name].concat();
-        let aggregator = SystemInfo::new(self.access).state_aggregator();
+        let aggregator = SystemSchema::new(self.access).state_aggregator();
         aggregator.get(&full_index_name)?;
         let index_proof = aggregator.get_proof(full_index_name);
         Some(IndexProof {

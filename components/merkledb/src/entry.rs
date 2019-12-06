@@ -19,7 +19,7 @@ use std::marker::PhantomData;
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryValue, ObjectHash,
+    BinaryValue,
 };
 
 /// An index that may only contain one element.
@@ -100,7 +100,7 @@ where
 impl<T, V> Entry<T, V>
 where
     T: RawAccessMut,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Changes a value of the entry.
     ///

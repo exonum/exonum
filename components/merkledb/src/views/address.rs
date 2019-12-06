@@ -10,7 +10,7 @@ pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 ///
 /// An address has a string *name* and an optional byte *key*. An index is uniquely identified
 /// by its address. Different addresses correspond to different indexes. Addresses with the same
-/// name and differing prefixes are said to belong to the same *group* (see also [`Group`]). Groups
+/// name and differing keys are said to belong to the same *group* (see also [`Group`]). Groups
 /// can be used for a potentially unbounded group of indexes that can be identified by a certain
 /// key (for example, `ProofListIndex` with the transaction history of a wallet keyed by the
 /// `PublicKey` of the wallet).
@@ -171,14 +171,6 @@ pub struct ResolvedAddress {
     pub id: Option<NonZeroU64>,
 }
 
-// This conversion is only useful for tests, since all user-created indexes should have an ID set.
-#[cfg(test)]
-impl From<&str> for ResolvedAddress {
-    fn from(name: &str) -> Self {
-        Self::system(name)
-    }
-}
-
 impl ResolvedAddress {
     /// Creates a system view. System views are low-level (i.e., they are not wrapped in indexes).
     pub(crate) fn system(name: impl Into<String>) -> Self {
@@ -203,5 +195,13 @@ impl ResolvedAddress {
                 bytes.into()
             }
         }
+    }
+}
+
+// This conversion is only useful for tests, since all user-created indexes should have an ID set.
+#[cfg(test)]
+impl From<&str> for ResolvedAddress {
+    fn from(name: &str) -> Self {
+        Self::system(name)
     }
 }

@@ -15,7 +15,7 @@
 pub use self::{
     address::{IndexAddress, ResolvedAddress},
     metadata::{get_object_hash, BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
-    system_info::SystemInfo,
+    system_schema::SystemSchema,
 };
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
@@ -28,7 +28,7 @@ use super::{
 
 mod address;
 mod metadata;
-mod system_info;
+mod system_schema;
 #[cfg(test)]
 mod tests;
 

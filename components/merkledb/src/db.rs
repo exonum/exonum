@@ -24,7 +24,7 @@ use std::{
 
 use crate::{
     views::{get_object_hash, AsReadonly, RawAccess, ResolvedAddress, View},
-    Error, Result, SystemInfo,
+    Error, Result, SystemSchema,
 };
 
 /// Changes related to a specific `View`.
@@ -629,7 +629,7 @@ impl Fork {
             .into_iter()
             .map(|addr| (addr.name.clone(), get_object_hash(&self.patch, addr)));
 
-        SystemInfo::new(&self).update_state_aggregator(updated_entries);
+        SystemSchema::new(&self).update_state_aggregator(updated_entries);
         self.flush(); // flushes changes in the state aggregator
         self.patch
     }
@@ -1148,7 +1148,7 @@ mod tests {
         assert_eq!(changed_addrs, HashSet::from_iter(vec!["bar", "other_list"]));
 
         let patch = fork.into_patch();
-        let aggregator = SystemInfo::new(&patch).state_aggregator();
+        let aggregator = SystemSchema::new(&patch).state_aggregator();
         assert_eq!(
             aggregator.get(&"foo".to_owned()).unwrap(),
             patch.get_proof_list::<_, u64>("foo").object_hash()
