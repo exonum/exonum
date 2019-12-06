@@ -49,7 +49,7 @@ pub enum ApiKind {
     /// `api/explorer` endpoints of the built-in Exonum REST API.
     Explorer,
     /// `api/runtimes/rust` endpoints of the built-in Exonum REST API.
-    Runtime,
+    RustRuntime,
     /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
 }
@@ -59,7 +59,7 @@ impl fmt::Display for ApiKind {
         match self {
             ApiKind::System => write!(f, "api/system"),
             ApiKind::Explorer => write!(f, "api/explorer"),
-            ApiKind::Runtime => write!(f, "api/runtimes/rust"),
+            ApiKind::RustRuntime => write!(f, "api/runtimes/rust"),
             ApiKind::Service(name) => write!(f, "api/services/{}", name),
         }
     }

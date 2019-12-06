@@ -16,7 +16,6 @@
 extern crate assert_matches;
 
 use exonum::{api::Error as ApiError, runtime::rust::ProtoSourceFile};
-
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::service::TestRuntimeApiService;
@@ -36,12 +35,29 @@ pub fn testkit_with_rust_service() -> TestKit {
 fn test_exonum_protos_with_service() {
     let mut testkit = testkit_with_rust_service();
 
-    let proto = testkit
+    let response = testkit
         .api()
-        .public(exonum_testkit::ApiKind::Runtime)
-        .get::<Vec<ProtoSourceFile>>("proto-sources")
-        .unwrap();
-    assert_ne!(proto.len(), 0);
+        .public(exonum_testkit::ApiKind::RustRuntime)
+        .get::<Vec<ProtoSourceFile>>("proto-sources");
+
+    match response {
+        Ok(proto_files) => {
+            assert_eq!(proto_files.len(), 7);
+            let proto_names = [
+                "blockchain.proto",
+                "consensus.proto",
+                "doc_tests.proto",
+                "runtime.proto",
+                "tests.proto",
+                "common.proto",
+                "types.proto",
+            ];
+            proto_files
+                .iter()
+                .for_each(|proto| assert!(proto_names.contains(&proto.name.as_ref())));
+        }
+        Err(err) => panic!("Rust runtime Api failed with: {}", err),
+    }
 }
 
 #[test]
@@ -50,41 +66,47 @@ fn test_exonum_protos_without_service() {
 
     let response = testkit
         .api()
-        .public(exonum_testkit::ApiKind::Runtime)
-        .get::<Vec<ProtoSourceFile>>("proto-sources")
-        .unwrap_err();
+        .public(exonum_testkit::ApiKind::RustRuntime)
+        .get::<Vec<ProtoSourceFile>>("proto-sources");
 
-    assert_matches!(
-        response,
-        ApiError::NotFound(ref body) if body == ""
-    );
+    match response {
+        // TODO make corresponding check after fix ECR-3948
+        Ok(_) => panic!("Unexpected OK"),
+        Err(err) => assert_matches!(err, ApiError::NotFound(ref body) if body == ""),
+    }
 }
 
 #[test]
 fn test_service_protos_with_service() {
     let mut testkit = testkit_with_rust_service();
 
-    let proto = testkit
+    let response = testkit
         .api()
-        .public(exonum_testkit::ApiKind::Runtime)
-        .get::<Vec<ProtoSourceFile>>("proto-sources?artifact=test-runtime-api:0.0.1")
-        .unwrap();
+        .public(exonum_testkit::ApiKind::RustRuntime)
+        .get::<Vec<ProtoSourceFile>>("proto-sources?artifact=test-runtime-api:0.0.1");
 
-    assert_eq!(proto.len(), 1);
+    match response {
+        Ok(proto_files) => {
+            assert_eq!(proto_files.len(), 1);
+            assert_eq!(proto_files[0].name, "test_service.proto".to_string());
+        }
+        Err(err) => panic!("Rust runtime Api unexpectedly failed with: {}", err),
+    }
 }
 
 #[test]
-fn test_service_protos_without_service() {
-    let mut testkit = TestKitBuilder::validator().with_validators(1).create();
+fn test_service_protos_with_incorrect_service() {
+    let mut testkit = testkit_with_rust_service();
 
     let response = testkit
         .api()
-        .public(exonum_testkit::ApiKind::Runtime)
-        .get::<Vec<ProtoSourceFile>>("proto-sources")
-        .unwrap_err();
+        .public(exonum_testkit::ApiKind::RustRuntime)
+        .get::<Vec<ProtoSourceFile>>("proto-sources?artifact=invalid-service:0.0.1");
 
-    assert_matches!(
-        response,
-        ApiError::NotFound(ref body) if body == ""
-    );
+    match response {
+        Ok(_) => panic!("Unexpected OK"),
+        Err(err) => {
+            assert_matches!(err, ApiError::NotFound(ref body) if body == "Unable to find sources for artifact invalid-service:0.0.1")
+        }
+    }
 }
