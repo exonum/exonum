@@ -9,6 +9,34 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `before_commit` hook was renamed to the `after_transactions`. (#1577)
+- `before_transactions` and `after_transactions` hooks in Rust services
+  now return a `Result`. The semantics is the same as for transactions;
+  an error or panic in the hook will lead to the rollback of the blockchain
+  state. (#1576)
+- Errors occurring while executing transactions and `before_transactions` /
+  `after_transactions` hooks are now aggregated within each block, rather than
+  globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+- The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
+  Error fields were made private and information about a failing call
+  was added. (#1585)
+- `ErrorMatch` was introduced to test (e.g., using the testkit) that
+  an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
+  and a corresponding derive macro. (#1585)
+
+### New features
+
+#### exonum
+
+- `before_transactions` hook for services was introduced. (#1577)
+
+## 0.13.0-rc.2 - 2019-12-04
+
+### Breaking changes
+
+#### exonum
+
 - **Most important**: new Dynamic Services feature was introduced. For details see
   the [Dynamic Services](#dynamic-services-feature) section of the changelog.
 
@@ -128,8 +156,8 @@ Key points of this feature are the following:
   For details see the [`Runtime` trait docs][runtime-trait] and the
   [`sample_runtime` example][sample-runtime].
 
-  [runtime-trait]: https://docs.rs/exonum/0.13.0/exonum/runtime/trait.Runtime.html
-  [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13/examples/sample_runtime
+  [runtime-trait]: https://docs.rs/exonum/0.13.0-rc.2/exonum/runtime/trait.Runtime.html
+  [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13.0-rc.2/examples/sample_runtime
 
 - Services are not statically tied to the compiled binary anymore. There is
   support of adding new service types (aka artifacts) dynamically and starting new
@@ -137,7 +165,7 @@ Key points of this feature are the following:
 
   For details see [`runtime` module docs][runtime-docs].
 
-  [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+  [runtime-docs]: https://docs.rs/exonum/0.13.0-rc.2/exonum/runtime/index.html
 
 - Services now can have initialization parameters, provided within service start
   procedure.
@@ -148,7 +176,7 @@ Key points of this feature are the following:
   capable of not only changing configuration, but of deploying and starting
   services as well. For details see [`supervisor` service][supervisor].
 
-  [supervisor]: https://github.com/exonum/exonum/tree/v0.13/services/supervisor
+  [supervisor]: https://github.com/exonum/exonum/tree/v0.13.0-rc.2/services/supervisor
 
 #### Migration Guide
 
@@ -157,7 +185,7 @@ So to make the changes apparent, compare the `Cryptocurrency` example service ve
 for [0.12.1][crypt-0-12] and [0.13.0][crypt-0-13] releases.
 
 [crypt-0-12]: https://github.com/exonum/exonum/blob/v0.12.1/examples/cryptocurrency/
-[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13/examples/cryptocurrency/
+[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13.0-rc.2/examples/cryptocurrency/
 
 Key points:
 

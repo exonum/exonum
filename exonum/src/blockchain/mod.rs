@@ -25,7 +25,7 @@ pub use self::{
     block::{Block, BlockProof, IndexProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
-    schema::{Schema, TxLocation},
+    schema::{CallInBlock, Schema, TxLocation},
 };
 
 pub mod config;
@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemInfo, TemporaryDB,
 };
-use failure::{format_err, Error};
+use failure::Error;
 use futures::Future;
 
 use std::{
@@ -50,7 +50,7 @@ use crate::{
     helpers::{Height, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
     node::ApiSender,
-    runtime::{error::catch_panic, ArtifactSpec, Dispatcher},
+    runtime::{ArtifactSpec, Dispatcher},
 };
 
 mod block;
@@ -236,6 +236,8 @@ impl BlockchainMut {
             self.dispatcher.deploy_artifact(artifact, payload).wait()?
         }
         // Add service instances.
+        // Note that `before_transactions` will not be invoked for services, since
+        // they are added within block (and don't appear from nowhere).
         for inst in genesis_config.builtin_instances {
             self.dispatcher
                 .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
@@ -244,7 +246,7 @@ impl BlockchainMut {
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
         // TODO Unify block creation logic [ECR-3879]
-        self.dispatcher.before_commit(&mut fork);
+        self.dispatcher.after_transactions(&mut fork);
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch)?;
 
@@ -259,7 +261,7 @@ impl BlockchainMut {
         self.dispatcher.notify_runtimes_about_commit(&patch);
         self.merge(patch)?;
 
-        info!(
+        log::info!(
             "GENESIS_BLOCK ====== hash={}",
             self.inner.last_hash().to_hex()
         );
@@ -280,32 +282,47 @@ impl BlockchainMut {
         let mut fork = self.fork();
         // Get last hash.
         let last_hash = self.inner.last_hash();
+
+        // Skip execution for genesis block.
+        if height > Height(0) {
+            let errors = self.dispatcher.before_transactions(&mut fork);
+            let mut call_errors = Schema::new(&fork).call_errors(height);
+            for (location, error) in errors {
+                call_errors.put(&location, error);
+            }
+        }
+
         // Save & execute transactions.
         for (index, hash) in tx_hashes.iter().enumerate() {
-            self.execute_transaction(*hash, height, index, &mut fork, tx_cache)
-                // Execution could fail if the transaction
-                // cannot be deserialized or it isn't in the pool.
-                .expect("Transaction execution error");
+            self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
+
         // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
-            self.dispatcher.before_commit(&mut fork);
+            let errors = self.dispatcher.after_transactions(&mut fork);
+            let mut call_errors = Schema::new(&fork).call_errors(height);
+            for (location, error) in errors {
+                call_errors.put(&location, error);
+            }
         }
         // Get tx & state hash.
-        let tx_hash = Schema::new(&fork).block_transactions(height).object_hash();
+        let schema = Schema::new(&fork);
+        let error_hash = schema.call_errors(height).object_hash();
+        let tx_hash = schema.block_transactions(height).object_hash();
         let patch = fork.into_patch();
         let state_hash = SystemInfo::new(&patch).state_hash();
 
-        // Create block header.
-        let block = Block::new(
+        // Create block.
+        let block = Block {
             proposer_id,
             height,
-            tx_hashes.len() as u32,
-            last_hash,
+            tx_count: tx_hashes.len() as u32,
+            prev_hash: last_hash,
             tx_hash,
             state_hash,
-        );
-        trace!("execute block = {:?}", block);
+            error_hash,
+        };
+        log::trace!("Executing {:?}", block);
 
         // Calculate block hash.
         let block_hash = block.object_hash();
@@ -325,39 +342,27 @@ impl BlockchainMut {
         index: usize,
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), Error> {
+    ) {
         let schema = Schema::new(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
-            .ok_or_else(|| format_err!("BUG: Cannot find transaction {:?} in database", tx_hash))?;
+            .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
-        let tx_result = catch_panic(|| self.dispatcher.execute(fork, tx_hash, &transaction));
-        match &tx_result {
-            Ok(_) => {
-                fork.flush();
-            }
-            Err(e) => {
-                if e.kind == ExecutionErrorKind::Panic {
-                    error!("{:?} transaction execution panicked: {:?}", transaction, e);
-                } else {
-                    // Unlike panic, transaction failure is a regular case. So logging the
-                    // whole transaction body is an overkill: the body can be relatively big.
-                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                }
-                fork.rollback();
-            }
-        }
-
+        let tx_result = self
+            .dispatcher
+            .execute(fork, tx_hash, index as u64, &transaction);
         let mut schema = Schema::new(&*fork);
-        schema
-            .transaction_results()
-            .put(&tx_hash, ExecutionStatus(tx_result));
+
+        if let Err(e) = tx_result {
+            schema
+                .call_errors(height)
+                .put(&CallInBlock::transaction(index as u64), e);
+        }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
-        Ok(())
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
@@ -379,7 +384,7 @@ impl BlockchainMut {
         // Consensus messages cache is useful only during one height, so it should be
         // cleared when a new height is achieved.
         schema.consensus_messages_cache().clear();
-        let txs_in_block = schema.last_block().tx_count();
+        let txs_in_block = schema.last_block().tx_count;
         schema.update_transaction_count(u64::from(txs_in_block));
 
         let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();

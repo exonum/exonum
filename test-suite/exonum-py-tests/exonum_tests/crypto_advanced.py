@@ -20,7 +20,7 @@ class CryptoAdvancedTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = {
           "networks": launcher_networks(self.network),
           "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.12.0"}},
+          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.2"}},
           "instances": {"crypto": {"artifact": "cryptocurrency"}},
         }
 

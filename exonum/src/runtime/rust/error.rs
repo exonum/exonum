@@ -14,12 +14,15 @@
 
 //! The set of specific for the Rust runtime implementation errors.
 
+use exonum_derive::ExecutionFail;
+
 /// List of possible Rust runtime errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[execution_error(crate = "crate", kind = "runtime")]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[execution_fail(crate = "crate", kind = "runtime")]
 pub enum Error {
     /// Unable to parse artifact identifier or specified artifact has non-empty spec.
     IncorrectArtifactId = 0,
-    /// Unable to deploy artifact with the specified identifier, it is not listed in available artifacts.
+    /// Unable to deploy artifact with the specified identifier, it is not listed
+    /// among available artifacts.
     UnableToDeploy = 1,
 }

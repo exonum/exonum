@@ -136,7 +136,7 @@
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
-    error::{ErrorKind, ExecutionError},
+    error::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
         InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
@@ -206,7 +206,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// GENESIS ::= (deploy_artifact | start_adding_service commit_service)* after_commit
 /// RESUME ::= (deploy_artifact | commit_service)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= (execute | start_adding_service)* before_commit*
+/// PROPOSAL ::= before_transactions* (execute | start_adding_service)* after_transactions*
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
@@ -218,8 +218,9 @@ impl From<RuntimeIdentifier> for u32 {
 /// The following methods should return the same result given the same arguments for all nodes
 /// in the blockchain network:
 ///
+/// - `before_transactions`
 /// - `execute`
-/// - `before_commit`
+/// - `after_transactions`
 /// - `start_adding_service`
 ///
 /// All these methods should also produce the same changes
@@ -230,9 +231,9 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Handling Panics
 ///
-/// Unless specified in the method docs, a panic in the `Runtime` methods will **not** be caught
+/// A panic in the `Runtime` methods will **not** be caught
 /// and will cause node termination. You may use [`catch_panic`](error/fn.catch_panic.html) method
-/// to catch panics according to panic policy.
+/// to catch panics in the Rust code and convert them to unchecked execution errors.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
@@ -284,8 +285,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
-    /// The dispatcher does not route transactions and `before_commit` events to the service
-    /// until after `commit_service()` is called with the same instance spec.
+    /// The dispatcher does not route transactions and `before_transactions` / `after_transactions`
+    /// events to the service until after `commit_service()` is called with the same instance spec.
     ///
     /// The runtime should discard the instantiated service instance after completing this method,
     /// unless there are compelling reasons to retain it (e.g., creating an instance takes very
@@ -301,7 +302,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The `Runtime` should catch all panics except for `FatalError`s and convert
     /// them into an `ExecutionError`.
     ///
-    /// Returning an error or panicking provides a way for the `Runtime` to signal that
+    /// Returning an error provides a way for the `Runtime` to signal that
     /// service instantiation has failed. As a rule of a thumb, changes made by the method
     /// will be rolled back after such a signal (the exact logic is determined by the supervisor).
     /// Because an error is one of expected / handled outcomes, verifying prerequisites
@@ -378,9 +379,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - If service does not implement an interface, return `NoSuchInterface` error.
     /// - If the interface does not have a method, return `NoSuchMethod` error.
     ///
-    /// An error or panic returned from this method will lead to the rollback of all changes
-    /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
-    /// into errors.
+    /// An error returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`.
     fn execute(
         &self,
         context: ExecutionContext<'_>,
@@ -388,19 +388,36 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Notifies a service stored in this runtime about the end of the block, allowing it
-    /// to modify the blockchain state after all transactions in the block are processed.
+    /// Notifies a service stored in this runtime about the beginning of the block, allowing it
+    /// to modify the blockchain state before any transaction in the block will be processed.
     ///
-    /// `before_commit` is called for every service active at the beginning of the block
-    /// (i.e., services instantiated within the block do **not** receive a call) exactly
-    /// once for each block.
+    /// `before_transactions` is called for every service active at the beginning of the block
+    /// (i.e., services that will be instantiated within the block do **not** receive a call)
+    /// exactly once for each block. The method is not called for the genesis block.
     ///
     /// # Return value
     ///
     /// An error or panic returned from this method will lead to the rollback of all changes
     /// in the fork enclosed in the `context`. Runtimes can, but are not required to convert panics
     /// into errors.
-    fn before_commit(
+    fn before_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError>;
+
+    /// Notifies a service stored in this runtime about the end of the block, allowing it
+    /// to modify the blockchain state after all transactions in the block are processed.
+    ///
+    /// `after_transactions` is called for every service active at the beginning of the block
+    /// (i.e., services instantiated within the block do **not** receive a call) exactly
+    /// once for each block.
+    ///
+    /// # Return value
+    ///
+    /// An error or panic returned from this method will lead to the rollback of all changes
+    /// in the fork enclosed in the `context`.
+    fn after_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -482,8 +499,8 @@ pub enum Caller {
 
     /// Call is invoked by one of the blockchain lifecycle events.
     ///
-    /// This kind of authorization is used for `before_commit` calls to the service instances,
-    /// and for initialization of builtin services.
+    /// This kind of authorization is used for `before_transactions` / `after_transactions`
+    /// calls to the service instances, and for initialization of builtin services.
     Blockchain,
 }
 
@@ -579,25 +596,32 @@ impl<'a> ExecutionContext<'a> {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        if self.call_stack_depth >= ExecutionContext::MAX_CALL_STACK_DEPTH {
-            let kind = DispatcherError::StackOverflow;
-            let msg = format!(
-                "Maximum depth of call stack has been reached. `MAX_CALL_STACK_DEPTH` is {}.",
-                ExecutionContext::MAX_CALL_STACK_DEPTH
-            );
-            return Err((kind, msg).into());
+        if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
+            let err = DispatcherError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            return Err(err);
         }
 
-        let runtime = self
+        let (runtime_id, runtime) = self
             .dispatcher
             .runtime_for_service(call_info.instance_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
         let reborrowed = self.reborrow_with_interface(interface_name);
-        runtime.execute(reborrowed, call_info, arguments)
+        runtime
+            .execute(reborrowed, call_info, arguments)
+            .map_err(|mut err| {
+                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                    instance_id: call_info.instance_id,
+                    call_type: CallType::Method {
+                        interface: interface_name.to_owned(),
+                        id: call_info.method_id,
+                    },
+                });
+                err
+            })
     }
 
     /// Starts adding a new service instance to the blockchain. The created service is not active
-    /// (i.e., does not process transactions or the `before_commit` hook)
+    /// (i.e., does not process transactions or the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     ///
     /// This method should be called for the exact context passed to the runtime.
@@ -612,7 +636,16 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
-        runtime.start_adding_service(self.reborrow(), &spec, constructor.into_bytes())?;
+        runtime
+            .start_adding_service(self.reborrow(), &spec, constructor.into_bytes())
+            .map_err(|mut err| {
+                err.set_runtime_id(spec.artifact.runtime_id)
+                    .set_call_site(|| CallSite {
+                        instance_id: spec.id,
+                        call_type: CallType::Constructor,
+                    });
+                err
+            })?;
 
         // Add service instance to the dispatcher schema.
         DispatcherSchema::new(&*self.fork)

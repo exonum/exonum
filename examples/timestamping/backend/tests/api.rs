@@ -191,6 +191,7 @@ fn test_api_can_not_add_same_content_hash() {
         &json!({
             "type": "service_error",
             "code": 0,
+            "instance_id": SERVICE_ID,
             "description": "Content hash already exists."
         }),
     );

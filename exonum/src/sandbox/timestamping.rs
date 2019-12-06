@@ -80,12 +80,20 @@ pub struct TimestampingTxGenerator {
     data_size: usize,
     public_key: PublicKey,
     secret_key: SecretKey,
+    instance_id: InstanceId,
 }
 
 impl TimestampingTxGenerator {
-    pub fn new(data_size: usize) -> TimestampingTxGenerator {
+    pub fn new(data_size: usize) -> Self {
         let keypair = gen_keypair();
         TimestampingTxGenerator::with_keypair(data_size, keypair)
+    }
+
+    /// Creates a generator of transactions for a service not instantiated on the blockchain.
+    pub fn for_incorrect_service(data_size: usize) -> Self {
+        let mut this = Self::new(data_size);
+        this.instance_id += 1;
+        this
     }
 
     pub fn with_keypair(
@@ -99,17 +107,8 @@ impl TimestampingTxGenerator {
             data_size,
             public_key: keypair.0,
             secret_key: keypair.1,
+            instance_id: TimestampingService::ID,
         }
-    }
-
-    /// Generates not signed `TimestampTx`.
-    pub fn gen_tx_payload(&mut self) -> TimestampTx {
-        let mut data = vec![0; self.data_size];
-        self.rand.fill_bytes(&mut data);
-        let mut tx = TimestampTx::new();
-        tx.set_data(data);
-
-        tx
     }
 }
 
@@ -117,7 +116,10 @@ impl Iterator for TimestampingTxGenerator {
     type Item = Verified<AnyTx>;
 
     fn next(&mut self) -> Option<Verified<AnyTx>> {
-        let tx = self.gen_tx_payload();
-        Some(tx.sign(TimestampingService::ID, self.public_key, &self.secret_key))
+        let mut data = vec![0; self.data_size];
+        self.rand.fill_bytes(&mut data);
+        let mut tx = TimestampTx::new();
+        tx.set_data(data);
+        Some(tx.sign(self.instance_id, self.public_key, &self.secret_key))
     }
 }

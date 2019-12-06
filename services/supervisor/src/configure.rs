@@ -90,25 +90,19 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         match method {
-            VERIFY_CONFIG_METHOD_ID => self.verify_config(
-                context,
-                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
-            ),
-
-            APPLY_CONFIG_METHOD_ID => self.apply_config(
-                context,
-                T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?,
-            ),
-
-            other => {
-                let kind = DispatcherError::NoSuchMethod;
-                let message = format!(
-                    "Method with ID {} is absent in the 'Configure' interface of the instance `{}`",
-                    other,
-                    context.instance().name,
-                );
-                Err((kind, message)).map_err(From::from)
+            VERIFY_CONFIG_METHOD_ID => {
+                let params =
+                    T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?;
+                self.verify_config(context, params)
             }
+
+            APPLY_CONFIG_METHOD_ID => {
+                let params =
+                    T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?;
+                self.apply_config(context, params)
+            }
+
+            _ => Err(DispatcherError::NoSuchMethod.into()),
         }
     }
 }

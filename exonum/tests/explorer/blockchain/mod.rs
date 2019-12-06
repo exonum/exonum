@@ -22,12 +22,14 @@ use exonum::{
     node::ApiSender,
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory},
-        AnyTx, InstanceId,
+        AnyTx, ExecutionError, InstanceId,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::{ObjectHash, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
+use serde_derive::*;
 
 use std::collections::BTreeMap;
 
@@ -69,16 +71,21 @@ impl Transfer {
     }
 }
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
-    /// Not allowed
+    /// Not allowed!
     NotAllowed = 0,
 }
 
 #[exonum_interface]
 pub trait ExplorerTransactions {
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError>;
+
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -91,15 +98,19 @@ pub trait ExplorerTransactions {
 struct MyService;
 
 impl ExplorerTransactions for MyService {
-    fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(
+        &self,
+        _context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(Error::NotAllowed)
+            Err(Error::NotAllowed.into())
         }
     }
 
-    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
         panic!("oops");
     }
 }
@@ -143,7 +154,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
-    let height = blockchain.as_ref().last_block().height().next();
+    let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
 
     let mut tx_cache = BTreeMap::new();

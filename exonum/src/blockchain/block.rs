@@ -58,52 +58,10 @@ pub struct Block {
     pub tx_hash: Hash,
     /// Hash of the blockchain state after applying transactions in the block.
     pub state_hash: Hash,
-}
-
-impl Block {
-    /// Create new `Block`.
-    pub fn new(
-        proposer_id: ValidatorId,
-        height: Height,
-        tx_count: u32,
-        prev_hash: Hash,
-        tx_hash: Hash,
-        state_hash: Hash,
-    ) -> Self {
-        Self {
-            proposer_id,
-            height,
-            tx_count,
-            prev_hash,
-            tx_hash,
-            state_hash,
-        }
-    }
-    /// Identifier of the leader node which has proposed the block.
-    pub fn proposer_id(&self) -> ValidatorId {
-        self.proposer_id
-    }
-    /// Height of the block, which is also the number of this particular
-    /// block in the blockchain.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// Number of transactions in this block.
-    pub fn tx_count(&self) -> u32 {
-        self.tx_count
-    }
-    /// Hash link to the previous block in the blockchain.
-    pub fn prev_hash(&self) -> &Hash {
-        &self.prev_hash
-    }
-    /// Root hash of the Merkle tree of transactions in this block.
-    pub fn tx_hash(&self) -> &Hash {
-        &self.tx_hash
-    }
-    /// Hash of the blockchain state after applying transactions in the block.
-    pub fn state_hash(&self) -> &Hash {
-        &self.state_hash
-    }
+    /// Root hash of the Merkle Patricia tree of the erroneous calls performed within the block.
+    /// These calls can include transactions, `before_transactions` and/or `after_transactions` hooks
+    /// for services.
+    pub error_hash: Hash,
 }
 
 /// Block with its `Precommit` messages.
@@ -148,21 +106,17 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-        let block = Block::new(
+        let error_hash = hash(&[10, 11]);
+        let block = Block {
             proposer_id,
             height,
             tx_count,
             prev_hash,
             tx_hash,
             state_hash,
-        );
+            error_hash,
+        };
 
-        assert_eq!(block.proposer_id(), proposer_id);
-        assert_eq!(block.height(), height);
-        assert_eq!(block.tx_count(), tx_count);
-        assert_eq!(block.prev_hash(), &prev_hash);
-        assert_eq!(block.tx_hash(), &tx_hash);
-        assert_eq!(block.state_hash(), &state_hash);
         let json_str = ::serde_json::to_string(&block).unwrap();
         let block1: Block = ::serde_json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);

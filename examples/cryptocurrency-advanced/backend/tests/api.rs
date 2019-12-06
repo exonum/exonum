@@ -123,7 +123,13 @@ fn test_transfer_from_nonexisting_wallet() {
         &json!({
             "type": "service_error",
             "code": 1,
-            "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`."
+            "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
         }),
     );
 
@@ -161,7 +167,13 @@ fn test_transfer_to_nonexisting_wallet() {
         &json!({
             "type": "service_error",
             "code": 2,
-            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`."
+            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
         }),
     );
 
@@ -194,7 +206,13 @@ fn test_transfer_overcharge() {
         &json!({
             "type": "service_error",
             "code": 3,
-            "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`."
+            "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
         }),
     );
 
@@ -251,7 +269,7 @@ impl CryptocurrencyApi {
             .unwrap();
 
         // Check parts of the proof returned together with the wallet.
-        let state_hash = *wallet_info.block_proof.block.state_hash();
+        let state_hash = wallet_info.block_proof.block.state_hash;
         let to_table = wallet_info
             .wallet_proof
             .to_table

@@ -135,7 +135,15 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn before_commit(
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,

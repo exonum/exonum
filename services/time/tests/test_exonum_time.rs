@@ -19,12 +19,11 @@ extern crate pretty_assertions;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::ExecutionErrorKind,
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
     runtime::{
         rust::{ServiceFactory, Transaction},
-        InstanceId, SnapshotExt,
+        ErrorMatch, InstanceId, SnapshotExt,
     },
 };
 use exonum_merkledb::{access::Access, Snapshot};
@@ -257,7 +256,7 @@ fn test_exonum_time_service_with_7_validators() {
         let (pub_key, sec_key) = validator.service_keypair();
         let tx = TxTime { time: times[i] }.sign(INSTANCE_ID, pub_key, &sec_key);
         let block = testkit.create_block_with_transaction(tx);
-        assert!(block[0].status().is_ok(), "{:?}", block);
+        block[0].status().unwrap();
 
         validators_times[i] = Some(times[i]);
 
@@ -362,7 +361,7 @@ fn test_selected_time_less_than_time_in_storage() {
         let time_tx = time_in_storage - Duration::seconds(10);
         let tx = TxTime { time: time_tx }.sign(INSTANCE_ID, pub_key_1, &sec_key_1);
         let block = testkit.create_block_with_transaction(tx);
-        assert!(block[0].status().is_ok(), "{:?}", block);
+        block[0].status().unwrap();
     }
 
     let snapshot = testkit.snapshot();
@@ -381,8 +380,8 @@ fn test_creating_transaction_is_not_validator() {
     let tx = TxTime { time: Utc::now() }.sign(INSTANCE_ID, pub_key, &sec_key);
     let block = testkit.create_block_with_transaction(tx);
     assert_eq!(
-        block[0].status().unwrap_err().kind,
-        ExecutionErrorKind::service(Error::UnknownSender as u8)
+        *block[0].status().unwrap_err(),
+        ErrorMatch::from_fail(&Error::UnknownSender).for_service(INSTANCE_ID)
     );
 
     let snapshot = testkit.snapshot();
@@ -401,7 +400,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let time0 = Utc::now();
     let tx0 = TxTime { time: time0 }.sign(INSTANCE_ID, pub_key, &sec_key);
     let block = testkit.create_block_with_transaction(tx0);
-    assert!(block[0].status().is_ok(), "{:?}", block);
+    block[0].status().unwrap();
 
     let snapshot = testkit.snapshot();
     let schema = get_schema(&snapshot);
@@ -412,8 +411,8 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let tx1 = TxTime { time: time1 }.sign(INSTANCE_ID, pub_key, &sec_key);
     let block = testkit.create_block_with_transaction(tx1);
     assert_eq!(
-        block[0].status().unwrap_err().kind,
-        ExecutionErrorKind::service(Error::ValidatorTimeIsGreater as u8),
+        *block[0].status().unwrap_err(),
+        ErrorMatch::from_fail(&Error::ValidatorTimeIsGreater).for_service(INSTANCE_ID),
     );
 
     let snapshot = testkit.snapshot();

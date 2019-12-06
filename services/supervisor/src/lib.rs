@@ -82,7 +82,7 @@ use exonum::runtime::{
         api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance,
         Service,
     },
-    InstanceId, SUPERVISOR_INSTANCE_ID,
+    ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
 };
 use exonum_derive::*;
 
@@ -120,7 +120,10 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
 
 /// Applies configuration changes.
 /// Upon any failure, execution of this method stops and `Err(())` is returned.
-fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> Result<(), ()> {
+fn update_configs(
+    context: &mut CallContext<'_>,
+    changes: Vec<ConfigChange>,
+) -> Result<(), ExecutionError> {
     for change in changes.into_iter() {
         match change {
             ConfigChange::Consensus(config) => {
@@ -144,11 +147,12 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     .interface::<ConfigureCall<'_>>(config.instance_id)
                     .expect("Obtaining Configure interface failed")
                     .apply_config(config.params.clone())
-                    .map_err(|e| {
+                    .map_err(|err| {
                         log::error!(
                             "An error occurred while applying service configuration. {}",
-                            e
+                            err
                         );
+                        err
                     })?;
             }
 
@@ -164,8 +168,9 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
 
                 context
                     .start_adding_service(instance_spec, config)
-                    .map_err(|e| {
-                        log::error!("Service start request failed. {}", e);
+                    .map_err(|err| {
+                        log::error!("Service start request failed. {}", err);
+                        err
                     })?;
             }
         }
@@ -183,7 +188,7 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
             // Instance ID entry is not initialized, do it now.
             // We have to do it lazy, since dispatcher doesn't know the amount
             // of builtin instances until the genesis block is committed, and
-            // `before_commit` hook is not invoked for services at the genesis
+            // `after_transactions` hook is not invoked for services at the genesis
             // block.
 
             // ID for the new instance is next to the highest builtin ID to avoid
@@ -247,13 +252,12 @@ impl<Mode> Service for Supervisor<Mode>
 where
     Mode: mode::SupervisorMode,
 {
-    fn before_commit(&self, mut context: CallContext<'_>) {
+    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        // Perform a cleanup for outdated requests.
         let mut schema = Schema::new(context.service_data());
-        let core_schema = context.data().for_core();
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        let height = core_schema.height();
+        let height = context.data().for_core().height();
 
-        // Removes pending deploy requests for which deadline was exceeded.
+        // Remove pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema
             .pending_deployments
             .values()
@@ -271,7 +275,21 @@ where
                 // Remove pending config proposal for which deadline was exceeded.
                 log::trace!("Removed outdated config proposal");
                 schema.pending_proposal.remove();
-            } else if entry.config_propose.actual_from == height.next() {
+            }
+        }
+        Ok(())
+    }
+
+    fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        let height = core_schema.height();
+
+        // Check if we should apply a new config.
+        let entry = schema.pending_proposal.get();
+        if let Some(entry) = entry {
+            if entry.config_propose.actual_from == height.next() {
                 // Config should be applied at the next height.
                 if Mode::config_approved(
                     &entry.propose_hash,
@@ -285,22 +303,17 @@ where
 
                     // Remove config from proposals.
                     // If the config update will fail, this entry will be restored due to rollback.
-                    // However, it won't be actual anymore and will be removed at the next height.
+                    // However, it won't be actual anymore and will be removed at the beginning
+                    // of the next height (within `before_transactions` hook).
                     schema.pending_proposal.remove();
                     drop(schema);
 
                     // Perform the application of configs.
-                    let update_result = update_configs(&mut context, entry.config_propose.changes);
-
-                    if update_result.is_err() {
-                        // Panic will cause changes to be rolled back.
-                        // TODO: Return error instead of panic once the signature
-                        // of `before_commit` will allow it. [ECR-3811]
-                        panic!("Config update failed")
-                    }
+                    update_configs(&mut context, entry.config_propose.changes)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Sends confirmation transaction for unconfirmed deployment requests.

@@ -16,9 +16,9 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.12.0"
-exonum-cli = "0.12.0"
-exonum-time = "0.12.0"
+exonum = "0.13.0-rc.2"
+exonum-cli = "0.13.0-rc.2"
+exonum-time = "0.13.0-rc.2"
 ```
 
 Add the time oracle service to the blockchain in the main project file:
@@ -82,13 +82,6 @@ pub struct MarkerSchema<T: Access> {
     pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
 }
 
-impl<T: Access> MarkerSchema<T> {
-    /// Returns hashes for stored table.
-    fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks.object_hash()]
-    }
-}
-
 impl MarkerTransactions for MarkerService {
     fn mark(
       &self,
@@ -113,12 +106,6 @@ impl MarkerTransactions for MarkerService {
             _ => {}
         }
         Ok(())
-    }
-}
-
-impl Service for MarkerService {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        MarkerSchema::new(data.for_executing_service()).state_hash()
     }
 }
 ```

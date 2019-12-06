@@ -14,6 +14,7 @@
 
 //! Tests in this module are designed to test details of round timeout handling.
 
+use exonum_crypto::Hash;
 use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
@@ -21,7 +22,7 @@ use std::time::Duration;
 use crate::{
     helpers::{Height, Round, ValidatorId},
     node::state::PROPOSE_REQUEST_TIMEOUT,
-    sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 
 /// HANDLE ROUND TIMEOUT:
@@ -41,10 +42,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         .build();
 
     // this block with transactions should be in real
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -245,7 +243,7 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
         ValidatorId(2),
         Height(1),
         Round(2),
-        empty_hash(),
+        Hash::zero(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(2)),
     ));

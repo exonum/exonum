@@ -18,16 +18,16 @@ use exonum::{
     api::{
         self,
         backends::actix::{HttpRequest, RawHandler, RequestHandler},
+        node::public::explorer::TransactionResponse,
         ApiBackend,
     },
     blockchain::{IndexProof, ValidatorKeys},
-    crypto::Hash,
     runtime::{
         rust::{
             api::{ServiceApiBuilder, ServiceApiState},
             CallContext, DefaultInstance, Service,
         },
-        InstanceId,
+        ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -89,25 +89,29 @@ impl Increment {
     }
 }
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Adding zero does nothing!
     AddingZero = 0,
+    /// What's the question?
+    AnswerToTheUltimateQuestion = 1,
+    /// Number 13 is considered unlucky by some cultures.
+    BadLuck = 2,
 }
 
 #[exonum_interface]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error>;
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError>;
 
-    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), Error>;
+    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), ExecutionError>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error> {
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError> {
         if arg.by == 0 {
-            return Err(Error::AddingZero);
+            return Err(Error::AddingZero.into());
         }
 
         let mut schema = CounterSchema::new(context.service_data());
@@ -115,7 +119,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), Error> {
+    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), ExecutionError> {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -125,19 +129,14 @@ impl CounterServiceInterface for CounterService {
 // // // // API // // // //
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TransactionResponse {
-    pub tx_hash: Hash,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct CounterWithProof {
-    counter: u64,
+    counter: Option<u64>,
     proof: IndexProof,
 }
 
 impl CounterWithProof {
     /// Verifies the proof against the known set of validators. Panics on an error.
-    pub fn verify(&self, validators: &[ValidatorKeys]) -> u64 {
+    pub fn verify(&self, validators: &[ValidatorKeys]) -> Option<u64> {
         let block_hash = self.proof.block_proof.block.object_hash();
 
         // Check precommits.
@@ -155,7 +154,7 @@ impl CounterWithProof {
             "Insufficient number of precommits"
         );
 
-        let state_hash = *self.proof.block_proof.block.state_hash();
+        let state_hash = self.proof.block_proof.block.state_hash;
         let index_proof = self
             .proof
             .index_proof
@@ -172,7 +171,10 @@ impl CounterWithProof {
         );
         assert_eq!(
             *value_hash,
-            self.counter.object_hash(),
+            self.counter
+                .as_ref()
+                .map(ObjectHash::object_hash)
+                .unwrap_or_default(),
             "Invalid counter value in proof"
         );
         self.counter
@@ -185,7 +187,7 @@ impl CounterWithProof {
 
     /// Mauls the proof by mutating the value.
     pub fn maul_value(&mut self) {
-        self.counter += 1;
+        self.counter = Some(self.counter.unwrap_or_default() + 1);
     }
 }
 
@@ -211,7 +213,7 @@ impl CounterApi {
             .ok_or_else(|| api::Error::NotFound("counter not initialized".to_owned()))?;
         let schema = CounterSchema::new(state.service_data());
         Ok(CounterWithProof {
-            counter: schema.counter.get().unwrap_or_default(),
+            counter: schema.counter.get(),
             proof,
         })
     }
@@ -297,6 +299,25 @@ impl DefaultInstance for CounterService {
 }
 
 impl Service for CounterService {
+    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let mut schema = CounterSchema::new(context.service_data());
+        if schema.counter.get() == Some(13) {
+            schema.counter.set(0);
+            Err(Error::BadLuck.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let schema = CounterSchema::new(context.service_data());
+        if schema.counter.get() == Some(42) {
+            Err(Error::AnswerToTheUltimateQuestion.into())
+        } else {
+            Ok(())
+        }
+    }
+
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CounterApi::wire(builder)
     }

@@ -127,7 +127,13 @@ fn test_transfer_from_nonexisting_wallet() {
         &json!({
             "type": "service_error",
             "code": 1,
-            "description": "Sender doesn\'t exist.\n\nCan be emitted by `TxTransfer`."
+            "description": "Sender doesn\'t exist.\n\nCan be emitted by `TxTransfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": INSTANCE_ID,
+                "method_id": 1,
+            },
         }),
     );
 
@@ -165,7 +171,13 @@ fn test_transfer_to_nonexisting_wallet() {
         &json!({
             "type": "service_error",
             "code": 2,
-            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `TxTransfer`."
+            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `TxTransfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": INSTANCE_ID,
+                "method_id": 1,
+            },
         }),
     );
 
@@ -197,8 +209,14 @@ fn test_transfer_overcharge() {
         tx.object_hash(),
         &json!({
             "type": "service_error",
-            "code": 3, "description":
-            "Insufficient currency amount.\n\nCan be emitted by `TxTransfer`."
+            "code": 3,
+            "description": "Insufficient currency amount.\n\nCan be emitted by `TxTransfer`.",
+            "runtime_id": 0,
+            "call_site": {
+                "call_type": "method",
+                "instance_id": INSTANCE_ID,
+                "method_id": 1,
+            },
         }),
     );
 

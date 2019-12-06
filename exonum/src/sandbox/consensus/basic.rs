@@ -241,7 +241,7 @@ fn test_retrieve_block_and_precommits() {
     let expected_height = target_height.previous();
     let expected_block_hash = block.object_hash();
 
-    assert_eq!(expected_height, block.height());
+    assert_eq!(expected_height, block.height);
     for precommit in precommits {
         assert_eq!(expected_height, precommit.payload().height);
         assert_eq!(expected_block_hash, precommit.payload().block_hash);

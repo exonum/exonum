@@ -14,7 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::rust::CallContext;
+use exonum::runtime::{rust::CallContext, DispatcherError, ExecutionError};
 use exonum_proto::ProtobufConvert;
 use exonum_time::schema::TimeSchema;
 
@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Content hash already exists.
     HashAlreadyExists = 0,
@@ -51,16 +51,15 @@ pub struct Config {
 
 #[exonum_interface]
 pub trait TimestampingInterface {
-    fn timestamp(&self, ctx: CallContext<'_>, arg: TxTimestamp) -> Result<(), Error>;
+    fn timestamp(&self, ctx: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
 }
 
 impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), Error> {
-        let tx_hash = context
+    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError> {
+        let (tx_hash, _) = context
             .caller()
             .as_transaction()
-            .expect("Wrong `TxTimestamp` initiator")
-            .0;
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
         let config = schema.config.get().expect("Can't read service config");
@@ -68,15 +67,15 @@ impl TimestampingInterface for TimestampingService {
         let data = context.data();
         let time_service_data = data
             .for_service(config.time_service_name.as_str())
-            .expect("No time service schema");
+            .ok_or(Error::TimeServiceNotFound)?;
         let time = TimeSchema::new(time_service_data)
             .time
             .get()
-            .expect("Can't get the time");
+            .ok_or(Error::TimeServiceNotFound)?;
 
         let hash = &arg.content.content_hash;
         if schema.timestamps.get(hash).is_some() {
-            Err(Error::HashAlreadyExists)
+            Err(Error::HashAlreadyExists.into())
         } else {
             trace!("Timestamp added: {:?}", arg);
             let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
