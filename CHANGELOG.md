@@ -10,6 +10,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_commit` hook was renamed to the `after_transactions`. (#1577)
+- `before_transactions` and `after_transactions` hooks in Rust services
+  now return a `Result`. The semantics is the same as for transactions;
+  an error or panic in the hook will lead to the rollback of the blockchain
+  state. (#1576)
+- Errors occurring while executing transactions and `before_transactions` /
+  `after_transactions` hooks are now aggregated within each block, rather than
+  globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+- The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
+  Error fields were made private and information about a failing call
+  was added. (#1585)
+- `ErrorMatch` was introduced to test (e.g., using the testkit) that
+  an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
+  and a corresponding derive macro. (#1585)
 
 #### exonum-supervisor
 

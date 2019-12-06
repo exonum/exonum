@@ -15,7 +15,7 @@ enum ExecutionType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ExecutionStatus {
+pub(super) struct ExecutionStatus {
     #[serde(rename = "type")]
     typ: ExecutionType,
     #[serde(skip_serializing_if = "String::is_empty", default)]
@@ -28,9 +28,9 @@ struct ExecutionStatus {
     call_site: Option<CallSite>,
 }
 
-impl From<&Result<(), ExecutionError>> for ExecutionStatus {
-    fn from(inner: &Result<(), ExecutionError>) -> Self {
-        if let Err(err) = &inner {
+impl From<Result<(), &ExecutionError>> for ExecutionStatus {
+    fn from(inner: Result<(), &ExecutionError>) -> Self {
+        if let Err(err) = inner {
             let (typ, code) = match err.kind {
                 ErrorKind::Unexpected => (ExecutionType::UnexpectedError, None),
                 ErrorKind::Dispatcher { code } => (ExecutionType::DispatcherError, Some(code)),
@@ -60,7 +60,7 @@ impl From<&Result<(), ExecutionError>> for ExecutionStatus {
 impl ExecutionStatus {
     /// Converts an execution status from an untrusted format (e.g., received in JSON via HTTP API)
     /// into an actionable `Result`.
-    fn into_result(self) -> Result<Result<(), ExecutionError>, &'static str> {
+    pub(super) fn into_result(self) -> Result<Result<(), ExecutionError>, &'static str> {
         Ok(if let ExecutionType::Success = self.typ {
             Ok(())
         } else {
@@ -97,7 +97,7 @@ pub fn serialize<S>(inner: &Result<(), ExecutionError>, serializer: S) -> Result
 where
     S: Serializer,
 {
-    ExecutionStatus::from(inner).serialize(serializer)
+    ExecutionStatus::from(inner.as_ref().map(|_| ())).serialize(serializer)
 }
 
 pub fn deserialize<'a, D>(deserializer: D) -> Result<Result<(), ExecutionError>, D::Error>

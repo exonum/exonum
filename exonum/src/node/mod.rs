@@ -474,7 +474,7 @@ impl NodeHandler {
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.as_ref().last_block();
-            (block.object_hash(), block.height().next())
+            (block.object_hash(), block.height.next())
         };
 
         let snapshot = blockchain.snapshot();

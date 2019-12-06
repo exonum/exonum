@@ -78,7 +78,7 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::config::InstanceInitParams,
+    blockchain::{config::InstanceInitParams, ExecutionError},
     crypto::Hash,
     runtime::{
         rust::{
@@ -115,7 +115,10 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
 
 /// Applies configuration changes.
 /// Upon any failure, execution of this method stops and `Err(())` is returned.
-fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> Result<(), ()> {
+fn update_configs(
+    context: &mut CallContext<'_>,
+    changes: Vec<ConfigChange>,
+) -> Result<(), ExecutionError> {
     for change in changes.into_iter() {
         match change {
             ConfigChange::Consensus(config) => {
@@ -139,11 +142,12 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
                     .interface::<ConfigureCall<'_>>(config.instance_id)
                     .expect("Obtaining Configure interface failed")
                     .apply_config(config.params.clone())
-                    .map_err(|e| {
+                    .map_err(|err| {
                         log::error!(
                             "An error occurred while applying service configuration. {}",
-                            e
+                            err
                         );
+                        err
                     })?;
             }
 
@@ -159,8 +163,9 @@ fn update_configs(context: &mut CallContext<'_>, changes: Vec<ConfigChange>) -> 
 
                 context
                     .start_adding_service(instance_spec, config)
-                    .map_err(|e| {
-                        log::error!("Service start request failed. {}", e);
+                    .map_err(|err| {
+                        log::error!("Service start request failed. {}", err);
+                        err
                     })?;
             }
         }
@@ -269,7 +274,7 @@ impl Service for Supervisor {
         Schema::new(data.for_executing_service()).state_hash()
     }
 
-    fn before_transactions(&self, context: CallContext<'_>) {
+    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         // Perform a cleanup for outdated requests.
         let mut schema = Schema::new(context.service_data());
         let core_schema = context.data().for_core();
@@ -295,9 +300,10 @@ impl Service for Supervisor {
                 schema.pending_proposal.remove();
             }
         }
+        Ok(())
     }
 
-    fn after_transactions(&self, mut context: CallContext<'_>) {
+    fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.service_data());
         let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
@@ -327,17 +333,11 @@ impl Service for Supervisor {
                     drop(schema);
 
                     // Perform the application of configs.
-                    let update_result = update_configs(&mut context, entry.config_propose.changes);
-
-                    if update_result.is_err() {
-                        // Panic will cause changes to be rolled back.
-                        // TODO: Return error instead of panic once the signature
-                        // of `after_transactions` will allow it. [ECR-3811]
-                        panic!("Config update failed")
-                    }
+                    update_configs(&mut context, entry.config_propose.changes)?;
                 }
             }
         }
+        Ok(())
     }
 
     /// Sends confirmation transaction for unconfirmed deployment requests.
