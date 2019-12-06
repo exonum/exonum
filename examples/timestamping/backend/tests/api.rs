@@ -192,8 +192,8 @@ fn test_api_can_not_add_same_content_hash() {
             "type": "service_error",
             "call_site": {
                 "call_type": "method",
-                "instance_id": SERVICE_ID,
-                "method_id": 0,
+                "instance_id": 3,
+                "method_id": 0
             },
             "code": 0,
             "description": "Content hash already exists.",

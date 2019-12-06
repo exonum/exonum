@@ -15,6 +15,7 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
+use exonum_crypto::Hash;
 use exonum_merkledb::ObjectHash;
 
 use crate::{
@@ -72,7 +73,7 @@ fn ignore_propose_with_incorrect_prev_hash() {
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_prev_hash(&empty_hash())
+        .with_prev_hash(&Hash::zero())
         .build();
 
     sandbox.recv(&propose);

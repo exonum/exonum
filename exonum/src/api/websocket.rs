@@ -108,8 +108,8 @@ impl CommittedTransactionSummary {
         let tx = tx.as_ref();
         let service_id = tx.call_info.instance_id as u16;
         let tx_id = tx.call_info.method_id as u16;
-        let tx_result = schema.transaction_results().get(tx_hash)?;
         let location = schema.transactions_locations().get(tx_hash)?;
+        let tx_result = schema.transaction_result(location)?;
         let location_proof = schema
             .block_transactions(location.block_height())
             .get_proof(location.position_in_block());
@@ -123,7 +123,7 @@ impl CommittedTransactionSummary {
             tx_hash: *tx_hash,
             service_id,
             message_id: tx_id,
-            status: tx_result,
+            status: ExecutionStatus(tx_result),
             location,
             location_proof,
             time,
@@ -298,7 +298,7 @@ impl Handler<Broadcast> for Server {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let block = schema.blocks().get(&block_hash).unwrap();
-        let height = block.height();
+        let height = block.height;
         let block_header = Notification::Block(block);
 
         // Notify about block

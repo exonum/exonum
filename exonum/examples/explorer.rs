@@ -15,25 +15,20 @@
 //! Examples of usage of a blockchain explorer.
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::{
-    blockchain::BlockchainMut,
+    blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
+    merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
     runtime::rust::Transaction as _,
 };
-use exonum_merkledb::ObjectHash;
+use serde_json::json;
 
-use std::iter;
+use std::{collections::BTreeMap, iter};
 
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
@@ -146,7 +141,8 @@ fn main() {
     );
 
     // JSON for erroneous transactions
-    let erroneous_tx = explorer.block(Height(1)).unwrap().transaction(1).unwrap();
+    let block_info = explorer.block(Height(1)).unwrap();
+    let erroneous_tx = block_info.transaction(1).unwrap();
     assert_eq!(
         serde_json::to_value(&erroneous_tx).unwrap(),
         json!({
@@ -168,6 +164,33 @@ fn main() {
             "time": erroneous_tx.time(),
         })
     );
+
+    // `BlockWithTransactions` contains errors that have occurred during block execution.
+    for (i, error) in block.errors.iter().enumerate() {
+        println!("Error #{}: {}", i + 1, error);
+    }
+    // In this block, two errors correspond to 2nd and 3rd transactions. Originally, errors
+    // are stored in a `Vec` for serialization reasons, but they can be converted
+    // into a `BTreeMap` with a builtin method.
+    let errors: BTreeMap<_, _> = block.error_map();
+    assert_eq!(errors.len(), 2);
+    assert_eq!(
+        errors[&CallInBlock::transaction(1)].description(),
+        "Not allowed!"
+    );
+    assert_eq!(
+        errors[&CallInBlock::transaction(2)].kind(),
+        ExecutionErrorKind::Unexpected
+    );
+
+    // It is possible to extract a proof of a transaction error using `BlockInfo`. The proof is tied
+    // to the `error_hash` mentioned in the block header.
+    let proof: MapProof<_, _> = block_info.error_proof(CallInBlock::transaction(1));
+    let proof = proof
+        .check_against_hash(block_info.header().error_hash)
+        .unwrap();
+    let (_, error) = proof.entries().next().unwrap();
+    assert_eq!(error.description(), "Not allowed!");
 
     // JSON for a transaction with a panic in service code (termed "unexpected errors"
     // for compatibility with other runtimes).
@@ -236,7 +259,7 @@ fn main() {
     // Determine the number of blocks proposed by a specific validator
     let block_count = explorer
         .blocks(Height(1)..) // skip genesis block
-        .filter(|block| block.header().proposer_id() == ValidatorId(0))
+        .filter(|block| block.header().proposer_id == ValidatorId(0))
         .count();
     assert_eq!(block_count, 1);
 }

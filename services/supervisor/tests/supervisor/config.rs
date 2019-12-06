@@ -16,16 +16,17 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
 use exonum::{
+    blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
     runtime::{
         rust::{ServiceFactory, Transaction},
-        ErrorMatch, InstanceId, SUPERVISOR_INSTANCE_ID,
+        ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
-use exonum_supervisor::{ConfigVote, DecentralizedSupervisor, Error, SupervisorInterface};
+use exonum_supervisor::{ConfigVote, Error, Supervisor, SupervisorInterface};
 
 #[test]
 fn test_multiple_consensus_change_proposes() {
@@ -486,16 +487,18 @@ fn test_another_configuration_change_proposal() {
 fn test_service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
     let keypair = crypto::gen_keypair();
-    let fake_supervisor = DecentralizedSupervisor::new();
-    let fake_supervisor_artifact = fake_supervisor.artifact_id();
+    let fake_supervisor_artifact = Supervisor.artifact_id();
+
+    let fake_supervisor_instance = fake_supervisor_artifact
+        .clone()
+        .into_default_instance(FAKE_SUPERVISOR_ID, "fake-supervisor")
+        .with_constructor(Supervisor::decentralized_config());
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_artifact(fake_supervisor_artifact.clone())
-        .with_instance(
-            fake_supervisor_artifact.into_default_instance(FAKE_SUPERVISOR_ID, "fake-supervisor"),
-        )
-        .with_rust_service(fake_supervisor)
+        .with_rust_service(Supervisor)
+        .with_artifact(fake_supervisor_artifact)
+        .with_instance(fake_supervisor_instance)
         .with_default_rust_service(ConfigChangeService)
         .create();
 
@@ -586,6 +589,13 @@ fn test_service_config_discard_single_apply_error() {
         .expect("Transaction with change propose discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+    let snapshot = testkit.snapshot();
+    let err = snapshot
+        .for_core()
+        .call_errors(testkit.height())
+        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
+        .unwrap();
+    assert!(err.description().contains("IncService: Configure error"));
 
     // Create one more block for supervisor to remove failed config.
     testkit.create_block();
@@ -614,6 +624,14 @@ fn test_service_config_discard_single_apply_panic() {
         .status()
         .expect("Transaction with change propose discarded.");
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+
+    let snapshot = testkit.snapshot();
+    let err = snapshot
+        .for_core()
+        .call_errors(testkit.height())
+        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
+        .unwrap();
+    assert!(err.description().contains("Configure panic"));
 
     // Create one more block for supervisor to remove failed config.
     testkit.create_block();

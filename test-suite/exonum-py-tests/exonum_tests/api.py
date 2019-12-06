@@ -93,7 +93,14 @@ class ApiTest(unittest.TestCase):
 
     def test_get_blocks_with_precommits(self):
         """Tests the `blocks` endpoint. Check response for blocks with precommits"""
-        # TODO: Add test after ECR-3875 is implemented
+
+        time.sleep(2)
+        for validator_id in range(self.network.validators_count()):
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            blocks_response = client.get_blocks(count=1, add_precommits=True)
+            self.assertEqual(blocks_response.status_code, 200)
+            self.assertEqual(len(blocks_response.json()['blocks'][0]['precommits']), 3)
 
     def test_get_n_latest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N latest blocks"""
@@ -106,6 +113,7 @@ class ApiTest(unittest.TestCase):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
             blocks_response = client.get_blocks(count=number_of_blocks, latest=latest)
+            self.assertEqual(len(blocks_response.json()['blocks']), latest+1)
             for block in blocks_response.json()['blocks']:
                 self.assertEqual(int(block['height']), height_counter)
                 height_counter -= 1
@@ -123,11 +131,38 @@ class ApiTest(unittest.TestCase):
 
     def test_get_n_earliest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N earliest blocks"""
-        # TODO: Add test after ECR-3875 is implemented
+
+        earliest = 20
+        number_of_blocks = 15
+        time.sleep(5)
+        for validator_id in range(self.network.validators_count()):
+            height_counter = earliest
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            blocks_response = client.get_blocks(count=number_of_blocks, earliest=earliest)
+            latest_height = int(blocks_response.json()['blocks'][0]['height'])
+            self.assertEqual(len(blocks_response.json()['blocks']), latest_height - earliest + 1)
+            # blocks must be started from 'earliest' height
+            for block in reversed(blocks_response.json()['blocks']):
+                self.assertEqual(int(block['height']), height_counter)
+                height_counter += 1
 
     def test_get_mix_latest_earliest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N latest and earliest blocks"""
-        # TODO: Add test after ECR-3875 is implemented
+
+        latest = 10
+        earliest = 5
+        number_of_blocks = 15
+        time.sleep(5)
+        for validator_id in range(self.network.validators_count()):
+            height_counter = latest
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            blocks_response = client.get_blocks(count=number_of_blocks, latest=latest, earliest=earliest)
+            self.assertEqual(len(blocks_response.json()['blocks']), latest - earliest + 1)
+            for block in blocks_response.json()['blocks']:
+                self.assertEqual(int(block['height']), height_counter)
+                height_counter -= 1
 
     def test_get_unknown_transaction(self):
         """Tests the `transactions` endpoint. Check response for unknown transaction"""
