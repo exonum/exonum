@@ -44,13 +44,68 @@ mod tests;
 struct ServiceInfo {
     runtime_id: u32,
     name: String,
+    status: InstanceStatus,
+}
+
+/// Lookup table for the committed service instances.
+#[derive(Debug, Default)]
+struct CommittedServices {
+    instances: BTreeMap<InstanceId, ServiceInfo>,
+    instance_names: BTreeMap<String, InstanceId>,
+}
+
+impl CommittedServices {
+    fn insert(&mut self, id: InstanceId, info: ServiceInfo) {
+        let name = info.name.clone();
+        self.instances.insert(id, info);
+        self.instance_names.insert(name, id);
+    }
+
+    fn get_runtime_for_active_instance(&self, id: InstanceId) -> Option<u32> {
+        self.instances.get(&id).and_then(|info| {
+            if info.status.is_active() {
+                Some(info.runtime_id)
+            } else {
+                None
+            }
+        })
+    }
+
+    fn get_instance<'s>(
+        &'s self,
+        id: impl Into<InstanceQuery<'s>>,
+    ) -> Option<(InstanceDescriptor<'s>, InstanceStatus)> {
+        match id.into() {
+            InstanceQuery::Id(id) => {
+                let info = self.instances.get(&id)?;
+                let name = info.name.as_str();
+                Some((InstanceDescriptor { id, name }, info.status))
+            }
+
+            InstanceQuery::Name(name) => {
+                let id = *self.instance_names.get(name)?;
+                let status = self.instances.get(&id)?.status;
+                Some((InstanceDescriptor { id, name }, status))
+            }
+        }
+    }
+
+    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
+        self.instances.iter().filter_map(|(&id, info)| {
+            if info.status.is_active() {
+                Some((id, info.runtime_id))
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
-    service_infos: BTreeMap<InstanceId, ServiceInfo>,
+    service_infos: CommittedServices,
 }
 
 impl Dispatcher {
@@ -64,7 +119,7 @@ impl Dispatcher {
                 .into_iter()
                 .map(|runtime| (runtime.id, runtime.instance))
                 .collect(),
-            service_infos: BTreeMap::new(),
+            service_infos: CommittedServices::default(),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -87,12 +142,13 @@ impl Dispatcher {
         }
         // Restart active service instances.
         for state in schema.instances().values() {
-            debug_assert_eq!(
+            debug_assert_ne!(
                 state.status,
-                InstanceStatus::Active,
-                "BUG: Service instance should not be in pending state."
+                InstanceStatus::None,
+                "BUG: Service instance should has state."
             );
-            self.start_service(snapshot, &state.spec)?;
+
+            self.commit_service_state(snapshot, &state.spec, state.status)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
@@ -283,7 +339,7 @@ impl Dispatcher {
     /// Calls service hooks of the specified type for all active services.
     // FIXME: Use `CallLocation` instead of `CallType` once #1576 is landed
     fn call_service_hooks(&self, fork: &mut Fork, call_type: CallType) {
-        for (&instance_id, info) in &self.service_infos {
+        for (instance_id, runtime_id) in self.service_infos.active_instances() {
             let context = ExecutionContext::new(self, fork, Caller::Blockchain);
             let call_fn = match &call_type {
                 CallType::BeforeTransactions => Runtime::before_transactions,
@@ -291,18 +347,13 @@ impl Dispatcher {
                 _ => unreachable!(),
             };
 
-            let mut res = call_fn(
-                self.runtimes[&info.runtime_id].as_ref(),
-                context,
-                instance_id,
-            );
+            let mut res = call_fn(self.runtimes[&runtime_id].as_ref(), context, instance_id);
             if let Err(ref mut err) = res {
                 fork.rollback();
-                err.set_runtime_id(info.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: call_type.clone(),
-                    });
+                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                    instance_id,
+                    call_type: call_type.clone(),
+                });
                 Self::report_error(err, fork, instance_id, &call_type);
             } else {
                 fork.flush();
@@ -341,9 +392,9 @@ impl Dispatcher {
             self.block_until_deployed(spec.artifact, spec.payload);
         }
         // Notify runtime about changes in service instances.
-        for (spec, _status) in schema.take_modified_instances() {
-            self.start_service(snapshot, &spec)
-                .expect("Cannot start service");
+        for (spec, status) in schema.take_modified_instances() {
+            self.commit_service_state(snapshot, &spec, status)
+                .expect("Cannot commit service");
         }
     }
 
@@ -393,57 +444,64 @@ impl Dispatcher {
         &self,
         instance_id: InstanceId,
     ) -> Option<(u32, &dyn Runtime)> {
-        let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
+        let runtime_id = self
+            .service_infos
+            .get_runtime_for_active_instance(instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
-        Some((*runtime_id, runtime))
+        Some((runtime_id, runtime))
     }
 
     /// Returns the service matching the specified query.
     pub(crate) fn get_service<'s>(
         &'s self,
-        fork: &Fork,
         id: impl Into<InstanceQuery<'s>>,
     ) -> Option<InstanceDescriptor<'s>> {
-        match id.into() {
-            InstanceQuery::Id(id) => {
-                let name = self.service_infos.get(&id)?.name.as_str();
-                Some(InstanceDescriptor { id, name })
-            }
-
-            InstanceQuery::Name(name) => {
-                // TODO: This may be slow.
-                let id = Schema::new(fork).instances().get(name)?.spec.id;
-                Some(InstanceDescriptor { id, name })
-            }
-        }
+        self.service_infos
+            .get_instance(id)
+            .and_then(|(descriptor, status)| {
+                if status.is_active() {
+                    Some(descriptor)
+                } else {
+                    None
+                }
+            })
     }
 
-    /// Notify the runtimes that it has to shutdown.
+    /// Notifies the runtimes that it has to shutdown.
     pub(crate) fn shutdown(&mut self) {
         for runtime in self.runtimes.values_mut() {
             runtime.shutdown();
         }
     }
 
-    /// Start a previously committed service instance.
-    fn start_service(
+    /// Commits service instance state in the corresponding runtime.
+    fn commit_service_state(
         &mut self,
         snapshot: &dyn Snapshot,
         instance: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         // Notify the runtime that the service has been committed.
         let runtime = self
             .runtimes
             .get_mut(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
-        runtime.commit_service(snapshot, instance)?;
+        // TODO Rewrite runtime API to pass status to runtime.
+        if status.is_active() {
+            runtime.commit_service(snapshot, instance)?;
+        }
 
-        info!("Running service instance {:?}", instance);
+        info!(
+            "Committing service instance {:?} with status {}",
+            instance, status
+        );
+
         self.service_infos.insert(
             instance.id,
             ServiceInfo {
                 runtime_id: instance.artifact.runtime_id,
                 name: instance.name.to_owned(),
+                status,
             },
         );
         Ok(())

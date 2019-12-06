@@ -424,6 +424,13 @@ pub enum InstanceStatus {
     Stopped = 2,
 }
 
+impl InstanceStatus {
+    /// Indicates whether the service instance status is active.
+    pub fn is_active(self) -> bool {
+        self == InstanceStatus::Active
+    }
+}
+
 impl Display for InstanceStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -524,6 +531,11 @@ impl InstanceState {
             status,
             next_status: InstanceStatus::None,
         }
+    }
+
+    /// Indicates whether the service instance status is active.
+    pub fn is_active(&self) -> bool {
+        self.status.is_active()
     }
 
     /// Sets next status as current and changes next status to `None`

@@ -74,7 +74,7 @@ impl<'a> CallContext<'a> {
         let descriptor = self
             .inner
             .dispatcher
-            .get_service(self.inner.fork, called_id)
+            .get_service(called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         Ok(CallContext {
             inner: self.inner.child_context(self.instance.id),

@@ -72,7 +72,9 @@ fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
 ) -> Option<Prefixed<'static, T>> {
-    let state = DispatcherSchema::new(access.clone()).get_instance(id)?;
+    let state = DispatcherSchema::new(access.clone())
+        .get_instance(id)
+        .filter(|state| state.is_active())?;
     Some(Prefixed::new(state.spec.name, access))
 }
 
