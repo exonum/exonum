@@ -17,18 +17,22 @@
 use failure::Error;
 
 pub use self::schema::{
-    blockchain::{ActiveServices, Block, BlockHeaderEntry, ServiceInfo, TxLocation},
+    blockchain::{ActiveServices, Block, ServiceInfo, TxLocation},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
         TransactionsResponse,
     },
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
+
 };
+pub use self::binary_map::BinaryMap;
+
 use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
 
 pub mod schema;
+mod binary_map;
 
 #[cfg(test)]
 mod tests;

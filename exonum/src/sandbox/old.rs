@@ -17,7 +17,7 @@ use std::time::Duration;
 use exonum_merkledb::{HashTag, ObjectHash};
 
 use crate::{
-    blockchain::Block,
+    blockchain::{Block, BlockHeaderEntries},
     helpers::{Height, Round, ValidatorId},
 };
 
@@ -105,7 +105,7 @@ fn test_get_lock_and_send_precommit() {
         sandbox.last_hash(),
         HashTag::empty_list_hash(),
         sandbox.last_state_hash(),
-        Vec::new(),
+        BlockHeaderEntries::new(),
     );
 
     sandbox.recv(&propose);
@@ -166,7 +166,7 @@ fn test_commit() {
         sandbox.last_hash(),
         HashTag::empty_list_hash(),
         sandbox.last_state_hash(),
-        Vec::new(),
+        BlockHeaderEntries::new(),
     );
 
     sandbox.recv(&propose);

@@ -17,9 +17,27 @@ use crate::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{Precommit, Verified},
-    proto,
+    proto::{self, BinaryMap},
 };
 use exonum_merkledb::BinaryValue;
+use std::borrow::Cow;
+
+pub type BlockHeaderEntries = BinaryMap<String, Vec<u8>>;
+
+impl BlockHeaderEntries {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn insert<K: Into<String>, V: BinaryValue>(&mut self, key: K, value: V) {
+        self.0.insert(key.into(), value.to_bytes());
+    }
+
+    pub fn get<K: Into<String>, V: BinaryValue>(&mut self, key: K) -> Option<V> {
+        let value = self.0.get(&key.into())?;
+        BinaryValue::from_bytes(Cow::Borrowed(value)).ok()
+    }
+}
 
 /// Exonum block header data structure.
 ///
@@ -59,41 +77,7 @@ pub struct Block {
     pub state_hash: Hash,
 
     /// TODO: add doc
-    pub entries: Vec<BlockHeaderEntry>,
-}
-
-/// TODO: add doc
-#[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    Ord,
-    PartialOrd,
-    Debug,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
-#[protobuf_convert(source = "proto::BlockHeaderEntry")]
-pub struct BlockHeaderEntry {
-    /// TODO: add doc
-    pub key: String,
-    /// TODO: add doc
-    pub value: Vec<u8>,
-}
-
-/// TODO: add doc
-impl BlockHeaderEntry {
-    /// TODO: add doc
-    pub fn from<T>(key: String, value: T) -> Self
-    where
-        T: BinaryValue,
-    {
-        let value = value.to_bytes();
-        Self { key, value }
-    }
+    pub entries: BlockHeaderEntries,
 }
 
 impl Block {
@@ -105,7 +89,7 @@ impl Block {
         prev_hash: Hash,
         tx_hash: Hash,
         state_hash: Hash,
-        entries: Vec<BlockHeaderEntry>,
+        entries: BlockHeaderEntries,
     ) -> Self {
         Self {
             proposer_id,
@@ -167,7 +151,8 @@ mod tests {
 
     #[test]
     fn block() {
-        let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
+        let mut entries = BlockHeaderEntries::new();
+        entries.insert("key", hash(&[0u8; 10]));
 
         let proposer_id = ValidatorId(1024);
         let txs = [4, 5, 6];
@@ -184,7 +169,7 @@ mod tests {
             prev_hash,
             tx_hash,
             state_hash,
-            vec![entry.clone()],
+            entries.clone(),
         );
 
         assert_eq!(block.proposer_id(), proposer_id);
@@ -193,7 +178,7 @@ mod tests {
         assert_eq!(block.prev_hash(), &prev_hash);
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
-        assert_eq!(block.entries, vec![entry]);
+        assert_eq!(block.entries, entries);
 
         // json roundtrip
         let json_str = ::serde_json::to_string(&block).unwrap();
@@ -206,7 +191,7 @@ mod tests {
         assert_eq!(block, de_block);
     }
 
-    fn create_block(entries: Vec<BlockHeaderEntry>) -> Block {
+    fn create_block(entries: BlockHeaderEntries) -> Block {
         let proposer_id = ValidatorId(1024);
         let txs = [4, 5, 6];
         let height = Height(123_345);
@@ -228,12 +213,13 @@ mod tests {
 
     #[test]
     fn block_object_hash() {
-        let block_without_entries = create_block(vec![]);
+        let block_without_entries = create_block(BlockHeaderEntries::new());
         let hash_without_entries = block_without_entries.object_hash();
 
-        let entry = BlockHeaderEntry::from("key".to_owned(), hash(&[0u8; 10]));
+        let mut entries = BlockHeaderEntries::new();
+        entries.insert("key", hash(&[0u8; 10]));
 
-        let block_with_entries = create_block(vec![entry]);
+        let block_with_entries = create_block(entries);
         let hash_with_entries = block_with_entries.object_hash();
 
         assert_ne!(hash_without_entries, hash_with_entries);

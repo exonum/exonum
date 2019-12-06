@@ -25,7 +25,7 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{BlockHeaderEntry, Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin},
+    blockchain::{Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin, BlockHeaderEntries},
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
@@ -419,11 +419,12 @@ impl Dispatcher {
     }
 
     /// TODO: add doc
-    pub fn get_block_header_entries(&self) -> Vec<BlockHeaderEntry> {
+    pub fn get_block_header_entries(&self) -> BlockHeaderEntries {
         // Active services
-        let entry =
-            BlockHeaderEntry::from("active_services".to_owned(), self.get_active_services());
-        vec![entry]
+        let mut map = BlockHeaderEntries::new();
+        map.insert("active_service", self.get_active_services());
+
+        map
     }
 
     /// Returns the service matching the specified query.

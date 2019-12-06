@@ -30,6 +30,7 @@ use super::{
     timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
+use crate::blockchain::BlockHeaderEntries;
 
 pub type TimestampingSandbox = Sandbox;
 
@@ -107,7 +108,7 @@ impl<'a> BlockBuilder<'a> {
             self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
             self.state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
-            Vec::new(),
+            BlockHeaderEntries::new(),
         )
     }
 }

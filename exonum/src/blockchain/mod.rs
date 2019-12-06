@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockHeaderEntry, BlockProof},
+    block::{Block, BlockProof, BlockHeaderEntries},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},

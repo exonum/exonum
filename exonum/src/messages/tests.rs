@@ -30,6 +30,7 @@ use super::{
     BinaryValue, BlockResponse, Message, Precommit, SignedMessage, Status, TransactionsResponse,
     Verified, SIGNED_MESSAGE_MIN_SIZE, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
 };
+use crate::blockchain::BlockHeaderEntries;
 
 #[test]
 fn test_signed_message_min_size() {
@@ -131,7 +132,7 @@ fn test_block() {
         crypto::hash(&[1]),
         crypto::hash(&txs),
         crypto::hash(&[3]),
-        Vec::new(),
+        BlockHeaderEntries::new(),
     );
 
     let precommits = vec![

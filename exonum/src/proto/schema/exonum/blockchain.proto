@@ -19,6 +19,7 @@ package exonum;
 option java_package = "com.exonum.core.messages";
 
 import "types.proto";
+import "binary_map.proto";
 
 message Block {
   uint32 proposer_id = 1;
@@ -27,12 +28,7 @@ message Block {
   exonum.crypto.Hash prev_hash = 4;
   exonum.crypto.Hash tx_hash = 5;
   exonum.crypto.Hash state_hash = 6;
-  repeated BlockHeaderEntry entries = 7;
-}
-
-message BlockHeaderEntry {
-  string key = 1;
-  bytes value = 2;
+  BinaryMap entries = 7;
 }
 
 message ServiceInfo {
