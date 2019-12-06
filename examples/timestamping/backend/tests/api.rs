@@ -190,9 +190,15 @@ fn test_api_can_not_add_same_content_hash() {
         &tx_err,
         &json!({
             "type": "service_error",
+            "call_site": {
+                "call_type": "method",
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
+            },
             "code": 0,
-            "instance_id": SERVICE_ID,
-            "description": "Content hash already exists."
+            "description": "Content hash already exists.",
+            "runtime_id": 0,
+            "type": "service_error"
         }),
     );
 }
