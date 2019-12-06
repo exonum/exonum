@@ -261,7 +261,7 @@ where
         Schema::new(data.for_executing_service()).state_hash()
     }
 
-    fn before_transactions(&self, context: CallContext<'_>) {
+    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         // Perform a cleanup for outdated requests.
         let mut schema = Schema::new(context.service_data());
         let height = context.data().for_core().height();
@@ -286,6 +286,7 @@ where
                 schema.pending_proposal.remove();
             }
         }
+        Ok(())
     }
 
     fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {

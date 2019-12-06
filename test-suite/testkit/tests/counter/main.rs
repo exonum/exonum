@@ -931,3 +931,25 @@ fn test_explorer_with_after_transactions_error() {
     assert!(block.errors.is_empty());
     assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
 }
+
+#[test]
+fn test_explorer_with_before_transactions_error() {
+    let (mut testkit, _) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(13).sign(SERVICE_ID, pubkey, &key);
+
+    let block = testkit.create_block_with_transaction(tx);
+    let errors = block.error_map();
+    assert!(errors.is_empty(), "{:?}", errors);
+    let block = testkit.create_block();
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[&CallInBlock::before_transactions(SERVICE_ID)]
+        .description()
+        .contains("Number 13"));
+
+    let snapshot = testkit.snapshot();
+    let schema = CounterSchema::new(snapshot.for_service(SERVICE_ID).unwrap());
+    assert_eq!(schema.counter.get(), Some(13));
+    // ^-- The changes in `before_transactions` should be reverted.
+}

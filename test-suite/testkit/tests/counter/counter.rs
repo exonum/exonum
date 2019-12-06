@@ -94,6 +94,8 @@ pub enum Error {
     AddingZero = 0,
     /// What's the question?
     AnswerToTheUltimateQuestion = 1,
+    /// Number 13 is considered unlucky by some cultures.
+    BadLuck = 2,
 }
 
 #[exonum_interface]
@@ -222,6 +224,16 @@ impl DefaultInstance for CounterService {
 impl Service for CounterService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
+    }
+
+    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let mut schema = CounterSchema::new(context.service_data());
+        if schema.counter.get() == Some(13) {
+            schema.counter.set(0);
+            Err(Error::BadLuck.into())
+        } else {
+            Ok(())
+        }
     }
 
     fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
