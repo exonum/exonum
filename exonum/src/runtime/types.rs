@@ -533,9 +533,9 @@ impl InstanceState {
         }
     }
 
-    /// Indicates whether the service instance status is active.
+    /// Indicates whether the service instance current or pending status is active.
     pub fn is_active(&self) -> bool {
-        self.status.is_active()
+        self.status.is_active() || self.next_status.is_active()
     }
 
     /// Sets next status as current and changes next status to `None`
