@@ -35,10 +35,9 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        error::{ErrorKind, ExecutionError},
-        BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema,
-        ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        StateHashAggregator, WellKnownRuntime,
+        error::ExecutionError, BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError,
+        DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
+        Runtime, StateHashAggregator, WellKnownRuntime,
     },
 };
 
@@ -64,9 +63,10 @@ fn create_block(blockchain: &BlockchainMut) -> Fork {
 }
 
 fn commit_block(blockchain: &mut BlockchainMut, mut fork: Fork) {
-    // FIXME: Due to during the `create_patch` `before_commit` hook invokes without changes in
-    // instances and artifacts, do this call again to mark pending artifacts and instances as
-    // active. [ECR-3222]
+    // Since `BlockchainMut::create_patch` invocation in `create_block` does not use transactions,
+    // the `after_transactions` hook does not change artifact / service statuses. Thus, we need to call
+    // `activate_pending` manually.
+    // FIXME: Fix this behavior [ECR-3222]
     blockchain.dispatcher().activate_pending(&fork);
     // Get state hash from the block proposal.
     fork.flush();
@@ -676,7 +676,7 @@ impl Service for DependentServiceImpl {
             .get_instance(&*init.msg)
             .is_none()
         {
-            return Err(ExecutionError::new(ErrorKind::service(0), "no dependency"));
+            return Err(ExecutionError::service(0, "no dependency"));
         }
 
         // Check that it is possible to access data of the dependency right away,

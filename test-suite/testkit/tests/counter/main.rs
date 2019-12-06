@@ -858,15 +858,14 @@ fn test_explorer_transaction_statuses() {
 
     fn check_statuses(statuses: &[Result<(), ExecutionError>]) {
         assert!(statuses[0].is_ok());
-        assert_matches!(
-            statuses[1],
-            Err(ref err) if err.kind == ExecutionErrorKind::service(0)
-                && err.description == "Adding zero does nothing!"
+        assert_eq!(
+            *statuses[1].as_ref().unwrap_err(),
+            ExecutionError::service(0, "Adding zero does nothing!").to_match()
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.kind == ExecutionErrorKind::panic()
-                && err.description == "attempt to add with overflow"
+            Err(ref err) if err.kind() == ExecutionErrorKind::Unexpected
+                && err.description() == "attempt to add with overflow"
         );
     }
 

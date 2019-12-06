@@ -153,7 +153,13 @@ fn main() {
             "status": {
                 "type": "service_error",
                 "code": 0,
-                "description": "Not allowed",
+                "description": "Not allowed!",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 0,
+                },
             },
             // Other fields...
             "content": serde_json::to_value(erroneous_tx.content()).unwrap(),
@@ -163,12 +169,22 @@ fn main() {
         })
     );
 
-    // JSON for panicking transactions
+    // JSON for a transaction with a panic in service code (termed "unexpected errors"
+    // for compatibility with other runtimes).
     let panicked_tx = explorer.block(Height(1)).unwrap().transaction(2).unwrap();
     assert_eq!(
         serde_json::to_value(&panicked_tx).unwrap(),
         json!({
-            "status": { "type": "panic", "description": "oops" },
+            "status": {
+                "type": "unexpected_error",
+                "description": "oops",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 1,
+                },
+            },
             // Other fields...
             "content": serde_json::to_value(panicked_tx.content()).unwrap(),
             "location": panicked_tx.location(),

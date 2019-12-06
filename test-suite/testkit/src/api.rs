@@ -32,6 +32,7 @@ use exonum::{
     crypto::Hash,
     messages::{AnyTx, Verified},
     node::ApiSender,
+    runtime::error::ErrorMatch,
 };
 
 use crate::TestKit;
@@ -334,7 +335,7 @@ impl<'a> ExonumNodeApi<'a> {
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
-    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: &ExecutionStatus) {
+    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: Result<(), &ErrorMatch>) {
         let info: serde_json::Value = self
             .inner
             .public(ApiKind::Explorer)
@@ -344,7 +345,10 @@ impl<'a> ExonumNodeApi<'a> {
         if let serde_json::Value::Object(info) = info {
             let tx_status_raw = info.get("status").unwrap().clone();
             let tx_status: ExecutionStatus = serde_json::from_value(tx_status_raw).unwrap();
-            assert_eq!(&tx_status, expected_status);
+            match expected_status {
+                Ok(()) => tx_status.0.expect("Expected successful execution"),
+                Err(e) => assert_eq!(*e, tx_status.0.expect_err("Expected execution error")),
+            }
         } else {
             panic!("Invalid transaction info format, object expected");
         }
@@ -352,7 +356,7 @@ impl<'a> ExonumNodeApi<'a> {
 
     /// Asserts that the transaction with the given hash was executed successfully.
     pub fn assert_tx_success(&self, tx_hash: Hash) {
-        self.assert_tx_status(tx_hash, &ExecutionStatus::ok());
+        self.assert_tx_status(tx_hash, Ok(()));
     }
 
     /// Same as `assert_tx_success`, but for a sequence of transactions.

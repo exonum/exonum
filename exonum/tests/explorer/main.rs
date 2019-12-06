@@ -76,7 +76,7 @@ fn test_explorer_basics() {
     assert_eq!(block.len(), 1);
     let tx_info = block.transaction(0).unwrap();
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-    assert_eq!(tx_info.status(), Ok(()));
+    tx_info.status().unwrap();
     assert_eq!(tx_info.content(), &tx_alice);
     assert_eq!(
         tx_info.content().object_hash(),
@@ -119,8 +119,8 @@ fn test_explorer_basics() {
 
     let tx_info = block.transaction(0).unwrap();
     let err = tx_info.status().unwrap_err();
-    assert_eq!(err.kind, ErrorKind::service(0));
-    assert_eq!(err.description, "Not allowed");
+    assert_eq!(err.kind(), ErrorKind::Service { code: 0 });
+    assert_eq!(err.description(), "Not allowed!");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
@@ -133,7 +133,13 @@ fn test_explorer_basics() {
             "status": {
                 "type": "service_error",
                 "code": 0,
-                "description": "Not allowed",
+                "description": "Not allowed!",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 0,
+                },
             },
             "time": tx_info.time(),
         })
@@ -141,8 +147,8 @@ fn test_explorer_basics() {
 
     let tx_info = block.transaction(1).unwrap();
     let err = tx_info.status().unwrap_err();
-    assert_eq!(err.kind, ErrorKind::Panic);
-    assert_eq!(err.description, "oops");
+    assert_eq!(err.kind(), ErrorKind::Unexpected);
+    assert_eq!(err.description(), "oops");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
@@ -153,8 +159,14 @@ fn test_explorer_basics() {
             },
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
-                "type": "panic",
+                "type": "unexpected_error",
                 "description": "oops",
+                "runtime_id": 0,
+                "call_site": {
+                    "call_type": "method",
+                    "instance_id": SERVICE_ID,
+                    "method_id": 1,
+                },
             },
             "time": tx_info.time(),
         })
@@ -326,7 +338,7 @@ fn test_transaction_iterator() {
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
     let block = explorer.block(Height(1)).unwrap();
     for tx in &block {
-        assert_eq!(tx.status(), Ok(()));
+        tx.status().unwrap();
     }
     for (i, tx) in block.iter().enumerate() {
         let raw_tx = tx.content();

@@ -26,12 +26,12 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         rust::{RustRuntime, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, StateHashAggregator,
-        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
+        ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
+        StateHashAggregator, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::IntoExecutionError;
+use exonum_derive::*;
 use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
@@ -57,8 +57,8 @@ struct SampleRuntime {
 }
 
 // Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[execution_error(kind = "runtime")]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[execution_fail(kind = "runtime")]
 enum SampleRuntimeError {
     /// Incorrect information to call transaction.
     IncorrectCallInfo = 1,
@@ -160,7 +160,7 @@ impl Runtime for SampleRuntime {
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
-                    .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
+                    .map_err(|e| SampleRuntimeError::IncorrectPayload.with_description(e))?;
                 let counter = service.counter.get();
                 println!("Updating counter value to {}", counter + value);
                 service.counter.set(value + counter);
@@ -180,14 +180,11 @@ impl Runtime for SampleRuntime {
 
             // Unknown transaction.
             (interface, method) => {
-                let err = (
-                    SampleRuntimeError::IncorrectCallInfo,
-                    format!(
-                        "Incorrect information to call transaction. {}#{}",
-                        interface, method
-                    ),
-                );
-                Err(err.into())
+                let err = SampleRuntimeError::IncorrectCallInfo.with_description(format!(
+                    "Incorrect information to call transaction. {}#{}",
+                    interface, method
+                ));
+                Err(err)
             }
         }
     }
