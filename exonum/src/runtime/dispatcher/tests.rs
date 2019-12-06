@@ -37,8 +37,8 @@ use crate::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
         ArtifactId, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema, ErrorKind,
-        ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec, MethodId,
-        Runtime, RuntimeIdentifier, StateHashAggregator,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
+        RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -372,7 +372,10 @@ fn test_dispatcher_simple() {
     let err = context
         .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, DispatcherError::ServiceIdExists.to_match());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::ServiceIdExists)
+    );
 
     let conflicting_rust_service = InstanceSpec {
         artifact: rust_artifact.clone(),
@@ -382,7 +385,10 @@ fn test_dispatcher_simple() {
     let err = context
         .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, DispatcherError::ServiceNameExists.to_match());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::ServiceNameExists)
+    );
 
     // Activate services / artifacts.
     create_genesis_block(&mut dispatcher, &mut fork);
@@ -475,7 +481,7 @@ fn test_dispatcher_rust_runtime_no_service() {
             .deploy_artifact(rust_artifact.clone(), vec![])
             .wait()
             .unwrap_err(),
-        RustRuntimeError::UnableToDeploy.to_match()
+        ErrorMatch::from_fail(&RustRuntimeError::UnableToDeploy)
     );
 
     let mut fork = db.fork();
@@ -490,8 +496,7 @@ fn test_dispatcher_rust_runtime_no_service() {
         .unwrap_err();
     assert_eq!(
         err,
-        DispatcherError::ArtifactNotDeployed
-            .to_match()
+        ErrorMatch::from_fail(&DispatcherError::ArtifactNotDeployed)
             .for_service(RUST_SERVICE_ID)
             .in_call(CallType::Constructor)
     );

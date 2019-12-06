@@ -32,7 +32,7 @@ use exonum::{
     crypto::Hash,
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::error::ExecutionErrorMatch,
+    runtime::error::ErrorMatch,
 };
 
 use crate::TestKit;
@@ -338,11 +338,7 @@ impl<'a> ExonumNodeApi<'a> {
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
-    pub fn assert_tx_status(
-        &self,
-        tx_hash: Hash,
-        expected_status: &Result<(), ExecutionErrorMatch>,
-    ) {
+    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: Result<(), &ErrorMatch>) {
         let info: serde_json::Value = self
             .inner
             .public(ApiKind::Explorer)
@@ -363,7 +359,7 @@ impl<'a> ExonumNodeApi<'a> {
 
     /// Asserts that the transaction with the given hash was executed successfully.
     pub fn assert_tx_success(&self, tx_hash: Hash) {
-        self.assert_tx_status(tx_hash, &Ok(()));
+        self.assert_tx_status(tx_hash, Ok(()));
     }
 
     /// Same as `assert_tx_success`, but for a sequence of transactions.
