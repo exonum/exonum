@@ -26,7 +26,7 @@ use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
     blockchain::{
-        BlockHeaderEntries, Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin,
+        BlockHeaderEntries, Blockchain, CallInBlock, IndexCoordinates, Schema as CoreSchema, SchemaOrigin,
     },
     crypto::Hash,
     helpers::ValidateInput,
@@ -234,29 +234,17 @@ impl Dispatcher {
         Ok(())
     }
 
-    fn report_error(
-        err: &ExecutionError,
-        fork: &Fork,
-        instance_id: InstanceId,
-        call_type: &CallType, // FIXME: Use `CallLocation` here once #1576 is landed
-    ) {
+    fn report_error(err: &ExecutionError, fork: &Fork, call: CallInBlock) {
         let height = CoreSchema::new(fork).height().next();
         if err.kind() == ErrorKind::Unexpected {
             log::error!(
-                "{} for service {} at {:?} resulted in unexpected error: {:?}",
-                call_type,
-                instance_id,
+                "{} at {:?} resulted in unexpected error: {:?}",
+                call,
                 height,
                 err
             );
         } else {
-            log::info!(
-                "{} for service {} at {:?} failed: {:?}",
-                call_type,
-                instance_id,
-                height,
-                err
-            );
+            log::info!("{} at {:?} failed: {:?}", call, height, err);
         }
     }
 
@@ -265,6 +253,7 @@ impl Dispatcher {
         &self,
         fork: &mut Fork,
         tx_id: Hash,
+        tx_index: u64,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let caller = Caller::Transaction {
@@ -281,15 +270,14 @@ impl Dispatcher {
         if let Err(ref mut err) = res {
             fork.rollback();
 
-            let call_type = CallType::Method {
-                interface: String::new(),
-                id: call_info.method_id,
-            };
             err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
                 instance_id: call_info.instance_id,
-                call_type: call_type.clone(),
+                call_type: CallType::Method {
+                    interface: String::new(),
+                    id: call_info.method_id,
+                },
             });
-            Self::report_error(err, fork, call_info.instance_id, &call_type);
+            Self::report_error(err, fork, CallInBlock::transaction(tx_index));
         } else {
             fork.flush();
         }
@@ -297,38 +285,57 @@ impl Dispatcher {
     }
 
     /// Calls service hooks of the specified type for all active services.
-    // FIXME: Use `CallLocation` instead of `CallType` once #1576 is landed
-    fn call_service_hooks(&self, fork: &mut Fork, call_type: CallType) {
-        for (&instance_id, info) in &self.service_infos {
-            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            let call_fn = match &call_type {
-                CallType::BeforeTransactions => Runtime::before_transactions,
-                CallType::AfterTransactions => Runtime::after_transactions,
-                _ => unreachable!(),
-            };
+    fn call_service_hooks(
+        &self,
+        fork: &mut Fork,
+        call_type: CallType,
+    ) -> Vec<(CallInBlock, ExecutionError)> {
+        self.service_infos
+            .iter()
+            .filter_map(|(&instance_id, info)| {
+                let context = ExecutionContext::new(self, fork, Caller::Blockchain);
+                let call_fn = match &call_type {
+                    CallType::BeforeTransactions => Runtime::before_transactions,
+                    CallType::AfterTransactions => Runtime::after_transactions,
+                    _ => unreachable!(),
+                };
 
-            let mut res = call_fn(
-                self.runtimes[&info.runtime_id].as_ref(),
-                context,
-                instance_id,
-            );
-            if let Err(ref mut err) = res {
-                fork.rollback();
-                err.set_runtime_id(info.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: call_type.clone(),
-                    });
-                Self::report_error(err, fork, instance_id, &call_type);
-            } else {
-                fork.flush();
-            }
-        }
+                let res = call_fn(
+                    self.runtimes[&info.runtime_id].as_ref(),
+                    context,
+                    instance_id,
+                );
+                if let Err(mut err) = res {
+                    fork.rollback();
+                    err.set_runtime_id(info.runtime_id)
+                        .set_call_site(|| CallSite {
+                            instance_id,
+                            call_type: call_type.clone(),
+                        });
+
+                    let call = match &call_type {
+                        CallType::BeforeTransactions => {
+                            CallInBlock::before_transactions(instance_id)
+                        }
+                        CallType::AfterTransactions => CallInBlock::after_transactions(instance_id),
+                        _ => unreachable!(),
+                    };
+                    Self::report_error(&err, fork, call);
+                    Some((call, err))
+                } else {
+                    fork.flush();
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Calls `before_transactions` for all currently active services, isolating each call.
-    pub(crate) fn before_transactions(&self, fork: &mut Fork) {
-        self.call_service_hooks(fork, CallType::BeforeTransactions);
+    pub(crate) fn before_transactions(
+        &self,
+        fork: &mut Fork,
+    ) -> Vec<(CallInBlock, ExecutionError)> {
+        self.call_service_hooks(fork, CallType::BeforeTransactions)
     }
 
     /// Calls `after_transactions` for all currently active services, isolating each call.
@@ -336,9 +343,10 @@ impl Dispatcher {
     /// Changes the status of pending artifacts and services to active in the merkelized
     /// indices of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
-    pub(crate) fn after_transactions(&self, fork: &mut Fork) {
-        self.call_service_hooks(fork, CallType::AfterTransactions);
+    pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
+        let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
         self.activate_pending(fork);
+        errors
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.

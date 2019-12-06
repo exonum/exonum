@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -55,7 +55,8 @@ use crate::{
         SystemStateProvider,
     },
     sandbox::{
-        config_updater::ConfigUpdaterService, sandbox_tests_helper::PROPOSE_TIMEOUT,
+        config_updater::ConfigUpdaterService,
+        sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
         timestamping::TimestampingService,
     },
 };
@@ -683,7 +684,7 @@ impl Sandbox {
     }
 
     pub fn last_state_hash(&self) -> Hash {
-        *self.last_block().state_hash()
+        self.last_block().state_hash
     }
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Verified<AnyTx>>
@@ -714,14 +715,11 @@ impl Sandbox {
             .collect()
     }
 
-    /// Extracts state_hash from the fake block.
+    /// Extracts `state_hash` and `error_hash` from the fake block.
     ///
     /// **NB.** This method does not correctly process transactions that mutate the `Dispatcher`,
     /// e.g., starting new services.
-    pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
-    where
-        I: IntoIterator<Item = &'a Verified<AnyTx>>,
-    {
+    pub fn compute_block_hashes(&self, txs: &[Verified<AnyTx>]) -> (Hash, Hash) {
         let height = self.current_height();
         let mut blockchain = self.blockchain_mut();
 
@@ -750,7 +748,19 @@ impl Sandbox {
             schema.reject_transaction(&hash).unwrap();
         }
         blockchain.merge(fork.into_patch()).unwrap();
-        *Schema::new(&fork_with_new_block).last_block().state_hash()
+
+        let block = Schema::new(&fork_with_new_block).last_block();
+        (block.state_hash, block.error_hash)
+    }
+
+    pub fn create_block(&self, txs: &[Verified<AnyTx>]) -> Block {
+        let tx_hashes: Vec<_> = txs.iter().map(ObjectHash::object_hash).collect();
+        let (state_hash, error_hash) = self.compute_block_hashes(txs);
+        BlockBuilder::new(self)
+            .with_txs_hashes(&tx_hashes)
+            .with_state_hash(&state_hash)
+            .with_error_hash(&error_hash)
+            .build()
     }
 
     pub fn get_proof_to_index(
@@ -1248,17 +1258,6 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
             (),
         ),
     ])
-}
-
-pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
-where
-    I: IntoIterator<Item = &'a Verified<AnyTx>>,
-{
-    let txs = txs
-        .into_iter()
-        .map(Verified::object_hash)
-        .collect::<Vec<Hash>>();
-    HashTag::hash_list(&txs)
 }
 
 #[cfg(test)]

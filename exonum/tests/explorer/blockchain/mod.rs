@@ -25,9 +25,11 @@ use exonum::{
         AnyTx, BlockchainData, ExecutionError, InstanceId,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
+use serde_derive::*;
 
 use std::collections::BTreeMap;
 
@@ -156,7 +158,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
-    let height = blockchain.as_ref().last_block().height().next();
+    let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
 
     let mut tx_cache = BTreeMap::new();

@@ -281,7 +281,7 @@ mod tests {
             .post("v1/blocks/create")
             .unwrap();
 
-        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx);
 
@@ -290,7 +290,7 @@ mod tests {
             .query(&Height(1))
             .post("v1/blocks/rollback")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(0));
+        assert_eq!(block_info.header.height, Height(0));
         api.send(tx.clone());
         sleep();
 
@@ -299,7 +299,7 @@ mod tests {
             .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx);
     }
@@ -321,7 +321,7 @@ mod tests {
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx_foo);
 
@@ -333,7 +333,7 @@ mod tests {
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(2));
+        assert_eq!(block_info.header.height, Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx_bar);
     }
@@ -375,7 +375,7 @@ mod tests {
             .query(&Height(10))
             .post("v1/blocks/rollback")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(4));
+        assert_eq!(block_info.header.height, Height(4));
 
         // Test idempotence of the rollback endpoint
         for _ in 0..2 {
@@ -385,7 +385,7 @@ mod tests {
                 .post("v1/blocks/rollback")
                 .unwrap();
 
-            assert_eq!(block_info.header.height(), Height(3));
+            assert_eq!(block_info.header.height, Height(3));
         }
 
         // Test roll-back to the genesis block
@@ -394,7 +394,7 @@ mod tests {
             .query(&Height(1))
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap();
-        assert_eq!(block.header.height(), Height(0));
+        assert_eq!(block.header.height, Height(0));
     }
 
     #[test]

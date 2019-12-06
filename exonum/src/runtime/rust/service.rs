@@ -94,21 +94,23 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// act similarly on different nodes. In other words, the service should only use data available
     /// in the provided `CallContext`.
     ///
-    /// The order of invoking the `before_transactions` method is an implementation detail.
-    /// Effectively, this means that services must not rely on a particular ordering
-    /// of `Service::before_transactions` invocations.
-    fn before_transactions(&self, _context: CallContext<'_>) {}
+    /// Services should not rely on a particular ordering of `Service::before_transactions`
+    /// invocations.
+    fn before_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
 
     /// Performs storage operations on behalf of the service before committing the block.
+    /// The default implementation does nothing and returns `Ok(())`.
     ///
     /// Any changes of the storage state will affect `state_hash`, which means this method must
     /// act similarly on different nodes. In other words, the service should only use data available
     /// in the provided `CallContext`.
     ///
-    /// The order of invoking the `after_transactions` method is an implementation detail. Effectively,
-    /// this means that services must not rely on a particular ordering of `Service::after_transactions`
-    /// invocations.
-    fn after_transactions(&self, _context: CallContext<'_>) {}
+    /// Services should not rely on a particular ordering of `Service::after_transactions` invocations.
+    fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
 
     /// Handles block commit event.
     ///

@@ -47,4 +47,6 @@ pub enum Error {
     UnknownArtifact = 13,
     /// Incorrect configuration number.
     IncorrectConfigurationNumber = 14,
+    /// Invalid configuration for supervisor.
+    InvalidConfig = 15,
 }

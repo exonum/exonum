@@ -125,15 +125,16 @@ fn test_block() {
     let txs = [2];
     let tx_count = txs.len() as u32;
 
-    let content = Block::new(
-        ValidatorId::zero(),
-        Height(500),
+    let content = Block {
+        proposer_id: ValidatorId::zero(),
+        height: Height(500),
         tx_count,
-        crypto::hash(&[1]),
-        crypto::hash(&txs),
-        crypto::hash(&[3]),
-        BlockHeaderEntries::new(),
-    );
+        prev_hash: crypto::hash(&[1]),
+        tx_hash: crypto::hash(&txs),
+        state_hash: crypto::hash(&[3]),
+        error_hash: crypto::hash(&[4]),
+        entries: BlockHeaderEntries::new(),
+    };
 
     let precommits = vec![
         Verified::from_value(

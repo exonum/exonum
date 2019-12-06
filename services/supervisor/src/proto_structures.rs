@@ -28,7 +28,18 @@ use exonum_derive::*;
 use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 use exonum_proto::ProtobufConvert;
 
-use super::{proto, transactions::SupervisorInterface};
+use super::{mode::Mode, proto, transactions::SupervisorInterface};
+
+/// Supervisor service configuration (not to be confused with `ConfigPropose`, which
+/// contains core/service configuration change proposal).
+#[derive(
+    Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize,
+)]
+#[protobuf_convert(source = "proto::Config")]
+pub struct SupervisorConfig {
+    /// Supervisor operating mode.
+    pub mode: Mode,
+}
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]

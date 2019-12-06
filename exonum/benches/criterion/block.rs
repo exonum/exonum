@@ -628,7 +628,7 @@ fn execute_block_rocksdb(
         ParameterizedBenchmark::new(
             "transactions",
             move |bencher, &&txs_in_block| {
-                let height: u64 = blockchain.as_ref().last_block().height().next().into();
+                let height: u64 = blockchain.as_ref().last_block().height.next().into();
                 bencher.iter(|| {
                     execute_block(&blockchain, height, &tx_hashes[..txs_in_block]);
                 });

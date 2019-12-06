@@ -18,7 +18,7 @@ use failure::Error;
 
 pub use self::binary_map::BinaryMap;
 pub use self::schema::{
-    blockchain::{ActiveServices, Block, ServiceInfo, TxLocation},
+    blockchain::{ActiveServices, ServiceInfo, Block, CallInBlock, TxLocation},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,

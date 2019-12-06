@@ -51,15 +51,17 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
     dispatcher.activate_pending(fork);
     dispatcher.commit_block(fork);
 
-    let block = Block::new(
-        ValidatorId(0),
-        Height(0),
-        0,
-        Hash::zero(),
-        Hash::zero(),
-        Hash::zero(),
-        BlockHeaderEntries::new(),
-    );
+    let block = Block {
+        proposer_id: ValidatorId(0),
+        height: Height(0),
+        tx_count: 0,
+        prev_hash: Hash::zero(),
+        tx_hash: Hash::zero(),
+        state_hash: Hash::zero(),
+        error_hash: Hash::zero(),
+        entries: BlockHeaderEntries::new(),
+    };
+
     let block_hash = block.object_hash();
     let schema = CoreSchema::new(&*fork);
     schema.block_hashes_by_height().push(block_hash);
