@@ -163,7 +163,7 @@
 pub use self::{
     call_context::CallContext,
     error::Error,
-    runtime_api::ArtifactProtobufSpec,
+    runtime_api::{ArtifactProtobufSpec, ProtoSourceFile},
     service::{
         AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
         ServiceFactory, Transaction,
