@@ -139,20 +139,19 @@ impl<T: Access> Schema<T> {
             .get_proof_map((CALL_ERRORS, &block_height.0))
     }
 
-    /// Returns the result of the execution of a transaction with the specified location.
+    /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
         if self.block_transactions(location.block_height).len() <= location.position_in_block {
             return None;
         }
 
-        let call_location = CallInBlock::transaction(location.position_in_block as u64);
-        Some(
-            match self.call_errors(location.block_height).get(&call_location) {
-                None => Ok(()),
-                Some(e) => Err(e),
-            },
-        )
+        let call_location = CallInBlock::transaction(location.position_in_block);
+        let call_result = match self.call_errors(location.block_height).get(&call_location) {
+            None => Ok(()),
+            Some(e) => Err(e),
+        };
+        Some(call_result)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
