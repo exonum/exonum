@@ -21,7 +21,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, DefaultInstance, Service},
+        rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
         ArtifactId, DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
         SUPERVISOR_INSTANCE_ID,
     },
@@ -31,8 +31,7 @@ use exonum_merkledb::{access::AccessExt, ObjectHash};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema,
-    SimpleSupervisor,
+    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema, Supervisor,
 };
 
 pub fn sign_config_propose_transaction(
@@ -136,7 +135,9 @@ fn change_consensus_config_with_one_confirmation() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     let cfg_change_height = Height(5);
@@ -183,7 +184,9 @@ fn change_consensus_config_with_one_confirmation() {
 fn service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .with_default_rust_service(ConfigChangeService)
         .create();
 
@@ -214,7 +217,9 @@ fn service_config_change() {
 fn incorrect_actual_from_field() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .with_default_rust_service(ConfigChangeService)
         .create();
 
@@ -241,7 +246,9 @@ fn incorrect_actual_from_field() {
 fn discard_config_propose_from_auditor() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     let cfg_change_height = Height(5);
@@ -286,7 +293,9 @@ fn discard_config_propose_from_auditor() {
 fn test_send_proposal_with_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     let old_validators = testkit.network().validators();
@@ -340,7 +349,9 @@ fn test_send_proposal_with_api() {
 #[test]
 fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .with_rust_service(DeployableService)
         .create();
 
@@ -382,7 +393,9 @@ fn actual_from_is_zero() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_default_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     // Change height set to 0

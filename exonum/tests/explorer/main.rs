@@ -197,12 +197,21 @@ fn test_explorer_errors_in_block() {
                 block[0], // We aren't that interested in the transaction contents in this test
             ],
             "errors": [{
-                "location": { "type": "transaction", "index": 0 },
                 "error": {
-                    "type": "service_error",
+                    "call_site": {
+                        "call_type": "method",
+                        "instance_id": 4,
+                        "method_id": 0
+                    },
                     "code": 0,
-                    "description": "Not allowed",
+                    "description": "Not allowed!",
+                    "runtime_id": 0,
+                    "type": "service_error"
                 },
+                "location": {
+                    "index": 0,
+                    "type": "transaction"
+                }
             }],
         })
     );

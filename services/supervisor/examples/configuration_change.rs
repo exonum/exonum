@@ -24,7 +24,7 @@ use exonum_merkledb::{
     access::{Access, AccessExt},
     Entry, ObjectHash,
 };
-use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, DecentralizedSupervisor};
+use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 const SERVICE_ID: InstanceId = 256;
@@ -82,7 +82,9 @@ fn main() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_validators(4)
-        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
         .with_rust_service(service)

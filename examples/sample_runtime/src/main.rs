@@ -25,14 +25,14 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory, Transaction},
+        rust::{RustRuntime, ServiceFactory, Transaction},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
         WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
+use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -276,13 +276,11 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
-    let supervisor_service = SimpleSupervisor::new();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
-        .with_artifact(supervisor_service.artifact_id())
-        .with_instance(supervisor_service.default_instance())
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .build();
-    let rust_runtime =
-        RustRuntime::new(channel.endpoints.0.clone()).with_factory(supervisor_service);
+    let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())
