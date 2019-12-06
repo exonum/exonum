@@ -78,7 +78,7 @@ pub use self::{
 };
 
 use exonum::{
-    blockchain::{config::InstanceInitParams, ExecutionError},
+    blockchain::config::InstanceInitParams,
     crypto::Hash,
     runtime::{
         rust::{
