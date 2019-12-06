@@ -86,3 +86,17 @@ message ConfigVote {
   // Hash of configuration proposition.
   exonum.crypto.Hash propose_hash = 1;
 }
+
+
+// Supervisor operating mode.
+enum SupervisorMode {
+  SIMPLE = 0;
+  DECENTRALIZED = 1;
+}
+
+// Supervisor service configuration (not to be confused with `ConfigPropose`, which
+// contains core/service configuration change proposal).
+message Config {
+  // Supervisor operating mode.
+  SupervisorMode mode = 1;
+}

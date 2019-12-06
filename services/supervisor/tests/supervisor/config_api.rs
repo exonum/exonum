@@ -37,7 +37,7 @@ fn current_config_proposal(api: &TestKitApi) -> Option<ConfigProposalWithHash> {
         .unwrap()
 }
 
-fn create_proposal(api: &TestKitApi, proposal: ConfigPropose) -> Hash {
+pub fn create_proposal(api: &TestKitApi, proposal: ConfigPropose) -> Hash {
     let hash: Hash = api
         .private(ApiKind::Service("supervisor"))
         .query(&proposal)

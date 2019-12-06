@@ -25,11 +25,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
   and a corresponding derive macro. (#1585)
 
+#### exonum-supervisor
+
+- `Supervisor` structure isn't generic anymore. (#1587)
+
 ### New features
 
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
+
+#### exonum-supervisor
+
+- `Supervisor` service now can have initial configuration and implements
+  `Configure` interface. (#1587)
 
 ## 0.13.0-rc.2 - 2019-12-04
 

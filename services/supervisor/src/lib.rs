@@ -71,25 +71,27 @@ pub use self::{
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-        DeployRequest, ServiceConfig, StartService,
+        DeployRequest, ServiceConfig, StartService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
 };
 
 use exonum::{
-    blockchain::ExecutionError,
+    blockchain::config::InstanceInitParams,
     crypto::Hash,
     runtime::{
         rust::{
-            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, DefaultInstance,
-            Service,
+            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
+            ServiceFactory as _,
         },
-        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::Snapshot;
+use exonum_merkledb::{BinaryValue, Snapshot};
+
+use mode::Mode;
 
 pub mod mode;
 
@@ -102,21 +104,9 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Decentralized supervisor.
-///
-/// Within the "decentralized" mode, both deploy requests and configuration change proposals
-/// should be approved by (2/3+1) validators.
-pub type DecentralizedSupervisor = Supervisor<mode::Decentralized>;
-
-/// Simple supervisor.
-///
-/// Within the "simple" mode, both deploy requests and configuration change proposals require
-/// only one approval from a validator node.
-pub type SimpleSupervisor = Supervisor<mode::Simple>;
-
 /// Returns the `Supervisor` entity name.
 pub const fn supervisor_name() -> &'static str {
-    Supervisor::<mode::Decentralized>::NAME
+    Supervisor::NAME
 }
 
 /// Error message emitted when the `Supervisor` is installed as a non-privileged service.
@@ -219,44 +209,67 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
 
 /// Supervisor service implementation.
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(implements("transactions::SupervisorInterface"))]
-#[service_factory(
-    proto_sources = "proto",
-    artifact_name = "exonum-supervisor",
-    service_constructor = "Self::construct"
-)]
-pub struct Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
-    phantom: std::marker::PhantomData<Mode>,
-}
+#[service_dispatcher(implements(
+    "transactions::SupervisorInterface",
+    "Configure<Params = SupervisorConfig>"
+))]
+#[service_factory(proto_sources = "proto", artifact_name = "exonum-supervisor")]
+pub struct Supervisor;
 
-impl<Mode> Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
+impl Supervisor {
     /// Name of the supervisor service.
     pub const NAME: &'static str = "supervisor";
 
-    /// Creates a new `Supervisor` service object.
-    pub fn new() -> Supervisor<Mode> {
-        Supervisor {
-            phantom: std::marker::PhantomData::<Mode>::default(),
+    /// Creates a configuration for a simple `Supervisor`.
+    pub fn simple_config() -> SupervisorConfig {
+        SupervisorConfig { mode: Mode::Simple }
+    }
+
+    /// Creates a configuration for a decentralized `Supervisor`.
+    pub fn decentralized_config() -> SupervisorConfig {
+        SupervisorConfig {
+            mode: Mode::Decentralized,
         }
     }
 
-    /// Factory constructor of the `Supervisor` object that takes `&self` as an argument.
-    /// The constructor is required for the `ServiceFactory` trait implementation.
-    pub fn construct(&self) -> Box<Self> {
-        Box::new(Self::new())
+    /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
+    /// simple configuration.
+    pub fn simple() -> InstanceInitParams {
+        Self::builtin_instance(Self::simple_config())
+    }
+
+    /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
+    /// decentralized configuration.
+    pub fn decentralized() -> InstanceInitParams {
+        Self::builtin_instance(Self::decentralized_config())
+    }
+
+    /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
+    /// configuration.
+    fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
+        Supervisor
+            .artifact_id()
+            .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
+            .with_constructor(config)
     }
 }
 
-impl<Mode> Service for Supervisor<Mode>
-where
-    Mode: mode::SupervisorMode,
-{
+impl Service for Supervisor {
+    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+        use std::borrow::Cow;
+
+        // Load configuration from bytes and store it.
+        // Since `Supervisor` is expected to be created at the start of the blockchain, invalid config
+        // will cause genesis block creation to fail, and thus blockchain won't start.
+        let config =
+            SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
+
+        let mut schema = Schema::new(context.service_data());
+        schema.configuration.set(config);
+
+        Ok(())
+    }
+
     fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         Schema::new(data.for_executing_service()).state_hash()
     }
@@ -264,7 +277,8 @@ where
     fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         // Perform a cleanup for outdated requests.
         let mut schema = Schema::new(context.service_data());
-        let height = context.data().for_core().height();
+        let core_schema = context.data().for_core();
+        let height = core_schema.height();
 
         // Remove pending deploy requests for which deadline was exceeded.
         let requests_to_remove = schema
@@ -291,6 +305,7 @@ where
 
     fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.service_data());
+        let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();
@@ -300,7 +315,7 @@ where
         if let Some(entry) = entry {
             if entry.config_propose.actual_from == height.next() {
                 // Config should be applied at the next height.
-                if Mode::config_approved(
+                if configuration.mode.config_approved(
                     &entry.propose_hash,
                     &schema.config_confirms,
                     validator_count,
@@ -372,7 +387,27 @@ where
     }
 }
 
-impl<Mode: mode::SupervisorMode> DefaultInstance for Supervisor<Mode> {
-    const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
-    const INSTANCE_NAME: &'static str = Self::NAME;
+impl Configure for Supervisor {
+    type Params = SupervisorConfig;
+
+    fn verify_config(
+        &self,
+        _context: CallContext<'_>,
+        _params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        // If config was decoded, it's OK.
+        Ok(())
+    }
+
+    fn apply_config(
+        &self,
+        context: CallContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.service_data());
+
+        schema.configuration.set(params);
+
+        Ok(())
+    }
 }
