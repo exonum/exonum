@@ -327,7 +327,7 @@ fn test_selected_time_less_than_time_in_storage() {
         .with_rust_service(time_service)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     let validators = testkit.network().validators().to_vec();
@@ -494,7 +494,7 @@ fn test_endpoint_api() {
         .with_rust_service(time_service)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     let mut api = testkit.api();

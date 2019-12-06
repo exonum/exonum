@@ -83,7 +83,7 @@ use exonum::{
     runtime::{
         rust::{
             api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
-            ServiceFactory as ServiceFactoryTrait,
+            ServiceFactory as _,
         },
         BlockchainData, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
@@ -227,9 +227,21 @@ impl Supervisor {
         }
     }
 
+    /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
+    /// simple configuration.
+    pub fn simple() -> InstanceInitParams {
+        Self::builtin_instance(Self::simple_config())
+    }
+
+    /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
+    /// decentralized configuration.
+    pub fn decentralized() -> InstanceInitParams {
+        Self::builtin_instance(Self::decentralized_config())
+    }
+
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
-    pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
+    fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
         Supervisor
             .artifact_id()
             .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
@@ -242,12 +254,10 @@ impl Service for Supervisor {
         use std::borrow::Cow;
 
         // Load configuration from bytes and store it.
-        let config = SupervisorConfig::from_bytes(Cow::from(&params)).unwrap_or_else(|err| {
-            // Incorrect config is a critical error for both the service and the
-            // blockchain itself: supervisor can't operate not configured, and the
-            // blockchain isn't expected to work without supervisor.
-            panic!("Unable to parse initialization parameters: {}", err);
-        });
+        // Since `Supervisor` is expected to be created at the start of the blockchain, invalid config
+        // will cause genesis block creation to fail, and thus blockchain won't start.
+        let config =
+            SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
 
         let mut schema = Schema::new(context.service_data());
         schema.configuration.set(config);
@@ -289,10 +299,7 @@ impl Service for Supervisor {
 
     fn after_transactions(&self, mut context: CallContext<'_>) {
         let mut schema = Schema::new(context.service_data());
-        let configuration = schema
-            .configuration
-            .get()
-            .expect("Supervisor entity was not configured; unable to load configuration");
+        let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();

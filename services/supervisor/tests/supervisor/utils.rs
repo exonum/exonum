@@ -152,9 +152,7 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
         .with_validators(validator_count)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .create()
 }
 
@@ -163,9 +161,7 @@ pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
         .with_validators(validator_count)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_default_rust_service(ConfigChangeService)
         .create()
 }
@@ -177,9 +173,7 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
         .with_validators(validator_count)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_artifact(artifact.clone())
         .with_instance(
             artifact

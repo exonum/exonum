@@ -282,7 +282,7 @@ fn main() {
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .build();
     let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)

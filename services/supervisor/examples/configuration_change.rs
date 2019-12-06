@@ -91,9 +91,7 @@ fn main() {
         .with_validators(4)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
         .with_rust_service(service)

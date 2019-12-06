@@ -146,7 +146,7 @@ impl NodeBuilder {
                 run_config.node_config.consensus.clone(),
             )
             .with_artifact(Supervisor.artifact_id())
-            .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+            .with_instance(Supervisor::simple())
             .build();
 
             let mut services: Vec<Box<dyn ServiceFactory>> = vec![Supervisor.into()];

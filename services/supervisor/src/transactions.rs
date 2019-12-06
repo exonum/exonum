@@ -250,10 +250,6 @@ impl SupervisorInterface for Supervisor {
             return Err(Error::ActualFromIsPast.into());
         }
         let mut schema = Schema::new(context.service_data());
-        let configuration = schema
-            .configuration
-            .get()
-            .expect("Supervisor entity was not configured; unable to load configuration");
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -286,10 +282,8 @@ impl SupervisorInterface for Supervisor {
         }
 
         schema.deploy_requests.confirm(&deploy, author);
-        if configuration
-            .mode
-            .deploy_approved(&deploy, &schema.deploy_requests, validator_count)
-        {
+        let supervisor_mode = schema.supervisor_config().mode;
+        if supervisor_mode.deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments.put(&artifact, deploy);

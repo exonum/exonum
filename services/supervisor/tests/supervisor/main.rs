@@ -217,9 +217,7 @@ fn testkit_with_inc_service() -> TestKit {
         .with_logger()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
         .create()
 }
@@ -229,9 +227,7 @@ fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
         .with_logger()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
         .with_validators(n)
         .create()
@@ -246,9 +242,7 @@ fn testkit_with_inc_service_auditor_validator() -> TestKit {
         .with_logger()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
         .with_validators(1)
         .create()
@@ -259,9 +253,7 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
         .with_logger()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_default_rust_service(IncService)
         .create()
 }
@@ -553,9 +545,7 @@ fn test_restart_node_and_start_service_instance() {
         .with_logger()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
         .create();
     deploy_default(&mut testkit);
@@ -1021,9 +1011,7 @@ fn test_id_assignment_sparse() {
         .with_logger()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .with_artifact(inc_service_artifact.clone())
         .with_instance(inc_service_artifact.into_default_instance(max_builtin_id, "inc"))
         .with_rust_service(inc_service)
