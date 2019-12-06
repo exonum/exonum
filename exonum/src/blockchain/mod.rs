@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockProof, BlockHeaderEntries},
+    block::{Block, BlockHeaderEntries, BlockProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{IndexCoordinates, Schema, SchemaOrigin, TxLocation},
@@ -354,7 +354,7 @@ impl BlockchainMut {
             last_hash,
             tx_hash,
             state_hash,
-            entries
+            entries,
         )
     }
 

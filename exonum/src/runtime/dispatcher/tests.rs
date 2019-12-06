@@ -30,7 +30,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, Blockchain, Schema as CoreSchema, BlockHeaderEntries},
+    blockchain::{Block, BlockHeaderEntries, Blockchain, Schema as CoreSchema},
     helpers::{Height, ValidatorId},
     node::ApiSender,
     runtime::{

@@ -25,7 +25,9 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin, BlockHeaderEntries},
+    blockchain::{
+        BlockHeaderEntries, Blockchain, IndexCoordinates, Schema as CoreSchema, SchemaOrigin,
+    },
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::proto;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use protobuf::Message;
-use crate::proto;
 
 use std::{borrow::Cow, collections::BTreeMap};
 
@@ -25,8 +25,8 @@ use std::{borrow::Cow, collections::BTreeMap};
 pub struct BinaryMap<K: Ord, V>(pub BTreeMap<K, V>);
 
 impl<K, V> Default for BinaryMap<K, V>
-    where
-        K: Ord,
+where
+    K: Ord,
 {
     fn default() -> Self {
         Self(BTreeMap::new())
@@ -41,23 +41,23 @@ struct KeyValue {
 }
 
 fn pair_to_key_value_pb<K, V>(pair: (&K, &V)) -> crate::proto::schema::binary_map::KeyValue
-    where
-        K: BinaryValue,
-        V: BinaryValue,
+where
+    K: BinaryValue,
+    V: BinaryValue,
 {
     KeyValue {
         key: pair.0.to_bytes(),
         value: pair.1.to_bytes(),
     }
-        .to_pb()
+    .to_pb()
 }
 
 fn key_value_pb_to_pair<K, V>(
     pb: crate::proto::schema::binary_map::KeyValue,
 ) -> Result<(K, V), failure::Error>
-    where
-        K: BinaryValue,
-        V: BinaryValue,
+where
+    K: BinaryValue,
+    V: BinaryValue,
 {
     let KeyValue { key, value } = KeyValue::from_pb(pb)?;
     let key = K::from_bytes(key.into())?;
@@ -66,9 +66,9 @@ fn key_value_pb_to_pair<K, V>(
 }
 
 impl<K, V> ProtobufConvert for BinaryMap<K, V>
-    where
-        K: BinaryValue + Ord,
-        V: BinaryValue,
+where
+    K: BinaryValue + Ord,
+    V: BinaryValue,
 {
     type ProtoStruct = crate::proto::schema::binary_map::BinaryMap;
 
@@ -94,9 +94,9 @@ impl<K, V> ProtobufConvert for BinaryMap<K, V>
 }
 
 impl<K, V> BinaryValue for BinaryMap<K, V>
-    where
-        K: BinaryValue + Ord,
-        V: BinaryValue,
+where
+    K: BinaryValue + Ord,
+    V: BinaryValue,
 {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_pb()
@@ -112,9 +112,9 @@ impl<K, V> BinaryValue for BinaryMap<K, V>
 }
 
 impl<K, V> ObjectHash for BinaryMap<K, V>
-    where
-        K: BinaryValue + Ord,
-        V: BinaryValue,
+where
+    K: BinaryValue + Ord,
+    V: BinaryValue,
 {
     fn object_hash(&self) -> Hash {
         exonum_crypto::hash(&self.to_bytes())
