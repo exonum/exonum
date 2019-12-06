@@ -561,8 +561,7 @@ impl Runtime for RustRuntime {
         let descriptor = instance.descriptor();
         catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_transactions(context);
-            Ok(())
+            instance.as_ref().before_transactions(context)
         })
     }
 
@@ -579,8 +578,7 @@ impl Runtime for RustRuntime {
         let descriptor = instance.descriptor();
         catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().after_transactions(context);
-            Ok(())
+            instance.as_ref().after_transactions(context)
         })
     }
 

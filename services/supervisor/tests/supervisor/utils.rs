@@ -30,8 +30,7 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{
-    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, DecentralizedSupervisor, Schema,
-    ServiceConfig,
+    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
@@ -151,14 +150,18 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
         .create()
 }
 
 pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
         .with_default_rust_service(ConfigChangeService)
         .create()
 }
@@ -168,7 +171,9 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
     let artifact = service.artifact_id();
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_default_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
         .with_artifact(artifact.clone())
         .with_instance(
             artifact

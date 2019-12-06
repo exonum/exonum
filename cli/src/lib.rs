@@ -93,12 +93,9 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::{
-        rust::{DefaultInstance, ServiceFactory},
-        RuntimeInstance, WellKnownRuntime,
-    },
+    runtime::{rust::ServiceFactory, RuntimeInstance, WellKnownRuntime},
 };
-use exonum_supervisor::SimpleSupervisor;
+use exonum_supervisor::Supervisor;
 
 use std::sync::Arc;
 
@@ -145,15 +142,14 @@ impl NodeBuilder {
 
         if let StandardResult::Run(run_config) = command.execute()? {
             // Add builtin services to genesis config.
-            let supervisor = SimpleSupervisor::new();
             let genesis_config = GenesisConfigBuilder::with_consensus_config(
                 run_config.node_config.consensus.clone(),
             )
-            .with_artifact(supervisor.artifact_id())
-            .with_instance(supervisor.default_instance())
+            .with_artifact(Supervisor.artifact_id())
+            .with_instance(Supervisor::simple())
             .build();
 
-            let mut services: Vec<Box<dyn ServiceFactory>> = vec![supervisor.into()];
+            let mut services: Vec<Box<dyn ServiceFactory>> = vec![Supervisor.into()];
             services.extend(self.services);
 
             let db_options = &run_config.node_config.database;

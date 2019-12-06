@@ -25,7 +25,6 @@ use crate::{
     messages::{AnyTx, Verified},
     node::state::TRANSACTIONS_REQUEST_TIMEOUT,
     sandbox::{
-        compute_tx_hash,
         config_updater::TxConfig,
         sandbox_tests_helper::*,
         timestamping::{TimestampingTxGenerator, DATA_SIZE},
@@ -124,13 +123,9 @@ fn tx_pool_size_overflow() {
         sandbox.secret_key(ValidatorId(2)),
     );
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_proposer_id(ValidatorId(2))
-        .with_height(Height(1))
-        .with_tx_hash(&compute_tx_hash(&[tx1.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx1.clone()]))
-        .with_prev_hash(&sandbox.last_hash())
-        .build();
+    let mut block = sandbox.create_block(&[tx1.clone()]);
+    block.proposer_id = ValidatorId(2);
+    block.height = Height(1);
 
     sandbox.recv(&propose);
     sandbox.broadcast(&sandbox.create_prevote(
@@ -419,11 +414,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[tx.object_hash()]) //ordinary propose, but with this unreceived tx
         .build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
