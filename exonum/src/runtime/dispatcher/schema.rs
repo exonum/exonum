@@ -68,9 +68,9 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns a pending instances queue used to notify the runtime about service instances
-    /// to be committed.
-    fn pending_instances(&self) -> ListIndex<T::Base, InstanceSpec> {
-        self.access.clone().get_list(PENDING_INSTANCES)
+    /// to be committed with a new status.
+    fn pending_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
+        self.access.clone().get_map(PENDING_INSTANCES)
     }
 
     /// Returns the information about a service instance by its identifier.
@@ -158,17 +158,20 @@ impl Schema<&Fork> {
             return Err(Error::ServiceIdExists);
         }
 
-        let id = spec.id;
-        let name = spec.name.clone();
+        let instance_id = spec.id;
+        let instance_name = spec.name.clone();
+        let next_status = InstanceStatus::Active;
+
         instances.put(
-            &name,
+            &instance_name,
             InstanceState {
-                spec: spec.clone(),
-                status: InstanceStatus::Pending,
+                spec,
+                status: InstanceStatus::None,
+                next_status,
             },
         );
-        instance_ids.put(&id, name);
-        self.pending_instances().push(spec);
+        self.pending_instances().put(&instance_name, next_status);
+        instance_ids.put(&instance_id, instance_name);
         Ok(())
     }
 
@@ -180,11 +183,20 @@ impl Schema<&Fork> {
             let name = spec.artifact.name.clone();
             artifacts.put(&name, ArtifactState::new(spec, ArtifactStatus::Active));
         }
-        // Activate pending instances.
+        // Commit new statuses for pending instances.
         let mut instances = self.instances();
-        for spec in &self.pending_instances() {
-            let name = spec.name.clone();
-            instances.put(&name, InstanceState::new(spec, InstanceStatus::Active));
+        for (instance, status) in &self.pending_instances() {
+            let mut state = instances
+                .get(&instance)
+                .expect("Instance marked as modified is not saved in `instances`");
+            debug_assert_eq!(
+                status, state.next_status,
+                "Instance status in `pending_instances` should be same as `next_status` \
+                 in the instance state."
+            );
+
+            state.commit_next_status();
+            instances.put(&instance, state);
         }
     }
 
@@ -196,11 +208,22 @@ impl Schema<&Fork> {
         pending_artifacts
     }
 
-    /// Takes pending service instances from queue.
-    pub(super) fn take_pending_instances(&mut self) -> Vec<InstanceSpec> {
-        let mut index = self.pending_instances();
-        let pending_instances = index.iter().collect::<Vec<_>>();
-        index.clear();
-        pending_instances
+    /// Takes modified service instances from queue.
+    pub(super) fn take_modified_instances(&mut self) -> Vec<(InstanceSpec, InstanceStatus)> {
+        let mut modified_instances = self.pending_instances();
+        let instances = self.instances();
+
+        let output = modified_instances
+            .iter()
+            .map(|(instance_name, status)| {
+                let state = instances
+                    .get(&instance_name)
+                    .expect("Instance marked as modified is not saved in `instances`");
+                (state.spec, status)
+            })
+            .collect::<Vec<_>>();
+        modified_instances.clear();
+
+        output
     }
 }

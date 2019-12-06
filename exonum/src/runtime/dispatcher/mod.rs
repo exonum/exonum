@@ -340,8 +340,8 @@ impl Dispatcher {
         for spec in schema.take_pending_artifacts() {
             self.block_until_deployed(spec.artifact, spec.payload);
         }
-        // Start pending services.
-        for spec in schema.take_pending_instances() {
+        // Notify runtime about changes in service instances.
+        for (spec, _status) in schema.take_modified_instances() {
             self.start_service(snapshot, &spec)
                 .expect("Cannot start service");
         }
