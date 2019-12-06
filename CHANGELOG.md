@@ -35,6 +35,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `before_transactions` hook for services was introduced. (#1577)
 
+- Mechanism to extend block header has been added. Using
+`Dispatcher::get_block_header_entries` is possible to add new entries. (#1602)
+
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements

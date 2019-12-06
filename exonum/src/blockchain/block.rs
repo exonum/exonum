@@ -22,11 +22,10 @@ use crate::{
 use exonum_merkledb::BinaryValue;
 use std::borrow::Cow;
 
-///
+/// Expandable set of entries allowed to be added to the block.
 pub type BlockHeaderEntries = BinaryMap<String, Vec<u8>>;
 
 impl BlockHeaderEntries {
-
     /// New instance of `BlockHeaderEntries`.
     pub fn new() -> Self {
         Self::default()

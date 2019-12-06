@@ -32,16 +32,6 @@ message Block {
   BinaryMap entries = 8;
 }
 
-message ServiceInfo {
-  uint32 instance_id = 1;
-  uint32 runtime_id = 2;
-  string name = 3;
-}
-
-message ActiveServices {
-  repeated ServiceInfo services = 1;
-}
-
 message TxLocation {
   uint64 block_height = 1;
   uint64 position_in_block = 2;

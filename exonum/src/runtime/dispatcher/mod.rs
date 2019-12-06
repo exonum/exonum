@@ -14,8 +14,6 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_proto::ProtobufConvert;
-
 use exonum_merkledb::{Fork, Snapshot};
 use futures::{
     future::{self, Either},
@@ -26,12 +24,12 @@ use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
     blockchain::{
-        BlockHeaderEntries, Blockchain, CallInBlock, IndexCoordinates, Schema as CoreSchema, SchemaOrigin,
+        BlockHeaderEntries, Blockchain, CallInBlock, IndexCoordinates, Schema as CoreSchema,
+        SchemaOrigin,
     },
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
-    proto,
     runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
@@ -45,21 +43,11 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
-/// TODO: add doc
-#[derive(Debug, Clone, ProtobufConvert)]
-#[protobuf_convert(source = "proto::ServiceInfo")]
-pub struct ServiceInfo {
+#[derive(Debug)]
+struct ServiceInfo {
     instance_id: InstanceId,
     runtime_id: u32,
     name: String,
-}
-
-/// TODO: add doc
-#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "proto::ActiveServices")]
-pub struct ActiveServices {
-    /// TODO: add doc
-    pub services: Vec<ServiceInfo>,
 }
 
 /// A collection of `Runtime`s capable of modifying the blockchain state.
@@ -422,19 +410,9 @@ impl Dispatcher {
         Some((*runtime_id, runtime))
     }
 
-    fn get_active_services<'s>(&'s self) -> ActiveServices {
-        ActiveServices {
-            services: self.service_infos.values().cloned().collect(),
-        }
-    }
-
-    /// TODO: add doc
+    /// Entries allowed to be added to the block. Currently empty.
     pub fn get_block_header_entries(&self) -> BlockHeaderEntries {
-        // Active services
-        let mut map = BlockHeaderEntries::new();
-        map.insert("active_service", self.get_active_services());
-
-        map
+        BlockHeaderEntries::new()
     }
 
     /// Returns the service matching the specified query.
