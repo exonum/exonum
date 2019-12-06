@@ -319,7 +319,7 @@ fn execution_error_matching() {
         runtime_id: None,
         call_site: None,
     };
-    let mut matcher = ExecutionErrorMatch {
+    let mut matcher = ErrorMatch {
         kind: ErrorKind::Unexpected,
         description: StringMatch::Any,
         runtime_id: None,

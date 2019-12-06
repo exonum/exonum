@@ -23,7 +23,7 @@ use exonum::{
     helpers::Height,
     runtime::{
         rust::{ServiceFactory, Transaction},
-        ExecutionFail, InstanceId, SnapshotExt,
+        ErrorMatch, InstanceId, SnapshotExt,
     },
 };
 use exonum_merkledb::{access::Access, Snapshot};
@@ -381,7 +381,7 @@ fn test_creating_transaction_is_not_validator() {
     let block = testkit.create_block_with_transaction(tx);
     assert_eq!(
         *block[0].status().unwrap_err(),
-        Error::UnknownSender.to_match().for_service(INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::UnknownSender).for_service(INSTANCE_ID)
     );
 
     let snapshot = testkit.snapshot();
@@ -412,9 +412,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let block = testkit.create_block_with_transaction(tx1);
     assert_eq!(
         *block[0].status().unwrap_err(),
-        Error::ValidatorTimeIsGreater
-            .to_match()
-            .for_service(INSTANCE_ID),
+        ErrorMatch::from_fail(&Error::ValidatorTimeIsGreater).for_service(INSTANCE_ID),
     );
 
     let snapshot = testkit.snapshot();

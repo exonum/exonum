@@ -16,7 +16,7 @@ use exonum::{
     crypto,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError, ExecutionFail},
+    runtime::{rust::Transaction, CallInfo, DispatcherError, ErrorMatch, ExecutionError},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -116,9 +116,7 @@ fn test_deposit_err_issue_without_wallet() {
 
     assert_eq!(
         err,
-        Error::WalletNotFound
-            .to_match()
-            .for_service(WalletService::ID)
+        ErrorMatch::from_fail(&Error::WalletNotFound).for_service(WalletService::ID)
     );
 }
 
@@ -199,9 +197,7 @@ fn test_any_call_err_deposit_unauthorized() {
 
     assert_eq!(
         err,
-        Error::UnauthorizedIssuer
-            .to_match()
-            .for_service(WalletService::ID)
+        ErrorMatch::from_fail(&Error::UnauthorizedIssuer).for_service(WalletService::ID)
     );
 }
 
@@ -221,7 +217,10 @@ fn test_any_call_err_unknown_instance() {
     )
     .unwrap_err();
 
-    assert_eq!(err, DispatcherError::IncorrectInstanceId.to_match());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
 }
 
 #[test]
@@ -243,7 +242,10 @@ fn test_any_call_err_unknown_interface() {
     )
     .unwrap_err();
 
-    assert_eq!(err, DispatcherError::NoSuchInterface.to_match());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::NoSuchInterface)
+    );
 }
 
 #[test]
@@ -269,7 +271,7 @@ fn test_any_call_err_unknown_method() {
     )
     .unwrap_err();
 
-    assert_eq!(err, DispatcherError::NoSuchMethod.to_match());
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
 }
 
 #[test]
@@ -298,8 +300,7 @@ fn test_any_call_err_wrong_arg() {
 
     assert_eq!(
         err,
-        DispatcherError::MalformedArguments
-            .to_match()
+        ErrorMatch::from_fail(&DispatcherError::MalformedArguments)
             .with_description_containing("Utf8Error")
     );
 }
@@ -323,8 +324,7 @@ fn test_any_call_panic_recursion_limit() {
 
     assert_eq!(
         err,
-        DispatcherError::StackOverflow
-            .to_match()
+        ErrorMatch::from_fail(&DispatcherError::StackOverflow)
             .with_description_containing("Maximum depth of call stack (256)")
     );
 }
