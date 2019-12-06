@@ -122,17 +122,12 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
 #[test]
 fn should_not_vote_after_node_restart() {
     let sandbox = timestamping_sandbox();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
     let prevote = make_prevote_from_propose(&sandbox, &propose);
-
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-
     sandbox.broadcast(&prevote);
-
     sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
@@ -191,17 +186,12 @@ fn should_not_vote_after_node_restart() {
 #[test]
 fn should_save_precommit_to_consensus_cache() {
     let sandbox = timestamping_sandbox();
-
     let propose = ProposeBuilder::new(&sandbox).build();
-
     let prevote = make_prevote_from_propose(&sandbox, &propose);
-
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-
     sandbox.broadcast(&prevote);
-
     sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),
@@ -286,9 +276,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&first_propose);
-
     sandbox.broadcast(&first_prevote);
-
     sandbox.recv(&sandbox.create_prevote(
         ValidatorId(1),
         Height(1),

@@ -18,12 +18,12 @@
 //! See the `explorer` example in the crate for examples of usage.
 
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ListProof, ObjectHash, Snapshot};
+use exonum_merkledb::{ListProof, MapProof, ObjectHash, Snapshot};
 use serde::{Serialize, Serializer};
 
 use std::{
     cell::{Ref, RefCell},
-    collections::Bound,
+    collections::{BTreeMap, Bound},
     fmt,
     ops::{Index, RangeBounds},
     slice,
@@ -31,10 +31,11 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, ExecutionError, ExecutionStatus, Schema, TxLocation},
+    blockchain::{Block, CallInBlock, ExecutionError, ExecutionStatus, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
     messages::{AnyTx, Precommit, Verified},
+    runtime::error::execution_error,
 };
 
 /// Ending height of the range (exclusive), given the a priori max height.
@@ -108,12 +109,12 @@ impl<'a> BlockInfo<'a> {
     ///
     /// This method is equivalent to calling `block.header().height()`.
     pub fn height(&self) -> Height {
-        self.header.height()
+        self.header.height
     }
 
     /// Returns the number of transactions in this block.
     pub fn len(&self) -> usize {
-        self.header.tx_count() as usize
+        self.header.tx_count as usize
     }
 
     /// Is this block empty (i.e., contains no transactions)?
@@ -150,6 +151,19 @@ impl<'a> BlockInfo<'a> {
             .map(|hash| self.explorer.committed_transaction(hash, None))
     }
 
+    /// Returns the proof for the execution status of a call within this block.
+    ///
+    /// Note that if the call did not result in an error or did not happen at all, the returned
+    /// proof will not contain entries. To distinguish between two cases, one can inspect
+    /// the number of transactions in the block or IDs of the active services when the block
+    /// was executed.
+    pub fn error_proof(&self, call_location: CallInBlock) -> MapProof<CallInBlock, ExecutionError> {
+        self.explorer
+            .schema
+            .call_errors(self.header.height)
+            .get_proof(call_location)
+    }
+
     /// Iterates over transactions in the block.
     pub fn iter(&self) -> Transactions<'_, '_> {
         Transactions {
@@ -159,7 +173,7 @@ impl<'a> BlockInfo<'a> {
         }
     }
 
-    /// Loads transactions and precommits for the block.
+    /// Loads transactions, errors and precommits for the block.
     pub fn with_transactions(self) -> BlockWithTransactions {
         let (explorer, header, precommits, transactions) =
             (self.explorer, self.header, self.precommits, self.txs);
@@ -173,11 +187,19 @@ impl<'a> BlockInfo<'a> {
             .iter()
             .map(|tx_hash| explorer.committed_transaction(tx_hash, None))
             .collect();
+        let errors: Vec<_> = self
+            .explorer
+            .schema
+            .call_errors(header.height)
+            .iter()
+            .map(|(location, error)| ErrorWithLocation { location, error })
+            .collect();
 
         BlockWithTransactions {
             header,
             precommits,
             transactions,
+            errors,
         }
     }
 }
@@ -235,6 +257,24 @@ pub struct BlockWithTransactions {
     pub precommits: Vec<Verified<Precommit>>,
     /// Transactions in the order they appear in the block.
     pub transactions: Vec<CommittedTransaction>,
+    /// Errors that have occurred within the block.
+    pub errors: Vec<ErrorWithLocation>,
+}
+
+/// Execution error together with its location within the block.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorWithLocation {
+    /// Location of the error.
+    pub location: CallInBlock,
+    /// Error data.
+    #[serde(with = "execution_error")]
+    pub error: ExecutionError,
+}
+
+impl fmt::Display for ErrorWithLocation {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "In {}: {}", self.location, self.error)
+    }
 }
 
 impl BlockWithTransactions {
@@ -242,7 +282,7 @@ impl BlockWithTransactions {
     ///
     /// This method is equivalent to calling `block.header.height()`.
     pub fn height(&self) -> Height {
-        self.header.height()
+        self.header.height
     }
 
     /// Returns the number of transactions in this block.
@@ -258,6 +298,11 @@ impl BlockWithTransactions {
     /// Iterates over transactions in the block.
     pub fn iter(&self) -> EagerTransactions<'_> {
         self.transactions.iter()
+    }
+
+    /// Returns errors converted into a map. Note that this is potentially a costly operation.
+    pub fn error_map(&self) -> BTreeMap<CallInBlock, &ExecutionError> {
+        self.errors.iter().map(|e| (e.location, &e.error)).collect()
     }
 }
 
@@ -521,7 +566,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
-        let tx_hashes_table = self.schema.block_transactions(block.height());
+        let tx_hashes_table = self.schema.block_transactions(block.height);
         tx_hashes_table.iter().collect()
     }
 
@@ -549,7 +594,7 @@ impl<'a> BlockchainExplorer<'a> {
         let time = median_precommits_time(&block_precommits.precommits);
 
         // Unwrap is OK here, because we already know that transaction is committed.
-        let status = self.schema.transaction_results().get(tx_hash).unwrap();
+        let status = self.schema.transaction_result(location).unwrap();
 
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
@@ -560,7 +605,7 @@ impl<'a> BlockchainExplorer<'a> {
             }),
             location,
             location_proof,
-            status,
+            status: ExecutionStatus(status),
             time,
         }
     }
@@ -584,6 +629,7 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let txs_table = self.schema.block_transactions(height);
         let block_proof = self.schema.block_and_precommits(height);
+        let errors = self.schema.call_errors(height);
 
         block_proof.map(|proof| BlockWithTransactions {
             header: proof.block,
@@ -591,6 +637,10 @@ impl<'a> BlockchainExplorer<'a> {
             transactions: txs_table
                 .iter()
                 .map(|tx_hash| self.committed_transaction(&tx_hash, None))
+                .collect(),
+            errors: errors
+                .iter()
+                .map(|(location, error)| ErrorWithLocation { location, error })
                 .collect(),
         })
     }

@@ -716,7 +716,7 @@ impl BlockRequest {
 impl BlockResponse {
     /// Verify Merkle root of transactions in the block.
     pub fn verify_tx_hash(&self) -> bool {
-        *self.block().tx_hash() == HashTag::hash_list(self.transactions())
+        self.block().tx_hash == HashTag::hash_list(self.transactions())
     }
 }
 

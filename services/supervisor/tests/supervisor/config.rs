@@ -16,11 +16,12 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
 use exonum::{
+    blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
     runtime::{
         rust::{ServiceFactory, Transaction},
-        ErrorMatch, InstanceId, SUPERVISOR_INSTANCE_ID,
+        ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -586,6 +587,13 @@ fn test_service_config_discard_single_apply_error() {
         .expect("Transaction with change propose discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+    let snapshot = testkit.snapshot();
+    let err = snapshot
+        .for_core()
+        .call_errors(testkit.height())
+        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
+        .unwrap();
+    assert!(err.description().contains("IncService: Configure error"));
 
     // Create one more block for supervisor to remove failed config.
     testkit.create_block();
@@ -614,6 +622,14 @@ fn test_service_config_discard_single_apply_panic() {
         .status()
         .expect("Transaction with change propose discarded.");
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
+
+    let snapshot = testkit.snapshot();
+    let err = snapshot
+        .for_core()
+        .call_errors(testkit.height())
+        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
+        .unwrap();
+    assert!(err.description().contains("Configure panic"));
 
     // Create one more block for supervisor to remove failed config.
     testkit.create_block();

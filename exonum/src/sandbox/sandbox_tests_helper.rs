@@ -15,19 +15,19 @@
 //! Functions with reusable code used for sandbox tests.
 
 use bit_vec::BitVec;
+use exonum_crypto::Hash;
 use exonum_merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB};
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
 use crate::{
     blockchain::Block,
-    crypto::{Hash, HASH_SIZE},
     helpers::{Height, Milliseconds, Round, ValidatorId},
     messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Verified},
 };
 
 use super::{
-    timestamping::{TimestampTx, TimestampingTxGenerator, DATA_SIZE},
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
 
@@ -44,6 +44,7 @@ pub struct BlockBuilder<'a> {
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
+    error_hash: Option<Hash>,
     tx_count: Option<u32>,
 
     sandbox: &'a TimestampingSandbox,
@@ -57,6 +58,7 @@ impl<'a> BlockBuilder<'a> {
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
+            error_hash: None,
             tx_count: None,
 
             sandbox,
@@ -65,16 +67,6 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn with_proposer_id(mut self, proposer_id: ValidatorId) -> Self {
         self.proposer_id = Some(proposer_id);
-        self
-    }
-
-    pub fn with_height(mut self, height: Height) -> Self {
-        self.height = Some(height);
-        self
-    }
-
-    pub fn with_prev_hash(mut self, prev_hash: &'a Hash) -> Self {
-        self.prev_hash = Some(*prev_hash);
         self
     }
 
@@ -97,17 +89,25 @@ impl<'a> BlockBuilder<'a> {
         self
     }
 
+    pub fn with_error_hash(mut self, error_hash: &Hash) -> Self {
+        self.error_hash = Some(*error_hash);
+        self
+    }
+
     pub fn build(&self) -> Block {
-        Block::new(
-            self.proposer_id
+        Block {
+            proposer_id: self
+                .proposer_id
                 .unwrap_or_else(|| self.sandbox.current_leader()),
-            self.height.unwrap_or_else(|| self.sandbox.current_height()),
-            self.tx_count.unwrap_or(0),
-            self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
-            self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
-            self.state_hash
+            height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
+            tx_count: self.tx_count.unwrap_or(0),
+            prev_hash: self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
+            tx_hash: self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
+            state_hash: self
+                .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
-        )
+            error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
+        }
     }
 }
 
@@ -192,17 +192,12 @@ impl SandboxState {
 impl Default for SandboxState {
     fn default() -> Self {
         SandboxState {
-            accepted_block_hash: RefCell::new(empty_hash()),
-            accepted_propose_hash: RefCell::new(empty_hash()),
+            accepted_block_hash: RefCell::new(Hash::zero()),
+            accepted_propose_hash: RefCell::new(Hash::zero()),
             committed_transaction_hashes: RefCell::new(Vec::new()),
             time_millis_since_round_start: RefCell::new(0),
         }
     }
-}
-
-/// Returns valid Hash object filled with zeros.
-pub fn empty_hash() -> Hash {
-    Hash::from_slice(&[0; HASH_SIZE]).unwrap()
 }
 
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
@@ -263,13 +258,13 @@ pub fn gen_timestamping_tx() -> Verified<AnyTx> {
     tx_gen.next().unwrap()
 }
 
-pub fn gen_unverified_timestamping_tx() -> TimestampTx {
-    let mut tx_gen = TimestampingTxGenerator::new(DATA_SIZE);
-    tx_gen.gen_tx_payload()
+pub fn gen_incorrect_tx() -> Verified<AnyTx> {
+    let mut tx_gen = TimestampingTxGenerator::for_incorrect_service(DATA_SIZE);
+    tx_gen.next().unwrap()
 }
 
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
-    // gen some tx
+    // Generate some transaction.
     let tx = gen_timestamping_tx();
     add_one_height_with_transactions(sandbox, sandbox_state, &[tx.clone()]);
 }
@@ -318,17 +313,12 @@ where
     // assert 1st round
     sandbox.assert_state(initial_height, Round(1));
 
-    let hashes = {
-        let mut hashes = Vec::new();
-        for tx in txs.iter() {
-            sandbox.recv(tx);
-            hashes.push(tx.object_hash());
-        }
-        hashes
-    };
-    {
-        *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
+    let mut hashes = Vec::new();
+    for tx in txs.iter() {
+        sandbox.recv(tx);
+        hashes.push(tx.object_hash());
     }
+    *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
 
     let n_validators = sandbox.validators().len();
     let new_height = initial_height.next();
@@ -336,9 +326,9 @@ where
     if n_validators == 1 {
         try_add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref())?;
         let block = sandbox.last_block();
-        assert_eq!(block.tx_hash(), &compute_txs_merkle_root(&hashes));
-        assert_eq!(block.tx_count(), hashes.len() as u32);
-        assert_eq!(block.height(), initial_height);
+        assert_eq!(block.tx_hash, compute_txs_merkle_root(&hashes));
+        assert_eq!(block.tx_count, hashes.len() as u32);
+        assert_eq!(block.height, initial_height);
         sandbox.assert_state(new_height, Round(1));
 
         return Ok(hashes);
@@ -352,9 +342,7 @@ where
             let propose = propose.unwrap();
             trace!("propose.hash: {:?}", propose.object_hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
-            {
-                *sandbox_state.accepted_propose_hash.borrow_mut() = propose.object_hash();
-            }
+            *sandbox_state.accepted_propose_hash.borrow_mut() = propose.object_hash();
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
@@ -376,17 +364,16 @@ where
                 sandbox.last_block().object_hash()
             );
 
-            let state_hash = sandbox.compute_state_hash(&raw_txs);
+            let (state_hash, error_hash) = sandbox.compute_block_hashes(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
                 .with_state_hash(&state_hash)
+                .with_error_hash(&error_hash)
                 .build();
 
             trace!("new_block: {:?}", block);
             trace!("new_block.object_hash(): {:?}", block.object_hash());
-            {
-                *sandbox_state.accepted_block_hash.borrow_mut() = block.object_hash();
-            }
+            *sandbox_state.accepted_block_hash.borrow_mut() = block.object_hash();
 
             sandbox.broadcast(&sandbox.create_precommit(
                 ValidatorId(0),
@@ -417,9 +404,7 @@ where
             }
 
             sandbox.assert_state(new_height, Round(1));
-            {
-                *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
-            }
+            *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             sandbox.check_broadcast_status(new_height, block.object_hash());
 
             return Ok(hashes);
@@ -445,21 +430,15 @@ pub fn add_one_height_with_transactions_from_other_validator(
     // assert 1st round
     sandbox.assert_state(initial_height, Round(1));
 
-    let hashes = {
-        let mut hashes = Vec::new();
-        for tx in txs.iter() {
-            sandbox.recv(tx);
-            hashes.push(tx.object_hash());
-        }
-        hashes
-    };
-
-    {
-        *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
+    let mut hashes = Vec::new();
+    for tx in txs.iter() {
+        sandbox.recv(tx);
+        hashes.push(tx.object_hash());
     }
+
+    *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     let n_validators = sandbox.validators().len();
     for _ in 0..n_validators {
-        //        add_round_with_transactions(&sandbox, &[tx.object_hash()]);
         add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
         let round = sandbox.current_round();
         if ValidatorId(1) == sandbox.leader(round) {
@@ -488,10 +467,11 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.assert_lock(round, Some(propose.object_hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
-            let state_hash = sandbox.compute_state_hash(&raw_txs);
+            let (state_hash, error_hash) = sandbox.compute_block_hashes(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
                 .with_state_hash(&state_hash)
+                .with_error_hash(&error_hash)
                 .build();
             trace!("new_block: {:?}", block);
             trace!("new_block.object_hash(): {:?}", block.object_hash());
@@ -516,9 +496,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.assert_state(new_height, Round(1));
             sandbox.check_broadcast_status(new_height, block.object_hash());
 
-            {
-                *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
-            }
+            *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             return hashes;
         }
     }
