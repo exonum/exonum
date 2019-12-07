@@ -24,7 +24,7 @@ use exonum::{
         BlockchainData, RuntimeInstance,
     },
 };
-use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{Database, Snapshot, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
@@ -36,11 +36,7 @@ use std::{
     time::Duration,
 };
 
-#[exonum_interface]
-trait CommitWatcherInterface {}
-
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("CommitWatcherInterface"))]
 #[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
@@ -55,8 +51,6 @@ impl CommitWatcherService {
     }
 }
 
-impl CommitWatcherInterface for CommitWatcherService {}
-
 impl Service for CommitWatcherService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
@@ -67,14 +61,8 @@ impl Service for CommitWatcherService {
     }
 }
 
-#[exonum_interface]
-trait StartCheckerInterface {}
-
 #[derive(Debug, ServiceDispatcher)]
-#[service_dispatcher(implements("StartCheckerInterface"))]
 struct StartCheckerService;
-
-impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {

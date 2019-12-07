@@ -29,6 +29,7 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, Mailbox},
+        rust::CallStub,
         AnyTx, ArtifactId, CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
@@ -36,6 +37,7 @@ use crate::{
 use super::{
     api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId,
 };
+use crate::runtime::rust::MethodDescriptor;
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -163,36 +165,6 @@ pub trait DefaultInstance: ServiceFactory {
     fn default_instance(&self) -> InstanceInitParams {
         self.artifact_id()
             .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
-    }
-}
-
-/// Transaction specification for a specific service interface method.
-pub trait Transaction<Svc: ?Sized>: BinaryValue {
-    /// Identifier of the service interface required for the call.
-    #[doc(hidden)]
-    const INTERFACE_NAME: &'static str;
-    /// Identifier of the service method which executes the given transaction.
-    const METHOD_ID: MethodId;
-
-    /// Creates an unsigned service transaction from the value.
-    fn into_any_tx(self, instance_id: InstanceId) -> AnyTx {
-        AnyTx {
-            call_info: CallInfo {
-                instance_id,
-                method_id: Self::METHOD_ID,
-            },
-            arguments: self.into_bytes(),
-        }
-    }
-
-    /// Signs the value as a transaction with the specified instance identifier.
-    fn sign(
-        self,
-        service_id: InstanceId,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        Verified::from_value(self.into_any_tx(service_id), public_key, secret_key)
     }
 }
 
@@ -348,26 +320,6 @@ impl<'a> Broadcaster<'a> {
         self.instance.as_ref()
     }
 
-    /// Signs and broadcasts a transaction to the other nodes in the network.
-    ///
-    /// The transaction is signed by the service keypair of the node. The same input transaction
-    /// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
-    /// field to the input transaction (e.g., a `u64`) and change it between the calls.
-    ///
-    /// # Return value
-    ///
-    /// Returns the hash of the created transaction, or an error if the transaction cannot be
-    /// broadcast. An error means that the node is being shut down.
-    pub fn send<Svc: ?Sized, T>(self, tx: T) -> Result<Hash, Error>
-    where
-        T: Transaction<Svc>,
-    {
-        let (public_key, secret_key) = self.service_keypair.as_ref();
-        let msg = tx.sign(self.instance().id, *public_key, secret_key);
-        let tx_hash = msg.object_hash();
-        self.tx_sender.broadcast_transaction(msg).map(|()| tx_hash)
-    }
-
     /// Converts the broadcaster into the owned representation, which can be used to broadcast
     /// transactions asynchronously.
     pub fn into_owned(self) -> Broadcaster<'static> {
@@ -376,6 +328,34 @@ impl<'a> Broadcaster<'a> {
             service_keypair: Cow::Owned(self.service_keypair.into_owned()),
             tx_sender: Cow::Owned(self.tx_sender.into_owned()),
         }
+    }
+}
+
+/// Signs and broadcasts a transaction to the other nodes in the network.
+///
+/// The transaction is signed by the service keypair of the node. The same input transaction
+/// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
+/// field to the input transaction (e.g., a `u64`) and change it between the calls.
+///
+/// # Return value
+///
+/// Returns the hash of the created transaction, or an error if the transaction cannot be
+/// broadcast. An error means that the node is being shut down.
+impl CallStub for Broadcaster<'_> {
+    type Output = Result<Hash, Error>;
+
+    fn call_stub(&mut self, method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
+        let tx = AnyTx {
+            call_info: CallInfo {
+                instance_id: self.instance().id,
+                method_id: method.id,
+            },
+            arguments: args,
+        };
+        let (public_key, secret_key) = self.service_keypair.as_ref();
+        let msg = Verified::from_value(tx, *public_key, secret_key);
+        let tx_hash = msg.object_hash();
+        self.tx_sender.broadcast_transaction(msg).map(|()| tx_hash)
     }
 }
 
@@ -412,19 +392,6 @@ impl Debug for AfterCommitContext<'_> {
             .field("instance", &self.broadcaster.instance)
             .finish()
     }
-}
-
-/// A service interface specification.
-pub trait Interface {
-    /// Fully qualified name of this interface.
-    const INTERFACE_NAME: &'static str;
-    /// Invokes the specified method handler of the service instance.
-    fn dispatch(
-        &self,
-        context: CallContext<'_>,
-        method: MethodId,
-        payload: &[u8],
-    ) -> Result<(), ExecutionError>;
 }
 
 fn is_supervisor(instance_id: InstanceId) -> bool {

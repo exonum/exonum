@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::{PublicKey, SecretKey};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
     validation::{is_allowed_index_name_char, is_valid_index_name_component},
@@ -23,7 +24,10 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use super::InstanceDescriptor;
-use crate::{blockchain::config::InstanceInitParams, helpers::ValidateInput, proto::schema};
+use crate::{
+    blockchain::config::InstanceInitParams, helpers::ValidateInput, messages::Verified,
+    proto::schema,
+};
 
 /// Unique service instance identifier.
 ///
@@ -97,6 +101,11 @@ pub struct AnyTx {
 }
 
 impl AnyTx {
+    /// Signs a transaction with the specified Ed25519 keypair.
+    pub fn sign(self, public_key: PublicKey, secret_key: &SecretKey) -> Verified<Self> {
+        Verified::from_value(self, public_key, secret_key)
+    }
+
     /// Parse transaction arguments as a specific type.
     pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
         T::from_bytes(Cow::Borrowed(&self.arguments))

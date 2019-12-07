@@ -30,24 +30,18 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
-    interface::{IssueReceiver, IssueReceiverClient},
+    interface::{IssueReceiver, ServeIssueReceiver},
     proto,
     schema::{Wallet, WalletSchema},
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::CreateWallet")]
-pub struct TxCreateWallet {
-    pub name: String,
-}
-
 #[exonum_interface]
 pub trait WalletInterface {
-    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
+    fn create(&mut self, arg: String) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("WalletInterface", "IssueReceiver"))]
+#[service_dispatcher(implements("ServeWalletInterface", "ServeIssueReceiver"))]
 #[service_factory(artifact_name = "wallet-service", proto_sources = "proto")]
 pub struct WalletService;
 
@@ -65,13 +59,10 @@ impl Service for WalletService {
     }
 }
 
-impl WalletInterface for WalletService {
-    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
-        let owner = context
-            .caller()
-            .author()
-            .ok_or(Error::WrongInterfaceCaller)?;
-        let mut schema = WalletSchema::new(context.service_data());
+impl ServeWalletInterface for CallContext<'_> {
+    fn create(&mut self, arg: String) -> Result<(), ExecutionError> {
+        let owner = self.caller().author().ok_or(Error::WrongInterfaceCaller)?;
+        let mut schema = WalletSchema::new(self.service_data());
 
         if schema.wallets.contains(&owner) {
             return Err(Error::WalletAlreadyExists.into());
@@ -87,9 +78,9 @@ impl WalletInterface for WalletService {
     }
 }
 
-impl IssueReceiver for WalletService {
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
-        let instance_id = context
+impl ServeIssueReceiver for CallContext<'_> {
+    fn issue(&mut self, arg: Issue) -> Result<(), ExecutionError> {
+        let instance_id = self
             .caller()
             .as_service()
             .ok_or(Error::WrongInterfaceCaller)?;

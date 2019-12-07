@@ -14,10 +14,11 @@
 
 use darling::FromMeta;
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, TraitItem,
-    Type,
+    parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, Receiver,
+    ReturnType, TraitItem, TraitItemMethod, Type, Visibility,
 };
 
 use std::convert::TryFrom;
@@ -31,47 +32,60 @@ struct ServiceMethodDescriptor {
     id: u32,
 }
 
-impl TryFrom<(usize, &TraitItem)> for ServiceMethodDescriptor {
-    type Error = darling::Error;
+const INVALID_METHOD_MSG: &str =
+    "Interface method should have form `fn foo(&mut self, arg: Bar) -> Self::Output`";
 
-    fn try_from(value: (usize, &TraitItem)) -> Result<Self, Self::Error> {
-        let method = match value.1 {
-            TraitItem::Method(m) => m,
-            _ => unreachable!(),
-        };
+impl ServiceMethodDescriptor {
+    fn try_from(index: usize, method: &mut TraitItemMethod) -> Result<Self, darling::Error> {
         let mut method_args_iter = method.sig.inputs.iter();
 
-        method_args_iter
-            .next()
-            .and_then(|arg| match arg {
-                FnArg::Receiver(_) => Some(()),
-                _ => None,
-            })
-            .ok_or_else(|| {
-                darling::Error::unexpected_type("Expected `&self` or `&mut self` as an argument")
-            })?;
-
-        method_args_iter
-            .next()
-            .ok_or_else(|| darling::Error::unexpected_type("Expected `CallContext` argument"))?;
+        if let Some(arg) = method_args_iter.next() {
+            match arg {
+                FnArg::Receiver(Receiver {
+                    reference: Some(_),
+                    mutability: Some(_),
+                    ..
+                }) => {}
+                _ => {
+                    let msg = "The first argument in an interface method should be `&mut self`";
+                    return Err(darling::Error::custom(msg).with_span(&arg));
+                }
+            }
+        } else {
+            return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method));
+        }
 
         let arg_type = method_args_iter
             .next()
-            .ok_or_else(|| darling::Error::unexpected_type("Expected argument with transaction"))
+            .ok_or_else(|| darling::Error::custom(INVALID_METHOD_MSG).with_span(method))
             .and_then(|arg| match arg {
                 FnArg::Typed(arg) => Ok(arg.ty.clone()),
-                _ => Err(darling::Error::unexpected_type("Expected captured arg")),
+                _ => Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method)),
             })?;
 
         if method_args_iter.next().is_some() {
-            return Err(darling::Error::unsupported_format(
-                "Function should have only one argument for transaction",
-            ));
+            return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method));
+        }
+
+        if let ReturnType::Type(_, ref mut ty) = method.sig.output {
+            let ty: &mut Type = ty.as_mut();
+            match ty {
+                Type::Infer(_) => {
+                    *ty = syn::parse_quote!(Self::Output);
+                }
+                Type::Path(_) => {} // FIXME: use more thorough check
+                _ => {
+                    let msg = "Unsupported return type; use `_` or `Self::Output`";
+                    return Err(darling::Error::custom(msg).with_span(ty));
+                }
+            }
+        } else {
+            return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(&method.sig.output));
         }
 
         Ok(ServiceMethodDescriptor {
             name: method.sig.ident.clone(),
-            id: value.0 as u32,
+            id: index as u32, // TODO: allow to parse `method_id` from attrs
             arg_type,
         })
     }
@@ -112,19 +126,40 @@ struct ExonumService {
 }
 
 impl ExonumService {
-    fn new(item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
-        let methods = item_trait
-            .items
-            .iter()
-            .enumerate()
-            .filter_map(|x| match x.1 {
-                TraitItem::Method(_) => Some(ServiceMethodDescriptor::try_from(x)),
-                _ => None,
-            })
-            .try_fold(Vec::new(), |mut v, x| {
-                v.push(x?);
-                Ok(v)
-            })?;
+    fn new(mut item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
+        if !item_trait.generics.params.is_empty() {
+            let msg = "Generics are not supported";
+            return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params));
+        }
+
+        let mut methods = Vec::with_capacity(item_trait.items.len());
+        let mut has_output = false;
+
+        for (i, trait_item) in item_trait.items.iter_mut().enumerate() {
+            match trait_item {
+                TraitItem::Method(method) => {
+                    methods.push(ServiceMethodDescriptor::try_from(i, method)?);
+                }
+                TraitItem::Type(ty) if ty.ident.to_string() == "Output" => {
+                    if !ty.bounds.is_empty() {
+                        let msg = "`Output` type must not have bounds";
+                        return Err(darling::Error::custom(msg).with_span(trait_item));
+                    }
+                    has_output = true;
+                }
+                _ => {
+                    let msg = "Unsupported item in an Exonum interface";
+                    return Err(darling::Error::custom(msg).with_span(trait_item));
+                }
+            }
+        }
+
+        if !has_output {
+            item_trait.items.push(syn::parse_quote! {
+                /// Type of items output by the stub.
+                type Output;
+            });
+        }
 
         Ok(Self {
             item_trait,
@@ -137,35 +172,13 @@ impl ExonumService {
         self.attrs
             .interface
             .as_ref()
-            .map(String::as_ref)
+            .map(String::as_str)
             .unwrap_or_default()
-    }
-
-    fn impl_transactions(&self) -> impl ToTokens {
-        let cr = &self.attrs.cr;
-        let trait_name = &self.item_trait.ident;
-        let interface_name = self.interface_name();
-
-        let transactions_for_methods =
-            self.methods
-                .iter()
-                .map(|ServiceMethodDescriptor { arg_type, id, .. }| {
-                    quote! {
-                        impl #cr::runtime::rust::Transaction<dyn #trait_name> for #arg_type {
-                            const INTERFACE_NAME: &'static str = #interface_name;
-                            const METHOD_ID: #cr::runtime::MethodId = #id;
-                        }
-                    }
-                });
-
-        quote! {
-            #( #transactions_for_methods )*
-        }
     }
 
     fn impl_interface(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
-        let trait_name = &self.item_trait.ident;
+        let serve_trait_name = self.serve_trait_name();
         let interface_name = self.interface_name();
 
         let impl_match_arm = |descriptor: &ServiceMethodDescriptor| {
@@ -173,25 +186,25 @@ impl ExonumService {
 
             quote! {
                 #id => {
-                    let bytes = payload.into();
-                    let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(bytes)
+                    let arg: #arg_type = #cr::merkledb::BinaryValue::from_bytes(payload.into())
                         .map_err(#cr::runtime::DispatcherError::malformed_arguments)?;
-                    self.#name(ctx, arg)
+                    self.#name(context, arg)
                 }
             }
         };
         let match_arms = self.methods.iter().map(impl_match_arm);
 
+        let res = quote!(std::result::Result<(), #cr::runtime::ExecutionError>);
         quote! {
-            impl #cr::runtime::rust::Interface for dyn #trait_name {
+            impl<'a> #cr::runtime::rust::Interface for dyn #serve_trait_name + 'a {
                 const INTERFACE_NAME: &'static str = #interface_name;
 
                 fn dispatch(
                     &self,
-                    ctx: #cr::runtime::rust::CallContext<'_>,
+                    context: #cr::runtime::rust::CallContext<'_>,
                     method: #cr::runtime::MethodId,
                     payload: &[u8],
-                ) -> Result<(), #cr::runtime::error::ExecutionError> {
+                ) -> #res {
                     match method {
                         #( #match_arms )*
                         _ => Err(#cr::runtime::DispatcherError::NoSuchMethod.into()),
@@ -200,17 +213,88 @@ impl ExonumService {
             }
         }
     }
+
+    fn impl_trait_for_call_stub(&self) -> impl ToTokens {
+        let cr = &self.attrs.cr;
+        let trait_name = &self.item_trait.ident;
+        let interface_name = self.interface_name();
+
+        let method_impl = |descriptor: &ServiceMethodDescriptor| {
+            let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
+            let name_string = name.to_string();
+            let descriptor = quote! {
+                #cr::runtime::rust::MethodDescriptor::new(
+                    #interface_name,
+                    #name_string,
+                    #id,
+                )
+            };
+
+            quote! {
+                fn #name(&mut self, arg: #arg_type) -> Self::Output {
+                    #cr::runtime::rust::CallStub::call_stub(
+                        self,
+                        #descriptor,
+                        #cr::merkledb::BinaryValue::into_bytes(arg),
+                    )
+                }
+            }
+        };
+        let methods = self.methods.iter().map(method_impl);
+
+        quote! {
+            impl<T: #cr::runtime::rust::CallStub> #trait_name for T {
+                type Output = <T as #cr::runtime::rust::CallStub>::Output;
+
+                #( #methods )*
+            }
+        }
+    }
+
+    fn serve_trait(&self) -> impl ToTokens {
+        let mut serve_trait = self.item_trait.clone();
+        serve_trait.vis = Visibility::Inherited;
+        serve_trait.ident = self.serve_trait_name();
+        serve_trait.items.retain(|trait_item| match trait_item {
+            TraitItem::Method(_) => true,
+            _ => false,
+        });
+
+        let cr = &self.attrs.cr;
+        for trait_item in &mut serve_trait.items {
+            if let TraitItem::Method(method) = trait_item {
+                if let FnArg::Receiver(ref mut recv) = method.sig.inputs[0] {
+                    recv.mutability = None;
+                }
+                method.sig.inputs.insert(
+                    1,
+                    syn::parse_quote!(context: #cr::runtime::rust::CallContext<'_>),
+                );
+                method.sig.output =
+                    syn::parse_quote!(-> std::result::Result<(), #cr::runtime::ExecutionError>);
+            }
+        }
+
+        quote!(#serve_trait)
+    }
+
+    fn serve_trait_name(&self) -> Ident {
+        let name = format!("Serve{}", self.item_trait.ident);
+        Ident::new(&name, Span::call_site())
+    }
 }
 
 impl ToTokens for ExonumService {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let item_trait = &self.item_trait;
-        let impl_transactions = self.impl_transactions();
+        let serve_trait = self.serve_trait();
         let impl_interface = self.impl_interface();
+        let impl_trait = self.impl_trait_for_call_stub();
 
         let expanded = quote! {
             #item_trait
-            #impl_transactions
+            #impl_trait
+            #serve_trait
             #impl_interface
         };
         tokens.extend(expanded);
@@ -221,9 +305,10 @@ pub fn impl_exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStrea
     let item_trait = parse_macro_input!(item as ItemTrait);
     let attrs = parse_macro_input!(attr as AttributeArgs);
 
-    let exonum_service =
-        ExonumService::new(item_trait, attrs).unwrap_or_else(|e| panic!("ExonumService: {}", e));
-
-    let tokens = quote! {#exonum_service};
+    let exonum_service = match ExonumService::new(item_trait, attrs) {
+        Ok(exonum_service) => exonum_service,
+        Err(e) => return e.write_errors().into(),
+    };
+    let tokens = quote!(#exonum_service);
     tokens.into()
 }

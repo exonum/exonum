@@ -98,6 +98,12 @@ pub struct CreateWallet {
     pub name: String,
 }
 
+impl CreateWallet {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
+    }
+}
+
 /// Transfer coins between the wallets.
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTransfer")]
@@ -118,26 +124,18 @@ pub enum Error {
 #[exonum_interface]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(
-        &self,
-        context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError>;
+    fn create_wallet(&mut self, arg: CreateWallet) -> _;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
+    fn transfer(&mut self, arg: Transfer) -> _;
 }
 
-impl CurrencyInterface for CurrencyService {
-    fn create_wallet(
-        &self,
-        context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError> {
-        let author = context.caller().author().unwrap();
+impl ServeCurrencyInterface for CallContext<'_> {
+    fn create_wallet(&mut self, arg: CreateWallet) -> Result<(), ExecutionError> {
+        let author = self.caller().author().unwrap();
 
-        let height = context.data().for_core().height();
-        let mut schema = CurrencySchema::new(context.service_data());
+        let height = self.data().for_core().height();
+        let mut schema = CurrencySchema::new(self.service_data());
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
             schema.wallets.put(&author, wallet);
@@ -145,14 +143,14 @@ impl CurrencyInterface for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError> {
-        let author = context.caller().author().unwrap();
+    fn transfer(&mut self, arg: Transfer) -> Result<(), ExecutionError> {
+        let author = self.caller().author().unwrap();
         if author == arg.to {
             return Err(Error::SenderSameAsReceiver.into());
         }
 
-        let height = context.data().for_core().height();
-        let mut schema = CurrencySchema::new(context.service_data());
+        let height = self.data().for_core().height();
+        let mut schema = CurrencySchema::new(self.service_data());
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);
         if let (Some(sender), Some(receiver)) = (sender, receiver) {

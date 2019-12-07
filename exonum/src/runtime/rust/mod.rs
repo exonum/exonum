@@ -161,13 +161,14 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    call_context::CallContext,
+    call_context::{CallContext, ClientStub},
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
-        ServiceFactory, Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
+        ServiceFactory,
     },
+    stubs::{CallStub, Interface, MethodDescriptor, Signer, TxStub},
 };
 
 pub mod api;
@@ -202,6 +203,7 @@ use super::{
 mod call_context;
 mod runtime_api;
 mod service;
+mod stubs;
 #[cfg(test)]
 mod tests;
 

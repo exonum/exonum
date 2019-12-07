@@ -35,27 +35,9 @@ use std::sync::{
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
-)]
-#[protobuf_convert(source = "proto::TxAfterCommit")]
-pub struct TxAfterCommit {
-    pub height: Height,
-}
-
 #[exonum_interface]
 pub trait AfterCommitInterface {
-    fn handle_after_commit(
-        &self,
-        context: CallContext<'_>,
-        arg: TxAfterCommit,
-    ) -> Result<(), ExecutionError>;
-}
-
-impl TxAfterCommit {
-    pub fn new(height: Height) -> Self {
-        Self { height }
-    }
+    fn after_commit(&mut self, height: u64) -> _;
 }
 
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
@@ -65,17 +47,13 @@ impl TxAfterCommit {
     proto_sources = "crate::proto",
     service_constructor = "Self::new_instance"
 )]
-#[service_dispatcher(implements("AfterCommitInterface"))]
+#[service_dispatcher(implements("ServeAfterCommitInterface"))]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
 
-impl AfterCommitInterface for AfterCommitService {
-    fn handle_after_commit(
-        &self,
-        _context: CallContext<'_>,
-        _arg: TxAfterCommit,
-    ) -> Result<(), ExecutionError> {
+impl ServeAfterCommitInterface for CallContext<'_> {
+    fn after_commit(&mut self, _arg: TxAfterCommit) -> Result<(), ExecutionError> {
         Ok(())
     }
 }
@@ -107,13 +85,15 @@ impl Service for AfterCommitService {
         let counter = self.counter.fetch_add(1, Ordering::SeqCst);
 
         // Test both validator-specific and generic sending.
-        let tx = TxAfterCommit::new(context.height());
         if counter < 10_000 {
-            if let Some(broadcast) = context.broadcaster() {
-                broadcast.send(tx).ok();
+            if let Some(mut broadcast) = context.broadcaster() {
+                broadcast.after_commit(context.height()).ok();
             }
         } else {
-            context.generic_broadcaster().send(tx).ok();
+            context
+                .generic_broadcaster()
+                .after_commit(context.height())
+                .ok();
         }
     }
 }

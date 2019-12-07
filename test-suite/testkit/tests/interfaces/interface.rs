@@ -36,19 +36,5 @@ pub struct Issue {
 
 #[exonum_interface(interface = "IssueReceiver")]
 pub trait IssueReceiver {
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
-}
-
-pub struct IssueReceiverClient<'a>(CallContext<'a>);
-
-impl<'a> IssueReceiverClient<'a> {
-    pub fn issue(&mut self, arg: Issue) -> Result<(), ExecutionError> {
-        self.0.call(IssueReceiver::INTERFACE_NAME, 0, arg)
-    }
-}
-
-impl<'a> From<CallContext<'a>> for IssueReceiverClient<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
-    }
+    fn issue(&mut self, arg: Issue) -> _;
 }

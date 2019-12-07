@@ -263,13 +263,13 @@ struct TxB {
 }
 
 #[exonum_interface(crate = "crate")]
-trait TestService {
-    fn method_a(&self, context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError>;
-    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError>;
+trait Test {
+    fn method_a(&mut self, arg: TxA) -> _;
+    fn method_b(&mut self, arg: TxB) -> _;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(crate = "crate", implements("TestService"))]
+#[service_dispatcher(crate = "crate", implements("ServeTest"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "test_service",
@@ -278,40 +278,18 @@ trait TestService {
 )]
 pub struct TestServiceImpl;
 
-#[derive(Debug)]
-struct TestServiceClient<'a>(CallContext<'a>);
-
-impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
-    }
-}
-
-impl<'a> TestServiceClient<'a> {
-    fn method_b(&mut self, arg: TxB) -> Result<(), ExecutionError> {
-        self.0.call("", 1, arg)
-    }
-}
-
-impl TestService for TestServiceImpl {
-    fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
-        context
-            .service_data()
-            .get_entry("method_a_entry")
-            .set(arg.value);
+impl ServeTest for TestServiceImpl {
+    fn method_a(&self, mut cx: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
+        cx.service_data().get_entry("method_a_entry").set(arg.value);
         // Test calling one service from another.
-        context
-            .interface::<TestServiceClient<'_>>(SERVICE_INSTANCE_ID)?
+        cx.client_stub(SERVICE_INSTANCE_ID)?
             .method_b(TxB { value: arg.value })
             .expect("Failed to dispatch call");
         Ok(())
     }
 
-    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
-        context
-            .service_data()
-            .get_entry("method_b_entry")
-            .set(arg.value);
+    fn method_b(&self, cx: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
+        cx.service_data().get_entry("method_b_entry").set(arg.value);
         Ok(())
     }
 }

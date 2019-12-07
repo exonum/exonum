@@ -40,14 +40,12 @@ pub const SERVICE_ID: InstanceId = 118;
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
-    pub pubkey: PublicKey,
     pub name: String,
 }
 
 impl CreateWallet {
-    pub fn new(pubkey: PublicKey, name: &str) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
-            pubkey,
             name: name.to_owned(),
         }
     }
@@ -56,14 +54,13 @@ impl CreateWallet {
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
-    pub from: PublicKey,
     pub to: PublicKey,
     pub amount: u64,
 }
 
 impl Transfer {
-    pub fn new(from: PublicKey, to: PublicKey, amount: u64) -> Self {
-        Self { from, to, amount }
+    pub fn new(to: PublicKey, amount: u64) -> Self {
+        Self { to, amount }
     }
 }
 
@@ -74,27 +71,18 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait MyServiceInterface {
-    fn create_wallet(
-        &self,
-        context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError>;
-
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
+pub trait Transactions {
+    fn create_wallet(&mut self, arg: CreateWallet) -> _;
+    fn transfer(&mut self, arg: Transfer) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "ws-test", proto_sources = "exonum::proto::schema")]
-#[service_dispatcher(implements("MyServiceInterface"))]
+#[service_dispatcher(implements("ServeTransactions"))]
 struct MyService;
 
-impl MyServiceInterface for MyService {
-    fn create_wallet(
-        &self,
-        _context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError> {
+impl ServeTransactions for MyService {
+    fn create_wallet(&self, _cx: CallContext<'_>, arg: CreateWallet) -> Result<(), ExecutionError> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -102,7 +90,7 @@ impl MyServiceInterface for MyService {
         }
     }
 
-    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
+    fn transfer(&self, _cx: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
         panic!("oops")
     }
 }

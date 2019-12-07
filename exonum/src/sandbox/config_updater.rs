@@ -24,18 +24,18 @@ use crate::{
     merkledb::Snapshot,
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, Service, Transaction},
+        rust::{CallContext, Service, TxStub},
         BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
 #[exonum_interface(crate = "crate")]
-pub trait ConfigUpdaterInterface {
-    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
+pub trait ConfigUpdater {
+    fn update_config(&mut self, arg: TxConfig) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("ConfigUpdaterInterface"))]
+#[service_dispatcher(crate = "crate", implements("ServeConfigUpdater"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "config_updater",
@@ -44,10 +44,9 @@ pub trait ConfigUpdaterInterface {
 )]
 pub struct ConfigUpdaterService;
 
-impl ConfigUpdaterInterface for ConfigUpdaterService {
-    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
-        context
-            .writeable_core_schema()
+impl ServeConfigUpdater for ConfigUpdaterService {
+    fn update_config(&self, cx: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
+        cx.writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
@@ -75,7 +74,9 @@ impl TxConfig {
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
-        msg.sign(ConfigUpdaterService::ID, from, signer)
+        TxStub(ConfigUpdaterService::ID)
+            .update_config(msg)
+            .sign(from, signer)
     }
 }
 

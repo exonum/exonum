@@ -24,7 +24,7 @@ use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash},
     runtime::{
-        rust::{CallContext, Service, ServiceFactory, Transaction},
+        rust::{CallContext, Service, ServiceFactory, TxStub},
         BlockchainData, SnapshotExt,
     },
 };
@@ -36,23 +36,9 @@ mod proto;
 
 // Simple service implementation.
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxTimestamp")]
-struct TxTimestamp {
-    message: String,
-}
-
-impl TxTimestamp {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
-    }
-}
-
 #[exonum_interface]
 trait TimestampingInterface {
-    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+    fn timestamp(&mut self, arg: String) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -61,15 +47,11 @@ trait TimestampingInterface {
     artifact_version = "1.0.0",
     proto_sources = "crate::proto"
 )]
-#[service_dispatcher(implements("TimestampingInterface"))]
+#[service_dispatcher(implements("ServeTimestampingInterface"))]
 struct TimestampingService;
 
-impl TimestampingInterface for TimestampingService {
-    fn timestamp(
-        &self,
-        _context: CallContext<'_>,
-        _arg: TxTimestamp,
-    ) -> Result<(), ExecutionError> {
+impl ServeTimestampingInterface for CallContext<'_> {
+    fn timestamp(&mut self, _arg: String) -> Result<(), ExecutionError> {
         Ok(())
     }
 }
@@ -92,14 +74,13 @@ fn main() {
         .with_rust_service(service)
         .create();
     // Create few transactions.
-    let keypair = gen_keypair();
-    let tx1 = TxTimestamp::new("Down To Earth").sign(instance_id, keypair.0, &keypair.1);
-    let tx2 = TxTimestamp::new("Cry Over Spilt Milk").sign(instance_id, keypair.0, &keypair.1);
-    let tx3 = TxTimestamp::new("Dropping Like Flies").sign(instance_id, keypair.0, &keypair.1);
+    let mut signer = TxStub(instance_id).with_random_keypair();
+    let tx1 = signer.timestamp("Down To Earth".to_owned());
+    let tx2 = signer.timestamp("Cry Over Spilt Milk".to_owned());
+    let tx3 = signer.timestamp("Dropping Like Flies".to_owned());
 
     // Commit them into blockchain.
-    let block =
-        testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone(),]);
+    let block = testkit.create_block_with_transactions(vec![tx1.clone(), tx2.clone(), tx3.clone()]);
     assert_eq!(block.len(), 3);
     assert!(block.iter().all(|transaction| transaction.status().is_ok()));
 

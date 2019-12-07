@@ -24,7 +24,7 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, BinaryValue, Verified},
-    runtime::rust::Transaction,
+    runtime::rust::TxStub,
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{txvec, ApiKind, TestKit, TestKitApi, TestKitBuilder};
@@ -46,10 +46,9 @@ fn init_testkit() -> TestKit {
 fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = CreateWallet {
-        name: name.to_owned(),
-    }
-    .sign(SERVICE_ID, pubkey, &key);
+    let tx = TxStub(SERVICE_ID)
+        .into_signer(pubkey, key.clone())
+        .create_wallet(CreateWallet::new(name));
 
     let data = hex::encode(tx.to_bytes());
     let tx_info: TransactionResponse = api

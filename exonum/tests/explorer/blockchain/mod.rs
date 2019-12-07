@@ -40,14 +40,12 @@ mod proto;
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
-    pub pubkey: PublicKey,
     pub name: String,
 }
 
 impl CreateWallet {
-    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
-            pubkey: *pubkey,
             name: name.to_owned(),
         }
     }
@@ -56,18 +54,13 @@ impl CreateWallet {
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
-    pub from: PublicKey,
     pub to: PublicKey,
     pub amount: u64,
 }
 
 impl Transfer {
-    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
-        Self {
-            from: *from,
-            to: *to,
-            amount,
-        }
+    pub fn new(to: &PublicKey, amount: u64) -> Self {
+        Self { to: *to, amount }
     }
 }
 
@@ -79,13 +72,8 @@ pub enum Error {
 
 #[exonum_interface]
 pub trait ExplorerTransactions {
-    fn create_wallet(
-        &self,
-        context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError>;
-
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
+    fn create_wallet(&mut self, arg: CreateWallet) -> _;
+    fn transfer(&mut self, arg: Transfer) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -94,15 +82,11 @@ pub trait ExplorerTransactions {
     artifact_version = "1.0.1",
     proto_sources = "proto"
 )]
-#[service_dispatcher(implements("ExplorerTransactions"))]
+#[service_dispatcher(implements("ServeExplorerTransactions"))]
 struct MyService;
 
-impl ExplorerTransactions for MyService {
-    fn create_wallet(
-        &self,
-        _context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError> {
+impl ServeExplorerTransactions for MyService {
+    fn create_wallet(&self, _cx: CallContext<'_>, arg: CreateWallet) -> Result<(), ExecutionError> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -110,7 +94,7 @@ impl ExplorerTransactions for MyService {
         }
     }
 
-    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
+    fn transfer(&self, _cx: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
         panic!("oops");
     }
 }

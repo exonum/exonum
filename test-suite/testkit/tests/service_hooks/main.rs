@@ -16,9 +16,9 @@
 extern crate serde_derive;
 
 // HACK: Silent "dead_code" warning.
-pub use crate::hooks::{AfterCommitService, TxAfterCommit, SERVICE_ID, SERVICE_NAME};
+pub use crate::hooks::{AfterCommitService, SERVICE_ID, SERVICE_NAME};
 
-use exonum::{explorer::BlockchainExplorer, helpers::Height, runtime::rust::Transaction};
+use exonum::{explorer::BlockchainExplorer, helpers::Height, runtime::rust::TxStub};
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::TestKitBuilder;
 
@@ -37,15 +37,17 @@ fn test_after_commit() {
         let block = testkit.create_block();
         if i > 1 {
             let arguments = &block[0].content().payload().arguments;
-            let message = TxAfterCommit::from_bytes(arguments.into()).unwrap();
-            assert_eq!(message, TxAfterCommit::new(Height(i - 1)));
+            let height_from_tx = u64::from_bytes(arguments.into()).unwrap();
+            assert_eq!(height_from_tx, i - 1);
         }
 
         assert_eq!(service.counter() as u64, i);
 
         let blockchain = testkit.blockchain();
         let keypair = blockchain.service_keypair();
-        let tx = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
+        let tx = TxStub(SERVICE_ID)
+            .into_signer(keypair.0, keypair.1)
+            .after_commit(i);
         assert!(testkit.is_tx_in_pool(&tx.object_hash()));
     }
 
@@ -72,7 +74,9 @@ fn test_after_commit_with_auditor() {
 
         let blockchain = testkit.blockchain();
         let keypair = blockchain.service_keypair();
-        let tx = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
+        let tx = TxStub(SERVICE_ID)
+            .into_signer(keypair.0, keypair.1)
+            .after_commit(i);
         assert!(!testkit.is_tx_in_pool(&tx.object_hash()));
     }
 
@@ -113,9 +117,9 @@ fn restart_testkit() {
         .map(|i| {
             let blockchain = testkit.blockchain();
             let keypair = blockchain.service_keypair();
-            TxAfterCommit::new(Height(i))
-                .sign(SERVICE_ID, keypair.0, &keypair.1)
-                .object_hash()
+            TxStub(SERVICE_ID)
+                .into_signer(keypair.0, keypair.1)
+                .after_commit(i)
         })
         .all(|hash| {
             let snapshot = testkit.snapshot();
@@ -136,9 +140,11 @@ fn tx_pool_is_retained_on_restart() {
         .map(|i| {
             let blockchain = testkit.blockchain();
             let keypair = blockchain.service_keypair();
-            let message = TxAfterCommit::new(Height(i)).sign(SERVICE_ID, keypair.0, &keypair.1);
-            let tx_hash = message.object_hash();
-            testkit.add_tx(message);
+            let tx = TxStub(SERVICE_ID)
+                .into_signer(keypair.0, keypair.1)
+                .after_commit(i);
+            let tx_hash = tx.object_hash();
+            testkit.add_tx(tx);
             assert!(testkit.is_tx_in_pool(&tx_hash));
             tx_hash
         })

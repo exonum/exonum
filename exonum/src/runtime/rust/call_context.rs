@@ -3,8 +3,9 @@ use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
+    rust::stubs::{CallStub, MethodDescriptor},
     ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+    InstanceDescriptor, InstanceQuery, InstanceSpec, SUPERVISOR_INSTANCE_ID,
 };
 
 /// Context for the executed call.
@@ -49,47 +50,21 @@ impl<'a> CallContext<'a> {
         self.instance
     }
 
-    /// Invokes an arbitrary method in the context.
-    #[doc(hidden)]
-    pub fn call(
-        &mut self,
-        interface_name: impl AsRef<str>,
-        method_id: MethodId,
-        arguments: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        let call_info = CallInfo {
-            instance_id: self.instance.id,
-            method_id,
-        };
-        self.inner
-            .call(interface_name.as_ref(), &call_info, &arguments.into_bytes())
-    }
-
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
     #[doc(hidden)]
-    pub fn call_context<'s>(
+    pub fn client_stub<'s>(
         &'s mut self,
         called_id: impl Into<InstanceQuery<'s>>,
-    ) -> Result<CallContext<'s>, ExecutionError> {
+    ) -> Result<ClientStub<'s>, ExecutionError> {
         let descriptor = self
             .inner
             .dispatcher
             .get_service(self.inner.fork, called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
-        Ok(CallContext {
+        Ok(ClientStub {
             inner: self.inner.child_context(self.instance.id),
             instance: descriptor,
         })
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
-    /// Creates a client to call interface methods of the specified service instance.
-    #[doc(hidden)]
-    pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
-    where
-        T: From<CallContext<'s>>,
-    {
-        self.call_context(called).map(Into::into)
     }
 
     /// Provides writeable access to core schema.
@@ -143,5 +118,24 @@ impl<'a> CallContext<'a> {
         self.inner
             .child_context(self.instance.id)
             .start_adding_service(instance_spec, constructor)
+    }
+}
+
+/// Client stub allowing to call methods of a service on the same blockchain.
+#[derive(Debug)]
+pub struct ClientStub<'a> {
+    inner: ExecutionContext<'a>,
+    instance: InstanceDescriptor<'a>,
+}
+
+impl CallStub for ClientStub<'_> {
+    type Output = Result<(), ExecutionError>;
+
+    fn call_stub(&mut self, method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
+        let call_info = CallInfo {
+            instance_id: self.instance.id,
+            method_id: method.id,
+        };
+        self.inner.call(method.interface_name, &call_info, &args)
     }
 }

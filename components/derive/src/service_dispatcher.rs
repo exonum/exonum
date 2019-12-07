@@ -51,6 +51,7 @@ struct ServiceDispatcher {
     ident: Ident,
     #[darling(rename = "crate", default)]
     cr: CratePath,
+    #[darling(default)]
     implements: ServiceInterfaces,
     #[darling(default)]
     generics: Generics,

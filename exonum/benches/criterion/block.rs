@@ -116,45 +116,34 @@ mod timestamping {
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{CallContext, Service, Transaction},
+            rust::{CallContext, Service, TxStub},
             AnyTx, BlockchainData, InstanceId,
         },
     };
     use exonum_merkledb::{ObjectHash, Snapshot};
-    use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
-    use crate::proto;
 
     const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
     #[exonum_interface]
     pub trait TimestampingInterface {
-        fn timestamp(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError>;
-
-        fn timestamp_panic(
-            &self,
-            context: CallContext<'_>,
-            arg: PanickingTx,
-        ) -> Result<(), ExecutionError>;
+        fn timestamp(&mut self, arg: Hash) -> _;
+        fn timestamp_panic(&mut self, arg: Hash) -> _;
     }
 
     #[derive(Debug, ServiceFactory, ServiceDispatcher)]
-    #[service_dispatcher(implements("TimestampingInterface"))]
+    #[service_dispatcher(implements("ServeTimestampingInterface"))]
     #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
 
-    impl TimestampingInterface for Timestamping {
-        fn timestamp(&self, _context: CallContext<'_>, _arg: Tx) -> Result<(), ExecutionError> {
+    impl ServeTimestampingInterface for Timestamping {
+        fn timestamp(&self, _cx: CallContext<'_>, _arg: Hash) -> Result<(), ExecutionError> {
             Ok(())
         }
 
-        fn timestamp_panic(
-            &self,
-            _context: CallContext<'_>,
-            _arg: PanickingTx,
-        ) -> Result<(), ExecutionError> {
+        fn timestamp_panic(&self, _cx: CallContext<'_>, _arg: Hash) -> Result<(), ExecutionError> {
             panic!("panic text");
         }
     }
@@ -171,35 +160,21 @@ mod timestamping {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
-    #[protobuf_convert(source = "proto::TimestampTx")]
-    pub struct Tx {
-        data: Hash,
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
-    #[protobuf_convert(source = "proto::TimestampTx")]
-    pub struct PanickingTx {
-        data: Hash,
-    }
-
     pub fn transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            Tx {
-                data: i.object_hash(),
-            }
-            .sign(TIMESTAMPING_SERVICE_ID, pub_key, &sec_key)
+            TxStub(TIMESTAMPING_SERVICE_ID)
+                .into_signer(pub_key, sec_key)
+                .timestamp(i.object_hash())
         })
     }
 
     pub fn panicking_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            PanickingTx {
-                data: i.object_hash(),
-            }
-            .sign(TIMESTAMPING_SERVICE_ID, pub_key, &sec_key)
+            TxStub(TIMESTAMPING_SERVICE_ID)
+                .into_signer(pub_key, sec_key)
+                .timestamp(i.object_hash())
         })
     }
 }
@@ -210,7 +185,7 @@ mod cryptocurrency {
         crypto::{Hash, PublicKey},
         messages::Verified,
         runtime::{
-            rust::{CallContext, Service, Transaction},
+            rust::{CallContext, Service, TxStub},
             AnyTx, BlockchainData, ErrorKind, InstanceId,
         },
     };
@@ -231,30 +206,22 @@ mod cryptocurrency {
     #[exonum_interface]
     pub trait CryptocurrencyInterface {
         /// Transfers one unit of currency from `from` to `to`.
-        fn transfer(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError>;
-        /// Same as `Tx`, but without cryptographic proofs in `execute`.
-        fn transfer_without_proof(
-            &self,
-            context: CallContext<'_>,
-            arg: SimpleTx,
-        ) -> Result<(), ExecutionError>;
-        /// Same as `SimpleTx`, but signals an error 50% of the time.
-        fn transfer_error_sometimes(
-            &self,
-            context: CallContext<'_>,
-            arg: RollbackTx,
-        ) -> Result<(), ExecutionError>;
+        fn transfer(&mut self, arg: Tx) -> _;
+        /// Same as `transfer`, but without cryptographic proofs in `execute`.
+        fn transfer_without_proof(&mut self, arg: Tx) -> _;
+        /// Same as `transfer_without_proof`, but signals an error 50% of the time.
+        fn transfer_error_sometimes(&mut self, arg: Tx) -> _;
     }
 
     #[derive(Debug, ServiceFactory, ServiceDispatcher)]
-    #[service_dispatcher(implements("CryptocurrencyInterface"))]
+    #[service_dispatcher(implements("ServeCryptocurrencyInterface"))]
     #[service_factory(artifact_name = "cryptocurrency", proto_sources = "crate::proto")]
     pub struct Cryptocurrency;
 
-    impl CryptocurrencyInterface for Cryptocurrency {
-        fn transfer(&self, context: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError> {
-            let from = context.caller().author().unwrap();
-            let mut index = context.service_data().get_proof_map("provable_balances");
+    impl ServeCryptocurrencyInterface for Cryptocurrency {
+        fn transfer(&self, cx: CallContext<'_>, arg: Tx) -> Result<(), ExecutionError> {
+            let from = cx.caller().author().unwrap();
+            let mut index = cx.service_data().get_proof_map("provable_balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -266,11 +233,11 @@ mod cryptocurrency {
 
         fn transfer_without_proof(
             &self,
-            context: CallContext<'_>,
-            arg: SimpleTx,
+            cx: CallContext<'_>,
+            arg: Tx,
         ) -> Result<(), ExecutionError> {
-            let from = context.caller().author().unwrap();
-            let mut index = context.service_data().get_map("balances");
+            let from = cx.caller().author().unwrap();
+            let mut index = cx.service_data().get_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -282,11 +249,11 @@ mod cryptocurrency {
 
         fn transfer_error_sometimes(
             &self,
-            context: CallContext<'_>,
-            arg: RollbackTx,
+            cx: CallContext<'_>,
+            arg: Tx,
         ) -> Result<(), ExecutionError> {
-            let from = context.caller().author().unwrap();
-            let mut index = context.service_data().get_map("balances");
+            let from = cx.caller().author().unwrap();
+            let mut index = cx.service_data().get_map("balances");
 
             let from_balance = index.get(&from).unwrap_or(INITIAL_BALANCE);
             let to_balance = index.get(&arg.to).unwrap_or(INITIAL_BALANCE);
@@ -324,35 +291,20 @@ mod cryptocurrency {
         seed: u32,
     }
 
-    /// Same as `Tx`, but without cryptographic proofs in `execute`.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
-    #[protobuf_convert(source = "proto::CurrencyTx")]
-    pub struct SimpleTx {
-        to: PublicKey,
-        seed: u32,
-    }
-
-    /// Same as `SimpleTx`, but signals an error 50% of the time.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
-    #[protobuf_convert(source = "proto::CurrencyTx")]
-    pub struct RollbackTx {
-        to: PublicKey,
-        seed: u32,
-    }
-
     pub fn provable_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         let keys: Vec<_> = (0..KEY_COUNT)
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(
-            move |seed| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
-                [(ref from, ref from_sk), (ref to, ..)] => {
-                    Tx { to: *to, seed }.sign(CRYPTOCURRENCY_SERVICE_ID, *from, &from_sk)
-                }
+        (0..).map(move |seed| {
+            let sender_and_receiver: Vec<_> = keys.choose_multiple(&mut rng, 2).collect();
+            match &sender_and_receiver[..] {
+                [(from, from_sk), (to, ..)] => TxStub(CRYPTOCURRENCY_SERVICE_ID)
+                    .into_signer(*from, from_sk.to_owned())
+                    .transfer(Tx { to: *to, seed }),
                 _ => unreachable!(),
-            },
-        )
+            }
+        })
     }
 
     pub fn unprovable_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
@@ -360,14 +312,15 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(
-            move |seed| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
-                [(ref from, ref from_sk), (ref to, ..)] => {
-                    SimpleTx { to: *to, seed }.sign(CRYPTOCURRENCY_SERVICE_ID, *from, &from_sk)
-                }
+        (0..).map(move |seed| {
+            let sender_and_receiver: Vec<_> = keys.choose_multiple(&mut rng, 2).collect();
+            match &sender_and_receiver[..] {
+                [(from, from_sk), (to, ..)] => TxStub(CRYPTOCURRENCY_SERVICE_ID)
+                    .into_signer(*from, from_sk.to_owned())
+                    .transfer_without_proof(Tx { to: *to, seed }),
                 _ => unreachable!(),
-            },
-        )
+            }
+        })
     }
 
     pub fn rollback_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
@@ -375,14 +328,15 @@ mod cryptocurrency {
             .map(|_| gen_keypair_from_rng(&mut rng))
             .collect();
 
-        (0..).map(
-            move |seed| match &keys.choose_multiple(&mut rng, 2).collect::<Vec<_>>()[..] {
-                [(ref from, ref from_sk), (ref to, ..)] => {
-                    RollbackTx { to: *to, seed }.sign(CRYPTOCURRENCY_SERVICE_ID, *from, &from_sk)
-                }
+        (0..).map(move |seed| {
+            let sender_and_receiver: Vec<_> = keys.choose_multiple(&mut rng, 2).collect();
+            match &sender_and_receiver[..] {
+                [(from, from_sk), (to, ..)] => TxStub(CRYPTOCURRENCY_SERVICE_ID)
+                    .into_signer(*from, from_sk.to_owned())
+                    .transfer_error_sometimes(Tx { to: *to, seed }),
                 _ => unreachable!(),
-            },
-        )
+            }
+        })
     }
 }
 
@@ -393,61 +347,27 @@ mod foreign_interface_call {
         merkledb::ObjectHash,
         messages::Verified,
         runtime::{
-            rust::{CallContext, Interface, Service, Transaction},
+            rust::{CallContext, Service, TxStub},
             AnyTx, BlockchainData, InstanceId,
         },
     };
     use exonum_merkledb::Snapshot;
-    use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
-    use crate::proto;
 
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
-    #[protobuf_convert(source = "proto::TimestampTx")]
-    pub struct SelfTx {
-        data: Hash,
-    }
-
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
-    #[protobuf_convert(source = "proto::TimestampTx")]
-    pub struct ForeignTx {
-        data: Hash,
-    }
-
     #[exonum_interface]
     pub trait SelfInterface {
-        fn timestamp(&self, context: CallContext<'_>, arg: SelfTx) -> Result<(), ExecutionError>;
-
-        fn timestamp_foreign(
-            &self,
-            context: CallContext<'_>,
-            arg: ForeignTx,
-        ) -> Result<(), ExecutionError>;
+        fn timestamp(&mut self, arg: Hash) -> Self::Output;
+        fn call_foreign(&mut self, arg: Hash) -> Self::Output;
     }
 
     #[exonum_interface]
     pub trait ForeignInterface {
-        fn timestamp(&self, context: CallContext<'_>, arg: SelfTx) -> Result<(), ExecutionError>;
-    }
-
-    #[derive(Debug)]
-    pub struct ForeignInterfaceClient<'a>(CallContext<'a>);
-
-    impl<'a> ForeignInterfaceClient<'a> {
-        fn timestamp(&mut self, arg: SelfTx) -> Result<(), ExecutionError> {
-            self.0.call(ForeignInterface::INTERFACE_NAME, 0, arg)
-        }
-    }
-
-    impl<'a> From<CallContext<'a>> for ForeignInterfaceClient<'a> {
-        fn from(context: CallContext<'a>) -> Self {
-            Self(context)
-        }
+        fn foreign_timestamp(&mut self, arg: Hash) -> Self::Output;
     }
 
     #[exonum_interface(interface = "Configure")]
@@ -461,46 +381,36 @@ mod foreign_interface_call {
 
     #[derive(Debug, ServiceFactory, ServiceDispatcher)]
     #[service_dispatcher(implements(
-        "SelfInterface",
-        "ForeignInterface",
-        "Configure",
-        "Events",
-        "ERC30Tokens"
+        "ServeSelfInterface",
+        "ServeForeignInterface",
+        "ServeConfigure",
+        "ServeEvents",
+        "ServeERC30Tokens"
     ))]
     #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
 
-    impl SelfInterface for Timestamping {
-        fn timestamp(&self, _context: CallContext<'_>, _arg: SelfTx) -> Result<(), ExecutionError> {
+    impl ServeSelfInterface for Timestamping {
+        fn timestamp(&self, _cx: CallContext<'_>, _arg: Hash) -> Result<(), ExecutionError> {
             Ok(())
         }
 
-        fn timestamp_foreign(
-            &self,
-            mut context: CallContext<'_>,
-            arg: ForeignTx,
-        ) -> Result<(), ExecutionError> {
-            context
-                .interface::<ForeignInterfaceClient<'_>>(FOREIGN_INTERFACE_SERVICE_ID)?
-                .timestamp(SelfTx { data: arg.data })
+        fn call_foreign(&self, mut cx: CallContext<'_>, arg: Hash) -> Result<(), ExecutionError> {
+            cx.client_stub(FOREIGN_INTERFACE_SERVICE_ID)?
+                .foreign_timestamp(arg)
         }
     }
 
-    impl ForeignInterface for Timestamping {
-        fn timestamp(&self, context: CallContext<'_>, _arg: SelfTx) -> Result<(), ExecutionError> {
-            assert_eq!(
-                context.caller().as_service().unwrap(),
-                SELF_INTERFACE_SERVICE_ID
-            );
+    impl ServeForeignInterface for Timestamping {
+        fn foreign_timestamp(&self, cx: CallContext<'_>, _arg: Hash) -> Result<(), ExecutionError> {
+            assert_eq!(cx.caller().as_service().unwrap(), SELF_INTERFACE_SERVICE_ID);
             Ok(())
         }
     }
 
-    impl Configure for Timestamping {}
-
-    impl Events for Timestamping {}
-
-    impl ERC30Tokens for Timestamping {}
+    impl ServeConfigure for Timestamping {}
+    impl ServeEvents for Timestamping {}
+    impl ServeERC30Tokens for Timestamping {}
 
     impl Service for Timestamping {
         fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
@@ -523,24 +433,18 @@ mod foreign_interface_call {
     pub fn self_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            Transaction::<dyn SelfInterface>::sign(
-                SelfTx {
-                    data: i.object_hash(),
-                },
-                SELF_INTERFACE_SERVICE_ID,
-                pub_key,
-                &sec_key,
-            )
+            TxStub(SELF_INTERFACE_SERVICE_ID)
+                .into_signer(pub_key, sec_key)
+                .timestamp(i.object_hash())
         })
     }
 
     pub fn foreign_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            ForeignTx {
-                data: i.object_hash(),
-            }
-            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+            TxStub(SELF_INTERFACE_SERVICE_ID)
+                .into_signer(pub_key, sec_key)
+                .call_foreign(i.object_hash())
         })
     }
 }
