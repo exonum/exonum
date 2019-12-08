@@ -34,14 +34,11 @@ use exonum_merkledb::{
     access::{Access, RawAccessMut},
     Entry, Snapshot,
 };
-use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
 use std::sync::Arc;
-
-use super::proto;
 
 pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 2;
@@ -72,22 +69,6 @@ where
 
 // // // // Transactions // // // //
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxReset")]
-pub struct Reset;
-
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxIncrement")]
-pub struct Increment {
-    by: u64,
-}
-
-impl Increment {
-    pub fn new(by: u64) -> Self {
-        Self { by }
-    }
-}
-
 #[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Adding zero does nothing!
@@ -99,26 +80,27 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait CounterServiceInterface {
+pub trait CounterServiceInterface<Ctx> {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError>;
-
-    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), ExecutionError>;
+    fn increment(&self, ctx: Ctx, by: u64) -> _;
+    fn reset(&self, ctx: Ctx, _: ()) -> _;
 }
 
-impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError> {
-        if arg.by == 0 {
+impl CounterServiceInterface<CallContext<'_>> for CounterService {
+    type Output = Result<(), ExecutionError>;
+
+    fn increment(&self, context: CallContext<'_>, by: u64) -> Self::Output {
+        if by == 0 {
             return Err(Error::AddingZero.into());
         }
 
         let mut schema = CounterSchema::new(context.service_data());
-        schema.inc_counter(arg.by);
+        schema.inc_counter(by);
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), ExecutionError> {
+    fn reset(&self, context: CallContext<'_>, _: ()) -> Self::Output {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -138,7 +120,7 @@ struct CounterApi;
 impl CounterApi {
     fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
-        let tx_hash = state.generic_broadcaster().send(Increment::new(value))?;
+        let tx_hash = state.generic_broadcaster().increment((), value)?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -149,7 +131,8 @@ impl CounterApi {
 
     fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
-        let tx_hash = state.generic_broadcaster().send(Reset)?;
+        // The first `()` is the empty context, the second one is the `reset` arg.
+        let tx_hash = state.generic_broadcaster().reset((), ())?;
         Ok(TransactionResponse { tx_hash })
     }
 

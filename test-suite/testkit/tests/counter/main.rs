@@ -19,10 +19,10 @@ use exonum::{
         Error as ApiError,
     },
     blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind},
-    crypto::{self, Hash, PublicKey},
+    crypto::{self, gen_keypair, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
-    runtime::{rust::Transaction, SnapshotExt},
+    runtime::SnapshotExt,
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
@@ -31,7 +31,7 @@ use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, Increment, Reset, ADMIN_KEY, SERVICE_ID, SERVICE_NAME,
+    CounterSchema, CounterService, CounterServiceInterface, ADMIN_KEY, SERVICE_ID, SERVICE_NAME,
 };
 
 mod counter;
@@ -59,10 +59,10 @@ fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a>
 #[test]
 fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
+    let keypair = gen_keypair();
 
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api
@@ -72,8 +72,8 @@ fn test_inc_count_create_block() {
     assert_eq!(counter, 5);
 
     testkit.create_block_with_transactions(vec![
-        Increment::new(4).sign(SERVICE_ID, pubkey, &key),
-        Increment::new(1).sign(SERVICE_ID, pubkey, &key),
+        keypair.increment(SERVICE_ID, 4),
+        keypair.increment(SERVICE_ID, 1),
     ]);
 
     let counter: u64 = api
@@ -87,11 +87,11 @@ fn test_inc_count_create_block() {
 #[test]
 fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
+    let keypair = gen_keypair();
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
     // Create another block with the same transaction
-    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
 }
 
 #[test]
@@ -171,8 +171,7 @@ fn test_private_api() {
         .unwrap();
     assert_eq!(counter, 8);
 
-    let (pubkey, key) = testkit.us().service_keypair();
-    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    let tx = testkit.us().service_keypair().reset(SERVICE_ID, ());
     let tx_info: TransactionResponse = api
         .private(ApiKind::Service("counter"))
         .query(&())
@@ -191,9 +190,8 @@ fn test_private_api() {
 #[test]
 fn test_probe() {
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = testkit.us().service_keypair();
-
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let us = testkit.us().service_keypair();
+    let tx = us.increment(SERVICE_ID, 5);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -205,7 +203,7 @@ fn test_probe() {
         .unwrap();
     assert_eq!(counter, 0);
 
-    let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
+    let other_tx = us.increment(SERVICE_ID, 3);
     let snapshot = testkit.probe_all(vec![tx.clone(), other_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(8));
@@ -245,14 +243,14 @@ fn test_duplicate_tx() {
 fn test_probe_advanced() {
     let (mut testkit, api) = init_testkit();
 
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(6).sign(SERVICE_ID, pubkey, &key);
-    let other_tx = Increment::new(10).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair_from_seed(
+    let keypair = gen_keypair();
+    let tx = keypair.increment(SERVICE_ID, 6);
+    let other_tx = keypair.increment(SERVICE_ID, 10);
+    let admin = crypto::gen_keypair_from_seed(
         &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
     );
-    assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-    let admin_tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    assert_eq!(admin.0, PublicKey::from_hex(ADMIN_KEY).unwrap());
+    let admin_tx = admin.reset(SERVICE_ID, ());
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -307,8 +305,8 @@ fn test_probe_duplicate_tx() {
 
     let (mut testkit, api) = init_testkit();
     inc_count(&api, 5);
-    let (pubkey, key) = testkit.us().service_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let us = testkit.us().service_keypair();
+    let tx = us.increment(SERVICE_ID, 5);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -321,7 +319,7 @@ fn test_probe_duplicate_tx() {
 
     // Check the mixed case when some probed transactions are committed and some are not
     inc_count(&api, 7);
-    let other_tx = Increment::new(7).sign(SERVICE_ID, pubkey, &key);
+    let other_tx = us.increment(SERVICE_ID, 7);
     let snapshot = testkit.probe_all(vec![tx, other_tx]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(12));
@@ -331,8 +329,8 @@ fn test_probe_duplicate_tx() {
 fn test_snapshot_comparison() {
     let (mut testkit, api) = init_testkit();
 
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let keypair = gen_keypair();
+    let tx = keypair.increment(SERVICE_ID, 5);
     testkit
         .probe(tx.clone())
         .compare(testkit.snapshot())
@@ -344,8 +342,8 @@ fn test_snapshot_comparison() {
     api.send(tx);
     testkit.create_block();
 
-    let (pubkey, key) = crypto::gen_keypair();
-    let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
+    let keypair = gen_keypair();
+    let other_tx = keypair.increment(SERVICE_ID, 3);
     testkit
         .probe(other_tx.clone())
         .compare(testkit.snapshot())
@@ -360,8 +358,8 @@ fn test_snapshot_comparison() {
 fn test_snapshot_comparison_panic() {
     let (mut testkit, api) = init_testkit();
     let increment_by = 5;
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(increment_by).sign(SERVICE_ID, pubkey, &key);
+    let keypair = gen_keypair();
+    let tx = keypair.increment(SERVICE_ID, increment_by);
 
     api.send(tx.clone());
     testkit.create_block();
@@ -381,8 +379,8 @@ fn test_snapshot_comparison_panic() {
 fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
-        let (pubkey, key) = crypto::gen_keypair();
-        let tx = Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key);
+        let keypair = gen_keypair();
+        let tx = keypair.increment(SERVICE_ID, height as u64);
         testkit.api().send(tx.clone());
     }
     testkit.create_block();
@@ -717,8 +715,7 @@ fn test_explorer_single_block() {
         assert_eq!(&*block.transaction_hashes(), &[]);
     }
 
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 5);
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
@@ -756,8 +753,7 @@ fn test_explorer_transaction_info() {
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 5);
 
     let info = api
         .public(ApiKind::Explorer)
@@ -823,12 +819,9 @@ fn test_explorer_transaction_statuses() {
     use exonum::explorer::TransactionInfo;
 
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair();
-    let error_tx = Increment::new(0).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair();
-    let panicking_tx = Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 5);
+    let error_tx = gen_keypair().increment(SERVICE_ID, 0);
+    let panicking_tx = gen_keypair().increment(SERVICE_ID, u64::max_value() - 3);
 
     let block = testkit.create_block_with_transactions(vec![
         tx.clone(),
@@ -913,10 +906,9 @@ fn test_explorer_transaction_statuses() {
 #[test]
 fn test_explorer_with_after_transactions_error() {
     let (mut testkit, _) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx1 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx2 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
+    let tx1 = gen_keypair().increment(SERVICE_ID, 21);
+    let keypair = gen_keypair();
+    let tx2 = keypair.increment(SERVICE_ID, 21);
 
     let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
     let errors = block.error_map();
@@ -926,7 +918,7 @@ fn test_explorer_with_after_transactions_error() {
         .contains("What's the question?"));
     assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
 
-    let tx3 = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+    let tx3 = keypair.increment(SERVICE_ID, 1);
     let block = testkit.create_block_with_transaction(tx3);
     assert!(block.errors.is_empty());
     assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
@@ -935,8 +927,7 @@ fn test_explorer_with_after_transactions_error() {
 #[test]
 fn test_explorer_with_before_transactions_error() {
     let (mut testkit, _) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(13).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 13);
 
     let block = testkit.create_block_with_transaction(tx);
     let errors = block.error_map();

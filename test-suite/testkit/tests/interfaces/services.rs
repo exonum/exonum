@@ -19,7 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::{Hash, PublicKey},
     runtime::{
-        rust::{CallContext, DefaultInstance, Service},
+        rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
         BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -30,18 +30,18 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
-    interface::{IssueReceiver, ServeIssueReceiver},
+    interface::IssueReceiver,
     proto,
     schema::{Wallet, WalletSchema},
 };
 
 #[exonum_interface]
-pub trait WalletInterface {
-    fn create(&mut self, arg: String) -> _;
+pub trait WalletInterface<Ctx> {
+    fn create_wallet(&self, ctx: Ctx, username: String) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("ServeWalletInterface", "ServeIssueReceiver"))]
+#[service_dispatcher(implements("WalletInterface", "IssueReceiver"))]
 #[service_factory(artifact_name = "wallet-service", proto_sources = "proto")]
 pub struct WalletService;
 
@@ -59,10 +59,12 @@ impl Service for WalletService {
     }
 }
 
-impl ServeWalletInterface for CallContext<'_> {
-    fn create(&mut self, arg: String) -> Result<(), ExecutionError> {
-        let owner = self.caller().author().ok_or(Error::WrongInterfaceCaller)?;
-        let mut schema = WalletSchema::new(self.service_data());
+impl WalletInterface<CallContext<'_>> for WalletService {
+    type Output = Result<(), ExecutionError>;
+
+    fn create_wallet(&self, ctx: CallContext<'_>, username: String) -> Self::Output {
+        let owner = ctx.caller().author().ok_or(Error::WrongInterfaceCaller)?;
+        let mut schema = WalletSchema::new(ctx.service_data());
 
         if schema.wallets.contains(&owner) {
             return Err(Error::WalletAlreadyExists.into());
@@ -70,7 +72,7 @@ impl ServeWalletInterface for CallContext<'_> {
         schema.wallets.put(
             &owner,
             Wallet {
-                name: arg.name,
+                name: username,
                 balance: 0,
             },
         );
@@ -78,9 +80,11 @@ impl ServeWalletInterface for CallContext<'_> {
     }
 }
 
-impl ServeIssueReceiver for CallContext<'_> {
-    fn issue(&mut self, arg: Issue) -> Result<(), ExecutionError> {
-        let instance_id = self
+impl IssueReceiver<CallContext<'_>> for WalletService {
+    type Output = Result<(), ExecutionError>;
+
+    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Self::Output {
+        let instance_id = ctx
             .caller()
             .as_service()
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -88,7 +92,7 @@ impl ServeIssueReceiver for CallContext<'_> {
             return Err(Error::UnauthorizedIssuer.into());
         }
 
-        let mut schema = WalletSchema::new(context.service_data());
+        let mut schema = WalletSchema::new(ctx.service_data());
         let mut wallet = schema.wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
         wallet.balance += arg.amount;
         schema.wallets.put(&arg.to, wallet);
@@ -109,8 +113,8 @@ pub struct TxIssue {
 }
 
 #[exonum_interface]
-pub trait DepositInterface {
-    fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
+pub trait DepositInterface<Ctx> {
+    fn deposit(&self, context: Ctx, arg: TxIssue) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -128,14 +132,19 @@ impl Service for DepositService {
     }
 }
 
-impl DepositInterface for DepositService {
-    fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
-        context
-            .interface::<IssueReceiverClient<'_>>(WalletService::ID)?
-            .issue(Issue {
+impl DepositInterface<CallContext<'_>> for DepositService {
+    type Output = Result<(), ExecutionError>;
+
+    fn deposit(&self, mut ctx: CallContext<'_>, arg: TxIssue) -> Self::Output {
+        use crate::interface::IssueReceiverMut;
+
+        ctx.issue(
+            WalletService::ID,
+            Issue {
                 to: arg.to,
                 amount: arg.amount,
-            })
+            },
+        )
     }
 }
 
@@ -152,21 +161,10 @@ pub struct TxAnyCall {
     pub args: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::RecursiveCall")]
-pub struct TxRecursiveCall {
-    pub depth: u64,
-}
-
 #[exonum_interface]
-pub trait AnyCall {
-    fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
-
-    fn call_recursive(
-        &self,
-        context: CallContext<'_>,
-        arg: TxRecursiveCall,
-    ) -> Result<(), ExecutionError>;
+pub trait AnyCall<Ctx> {
+    fn call_any(&self, context: Ctx, arg: TxAnyCall) -> _;
+    fn call_recursive(&self, context: Ctx, depth: u64) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -178,31 +176,24 @@ impl AnyCallService {
     pub const ID: InstanceId = 26;
 }
 
-impl AnyCall for AnyCallService {
-    fn call_any(&self, mut context: CallContext<'_>, tx: TxAnyCall) -> Result<(), ExecutionError> {
-        context.call_context(tx.call_info.instance_id)?.call(
-            tx.interface_name,
-            tx.call_info.method_id,
-            tx.args,
-        )
+impl AnyCall<CallContext<'_>> for AnyCallService {
+    type Output = Result<(), ExecutionError>;
+
+    fn call_any(&self, mut ctx: CallContext<'_>, tx: TxAnyCall) -> Self::Output {
+        let method_descriptor =
+            MethodDescriptor::new(&tx.interface_name, "", tx.call_info.method_id);
+        ctx.generic_call_mut(tx.call_info.instance_id, method_descriptor, tx.args)
     }
 
     fn call_recursive(
         &self,
         mut context: CallContext<'_>,
-        arg: TxRecursiveCall,
+        depth: u64,
     ) -> Result<(), ExecutionError> {
-        if arg.depth == 1 {
+        if depth == 1 {
             return Ok(());
         }
-
-        context.call_context(context.instance().id)?.call(
-            "",
-            1,
-            TxRecursiveCall {
-                depth: arg.depth - 1,
-            },
-        )
+        context.call_recursive(context.instance().id, depth - 1)
     }
 }
 

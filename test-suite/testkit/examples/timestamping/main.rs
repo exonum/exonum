@@ -12,24 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate exonum_derive;
-
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash},
     runtime::{
-        rust::{CallContext, Service, ServiceFactory, TxStub},
+        rust::{CallContext, Service, ServiceFactory},
         BlockchainData, SnapshotExt,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::{ObjectHash, Snapshot};
-use exonum_proto::ProtobufConvert;
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 mod proto;
@@ -37,8 +30,8 @@ mod proto;
 // Simple service implementation.
 
 #[exonum_interface]
-trait TimestampingInterface {
-    fn timestamp(&mut self, arg: String) -> _;
+trait TimestampingInterface<Ctx> {
+    fn timestamp(&self, ctx: Ctx, arg: String) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -47,11 +40,13 @@ trait TimestampingInterface {
     artifact_version = "1.0.0",
     proto_sources = "crate::proto"
 )]
-#[service_dispatcher(implements("ServeTimestampingInterface"))]
+#[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
-impl ServeTimestampingInterface for CallContext<'_> {
-    fn timestamp(&mut self, _arg: String) -> Result<(), ExecutionError> {
+impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+    type Output = Result<(), ExecutionError>;
+
+    fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
         Ok(())
     }
 }
@@ -74,10 +69,10 @@ fn main() {
         .with_rust_service(service)
         .create();
     // Create few transactions.
-    let mut signer = TxStub(instance_id).with_random_keypair();
-    let tx1 = signer.timestamp("Down To Earth".to_owned());
-    let tx2 = signer.timestamp("Cry Over Spilt Milk".to_owned());
-    let tx3 = signer.timestamp("Dropping Like Flies".to_owned());
+    let keypair = gen_keypair();
+    let tx1 = keypair.timestamp(instance_id, "Down To Earth".to_owned());
+    let tx2 = keypair.timestamp(instance_id, "Cry Over Spilt Milk".to_owned());
+    let tx3 = keypair.timestamp(instance_id, "Dropping Like Flies".to_owned());
 
     // Commit them into blockchain.
     let block = testkit.create_block_with_transactions(vec![tx1.clone(), tx2.clone(), tx3.clone()]);

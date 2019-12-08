@@ -13,19 +13,16 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-use super::proto;
 use exonum::{
     blockchain::ExecutionError,
     crypto::Hash,
-    helpers::Height,
     runtime::{
         rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
         BlockchainData, InstanceId,
     },
 };
-use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
+use exonum_derive::*;
 use exonum_merkledb::Snapshot;
-use exonum_proto::ProtobufConvert;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -36,8 +33,8 @@ pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
 #[exonum_interface]
-pub trait AfterCommitInterface {
-    fn after_commit(&mut self, height: u64) -> _;
+pub trait AfterCommitInterface<Ctx> {
+    fn after_commit(&self, ctx: Ctx, height: u64) -> _;
 }
 
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
@@ -47,13 +44,15 @@ pub trait AfterCommitInterface {
     proto_sources = "crate::proto",
     service_constructor = "Self::new_instance"
 )]
-#[service_dispatcher(implements("ServeAfterCommitInterface"))]
+#[service_dispatcher(implements("AfterCommitInterface"))]
 pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
 
-impl ServeAfterCommitInterface for CallContext<'_> {
-    fn after_commit(&mut self, _arg: TxAfterCommit) -> Result<(), ExecutionError> {
+impl AfterCommitInterface<CallContext<'_>> for AfterCommitService {
+    type Output = Result<(), ExecutionError>;
+
+    fn after_commit(&self, _ctx: CallContext<'_>, _height: u64) -> Self::Output {
         Ok(())
     }
 }
@@ -86,13 +85,13 @@ impl Service for AfterCommitService {
 
         // Test both validator-specific and generic sending.
         if counter < 10_000 {
-            if let Some(mut broadcast) = context.broadcaster() {
-                broadcast.after_commit(context.height()).ok();
+            if let Some(broadcast) = context.broadcaster() {
+                broadcast.after_commit((), context.height().0).ok();
             }
         } else {
             context
                 .generic_broadcaster()
-                .after_commit(context.height())
+                .after_commit((), context.height().0)
                 .ok();
         }
     }

@@ -122,20 +122,22 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait CurrencyInterface {
+pub trait CurrencyInterface<Ctx> {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&mut self, arg: CreateWallet) -> _;
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&mut self, arg: Transfer) -> _;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> _;
 }
 
-impl ServeCurrencyInterface for CallContext<'_> {
-    fn create_wallet(&mut self, arg: CreateWallet) -> Result<(), ExecutionError> {
-        let author = self.caller().author().unwrap();
+impl CurrencyInterface<CallContext<'_>> for CurrencyService {
+    type Output = Result<(), ExecutionError>;
 
-        let height = self.data().for_core().height();
-        let mut schema = CurrencySchema::new(self.service_data());
+    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
+        let author = ctx.caller().author().unwrap();
+
+        let height = ctx.data().for_core().height();
+        let mut schema = CurrencySchema::new(ctx.service_data());
         if schema.wallet(&author).is_none() {
             let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE, height.0);
             schema.wallets.put(&author, wallet);
@@ -143,14 +145,14 @@ impl ServeCurrencyInterface for CallContext<'_> {
         Ok(())
     }
 
-    fn transfer(&mut self, arg: Transfer) -> Result<(), ExecutionError> {
-        let author = self.caller().author().unwrap();
+    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Self::Output {
+        let author = ctx.caller().author().unwrap();
         if author == arg.to {
             return Err(Error::SenderSameAsReceiver.into());
         }
 
-        let height = self.data().for_core().height();
-        let mut schema = CurrencySchema::new(self.service_data());
+        let height = ctx.data().for_core().height();
+        let mut schema = CurrencySchema::new(ctx.service_data());
         let sender = schema.wallet(&author);
         let receiver = schema.wallet(&arg.to);
         if let (Some(sender), Some(receiver)) = (sender, receiver) {

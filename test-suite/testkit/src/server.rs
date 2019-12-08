@@ -175,12 +175,12 @@ mod tests {
     use exonum::{
         api,
         blockchain::ExecutionError,
-        crypto::Hash,
+        crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::{
-            rust::{CallContext, Service, ServiceFactory, TxStub},
+            rust::{CallContext, Service, ServiceFactory},
             BlockchainData,
         },
     };
@@ -195,23 +195,23 @@ mod tests {
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
 
     fn timestamp(s: &str) -> Verified<AnyTx> {
-        TxStub(TIMESTAMP_SERVICE_ID)
-            .with_random_keypair()
-            .timestamp(s.to_owned())
+        gen_keypair().timestamp(TIMESTAMP_SERVICE_ID, s.to_owned())
     }
 
     #[derive(Debug, ServiceDispatcher, ServiceFactory)]
     #[service_factory(artifact_name = "sample-service", proto_sources = "crate::proto")]
-    #[service_dispatcher(implements("ServeSampleInterface"))]
+    #[service_dispatcher(implements("SampleInterface"))]
     struct SampleService;
 
     #[exonum_interface]
-    trait SampleInterface {
-        fn timestamp(&mut self, arg: String) -> _;
+    trait SampleInterface<Ctx> {
+        fn timestamp(&self, ctx: Ctx, arg: String) -> _;
     }
 
-    impl ServeSampleInterface for CallContext<'_> {
-        fn timestamp(&mut self, _arg: String) -> Result<(), ExecutionError> {
+    impl SampleInterface<CallContext<'_>> for SampleService {
+        type Output = Result<(), ExecutionError>;
+
+        fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
             Ok(())
         }
     }
