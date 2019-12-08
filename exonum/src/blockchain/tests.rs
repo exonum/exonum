@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{self as crypto, Hash};
+use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{
     access::AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot,
     TemporaryDB,
 };
-use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
 
 use std::{collections::BTreeMap, panic, sync::Mutex};
@@ -30,9 +29,8 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     node::ApiSender,
-    proto::schema::tests::*,
     runtime::{
-        rust::{CallContext, RustRuntime, Service, ServiceFactory, Signer, TxStub},
+        rust::{CallContext, RustRuntime, Service, ServiceFactory},
         AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
         ErrorMatch, ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
@@ -42,38 +40,15 @@ const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 const TEST_SERVICE_NAME: &str = "test_service";
 const IDX_NAME: &str = "test_service.val";
 
-fn gen_signer() -> Signer {
-    let (pk, sk) = crypto::gen_keypair();
-    TxStub(TEST_SERVICE_ID).into_signer(pk, sk)
-}
-
-#[derive(Debug, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct Execute {
-    value: u64,
-}
-
-#[derive(Debug, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct Deploy {
-    value: u64,
-}
-
-#[derive(Debug, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct Add {
-    value: u64,
-}
-
 #[exonum_interface(crate = "crate")]
-trait TestDispatcher {
-    fn test_execute(&mut self, arg: Execute) -> _;
-    fn test_deploy(&mut self, arg: Deploy) -> _;
-    fn test_add(&mut self, arg: Add) -> _;
+trait TestDispatcher<Ctx> {
+    fn test_execute(&self, ctx: Ctx, arg: u64) -> _;
+    fn test_deploy(&self, ctx: Ctx, arg: u64) -> _;
+    fn test_add(&self, ctx: Ctx, arg: u64) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("ServeTestDispatcher"))]
+#[service_dispatcher(crate = "crate", implements("TestDispatcher"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "test_dispatcher",
@@ -84,8 +59,8 @@ struct TestDispatcherService;
 impl Service for TestDispatcherService {
     fn initialize(&self, _context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         if !params.is_empty() {
-            let v = Execute::from_bytes(params.into()).unwrap();
-            if v.value == 42 {
+            let v = u64::from_bytes(params.into()).unwrap();
+            if v == 42 {
                 panic!("42!");
             } else {
                 return Err(ExecutionError::service(0, "Not a great answer"));
@@ -99,65 +74,67 @@ impl Service for TestDispatcherService {
     }
 }
 
-impl ServeTestDispatcher for TestDispatcherService {
-    fn test_execute(&self, cx: CallContext<'_>, arg: Execute) -> Result<(), ExecutionError> {
-        if arg.value == 42 {
+impl TestDispatcher<CallContext<'_>> for TestDispatcherService {
+    type Output = Result<(), ExecutionError>;
+
+    fn test_execute(&self, ctx: CallContext<'_>, arg: u64) -> Self::Output {
+        if arg == 42 {
             panic!(StorageError::new("42"))
         }
-        let mut index = cx.service_data().get_list("val");
-        index.push(arg.value);
-        index.push(42 / arg.value);
+        let mut index = ctx.service_data().get_list("val");
+        index.push(arg);
+        index.push(42 / arg);
         Ok(())
     }
 
-    fn test_deploy(&self, cx: CallContext<'_>, arg: Deploy) -> Result<(), ExecutionError> {
-        cx.service_data().get_entry("val").set(arg.value);
+    fn test_deploy(&self, ctx: CallContext<'_>, arg: u64) -> Self::Output {
+        ctx.service_data().get_entry("val").set(arg);
 
-        let artifact = if arg.value == 24 {
+        let artifact = if arg == 24 {
             ServicePanicImpl.artifact_id().into()
         } else {
             ServiceGoodImpl.artifact_id().into()
         };
-        cx.start_artifact_registration(artifact, vec![])?;
-        if arg.value == 42 {
+        ctx.start_artifact_registration(artifact, vec![])?;
+        if arg == 42 {
             return Err(DispatcherError::UnknownArtifactId.into());
         }
 
         Ok(())
     }
 
-    fn test_add(&self, mut cx: CallContext<'_>, arg: Add) -> Result<(), ExecutionError> {
+    fn test_add(&self, mut ctx: CallContext<'_>, arg: u64) -> Self::Output {
         {
-            let mut index = cx.service_data().get_entry("val");
-            index.set(arg.value);
+            let mut index = ctx.service_data().get_entry("val");
+            index.set(arg);
         }
 
         let instance_id = {
-            let mut instance_id_entry = cx.service_data().get_entry("instance_ids");
+            let mut instance_id_entry = ctx.service_data().get_entry("instance_ids");
             let instance_id = instance_id_entry.get().unwrap_or(TEST_SERVICE_ID + 1);
             instance_id_entry.set(instance_id + 1);
             instance_id
         };
 
-        let config = match arg.value {
-            42 => Execute { value: 42 }.into_bytes(),
-            18 => Execute { value: 18 }.into_bytes(),
+        let config = match arg {
+            42 => 42_u64.into_bytes(),
+            18 => 18_u64.into_bytes(),
             _ => Vec::new(),
         };
 
-        let artifact = if arg.value == 24 {
+        let artifact = if arg == 24 {
             ServicePanicImpl.artifact_id().into()
         } else {
             TestDispatcherService.artifact_id().into()
         };
 
-        let instance_name = format!("good-service-{}", arg.value);
+        let instance_name = format!("good-service-{}", arg);
         let spec = InstanceSpec {
             id: instance_id,
             name: instance_name,
             artifact,
         };
-        cx.start_adding_service(spec, config)
+        ctx.start_adding_service(spec, config)
     }
 }
 
@@ -223,25 +200,19 @@ impl Service for ServicePanicStorageErrorImpl {
     }
 }
 
-const TX_CHECK_RESULT_SERVICE_ID: InstanceId = 255;
+const CHECK_RESULT_SERVICE_ID: InstanceId = 255;
 
 lazy_static! {
     static ref EXECUTION_STATUS: Mutex<Result<(), ExecutionError>> = Mutex::new(Ok(()));
 }
 
-#[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-struct TxResult {
-    value: u64,
-}
-
 #[exonum_interface(crate = "crate")]
-trait ResultCheck {
-    fn tx_result(&mut self, arg: TxResult) -> Self::Output;
+trait ResultCheck<Ctx> {
+    fn tx_result(&self, ctx: Ctx, arg: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("ServeResultCheck"))]
+#[service_dispatcher(crate = "crate", implements("ResultCheck"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "result_check",
@@ -250,10 +221,12 @@ trait ResultCheck {
 )]
 struct ResultCheckService;
 
-impl ServeResultCheck for ResultCheckService {
-    fn tx_result(&self, cx: CallContext<'_>, arg: TxResult) -> Result<(), ExecutionError> {
-        let mut entry = cx.service_data().get_entry("status");
-        entry.set(arg.value);
+impl ResultCheck<CallContext<'_>> for ResultCheckService {
+    type Output = Result<(), ExecutionError>;
+
+    fn tx_result(&self, ctx: CallContext<'_>, arg: u64) -> Self::Output {
+        let mut entry = ctx.service_data().get_entry("status");
+        entry.set(arg);
         EXECUTION_STATUS.lock().unwrap().clone()
     }
 }
@@ -357,11 +330,11 @@ fn handling_tx_panic_error() {
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
-    let mut signer = gen_signer();
-    let tx_ok1 = signer.test_execute(Execute { value: 3 });
-    let tx_ok2 = signer.test_execute(Execute { value: 4 });
-    let tx_failed = signer.test_execute(Execute { value: 0 });
-    let tx_storage_error = signer.test_execute(Execute { value: 42 });
+    let keypair = gen_keypair();
+    let tx_ok1 = keypair.test_execute(TEST_SERVICE_ID, 3);
+    let tx_ok2 = keypair.test_execute(TEST_SERVICE_ID, 4);
+    let tx_failed = keypair.test_execute(TEST_SERVICE_ID, 0);
+    let tx_storage_error = keypair.test_execute(TEST_SERVICE_ID, 42);
 
     let fork = blockchain.fork();
     let mut schema = Schema::new(&fork);
@@ -416,11 +389,11 @@ fn handling_tx_panic_storage_error() {
             .into_default_instance(TEST_SERVICE_ID, IDX_NAME)],
     );
 
-    let mut signer = gen_signer();
-    let tx_ok1 = signer.test_execute(Execute { value: 3 });
-    let tx_ok2 = signer.test_execute(Execute { value: 4 });
-    let tx_failed = signer.test_execute(Execute { value: 0 });
-    let tx_storage_error = signer.test_execute(Execute { value: 42 });
+    let keypair = gen_keypair();
+    let tx_ok1 = keypair.test_execute(TEST_SERVICE_ID, 3);
+    let tx_ok2 = keypair.test_execute(TEST_SERVICE_ID, 4);
+    let tx_failed = keypair.test_execute(TEST_SERVICE_ID, 0);
+    let tx_storage_error = keypair.test_execute(TEST_SERVICE_ID, 42);
 
     let fork = blockchain.fork();
     let mut schema = Schema::new(&fork);
@@ -491,12 +464,12 @@ fn error_discards_transaction_changes() {
         Ok(()),
     ];
 
-    let (pk, sec_key) = crypto::gen_keypair();
+    let keypair = gen_keypair();
     let mut blockchain = create_blockchain(
         vec![ResultCheckService.into()],
         vec![ResultCheckService
             .artifact_id()
-            .into_default_instance(TX_CHECK_RESULT_SERVICE_ID, "check_result")],
+            .into_default_instance(CHECK_RESULT_SERVICE_ID, "check_result")],
     );
     let db = TemporaryDB::new();
 
@@ -504,9 +477,7 @@ fn error_discards_transaction_changes() {
         let index = index as u64;
         *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
-        let transaction = TxStub(TX_CHECK_RESULT_SERVICE_ID)
-            .tx_result(TxResult { value: index })
-            .sign(pk, &sec_key);
+        let transaction = keypair.tx_result(CHECK_RESULT_SERVICE_ID, index);
         let hash = transaction.object_hash();
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
@@ -561,7 +532,7 @@ fn test_dispatcher_deploy_good() {
         .contains(&artifact_id.name));
     execute_transaction(
         &mut blockchain,
-        gen_signer().test_deploy(Deploy { value: 1 }),
+        gen_keypair().test_deploy(TEST_SERVICE_ID, 1),
     )
     .unwrap();
     let snapshot = blockchain.snapshot();
@@ -601,7 +572,7 @@ fn test_dispatcher_already_deployed() {
     // Tests that we cannot register artifact twice.
     let res = execute_transaction(
         &mut blockchain,
-        gen_signer().test_deploy(Deploy { value: 1 }),
+        gen_keypair().test_deploy(TEST_SERVICE_ID, 1),
     );
     assert_eq!(
         res.unwrap_err(),
@@ -630,7 +601,7 @@ fn test_dispatcher_register_unavailable() {
     // Tests ExecutionError during the register artifact execution.
     execute_transaction(
         &mut blockchain,
-        gen_signer().test_deploy(Deploy { value: 42 }),
+        gen_keypair().test_deploy(TEST_SERVICE_ID, 42),
     )
     .unwrap_err();
 
@@ -642,7 +613,7 @@ fn test_dispatcher_register_unavailable() {
     // Tests that an unavailable artifact will not be registered.
     execute_transaction(
         &mut blockchain,
-        gen_signer().test_deploy(Deploy { value: 24 }),
+        gen_keypair().test_deploy(TEST_SERVICE_ID, 24),
     )
     .unwrap();
 }
@@ -660,7 +631,7 @@ fn test_dispatcher_start_service_good() {
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
         .contains(&"good-service-1".to_owned()));
-    execute_transaction(&mut blockchain, gen_signer().test_add(Add { value: 1 })).unwrap();
+    execute_transaction(&mut blockchain, gen_keypair().test_add(TEST_SERVICE_ID, 1)).unwrap();
     let snapshot = blockchain.snapshot();
     assert!(DispatcherSchema::new(&snapshot)
         .instances()
@@ -670,7 +641,7 @@ fn test_dispatcher_start_service_good() {
 
 #[test]
 fn test_dispatcher_start_service_rollback() {
-    let mut signer = gen_signer();
+    let keypair = gen_keypair();
     let mut blockchain = create_blockchain(
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
@@ -683,7 +654,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
         .contains(&"good-service-24".to_owned()));
-    let res = execute_transaction(&mut blockchain, signer.test_add(Add { value: 24 }));
+    let res = execute_transaction(&mut blockchain, keypair.test_add(TEST_SERVICE_ID, 24));
     assert_eq!(
         res.unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::ArtifactNotDeployed)
@@ -699,7 +670,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
         .contains(&"good-service-42".to_owned()));
-    execute_transaction(&mut blockchain, signer.test_add(Add { value: 42 })).unwrap_err();
+    execute_transaction(&mut blockchain, keypair.test_add(TEST_SERVICE_ID, 42)).unwrap_err();
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
@@ -710,7 +681,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
         .contains(&"good-service-18".to_owned()));
-    execute_transaction(&mut blockchain, signer.test_add(Add { value: 18 })).unwrap_err();
+    execute_transaction(&mut blockchain, keypair.test_add(TEST_SERVICE_ID, 18)).unwrap_err();
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
@@ -722,7 +693,7 @@ fn test_dispatcher_start_service_rollback() {
 /// instance IDs.
 #[test]
 fn test_check_tx() {
-    let keypair = crypto::gen_keypair();
+    let keypair = gen_keypair();
     let blockchain = create_blockchain(
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
@@ -730,12 +701,9 @@ fn test_check_tx() {
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
-    let correct_tx = gen_signer().test_add(Add { value: 1 });
+    let correct_tx = keypair.test_add(TEST_SERVICE_ID, 1);
     blockchain.check_tx(&correct_tx).unwrap();
-
-    let incorrect_tx = TxStub(TEST_SERVICE_ID + 1)
-        .test_add(Add { value: 1 })
-        .sign(keypair.0, &keypair.1);
+    let incorrect_tx = keypair.test_add(TEST_SERVICE_ID + 1, 1);
     assert_eq!(
         blockchain.check_tx(&incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)

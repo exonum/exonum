@@ -33,7 +33,7 @@ use crate::{
         Blockchain, BlockchainMut, Schema as CoreSchema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
-    proto::schema::tests::{TestServiceInit, TestServiceTx},
+    proto::schema::tests::TestServiceInit,
     runtime::{
         error::ExecutionError, BlockchainData, CallInfo, Caller, Dispatcher, DispatcherError,
         DispatcherSchema, ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
@@ -244,32 +244,20 @@ impl WellKnownRuntime for Inspected<RustRuntime> {
     const ID: u32 = RustRuntime::ID;
 }
 
-#[derive(Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "TestServiceInit")]
 pub struct Init {
     msg: String,
 }
 
-#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct TxA {
-    value: u64,
-}
-
-#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct TxB {
-    value: u64,
-}
-
 #[exonum_interface(crate = "crate")]
-trait Test {
-    fn method_a(&mut self, arg: TxA) -> _;
-    fn method_b(&mut self, arg: TxB) -> _;
+trait Test<Ctx> {
+    fn method_a(&self, ctx: Ctx, arg: u64) -> _;
+    fn method_b(&self, ctx: Ctx, arg: u64) -> _;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(crate = "crate", implements("ServeTest"))]
+#[service_dispatcher(crate = "crate", implements("Test"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "test_service",
@@ -278,18 +266,17 @@ trait Test {
 )]
 pub struct TestServiceImpl;
 
-impl ServeTest for TestServiceImpl {
-    fn method_a(&self, mut cx: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
-        cx.service_data().get_entry("method_a_entry").set(arg.value);
+impl Test<CallContext<'_>> for TestServiceImpl {
+    type Output = Result<(), ExecutionError>;
+
+    fn method_a(&self, mut ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
+        ctx.service_data().get_entry("method_a_entry").set(arg);
         // Test calling one service from another.
-        cx.client_stub(SERVICE_INSTANCE_ID)?
-            .method_b(TxB { value: arg.value })
-            .expect("Failed to dispatch call");
-        Ok(())
+        ctx.method_b(SERVICE_INSTANCE_ID, arg)
     }
 
-    fn method_b(&self, cx: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
-        cx.service_data().get_entry("method_b_entry").set(arg.value);
+    fn method_b(&self, ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
+        ctx.service_data().get_entry("method_b_entry").set(arg);
         Ok(())
     }
 }
@@ -407,7 +394,7 @@ fn basic_rust_runtime() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 0,
     };
-    let payload = TxA { value: ARG_A_VALUE }.into_bytes();
+    let payload = ARG_A_VALUE.into_bytes();
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
@@ -442,7 +429,7 @@ fn basic_rust_runtime() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 1,
     };
-    let payload = TxB { value: ARG_B_VALUE }.into_bytes();
+    let payload = ARG_B_VALUE.into_bytes();
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
@@ -616,7 +603,7 @@ fn conflicting_service_instances() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 0,
     };
-    let payload = TxA { value: 10 }.into_bytes();
+    let payload = 10_u64.into_bytes();
     let caller = Caller::Transaction {
         hash: Hash::zero(),
         author: PublicKey::new([0; PUBLIC_KEY_LENGTH]),

@@ -18,7 +18,7 @@ use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
     parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, Receiver,
-    ReturnType, TraitItem, TraitItemMethod, Type, Visibility,
+    ReturnType, TraitItem, TraitItemMethod, Type,
 };
 
 use std::convert::TryFrom;
@@ -33,7 +33,7 @@ struct ServiceMethodDescriptor {
 }
 
 const INVALID_METHOD_MSG: &str =
-    "Interface method should have form `fn foo(&mut self, arg: Bar) -> Self::Output`";
+    "Interface method should have form `fn foo(&self, ctx: Ctx, arg: Bar) -> Self::Output`";
 
 impl ServiceMethodDescriptor {
     fn try_from(index: usize, method: &mut TraitItemMethod) -> Result<Self, darling::Error> {
@@ -43,17 +43,21 @@ impl ServiceMethodDescriptor {
             match arg {
                 FnArg::Receiver(Receiver {
                     reference: Some(_),
-                    mutability: Some(_),
+                    mutability: None,
                     ..
                 }) => {}
                 _ => {
-                    let msg = "The first argument in an interface method should be `&mut self`";
+                    let msg = "The first argument in an interface method should be `&self`";
                     return Err(darling::Error::custom(msg).with_span(&arg));
                 }
             }
         } else {
             return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method));
         }
+
+        method_args_iter
+            .next()
+            .ok_or_else(|| darling::Error::custom(INVALID_METHOD_MSG).with_span(method))?;
 
         let arg_type = method_args_iter
             .next()
@@ -127,10 +131,12 @@ struct ExonumService {
 
 impl ExonumService {
     fn new(mut item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
+        /*
         if !item_trait.generics.params.is_empty() {
             let msg = "Generics are not supported";
             return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params));
         }
+        */
 
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
@@ -176,9 +182,14 @@ impl ExonumService {
             .unwrap_or_default()
     }
 
+    fn mut_trait_name(&self) -> Ident {
+        let name = format!("{}Mut", self.item_trait.ident);
+        Ident::new(&name, Span::call_site())
+    }
+
     fn impl_interface(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
-        let serve_trait_name = self.serve_trait_name();
+        let trait_name = &self.item_trait.ident;
         let interface_name = self.interface_name();
 
         let impl_match_arm = |descriptor: &ServiceMethodDescriptor| {
@@ -194,14 +205,15 @@ impl ExonumService {
         };
         let match_arms = self.methods.iter().map(impl_match_arm);
 
+        let ctx = quote!(#cr::runtime::rust::CallContext<'a>);
         let res = quote!(std::result::Result<(), #cr::runtime::ExecutionError>);
         quote! {
-            impl<'a> #cr::runtime::rust::Interface for dyn #serve_trait_name + 'a {
+            impl<'a> #cr::runtime::rust::Interface<'a> for dyn #trait_name<#ctx, Output = #res> {
                 const INTERFACE_NAME: &'static str = #interface_name;
 
                 fn dispatch(
                     &self,
-                    context: #cr::runtime::rust::CallContext<'_>,
+                    context: #cr::runtime::rust::CallContext<'a>,
                     method: #cr::runtime::MethodId,
                     payload: &[u8],
                 ) -> #res {
@@ -214,12 +226,13 @@ impl ExonumService {
         }
     }
 
-    fn impl_trait_for_call_stub(&self) -> impl ToTokens {
+    fn impl_trait_for_generic_stub(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
         let trait_name = &self.item_trait.ident;
+        let mut_trait_name = self.mut_trait_name();
         let interface_name = self.interface_name();
 
-        let method_impl = |descriptor: &ServiceMethodDescriptor| {
+        let impl_method = |descriptor: &ServiceMethodDescriptor| {
             let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
             let name_string = name.to_string();
             let descriptor = quote! {
@@ -230,71 +243,70 @@ impl ExonumService {
                 )
             };
 
-            quote! {
-                fn #name(&mut self, arg: #arg_type) -> Self::Output {
-                    #cr::runtime::rust::CallStub::call_stub(
+            let method = quote! {
+                fn #name(&self, context: Ctx, arg: #arg_type) -> Self::Output {
+                    #cr::runtime::rust::GenericCall::generic_call(
                         self,
+                        context,
                         #descriptor,
                         #cr::merkledb::BinaryValue::into_bytes(arg),
                     )
                 }
-            }
+            };
+            let mut_method = quote! {
+                fn #name(&mut self, context: Ctx, arg: #arg_type) -> Self::Output {
+                    #cr::runtime::rust::GenericCallMut::generic_call_mut(
+                        self,
+                        context,
+                        #descriptor,
+                        #cr::merkledb::BinaryValue::into_bytes(arg),
+                    )
+                }
+            };
+            (method, mut_method)
         };
-        let methods = self.methods.iter().map(method_impl);
 
+        let (methods, mut_methods): (Vec<_>, Vec<_>) = self.methods.iter().map(impl_method).unzip();
         quote! {
-            impl<T: #cr::runtime::rust::CallStub> #trait_name for T {
-                type Output = <T as #cr::runtime::rust::CallStub>::Output;
-
+            impl<Ctx, T: #cr::runtime::rust::GenericCall<Ctx>> #trait_name<Ctx> for T {
+                type Output = <T as #cr::runtime::rust::GenericCall<Ctx>>::Output;
                 #( #methods )*
             }
+
+            impl<Ctx, T: #cr::runtime::rust::GenericCallMut<Ctx>> #mut_trait_name<Ctx> for T {
+                type Output = <T as #cr::runtime::rust::GenericCallMut<Ctx>>::Output;
+                #( #mut_methods )*
+            }
         }
     }
 
-    fn serve_trait(&self) -> impl ToTokens {
-        let mut serve_trait = self.item_trait.clone();
-        serve_trait.vis = Visibility::Inherited;
-        serve_trait.ident = self.serve_trait_name();
-        serve_trait.items.retain(|trait_item| match trait_item {
-            TraitItem::Method(_) => true,
-            _ => false,
-        });
+    fn mut_trait(&self) -> impl ToTokens {
+        let mut mut_trait = self.item_trait.clone();
+        mut_trait.ident = self.mut_trait_name();
 
-        let cr = &self.attrs.cr;
-        for trait_item in &mut serve_trait.items {
+        for trait_item in &mut mut_trait.items {
             if let TraitItem::Method(method) = trait_item {
                 if let FnArg::Receiver(ref mut recv) = method.sig.inputs[0] {
-                    recv.mutability = None;
+                    recv.mutability = Some(syn::parse_quote!(mut));
                 }
-                method.sig.inputs.insert(
-                    1,
-                    syn::parse_quote!(context: #cr::runtime::rust::CallContext<'_>),
-                );
-                method.sig.output =
-                    syn::parse_quote!(-> std::result::Result<(), #cr::runtime::ExecutionError>);
             }
         }
 
-        quote!(#serve_trait)
-    }
-
-    fn serve_trait_name(&self) -> Ident {
-        let name = format!("Serve{}", self.item_trait.ident);
-        Ident::new(&name, Span::call_site())
+        quote!(#mut_trait)
     }
 }
 
 impl ToTokens for ExonumService {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let item_trait = &self.item_trait;
-        let serve_trait = self.serve_trait();
+        let mut_trait = self.mut_trait();
         let impl_interface = self.impl_interface();
-        let impl_trait = self.impl_trait_for_call_stub();
+        let impl_trait = self.impl_trait_for_generic_stub();
 
         let expanded = quote! {
+            #mut_trait
             #item_trait
             #impl_trait
-            #serve_trait
             #impl_interface
         };
         tokens.extend(expanded);

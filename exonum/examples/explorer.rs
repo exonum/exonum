@@ -19,11 +19,11 @@ extern crate serde_derive;
 
 use exonum::{
     blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind},
+    crypto::gen_keypair,
     explorer::*,
     helpers::{Height, ValidatorId},
     merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
-    runtime::rust::TxStub,
 };
 use serde_json::json;
 
@@ -41,10 +41,7 @@ mod blockchain;
 pub fn mempool_transaction() -> Verified<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
-    let (pk_alex, sk_alex) = consensus_keys();
-    TxStub(SERVICE_ID)
-        .into_signer(pk_alex, sk_alex)
-        .create_wallet(CreateWallet::new("Alex"))
+    consensus_keys().create_wallet(SERVICE_ID, CreateWallet::new("Alex"))
 }
 
 /// Creates a sample blockchain for the example.
@@ -58,12 +55,12 @@ pub fn mempool_transaction() -> Verified<AnyTx> {
 /// Additionally, a single transaction is placed into the pool.
 pub fn sample_blockchain() -> BlockchainMut {
     let mut blockchain = create_blockchain();
-    let mut alice = TxStub(SERVICE_ID).with_random_keypair();
-    let mut bob = TxStub(SERVICE_ID).with_random_keypair();
+    let alice = gen_keypair();
+    let bob = gen_keypair();
 
-    let tx_alice = alice.create_wallet(CreateWallet::new("Alice"));
-    let tx_bob = bob.create_wallet(CreateWallet::new("Bob"));
-    let tx_transfer = alice.transfer(Transfer::new(bob.public_key(), 100));
+    let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(&bob.0, 100));
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));

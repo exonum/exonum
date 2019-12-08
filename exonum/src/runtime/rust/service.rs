@@ -25,12 +25,11 @@ use crate::{
     blockchain::config::InstanceInitParams,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    messages::Verified,
     node::ApiSender,
     runtime::{
         dispatcher::{Action, Mailbox},
-        rust::CallStub,
-        AnyTx, ArtifactId, CallInfo, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
+        rust::GenericCall,
+        ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
     },
 };
 
@@ -341,19 +340,13 @@ impl<'a> Broadcaster<'a> {
 ///
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
-impl CallStub for Broadcaster<'_> {
+impl GenericCall<()> for Broadcaster<'_> {
     type Output = Result<Hash, Error>;
 
-    fn call_stub(&mut self, method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
-        let tx = AnyTx {
-            call_info: CallInfo {
-                instance_id: self.instance().id,
-                method_id: method.id,
-            },
-            arguments: args,
-        };
-        let (public_key, secret_key) = self.service_keypair.as_ref();
-        let msg = Verified::from_value(tx, *public_key, secret_key);
+    fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
+        let msg = self
+            .service_keypair
+            .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
         self.tx_sender.broadcast_transaction(msg).map(|()| tx_hash)
     }

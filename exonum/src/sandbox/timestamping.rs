@@ -23,7 +23,7 @@ use crate::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
     runtime::{
-        rust::{CallContext, Service, TxStub},
+        rust::{CallContext, Service},
         AnyTx, BlockchainData, InstanceId,
     },
 };
@@ -31,12 +31,12 @@ use crate::{
 pub const DATA_SIZE: usize = 64;
 
 #[exonum_interface(crate = "crate")]
-pub trait Timestamping {
-    fn timestamp(&mut self, arg: TimestampTx) -> _;
+pub trait Timestamping<Ctx> {
+    fn timestamp(&self, ctx: Ctx, arg: TimestampTx) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("ServeTimestamping"))]
+#[service_dispatcher(crate = "crate", implements("Timestamping"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "timestamping",
@@ -45,8 +45,10 @@ pub trait Timestamping {
 )]
 pub struct TimestampingService;
 
-impl ServeTimestamping for TimestampingService {
-    fn timestamp(&self, _cx: CallContext<'_>, _arg: TimestampTx) -> Result<(), ExecutionError> {
+impl Timestamping<CallContext<'_>> for TimestampingService {
+    type Output = Result<(), ExecutionError>;
+
+    fn timestamp(&self, _ctx: CallContext<'_>, _arg: TimestampTx) -> Self::Output {
         Ok(())
     }
 }
@@ -66,9 +68,8 @@ impl_binary_value_for_pb_message! { TimestampTx }
 pub struct TimestampingTxGenerator {
     rand: ThreadRng,
     data_size: usize,
-    public_key: PublicKey,
-    secret_key: SecretKey,
-    tx_creator: TxStub,
+    keypair: (PublicKey, SecretKey),
+    instance_id: InstanceId,
 }
 
 impl TimestampingTxGenerator {
@@ -80,7 +81,7 @@ impl TimestampingTxGenerator {
     /// Creates a generator of transactions for a service not instantiated on the blockchain.
     pub fn for_incorrect_service(data_size: usize) -> Self {
         let mut this = Self::new(data_size);
-        this.tx_creator = TxStub(TimestampingService::ID + 1);
+        this.instance_id += 1;
         this
     }
 
@@ -93,9 +94,8 @@ impl TimestampingTxGenerator {
         TimestampingTxGenerator {
             rand,
             data_size,
-            public_key: keypair.0,
-            secret_key: keypair.1,
-            tx_creator: TxStub(TimestampingService::ID),
+            keypair,
+            instance_id: TimestampingService::ID,
         }
     }
 }
@@ -108,10 +108,6 @@ impl Iterator for TimestampingTxGenerator {
         self.rand.fill_bytes(&mut data);
         let mut timestamp = TimestampTx::new();
         timestamp.set_data(data);
-        let tx = self
-            .tx_creator
-            .timestamp(timestamp)
-            .sign(self.public_key, &self.secret_key);
-        Some(tx)
+        Some(self.keypair.timestamp(self.instance_id, timestamp))
     }
 }

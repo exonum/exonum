@@ -71,18 +71,20 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait Transactions {
-    fn create_wallet(&mut self, arg: CreateWallet) -> _;
-    fn transfer(&mut self, arg: Transfer) -> _;
+pub trait Transactions<Ctx> {
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "ws-test", proto_sources = "exonum::proto::schema")]
-#[service_dispatcher(implements("ServeTransactions"))]
+#[service_dispatcher(implements("Transactions"))]
 struct MyService;
 
-impl ServeTransactions for MyService {
-    fn create_wallet(&self, _cx: CallContext<'_>, arg: CreateWallet) -> Result<(), ExecutionError> {
+impl Transactions<CallContext<'_>> for MyService {
+    type Output = Result<(), ExecutionError>;
+
+    fn create_wallet(&self, _ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -90,7 +92,7 @@ impl ServeTransactions for MyService {
         }
     }
 
-    fn transfer(&self, _cx: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
+    fn transfer(&self, _ctx: CallContext<'_>, _arg: Transfer) -> Self::Output {
         panic!("oops")
     }
 }

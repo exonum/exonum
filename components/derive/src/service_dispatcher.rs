@@ -61,12 +61,13 @@ impl ToTokens for ServiceDispatcher {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let service_name = &self.ident;
         let cr = &self.cr;
-
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
+        let ctx = quote!(#cr::runtime::rust::CallContext<'_>);
+        let res = quote!(std::result::Result<(), #cr::runtime::ExecutionError>);
 
         let match_arms = self.implements.0.iter().map(|trait_name| {
             let interface_trait = quote! {
-                <dyn #trait_name as #cr::runtime::rust::Interface>
+                <dyn #trait_name<#ctx, Output = #res> as #cr::runtime::rust::Interface>
             };
 
             quote! {
@@ -82,7 +83,7 @@ impl ToTokens for ServiceDispatcher {
                     &self,
                     interface_name: &str,
                     method: #cr::runtime::MethodId,
-                    ctx: #cr::runtime::rust::CallContext<'_>,
+                    ctx: #ctx,
                     payload: &[u8],
                 ) -> Result<(), #cr::runtime::error::ExecutionError> {
                     match interface_name {

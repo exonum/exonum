@@ -44,10 +44,8 @@ pub struct CreateWallet {
 }
 
 impl CreateWallet {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_owned(),
-        }
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
     }
 }
 
@@ -71,9 +69,11 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait ExplorerTransactions {
-    fn create_wallet(&mut self, arg: CreateWallet) -> _;
-    fn transfer(&mut self, arg: Transfer) -> _;
+pub trait ExplorerTransactions<Ctx> {
+    type Output;
+
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -82,11 +82,13 @@ pub trait ExplorerTransactions {
     artifact_version = "1.0.1",
     proto_sources = "proto"
 )]
-#[service_dispatcher(implements("ServeExplorerTransactions"))]
+#[service_dispatcher(implements("ExplorerTransactions"))]
 struct MyService;
 
-impl ServeExplorerTransactions for MyService {
-    fn create_wallet(&self, _cx: CallContext<'_>, arg: CreateWallet) -> Result<(), ExecutionError> {
+impl ExplorerTransactions<CallContext<'_>> for MyService {
+    type Output = Result<(), ExecutionError>;
+
+    fn create_wallet(&self, _ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -94,7 +96,7 @@ impl ServeExplorerTransactions for MyService {
         }
     }
 
-    fn transfer(&self, _cx: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
+    fn transfer(&self, _ctx: CallContext<'_>, _arg: Transfer) -> Self::Output {
         panic!("oops");
     }
 }

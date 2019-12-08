@@ -30,12 +30,12 @@ use crate::{
 };
 
 #[exonum_interface(crate = "crate")]
-pub trait ConfigUpdater {
-    fn update_config(&mut self, arg: TxConfig) -> _;
+pub trait ConfigUpdater<Ctx> {
+    fn update_config(&self, ctx: Ctx, arg: TxConfig) -> _;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("ServeConfigUpdater"))]
+#[service_dispatcher(crate = "crate", implements("ConfigUpdater"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "config_updater",
@@ -44,9 +44,11 @@ pub trait ConfigUpdater {
 )]
 pub struct ConfigUpdaterService;
 
-impl ServeConfigUpdater for ConfigUpdaterService {
-    fn update_config(&self, cx: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
-        cx.writeable_core_schema()
+impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
+    type Output = Result<(), ExecutionError>;
+
+    fn update_config(&self, ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
+        ctx.writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
@@ -74,8 +76,8 @@ impl TxConfig {
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
-        TxStub(ConfigUpdaterService::ID)
-            .update_config(msg)
+        TxStub
+            .update_config(ConfigUpdaterService::ID, msg)
             .sign(from, signer)
     }
 }

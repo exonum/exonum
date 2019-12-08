@@ -3,7 +3,7 @@ use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 use crate::blockchain::Schema as CoreSchema;
 use crate::runtime::{
     dispatcher::{Dispatcher, Error as DispatcherError},
-    rust::stubs::{CallStub, MethodDescriptor},
+    rust::stubs::{GenericCallMut, MethodDescriptor},
     ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
     InstanceDescriptor, InstanceQuery, InstanceSpec, SUPERVISOR_INSTANCE_ID,
 };
@@ -48,23 +48,6 @@ impl<'a> CallContext<'a> {
     /// Returns a descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
-    #[doc(hidden)]
-    pub fn client_stub<'s>(
-        &'s mut self,
-        called_id: impl Into<InstanceQuery<'s>>,
-    ) -> Result<ClientStub<'s>, ExecutionError> {
-        let descriptor = self
-            .inner
-            .dispatcher
-            .get_service(self.inner.fork, called_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
-        Ok(ClientStub {
-            inner: self.inner.child_context(self.instance.id),
-            instance: descriptor,
-        })
     }
 
     /// Provides writeable access to core schema.
@@ -121,21 +104,27 @@ impl<'a> CallContext<'a> {
     }
 }
 
-/// Client stub allowing to call methods of a service on the same blockchain.
-#[derive(Debug)]
-pub struct ClientStub<'a> {
-    inner: ExecutionContext<'a>,
-    instance: InstanceDescriptor<'a>,
-}
-
-impl CallStub for ClientStub<'_> {
+impl<'a, I: Into<InstanceQuery<'a>>> GenericCallMut<I> for CallContext<'a> {
     type Output = Result<(), ExecutionError>;
 
-    fn call_stub(&mut self, method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
+    fn generic_call_mut(
+        &mut self,
+        called_id: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        let descriptor = self
+            .inner
+            .dispatcher
+            .get_service(self.inner.fork, called_id)
+            .ok_or(DispatcherError::IncorrectInstanceId)?;
+
         let call_info = CallInfo {
-            instance_id: self.instance.id,
+            instance_id: descriptor.id,
             method_id: method.id,
         };
-        self.inner.call(method.interface_name, &call_info, &args)
+        self.inner
+            .child_context(self.instance.id)
+            .call(method.interface_name, &call_info, &args)
     }
 }
