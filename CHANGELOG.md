@@ -29,19 +29,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` structure isn't generic anymore. (#1587)
 
-#### exonum-supervisor
-
-- `Supervisor` structure isn't generic anymore. (#1587)
-
 ### New features
 
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
 
+#### exonum-cli
+
+- `supervisor-mode` parameter has been added for `generate-template` subcommand.
+  (#1598)
+
 #### exonum-supervisor
 
-- `Supervisor` service now can has initial configuration and implements
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
 
