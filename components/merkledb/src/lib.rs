@@ -129,7 +129,7 @@
 //! [`BTreeMap`]: https://doc.rust-lang.org/std/collections/struct.BTreeMap.html
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
-//! [`state_aggregator`]: struct.SystemInfo.html#method.state_aggregator
+//! [`state_aggregator`]: struct.SystemSchema.html#method.state_aggregator
 //! [`Group`]: struct.Group.html
 //! [`IndexAddress`]: struct.IndexAddress.html
 //! [Exonum]: https://exonum.com/
