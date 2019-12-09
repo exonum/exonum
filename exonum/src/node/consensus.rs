@@ -696,21 +696,6 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub(crate) fn handle_incoming_tx(&mut self, msg: Verified<AnyTx>) {
         trace!("Handle incoming transaction");
-        // Check transaction before handling it to avoid the broadcasting.
-        // Reaction for an incorrect tx here and in `handle_tx` is different:
-        // here we simply ignore it without notifying the network, but if the
-        // transaction is received from the network, we have to deal with it
-        // and maybe even panic (if most of nodes will approve a block with such a
-        // transaction).
-        // TODO: Move this check to the `ExplorerApi::add_transaction`. [ECR-3907]
-        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &msg) {
-            warn!(
-                "Received incorrect transaction from outside of the network; \
-                 skipping it. Info on error: {}",
-                error
-            );
-            return;
-        }
 
         match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),

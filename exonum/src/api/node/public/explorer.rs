@@ -279,13 +279,15 @@ impl ExplorerApi {
     /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
     // TODO move this method to the public system API [ECR-3222]
     pub fn add_transaction(
+        snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
     ) -> FutureResult<TransactionResponse> {
-        let verify_message = |hex: String| -> Result<_, failure::Error> {
+        let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
             let verified = msg.into_verified()?;
+            Blockchain::check_tx(snapshot, &verified)?;
             Ok((verified, tx_hash))
         };
 
@@ -300,7 +302,7 @@ impl ExplorerApi {
         };
 
         Box::new(
-            verify_message(query.tx_body)
+            verify_message(snapshot, query.tx_body)
                 .into_future()
                 .map_err(|e| ApiError::BadRequest(e.to_string()))
                 .and_then(send_transaction),
@@ -403,7 +405,9 @@ impl ExplorerApi {
             })
             .endpoint_mut("v1/transactions", {
                 let blockchain = self.blockchain.clone();
-                move |query| Self::add_transaction(blockchain.sender(), query)
+                move |query| {
+                    Self::add_transaction(&blockchain.snapshot(), blockchain.sender(), query)
+                }
             })
     }
 }
