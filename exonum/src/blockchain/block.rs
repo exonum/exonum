@@ -22,6 +22,31 @@ use crate::{
 use exonum_merkledb::BinaryValue;
 use std::borrow::Cow;
 
+/// Trait that represents key in block header entry map. Provide
+/// mapping between `NAME` of the entry and its value.
+///
+/// # Usage
+///
+/// ```no_run
+/// use exonum::blockchain::Block;
+///
+/// struct SomeData {}
+///
+/// impl BlockHeaderKey for SomeData {
+///    const NAME: &'static str = "data";
+///    type Value = Self;
+/// }
+///
+/// let mut block = Block::default();
+///
+/// let data = SomeData {};
+/// block.insert::<SomeData>(data);
+/// ```
+pub trait BlockHeaderKey {
+    const NAME: &'static str;
+    type Value: BinaryValue;
+}
+
 /// Expandable set of entries allowed to be added to the block.
 pub type BlockHeaderEntries = BinaryMap<String, Vec<u8>>;
 
@@ -37,9 +62,8 @@ impl BlockHeaderEntries {
     }
 
     /// Get entry from map.
-    pub fn get<K: Into<String>, V: BinaryValue>(&mut self, key: K) -> Option<V> {
-        let value = self.0.get(&key.into())?;
-        BinaryValue::from_bytes(Cow::Borrowed(value)).ok()
+    pub fn get<K: Into<String>>(&self, key: K) -> Option<&Vec<u8>> {
+        self.0.get(&key.into())
     }
 }
 
@@ -83,8 +107,49 @@ pub struct Block {
     /// These calls can include transactions, `before_transactions` and/or `after_transactions` hooks
     /// for services.
     pub error_hash: Hash,
-    ///
+    /// Some additional entries that can be added into the block.
     pub entries: BlockHeaderEntries,
+}
+
+impl Block {
+    /// Insert new entry to the block header.
+    ///
+    /// # Usage
+    ///
+    /// ```no_run
+    /// use exonum::blockchain::Block;
+    ///
+    /// let mut block = Block::default();
+    ///
+    /// let services = ActiveServices::new();
+    /// block.insert::<ActiveServices>(services);
+    ///
+    /// ```
+    pub fn insert<K: BlockHeaderKey>(&mut self, value: K::Value) {
+        self.entries.insert(K::NAME, value.to_bytes());
+    }
+
+    /// Get block header entry for specified key type.
+    ///
+    /// # Usage
+    ///
+    /// ```no_run
+    /// use exonum::blockchain::Block;
+    ///
+    /// let mut block = Block::default();
+    ///
+    /// let services = block.get::<ActiveServices>();
+    ///
+    /// ```
+    pub fn get<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error>
+    where
+        K::Value: BinaryValue,
+    {
+        self.entries
+            .get(K::NAME)
+            .map(|bytes: &Vec<u8>| K::Value::from_bytes(Cow::Borrowed(bytes)))
+            .transpose()
+    }
 }
 
 /// Block with its `Precommit` messages.
@@ -107,6 +172,8 @@ mod tests {
     use super::*;
     use crate::crypto::hash;
     use crate::merkledb::ObjectHash;
+    use crate::proto::schema;
+    use crate::runtime::InstanceId;
 
     #[test]
     fn block() {
@@ -177,5 +244,81 @@ mod tests {
         let hash_with_entries = block_with_entries.object_hash();
 
         assert_ne!(hash_without_entries, hash_with_entries);
+    }
+
+    #[derive(Debug, Clone, ProtobufConvert, BinaryValue, Eq, PartialEq)]
+    #[protobuf_convert(source = "schema::tests::TestServiceInfo")]
+    struct TestServiceInfo {
+        pub instance_id: InstanceId,
+        pub runtime_id: u32,
+        pub name: String,
+    }
+
+    #[derive(Debug, Clone, ProtobufConvert, BinaryValue, Eq, PartialEq)]
+    #[protobuf_convert(source = "schema::tests::TestActiveServices")]
+    struct ActiveServices {
+        pub services: Vec<TestServiceInfo>,
+    }
+
+    impl BlockHeaderKey for ActiveServices {
+        const NAME: &'static str = "ACTIVE_SERVICES";
+        type Value = Self;
+    }
+
+    #[test]
+    fn block_entry_keys() {
+        let mut block = create_block(BlockHeaderEntries::new());
+
+        assert!(block.get::<ActiveServices>().unwrap().is_none());
+
+        let services = ActiveServices {
+            services: Vec::new(),
+        };
+
+        block.insert::<ActiveServices>(services.clone());
+        let services_2 = block
+            .get::<ActiveServices>()
+            .expect("Active services not found");
+
+        assert_eq!(services, services_2.unwrap());
+
+        let info = TestServiceInfo {
+            runtime_id: 0,
+            instance_id: 1,
+            name: "test".into(),
+        };
+
+        let info_2 = TestServiceInfo {
+            runtime_id: 2,
+            instance_id: 10,
+            name: "test service instance".into(),
+        };
+
+        let services = ActiveServices {
+            services: vec![info, info_2],
+        };
+
+        // Should override previous entry for `ActiveServices`.
+        block.insert::<ActiveServices>(services.clone());
+        let services_2 = block
+            .get::<ActiveServices>()
+            .expect("Active services not found");
+
+        assert_eq!(services, services_2.unwrap());
+    }
+
+    #[test]
+    fn block_entry_wrong_type() {
+        let mut entries = BlockHeaderEntries::new();
+
+        entries.insert("ACTIVE_SERVICES", vec![]);
+        let block = create_block(entries.clone());
+        let services = block.get::<ActiveServices>();
+        assert!(services.unwrap().unwrap().services.is_empty());
+
+        entries.insert("ACTIVE_SERVICES", vec![0_u8; 1024]);
+        let block = create_block(entries);
+        let services = block.get::<ActiveServices>();
+        assert!(services.is_err());
     }
 }
