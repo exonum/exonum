@@ -136,10 +136,12 @@ impl ExonumService {
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
 
-        for (i, trait_item) in item_trait.items.iter_mut().enumerate() {
+        let mut method_id = 0;
+        for trait_item in &mut item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
-                    methods.push(ServiceMethodDescriptor::try_from(i, method)?);
+                    methods.push(ServiceMethodDescriptor::try_from(method_id, method)?);
+                    method_id += 1;
                 }
                 TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {
