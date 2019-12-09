@@ -174,8 +174,8 @@ impl Blockchain {
     /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
     /// executed successfully, but returned `Err(..)` value means that this transaction is
     /// **obviously** incorrect and should be declined as early as possible.
-    pub fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
-        Dispatcher::check_tx(&self.snapshot(), tx)
+    pub fn check_tx(snapshot: &dyn Snapshot, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+        Dispatcher::check_tx(snapshot, tx)
     }
 }
 
