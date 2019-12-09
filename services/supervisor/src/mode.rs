@@ -33,7 +33,7 @@ use failure::{self, format_err};
 use std::str::FromStr;
 
 /// Supervisor operating mode.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -102,6 +102,27 @@ impl Mode {
                 let confirmations = config_confirms.confirmations(&config_hash);
                 confirmations >= byzantine_quorum(validators)
             }
+        }
+    }
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Mode::Simple
+    }
+}
+
+impl FromStr for Mode {
+    type Err = failure::Error;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "simple" => Ok(Mode::Simple),
+            "decentralized" => Ok(Mode::Decentralized),
+            _ => Err(format_err!(
+                "Invalid supervisor mode: {}. Could be 'simple' or 'decentralized'",
+                input
+            )),
         }
     }
 }

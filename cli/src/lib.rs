@@ -144,11 +144,10 @@ impl NodeBuilder {
 
         if let StandardResult::Run(run_config) = command.execute()? {
             // Add builtin services to genesis config.
-            let supervisor =
-                match run_config.node_config.public_config.general.supervisor_mode {
-                    SupervisorMode::Simple => Supervisor::simple(),
-                    SupervisorMode::Decentralized => Supervisor::decentralized(),
-                };
+            let supervisor = match run_config.node_config.public_config.general.supervisor_mode {
+                SupervisorMode::Simple => Supervisor::simple(),
+                SupervisorMode::Decentralized => Supervisor::decentralized(),
+            };
             let genesis_config = GenesisConfigBuilder::with_consensus_config(
                 run_config.node_config.public_config.consensus.clone(),
             )
