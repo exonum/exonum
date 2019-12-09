@@ -30,8 +30,8 @@ use serde_json::json;
 use std::{collections::BTreeMap, iter};
 
 use crate::blockchain::{
-    consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
-    ExplorerTransactions as _,
+    consensus_keys, create_block, create_blockchain, CreateWallet, ExplorerTransactions as _,
+    Transfer, SERVICE_ID,
 };
 
 #[path = "../tests/explorer/blockchain/mod.rs"]
