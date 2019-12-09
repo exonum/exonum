@@ -17,7 +17,7 @@
 
 use exonum::{
     blockchain::{
-        Blockchain, BlockchainBuilder, ConsensusConfig, InstanceCollection, ValidatorKeys,
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys,
     },
     helpers::Height,
     keys::Keys,
@@ -25,13 +25,14 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::Transaction, AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext,
-        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, SUPERVISOR_INSTANCE_ID,
+        rust::{RustRuntime, ServiceFactory, Transaction},
+        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
+        ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
+        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::IntoExecutionError;
-use exonum_supervisor::{ConfigPropose, DeployRequest, SimpleSupervisor, StartService};
+use exonum_derive::*;
+use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -56,8 +57,8 @@ struct SampleRuntime {
 }
 
 // Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[execution_error(kind = "runtime")]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[execution_fail(kind = "runtime")]
 enum SampleRuntimeError {
     /// Incorrect information to call transaction.
     IncorrectCallInfo = 1,
@@ -66,9 +67,6 @@ enum SampleRuntimeError {
 }
 
 impl SampleRuntime {
-    /// Runtime identifier for the present runtime.
-    const ID: u32 = 255;
-
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
@@ -162,7 +160,7 @@ impl Runtime for SampleRuntime {
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())
-                    .map_err(|e| (SampleRuntimeError::IncorrectPayload, e))?;
+                    .map_err(|e| SampleRuntimeError::IncorrectPayload.with_description(e))?;
                 let counter = service.counter.get();
                 println!("Updating counter value to {}", counter + value);
                 service.counter.set(value + counter);
@@ -182,23 +180,24 @@ impl Runtime for SampleRuntime {
 
             // Unknown transaction.
             (interface, method) => {
-                let err = (
-                    SampleRuntimeError::IncorrectCallInfo,
-                    format!(
-                        "Incorrect information to call transaction. {}#{}",
-                        interface, method
-                    ),
-                );
-                Err(err.into())
+                let err = SampleRuntimeError::IncorrectCallInfo.with_description(format!(
+                    "Incorrect information to call transaction. {}#{}",
+                    interface, method
+                ));
+                Err(err)
             }
         }
     }
 
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -213,6 +212,10 @@ impl From<SampleRuntime> for (u32, Box<dyn Runtime>) {
     fn from(inner: SampleRuntime) -> Self {
         (SampleRuntime::ID, Box::new(inner))
     }
+}
+
+impl WellKnownRuntime for SampleRuntime {
+    const ID: u32 = 255;
 }
 
 fn node_config() -> NodeConfig {
@@ -265,7 +268,7 @@ fn main() {
 
     let db = TemporaryDB::new();
     let node_cfg = node_config();
-    let genesis = node_cfg.consensus.clone();
+    let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
     let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
@@ -273,12 +276,14 @@ fn main() {
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
     let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
-    let blockchain = BlockchainBuilder::new(blockchain_base, genesis)
-        .with_rust_runtime(
-            channel.endpoints.0.clone(),
-            vec![InstanceCollection::from(SimpleSupervisor::new())],
-        )
-        .with_additional_runtime(SampleRuntime::default())
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
+        .build();
+    let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
+    let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
+        .with_runtime(rust_runtime)
+        .with_runtime(SampleRuntime::default())
         .build()
         .unwrap();
 

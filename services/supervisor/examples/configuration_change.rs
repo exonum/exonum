@@ -13,21 +13,18 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::InstanceCollection,
     helpers::Height,
-    messages::Verified,
     runtime::{
-        rust::{CallContext, Service, Transaction},
-        AnyTx, BlockchainData, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        rust::{CallContext, Service, ServiceFactory, Transaction},
+        ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_crypto::Hash;
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Entry, ObjectHash, Snapshot,
+    Entry, ObjectHash,
 };
-use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, DecentralizedSupervisor};
+use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 const SERVICE_ID: InstanceId = 256;
@@ -47,12 +44,7 @@ pub struct Schema<T: Access> {
     params: Entry<T::Base, String>,
 }
 
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<'_, &dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
-
+impl Service for ConfigChangeService {}
 impl ConfigChangeInterface for ConfigChangeService {}
 
 // To allow service change its configuration we need to implement `Configure` trait.
@@ -84,14 +76,18 @@ impl Configure for ConfigChangeService {
 
 fn main() {
     let service = ConfigChangeService;
-    let collection = InstanceCollection::new(service).with_instance(SERVICE_ID, SERVICE_NAME, ());
+    let artifact = service.artifact_id();
 
     // Create testkit instance with our test service and supervisor.
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_validators(4)
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
+        .with_rust_service(service)
         .create();
 
     // Firstly, lets change consensus configuration and increase `min_propose_timeout`.
@@ -149,7 +145,7 @@ fn send_and_vote_for_propose(
         .unwrap();
 
     // Create signed transactions for all validators.
-    let signed_txs = testkit
+    let signed_txs: Vec<_> = testkit
         .network()
         .validators()
         .iter()
@@ -158,7 +154,7 @@ fn send_and_vote_for_propose(
             let keys = validator.service_keypair();
             ConfigVote { propose_hash }.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1)
         })
-        .collect::<Vec<Verified<AnyTx>>>();
+        .collect();
 
     // Confirm this propose.
     testkit

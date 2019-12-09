@@ -15,20 +15,19 @@
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    blockchain::{ExecutionError, InstanceCollection},
-    crypto::Hash,
+    blockchain::ExecutionError,
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
-            CallContext, Service,
+            CallContext, DefaultInstance, Service,
         },
-        BlockchainData, DispatcherError, InstanceId,
+        DispatcherError, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, Snapshot,
+    Entry,
 };
 use exonum_proto::ProtobufConvert;
 
@@ -113,19 +112,14 @@ impl PublicApi {
 }
 
 impl Service for IncService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         PublicApi::wire(builder);
     }
 }
 
-impl From<IncService> for InstanceCollection {
-    fn from(instance: IncService) -> Self {
-        InstanceCollection::new(instance).with_instance(SERVICE_ID, SERVICE_NAME, Vec::default())
-    }
+impl DefaultInstance for IncService {
+    const INSTANCE_ID: InstanceId = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
 impl Configure for IncService {
@@ -143,9 +137,8 @@ impl Configure for IncService {
 
         match params.as_ref() {
             "error" => {
-                let error =
-                    DispatcherError::malformed_arguments("IncService: Configure error request");
-                Err(error)
+                let details = "IncService: Configure error request";
+                Err(DispatcherError::malformed_arguments(details))
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -168,9 +161,8 @@ impl Configure for IncService {
 
         match params.as_str() {
             "apply_error" => {
-                let error =
-                    DispatcherError::malformed_arguments("IncService: Configure error request");
-                Err(error)
+                let details = "IncService: Configure error request";
+                Err(DispatcherError::malformed_arguments(details))
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),

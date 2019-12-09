@@ -24,7 +24,7 @@
 //!
 //! ```text
 //! +---------+             +---------------+                  +----------+
-//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Message |-->(handle)
+//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Message  |-->(handle)
 //! +---------+     |       +---------------+        |         +----------+
 //!                 |                                |
 //!                 V                                V

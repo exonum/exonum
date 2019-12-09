@@ -14,7 +14,7 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
@@ -23,17 +23,16 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{Blockchain, IndexCoordinates, SchemaOrigin},
+    blockchain::{Blockchain, CallInBlock, Schema as CoreSchema},
     crypto::Hash,
     helpers::ValidateInput,
-    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus},
+    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
 use super::{
-    error::ExecutionError, ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId,
-    InstanceSpec, Runtime,
+    error::{CallSite, CallType, ErrorKind, ExecutionError},
+    ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -58,10 +57,13 @@ impl Dispatcher {
     /// Creates a new dispatcher with the specified runtimes.
     pub(crate) fn new(
         blockchain: &Blockchain,
-        runtimes: impl IntoIterator<Item = (u32, Box<dyn Runtime>)>,
+        runtimes: impl IntoIterator<Item = RuntimeInstance>,
     ) -> Self {
         let mut this = Self {
-            runtimes: runtimes.into_iter().collect(),
+            runtimes: runtimes
+                .into_iter()
+                .map(|runtime| (runtime.id, runtime.instance))
+                .collect(),
             service_infos: BTreeMap::new(),
         };
         for runtime in this.runtimes.values_mut() {
@@ -112,47 +114,12 @@ impl Dispatcher {
         &mut self,
         fork: &mut Fork,
         spec: InstanceSpec,
-        artifact_payload: impl BinaryValue,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        // Register service artifact in the runtime.
-        // TODO Write test for such situations [ECR-3222]
-        if !self.is_artifact_deployed(&spec.artifact) {
-            Self::commit_artifact(fork, spec.artifact.clone(), artifact_payload.to_bytes())?;
-            // Wait until the artifact is ready to instantiate the service instances.
-            self.block_until_deployed(spec.artifact.clone(), artifact_payload.into_bytes());
-        }
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec, constructor)?;
         Ok(())
-    }
-
-    pub(crate) fn state_hash(
-        &self,
-        access: &dyn Snapshot,
-    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        let mut aggregator = Vec::new();
-        // Insert state hash of Dispatcher schema.
-        aggregator.extend(IndexCoordinates::locate(
-            SchemaOrigin::Dispatcher,
-            Schema::new(access).state_hash(),
-        ));
-        // Insert state hashes for the runtimes.
-        for (runtime_id, runtime) in &self.runtimes {
-            let state = runtime.state_hashes(access);
-            aggregator.extend(
-                // Runtime state hash.
-                IndexCoordinates::locate(SchemaOrigin::Runtime(*runtime_id), state.runtime),
-            );
-            for (instance_id, instance_hashes) in state.instances {
-                aggregator.extend(
-                    // Instance state hashes.
-                    IndexCoordinates::locate(SchemaOrigin::Service(instance_id), instance_hashes),
-                );
-            }
-        }
-        aggregator
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy
@@ -220,13 +187,26 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Executes transaction with the specified ID without the fork isolation.
-    ///
-    /// The caller must catch the panics and rollback the changes if panic was happened.
+    fn report_error(err: &ExecutionError, fork: &Fork, call: CallInBlock) {
+        let height = CoreSchema::new(fork).height().next();
+        if err.kind() == ErrorKind::Unexpected {
+            log::error!(
+                "{} at {:?} resulted in unexpected error: {:?}",
+                call,
+                height,
+                err
+            );
+        } else {
+            log::info!("{} at {:?} failed: {:?}", call, height, err);
+        }
+    }
+
+    /// Executes transaction with the specified ID with fork isolation.
     pub(crate) fn execute(
         &self,
         fork: &mut Fork,
         tx_id: Hash,
+        tx_index: u64,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let caller = Caller::Transaction {
@@ -234,53 +214,111 @@ impl Dispatcher {
             hash: tx_id,
         };
         let call_info = &tx.as_ref().call_info;
-        let runtime = self
+        let (runtime_id, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
-        runtime.execute(context, call_info, &tx.as_ref().arguments)
+
+        let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);
+        if let Err(ref mut err) = res {
+            fork.rollback();
+
+            err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                instance_id: call_info.instance_id,
+                call_type: CallType::Method {
+                    interface: String::new(),
+                    id: call_info.method_id,
+                },
+            });
+            Self::report_error(err, fork, CallInBlock::transaction(tx_index));
+        } else {
+            fork.flush();
+        }
+        res
     }
 
-    /// Calls `before_commit` for all currently active services, isolating each call.
+    /// Calls service hooks of the specified type for all active services.
+    fn call_service_hooks(
+        &self,
+        fork: &mut Fork,
+        call_type: CallType,
+    ) -> Vec<(CallInBlock, ExecutionError)> {
+        self.service_infos
+            .iter()
+            .filter_map(|(&instance_id, info)| {
+                let context = ExecutionContext::new(self, fork, Caller::Blockchain);
+                let call_fn = match &call_type {
+                    CallType::BeforeTransactions => Runtime::before_transactions,
+                    CallType::AfterTransactions => Runtime::after_transactions,
+                    _ => unreachable!(),
+                };
+
+                let res = call_fn(
+                    self.runtimes[&info.runtime_id].as_ref(),
+                    context,
+                    instance_id,
+                );
+                if let Err(mut err) = res {
+                    fork.rollback();
+                    err.set_runtime_id(info.runtime_id)
+                        .set_call_site(|| CallSite {
+                            instance_id,
+                            call_type: call_type.clone(),
+                        });
+
+                    let call = match &call_type {
+                        CallType::BeforeTransactions => {
+                            CallInBlock::before_transactions(instance_id)
+                        }
+                        CallType::AfterTransactions => CallInBlock::after_transactions(instance_id),
+                        _ => unreachable!(),
+                    };
+                    Self::report_error(&err, fork, call);
+                    Some((call, err))
+                } else {
+                    fork.flush();
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Calls `before_transactions` for all currently active services, isolating each call.
+    pub(crate) fn before_transactions(
+        &self,
+        fork: &mut Fork,
+    ) -> Vec<(CallInBlock, ExecutionError)> {
+        self.call_service_hooks(fork, CallType::BeforeTransactions)
+    }
+
+    /// Calls `after_transactions` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
     /// indices of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
-    pub(crate) fn before_commit(&self, fork: &mut Fork) {
-        for (&service_id, info) in &self.service_infos {
-            let context = ExecutionContext::new(self, fork, Caller::Blockchain);
-            if self.runtimes[&info.runtime_id]
-                .before_commit(context, service_id)
-                .is_ok()
-            {
-                fork.flush();
-            } else {
-                fork.rollback();
-            }
-        }
+    pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
+        let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
         self.activate_pending(fork);
+        errors
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
-    ///
-    /// **NB.** Changes made to the `fork` in this method MUST be the same for all nodes.
-    /// This is not checked by the consensus algorithm as usual.
-    pub(crate) fn commit_block(&mut self, fork: &mut Fork) {
-        // If the fork is dirty, `snapshot` will be outdated, which can trip
-        // `Runtime::start_service()` calls.
-        fork.flush();
-        let snapshot = fork.snapshot_without_unflushed_changes();
+    pub(crate) fn commit_block(&mut self, fork: Fork) -> Patch {
+        let mut schema = Schema::new(&fork);
+        let pending_artifacts = schema.take_pending_artifacts();
+        let pending_instances = schema.take_pending_instances();
+        let patch = fork.into_patch();
 
         // Block futures with pending deployments.
-        let mut schema = Schema::new(&*fork);
-        for (artifact, spec) in schema.take_pending_artifacts() {
+        for (artifact, spec) in pending_artifacts {
             self.block_until_deployed(artifact, spec.payload);
         }
         // Start pending services.
-        for spec in schema.take_pending_instances() {
-            self.start_service(snapshot, &spec)
+        for spec in pending_instances {
+            self.start_service(&patch, &spec)
                 .expect("Cannot start service");
         }
+        patch
     }
 
     /// Make pending artifacts and instances active.
@@ -299,14 +337,16 @@ impl Dispatcher {
         }
     }
 
-    /// Performs the complete set of operations after committing a block.
+    /// Performs the complete set of operations after committing a block. Returns a patch
+    /// corresponding to the fork.
     ///
     /// This method should be called for all blocks except for the genesis block. For reasons
     /// described in `BlockchainMut::create_genesis_block()`, the processing of the genesis
     /// block is split into 2 parts.
-    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: &mut Fork) {
-        self.commit_block(fork);
-        self.notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
+    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: Fork) -> Patch {
+        let patch = self.commit_block(fork);
+        self.notify_runtimes_about_commit(&patch);
+        patch
     }
 
     /// Return true if the artifact with the given identifier is deployed.
@@ -325,10 +365,13 @@ impl Dispatcher {
 
     /// Looks up the runtime for the specified service instance. Returns a reference to
     /// the runtime, or `None` if the service with the specified instance ID does not exist.
-    pub(crate) fn runtime_for_service(&self, instance_id: InstanceId) -> Option<&dyn Runtime> {
+    pub(crate) fn runtime_for_service(
+        &self,
+        instance_id: InstanceId,
+    ) -> Option<(u32, &dyn Runtime)> {
         let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
-        Some(runtime)
+        Some((*runtime_id, runtime))
     }
 
     /// Returns the service matching the specified query.

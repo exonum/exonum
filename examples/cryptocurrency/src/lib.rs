@@ -39,7 +39,7 @@ pub mod proto;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::crypto::{Hash, PublicKey};
+    use exonum::crypto::PublicKey;
     use exonum_merkledb::{access::Access, MapIndex};
     use exonum_proto::ProtobufConvert;
 
@@ -92,14 +92,6 @@ pub mod schema {
         /// Correspondence of public keys of users to account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
-
-    impl<T: Access> CurrencySchema<T> {
-        /// Returns the state hash of cryptocurrency service.
-        pub fn state_hash(&self) -> Vec<Hash> {
-            // Since wallets are stored in MapIndex, there is no state hash.
-            vec![]
-        }
-    }
 }
 
 /// Transactions.
@@ -146,7 +138,7 @@ pub mod transactions {
 /// Contract errors.
 pub mod errors {
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
-    #[derive(Debug, IntoExecutionError)]
+    #[derive(Debug, ExecutionFail)]
     pub enum Error {
         /// Wallet already exists.
         ///
@@ -173,14 +165,9 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum_merkledb::Snapshot;
-
-    use exonum::{
-        crypto::Hash,
-        runtime::{
-            rust::{api::ServiceApiBuilder, CallContext, Service},
-            BlockchainData,
-        },
+    use exonum::runtime::{
+        rust::{api::ServiceApiBuilder, CallContext, Service},
+        ExecutionError,
     };
 
     use crate::{
@@ -197,9 +184,13 @@ pub mod contracts {
     #[exonum_interface]
     pub trait CryptocurrencyInterface {
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+        fn create_wallet(
+            &self,
+            ctx: CallContext<'_>,
+            arg: CreateWallet,
+        ) -> Result<(), ExecutionError>;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: CallContext<'_>, arg: TxTransfer) -> Result<(), Error>;
+        fn transfer(&self, ctx: CallContext<'_>, arg: TxTransfer) -> Result<(), ExecutionError>;
     }
 
     /// Cryptocurrency service implementation.
@@ -209,7 +200,11 @@ pub mod contracts {
     pub struct CryptocurrencyService;
 
     impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+        fn create_wallet(
+            &self,
+            context: CallContext<'_>,
+            arg: CreateWallet,
+        ) -> Result<(), ExecutionError> {
             let author = context
                 .caller()
                 .author()
@@ -222,17 +217,21 @@ pub mod contracts {
                 schema.wallets.put(&author, wallet);
                 Ok(())
             } else {
-                Err(Error::WalletAlreadyExists)
+                Err(Error::WalletAlreadyExists.into())
             }
         }
 
-        fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Result<(), Error> {
+        fn transfer(
+            &self,
+            context: CallContext<'_>,
+            arg: TxTransfer,
+        ) -> Result<(), ExecutionError> {
             let author = context
                 .caller()
                 .author()
                 .expect("Wrong 'TxTransfer' initiator");
             if author == arg.to {
-                return Err(Error::SenderSameAsReceiver);
+                return Err(Error::SenderSameAsReceiver.into());
             }
 
             let mut schema = CurrencySchema::new(context.service_data());
@@ -248,16 +247,12 @@ pub mod contracts {
                 schema.wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
-                Err(Error::InsufficientCurrencyAmount)
+                Err(Error::InsufficientCurrencyAmount.into())
             }
         }
     }
 
     impl Service for CryptocurrencyService {
-        fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            CurrencySchema::new(data.for_executing_service()).state_hash()
-        }
-
         fn wire_api(&self, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi.wire(builder);
         }

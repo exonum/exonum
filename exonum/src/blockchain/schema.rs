@@ -14,19 +14,20 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
-    BinaryKey, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+    impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
+    ProofEntry, ProofListIndex, ProofMapIndex,
 };
-
 use exonum_proto::ProtobufConvert;
+use failure::format_err;
 
-use std::mem;
+use std::fmt;
 
-use super::{Block, BlockProof, ConsensusConfig, ExecutionStatus};
+use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
 use crate::{
-    crypto::{self, Hash, PublicKey},
+    crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Connect, Message, Precommit, Verified},
-    proto,
+    proto::{self, schema::blockchain as pb_blockchain},
     runtime::InstanceId,
 };
 
@@ -43,7 +44,7 @@ macro_rules! define_names {
 
 define_names!(
     TRANSACTIONS => "transactions";
-    TRANSACTION_RESULTS => "transaction_results";
+    CALL_ERRORS => "call_errors";
     TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
@@ -52,7 +53,6 @@ define_names!(
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
-    STATE_HASH_AGGREGATOR => "state_hash_aggregator";
     PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
@@ -62,7 +62,9 @@ define_names!(
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(Debug, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
+)]
 #[protobuf_convert(source = "proto::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
@@ -72,7 +74,7 @@ pub struct TxLocation {
 }
 
 impl TxLocation {
-    /// New tx_location
+    /// Creates a new transaction location.
     pub fn new(block_height: Height, position_in_block: u64) -> Self {
         Self {
             block_height,
@@ -84,6 +86,7 @@ impl TxLocation {
     pub fn block_height(&self) -> Height {
         self.block_height
     }
+
     /// Zero-based position of this transaction in the block.
     pub fn position_in_block(&self) -> u64 {
         self.position_in_block
@@ -115,13 +118,39 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(TRANSACTIONS)
     }
 
-    /// Returns a table that represents a map with a key-value pair of a transaction
-    /// hash and execution result.
+    /// Returns a record of errors that occurred during execution of a particular block.
     ///
-    /// This method can be used to retrieve a proof that a certain transaction
-    /// result is present in the blockchain.
-    pub fn transaction_results(&self) -> ProofMapIndex<T::Base, Hash, ExecutionStatus> {
-        self.access.clone().get_proof_map(TRANSACTION_RESULTS)
+    /// This method can be used to retrieve a proof that execution of a certain transaction
+    /// ended up with a particular status. Since the number of transaction in a block is
+    /// mentioned in the block header, a proof of absence of an error for a transaction
+    /// with a particular index means that it was executed successfully.
+    ///
+    /// Similarly, execution errors of the `before_transactions` / `after_transactions` hooks can be proven
+    /// to external clients. Discerning successful execution from a non-existing service requires prior knowledge
+    /// though.
+    // TODO: Retain historic information about services [ECR-3922]
+    pub fn call_errors(
+        &self,
+        block_height: Height,
+    ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
+        self.access
+            .clone()
+            .get_proof_map((CALL_ERRORS, &block_height.0))
+    }
+
+    /// Returns the result of the execution for a transaction with the specified location.
+    /// If the location does not correspond to a transaction, returns `None`.
+    pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
+        if self.block_transactions(location.block_height).len() <= location.position_in_block {
+            return None;
+        }
+
+        let call_location = CallInBlock::transaction(location.position_in_block);
+        let call_result = match self.call_errors(location.block_height).get(&call_location) {
+            None => Ok(()),
+            Some(e) => Err(e),
+        };
+        Some(call_result)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -182,23 +211,8 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an actual consensus configuration entry.
-    pub fn consensus_config_entry(&self) -> Entry<T::Base, ConsensusConfig> {
-        self.access.clone().get_entry(CONSENSUS_CONFIG)
-    }
-
-    /// Returns the accessory `ProofMapIndex` for calculating
-    /// patches in the DBView layer.
-    ///
-    /// The table calculates the "aggregation" of root hashes of individual
-    /// service tables, in effect summing the state of various entities,
-    /// scattered across distinct services and their tables. Sum is performed by
-    /// means of computing the root hash of this table.
-    ///
-    /// - Table **key** contains normalized coordinates of an index.
-    /// - Table **value** contains a root hash of the index, which contributes
-    /// to the `state_hash` of the resulting block.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T::Base, IndexCoordinates, Hash> {
-        self.access.clone().get_proof_map(STATE_HASH_AGGREGATOR)
+    pub fn consensus_config_entry(&self) -> ProofEntry<T::Base, ConsensusConfig> {
+        self.access.clone().get_proof_entry(CONSENSUS_CONFIG)
     }
 
     /// Returns peers that have to be recovered in case of process restart
@@ -274,14 +288,6 @@ impl<T: Access> Schema<T> {
             .expect("Consensus configuration is absent")
     }
 
-    /// Returns the `state_hash` table for core tables.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.consensus_config_entry().object_hash(),
-            self.transaction_results().object_hash(),
-        ]
-    }
-
     /// Attempts to find a `ValidatorId` by the provided service public key.
     pub fn validator_id(&self, service_public_key: PublicKey) -> Option<ValidatorId> {
         self.consensus_config()
@@ -334,190 +340,132 @@ where
     }
 }
 
-/// Describes the origin of the information schema.
+/// Location of an isolated call within a block.
 ///
-/// A schema origin is a convenient wrapper over a two first parameters of an
-/// [`IndexCoordinates`](struct.IndexCoordinates.html) to simple calculation of coordinates of the specific index.
+/// Exonum isolates execution of the transactions included into the the block,
+/// and `before_transactions` / `after_transactions` hooks that are executed for each active service.
+/// If an isolated call ends with an error, all changes to the blockchain state made within a call
+/// are rolled back.
 ///
-/// # Examples
+/// `CallInBlock` objects are ordered in the same way the corresponding calls would be performed
+/// within a block:
 ///
+/// ```rust
+/// # use exonum::blockchain::CallInBlock;
+/// assert!(CallInBlock::before_transactions(3) < CallInBlock::transaction(0));
+/// assert!(CallInBlock::transaction(0) < CallInBlock::transaction(1));
+/// assert!(CallInBlock::transaction(1) < CallInBlock::after_transactions(0));
+/// assert!(CallInBlock::after_transactions(0) < CallInBlock::after_transactions(1));
 /// ```
-/// # use exonum::blockchain::SchemaOrigin;
-/// // Compute coordinate for the first index of runtime schema with ID 0.
-/// let runtime_coordinate = SchemaOrigin::Runtime(0).coordinate_for(0);
-/// // Compute coordinate for the first index of service schema with instance ID 0.
-/// let schema_coordinate = SchemaOrigin::Service(0).coordinate_for(0);
-/// // Note that the `origin_label` of these coordinates are different
-/// // but `local_schema_id` are same.
-/// assert_ne!(
-///     runtime_coordinate.origin_label,
-///     schema_coordinate.origin_label
-/// );
-/// assert_eq!(
-///     runtime_coordinate.local_schema_id,
-///     schema_coordinate.local_schema_id
-/// );
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SchemaOrigin {
-    /// This is a core schema.
-    Core,
-    /// This is a dispatcher schema.
-    Dispatcher,
-    /// Schema belongs to the runtime with the specified ID.
-    Runtime(u32),
-    /// This is a service schema with the specified instance ID.
-    Service(InstanceId),
+///
+/// # See also
+///
+/// Not to be confused with [`CallSite`], which provides information about a call in which
+/// an error may occur. Since Exonum services may call each other's methods, `CallSite` is
+/// richer than `CallInBlock`.
+///
+/// [`CallSite`]: ../runtime/error/struct.CallSite.html
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)] // builtin traits
+#[derive(Serialize, Deserialize, BinaryValue, ObjectHash)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CallInBlock {
+    /// Call of `before_transactions` hook in a service.
+    BeforeTransactions {
+        /// Numerical service identifier.
+        id: InstanceId,
+    },
+    /// Call of a transaction within the block.
+    Transaction {
+        /// Zero-based transaction index.
+        index: u64,
+    },
+    /// Call of `after_transactions` hook in a service.
+    AfterTransactions {
+        /// Numerical service identifier.
+        id: InstanceId,
+    },
 }
 
-impl SchemaOrigin {
-    /// Computes coordinates for a given schema index.
-    pub fn coordinate_for(self, index_id: u16) -> IndexCoordinates {
-        IndexCoordinates::new(self, index_id)
-    }
+impl ProtobufConvert for CallInBlock {
+    type ProtoStruct = pb_blockchain::CallInBlock;
 
-    /// Returns the corresponding origin label.
-    fn origin_label(self) -> OriginLabel {
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
         match self {
-            SchemaOrigin::Core => OriginLabel::Core,
-            SchemaOrigin::Dispatcher => OriginLabel::Dispatcher,
-            SchemaOrigin::Runtime { .. } => OriginLabel::Runtime,
-            SchemaOrigin::Service { .. } => OriginLabel::Service,
+            CallInBlock::BeforeTransactions { id } => pb.set_before_transactions(*id),
+            CallInBlock::Transaction { index } => pb.set_transaction(*index),
+            CallInBlock::AfterTransactions { id } => pb.set_after_transactions(*id),
         }
+        pb
     }
 
-    /// Returns the corresponding schema ID.
-    fn local_schema_id(self) -> u32 {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        if pb.has_before_transactions() {
+            Ok(CallInBlock::BeforeTransactions {
+                id: pb.get_before_transactions(),
+            })
+        } else if pb.has_transaction() {
+            Ok(CallInBlock::Transaction {
+                index: pb.get_transaction(),
+            })
+        } else if pb.has_after_transactions() {
+            Ok(CallInBlock::AfterTransactions {
+                id: pb.get_after_transactions(),
+            })
+        } else {
+            Err(format_err!("Invalid location format"))
+        }
+    }
+}
+
+impl CallInBlock {
+    /// Creates a location corresponding to a `before_transactions` call.
+    pub fn before_transactions(id: InstanceId) -> Self {
+        CallInBlock::BeforeTransactions { id }
+    }
+
+    /// Creates a location corresponding to a transaction.
+    pub fn transaction(index: u64) -> Self {
+        CallInBlock::Transaction { index }
+    }
+
+    /// Creates a location corresponding to a `after_transactions` call.
+    pub fn after_transactions(id: InstanceId) -> Self {
+        CallInBlock::AfterTransactions { id }
+    }
+}
+
+impl_binary_key_for_binary_value!(CallInBlock);
+
+impl fmt::Display for CallInBlock {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SchemaOrigin::Service(instance_id) => instance_id,
-            SchemaOrigin::Runtime(runtime_id) => runtime_id,
-            SchemaOrigin::Core => 0,
-            SchemaOrigin::Dispatcher => 1,
+            CallInBlock::BeforeTransactions { id } => write!(
+                formatter,
+                "`before_transactions` for service with ID {}",
+                id
+            ),
+            CallInBlock::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
+            CallInBlock::AfterTransactions { id } => {
+                write!(formatter, "`after_transactions` for service with ID {}", id)
+            }
         }
-    }
-}
-
-/// Label for the corresponding schema origin.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[repr(u16)]
-pub enum OriginLabel {
-    /// Origin label for Core schema.
-    Core = 0,
-    /// Origin label for Dispatcher schema.
-    Dispatcher = 1,
-    /// Origin label for runtime schemas.
-    Runtime = 2,
-    /// Origin label for service schemas.
-    Service = 3,
-}
-
-/// Normalized coordinates of the index in the [`state_hash_aggregator`][state_hash_aggregator] table.
-///
-/// This coordinate is used to map the index to its contribution to the blockchain state hash.
-/// Each index has its own unique coordinates.
-///
-/// [See also.][SchemaOrigin]
-///
-/// [state_hash_aggregator]: struct.Schema.html#method.state_hash_aggregator
-/// [SchemaOrigin]: enum.SchemaOrigin.html
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct IndexCoordinates {
-    /// Determines which category of an information schemas an index belongs to.
-    pub origin_label: u16,
-    /// Identifier of the schema to which the index belongs, should be unique in the corresponding
-    /// origin category.
-    pub local_schema_id: u32,
-    /// Index identifier in the corresponding information schema.
-    pub index_id: u16,
-}
-
-impl IndexCoordinates {
-    /// Creates index coordinates for the index with the specified schema origin
-    /// and index identifier.
-    pub fn new(schema_origin: SchemaOrigin, index_id: u16) -> Self {
-        Self {
-            origin_label: schema_origin.origin_label() as u16,
-            local_schema_id: schema_origin.local_schema_id(),
-            index_id,
-        }
-    }
-
-    /// For the given schema origin, returns a list of the index coordinates that match the
-    /// corresponding hashes of the indices.
-    pub fn locate(
-        schema_origin: SchemaOrigin,
-        object_hashes: impl IntoIterator<Item = Hash>,
-    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        object_hashes
-            .into_iter()
-            .enumerate()
-            .map(move |(id, hash)| (schema_origin.coordinate_for(id as u16), hash))
-    }
-
-    /// Returns a schema origin for this index.
-    pub fn schema_origin(self) -> SchemaOrigin {
-        match self.origin_label {
-            0 => SchemaOrigin::Core,
-            2 => SchemaOrigin::Runtime(self.local_schema_id),
-            3 => SchemaOrigin::Service(self.local_schema_id),
-            other => panic!("Unknown index owner: {}!", other),
-        }
-    }
-}
-
-impl BinaryKey for IndexCoordinates {
-    fn size(&self) -> usize {
-        mem::size_of_val(self)
-    }
-
-    fn write(&self, buffer: &mut [u8]) -> usize {
-        let mut pos = 0;
-        pos += self.origin_label.write(&mut buffer[pos..]);
-        pos += self.local_schema_id.write(&mut buffer[pos..]);
-        pos += self.index_id.write(&mut buffer[pos..]);
-        pos
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        let origin_label = u16::read(&buffer[0..2]);
-        let local_schema_id = u32::read(&buffer[2..6]);
-        let index_id = u16::read(&buffer[6..8]);
-        Self {
-            origin_label,
-            local_schema_id,
-            index_id,
-        }
-    }
-}
-
-impl ObjectHash for IndexCoordinates {
-    fn object_hash(&self) -> Hash {
-        let mut bytes = vec![0; self.size()];
-        self.write(&mut bytes);
-        crypto::hash(&bytes)
     }
 }
 
 #[test]
-fn index_coordinates_binary_key_round_trip() {
-    let schema_origins = vec![
-        (SchemaOrigin::Runtime(0), 0),
-        (SchemaOrigin::Runtime(0), 5),
-        (SchemaOrigin::Runtime(1), 0),
-        (SchemaOrigin::Runtime(1), 2),
-        (SchemaOrigin::Service(2), 0),
-        (SchemaOrigin::Service(2), 1),
-        (SchemaOrigin::Service(0), 0),
-        (SchemaOrigin::Service(0), 1),
-    ];
+fn location_json_serialization() {
+    use serde_json::json;
 
-    for (schema_origin, index_id) in schema_origins {
-        let coordinate = IndexCoordinates::new(schema_origin, index_id);
-        let mut buf = vec![0; coordinate.size()];
-        coordinate.write(&mut buf);
+    let location = CallInBlock::transaction(1);
+    assert_eq!(
+        serde_json::to_value(location).unwrap(),
+        json!({ "type": "transaction", "index": 1 })
+    );
 
-        let coordinate2 = IndexCoordinates::read(&buf);
-        assert_eq!(coordinate, coordinate2);
-        assert_eq!(coordinate2.schema_origin(), schema_origin);
-    }
+    let location = CallInBlock::after_transactions(1_000);
+    assert_eq!(
+        serde_json::to_value(location).unwrap(),
+        json!({ "type": "after_transactions", "id": 1_000 })
+    );
 }

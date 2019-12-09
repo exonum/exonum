@@ -22,14 +22,14 @@ use rand::{thread_rng, Rng};
 use std::collections::BTreeMap;
 
 use crate::{
-    blockchain::{IndexCoordinates, Schema, SchemaOrigin},
+    blockchain::Schema,
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Verified},
     sandbox::{
         self,
         sandbox_tests_helper::*,
-        timestamping::{TimestampingService, TimestampingTxGenerator, DATA_SIZE},
+        timestamping::{TimestampingTxGenerator, DATA_SIZE},
         timestamping_sandbox, timestamping_sandbox_builder,
     },
 };
@@ -185,34 +185,36 @@ fn test_query_state_hash() {
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_merkle_root();
-        let configs_key = IndexCoordinates::new(SchemaOrigin::Core, 0);
-        let timestamp_t1_key =
-            IndexCoordinates::new(SchemaOrigin::Service(TimestampingService::ID), 0);
-        let timestamp_t2_key =
-            IndexCoordinates::new(SchemaOrigin::Service(TimestampingService::ID), 1);
 
-        let proof_configs = sandbox.get_proof_to_index(SchemaOrigin::Core, 0);
-        let proof = proof_configs.check_against_hash(state_hash).unwrap();
+        let proof = sandbox.get_proof_to_index("core.consensus_config");
+        let proof = proof.check_against_hash(state_hash).unwrap();
         assert_ne!(configs_rh, Hash::zero());
         assert_eq!(
-            proof.entries().collect::<Vec<_>>(),
-            vec![(&configs_key, &configs_rh)]
+            proof
+                .entries()
+                .map(|(k, v)| (k.as_str(), v))
+                .collect::<Vec<_>>(),
+            vec![("core.consensus_config", &configs_rh)]
         );
 
-        let proof_configs =
-            sandbox.get_proof_to_index(SchemaOrigin::Service(TimestampingService::ID), 0);
-        let proof = proof_configs.check_against_hash(state_hash).unwrap();
+        let proof = sandbox.get_proof_to_index("timestamping.first");
+        let proof = proof.check_against_hash(state_hash).unwrap();
         assert_eq!(
-            proof.entries().collect::<Vec<_>>(),
-            vec![(&timestamp_t1_key, &Hash::new([127; HASH_SIZE]))]
+            proof
+                .entries()
+                .map(|(k, v)| (k.as_str(), v))
+                .collect::<Vec<_>>(),
+            vec![("timestamping.first", &Hash::new([127; HASH_SIZE]))]
         );
 
-        let proof_configs =
-            sandbox.get_proof_to_index(SchemaOrigin::Service(TimestampingService::ID), 1);
-        let proof = proof_configs.check_against_hash(state_hash).unwrap();
+        let proof = sandbox.get_proof_to_index("timestamping.second");
+        let proof = proof.check_against_hash(state_hash).unwrap();
         assert_eq!(
-            proof.entries().collect::<Vec<_>>(),
-            vec![(&timestamp_t2_key, &Hash::new([128; HASH_SIZE]))]
+            proof
+                .entries()
+                .map(|(k, v)| (k.as_str(), v))
+                .collect::<Vec<_>>(),
+            vec![("timestamping.second", &Hash::new([128; HASH_SIZE]))]
         );
 
         add_one_height(&sandbox, &sandbox_state)
@@ -239,7 +241,7 @@ fn test_retrieve_block_and_precommits() {
     let expected_height = target_height.previous();
     let expected_block_hash = block.object_hash();
 
-    assert_eq!(expected_height, block.height());
+    assert_eq!(expected_height, block.height);
     for precommit in precommits {
         assert_eq!(expected_height, precommit.payload().height);
         assert_eq!(expected_block_hash, precommit.payload().block_hash);

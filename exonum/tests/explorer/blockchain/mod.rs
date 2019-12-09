@@ -15,19 +15,21 @@
 //! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 use exonum::{
-    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut, InstanceCollection},
-    crypto::{self, Hash, PublicKey, SecretKey},
+    blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
+    crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
     node::ApiSender,
     runtime::{
-        rust::{CallContext, Service},
-        AnyTx, BlockchainData, InstanceId,
+        rust::{CallContext, RustRuntime, Service, ServiceFactory},
+        AnyTx, ExecutionError, InstanceId,
     },
 };
-use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
+use exonum_derive::*;
+use exonum_merkledb::{ObjectHash, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
+use serde_derive::*;
 
 use std::collections::BTreeMap;
 
@@ -69,16 +71,21 @@ impl Transfer {
     }
 }
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
-    /// Not allowed
+    /// Not allowed!
     NotAllowed = 0,
 }
 
 #[exonum_interface]
 pub trait ExplorerTransactions {
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError>;
+
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -91,24 +98,24 @@ pub trait ExplorerTransactions {
 struct MyService;
 
 impl ExplorerTransactions for MyService {
-    fn create_wallet(&self, _context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(
+        &self,
+        _context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError> {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
-            Err(Error::NotAllowed)
+            Err(Error::NotAllowed.into())
         }
     }
 
-    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
         panic!("oops");
     }
 }
 
-impl Service for MyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for MyService {}
 
 /// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {
@@ -126,10 +133,15 @@ pub fn create_blockchain() -> BlockchainMut {
         ApiSender::closed(),
     );
 
-    let services =
-        vec![InstanceCollection::new(MyService).with_instance(SERVICE_ID, "my-service", ())];
-    BlockchainBuilder::new(blockchain, config.consensus)
-        .with_rust_runtime(mpsc::channel(1).0, services)
+    let my_service = MyService;
+    let my_service_artifact = my_service.artifact_id();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
+        .with_artifact(my_service_artifact.clone())
+        .with_instance(my_service_artifact.into_default_instance(SERVICE_ID, "my-service"))
+        .build();
+    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(my_service);
+    BlockchainBuilder::new(blockchain, genesis_config)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap()
 }
@@ -142,7 +154,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
-    let height = blockchain.as_ref().last_block().height().next();
+    let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
 
     let mut tx_cache = BTreeMap::new();

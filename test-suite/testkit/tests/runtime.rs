@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::InstanceConfig,
+    blockchain::config::InstanceInitParams,
     runtime::{
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator,
+        Runtime, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -91,9 +91,6 @@ struct TestRuntime {
 }
 
 impl TestRuntime {
-    // Runtime identifier.
-    const ID: u32 = 42;
-
     pub fn with_runtime_tester(tester: Arc<RuntimeTester>) -> Self {
         TestRuntime { tester }
     }
@@ -113,14 +110,6 @@ impl Runtime for TestRuntime {
         self.tester.is_artifact_deployed(id)
     }
 
-    fn commit_service(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn start_adding_service(
         &self,
         _context: ExecutionContext<'_>,
@@ -128,6 +117,14 @@ impl Runtime for TestRuntime {
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.tester.construct_service(parameters);
+        Ok(())
+    }
+
+    fn commit_service(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        _spec: &InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -140,11 +137,15 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -155,10 +156,8 @@ impl Runtime for TestRuntime {
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
-impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(inner: TestRuntime) -> Self {
-        (TestRuntime::ID, Box::new(inner))
-    }
+impl WellKnownRuntime for TestRuntime {
+    const ID: u32 = 42;
 }
 
 /// We assert that:
@@ -170,7 +169,7 @@ impl From<TestRuntime> for (u32, Box<dyn Runtime>) {
 fn test_runtime_factory() {
     let tester = Arc::new(RuntimeTester::default());
 
-    let artifact_spec: Vec<u8> = "deploy_spec".into();
+    let deploy_args: Vec<u8> = "deploy_spec".into();
     let constructor: Vec<u8> = "constructor_params".into();
     let instance_spec = InstanceSpec::new(
         1,
@@ -178,20 +177,20 @@ fn test_runtime_factory() {
         &format!("{}:{}:1.0.0", TestRuntime::ID, "artifact_name"),
     )
     .unwrap();
-    let artifact_id = instance_spec.artifact.clone();
 
-    let instances = vec![InstanceConfig::new(
-        instance_spec.clone(),
-        Some(artifact_spec.clone()),
-        constructor.clone(),
-    )];
+    let inst_cfg = InstanceInitParams {
+        instance_spec: instance_spec.clone(),
+        constructor: constructor.clone(),
+    };
+    let artifact = instance_spec.artifact.clone();
 
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()
         .with_additional_runtime(TestRuntime::with_runtime_tester(tester.clone()))
-        .with_instances(instances)
+        .with_parametric_artifact(artifact.clone(), deploy_args.clone())
+        .with_instance(inst_cfg)
         .create();
 
-    tester.assert_artifact_deployed(artifact_id, artifact_spec);
+    tester.assert_artifact_deployed(artifact, deploy_args);
     tester.assert_constructor_params_passed(constructor);
 }

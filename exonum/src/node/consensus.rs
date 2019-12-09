@@ -46,7 +46,7 @@ impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     pub(crate) fn handle_consensus(&mut self, msg: ConsensusMessage) {
         if !self.is_enabled {
-            info!(
+            trace!(
                 "Ignoring a consensus message {:?} because the node is disabled",
                 msg
             );
@@ -175,17 +175,17 @@ impl NodeHandler {
         let block_hash = block.object_hash();
 
         // TODO: Add block with greater height to queue. (ECR-171)
-        if self.state.height() != block.height() {
+        if self.state.height() != block.height {
             bail!("Received block has another height, msg={:?}", msg);
         }
 
         // Check block content.
-        if block.prev_hash() != &self.last_block_hash() {
+        if block.prev_hash != self.last_block_hash() {
             bail!(
                 "Received block prev_hash is distinct from the one in db, \
                  block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
                 msg,
-                *block.prev_hash(),
+                block.prev_hash,
                 self.last_block_hash()
             );
         }
@@ -198,7 +198,7 @@ impl NodeHandler {
             bail!("Received block has invalid tx_hash, msg={:?}", msg);
         }
         let precommits = into_verified(msg.payload().precommits())?;
-        self.validate_precommits(&precommits, block_hash, block.height())?;
+        self.validate_precommits(&precommits, block_hash, block.height)?;
 
         Ok(())
     }
@@ -218,7 +218,7 @@ impl NodeHandler {
                 .create_incomplete_block(&msg, &schema.transactions(), &schema.transactions_pool())
                 .has_unknown_txs();
 
-            let known_nodes = self.remove_request(&RequestData::Block(block.height()));
+            let known_nodes = self.remove_request(&RequestData::Block(block.height));
 
             if has_unknown_txs {
                 trace!("REQUEST TRANSACTIONS");
@@ -329,8 +329,8 @@ impl NodeHandler {
 
         if self.state.block(&block_hash).is_none() {
             let (computed_block_hash, patch) = self.create_block(
-                block.proposer_id(),
-                block.height(),
+                block.proposer_id,
+                block.height,
                 msg.payload().transactions(),
             );
             // Verify block_hash.
@@ -345,7 +345,7 @@ impl NodeHandler {
                 computed_block_hash,
                 patch,
                 msg.payload().transactions().to_vec(),
-                block.proposer_id(),
+                block.proposer_id,
             );
         }
         let precommits = into_verified(msg.payload().precommits())?;
@@ -857,6 +857,14 @@ impl NodeHandler {
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
+            if !self.is_enabled {
+                trace!(
+                    "Not sending a request {:?} because the node is paused.",
+                    data
+                );
+                return;
+            }
+
             let message: SignedMessage = match *data {
                 RequestData::Propose(propose_hash) => self
                     .sign_message(ProposeRequest::new(peer, self.state.height(), propose_hash))
@@ -978,6 +986,11 @@ impl NodeHandler {
     /// Requests a block for the next height from all peers with a bigger height. Called when the
     /// node tries to catch up with other nodes' height.
     pub(crate) fn request_next_block(&mut self) {
+        if !self.is_enabled {
+            trace!("Not sending a request for the next block because the node is paused.");
+            return;
+        }
+
         // TODO: Randomize next peer. (ECR-171)
         let heights: Vec<_> = self
             .state

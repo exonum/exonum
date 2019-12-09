@@ -15,7 +15,7 @@
 use exonum_derive::*;
 
 /// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
 pub enum Error {
     /// Artifact has been already deployed.
     AlreadyDeployed = 0,
@@ -47,4 +47,6 @@ pub enum Error {
     UnknownArtifact = 13,
     /// Incorrect configuration number.
     IncorrectConfigurationNumber = 14,
+    /// Invalid configuration for supervisor.
+    InvalidConfig = 15,
 }

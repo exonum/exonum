@@ -16,7 +16,7 @@
 use exonum_merkledb::{proof_map_index::Raw, MapProof};
 
 use exonum::{
-    blockchain::{BlockProof, IndexCoordinates, SchemaOrigin},
+    blockchain::{BlockProof, IndexProof},
     crypto::Hash,
     runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 };
@@ -43,7 +43,7 @@ pub struct TimestampProof {
     /// Proof of the last block.
     pub block_info: BlockProof,
     /// Actual state hashes of the timestamping service with their proofs.
-    pub state_proof: MapProof<IndexCoordinates, Hash>,
+    pub state_proof: MapProof<String, Hash>,
     /// Actual state of the timestamping database with proofs.
     pub timestamp_proof: MapProof<Hash, TimestampEntry, Raw>,
 }
@@ -69,20 +69,16 @@ impl PublicApi {
         state: &ServiceApiState<'_>,
         hash: Hash,
     ) -> api::Result<TimestampProof> {
-        let blockchain_schema = state.data().for_core();
-        let last_block_height = blockchain_schema.height();
-        let block_info = blockchain_schema
-            .block_and_precommits(last_block_height)
-            .unwrap();
-        let state_proof = blockchain_schema
-            .state_hash_aggregator()
-            .get_proof(SchemaOrigin::Service(state.instance().id).coordinate_for(0));
+        let IndexProof {
+            block_proof,
+            index_proof,
+        } = state.data().proof_for_service_index("timestamps").unwrap();
 
         let schema = Schema::new(state.service_data());
         let timestamp_proof = schema.timestamps.get_proof(hash);
         Ok(TimestampProof {
-            block_info,
-            state_proof,
+            block_info: block_proof,
+            state_proof: index_proof,
             timestamp_proof,
         })
     }

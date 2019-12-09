@@ -51,7 +51,7 @@ use exonum::{
         ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId},
+    helpers::{create_rust_runtime_and_genesis_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
     runtime::SnapshotExt,
@@ -83,7 +83,7 @@ fn create_blockchain(
 ) -> BlockchainMut {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
-    let genesis_config = ConsensusConfig {
+    let consensus_config = ConsensusConfig {
         validator_keys: vec![ValidatorKeys {
             consensus_key: consensus_keypair.0,
             service_key: service_keypair.0,
@@ -93,8 +93,10 @@ fn create_blockchain(
 
     let api_sender = ApiSender::new(mpsc::channel(0).0);
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
+    let (rust_runtime, genesis_config) =
+        create_rust_runtime_and_genesis_config(mpsc::channel(1).0, consensus_config, services);
     BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_rust_runtime(mpsc::channel(1).0, services)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap()
 }
@@ -115,10 +117,10 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, BlockchainData, InstanceId,
+            AnyTx, InstanceId,
         },
     };
-    use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_merkledb::ObjectHash;
     use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
@@ -157,11 +159,7 @@ mod timestamping {
         }
     }
 
-    impl Service for Timestamping {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Timestamping {}
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
@@ -205,14 +203,14 @@ mod timestamping {
 mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
-        crypto::{Hash, PublicKey},
+        crypto::PublicKey,
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, BlockchainData, ErrorKind, InstanceId,
+            AnyTx, ErrorKind, InstanceId,
         },
     };
-    use exonum_merkledb::{access::AccessExt, Snapshot};
+    use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
@@ -296,16 +294,13 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                Err(ExecutionError::new(ErrorKind::service(15), ""))
+                let error_kind = ErrorKind::Service { code: 15 };
+                Err(ExecutionError::new(error_kind, ""))
             }
         }
     }
 
-    impl Service for Cryptocurrency {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Cryptocurrency {}
 
     impl From<Cryptocurrency> for InstanceCollection {
         fn from(t: Cryptocurrency) -> Self {
@@ -391,10 +386,9 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, BlockchainData, DispatcherError, InstanceId, MethodId,
+            AnyTx, InstanceId,
         },
     };
-    use exonum_merkledb::Snapshot;
     use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
@@ -427,29 +421,9 @@ mod foreign_interface_call {
         ) -> Result<(), ExecutionError>;
     }
 
+    #[exonum_interface]
     pub trait ForeignInterface {
         fn timestamp(&self, context: CallContext<'_>, arg: SelfTx) -> Result<(), ExecutionError>;
-    }
-
-    impl Interface for dyn ForeignInterface {
-        const INTERFACE_NAME: &'static str = "ForeignInterface";
-
-        fn dispatch(
-            &self,
-            ctx: CallContext<'_>,
-            method: MethodId,
-            payload: &[u8],
-        ) -> Result<(), ExecutionError> {
-            match method {
-                0u32 => {
-                    let bytes = payload.into();
-                    let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(DispatcherError::malformed_arguments)?;
-                    self.timestamp(ctx, arg)
-                }
-                _ => Err(DispatcherError::NoSuchMethod).map_err(From::from),
-            }
-        }
     }
 
     #[derive(Debug)]
@@ -519,11 +493,7 @@ mod foreign_interface_call {
 
     impl ERC30Tokens for Timestamping {}
 
-    impl Service for Timestamping {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Timestamping {}
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
@@ -540,10 +510,14 @@ mod foreign_interface_call {
     pub fn self_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            SelfTx {
-                data: i.object_hash(),
-            }
-            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+            Transaction::<dyn SelfInterface>::sign(
+                SelfTx {
+                    data: i.object_hash(),
+                },
+                SELF_INTERFACE_SERVICE_ID,
+                pub_key,
+                &sec_key,
+            )
         })
     }
 
@@ -641,7 +615,7 @@ fn execute_block_rocksdb(
         ParameterizedBenchmark::new(
             "transactions",
             move |bencher, &&txs_in_block| {
-                let height: u64 = blockchain.as_ref().last_block().height().next().into();
+                let height: u64 = blockchain.as_ref().last_block().height.next().into();
                 bencher.iter(|| {
                     execute_block(&blockchain, height, &tx_hashes[..txs_in_block]);
                 });

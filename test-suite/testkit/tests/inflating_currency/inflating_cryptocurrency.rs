@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     helpers::Height,
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
-            CallContext, Service,
+            CallContext, DefaultInstance, Service,
         },
-        BlockchainData, InstanceId,
+        ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{access::Access, MapIndex, Snapshot};
+use exonum_merkledb::{access::Access, MapIndex};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -109,23 +109,31 @@ pub struct Transfer {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
-    /// Dummy
-    Foo = 0,
+    /// Sender and receiver of the transfer are the same.
+    SenderSameAsReceiver = 0,
 }
 
 #[exonum_interface]
 pub trait CurrencyInterface {
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError>;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
 }
 
 impl CurrencyInterface for CurrencyService {
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError> {
         let author = context.caller().author().unwrap();
 
         let height = context.data().for_core().height();
@@ -137,11 +145,10 @@ impl CurrencyInterface for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError> {
         let author = context.caller().author().unwrap();
-
         if author == arg.to {
-            return Err(Error::Foo);
+            return Err(Error::SenderSameAsReceiver.into());
         }
 
         let height = context.data().for_core().height();
@@ -204,11 +211,12 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
     }
+}
+
+impl DefaultInstance for CurrencyService {
+    const INSTANCE_ID: u32 = SERVICE_ID;
+    const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }

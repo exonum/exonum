@@ -22,15 +22,15 @@ extern crate exonum_derive;
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::ExecutionError,
-    crypto::{gen_keypair, Hash},
+    crypto::gen_keypair,
     runtime::{
-        rust::{CallContext, Service, Transaction},
-        BlockchainData, SnapshotExt,
+        rust::{CallContext, Service, ServiceFactory, Transaction},
+        SnapshotExt,
     },
 };
-use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
-use exonum_testkit::{ApiKind, InstanceCollection, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKitBuilder};
 
 mod proto;
 
@@ -74,22 +74,18 @@ impl TimestampingInterface for TimestampingService {
     }
 }
 
-impl Service for TimestampingService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for TimestampingService {}
 
 fn main() {
     let instance_id = 512;
     // Create a testkit for a network with four validators.
+    let service = TimestampingService;
+    let artifact = service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_rust_service(InstanceCollection::new(TimestampingService).with_instance(
-            instance_id,
-            "timestamping",
-            (),
-        ))
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_default_instance(instance_id, "timestamping"))
+        .with_rust_service(service)
         .create();
     // Create few transactions.
     let keypair = gen_keypair();

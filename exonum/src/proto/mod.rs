@@ -17,13 +17,13 @@
 use failure::Error;
 
 pub use self::schema::{
-    blockchain::{Block, TxLocation},
+    blockchain::{Block, CallInBlock, TxLocation},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
         TransactionsResponse,
     },
-    runtime::{AnyTx, CallInfo},
+    runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;

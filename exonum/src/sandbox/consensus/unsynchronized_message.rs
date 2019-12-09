@@ -15,13 +15,14 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! message that arrive at the wrong time.
 
+use exonum_crypto::Hash;
 use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    sandbox::{compute_tx_hash, sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 
 #[test]
@@ -68,7 +69,7 @@ fn test_queue_prevote_message_from_next_height() {
         ValidatorId(3),
         Height(2),
         Round(1),
-        empty_hash(),
+        Hash::zero(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(3)),
     ));
@@ -91,14 +92,9 @@ fn test_queue_prevote_message_from_next_height() {
 fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
-
     let tx = gen_timestamping_tx();
-
-    let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_proposer_id(ValidatorId(0))
-        .with_tx_hash(&compute_tx_hash(&[tx.clone()]))
-        .with_state_hash(&sandbox.compute_state_hash(&[tx.clone()]))
-        .build();
+    let mut block_at_first_height = sandbox.create_block(&[tx.clone()]);
+    block_at_first_height.proposer_id = ValidatorId(0);
 
     let future_propose = sandbox.create_propose(
         ValidatorId(0),
@@ -110,7 +106,6 @@ fn test_queue_propose_message_from_next_height() {
     );
 
     sandbox.recv(&future_propose);
-
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
 
     info!(

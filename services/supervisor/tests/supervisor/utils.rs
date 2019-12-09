@@ -13,11 +13,14 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{ConsensusConfig, InstanceCollection},
+    blockchain::ConsensusConfig,
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        rust::{ServiceFactory, Transaction},
+        InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+    },
 };
 use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -27,8 +30,7 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{
-    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, DecentralizedSupervisor, Schema,
-    ServiceConfig,
+    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
@@ -148,30 +150,38 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(DecentralizedSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
         .create()
 }
 
 pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
-    let service = ConfigChangeService;
-    let collection =
-        InstanceCollection::new(service).with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
+        .with_default_rust_service(ConfigChangeService)
         .create()
 }
 
 pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
     let service = ConfigChangeService;
-    let collection = InstanceCollection::new(service)
-        .with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ())
-        .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
+    let artifact = service.artifact_id();
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(DecentralizedSupervisor::new())
-        .with_rust_service(collection)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::decentralized())
+        .with_artifact(artifact.clone())
+        .with_instance(
+            artifact
+                .clone()
+                .into_default_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME),
+        )
+        .with_instance(artifact.into_default_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME))
+        .with_rust_service(service)
         .create()
 }
 

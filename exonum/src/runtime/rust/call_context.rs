@@ -9,7 +9,8 @@ use crate::runtime::{
 
 /// Context for the executed call.
 ///
-/// The call can mean a transaction call, or the `before_commit` hook.
+/// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
+/// or the service constructor invocation.
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.
@@ -58,6 +59,7 @@ impl<'a> CallContext<'a> {
         self.instance
     }
 
+    /// Invokes an arbitrary method in the context.
     #[doc(hidden)]
     pub fn call(
         &mut self,
@@ -69,11 +71,8 @@ impl<'a> CallContext<'a> {
             instance_id: self.instance.id,
             method_id,
         };
-        self.inner.call(
-            interface_name.as_ref(),
-            &call_info,
-            arguments.into_bytes().as_ref(),
-        )
+        self.inner
+            .call(interface_name.as_ref(), &call_info, &arguments.into_bytes())
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]

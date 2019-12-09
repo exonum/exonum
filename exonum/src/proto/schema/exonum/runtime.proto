@@ -18,6 +18,7 @@ package exonum.runtime;
 
 option java_package = "com.exonum.core.messages";
 
+import "blockchain.proto";
 import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.
@@ -50,9 +51,20 @@ message InstanceSpec {
   ArtifactId artifact = 3;
 }
 
+message InstanceInitParams {
+  InstanceSpec instance_spec = 1;
+  bytes constructor = 2;
+}
+
+message GenesisConfig {
+  exonum.Config consensus_config = 1;
+  repeated ArtifactSpec artifacts = 2;
+  repeated InstanceInitParams builtin_instances = 3;
+}
+
 // The kind of ExecutionError.
 enum ErrorKind {
-  PANIC = 0;
+  UNEXPECTED = 0;
   DISPATCHER = 1;
   RUNTIME = 2;
   SERVICE = 3;
@@ -67,6 +79,42 @@ message ExecutionError {
   uint32 code = 2;
   // Optional description which doesn't affect `object_hash`.
   string description = 3;
+
+  oneof runtime {
+    // Runtime identifier associated with the error.
+    uint32 runtime_id = 4;
+    // The runtime associated with the error is unknown.
+    google.protobuf.Empty no_runtime_id = 5;
+  }
+
+  oneof call_info {
+    CallSite call_site = 6;
+    google.protobuf.Empty no_call_site = 7;
+  }
+}
+
+// Call site associated with an error.
+message CallSite {
+  enum Type {
+    // Service method.
+    METHOD = 0;
+    // Service constructor.
+    CONSTRUCTOR = 1;
+    // Hook executing before processing transactions in a block.
+    BEFORE_TRANSACTIONS = 2;
+    // Hook executing after processing transactions in a block.
+    AFTER_TRANSACTIONS = 3;
+  }
+
+  // Type of the call.
+  Type call_type = 1;
+  // Identifier of the service being called.
+  uint32 instance_id = 2;
+  // Numeric ID of the method. Set only for `call_type == METHOD`.
+  uint32 method_id = 3;
+  // Name of the interface defining the method. This field is empty for the default service
+  // interface. Set only for `call_type == METHOD`.
+  string interface = 4;
 }
 
 // Result of runtime execution.
@@ -89,7 +137,7 @@ enum InstanceStatus {
 
 message ArtifactState {
     exonum.runtime.ArtifactSpec spec = 1;
-    ArtifactStatus status = 2; 
+    ArtifactStatus status = 2;
 }
 
 message InstanceState {

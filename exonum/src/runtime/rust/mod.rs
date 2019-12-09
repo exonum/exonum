@@ -40,22 +40,12 @@
 //!         BlockchainData, ExecutionError,
 //!     },
 //! };
-//! use exonum_derive::{
-//!     exonum_interface, BinaryValue, IntoExecutionError,
-//!     ObjectHash, ServiceDispatcher, ServiceFactory
-//! };
+//! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_crypto::Hash;
 //!
 //! // Determine the types of data that will be used in service transactions.
-//!
-//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-//! #[protobuf_convert(source = "doc_tests::Point")]
-//! pub struct Point {
-//!     pub x: i32,
-//!     pub y: i32,
-//! }
 //!
 //! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 //! #[protobuf_convert(source = "doc_tests::CreateWallet")]
@@ -65,9 +55,9 @@
 //!
 //! // You may create service-specific error types.
 //!
-//! #[derive(Debug, IntoExecutionError)]
+//! #[derive(Debug, ExecutionFail)]
 //! pub enum Error {
-//!     PointAlreadyExists = 0,
+//!     /// Wallet with the specified owner key already exists.
 //!     WalletAlreadyExists = 1,
 //! }
 //!
@@ -83,13 +73,7 @@
 //!         &self,
 //!         context: CallContext<'_>,
 //!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>; // You may use `ExecutionError` directly.
-//!     // Also you can use any type which implements `Into<ExecutionError>` for the error.
-//!     fn add_point(
-//!         &self,
-//!         context: CallContext<'_>,
-//!         arg: Point,
-//!     ) -> Result<(), Error>;
+//!     ) -> Result<(), ExecutionError>;
 //! }
 //!
 //! // In order a service could process transactions, you have to implement the
@@ -115,22 +99,9 @@
 //!         // Some business logic...
 //!         Ok(())
 //!     }
-//!
-//!     fn add_point(
-//!         &self,
-//!         _context: CallContext<'_>,
-//!         _arg: Point
-//!     ) -> Result<(), Error> {
-//!         // Some business logic...
-//!         Ok(())
-//!     }
 //! }
 //!
-//! impl Service for PointService {
-//!     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//!         Vec::new()
-//!     }
-//! }
+//! impl Service for PointService {}
 //! ```
 //!
 //! ## Stateful Service Definition
@@ -176,11 +147,7 @@
 //!
 //! # impl Transactions for StatefulService {}
 //! #
-//! #  impl Service for StatefulService {
-//! #      fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//! #          Vec::new()
-//! #      }
-//! #  }
+//! # impl Service for StatefulService {}
 //! ```
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
@@ -190,8 +157,8 @@ pub use self::{
     error::Error,
     runtime_api::ArtifactProtobufSpec,
     service::{
-        AfterCommitContext, Broadcaster, Interface, Service, ServiceDispatcher, ServiceFactory,
-        Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
+        ServiceFactory, Transaction,
     },
 };
 
@@ -205,17 +172,17 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{Blockchain, Schema as CoreSchema},
-    crypto::Hash,
+    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     helpers::Height,
+    runtime::WellKnownRuntime,
 };
 
 use self::api::ServiceApiBuilder;
 use super::{
     dispatcher::{self, Mailbox},
-    error::{catch_panic, ExecutionError},
+    error::{catch_panic, ExecutionError, ExecutionFail},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
+    InstanceSpec, Runtime, RuntimeIdentifier,
 };
 
 mod call_context;
@@ -256,11 +223,6 @@ impl Instance {
             name: &self.name,
         }
     }
-
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
-        let blockchain_data = BlockchainData::new(snapshot, self.descriptor());
-        (self.id, self.service.state_hash(blockchain_data))
-    }
 }
 
 impl AsRef<dyn Service + 'static> for Instance {
@@ -270,8 +232,6 @@ impl AsRef<dyn Service + 'static> for Instance {
 }
 
 impl RustRuntime {
-    /// Rust runtime identifier.
-    pub const ID: RuntimeIdentifier = RuntimeIdentifier::Rust;
     /// Rust runtime name.
     pub const NAME: &'static str = "rust";
 
@@ -294,20 +254,13 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
-    /// Adds a new service factory to the runtime.
-    pub fn add_service_factory(&mut self, service_factory: Box<dyn ServiceFactory>) {
+    /// Adds a new service factory to the runtime and returns
+    /// a modified `RustRuntime` object for further chaining.
+    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
-    }
-
-    /// Adds a new service factory to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
-        self.add_service_factory(service_factory.into());
         self
     }
 
@@ -382,10 +335,8 @@ impl RustRuntime {
     }
 }
 
-impl From<RustRuntime> for (u32, Box<dyn Runtime>) {
-    fn from(r: RustRuntime) -> Self {
-        (RustRuntime::ID as u32, Box::new(r))
-    }
+impl WellKnownRuntime for RustRuntime {
+    const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
 impl Runtime for RustRuntime {
@@ -451,26 +402,18 @@ impl Runtime for RustRuntime {
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
         let descriptor = instance.descriptor();
-        instance.as_ref().call(
-            context.interface_name,
-            call_info.method_id,
-            CallContext::new(context, descriptor),
-            payload,
-        )
+        let id = call_info.method_id;
+        catch_panic(|| {
+            instance.as_ref().call(
+                context.interface_name,
+                id,
+                CallContext::new(context, descriptor),
+                payload,
+            )
+        })
     }
 
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator {
-            runtime: Vec::new(),
-            instances: self
-                .started_services
-                .values()
-                .map(|service| service.state_hash(snapshot))
-                .collect(),
-        }
-    }
-
-    fn before_commit(
+    fn before_transactions(
         &self,
         context: ExecutionContext<'_>,
         instance_id: InstanceId,
@@ -478,21 +421,30 @@ impl Runtime for RustRuntime {
         let instance = self
             .started_services
             .get(&instance_id)
-            .expect("`before_commit` called with non-existing `instance_id`");
+            .expect("`before_transactions` called with non-existing `instance_id`");
 
         let descriptor = instance.descriptor();
-        let result = catch_panic(|| {
+        catch_panic(|| {
             let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_commit(context);
-            Ok(())
-        });
-        if let Err(ref e) = result {
-            error!(
-                "Service \"{}\" `before_commit` failed with error: {:?}",
-                instance.name, e
-            );
-        }
-        result
+            instance.as_ref().before_transactions(context)
+        })
+    }
+
+    fn after_transactions(
+        &self,
+        context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        let instance = self
+            .started_services
+            .get(&instance_id)
+            .expect("`after_transactions` called with non-existing `instance_id`");
+
+        let descriptor = instance.descriptor();
+        catch_panic(|| {
+            let context = CallContext::new(context, descriptor);
+            instance.as_ref().after_transactions(context)
+        })
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {

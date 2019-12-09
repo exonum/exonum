@@ -14,13 +14,16 @@
 
 //! Cryptocurrency transactions.
 
-use exonum::{crypto::PublicKey, runtime::rust::CallContext};
+use exonum::{
+    crypto::PublicKey,
+    runtime::{rust::CallContext, DispatcherError, ExecutionError},
+};
 use exonum_proto::ProtobufConvert;
 
 use super::{proto, schema::Schema, CryptocurrencyService};
 
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Wallet already exists.
     ///
@@ -82,32 +85,32 @@ pub struct CreateWallet {
 #[exonum_interface]
 pub trait CryptocurrencyInterface {
     /// Transfers `amount` of the currency from one wallet to another.
-    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Result<(), Error>;
+    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
     /// Issues `amount` of the currency to the `wallet`.
-    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Result<(), Error>;
+    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
     /// Creates wallet with the given `name`.
-    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Result<(), Error>;
+    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Result<(), ExecutionError>;
 }
 
 impl CryptocurrencyInterface for CryptocurrencyService {
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), Error> {
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .expect("Wrong `Transfer` initiator");
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
 
         let to = arg.to;
         let amount = arg.amount;
         if from == to {
-            return Err(Error::SenderSameAsReceiver);
+            return Err(Error::SenderSameAsReceiver.into());
         }
 
         let sender = schema.wallets.get(&from).ok_or(Error::SenderNotFound)?;
         let receiver = schema.wallets.get(&to).ok_or(Error::ReceiverNotFound)?;
         if sender.balance < amount {
-            Err(Error::InsufficientCurrencyAmount)
+            Err(Error::InsufficientCurrencyAmount.into())
         } else {
             schema.decrease_wallet_balance(sender, amount, tx_hash);
             schema.increase_wallet_balance(receiver, amount, tx_hash);
@@ -115,28 +118,31 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), Error> {
+    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .expect("Wrong `Issue` initiator");
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
-
         if let Some(wallet) = schema.wallets.get(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
         } else {
-            Err(Error::ReceiverNotFound)
+            Err(Error::ReceiverNotFound.into())
         }
     }
 
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Result<(), Error> {
+    fn create_wallet(
+        &self,
+        context: CallContext<'_>,
+        arg: CreateWallet,
+    ) -> Result<(), ExecutionError> {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .expect("Wrong `CreateWallet` initiator");
+            .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
         if schema.wallets.get(&from).is_none() {
@@ -144,7 +150,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
             schema.create_wallet(&from, name, tx_hash);
             Ok(())
         } else {
-            Err(Error::WalletAlreadyExists)
+            Err(Error::WalletAlreadyExists.into())
         }
     }
 }

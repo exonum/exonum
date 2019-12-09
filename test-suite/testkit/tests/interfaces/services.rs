@@ -17,10 +17,10 @@
 pub use crate::interface::Issue;
 
 use exonum::{
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     runtime::{
         rust::{CallContext, ChildAuthorization, Service},
-        AnyTx, BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
+        AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
@@ -59,11 +59,7 @@ impl WalletService {
     }
 }
 
-impl Service for WalletService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for WalletService {}
 
 impl WalletInterface for WalletService {
     fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
@@ -105,6 +101,11 @@ impl IssueReceiver for WalletService {
     }
 }
 
+impl DefaultInstance for WalletService {
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "wallet";
+}
+
 #[protobuf_convert(source = "proto::Issue")]
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TxIssue {
@@ -126,11 +127,7 @@ impl DepositService {
     pub const ID: InstanceId = 25;
 }
 
-impl Service for DepositService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for DepositService {}
 
 impl DepositInterface for DepositService {
     fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
@@ -146,6 +143,11 @@ impl DepositInterface for DepositService {
                 amount: arg.amount,
             })
     }
+}
+
+impl DefaultInstance for DepositService {
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "deposit";
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
@@ -232,8 +234,9 @@ impl CallAny for AnyCallService {
     }
 }
 
-impl Service for AnyCallService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
+impl Service for AnyCallService {}
+
+impl DefaultInstance for AnyCallService {
+    const INSTANCE_ID: u32 = Self::ID;
+    const INSTANCE_NAME: &'static str = "any-call";
 }

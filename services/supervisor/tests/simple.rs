@@ -17,21 +17,21 @@
 //! decision-making algorithm, the tests affect only this aspect.
 
 use exonum::{
-    blockchain::InstanceCollection,
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, Service, ServiceFactory},
-        BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
+        rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
+        ArtifactId, DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
+use exonum_derive::*;
+use exonum_merkledb::{access::AccessExt, ObjectHash};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, SimpleSupervisor,
+    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema, Supervisor,
 };
 
 pub fn sign_config_propose_transaction(
@@ -57,19 +57,9 @@ pub fn sign_config_propose_transaction_by_us(
 #[service_factory(artifact_name = "config-change-test-service")]
 pub struct ConfigChangeService;
 
-impl ConfigChangeService {
-    pub const INSTANCE_ID: InstanceId = 119;
-    pub const INSTANCE_NAME: &'static str = "config-change";
-}
-
-impl From<ConfigChangeService> for InstanceCollection {
-    fn from(instance: ConfigChangeService) -> Self {
-        InstanceCollection::new(instance).with_instance(
-            ConfigChangeService::INSTANCE_ID,
-            ConfigChangeService::INSTANCE_NAME,
-            vec![],
-        )
-    }
+impl DefaultInstance for ConfigChangeService {
+    const INSTANCE_ID: InstanceId = 119;
+    const INSTANCE_NAME: &'static str = "config-change";
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -77,28 +67,13 @@ impl From<ConfigChangeService> for InstanceCollection {
 #[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
 pub struct DeployableService;
 
-impl Service for DeployableService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
-
-impl From<DeployableService> for InstanceCollection {
-    fn from(instance: DeployableService) -> Self {
-        InstanceCollection::new(instance)
-    }
-}
+impl Service for DeployableService {}
 
 #[exonum_interface]
 pub trait DeployableServiceInterface {}
 
 impl DeployableServiceInterface for DeployableService {}
-
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for ConfigChangeService {}
 
 impl Configure for ConfigChangeService {
     type Params = String;
@@ -114,7 +89,7 @@ impl Configure for ConfigChangeService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
+            "error" => Err(DispatcherError::malformed_arguments("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -136,9 +111,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => {
-                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
-            }
+            "apply_error" => Err(DispatcherError::malformed_arguments("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -162,7 +135,9 @@ fn change_consensus_config_with_one_confirmation() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     let cfg_change_height = Height(5);
@@ -209,8 +184,10 @@ fn change_consensus_config_with_one_confirmation() {
 fn service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
-        .with_rust_service(ConfigChangeService)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
+        .with_default_rust_service(ConfigChangeService)
         .create();
 
     let cfg_change_height = Height(5);
@@ -240,8 +217,10 @@ fn service_config_change() {
 fn incorrect_actual_from_field() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
-        .with_rust_service(ConfigChangeService)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
+        .with_default_rust_service(ConfigChangeService)
         .create();
 
     let cfg_change_height = Height(5);
@@ -267,7 +246,9 @@ fn incorrect_actual_from_field() {
 fn discard_config_propose_from_auditor() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     let cfg_change_height = Height(5);
@@ -295,11 +276,9 @@ fn discard_config_propose_from_auditor() {
     // Verify that transaction failed.
     let api = testkit.api();
     let system_api = api.exonum_api();
-    let expected_status = Err(exonum::blockchain::ExecutionError {
-        kind: exonum::blockchain::ExecutionErrorKind::Service { code: 1 },
-        description: "Transaction author is not a validator.".into(),
-    });
-    system_api.assert_tx_status(tx_hash, &expected_status.into());
+    let expected_err =
+        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+    system_api.assert_tx_status(tx_hash, Err(&expected_err));
 
     // Verify that no changes have been applied.
     let new_validators = testkit.network().validators();
@@ -314,7 +293,9 @@ fn discard_config_propose_from_auditor() {
 fn test_send_proposal_with_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     let old_validators = testkit.network().validators();
@@ -368,7 +349,9 @@ fn test_send_proposal_with_api() {
 #[test]
 fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .with_rust_service(DeployableService)
         .create();
 
@@ -410,7 +393,9 @@ fn actual_from_is_zero() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_rust_service(SimpleSupervisor::new())
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
         .create();
 
     // Change height set to 0

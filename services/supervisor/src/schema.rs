@@ -19,17 +19,19 @@ use exonum::{
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, Prefixed},
-    Entry, Fork, ObjectHash, ProofMapIndex,
+    Entry, Fork, ProofEntry, ProofMapIndex,
 };
 
 use super::{
     multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    StartService,
+    StartService, SupervisorConfig,
 };
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
+    /// Supervisor configuration.
+    pub configuration: ProofEntry<T::Base, SupervisorConfig>,
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
@@ -54,15 +56,14 @@ impl<T: Access> Schema<T> {
         self.configuration_number.get().unwrap_or(0)
     }
 
-    /// Returns hashes for tables with proofs.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.deploy_requests.object_hash(),
-            self.deploy_confirmations.object_hash(),
-            self.pending_deployments.object_hash(),
-            self.pending_instances.object_hash(),
-            self.config_confirms.object_hash(),
-        ]
+    /// Gets the configuration for the `Supervisor`.
+    pub fn supervisor_config(&self) -> SupervisorConfig {
+        // Configuration is required to be set, and there is no valid way
+        // to obtain `Supervisor` without configuration, thus this expect
+        // is intended to be safe.
+        self.configuration
+            .get()
+            .expect("Supervisor entity was not configured; unable to load configuration")
     }
 }
 

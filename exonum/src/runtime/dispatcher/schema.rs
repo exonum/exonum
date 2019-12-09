@@ -14,10 +14,9 @@
 
 //! Information schema for the runtime dispatcher.
 
-use exonum_crypto::Hash;
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly},
-    Fork, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofMapIndex,
+    Fork, KeySetIndex, ListIndex, MapIndex, ProofMapIndex,
 };
 
 use crate::runtime::{
@@ -90,14 +89,6 @@ impl<T: Access> Schema<T> {
     /// Returns information about an artifact by its identifier.
     pub fn get_artifact(&self, name: &ArtifactId) -> Option<ArtifactState> {
         self.artifacts().get(name)
-    }
-
-    /// Returns hashes for tables with proofs.
-    pub(crate) fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.artifacts().object_hash(),
-            self.instances().object_hash(),
-        ]
     }
 }
 

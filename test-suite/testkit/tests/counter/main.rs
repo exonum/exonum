@@ -12,31 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate assert_matches;
-#[macro_use]
-extern crate pretty_assertions;
-
+use assert_matches::assert_matches;
 use exonum::{
     api::{
         node::public::explorer::{TransactionQuery, TransactionResponse},
         Error as ApiError,
     },
-    blockchain::{ExecutionError, ExecutionErrorKind},
+    blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind, ValidatorKeys},
     crypto::{self, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
     runtime::{rust::Transaction, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{
-    txvec, ApiKind, ComparableSnapshot, InstanceCollection, TestKit, TestKitApi, TestKitBuilder,
-};
+use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use hex::FromHex;
+use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, Increment, Reset, ADMIN_KEY, SERVICE_ID, SERVICE_NAME,
+    CounterSchema, CounterService, CounterWithProof, Increment, Reset, ADMIN_KEY, SERVICE_ID,
+    SERVICE_NAME,
 };
 
 mod counter;
@@ -46,6 +42,15 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKit::for_rust_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
     let api = testkit.api();
     (testkit, api)
+}
+
+fn get_validator_keys(testkit: &TestKit) -> Vec<ValidatorKeys> {
+    testkit
+        .network()
+        .validators()
+        .iter()
+        .map(TestNode::public_keys)
+        .collect()
 }
 
 fn inc_count(api: &TestKitApi, by: u64) -> Hash {
@@ -76,7 +81,14 @@ fn test_inc_count_create_block() {
         .unwrap();
     assert_eq!(counter, 5);
 
-    testkit.create_block_with_transactions(txvec![
+    let counter_with_proof: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    let validator_keys = get_validator_keys(&testkit);
+    assert_eq!(counter_with_proof.verify(&validator_keys), Some(5));
+
+    testkit.create_block_with_transactions(vec![
         Increment::new(4).sign(SERVICE_ID, pubkey, &key),
         Increment::new(1).sign(SERVICE_ID, pubkey, &key),
     ]);
@@ -86,6 +98,11 @@ fn test_inc_count_create_block() {
         .get("count")
         .unwrap();
     assert_eq!(counter, 10);
+    let counter_with_proof: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    assert_eq!(counter_with_proof.verify(&validator_keys), Some(10));
 }
 
 #[should_panic(expected = "Transaction is already committed")]
@@ -116,6 +133,7 @@ fn test_inc_count_api() {
 #[test]
 fn test_inc_count_with_multiple_transactions() {
     let (mut testkit, api) = init_testkit();
+    let validator_keys = get_validator_keys(&testkit);
 
     for _ in 0..100 {
         inc_count(&api, 1);
@@ -124,6 +142,11 @@ fn test_inc_count_with_multiple_transactions() {
         inc_count(&api, 4);
 
         testkit.create_block();
+        let counter_with_proof: CounterWithProof = api
+            .public(ApiKind::Service("counter"))
+            .get("count-with-proof")
+            .unwrap();
+        counter_with_proof.verify(&validator_keys);
     }
 
     assert_eq!(testkit.height(), Height(100));
@@ -148,12 +171,19 @@ fn test_inc_count_with_manual_tx_control() {
         .unwrap();
     assert_eq!(counter, 0);
 
-    testkit.create_block_with_tx_hashes(&[tx_b.object_hash()]);
-    let counter: u64 = api
+    // The counter is touched by the `before_transactions` handler.
+    let counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
-        .get("count")
+        .get("count-with-proof")
         .unwrap();
-    assert_eq!(counter, 3);
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), None);
+
+    testkit.create_block_with_tx_hashes(&[tx_b.object_hash()]);
+    let counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(3));
 
     testkit.create_block_with_tx_hashes(&[tx_a.object_hash()]);
     let counter: u64 = api
@@ -186,11 +216,41 @@ fn test_private_api() {
     assert_eq!(tx_info.tx_hash, tx.object_hash());
 
     testkit.create_block();
-    let counter: u64 = api
-        .private(ApiKind::Service("counter"))
-        .get("count")
+    let counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
         .unwrap();
-    assert_eq!(counter, 0);
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(0));
+}
+
+#[test]
+#[should_panic(expected = "Insufficient number of precommits")]
+fn counter_proof_without_precommits() {
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    testkit.create_block();
+
+    let mut counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    counter.remove_precommits();
+    counter.verify(&get_validator_keys(&testkit));
+}
+
+#[test]
+#[should_panic(expected = "Invalid counter value in proof")]
+fn counter_proof_with_mauled_value() {
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    testkit.create_block();
+
+    let mut counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    counter.maul_value();
+    counter.verify(&get_validator_keys(&testkit));
 }
 
 #[test]
@@ -211,7 +271,7 @@ fn test_probe() {
     assert_eq!(counter, 0);
 
     let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
-    let snapshot = testkit.probe_all(txvec![tx.clone(), other_tx.clone()]);
+    let snapshot = testkit.probe_all(vec![tx.clone(), other_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(8));
 
@@ -250,21 +310,14 @@ fn test_duplicate_tx() {
 fn test_probe_advanced() {
     let (mut testkit, api) = init_testkit();
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(6).sign(SERVICE_ID, pubkey, &key)
-    };
-    let other_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(10).sign(SERVICE_ID, pubkey, &key)
-    };
-    let admin_tx = {
-        let (pubkey, key) = crypto::gen_keypair_from_seed(
-            &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
-        );
-        assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
-        Reset.sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(6).sign(SERVICE_ID, pubkey, &key);
+    let other_tx = Increment::new(10).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair_from_seed(
+        &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
+    );
+    assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
+    let admin_tx = Reset.sign(SERVICE_ID, pubkey, &key);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
@@ -275,10 +328,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.counter.get(), None);
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
+    let snapshot = testkit.probe_all(vec![tx.clone(), admin_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(0));
-    let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
+    let snapshot = testkit.probe_all(vec![admin_tx.clone(), tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(6));
     // Check that data is (still) not persisted
@@ -301,10 +354,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.counter.get(), Some(10));
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
+    let snapshot = testkit.probe_all(vec![tx.clone(), admin_tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(0));
-    let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
+    let snapshot = testkit.probe_all(vec![admin_tx.clone(), tx.clone()]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(6));
     // Check that data is (still) not persisted
@@ -327,7 +380,6 @@ fn test_probe_duplicate_tx() {
     assert_eq!(schema.counter.get(), Some(5));
 
     testkit.create_block();
-
     let snapshot = testkit.probe(tx.clone());
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(5));
@@ -335,7 +387,7 @@ fn test_probe_duplicate_tx() {
     // Check the mixed case when some probed transactions are committed and some are not
     inc_count(&api, 7);
     let other_tx = Increment::new(7).sign(SERVICE_ID, pubkey, &key);
-    let snapshot = testkit.probe_all(txvec![tx, other_tx]);
+    let snapshot = testkit.probe_all(vec![tx, other_tx]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(12));
 }
@@ -357,10 +409,8 @@ fn test_snapshot_comparison() {
     api.send(tx);
     testkit.create_block();
 
-    let other_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(3).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
     testkit
         .probe(other_tx.clone())
         .compare(testkit.snapshot())
@@ -375,10 +425,8 @@ fn test_snapshot_comparison() {
 fn test_snapshot_comparison_panic() {
     let (mut testkit, api) = init_testkit();
     let increment_by = 5;
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(increment_by).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(increment_by).sign(SERVICE_ID, pubkey, &key);
 
     api.send(tx.clone());
     testkit.create_block();
@@ -398,10 +446,8 @@ fn test_snapshot_comparison_panic() {
 fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
-        let tx = {
-            let (pubkey, key) = crypto::gen_keypair();
-            Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key)
-        };
+        let (pubkey, key) = crypto::gen_keypair();
+        let tx = Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key);
         testkit.api().send(tx.clone());
     }
     testkit.create_block();
@@ -419,8 +465,8 @@ fn test_explorer_blocks_basic() {
         .get("v1/blocks?count=10")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(0));
-    assert_eq!(*blocks[0].block.prev_hash(), crypto::Hash::zero());
+    assert_eq!(blocks[0].block.height, Height(0));
+    assert_eq!(blocks[0].block.prev_hash, crypto::Hash::zero());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(1));
 
@@ -439,7 +485,8 @@ fn test_explorer_blocks_basic() {
                 "tx_count": 0,
                 "prev_hash": crypto::Hash::zero(),
                 "tx_hash": HashTag::empty_list_hash(),
-                "state_hash": blocks[0].block.state_hash(),
+                "state_hash": blocks[0].block.state_hash,
+                "error_hash": blocks[0].block.error_hash,
             }],
         })
     );
@@ -452,11 +499,11 @@ fn test_explorer_blocks_basic() {
         .get("v1/blocks?count=10")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(1));
-    assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.object_hash());
-    assert_eq!(blocks[0].block.tx_count(), 0);
-    assert_eq!(blocks[1].block.height(), Height(0));
-    assert_eq!(*blocks[1].block.prev_hash(), crypto::Hash::default());
+    assert_eq!(blocks[0].block.height, Height(1));
+    assert_eq!(blocks[0].block.prev_hash, blocks[1].block.object_hash());
+    assert_eq!(blocks[0].block.tx_count, 0);
+    assert_eq!(blocks[1].block.height, Height(0));
+    assert_eq!(blocks[1].block.prev_hash, crypto::Hash::default());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
@@ -482,7 +529,8 @@ fn test_explorer_blocks_basic() {
                 "tx_count": 0,
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
-                "state_hash": blocks[0].block.state_hash(),
+                "state_hash": blocks[0].block.state_hash,
+                "error_hash": blocks[0].block.error_hash,
                 "precommits": [precommit],
             }],
         })
@@ -502,7 +550,8 @@ fn test_explorer_blocks_basic() {
                 "tx_count": 0,
                 "prev_hash": blocks[1].block.object_hash(),
                 "tx_hash": HashTag::empty_list_hash(),
-                "state_hash": blocks[0].block.state_hash(),
+                "state_hash": blocks[0].block.state_hash,
+                "error_hash": blocks[0].block.error_hash,
                 "time": precommit.payload().time(),
             }],
         })
@@ -554,9 +603,9 @@ fn test_explorer_blocks_skip_empty_small() {
         .get("v1/blocks?count=10")
         .unwrap();
     assert_eq!(blocks.len(), 3);
-    assert_eq!(blocks[0].block.height(), Height(2));
-    assert_eq!(*blocks[0].block.prev_hash(), blocks[1].block.object_hash());
-    assert_eq!(blocks[0].block.tx_count(), 1);
+    assert_eq!(blocks[0].block.height, Height(2));
+    assert_eq!(blocks[0].block.prev_hash, blocks[1].block.object_hash());
+    assert_eq!(blocks[0].block.tx_count, 1);
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
@@ -565,7 +614,7 @@ fn test_explorer_blocks_skip_empty_small() {
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
@@ -577,7 +626,7 @@ fn test_explorer_blocks_skip_empty_small() {
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
 }
@@ -597,7 +646,7 @@ fn test_explorer_blocks_skip_empty() {
         .get("v1/blocks?count=1&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(5));
     assert_eq!(range.end, Height(6));
 
@@ -606,8 +655,8 @@ fn test_explorer_blocks_skip_empty() {
         .get("v1/blocks?count=3&skip_empty_blocks=true")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(5));
-    assert_eq!(blocks[1].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(5));
+    assert_eq!(blocks[1].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(6));
 }
@@ -628,7 +677,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
         .unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].block.height(), Height(2));
+    assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
 
@@ -638,7 +687,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=10&earliest=3")
         .unwrap();
     assert_eq!(blocks.len(), 3);
-    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(6));
 
@@ -648,7 +697,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=10&latest=4&earliest=3")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(4));
+    assert_eq!(blocks[0].block.height, Height(4));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(5));
 
@@ -658,7 +707,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=2&latest=4&earliest=1")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(4));
+    assert_eq!(blocks[0].block.height, Height(4));
     assert_eq!(range.start, Height(3));
     assert_eq!(range.end, Height(5));
 
@@ -668,7 +717,7 @@ fn test_explorer_blocks_bounds() {
         .get("v1/blocks?count=2&latest=5")
         .unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[0].block.height(), Height(5));
+    assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(4));
     assert_eq!(range.end, Height(6));
 
@@ -719,11 +768,7 @@ fn test_explorer_single_block() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_rust_service(InstanceCollection::new(CounterService).with_instance(
-            SERVICE_ID,
-            SERVICE_NAME,
-            (),
-        ))
+        .with_default_rust_service(CounterService)
         .create();
 
     assert_eq!(testkit.majority_count(), 3);
@@ -733,14 +778,12 @@ fn test_explorer_single_block() {
         let explorer = BlockchainExplorer::new(snapshot.as_ref());
         let block = explorer.block(Height(0)).unwrap();
         assert_eq!(block.height(), Height(0));
-        assert_eq!(*block.header().prev_hash(), crypto::Hash::default());
+        assert_eq!(block.header().prev_hash, crypto::Hash::default());
         assert_eq!(&*block.transaction_hashes(), &[]);
     }
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
@@ -751,7 +794,7 @@ fn test_explorer_single_block() {
         assert_eq!(block.height(), Height(1));
         assert_eq!(block.len(), 1);
         assert_eq!(
-            *block.header().tx_hash(),
+            block.header().tx_hash,
             HashTag::hash_list(&[tx.object_hash()])
         );
         assert_eq!(&*block.transaction_hashes(), &[tx.object_hash()]);
@@ -778,11 +821,8 @@ fn test_explorer_transaction_info() {
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
-
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
 
     let info = api
         .public(ApiKind::Explorer)
@@ -833,8 +873,14 @@ fn test_explorer_transaction_info() {
     let block = explorer.block(Height(1)).unwrap();
     assert!(committed
         .location_proof()
-        .check_against_hash(*block.header().tx_hash())
+        .check_against_hash(block.header().tx_hash)
         .is_ok());
+
+    let proof = block.error_proof(CallInBlock::transaction(0));
+    let proof = proof.check_against_hash(block.header().error_hash).unwrap();
+    let (&call_location, status) = proof.all_entries().next().unwrap();
+    assert_eq!(call_location, CallInBlock::transaction(0));
+    assert!(status.is_none());
 }
 
 #[test]
@@ -842,21 +888,14 @@ fn test_explorer_transaction_statuses() {
     use exonum::explorer::TransactionInfo;
 
     let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair();
+    let error_tx = Increment::new(0).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair();
+    let panicking_tx = Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key);
 
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(5).sign(SERVICE_ID, pubkey, &key)
-    };
-    let error_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(0).sign(SERVICE_ID, pubkey, &key)
-    };
-    let panicking_tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key)
-    };
-
-    let block = testkit.create_block_with_transactions(txvec![
+    let block = testkit.create_block_with_transactions(vec![
         tx.clone(),
         error_tx.clone(),
         panicking_tx.clone(),
@@ -864,15 +903,14 @@ fn test_explorer_transaction_statuses() {
 
     fn check_statuses(statuses: &[Result<(), ExecutionError>]) {
         assert!(statuses[0].is_ok());
-        assert_matches!(
-            statuses[1],
-            Err(ref err) if err.kind == ExecutionErrorKind::service(0)
-                && err.description == "Adding zero does nothing!"
+        assert_eq!(
+            *statuses[1].as_ref().unwrap_err(),
+            ExecutionError::service(0, "Adding zero does nothing!").to_match()
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.kind == ExecutionErrorKind::panic()
-                && err.description == "attempt to add with overflow"
+            Err(ref err) if err.kind() == ExecutionErrorKind::Unexpected
+                && err.description() == "attempt to add with overflow"
         );
     }
 
@@ -883,6 +921,40 @@ fn test_explorer_transaction_statuses() {
         .map(|tx| tx.status().map_err(Clone::clone))
         .collect();
     check_statuses(&statuses);
+
+    // Check errors in the `BlockWithTransactions`.
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 2);
+    assert_eq!(
+        errors[&CallInBlock::transaction(1)].description(),
+        "Adding zero does nothing!"
+    );
+    assert_eq!(
+        errors[&CallInBlock::transaction(2)].kind(),
+        ExecutionErrorKind::Unexpected
+    );
+
+    // Check status proofs for transactions.
+    let snapshot = testkit.snapshot();
+    let explorer = BlockchainExplorer::new(&snapshot);
+    let block_info = explorer.block(testkit.height()).unwrap();
+    let proof = block_info.error_proof(CallInBlock::transaction(0));
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 0);
+    let proof = block_info.error_proof(CallInBlock::transaction(1));
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+    assert_eq!(
+        proof.entries().next().unwrap().1.description(),
+        "Adding zero does nothing!"
+    );
+    let proof = block_info.error_proof(CallInBlock::transaction(2));
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+    assert_eq!(
+        proof.entries().next().unwrap().1.kind(),
+        ExecutionErrorKind::Unexpected
+    );
 
     // Now, the same statuses retrieved via explorer web API.
     let statuses: Vec<_> = [
@@ -901,4 +973,48 @@ fn test_explorer_transaction_statuses() {
     })
     .collect();
     check_statuses(&statuses);
+}
+
+#[test]
+fn test_explorer_with_after_transactions_error() {
+    let (mut testkit, _) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx1 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx2 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
+
+    let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[&CallInBlock::after_transactions(SERVICE_ID)]
+        .description()
+        .contains("What's the question?"));
+    assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
+
+    let tx3 = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+    let block = testkit.create_block_with_transaction(tx3);
+    assert!(block.errors.is_empty());
+    assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
+}
+
+#[test]
+fn test_explorer_with_before_transactions_error() {
+    let (mut testkit, _) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(13).sign(SERVICE_ID, pubkey, &key);
+
+    let block = testkit.create_block_with_transaction(tx);
+    let errors = block.error_map();
+    assert!(errors.is_empty(), "{:?}", errors);
+    let block = testkit.create_block();
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[&CallInBlock::before_transactions(SERVICE_ID)]
+        .description()
+        .contains("Number 13"));
+
+    let snapshot = testkit.snapshot();
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(13));
+    // ^-- The changes in `before_transactions` should be reverted.
 }

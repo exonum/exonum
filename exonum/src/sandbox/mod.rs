@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, Fork, HashTag, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, SystemSchema, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -33,14 +33,17 @@ use crate::{
     api::node::SharedNodeState,
     blockchain::{
         contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
-        IndexCoordinates, InstanceCollection, Schema, SchemaOrigin, ValidatorKeys,
+        InstanceCollection, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
-    helpers::{user_agent, Height, Milliseconds, Round, ValidatorId},
+    helpers::{
+        create_rust_runtime_and_genesis_config, user_agent, Height, Milliseconds, Round,
+        ValidatorId,
+    },
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -52,7 +55,8 @@ use crate::{
         SystemStateProvider,
     },
     sandbox::{
-        config_updater::ConfigUpdaterService, sandbox_tests_helper::PROPOSE_TIMEOUT,
+        config_updater::ConfigUpdaterService,
+        sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
         timestamping::TimestampingService,
     },
 };
@@ -680,7 +684,7 @@ impl Sandbox {
     }
 
     pub fn last_state_hash(&self) -> Hash {
-        *self.last_block().state_hash()
+        self.last_block().state_hash
     }
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<Verified<AnyTx>>
@@ -711,14 +715,11 @@ impl Sandbox {
             .collect()
     }
 
-    /// Extracts state_hash from the fake block.
+    /// Extracts `state_hash` and `error_hash` from the fake block.
     ///
     /// **NB.** This method does not correctly process transactions that mutate the `Dispatcher`,
     /// e.g., starting new services.
-    pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
-    where
-        I: IntoIterator<Item = &'a Verified<AnyTx>>,
-    {
+    pub fn compute_block_hashes(&self, txs: &[Verified<AnyTx>]) -> (Hash, Hash) {
         let height = self.current_height();
         let mut blockchain = self.blockchain_mut();
 
@@ -736,10 +737,8 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let mut fork_with_new_block = blockchain.fork();
         let (_, patch) =
             blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
-        fork_with_new_block.merge(patch);
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
@@ -747,19 +746,26 @@ impl Sandbox {
             schema.reject_transaction(&hash).unwrap();
         }
         blockchain.merge(fork.into_patch()).unwrap();
-        *Schema::new(&fork_with_new_block).last_block().state_hash()
+
+        let block = Schema::new(&patch).last_block();
+        (block.state_hash, block.error_hash)
     }
 
-    pub fn get_proof_to_index(
-        &self,
-        origin: SchemaOrigin,
-        id: u16,
-    ) -> MapProof<IndexCoordinates, Hash> {
+    pub fn create_block(&self, txs: &[Verified<AnyTx>]) -> Block {
+        let tx_hashes: Vec<_> = txs.iter().map(ObjectHash::object_hash).collect();
+        let (state_hash, error_hash) = self.compute_block_hashes(txs);
+        BlockBuilder::new(self)
+            .with_txs_hashes(&tx_hashes)
+            .with_state_hash(&state_hash)
+            .with_error_hash(&error_hash)
+            .build()
+    }
+
+    pub fn get_proof_to_index(&self, index_name: &str) -> MapProof<String, Hash> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        schema
-            .state_hash_aggregator()
-            .get_proof(IndexCoordinates::new(origin, id))
+        SystemSchema::new(&snapshot)
+            .state_aggregator()
+            .get_proof(index_name.to_owned())
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {
@@ -1151,9 +1157,13 @@ fn sandbox_with_services_uninitialized(
         service_keys[0].clone(),
         ApiSender(api_channel.0.clone()),
     );
+
+    let (rust_runtime, genesis_config) =
+        create_rust_runtime_and_genesis_config(mpsc::channel(1).0, genesis, services);
+
     let blockchain = blockchain
-        .into_mut(genesis)
-        .with_rust_runtime(mpsc::channel(1).0, services)
+        .into_mut(genesis_config)
+        .with_runtime(rust_runtime)
         .build()
         .unwrap();
 
@@ -1241,17 +1251,6 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
             (),
         ),
     ])
-}
-
-pub fn compute_tx_hash<'a, I>(txs: I) -> Hash
-where
-    I: IntoIterator<Item = &'a Verified<AnyTx>>,
-{
-    let txs = txs
-        .into_iter()
-        .map(Verified::object_hash)
-        .collect::<Vec<Hash>>();
-    HashTag::hash_list(&txs)
 }
 
 #[cfg(test)]

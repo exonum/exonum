@@ -179,18 +179,15 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::{
-            rust::{CallContext, Service, Transaction},
-            BlockchainData,
-        },
+        runtime::rust::{CallContext, Service, ServiceFactory, Transaction},
     };
-    use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_merkledb::ObjectHash;
     use exonum_proto::ProtobufConvert;
 
     use std::time::Duration;
 
     use super::*;
-    use crate::{proto, InstanceCollection, TestKitApi, TestKitBuilder};
+    use crate::{proto, TestKitApi, TestKitBuilder};
 
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
@@ -235,21 +232,19 @@ mod tests {
         }
     }
 
-    impl Service for SampleService {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for SampleService {}
 
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> TestKitApi {
+        let service = SampleService;
+        let artifact = service.artifact_id();
         let mut testkit = TestKitBuilder::validator()
-            .with_rust_service(InstanceCollection::new(SampleService).with_instance(
-                TIMESTAMP_SERVICE_ID,
-                TIMESTAMP_SERVICE_NAME,
-                (),
-            ))
+            .with_artifact(artifact.clone())
+            .with_instance(
+                artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
+            )
+            .with_rust_service(service)
             .create();
         testkit.create_blocks_until(height);
         // Process incoming events in background.
@@ -279,7 +274,7 @@ mod tests {
             .post("v1/blocks/create")
             .unwrap();
 
-        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx);
 
@@ -288,7 +283,7 @@ mod tests {
             .query(&Height(1))
             .post("v1/blocks/rollback")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(0));
+        assert_eq!(block_info.header.height, Height(0));
         api.send(tx.clone());
         sleep();
 
@@ -297,7 +292,7 @@ mod tests {
             .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx);
     }
@@ -319,7 +314,7 @@ mod tests {
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx_foo);
 
@@ -331,7 +326,7 @@ mod tests {
             .query(&body)
             .post("v1/blocks/create")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(2));
+        assert_eq!(block_info.header.height, Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].content(), &tx_bar);
     }
@@ -373,7 +368,7 @@ mod tests {
             .query(&Height(10))
             .post("v1/blocks/rollback")
             .unwrap();
-        assert_eq!(block_info.header.height(), Height(4));
+        assert_eq!(block_info.header.height, Height(4));
 
         // Test idempotence of the rollback endpoint
         for _ in 0..2 {
@@ -383,7 +378,7 @@ mod tests {
                 .post("v1/blocks/rollback")
                 .unwrap();
 
-            assert_eq!(block_info.header.height(), Height(3));
+            assert_eq!(block_info.header.height, Height(3));
         }
 
         // Test roll-back to the genesis block
@@ -392,7 +387,7 @@ mod tests {
             .query(&Height(1))
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap();
-        assert_eq!(block.header.height(), Height(0));
+        assert_eq!(block.header.height, Height(0));
     }
 
     #[test]

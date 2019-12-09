@@ -14,7 +14,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
-use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
 use semver::Version;
 
@@ -37,39 +37,42 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
-        RuntimeIdentifier, StateHashAggregator,
+        ArtifactId, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema, ErrorKind,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
+        RuntimeIdentifier,
     },
 };
 
 /// We guarantee that the genesis block will be committed by the time
 /// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
 /// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
-fn create_genesis_block(dispatcher: &mut Dispatcher, fork: &mut Fork) {
-    let is_genesis_block = CoreSchema::new(&*fork).block_hashes_by_height().is_empty();
+fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
+    let is_genesis_block = CoreSchema::new(&fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
-    dispatcher.activate_pending(fork);
-    dispatcher.commit_block(fork);
+    dispatcher.activate_pending(&fork);
 
-    let block = Block::new(
-        ValidatorId(0),
-        Height(0),
-        0,
-        Hash::zero(),
-        Hash::zero(),
-        Hash::zero(),
-    );
+    let block = Block {
+        proposer_id: ValidatorId(0),
+        height: Height(0),
+        tx_count: 0,
+        prev_hash: Hash::zero(),
+        tx_hash: Hash::zero(),
+        state_hash: Hash::zero(),
+        error_hash: Hash::zero(),
+    };
     let block_hash = block.object_hash();
-    let schema = CoreSchema::new(&*fork);
+    let schema = CoreSchema::new(&fork);
     schema.block_hashes_by_height().push(block_hash);
     schema.blocks().put(&block_hash, block);
-    fork.flush();
-    dispatcher.notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
+
+    let patch = dispatcher.commit_block(fork);
+    dispatcher.notify_runtimes_about_commit(&patch);
+    patch
 }
 
 impl Dispatcher {
     /// Similar to `Dispatcher::execute()`, but accepts universal `caller` and `call_info`.
+    #[cfg(test)]
     pub(crate) fn call(
         &self,
         fork: &mut Fork,
@@ -77,7 +80,7 @@ impl Dispatcher {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        let runtime = self
+        let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
@@ -146,12 +149,6 @@ struct SampleRuntime {
     new_service_sender: Sender<(u32, Vec<InstanceId>)>,
 }
 
-#[derive(Debug, IntoExecutionError)]
-#[execution_error(crate = "crate")]
-enum SampleError {
-    Foo = 15,
-}
-
 impl SampleRuntime {
     fn new(
         runtime_type: u32,
@@ -200,6 +197,15 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
+    fn start_adding_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn commit_service(
         &mut self,
         _snapshot: &dyn Snapshot,
@@ -213,15 +219,6 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn start_adding_service(
-        &self,
-        _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
-        _parameters: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
@@ -231,15 +228,20 @@ impl Runtime for SampleRuntime {
         if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
             Ok(())
         } else {
-            Err(SampleError::Foo.into())
+            let kind = ErrorKind::Service { code: 15 };
+            Err(ExecutionError::new(kind, "oops"))
         }
     }
 
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -371,7 +373,10 @@ fn test_dispatcher_simple() {
     let err = context
         .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, DispatcherError::ServiceIdExists.into());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::ServiceIdExists)
+    );
 
     let conflicting_rust_service = InstanceSpec {
         artifact: rust_artifact.clone(),
@@ -381,10 +386,15 @@ fn test_dispatcher_simple() {
     let err = context
         .start_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, DispatcherError::ServiceNameExists.into());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::ServiceNameExists)
+    );
 
     // Activate services / artifacts.
-    create_genesis_block(&mut dispatcher, &mut fork);
+    let patch = create_genesis_block(&mut dispatcher, fork);
+    db.merge(patch).unwrap();
+    let mut fork = db.fork();
 
     // Check if transactions are ready for execution.
     dispatcher
@@ -436,10 +446,7 @@ fn test_dispatcher_simple() {
         .with_runtime(runtime_a.runtime_type, runtime_a)
         .with_runtime(runtime_b.runtime_type, runtime_b)
         .finalize(&blockchain);
-    let fork = db.fork();
-    dispatcher
-        .restore_state(fork.snapshot_without_unflushed_changes())
-        .unwrap();
+    dispatcher.restore_state(&db.snapshot()).unwrap();
 
     assert_eq!(
         expected_new_services,
@@ -474,8 +481,8 @@ fn test_dispatcher_rust_runtime_no_service() {
         dispatcher
             .deploy_artifact(rust_artifact.clone(), vec![])
             .wait()
-            .expect_err("deploy artifact succeed"),
-        RustRuntimeError::UnableToDeploy.into()
+            .unwrap_err(),
+        ErrorMatch::from_fail(&RustRuntimeError::UnableToDeploy)
     );
 
     let mut fork = db.fork();
@@ -484,15 +491,19 @@ fn test_dispatcher_rust_runtime_no_service() {
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
+
+    let err = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
+        .start_adding_service(rust_service, vec![])
+        .unwrap_err();
     assert_eq!(
-        ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
-            .start_adding_service(rust_service, vec![])
-            .expect_err("start service succeed"),
-        DispatcherError::ArtifactNotDeployed.into()
+        err,
+        ErrorMatch::from_fail(&DispatcherError::ArtifactNotDeployed)
+            .for_service(RUST_SERVICE_ID)
+            .in_call(CallType::Constructor)
     );
 
-    create_genesis_block(&mut dispatcher, &mut fork);
-    db.merge(fork.into_patch()).unwrap();
+    let patch = create_genesis_block(&mut dispatcher, fork);
+    db.merge(patch).unwrap();
 
     let mut fork = db.fork();
     let tx_payload = [0x00_u8; 1];
@@ -556,11 +567,15 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -639,10 +654,10 @@ impl DeploymentRuntime {
                 spec: Self::SPEC.to_vec(),
                 and_then: Box::new(|| Box::new(Ok(()).into_future())),
             });
-        let mut fork = db.fork();
+        let fork = db.fork();
         dispatcher.activate_pending(&fork);
-        dispatcher.commit_block_and_notify_runtimes(&mut fork);
-        db.merge_sync(fork.into_patch()).unwrap();
+        let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+        db.merge_sync(patch).unwrap();
         (artifact, Self::SPEC.to_vec())
     }
 }
@@ -656,7 +671,7 @@ impl Runtime for DeploymentRuntime {
         let delay = LittleEndian::read_u64(&spec);
         let delay = Duration::from_millis(delay);
 
-        let error_kind = ErrorKind::runtime(0);
+        let error_kind = ErrorKind::Runtime { code: 0 };
         let result = match artifact.name.as_str() {
             "good" => Ok(()),
             "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),
@@ -734,11 +749,15 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
+    fn before_transactions(
+        &self,
+        _context: ExecutionContext<'_>,
+        _id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
     }
 
-    fn before_commit(
+    fn after_transactions(
         &self,
         _context: ExecutionContext<'_>,
         _id: InstanceId,
@@ -766,9 +785,8 @@ fn delayed_deployment() {
         .with_runtime(2, runtime.clone())
         .finalize(&blockchain);
 
-    let mut fork = db.fork();
-    create_genesis_block(&mut dispatcher, &mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let patch = create_genesis_block(&mut dispatcher, db.fork());
+    db.merge_sync(patch).unwrap();
 
     // Queue an artifact for deployment.
     let (artifact, spec) = runtime.deploy_test_artifact("good", &mut dispatcher, &db);
@@ -779,10 +797,10 @@ fn delayed_deployment() {
 
     // Check that we don't require the runtime to deploy the artifact again if we mark it
     // as committed.
-    let mut fork = db.fork();
+    let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
-    dispatcher.commit_block_and_notify_runtimes(&mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge_sync(patch).unwrap();
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 }
 
@@ -796,9 +814,8 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
         .with_runtime(2, runtime.clone())
         .finalize(&blockchain);
 
-    let mut fork = db.fork();
-    create_genesis_block(&mut dispatcher, &mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let patch = create_genesis_block(&mut dispatcher, db.fork());
+    db.merge_sync(patch).unwrap();
 
     // Queue an artifact for deployment.
     let (artifact, spec) = runtime.deploy_test_artifact(artifact_name, &mut dispatcher, &db);
@@ -806,9 +823,9 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
-    let mut fork = db.fork();
+    let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact, spec).unwrap();
-    dispatcher.commit_block_and_notify_runtimes(&mut fork); // << should panic
+    dispatcher.commit_block_and_notify_runtimes(fork); // << should panic
 }
 
 #[test]
@@ -850,11 +867,11 @@ fn failed_deployment_with_node_restart() {
     let mut spec = vec![0_u8; 8];
     LittleEndian::write_u64(&mut spec, 100);
 
-    let mut fork = db.fork();
+    let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
     dispatcher.activate_pending(&fork);
-    dispatcher.commit_block_and_notify_runtimes(&mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge_sync(patch).unwrap();
     assert!(dispatcher.is_artifact_deployed(&artifact));
 
     let snapshot = db.snapshot();
@@ -877,18 +894,17 @@ fn recoverable_error_during_deployment() {
         .with_runtime(2, runtime.clone())
         .finalize(&blockchain);
 
-    let mut fork = db.fork();
-    create_genesis_block(&mut dispatcher, &mut fork);
-    db.merge_sync(fork.into_patch()).unwrap();
+    let patch = create_genesis_block(&mut dispatcher, db.fork());
+    db.merge_sync(patch).unwrap();
 
     // Queue an artifact for deployment.
     let (artifact, spec) = runtime.deploy_test_artifact("recoverable", &mut dispatcher, &db);
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
-    let mut fork = db.fork();
+    let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
-    dispatcher.commit_block_and_notify_runtimes(&mut fork);
+    dispatcher.commit_block_and_notify_runtimes(fork);
     // The dispatcher should try to deploy the artifact again despite a previous failure.
     assert!(dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 2);

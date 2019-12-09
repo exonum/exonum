@@ -16,12 +16,10 @@
 
 use std::marker::PhantomData;
 
-use exonum_crypto::Hash;
-
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
-    BinaryValue, ObjectHash,
+    BinaryValue,
 };
 
 /// An index that may only contain one element.
@@ -102,7 +100,7 @@ where
 impl<T, V> Entry<T, V>
 where
     T: RawAccessMut,
-    V: BinaryValue + ObjectHash,
+    V: BinaryValue,
 {
     /// Changes a value of the entry.
     ///
@@ -191,35 +189,5 @@ where
         let previous = self.get();
         self.set(value);
         previous
-    }
-}
-
-impl<T, V> ObjectHash for Entry<T, V>
-where
-    T: RawAccess,
-    V: BinaryValue + ObjectHash,
-{
-    /// Returns hash of the entry or default hash value if does not exist.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry, ObjectHash};
-    /// use exonum_crypto::{self, Hash};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let mut index = fork.get_entry("name");
-    /// assert_eq!(Hash::default(), index.object_hash());
-    ///
-    /// let value = 10;
-    /// index.set(value);
-    /// assert_eq!(exonum_crypto::hash(&[value]), index.object_hash());
-    /// ```
-    fn object_hash(&self) -> Hash {
-        self.base
-            .get::<(), V>(&())
-            .map(|v| v.object_hash())
-            .unwrap_or_default()
     }
 }

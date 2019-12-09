@@ -15,9 +15,9 @@
 use exonum::{
     crypto,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, CallInfo, DispatcherError, ExecutionError},
+    runtime::{rust::Transaction, CallInfo, DispatcherError, ErrorMatch, ExecutionError},
 };
-use exonum_testkit::{InstanceCollection, TestKit, TestKitBuilder};
+use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::{
     error::Error,
@@ -36,21 +36,9 @@ mod services;
 fn testkit_with_interfaces() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(InstanceCollection::new(WalletService).with_instance(
-            WalletService::ID,
-            "wallet",
-            vec![],
-        ))
-        .with_rust_service(InstanceCollection::new(DepositService).with_instance(
-            DepositService::ID,
-            "deposit",
-            vec![],
-        ))
-        .with_rust_service(InstanceCollection::new(AnyCallService).with_instance(
-            AnyCallService::ID,
-            "any-call",
-            vec![],
-        ))
+        .with_default_rust_service(WalletService)
+        .with_default_rust_service(DepositService)
+        .with_default_rust_service(AnyCallService)
         .create()
 }
 
@@ -259,7 +247,10 @@ fn test_deposit_err_issue_without_wallet() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, Error::WalletNotFound.into());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&Error::WalletNotFound).for_service(WalletService::ID)
+    );
 }
 
 #[test]
@@ -329,7 +320,10 @@ fn test_any_call_err_deposit_unauthorized() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, Error::UnauthorizedIssuer.into());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&Error::UnauthorizedIssuer).for_service(WalletService::ID)
+    );
 }
 
 #[test]
@@ -342,8 +336,11 @@ fn test_any_call_err_unknown_instance() {
         AnyCall::new(CallInfo::new(10_000, 0), ()).sign(AnyCallService::ID, keypair.0, &keypair.1),
     )
     .unwrap_err();
-    // The recipient service does not exist.
-    assert_eq!(err.kind, DispatcherError::IncorrectInstanceId.into());
+
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
 }
 
 #[test]
@@ -358,7 +355,11 @@ fn test_any_call_err_unknown_interface() {
         call.sign(AnyCallService::ID, keypair.0, &keypair.1),
     )
     .unwrap_err();
-    assert_eq!(err.kind, DispatcherError::NoSuchInterface.into());
+
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::NoSuchInterface)
+    );
 }
 
 #[test]
@@ -380,7 +381,7 @@ fn test_any_call_err_unknown_method() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::NoSuchMethod.into());
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
 }
 
 #[test]
@@ -399,7 +400,11 @@ fn test_any_call_err_wrong_arg() {
     )
     .unwrap_err();
 
-    assert_eq!(err.kind, DispatcherError::MalformedArguments.into());
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::MalformedArguments)
+            .with_description_containing("Utf8Error")
+    );
 }
 
 #[test]
@@ -418,5 +423,10 @@ fn test_any_call_panic_recursion_limit() {
         RecursiveCall { depth: 257 }.sign(AnyCallService::ID, keypair.0, &keypair.1),
     )
     .unwrap_err();
-    assert_eq!(err.kind, DispatcherError::StackOverflow.into());
+
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::StackOverflow)
+            .with_description_containing("Maximum depth of call stack (256)")
+    );
 }

@@ -242,7 +242,7 @@ impl ExplorerApi {
         let height = if blocks.len() < query.count {
             query.earliest.unwrap_or(Height(0))
         } else {
-            blocks.last().map_or(Height(0), |info| info.block.height())
+            blocks.last().map_or(Height(0), |info| info.block.height)
         };
 
         Ok(BlocksRange {

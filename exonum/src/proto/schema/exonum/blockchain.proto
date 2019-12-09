@@ -27,11 +27,27 @@ message Block {
   exonum.crypto.Hash prev_hash = 4;
   exonum.crypto.Hash tx_hash = 5;
   exonum.crypto.Hash state_hash = 6;
+  exonum.crypto.Hash error_hash = 7;
 }
 
 message TxLocation {
   uint64 block_height = 1;
   uint64 position_in_block = 2;
+}
+
+// Location of an isolated call within a block.
+message CallInBlock {
+  oneof call {
+    // Call of a transaction within the block. The value is the zero-based
+    // transaction index.
+    uint64 transaction = 1;
+    // Call of `before_transactions` hook in a service. The value is
+    // the service identifier.
+    uint32 before_transactions = 2;
+    // Call of `after_transactions` hook in a service. The value is
+    // the service identifier.
+    uint32 after_transactions = 3;
+  }
 }
 
 // Consensus configuration parameters

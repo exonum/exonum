@@ -14,9 +14,9 @@
 
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
-use proc_macro2::Ident;
+use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
-use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Path, Variant};
+use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Variant};
 
 use std::convert::TryFrom;
 
@@ -24,27 +24,39 @@ use super::{find_meta_attrs, CratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
-struct ExecutionErrorAttrs {
+struct ExecutionFailAttrs {
     #[darling(rename = "crate")]
     cr: CratePath,
-    kind: Path,
+    kind: String,
 }
 
-impl Default for ExecutionErrorAttrs {
+impl Default for ExecutionFailAttrs {
     fn default() -> Self {
         Self {
             cr: CratePath::default(),
-            kind: syn::parse_str("service").unwrap(),
+            kind: "Service".to_owned(),
         }
     }
 }
 
-impl TryFrom<&[Attribute]> for ExecutionErrorAttrs {
+impl TryFrom<&[Attribute]> for ExecutionFailAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
-        find_meta_attrs("execution_error", args)
-            .map(|meta| Self::from_nested_meta(&meta))
+        find_meta_attrs("execution_fail", args)
+            .map(|meta| {
+                Self::from_nested_meta(&meta).and_then(|mut attrs| match attrs.kind.as_str() {
+                    "service" | "runtime" | "dispatcher" => {
+                        attrs.kind[..1].make_ascii_uppercase();
+                        Ok(attrs)
+                    }
+                    _ => {
+                        let msg = "ExecutionFail: Unsupported error kind. Use one of \
+                                   \"service\", \"runtime\", or \"dispatcher\"";
+                        Err(darling::Error::custom(msg))
+                    }
+                })
+            })
             .unwrap_or_else(|| Ok(Self::default()))
     }
 }
@@ -60,12 +72,14 @@ impl ParsedVariant {
     fn from_variant(variant: &Variant) -> Self {
         assert!(
             variant.fields.iter().len() == 0,
-            "IntoExecutionError: Each enum variant should not have fields inside."
+            "ExecutionFail: Each enum variant should not have fields inside."
         );
         let discriminant = variant
             .discriminant
             .clone()
-            .expect("IntoExecutionError: Each enum variant should have an explicit discriminant declaration")
+            .expect(
+                "ExecutionFail: Each enum variant should have an explicit discriminant declaration",
+            )
             .1;
         // TODO parse discriminant.
         let id = discriminant;
@@ -130,18 +144,21 @@ impl ParsedVariant {
 }
 
 #[derive(Debug)]
-struct IntoExecutionError {
+struct ExecutionFail {
     name: Ident,
     variants: Vec<ParsedVariant>,
-    attrs: ExecutionErrorAttrs,
+    attrs: ExecutionFailAttrs,
 }
 
-impl FromDeriveInput for IntoExecutionError {
+impl FromDeriveInput for ExecutionFail {
     fn from_derive_input(input: &DeriveInput) -> Result<Self, darling::Error> {
-        let attrs = ExecutionErrorAttrs::try_from(input.attrs.as_ref())?;
+        let attrs = ExecutionFailAttrs::try_from(input.attrs.as_ref())?;
         let data = match &input.data {
             Data::Enum(enum_data) => enum_data,
-            _ => return Err(darling::Error::unsupported_shape("Only for enums.")),
+            _ => {
+                let msg = "`ExecutionFail` can only be implemented for enums";
+                return Err(darling::Error::unsupported_shape(msg));
+            }
         };
         let variants = data
             .variants
@@ -160,7 +177,7 @@ impl FromDeriveInput for IntoExecutionError {
     }
 }
 
-impl IntoExecutionError {
+impl ExecutionFail {
     fn implement_display(&self) -> impl ToTokens {
         let name = &self.name;
         let match_arms = self.variants.iter().map(|variant| {
@@ -180,69 +197,64 @@ impl IntoExecutionError {
         }
     }
 
-    fn implement_into_execution_error(&self) -> impl ToTokens {
+    fn implement_service_fail(&self) -> impl ToTokens {
         let name = &self.name;
+        let kind = Ident::new(&self.attrs.kind, Span::call_site());
         let cr = &self.attrs.cr;
-        let kind = &self.attrs.kind;
         let match_arms = self.variants.iter().map(|variant| {
             let ident = &variant.ident;
             let id = &variant.id;
-            quote! { #name::#ident => {
-                let kind = #cr::runtime::error::ErrorKind::#kind(#id);
-                #cr::runtime::error::ExecutionError::new(kind, inner.to_string())
-            } }
+            quote!(#name::#ident => #cr::runtime::error::ErrorKind::#kind { code: #id },)
         });
 
         quote! {
-            impl From<#name> for #cr::runtime::error::ExecutionError {
-                fn from(inner: #name) -> Self {
-                    match inner {
+            impl #cr::runtime::error::ExecutionFail for #name {
+                fn kind(&self) -> #cr::runtime::error::ErrorKind {
+                    match self {
                         #( #match_arms )*
                     }
+                }
+
+                fn description(&self) -> String {
+                    self.to_string()
                 }
             }
         }
     }
 
-    fn implement_into_error_kind(&self) -> impl ToTokens {
+    fn implement_into_execution_error(&self) -> impl ToTokens {
         let name = &self.name;
         let cr = &self.attrs.cr;
-        let kind = &self.attrs.kind;
-        let match_arms = self.variants.iter().map(|variant| {
-            let ident = &variant.ident;
-            let id = &variant.id;
-            quote! { #name::#ident => #cr::runtime::error::ErrorKind::#kind(#id), }
-        });
-
+        let module = quote!(#cr::runtime::error);
         quote! {
-            impl From<#name> for #cr::runtime::error::ErrorKind {
+            impl From<#name> for #module::ExecutionError {
                 fn from(inner: #name) -> Self {
-                    match inner {
-                        #( #match_arms )*
-                    }
+                    let kind = #module::ExecutionFail::kind(&inner);
+                    let description = #module::ExecutionFail::description(&inner);
+                    #module::ExecutionError::new(kind, description)
                 }
             }
         }
     }
 }
 
-impl ToTokens for IntoExecutionError {
+impl ToTokens for ExecutionFail {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let display_impl = self.implement_display();
+        let service_fail_impl = self.implement_service_fail();
         let into_execution_error_impl = self.implement_into_execution_error();
-        let into_error_kind_impl = self.implement_into_error_kind();
 
         tokens.extend(quote! {
             #display_impl
+            #service_fail_impl
             #into_execution_error_impl
-            #into_error_kind_impl
         })
     }
 }
 
-pub fn impl_execution_error(input: TokenStream) -> TokenStream {
-    let input = IntoExecutionError::from_derive_input(&syn::parse(input).unwrap())
-        .unwrap_or_else(|e| panic!("IntoExecutionError: {}", e));
-    let tokens = quote! {#input};
+pub fn impl_execution_fail(input: TokenStream) -> TokenStream {
+    let input = ExecutionFail::from_derive_input(&syn::parse(input).unwrap())
+        .unwrap_or_else(|e| panic!("ExecutionFail: {}", e));
+    let tokens = quote!(#input);
     tokens.into()
 }

@@ -14,14 +14,18 @@
 
 //! Testkit builder.
 
-pub use exonum::blockchain::{InstanceCollection, InstanceConfig};
+pub use exonum::blockchain::InstanceCollection;
 
 use exonum::{
+    blockchain::config::{GenesisConfigBuilder, InstanceInitParams},
     crypto,
     helpers::ValidatorId,
     keys::Keys,
-    merkledb::TemporaryDB,
-    runtime::{rust::RustRuntime, Runtime},
+    merkledb::{BinaryValue, TemporaryDB},
+    runtime::{
+        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        ArtifactId, RuntimeInstance, WellKnownRuntime,
+    },
 };
 use futures::sync::mpsc;
 
@@ -86,7 +90,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # use exonum::{
 /// #     blockchain::InstanceCollection,
 /// #     crypto::Hash,
-/// #     runtime::{BlockchainData, rust::Service},
+/// #     runtime::{BlockchainData, rust::{Service, ServiceFactory}},
 /// # };
 /// #
 /// # const SERVICE_ID: u32 = 1;
@@ -99,10 +103,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// #     proto_sources = "exonum_testkit::proto",
 /// # )]
 /// # pub struct ExampleService;
-/// #
-/// # impl Service for ExampleService {
-/// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
-/// # }
+/// # impl Service for ExampleService {}
 /// #
 /// # #[exonum_interface]
 /// # pub trait ExampleInterface {}
@@ -110,11 +111,12 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # impl ExampleInterface for ExampleService {}
 /// #
 /// # fn main() {
+/// let service = ExampleService;
+/// let artifact = service.artifact_id();
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_rust_service(
-///         InstanceCollection::new(ExampleService)
-///             .with_instance(SERVICE_ID, "example", ())
-///     )
+///     .with_artifact(artifact.clone())
+///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
+///     .with_rust_service(service)
 ///     .with_validators(4)
 ///     .create();
 /// testkit.create_block();
@@ -128,8 +130,9 @@ pub struct TestKitBuilder {
     logger: bool,
     rust_runtime: RustRuntime,
     api_notifier_channel: ApiNotifierChannel,
-    additional_runtimes: HashMap<u32, Box<dyn Runtime>>,
-    instances: Vec<InstanceConfig>,
+    additional_runtimes: Vec<RuntimeInstance>,
+    instances: Vec<InstanceInitParams>,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
 }
 
 impl TestKitBuilder {
@@ -172,11 +175,18 @@ impl TestKitBuilder {
     }
 
     /// Adds a Rust service to the testkit.
-    pub fn with_rust_service(mut self, service: impl Into<InstanceCollection>) -> Self {
-        let InstanceCollection { factory, instances } = service.into();
-        self.rust_runtime = self.rust_runtime.with_available_service(factory);
-        self.instances.extend(instances);
+    pub fn with_rust_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        let service = service.into();
+        self.rust_runtime = self.rust_runtime.with_factory(service);
         self
+    }
+
+    /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
+    /// artifact and default instance are added implicitly.
+    pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
+        self.with_artifact(service.artifact_id())
+            .with_instance(service.default_instance())
+            .with_rust_service(service)
     }
 
     /// Enables a logger inside the testkit.
@@ -190,20 +200,45 @@ impl TestKitBuilder {
     /// # Panics
     ///
     /// - Panics if builder's instance already contains specified runtime.
-    pub fn with_additional_runtime(mut self, runtime: impl Into<(u32, Box<dyn Runtime>)>) -> Self {
-        let (id, runtime) = runtime.into();
-        if id == RustRuntime::ID as u32 || self.additional_runtimes.contains_key(&id) {
-            panic!("TestkitBuilder already contains runtime with id {}", id);
+    pub fn with_additional_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
+        let instance: RuntimeInstance = runtime.into();
+        if instance.id == RustRuntime::ID
+            || self.additional_runtimes.iter().any(|r| r.id == instance.id)
+        {
+            panic!(
+                "TestkitBuilder already contains runtime with id {}",
+                instance.id
+            );
         }
 
-        self.additional_runtimes.insert(id, runtime);
+        self.additional_runtimes.push(instance);
         self
     }
 
     /// Adds instances descriptions to the testkit that will be used for specification of builtin
     /// services of testing blockchain.
-    pub fn with_instances(mut self, instances: impl IntoIterator<Item = InstanceConfig>) -> Self {
-        self.instances.extend(instances);
+    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
+        self.instances.push(instance.into());
+        self
+    }
+
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
+    /// already added.
+    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
+        self.with_parametric_artifact(artifact, ())
+    }
+
+    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
+    /// given id is already added.
+    pub fn with_parametric_artifact(
+        mut self,
+        artifact: impl Into<ArtifactId>,
+        payload: impl BinaryValue,
+    ) -> Self {
+        let artifact = artifact.into();
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| payload.into_bytes());
         self
     }
 
@@ -220,14 +255,28 @@ impl TestKitBuilder {
             .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
         let genesis = network.genesis_config();
 
-        let (id, runtime) = self.rust_runtime.into();
-        self.additional_runtimes.insert(id, runtime);
+        self.additional_runtimes.push(self.rust_runtime.into());
+
+        // TODO: Parametrize TestKitBuilder with GenesisConfig on creation to prevent code duplication [ECR-3913].
+        // Prepare GenesisConfig.
+        let genesis_config_builder = self.instances.into_iter().fold(
+            GenesisConfigBuilder::with_consensus_config(genesis),
+            |builder, instance| builder.with_instance(instance),
+        );
+
+        let genesis_config = self
+            .artifacts
+            .into_iter()
+            .fold(genesis_config_builder, |builder, (artifact, payload)| {
+                builder.with_parametric_artifact(artifact, payload)
+            })
+            .build();
+
         TestKit::assemble(
             TemporaryDB::new(),
             network,
-            genesis,
-            self.additional_runtimes.into_iter(),
-            self.instances,
+            genesis_config,
+            self.additional_runtimes,
             self.api_notifier_channel,
         )
     }
@@ -253,8 +302,9 @@ impl TestKitBuilder {
             logger: false,
             rust_runtime: RustRuntime::new(api_notifier_channel.0.clone()),
             api_notifier_channel,
-            additional_runtimes: HashMap::new(),
+            additional_runtimes: vec![],
             instances: vec![],
+            artifacts: HashMap::new(),
         }
     }
 }

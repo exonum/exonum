@@ -14,7 +14,7 @@
 
 pub use crate::proto::schema::tests::TimestampTx;
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{access::AccessExt, BinaryValue};
 use exonum_proto::impl_binary_value_for_pb_message;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
@@ -24,7 +24,7 @@ use crate::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, Transaction},
-        AnyTx, BlockchainData, InstanceId,
+        AnyTx, InstanceId,
     },
 };
 
@@ -56,8 +56,16 @@ impl TimestampingInterface for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        context
+            .service_data()
+            .get_proof_entry("first")
+            .set(Hash::new([127; HASH_SIZE]));
+        context
+            .service_data()
+            .get_proof_entry("second")
+            .set(Hash::new([128; HASH_SIZE]));
+        Ok(())
     }
 }
 
@@ -72,12 +80,20 @@ pub struct TimestampingTxGenerator {
     data_size: usize,
     public_key: PublicKey,
     secret_key: SecretKey,
+    instance_id: InstanceId,
 }
 
 impl TimestampingTxGenerator {
-    pub fn new(data_size: usize) -> TimestampingTxGenerator {
+    pub fn new(data_size: usize) -> Self {
         let keypair = gen_keypair();
         TimestampingTxGenerator::with_keypair(data_size, keypair)
+    }
+
+    /// Creates a generator of transactions for a service not instantiated on the blockchain.
+    pub fn for_incorrect_service(data_size: usize) -> Self {
+        let mut this = Self::new(data_size);
+        this.instance_id += 1;
+        this
     }
 
     pub fn with_keypair(
@@ -91,17 +107,8 @@ impl TimestampingTxGenerator {
             data_size,
             public_key: keypair.0,
             secret_key: keypair.1,
+            instance_id: TimestampingService::ID,
         }
-    }
-
-    /// Generates not signed `TimestampTx`.
-    pub fn gen_tx_payload(&mut self) -> TimestampTx {
-        let mut data = vec![0; self.data_size];
-        self.rand.fill_bytes(&mut data);
-        let mut tx = TimestampTx::new();
-        tx.set_data(data);
-
-        tx
     }
 }
 
@@ -109,7 +116,10 @@ impl Iterator for TimestampingTxGenerator {
     type Item = Verified<AnyTx>;
 
     fn next(&mut self) -> Option<Verified<AnyTx>> {
-        let tx = self.gen_tx_payload();
-        Some(tx.sign(TimestampingService::ID, self.public_key, &self.secret_key))
+        let mut data = vec![0; self.data_size];
+        self.rand.fill_bytes(&mut data);
+        let mut tx = TimestampTx::new();
+        tx.set_data(data);
+        Some(tx.sign(self.instance_id, self.public_key, &self.secret_key))
     }
 }
