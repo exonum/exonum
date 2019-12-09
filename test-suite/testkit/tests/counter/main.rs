@@ -31,8 +31,8 @@ use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, CounterWithProof, CounterServiceInterface, ADMIN_KEY, SERVICE_ID,
-    SERVICE_NAME,
+    CounterSchema, CounterService, CounterServiceInterface, CounterWithProof, ADMIN_KEY,
+    SERVICE_ID, SERVICE_NAME,
 };
 
 mod counter;

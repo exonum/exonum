@@ -327,7 +327,7 @@ mod foreign_interface_call {
         merkledb::ObjectHash,
         messages::Verified,
         runtime::{
-            rust::{CallContext,  Service},
+            rust::{CallContext, Service},
             AnyTx, InstanceId,
         },
     };

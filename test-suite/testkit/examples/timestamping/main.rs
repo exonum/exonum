@@ -21,6 +21,7 @@ use exonum::{
         SnapshotExt,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKitBuilder};
 

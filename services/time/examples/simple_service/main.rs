@@ -22,7 +22,7 @@ use exonum::{
     merkledb::{access::Access, ProofMapIndex},
     runtime::{
         rust::{CallContext, Service, ServiceFactory},
-        AnyTx, InstanceId, SnapshotExt,
+        InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;

@@ -259,13 +259,17 @@ impl Test<CallContext<'_>> for TestServiceImpl {
     type Output = Result<(), ExecutionError>;
 
     fn method_a(&self, mut ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
-        ctx.service_data().get_proof_entry("method_a_entry").set(arg);
+        ctx.service_data()
+            .get_proof_entry("method_a_entry")
+            .set(arg);
         // Test calling one service from another.
         ctx.method_b(SERVICE_INSTANCE_ID, arg)
     }
 
     fn method_b(&self, ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
-        ctx.service_data().get_proof_entry("method_b_entry").set(arg);
+        ctx.service_data()
+            .get_proof_entry("method_b_entry")
+            .set(arg);
         Ok(())
     }
 }

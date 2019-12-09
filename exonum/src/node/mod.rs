@@ -1182,8 +1182,8 @@ impl Node {
 mod tests {
     use exonum_merkledb::TemporaryDB;
 
-    use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
     use super::*;
+    use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
 
     #[test]
     fn test_good_internal_events_config() {
