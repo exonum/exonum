@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Transaction logic for `UtilsService`.
+//! Transaction logic for `MiddlewareService`.
 
 use exonum::runtime::{
     rust::{CallContext, ChildAuthorization},
@@ -23,9 +23,9 @@ use exonum_proto::ProtobufConvert;
 use semver::VersionReq;
 use serde_derive::*;
 
-use crate::{proto, UtilsService};
+use crate::{proto, MiddlewareService};
 
-/// Errors of the `UtilsService`.
+/// Errors of the `MiddlewareService`.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
 pub enum Error {
     /// The service instance targeted by the checked call does not exist.
@@ -152,7 +152,7 @@ pub trait UtilsInterface {
     fn batch(&self, context: CallContext<'_>, arg: Batch) -> Result<(), ExecutionError>;
 }
 
-impl UtilsInterface for UtilsService {
+impl UtilsInterface for MiddlewareService {
     fn checked_call(
         &self,
         mut context: CallContext<'_>,

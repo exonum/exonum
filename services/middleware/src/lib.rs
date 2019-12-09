@@ -51,15 +51,15 @@ use exonum::runtime::{
 };
 use exonum_derive::*;
 
-/// Utility service.
+/// Middleware service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("UtilsInterface"))]
 #[service_factory(proto_sources = "proto")]
-pub struct UtilsService;
+pub struct MiddlewareService;
 
-impl Service for UtilsService {}
+impl Service for MiddlewareService {}
 
-impl DefaultInstance for UtilsService {
+impl DefaultInstance for MiddlewareService {
     const INSTANCE_ID: InstanceId = 1;
     const INSTANCE_NAME: &'static str = "utils";
 }

@@ -24,15 +24,15 @@ use exonum::{
 use exonum_testkit::{TestKit, TestKitBuilder};
 use semver::Version;
 
-use exonum_utils_service::{Batch, CheckedCall, Error as TxError, UtilsService};
+use exonum_middleware_service::{Batch, CheckedCall, Error as TxError, MiddlewareService};
 
 mod inc;
 use crate::inc::{Inc, IncFactory, IncSchema};
 
-const INSTANCE_ID: InstanceId = UtilsService::INSTANCE_ID;
+const INSTANCE_ID: InstanceId = MiddlewareService::INSTANCE_ID;
 
 fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
-    let mut builder = TestKitBuilder::validator().with_default_rust_service(UtilsService);
+    let mut builder = TestKitBuilder::validator().with_default_rust_service(MiddlewareService);
     for (i, version) in inc_versions.into_iter().enumerate() {
         let service_factory = IncFactory::new(version);
         builder = builder

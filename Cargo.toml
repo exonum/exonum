@@ -8,9 +8,9 @@ members = [
     "examples/sample_runtime",
     "examples/timestamping/backend",
 
+    "services/middleware",
     "services/time",
     "services/supervisor",
-    "services/utils",
 
     "test-suite/testkit",
     "test-suite/testkit/server",
