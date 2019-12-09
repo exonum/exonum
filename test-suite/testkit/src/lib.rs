@@ -611,7 +611,7 @@ impl TestKit {
 
     /// Calls `BlockchainMut::check_tx` and panics on an error.
     fn check_tx(&self, transaction: &Verified<AnyTx>) {
-        if let Err(error) = self.blockchain.check_tx(&transaction) {
+        if let Err(error) = self.blockchain.as_ref().check_tx(&transaction) {
             panic!("Attempt to add invalid tx in the pool: {}", error);
         }
     }
