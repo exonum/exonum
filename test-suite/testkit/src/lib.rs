@@ -18,28 +18,22 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, Transaction, CallContext, Service}},
+//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, CallContext, Service}},
 //!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
 //!     helpers::Height,
 //!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
-//! use serde_derive::{Serialize, Deserialize};
-//! use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
+//! use serde_derive::*;
+//! use exonum_derive::*;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
-//! use exonum_testkit::{txvec, ApiKind, TestKitBuilder};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! // Simple service implementation.
 //!
 //! const SERVICE_ID: u32 = 1;
-//!
-//! #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
-//! #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
-//! pub struct TxTimestamp {
-//!     message: String,
-//! }
 //!
 //! #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
 //! #[service_dispatcher(implements("TimestampingInterface"))]
@@ -55,12 +49,14 @@
 //! }
 //!
 //! #[exonum_interface]
-//! pub trait TimestampingInterface {
-//!     fn timestamp(&self, _: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+//! pub trait TimestampingInterface<Ctx> {
+//!     fn timestamp(&self, _: Ctx, arg: String) -> _;
 //! }
 //!
-//! impl TimestampingInterface for TimestampingService {
-//!     fn timestamp(&self, _: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError> {
+//! impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+//!     type Output = Result<(), ExecutionError>;
+//!
+//!     fn timestamp(&self, _: CallContext<'_>, arg: String) -> Self::Output {
 //!         Ok(())
 //!     }
 //! }
@@ -80,16 +76,16 @@
 //!     // Create few transactions.
 //!     let keys = gen_keypair();
 //!     let id = SERVICE_ID;
-//!     let tx1 = TxTimestamp { message: "Down To Earth".into() }.sign(id, keys.0, &keys.1);
-//!     let tx2 = TxTimestamp { message: "Cry Over Spilt Milk".into() }.sign(id, keys.0, &keys.1);
-//!     let tx3 = TxTimestamp { message: "Dropping Like Flies".into() }.sign(id, keys.0, &keys.1);
+//!     let tx1 = keys.timestamp(id, "Down To Earth".into());
+//!     let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
+//!     let tx3 = keys.timestamp(id, "Dropping Like Flies".into());
 //!     // Commit them into blockchain.
-//!     testkit.create_block_with_transactions(txvec![
+//!     testkit.create_block_with_transactions(vec![
 //!         tx1.clone(), tx2.clone(), tx3.clone()
 //!     ]);
 //!
 //!     // Add a single transaction.
-//!     let tx4 = TxTimestamp { message: "Barking up the wrong tree".into() }.sign(id, keys.0, &keys.1);
+//!     let tx4 = keys.timestamp(id, "Barking up the wrong tree".into());
 //!     testkit.create_block_with_transaction(tx4.clone());
 //!
 //!     // Check results with schema.
@@ -358,45 +354,43 @@ impl TestKit {
     /// # use exonum::{
     /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{BlockchainData, rust::{CallContext, Service, ServiceFactory, Transaction}},
+    /// #     runtime::{BlockchainData, rust::{CallContext, Service, ServiceFactory}},
     /// # };
     /// #
-    /// # const SERVICE_ID: u32 = 1;
-    /// #
+    /// // Suppose we test this service interface:
+    /// #[exonum_interface]
+    /// pub trait ExampleInterface<Ctx> {
+    ///     fn example_tx(&self, ctx: Ctx, arg: String) -> _;
+    /// }
+    ///
+    /// // ...implemented by this service:
     /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-    /// # #[service_dispatcher(implements("ExampleInterface"))]
     /// # #[service_factory(
     /// #     artifact_name = "example",
     /// #     artifact_version = "1.0.0",
     /// #     proto_sources = "exonum_testkit::proto",
     /// # )]
-    /// # pub struct ExampleService;
+    /// #[service_dispatcher(implements("ExampleInterface"))]
+    /// pub struct ExampleService;
     /// #
     /// # impl Service for ExampleService {
     /// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
     /// # }
     /// #
-    /// # #[exonum_interface]
-    /// # pub trait ExampleInterface {
-    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError>;
-    /// # }
-    /// #
-    /// # impl ExampleInterface for ExampleService {
-    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError> {
+    /// # impl ExampleInterface<CallContext<'_>> for ExampleService {
+    /// #     type Output = Result<(), ExecutionError>;
+    /// #     fn example_tx(&self, _: CallContext<'_>, _: String) -> Self::Output {
     /// #         Ok(())
     /// #     }
-    /// # }
-    /// #
-    /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
-    /// # #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
-    /// # pub struct ExampleTx {
-    /// #     message: String,
     /// # }
     /// #
     /// # fn expensive_setup(_: &mut TestKit) {}
     /// # fn assert_something_about(_: &TestKit) {}
     /// #
     /// # fn main() {
+    /// // ...with this ID:
+    /// const SERVICE_ID: u32 = 1;
+    ///
     /// let service = ExampleService;
     /// let artifact = service.artifact_id();
     /// let mut testkit = TestKitBuilder::validator()
@@ -405,18 +399,18 @@ impl TestKit {
     ///     .with_rust_service(ExampleService)
     ///     .create();
     /// expensive_setup(&mut testkit);
-    /// let (pubkey, key) = exonum::crypto::gen_keypair();
-    /// let tx_a = ExampleTx { message: "foo".into() }.sign(SERVICE_ID, pubkey, &key);
-    /// let tx_b = ExampleTx { message: "bar".into() }.sign(SERVICE_ID, pubkey, &key);
+    /// let keys = exonum::crypto::gen_keypair();
+    /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
+    /// let tx_b = keys.example_tx(SERVICE_ID, "bar".into());
     ///
     /// testkit.checkpoint();
-    /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
+    /// testkit.create_block_with_transactions(vec![tx_a.clone(), tx_b.clone()]);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
     ///
     /// testkit.checkpoint();
-    /// testkit.create_block_with_transactions(txvec![tx_a.clone()]);
-    /// testkit.create_block_with_transactions(txvec![tx_b.clone()]);
+    /// testkit.create_block_with_transaction(tx_a);
+    /// testkit.create_block_with_transaction(tx_b);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
     /// # }
@@ -782,7 +776,6 @@ impl TestKit {
 /// # const SERVICE_ID: u32 = 1;
 /// // Service with internal state modified by a custom `after_commit` hook.
 /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-/// # #[service_dispatcher(implements("AfterCommitInterface"))]
 /// # #[service_factory(
 /// #     artifact_name = "after_commit",
 /// #     artifact_version = "1.0.0",
@@ -807,11 +800,6 @@ impl TestKit {
 ///     }
 /// }
 ///
-/// # #[exonum_interface]
-/// # trait AfterCommitInterface {}
-/// #
-/// # impl AfterCommitInterface for AfterCommitService {}
-/// #
 /// impl Service for AfterCommitService {
 ///     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
 ///         vec![]

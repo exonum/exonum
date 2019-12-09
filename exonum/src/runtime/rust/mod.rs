@@ -66,14 +66,16 @@
 //! // This attribute implements `Interface` trait for this trait and `Transaction`
 //! // trait for each argument.
 //! #[exonum_interface]
-//! pub trait Transactions {
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!
 //!     // Each method of the trait should have a signature of the following format. The argument
 //!     // should implement the `BinaryValue` trait.
 //!     fn create_wallet(
 //!         &self,
-//!         context: CallContext<'_>,
+//!         context: Ctx,
 //!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>;
+//!     ) -> Self::Output;
 //! }
 //!
 //! // In order a service could process transactions, you have to implement the
@@ -90,14 +92,16 @@
 //!
 //! // Do not forget to implement the `Transactions` and `Service` traits for the service.
 //!
-//! impl Transactions for PointService {
+//! impl Transactions<CallContext<'_>> for PointService {
+//!     type Output = Result<(), ExecutionError>;
+//!
 //!     fn create_wallet(
 //!         &self,
 //!         _context: CallContext<'_>,
 //!         _arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
-//!         Ok(())
+//! #       Ok(())
 //!     }
 //! }
 //!
@@ -114,13 +118,14 @@
 //! prototyping.
 //!
 //! ```
-//! use exonum::runtime::{rust::Service, BlockchainData};
-//! use exonum_crypto::Hash;
-//! use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-//! use exonum_merkledb::Snapshot;
-//!
-//! #  #[exonum_interface]
-//! #  pub trait Transactions {}
+//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
+//! # use exonum_crypto::Hash;
+//! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+//! # use exonum_merkledb::Snapshot;
+//! #[exonum_interface]
+//! pub trait Transactions<Ctx> {
+//!     // service methods...
+//! }
 //!
 //! // If your service has a state, for example, for debugging purposes, then you can
 //! // use a separate structure for the service.
@@ -149,7 +154,9 @@
 //!     }
 //! }
 //!
-//! # impl Transactions for StatefulService {}
+//! # impl Transactions<CallContext<'_>> for StatefulService {
+//! #     type Output = Result<(), ExecutionError>;
+//! # }
 //! #
 //! # impl Service for StatefulService {
 //! #     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {

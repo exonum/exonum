@@ -96,7 +96,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # const SERVICE_ID: u32 = 1;
 /// #
 /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-/// # #[service_dispatcher(implements("ExampleInterface"))]
 /// # #[service_factory(
 /// #     artifact_name = "example",
 /// #     artifact_version = "1.0.0",
@@ -107,11 +106,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # impl Service for ExampleService {
 /// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
 /// # }
-/// #
-/// # #[exonum_interface]
-/// # pub trait ExampleInterface {}
-/// #
-/// # impl ExampleInterface for ExampleService {}
 /// #
 /// # fn main() {
 /// let service = ExampleService;
