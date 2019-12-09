@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{
-    AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
-};
+use criterion::{AxisScale, Bencher, Criterion, PlotConfiguration, Throughput};
+use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::FromAccess;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-use serde_derive::{Deserialize, Serialize};
-use std::{borrow::Cow, collections::HashMap, convert::TryInto};
+use serde_derive::*;
 
-use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
+use std::{borrow::Cow, collections::HashMap, fmt};
+
 use exonum_merkledb::{
     access::Access, impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group,
     ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
@@ -29,8 +28,8 @@ use exonum_merkledb::{
 const SEED: [u8; 32] = [100; 32];
 const SAMPLE_SIZE: usize = 10;
 
-#[cfg(all(test, not(feature = "long_benchmarks")))]
-const ITEM_COUNT: [BenchParams; 10] = [
+#[cfg(not(feature = "long_benchmarks"))]
+const ITEM_COUNTS: &[BenchParams] = &[
     BenchParams {
         users: 10_000,
         blocks: 1,
@@ -82,9 +81,11 @@ const ITEM_COUNT: [BenchParams; 10] = [
         txs_in_block: 1,
     },
 ];
+#[cfg(not(feature = "long_benchmarks"))]
+const TOTAL_TX_COUNT: u64 = 10_000;
 
-#[cfg(all(test, feature = "long_benchmarks"))]
-const ITEM_COUNT: [BenchParams; 6] = [
+#[cfg(feature = "long_benchmarks")]
+const ITEM_COUNTS: &[BenchParams] = &[
     BenchParams {
         users: 1_000,
         blocks: 10,
@@ -110,18 +111,25 @@ const ITEM_COUNT: [BenchParams; 6] = [
         blocks: 100_000,
         txs_in_block: 1,
     },
-    BenchParams {
-        users: 1_000,
-        blocks: 1_000,
-        txs_in_block: 1_000,
-    },
 ];
+#[cfg(feature = "long_benchmarks")]
+const TOTAL_TX_COUNT: u64 = 100_000;
 
 #[derive(Clone, Copy, Debug)]
 struct BenchParams {
     users: usize,
     blocks: usize,
     txs_in_block: usize,
+}
+
+impl fmt::Display for BenchParams {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "users = {}, blocks = {} x {} txs",
+            self.users, self.blocks, self.txs_in_block
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -219,6 +227,22 @@ impl Block {
         Schema::new(&fork).blocks.push(self.object_hash());
         db.merge(fork.into_patch()).unwrap();
     }
+
+    fn execute_with_isolation(&self, db: &TemporaryDB) {
+        let mut rng = StdRng::from_seed(SEED);
+
+        let mut fork = db.fork();
+        for transaction in &self.transactions {
+            transaction.execute(&fork);
+            if rng.gen::<u8>() % 16 == 0 {
+                fork.rollback();
+            } else {
+                fork.flush();
+            }
+        }
+        Schema::new(&fork).blocks.push(self.object_hash());
+        db.merge(fork.into_patch()).unwrap();
+    }
 }
 
 fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> Vec<Block> {
@@ -250,30 +274,50 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
         .collect()
 }
 
+fn do_bench(bencher: &mut Bencher, params: BenchParams, isolate: bool) {
+    let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
+    bencher.iter_with_setup(TemporaryDB::new, |db| {
+        for block in &blocks {
+            if isolate {
+                block.execute_with_isolation(&db);
+            } else {
+                block.execute(&db);
+            }
+        }
+
+        // Some fast assertions.
+        let snapshot = db.snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.blocks.len(), params.blocks as u64);
+    });
+}
+
 pub fn bench_transactions(c: &mut Criterion) {
     exonum_crypto::init();
 
-    let item_counts = ITEM_COUNT.iter().cloned();
-    c.bench(
-        "transactions",
-        ParameterizedBenchmark::new(
-            "currency_like",
-            move |b: &mut Bencher<'_>, params: &BenchParams| {
-                let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
-                b.iter_with_setup(TemporaryDB::new, |db| {
-                    for block in &blocks {
-                        block.execute(&db)
-                    }
-                    // Some fast assertions.
-                    let snapshot = db.snapshot();
-                    let schema = Schema::new(&snapshot);
-                    assert_eq!(schema.blocks.len(), params.blocks as u64);
-                })
-            },
-            item_counts,
-        )
-        .throughput(|&s| Throughput::Elements((s.txs_in_block * s.blocks).try_into().unwrap()))
+    let mut group = c.benchmark_group("plain_transactions");
+    group
+        .throughput(Throughput::Elements(TOTAL_TX_COUNT))
         .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-        .sample_size(SAMPLE_SIZE),
-    );
+        .sample_size(SAMPLE_SIZE);
+
+    for &params in ITEM_COUNTS {
+        group.bench_function(params.to_string(), |bencher| {
+            do_bench(bencher, params, false);
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("isolated_transactions");
+    group
+        .throughput(Throughput::Elements(TOTAL_TX_COUNT))
+        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
+        .sample_size(SAMPLE_SIZE);
+
+    for &params in ITEM_COUNTS {
+        group.bench_function(params.to_string(), |bencher| {
+            do_bench(bencher, params, true);
+        });
+    }
+    group.finish();
 }

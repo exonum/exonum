@@ -16,15 +16,15 @@
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     helpers,
     node::{ApiSender, Node},
     runtime::{
         rust::{CallContext, Service, ServiceFactory},
-        BlockchainData, ExecutionError, InstanceId, RuntimeInstance,
+        ExecutionError, InstanceId, RuntimeInstance,
     },
 };
-use exonum_merkledb::{Snapshot, TemporaryDB};
+use exonum_merkledb::TemporaryDB;
 use exonum_proto::ProtobufConvert;
 
 use std::{
@@ -107,11 +107,7 @@ impl MyServiceInterface for MyService {
     }
 }
 
-impl Service for MyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for MyService {}
 
 pub struct RunHandle {
     pub node_thread: JoinHandle<()>,

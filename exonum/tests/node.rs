@@ -16,16 +16,15 @@
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
-    crypto::Hash,
     helpers,
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service, ServiceFactory},
-        BlockchainData, RuntimeInstance,
+        RuntimeInstance,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{Database, Snapshot, TemporaryDB};
+use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
@@ -58,10 +57,6 @@ impl CommitWatcherService {
 impl CommitWatcherInterface for CommitWatcherService {}
 
 impl Service for CommitWatcherService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn after_commit(&self, _context: AfterCommitContext<'_>) {
         self.0.unbounded_send(()).ok();
     }
@@ -76,11 +71,7 @@ struct StartCheckerService;
 
 impl StartCheckerInterface for StartCheckerService {}
 
-impl Service for StartCheckerService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for StartCheckerService {}
 
 #[derive(Debug, ServiceFactory)]
 #[service_factory(

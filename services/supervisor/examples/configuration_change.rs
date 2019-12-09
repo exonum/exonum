@@ -14,17 +14,15 @@
 
 use exonum::{
     helpers::Height,
-    messages::Verified,
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, BlockchainData, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_crypto::Hash;
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Entry, ObjectHash, Snapshot,
+    Entry, ObjectHash,
 };
 use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor};
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -46,12 +44,7 @@ pub struct Schema<T: Access> {
     params: Entry<T::Base, String>,
 }
 
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<'_, &dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
-
+impl Service for ConfigChangeService {}
 impl ConfigChangeInterface for ConfigChangeService {}
 
 // To allow service change its configuration we need to implement `Configure` trait.
@@ -152,7 +145,7 @@ fn send_and_vote_for_propose(
         .unwrap();
 
     // Create signed transactions for all validators.
-    let signed_txs = testkit
+    let signed_txs: Vec<_> = testkit
         .network()
         .validators()
         .iter()
@@ -161,7 +154,7 @@ fn send_and_vote_for_propose(
             let keys = validator.service_keypair();
             ConfigVote { propose_hash }.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1)
         })
-        .collect::<Vec<Verified<AnyTx>>>();
+        .collect();
 
     // Confirm this propose.
     testkit

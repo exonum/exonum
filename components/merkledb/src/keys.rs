@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(unsafe_code)]
-
 //! A definition of `BinaryKey` trait and implementations for common types.
 
 use byteorder::{BigEndian, ByteOrder};
@@ -78,7 +76,8 @@ pub trait BinaryKey: ToOwned {
     /// Serializes the key into the specified buffer of bytes.
     ///
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
-    /// of the serialized key. Returns number of written bytes.
+    /// of the serialized key returned via `size()`. Returns number of written bytes.
+    /// The provided buffer may be uninitialized; an implementor must not read from it.
     // TODO: Should be unsafe? (ECR-174)
     fn write(&self, buffer: &mut [u8]) -> usize;
 
@@ -258,7 +257,11 @@ impl BinaryKey for String {
         self.size()
     }
 
+    #[allow(unsafe_code)]
     fn read(buffer: &[u8]) -> Self::Owned {
+        // SAFETY:
+        // As with other `BinaryKey` implementations, we assume that data read by the key
+        // is trusted, i.e., was created by a previous call to `write()`.
         unsafe { std::str::from_utf8_unchecked(buffer).to_string() }
     }
 }

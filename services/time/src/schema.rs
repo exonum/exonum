@@ -14,13 +14,10 @@
 
 use chrono::{DateTime, Utc};
 
-use exonum::{
-    blockchain::ValidatorKeys,
-    crypto::{Hash, PublicKey},
-};
+use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, ObjectHash, ProofMapIndex,
+    ProofEntry, ProofMapIndex,
 };
 
 /// `Exonum-time` service database schema.
@@ -29,14 +26,7 @@ pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
     /// Consolidated time.
-    pub time: Entry<T::Base, DateTime<Utc>>,
-}
-
-impl<T: Access> TimeSchema<T> {
-    /// Returns hashes for stored tables.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_times.object_hash(), self.time.object_hash()]
-    }
+    pub time: ProofEntry<T::Base, DateTime<Utc>>,
 }
 
 impl<T: Access> TimeSchema<T>

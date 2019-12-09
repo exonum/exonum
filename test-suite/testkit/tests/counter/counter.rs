@@ -18,28 +18,29 @@ use exonum::{
     api::{
         self,
         backends::actix::{HttpRequest, RawHandler, RequestHandler},
+        node::public::explorer::TransactionResponse,
         ApiBackend,
     },
-    crypto::Hash,
+    blockchain::{IndexProof, ValidatorKeys},
     runtime::{
         rust::{
             api::{ServiceApiBuilder, ServiceApiState},
             CallContext, DefaultInstance, Service,
         },
-        BlockchainData, ExecutionError, InstanceId,
+        ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, Snapshot,
+    ObjectHash, ProofEntry,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use super::proto;
 
@@ -50,7 +51,7 @@ pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd9
 
 #[derive(FromAccess)]
 pub struct CounterSchema<T: Access> {
-    pub counter: Entry<T::Base, u64>,
+    pub counter: ProofEntry<T::Base, u64>,
 }
 
 impl<T> CounterSchema<T>
@@ -128,8 +129,66 @@ impl CounterServiceInterface for CounterService {
 // // // // API // // // //
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TransactionResponse {
-    pub tx_hash: Hash,
+pub struct CounterWithProof {
+    counter: Option<u64>,
+    proof: IndexProof,
+}
+
+impl CounterWithProof {
+    /// Verifies the proof against the known set of validators. Panics on an error.
+    pub fn verify(&self, validators: &[ValidatorKeys]) -> Option<u64> {
+        let block_hash = self.proof.block_proof.block.object_hash();
+
+        // Check precommits.
+        let mut validator_ids = HashSet::new();
+        for precommit in &self.proof.block_proof.precommits {
+            assert_eq!(*precommit.payload().block_hash(), block_hash);
+            let validator_id = validators
+                .iter()
+                .position(|keys| precommit.author() == keys.consensus_key)
+                .expect("Precommit not from a validator");
+            validator_ids.insert(validator_id);
+        }
+        assert!(
+            validator_ids.len() > 2 * validators.len() / 3,
+            "Insufficient number of precommits"
+        );
+
+        let state_hash = self.proof.block_proof.block.state_hash;
+        let index_proof = self
+            .proof
+            .index_proof
+            .check_against_hash(state_hash)
+            .expect("`index_proof` is invalid");
+        let (key, value_hash) = index_proof
+            .entries()
+            .next()
+            .expect("`index_proof` does not contain entries");
+        assert_eq!(
+            *key,
+            format!("{}.counter", SERVICE_NAME),
+            "Invalid index name in proof"
+        );
+        assert_eq!(
+            *value_hash,
+            self.counter
+                .as_ref()
+                .map(ObjectHash::object_hash)
+                .unwrap_or_default(),
+            "Invalid counter value in proof"
+        );
+        self.counter
+    }
+
+    /// Mauls the proof by removing precommits.
+    pub fn remove_precommits(&mut self) {
+        self.proof.block_proof.precommits.clear();
+    }
+
+    /// Mauls the proof by mutating the value.
+    pub fn maul_value(&mut self) {
+        self.counter = Some(self.counter.unwrap_or_default() + 1);
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -145,6 +204,18 @@ impl CounterApi {
     fn count(snapshot: impl Access) -> api::Result<u64> {
         let schema = CounterSchema::new(snapshot);
         Ok(schema.counter.get().unwrap_or_default())
+    }
+
+    fn count_with_proof(state: &ServiceApiState<'_>) -> api::Result<CounterWithProof> {
+        let proof = state
+            .data()
+            .proof_for_service_index("counter")
+            .ok_or_else(|| api::Error::NotFound("counter not initialized".to_owned()))?;
+        let schema = CounterSchema::new(state.service_data());
+        Ok(CounterWithProof {
+            counter: schema.counter.get(),
+            proof,
+        })
     }
 
     fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
@@ -164,6 +235,12 @@ impl CounterApi {
             .public_scope()
             .endpoint("count", |state, _query: ()| {
                 Self::count(state.service_data())
+            })
+            .endpoint_mut("count", Self::increment);
+        builder
+            .public_scope()
+            .endpoint("count-with-proof", |state, _query: ()| {
+                Self::count_with_proof(state)
             })
             .endpoint_mut("count", Self::increment);
 
@@ -222,10 +299,6 @@ impl DefaultInstance for CounterService {
 }
 
 impl Service for CounterService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         let mut schema = CounterSchema::new(context.service_data());
         if schema.counter.get() == Some(13) {
