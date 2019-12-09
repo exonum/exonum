@@ -15,33 +15,64 @@
 use darling::{FromDeriveInput, FromMeta};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{DeriveInput, Generics, Ident, Lit, NestedMeta, Path};
+use syn::{DeriveInput, Generics, Ident, Lit, Meta, NestedMeta, Path};
 
 use super::CratePath;
 
+#[derive(Debug)]
+struct ServiceInterface {
+    path: Path,
+    is_raw: bool,
+}
+
+impl FromMeta for ServiceInterface {
+    fn from_meta(meta: &Meta) -> darling::Result<Self> {
+        match meta {
+            Meta::NameValue(name_and_value) => {
+                let flag_name = name_and_value.path.get_ident().map(ToString::to_string);
+                if flag_name.as_ref().map(String::as_str) == Some("raw") {
+                    let mut this = Self::from_value(&name_and_value.lit)?;
+                    this.is_raw = true;
+                    Ok(this)
+                } else {
+                    let msg = "Unsupported flag (supported flags: `raw`)";
+                    Err(darling::Error::custom(msg).with_span(&name_and_value.path))
+                }
+            }
+            _ => {
+                let msg = "Unsupported interface format; use `\"InterfaceName\" or \
+                           `raw = \"InterfaceName\"`";
+                Err(darling::Error::custom(msg).with_span(meta))
+            }
+        }
+    }
+
+    fn from_string(value: &str) -> darling::Result<Self> {
+        Ok(Self {
+            path: Path::from_string(value)?,
+            is_raw: false,
+        })
+    }
+}
+
 #[derive(Debug, Default)]
-struct ServiceInterfaces(Vec<Path>);
+struct ServiceInterfaces(Vec<ServiceInterface>);
 
 impl FromMeta for ServiceInterfaces {
-    fn from_string(value: &str) -> darling::Result<Self> {
-        Path::from_string(value).map(|path| Self(vec![path]))
-    }
-
-    fn from_value(value: &Lit) -> darling::Result<Self> {
-        Path::from_value(value).map(|path| Self(vec![path]))
-    }
-
     fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
         items
             .iter()
-            .map(|meta| match meta {
-                NestedMeta::Lit(lit) => Path::from_value(lit),
-                _ => Err(darling::Error::unsupported_format(
-                    "Services should be in format: `implements(\"First\", \"Second\")`",
-                )),
-            })
+            .map(ServiceInterface::from_nested_meta)
             .collect::<Result<Vec<_>, _>>()
             .map(Self)
+    }
+
+    fn from_value(value: &Lit) -> darling::Result<Self> {
+        ServiceInterface::from_value(value).map(|interface| Self(vec![interface]))
+    }
+
+    fn from_string(value: &str) -> darling::Result<Self> {
+        ServiceInterface::from_string(value).map(|interface| Self(vec![interface]))
     }
 }
 
@@ -65,10 +96,14 @@ impl ToTokens for ServiceDispatcher {
         let ctx = quote!(#cr::runtime::rust::CallContext<'_>);
         let res = quote!(std::result::Result<(), #cr::runtime::ExecutionError>);
 
-        let match_arms = self.implements.0.iter().map(|trait_name| {
-            let interface_trait = quote! {
-                <dyn #trait_name<#ctx, Output = #res> as #cr::runtime::rust::Interface>
+        let match_arms = self.implements.0.iter().map(|interface| {
+            let trait_name = &interface.path;
+            let interface_trait = if interface.is_raw {
+                quote!(dyn #trait_name)
+            } else {
+                quote!(dyn #trait_name<#ctx, Output = #res>)
             };
+            let interface_trait = quote!(<#interface_trait as #cr::runtime::rust::Interface>);
 
             quote! {
                 #interface_trait::INTERFACE_NAME => {

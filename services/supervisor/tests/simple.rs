@@ -26,7 +26,7 @@ use exonum::{
         SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -53,17 +53,6 @@ pub fn sign_config_propose_transaction_by_us(
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("Configure<Params=String>"))]
-#[service_factory(artifact_name = "config-change-test-service")]
-pub struct ConfigChangeService;
-
-impl DefaultInstance for ConfigChangeService {
-    const INSTANCE_ID: InstanceId = 119;
-    const INSTANCE_NAME: &'static str = "config-change";
-}
-
-#[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("DeployableServiceInterface"))]
 #[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
 pub struct DeployableService;
 
@@ -73,10 +62,15 @@ impl Service for DeployableService {
     }
 }
 
-#[exonum_interface]
-pub trait DeployableServiceInterface {}
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements(raw = "Configure<Params = String>"))]
+#[service_factory(artifact_name = "config-change-test-service")]
+pub struct ConfigChangeService;
 
-impl DeployableServiceInterface for DeployableService {}
+impl DefaultInstance for ConfigChangeService {
+    const INSTANCE_ID: InstanceId = 119;
+    const INSTANCE_NAME: &'static str = "config-change";
+}
 
 impl Service for ConfigChangeService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {

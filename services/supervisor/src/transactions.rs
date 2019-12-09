@@ -22,13 +22,13 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
+    configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
     DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor,
 };
 
 /// Supervisor service transactions.
 #[exonum_interface]
-pub trait SupervisorInterface {
+pub trait SupervisorInterface<Ctx> {
     /// Requests artifact deploy.
     ///
     /// This request should be initiated by the validator (and depending on the `Supervisor`
@@ -36,21 +36,13 @@ pub trait SupervisorInterface {
     /// of other validators as well).
     /// After that, the supervisor will try to deploy the artifact, and if this procedure
     /// will be successful it will send `confirm_artifact_deploy` transaction.
-    fn request_artifact_deploy(
-        &self,
-        context: CallContext<'_>,
-        artifact: DeployRequest,
-    ) -> Result<(), ExecutionError>;
+    fn request_artifact_deploy(&self, context: Ctx, artifact: DeployRequest) -> _;
 
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// The artifact is registered in the dispatcher if all validators send this confirmation.
     /// This confirmation is sent automatically by the node if the deploy succeeds.
-    fn confirm_artifact_deploy(
-        &self,
-        context: CallContext<'_>,
-        artifact: DeployConfirmation,
-    ) -> Result<(), ExecutionError>;
+    fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployConfirmation) -> _;
 
     /// Propose config change
     ///
@@ -62,11 +54,7 @@ pub trait SupervisorInterface {
     /// are required.
     ///
     /// **Note:** only one proposal at time is possible.
-    fn propose_config_change(
-        &self,
-        context: CallContext<'_>,
-        propose: ConfigPropose,
-    ) -> Result<(), ExecutionError>;
+    fn propose_config_change(&self, context: Ctx, propose: ConfigPropose) -> _;
 
     /// Confirm config change
     ///
@@ -74,11 +62,7 @@ pub trait SupervisorInterface {
     /// Vote of the author of the `propose_config_change` transaction is taken into
     /// account automatically.
     /// The configuration application rules depend on the `Supervisor` mode.
-    fn confirm_config_change(
-        &self,
-        context: CallContext<'_>,
-        vote: ConfigVote,
-    ) -> Result<(), ExecutionError>;
+    fn confirm_config_change(&self, context: Ctx, vote: ConfigVote) -> _;
 }
 
 impl StartService {
@@ -118,12 +102,14 @@ impl StartService {
     }
 }
 
-impl SupervisorInterface for Supervisor {
+impl SupervisorInterface<CallContext<'_>> for Supervisor {
+    type Output = Result<(), ExecutionError>;
+
     fn propose_config_change(
         &self,
         mut context: CallContext<'_>,
         mut propose: ConfigPropose,
-    ) -> Result<(), ExecutionError> {
+    ) -> Self::Output {
         let author = context
             .caller()
             .author()
@@ -184,11 +170,7 @@ impl SupervisorInterface for Supervisor {
         Ok(())
     }
 
-    fn confirm_config_change(
-        &self,
-        context: CallContext<'_>,
-        vote: ConfigVote,
-    ) -> Result<(), ExecutionError> {
+    fn confirm_config_change(&self, context: CallContext<'_>, vote: ConfigVote) -> Self::Output {
         let (_, author) = context
             .caller()
             .as_transaction()
@@ -237,7 +219,7 @@ impl SupervisorInterface for Supervisor {
         &self,
         context: CallContext<'_>,
         deploy: DeployRequest,
-    ) -> Result<(), ExecutionError> {
+    ) -> Self::Output {
         deploy
             .artifact
             .validate()
@@ -295,7 +277,7 @@ impl SupervisorInterface for Supervisor {
         &self,
         context: CallContext<'_>,
         confirmation: DeployConfirmation,
-    ) -> Result<(), ExecutionError> {
+    ) -> Self::Output {
         confirmation
             .artifact
             .validate()
@@ -379,9 +361,7 @@ impl Supervisor {
                         return Err(Error::MalformedConfigPropose.into());
                     }
 
-                    context
-                        .interface::<ConfigureCall<'_>>(config.instance_id)?
-                        .verify_config(config.params.clone())?;
+                    context.verify_config(config.instance_id, config.params.clone())?;
                 }
 
                 ConfigChange::StartService(start_service) => {

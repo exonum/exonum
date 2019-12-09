@@ -17,7 +17,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{RustRuntime, ServiceFactory, Transaction},
+        rust::{RustRuntime, ServiceFactory},
         ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -26,10 +26,11 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
     ConfigPropose, DeployConfirmation, DeployRequest, Error as TxError, StartService, Supervisor,
+    SupervisorInterface,
 };
 
 use crate::{
-    inc::{Inc, IncService, SERVICE_ID, SERVICE_NAME},
+    inc::{IncInterface, IncService, SERVICE_ID, SERVICE_NAME},
     utils::build_confirmation_transactions,
 };
 
@@ -96,11 +97,12 @@ fn deploy_artifact_manually(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
-    let service_id = SUPERVISOR_INSTANCE_ID;
-    let keys = &testkit.validator(validator_id).service_keypair();
-    let signed_request = request.clone().sign(service_id, keys.0, &keys.1);
-    testkit.add_tx(signed_request.clone());
-    signed_request.object_hash()
+    let keypair = testkit.validator(validator_id).service_keypair();
+    let signed_request =
+        keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request.to_owned());
+    let request_hash = signed_request.object_hash();
+    testkit.add_tx(signed_request);
+    request_hash
 }
 
 fn start_service(api: &TestKitApi, request: ConfigPropose) -> crypto::Hash {
@@ -121,11 +123,11 @@ fn start_service_manually(
     request: &ConfigPropose,
     validator_id: ValidatorId,
 ) -> crypto::Hash {
-    let service_id = SUPERVISOR_INSTANCE_ID;
-    let keys = &testkit.validator(validator_id).service_keypair();
-    let signed_request = request.clone().sign(service_id, keys.0, &keys.1);
-    testkit.add_tx(signed_request.clone());
-    signed_request.object_hash()
+    let keypair = testkit.validator(validator_id).service_keypair();
+    let signed_request = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, request.to_owned());
+    let request_hash = signed_request.object_hash();
+    testkit.add_tx(signed_request);
+    request_hash
 }
 
 fn deploy_confirmation(
@@ -133,10 +135,11 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let service_id = SUPERVISOR_INSTANCE_ID;
-    let confirmation: DeployConfirmation = request.clone().into();
-    let keys = &testkit.validator(validator_id).service_keypair();
-    confirmation.sign(service_id, keys.0, &keys.1)
+    let confirmation = request.to_owned().into();
+    testkit
+        .validator(validator_id)
+        .service_keypair()
+        .confirm_artifact_deploy(SUPERVISOR_INSTANCE_ID, confirmation)
 }
 
 fn deploy_confirmation_hash(
@@ -270,13 +273,11 @@ fn test_static_service() {
 
     assert_count_is_not_set(&api, SERVICE_NAME);
 
-    let (key_pub, key_priv) = crypto::gen_keypair();
-
-    api.send(Inc { seed: 0 }.sign(SERVICE_ID, key_pub, &key_priv));
+    let keypair = crypto::gen_keypair();
+    api.send(keypair.inc(SERVICE_ID, 0));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 1);
-
-    api.send(Inc { seed: 1 }.sign(SERVICE_ID, key_pub, &key_priv));
+    api.send(keypair.inc(SERVICE_ID, 1));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 2);
 }
@@ -292,13 +293,12 @@ fn test_dynamic_service_normal_workflow() {
 
     assert_count_is_not_set(&api, instance_name);
 
-    let (key_pub, key_priv) = crypto::gen_keypair();
-
-    api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+    let keypair = crypto::gen_keypair();
+    api.send(keypair.inc(instance_id, 0));
     testkit.create_block();
     assert_count(&api, instance_name, 1);
 
-    api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+    api.send(keypair.inc(instance_id, 1));
     testkit.create_block();
     assert_count(&api, instance_name, 2);
 }
@@ -561,7 +561,7 @@ fn test_restart_node_and_start_service_instance() {
     assert!(artifact_exists(&api, &artifact_default().name));
 
     let instance_name = "test_basics";
-    let (key_pub, key_priv) = crypto::gen_keypair();
+    let keypair = crypto::gen_keypair();
 
     // Start IncService's instance now.
     let instance_id = start_service_instance(&mut testkit, instance_name);
@@ -571,11 +571,11 @@ fn test_restart_node_and_start_service_instance() {
     {
         assert_count_is_not_set(&api, instance_name);
 
-        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        api.send(keypair.inc(instance_id, 0));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
 
-        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(keypair.inc(instance_id, 1));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
@@ -592,7 +592,7 @@ fn test_restart_node_and_start_service_instance() {
     // Check that the service instance still works.
     {
         assert_count(&api, instance_name, 2);
-        api.send(Inc { seed: 2 }.sign(instance_id, key_pub, &key_priv));
+        api.send(keypair.inc(instance_id, 2));
         testkit.create_block();
         assert_count(&api, instance_name, 3);
     }
@@ -708,12 +708,12 @@ fn test_two_validators() {
     // Basic check that service works.
     {
         assert_count_is_not_set(&api, instance_name);
-        let (key_pub, key_priv) = crypto::gen_keypair();
-        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        let keypair = crypto::gen_keypair();
+        api.send(keypair.inc(instance_id, 0));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
 
-        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(keypair.inc(instance_id, 1));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }
@@ -726,7 +726,6 @@ fn test_multiple_validators_no_confirmation() {
 
     let artifact = artifact_default();
     let api = testkit.api();
-
     assert!(!artifact_exists(&api, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
@@ -736,9 +735,7 @@ fn test_multiple_validators_no_confirmation() {
     let deploy_artifact_0_tx_hash = deploy_artifact(&api, request_deploy.clone());
 
     // Deliberately not sending an artifact deploy request from the second validator.
-
     testkit.create_block();
-
     api.exonum_api()
         .assert_tx_success(deploy_artifact_0_tx_hash);
 
@@ -746,10 +743,8 @@ fn test_multiple_validators_no_confirmation() {
 
     // No confirmation was generated ...
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
-
     testkit.create_block();
-
-    // .. and no artifact was deployed.
+    // ...and no artifact was deployed.
     assert!(!artifact_exists(&testkit.api(), &artifact.name));
 }
 
@@ -768,10 +763,11 @@ fn test_auditor_cant_send_requests() {
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let service_id = SUPERVISOR_INSTANCE_ID;
         let confirmation: DeployConfirmation = request_deploy.clone().into();
-        let keys = &testkit.us().service_keypair();
-        confirmation.sign(service_id, keys.0, &keys.1)
+        testkit
+            .us()
+            .service_keypair()
+            .confirm_artifact_deploy(SUPERVISOR_INSTANCE_ID, confirmation)
     };
     testkit.add_tx(deploy_request_from_auditor.clone());
 
@@ -846,11 +842,11 @@ fn test_auditor_normal_workflow() {
     // Check that service still works.
     {
         assert_count_is_not_set(&api, instance_name);
-        let (key_pub, key_priv) = crypto::gen_keypair();
-        api.send(Inc { seed: 0 }.sign(instance_id, key_pub, &key_priv));
+        let keypair = crypto::gen_keypair();
+        api.send(keypair.inc(instance_id, 0));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
-        api.send(Inc { seed: 1 }.sign(instance_id, key_pub, &key_priv));
+        api.send(keypair.inc(instance_id, 1));
         testkit.create_block();
         assert_count(&api, instance_name, 2);
     }

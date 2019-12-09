@@ -21,7 +21,7 @@ use exonum::{
     helpers::Height,
     impl_serde_hex_for_binary_value,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, ArtifactId, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
+    runtime::{rust::TxStub, ArtifactId, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
@@ -150,12 +150,9 @@ impl ConfigPropose {
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Verified<AnyTx> {
-        Transaction::<dyn SupervisorInterface>::sign(
-            self,
-            SUPERVISOR_INSTANCE_ID,
-            public_key,
-            secret_key,
-        )
+        TxStub
+            .propose_config_change(SUPERVISOR_INSTANCE_ID, self)
+            .sign(public_key, secret_key)
     }
 
     /// Creates a new proposal which activates at the specified height.

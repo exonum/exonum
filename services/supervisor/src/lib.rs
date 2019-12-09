@@ -67,7 +67,7 @@
 )]
 
 pub use self::{
-    configure::{Configure, ConfigureCall, CONFIGURE_INTERFACE_NAME},
+    configure::{Configure, CONFIGURE_INTERFACE_NAME},
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
@@ -91,7 +91,7 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::{BinaryValue, Snapshot};
 
-use mode::Mode;
+use crate::{configure::ConfigureMut, mode::Mode};
 
 pub mod mode;
 
@@ -136,12 +136,10 @@ fn update_configs(
                     config.instance_id
                 );
 
-                // `ConfigureCall` interface was checked during the config verifying
+                // The service config was verified,
                 // so panic on `expect` here is unlikely and means a bug in the implementation.
                 context
-                    .interface::<ConfigureCall<'_>>(config.instance_id)
-                    .expect("Obtaining Configure interface failed")
-                    .apply_config(config.params.clone())
+                    .apply_config(config.instance_id, config.params.clone())
                     .map_err(|err| {
                         log::error!(
                             "An error occurred while applying service configuration. {}",
@@ -210,8 +208,8 @@ fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
 /// Supervisor service implementation.
 #[derive(Debug, Default, Clone, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements(
-    "transactions::SupervisorInterface",
-    "Configure<Params = SupervisorConfig>"
+    "SupervisorInterface",
+    raw = "Configure<Params = SupervisorConfig>"
 ))]
 #[service_factory(proto_sources = "proto", artifact_name = "exonum-supervisor")]
 pub struct Supervisor;
@@ -373,7 +371,7 @@ impl Service for Supervisor {
                         unconfirmed_request
                     );
                     let confirmation = DeployConfirmation::from(unconfirmed_request);
-                    if let Err(e) = tx_sender.send(confirmation) {
+                    if let Err(e) = tx_sender.confirm_artifact_deploy((), confirmation) {
                         log::error!("Cannot send confirmation: {}", e);
                     }
                 }
