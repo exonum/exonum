@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockHeaderEntries, BlockProof, IndexProof},
+    block::{Block, BlockHeaderEntries, BlockHeaderKey, BlockProof, IndexProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
@@ -304,7 +304,7 @@ impl BlockchainMut {
             }
         }
 
-        let (patch, block) = self.create_block_header(proposer_id, height, tx_hashes);
+        let (patch, block) = self.create_block_header(fork, proposer_id, height, tx_hashes);
         log::trace!("Executing {:?}", block);
 
         // Calculate block hash.
@@ -320,12 +320,11 @@ impl BlockchainMut {
 
     fn create_block_header(
         &self,
+        fork: Fork,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Patch, Block) {
-        let fork = self.fork();
-
         // Get last hash.
         let last_hash = self.inner.last_hash();
 
@@ -335,9 +334,6 @@ impl BlockchainMut {
         let patch = fork.into_patch();
         let state_hash = SystemSchema::new(&patch).state_hash();
 
-        // Add list of started services to block.
-        let entries = self.dispatcher.get_block_header_entries();
-
         let block = Block {
             proposer_id,
             height,
@@ -346,7 +342,7 @@ impl BlockchainMut {
             tx_hash,
             state_hash,
             error_hash,
-            entries,
+            entries: BlockHeaderEntries::new(),
         };
 
         (patch, block)

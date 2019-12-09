@@ -47,6 +47,7 @@ pub struct BlockBuilder<'a> {
     state_hash: Option<Hash>,
     error_hash: Option<Hash>,
     tx_count: Option<u32>,
+    entries: Option<BlockHeaderEntries>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -61,7 +62,7 @@ impl<'a> BlockBuilder<'a> {
             state_hash: None,
             error_hash: None,
             tx_count: None,
-
+            entries: None,
             sandbox,
         }
     }
@@ -108,7 +109,7 @@ impl<'a> BlockBuilder<'a> {
                 .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
             error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
-            entries: BlockHeaderEntries::new(),
+            entries: self.entries.clone().unwrap_or_else(BlockHeaderEntries::new),
         }
     }
 }

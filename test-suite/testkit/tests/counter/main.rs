@@ -487,6 +487,7 @@ fn test_explorer_blocks_basic() {
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
+                "entries": blocks[0].block.entries,
             }],
         })
     );
@@ -532,6 +533,7 @@ fn test_explorer_blocks_basic() {
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
                 "precommits": [precommit],
+                "entries": blocks[0].block.entries,
             }],
         })
     );
@@ -553,6 +555,7 @@ fn test_explorer_blocks_basic() {
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
                 "time": precommit.payload().time(),
+                "entries": blocks[0].block.entries,
             }],
         })
     );

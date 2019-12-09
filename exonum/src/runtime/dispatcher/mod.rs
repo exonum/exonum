@@ -23,7 +23,7 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{Blockchain, BlockHeaderEntries, CallInBlock, Schema as CoreSchema},
+    blockchain::{Blockchain, CallInBlock, Schema as CoreSchema},
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
@@ -377,11 +377,6 @@ impl Dispatcher {
         let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
         Some((*runtime_id, runtime))
-    }
-
-    /// Entries allowed to be added to the block. Currently empty.
-    pub fn get_block_header_entries(&self) -> BlockHeaderEntries {
-        BlockHeaderEntries::new()
     }
 
     /// Returns the service matching the specified query.

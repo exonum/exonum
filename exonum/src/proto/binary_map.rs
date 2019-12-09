@@ -21,17 +21,8 @@ use protobuf::Message;
 use std::{borrow::Cow, collections::BTreeMap};
 
 /// Protobuf wrapper type to store small maps of non-scalar keys and values.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct BinaryMap<K: Ord, V>(pub BTreeMap<K, V>);
-
-impl<K, V> Default for BinaryMap<K, V>
-where
-    K: Ord,
-{
-    fn default() -> Self {
-        Self(BTreeMap::new())
-    }
-}
 
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "proto::schema::binary_map::KeyValue")]
