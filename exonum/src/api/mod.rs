@@ -126,7 +126,7 @@ pub trait ApiBackend: Sized {
 
     /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
     /// to the incoming requests.
-    /// Responce will include a "Location" header denoting a new location of the resourse.
+    /// Response will include a "Location" header denoting a new location of the resource.
     fn moved_permanently(
         &mut self,
         name: &'static str,
@@ -240,7 +240,7 @@ impl ApiScope {
 
     /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
     /// to the incoming requests.
-    /// Response will include a "Location" header denoting a new location of the resourse.
+    /// Response will include a "Location" header denoting a new location of the resource.
     pub fn moved_permanently(
         &mut self,
         name: &'static str,
