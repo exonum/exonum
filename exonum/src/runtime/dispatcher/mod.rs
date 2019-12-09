@@ -32,7 +32,7 @@ use crate::{
 
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
-    ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -82,7 +82,7 @@ impl Dispatcher {
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
-            self.deploy_artifact(artifact, state.spec.payload).wait()?;
+            self.deploy_artifact(artifact, state.deploy_spec).wait()?;
         }
         // Restart active service instances.
         for state in schema.instances().values() {
@@ -156,7 +156,7 @@ impl Dispatcher {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork)
-            .add_pending_artifact(artifact, ArtifactSpec { payload })
+            .add_pending_artifact(artifact, payload)
             .map_err(From::from)
     }
 
@@ -310,8 +310,8 @@ impl Dispatcher {
         let patch = fork.into_patch();
 
         // Block futures with pending deployments.
-        for (artifact, spec) in pending_artifacts {
-            self.block_until_deployed(artifact, spec.payload);
+        for (artifact, deploy_spec) in pending_artifacts {
+            self.block_until_deployed(artifact, deploy_spec);
         }
         // Start pending services.
         for spec in pending_instances {

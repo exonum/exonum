@@ -591,8 +591,7 @@ fn test_dispatcher_already_deployed() {
                 .into_default_instance(11, "good"),
         ],
     );
-
-    let artifact_id = ServiceGoodImpl.artifact_id().into();
+    let artifact_id = ServiceGoodImpl.artifact_id();
 
     // Tests that we get an error if we try to deploy already deployed artifact.
     assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));

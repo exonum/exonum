@@ -172,7 +172,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
+    blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::WellKnownRuntime,
 };
@@ -180,7 +180,7 @@ use crate::{
 use self::api::ServiceApiBuilder;
 use super::{
     dispatcher::{self, Mailbox},
-    error::{catch_panic, ExecutionError, ExecutionFail},
+    error::{catch_panic, ExecutionError},
     ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
     InstanceSpec, Runtime, RuntimeIdentifier,
 };

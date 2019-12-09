@@ -32,9 +32,9 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::{TestServiceInit, TestServiceTx},
     runtime::{
-        error::ExecutionError, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema,
-        ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        WellKnownRuntime,
+        CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema, ErrorMatch,
+        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
+        Runtime, WellKnownRuntime,
     },
 };
 
@@ -307,7 +307,7 @@ impl TestService for TestServiceImpl {
 
 impl TestServiceImpl {
     fn genesis_config() -> GenesisConfig {
-        let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+        let artifact = TestServiceImpl.artifact_id();
         let config = generate_testnet_config(1, 0)[0].clone();
         GenesisConfigBuilder::with_consensus_config(config.consensus)
             .with_artifact(artifact)
@@ -356,17 +356,13 @@ impl TestService for TestServiceImplV2 {
     fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
         context
             .service_data()
-            .get_entry("method_b_entry")
+            .get_proof_entry("method_b_entry")
             .set(arg.value + 42);
         Ok(())
     }
 }
 
-impl Service for TestServiceImplV2 {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for TestServiceImplV2 {}
 
 /// In this test, we manually instruct the dispatcher to deploy artifacts / create services
 /// instead of using transactions. We still need to create patches using a `BlockchainMut`
@@ -519,7 +515,7 @@ fn rust_runtime_with_builtin_services() {
         .unwrap();
 
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact = TestServiceImpl.artifact_id();
     let instance_spec = TestServiceImpl.default_instance().instance_spec;
     assert_eq!(
         events,
@@ -607,12 +603,13 @@ fn state_aggregation() {
 #[test]
 fn multiple_service_versions() {
     let runtime = RustRuntime::new(mpsc::channel(1).0)
-        .with_available_service(TestServiceImpl)
-        .with_available_service(TestServiceImplV2);
+        .with_factory(TestServiceImpl)
+        .with_factory(TestServiceImplV2);
     let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
-        .into_mut(config.consensus.clone())
-        .with_additional_runtime(runtime)
+        .into_mut(genesis_config)
+        .with_runtime(runtime)
         .build()
         .unwrap();
 
@@ -690,13 +687,13 @@ fn multiple_service_versions() {
         .unwrap_err();
     // `method_a` is removed from the newer service version.
     // FIXME: Use a purpose-built error variant.
-    assert_eq!(err, DispatcherError::NoSuchMethod.into());
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
 
     {
         let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.get_entry(idx_name.as_str());
+        let entry = fork.get_proof_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(11));
-        let entry = fork.get_entry::<_, u64>("new_service.method_a_entry");
+        let entry = fork.get_proof_entry::<_, u64>("new_service.method_a_entry");
         assert!(!entry.exists());
     }
 
@@ -715,9 +712,9 @@ fn multiple_service_versions() {
 
     {
         let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
-        let entry = fork.get_entry(idx_name.as_str());
+        let entry = fork.get_proof_entry(idx_name.as_str());
         assert_eq!(entry.get(), Some(12));
-        let entry = fork.get_entry("new_service.method_b_entry");
+        let entry = fork.get_proof_entry("new_service.method_b_entry");
         assert_eq!(entry.get(), Some(54)); // 12 + 42
     }
 }

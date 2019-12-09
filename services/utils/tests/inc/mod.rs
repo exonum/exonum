@@ -15,11 +15,11 @@
 //! Simple service for testing.
 
 use exonum::{
-    crypto::{Hash, PublicKey},
-    merkledb::{access::Access, BinaryValue, MapIndex, Snapshot},
+    crypto::PublicKey,
+    merkledb::{access::Access, BinaryValue, MapIndex},
     runtime::{
         rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
-        ArtifactId, BlockchainData, DispatcherError, ExecutionError, RuntimeIdentifier,
+        ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
     },
 };
 use exonum_derive::*;
@@ -64,11 +64,7 @@ pub trait IncInterface {
 #[service_dispatcher(implements("IncInterface"))]
 pub struct IncService;
 
-impl Service for IncService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for IncService {}
 
 impl IncInterface for IncService {
     fn increment(&self, context: CallContext<'_>, _arg: Inc) -> Result<(), ExecutionError> {
@@ -83,7 +79,7 @@ impl IncInterface for IncService {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IncFactory {
     version: Version,
 }

@@ -22,7 +22,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
-        ArtifactId, DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
         SUPERVISOR_INSTANCE_ID,
     },
 };

@@ -26,7 +26,7 @@ use serde_derive::*;
 use crate::{proto, UtilsService};
 
 /// Errors of the `UtilsService`.
-#[derive(Debug, Clone, Copy, IntoExecutionError)]
+#[derive(Debug, Clone, Copy, ExecutionFail)]
 pub enum Error {
     /// The service instance targeted by the checked call does not exist.
     NoService = 0,

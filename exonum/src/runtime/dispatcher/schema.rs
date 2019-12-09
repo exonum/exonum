@@ -19,11 +19,10 @@ use exonum_merkledb::{
     Fork, KeySetIndex, ListIndex, MapIndex, ProofMapIndex,
 };
 
+use super::{ArtifactId, Error, InstanceSpec};
 use crate::runtime::{
     ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
 };
-
-use super::{ArtifactId, ArtifactSpec, Error, InstanceSpec};
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
 const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
@@ -105,7 +104,7 @@ impl Schema<&Fork> {
     pub(super) fn add_pending_artifact(
         &mut self,
         artifact: ArtifactId,
-        spec: ArtifactSpec,
+        payload: Vec<u8>,
     ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact) {
@@ -115,7 +114,7 @@ impl Schema<&Fork> {
         self.artifacts().put(
             &artifact,
             ArtifactState {
-                spec,
+                deploy_spec: payload,
                 status: ArtifactStatus::Pending,
             },
         );
@@ -178,17 +177,17 @@ impl Schema<&Fork> {
     }
 
     /// Takes pending artifacts from queue.
-    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, ArtifactSpec)> {
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, Vec<u8>)> {
         let mut index = self.pending_artifacts();
         let artifacts = self.artifacts();
         let pending_artifacts = index
             .iter()
             .map(|artifact| {
-                let spec = artifacts
+                let deploy_spec = artifacts
                     .get(&artifact)
                     .expect("Artifact marked as pending is not saved in `artifacts`")
-                    .spec;
-                (artifact, spec)
+                    .deploy_spec;
+                (artifact, deploy_spec)
             })
             .collect();
         index.clear();

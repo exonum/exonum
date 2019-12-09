@@ -583,8 +583,10 @@ mod tests {
     #[test]
     fn genesis_config_creation() {
         let consensus = gen_consensus_config();
-        let artifact1 = ArtifactId::new(42_u32, "test_artifact1").unwrap();
-        let artifact2 = ArtifactId::new(42_u32, "test_artifact2").unwrap();
+        let version = "1.0.0".parse().unwrap();
+        let artifact1 = ArtifactId::new(42_u32, "test_artifact1", version).unwrap();
+        let version = "0.2.8".parse().unwrap();
+        let artifact2 = ArtifactId::new(42_u32, "test_artifact2", version).unwrap();
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
             .with_artifact(artifact1.clone())
@@ -607,7 +609,8 @@ mod tests {
     #[test]
     fn genesis_config_check_artifacts_duplication() {
         let consensus = gen_consensus_config();
-        let artifact = ArtifactId::new(42_u32, "test_artifact").unwrap();
+        let version = "1.1.5-rc.3".parse().unwrap();
+        let artifact = ArtifactId::new(42_u32, "test_artifact", version).unwrap();
         let correct_payload = vec![1_u8, 2, 3];
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus)

@@ -15,9 +15,11 @@
 //! Tests related to transaction logic.
 
 use exonum::{
-    blockchain::InstanceCollection,
     crypto::gen_keypair,
-    runtime::{rust::Transaction, DispatcherError, InstanceId, SnapshotExt},
+    runtime::{
+        rust::{DefaultInstance, ServiceFactory, Transaction},
+        DispatcherError, ErrorMatch, InstanceId, SnapshotExt,
+    },
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 use semver::Version;
@@ -27,15 +29,20 @@ use exonum_utils_service::{Batch, CheckedCall, Error as TxError, UtilsService};
 mod inc;
 use crate::inc::{Inc, IncFactory, IncSchema};
 
+const INSTANCE_ID: InstanceId = UtilsService::INSTANCE_ID;
+
 fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
-    let mut builder = TestKitBuilder::validator().with_rust_service(UtilsService);
+    let mut builder = TestKitBuilder::validator().with_default_rust_service(UtilsService);
     for (i, version) in inc_versions.into_iter().enumerate() {
-        let service = InstanceCollection::new(IncFactory::new(version)).with_instance(
-            100 + i as InstanceId,
-            format!("inc-{}", i),
-            (),
-        );
-        builder = builder.with_rust_service(service);
+        let service_factory = IncFactory::new(version);
+        builder = builder
+            .with_artifact(service_factory.artifact_id())
+            .with_instance(
+                service_factory
+                    .artifact_id()
+                    .into_default_instance(100 + i as InstanceId, format!("inc-{}", i)),
+            )
+            .with_rust_service(service_factory);
     }
     builder.create()
 }
@@ -69,7 +76,7 @@ fn checked_call_normal_workflow() {
             .parse()
             .unwrap_or_else(|e| panic!("version req = {}: {}", version, e));
 
-        let signed = checked_call.clone().sign(UtilsService::DEFAULT_ID, pk, &sk);
+        let signed = checked_call.clone().sign(INSTANCE_ID, pk, &sk);
         let block = testkit.create_block_with_transaction(signed);
         block[0]
             .status()
@@ -95,11 +102,11 @@ fn checked_call_for_non_existing_service() {
         inner: Inc::new(0).into_any_tx(200),
     };
     let (pk, sk) = gen_keypair();
-    let checked_call = checked_call.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let checked_call = checked_call.sign(INSTANCE_ID, pk, &sk);
 
     let block = testkit.create_block_with_transaction(checked_call);
     let err = block[0].status().unwrap_err();
-    assert_eq!(*err, TxError::NoService.into());
+    assert_eq!(*err, ErrorMatch::from_fail(&TxError::NoService));
 }
 
 #[test]
@@ -111,11 +118,11 @@ fn checked_call_with_mismatched_artifact() {
         inner: Inc::new(0).into_any_tx(100),
     };
     let (pk, sk) = gen_keypair();
-    let checked_call = checked_call.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let checked_call = checked_call.sign(INSTANCE_ID, pk, &sk);
 
     let block = testkit.create_block_with_transaction(checked_call);
     let err = block[0].status().unwrap_err();
-    assert_eq!(*err, TxError::ArtifactMismatch.into());
+    assert_eq!(*err, ErrorMatch::from_fail(&TxError::ArtifactMismatch));
 }
 
 #[test]
@@ -147,10 +154,10 @@ fn checked_call_with_mismatched_version() {
             .parse()
             .unwrap_or_else(|e| panic!("version req = {}: {}", version, e));
 
-        let signed = checked_call.clone().sign(UtilsService::DEFAULT_ID, pk, &sk);
+        let signed = checked_call.clone().sign(INSTANCE_ID, pk, &sk);
         let block = testkit.create_block_with_transaction(signed);
         let err = block[0].status().unwrap_err();
-        assert_eq!(*err, TxError::VersionMismatch.into());
+        assert_eq!(*err, ErrorMatch::from_fail(&TxError::VersionMismatch));
     }
 }
 
@@ -165,10 +172,10 @@ fn batch_normal_workflow() {
     let batch = Batch::new()
         .with_call(Inc::new(0).into_any_tx(100))
         .with_call(Inc::new(0).into_any_tx(100))
-        .with_call(checked_call.into_any_tx(UtilsService::DEFAULT_ID));
+        .with_call(checked_call.into_any_tx(INSTANCE_ID));
 
     let (pk, sk) = gen_keypair();
-    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let batch = batch.sign(INSTANCE_ID, pk, &sk);
     let block = testkit.create_block_with_transaction(batch);
     block[0].status().unwrap();
 
@@ -189,11 +196,11 @@ fn batch_with_calls_to_different_services() {
         .with_call(Inc::new(0).into_any_tx(100));
     let batch = Batch::new()
         .with_call(Inc::new(1).into_any_tx(100))
-        .with_call(inner_batch.into_any_tx(UtilsService::DEFAULT_ID))
+        .with_call(inner_batch.into_any_tx(INSTANCE_ID))
         .with_call(Inc::new(1).into_any_tx(101));
 
     let (pk, sk) = gen_keypair();
-    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let batch = batch.sign(INSTANCE_ID, pk, &sk);
     let block = testkit.create_block_with_transaction(batch);
     block[0].status().unwrap();
 
@@ -213,10 +220,13 @@ fn batch_with_call_to_non_existing_service() {
         .with_call(Inc::new(0).into_any_tx(100));
 
     let (pk, sk) = gen_keypair();
-    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let batch = batch.sign(INSTANCE_ID, pk, &sk);
     let block = testkit.create_block_with_transaction(batch);
     let err = block[0].status().unwrap_err();
-    assert_eq!(*err, DispatcherError::IncorrectInstanceId.into());
+    assert_eq!(
+        *err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
 
     let snapshot = testkit.snapshot();
     let schema = IncSchema::new(snapshot.for_service(100).unwrap());
@@ -233,14 +243,14 @@ fn batch_with_service_error() {
     };
     let batch = Batch::new()
         .with_call(Inc::new(0).into_any_tx(100))
-        .with_call(checked_call.into_any_tx(UtilsService::DEFAULT_ID))
+        .with_call(checked_call.into_any_tx(INSTANCE_ID))
         .with_call(Inc::new(0).into_any_tx(100));
 
     let (pk, sk) = gen_keypair();
-    let batch = batch.sign(UtilsService::DEFAULT_ID, pk, &sk);
+    let batch = batch.sign(INSTANCE_ID, pk, &sk);
     let block = testkit.create_block_with_transaction(batch);
     let err = block[0].status().unwrap_err();
-    assert_eq!(*err, TxError::ArtifactMismatch.into());
+    assert_eq!(*err, ErrorMatch::from_fail(&TxError::ArtifactMismatch));
 
     let snapshot = testkit.snapshot();
     let schema = IncSchema::new(snapshot.for_service(100).unwrap());

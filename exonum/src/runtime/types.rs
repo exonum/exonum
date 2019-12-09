@@ -264,10 +264,23 @@ impl FromStr for ArtifactId {
     }
 }
 
-/// Artifact state.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+/// Exhaustive artifact specification.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    ProtobufConvert,
+    BinaryValue,
+    ObjectHash,
+)]
 #[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
 pub struct ArtifactSpec {
+    /// Information uniquely identifying the artifact.
+    pub artifact: ArtifactId,
     /// Runtime-specific artifact payload.
     pub payload: Vec<u8>,
 }
@@ -467,16 +480,19 @@ impl ProtobufConvert for InstanceStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::ArtifactState")]
 pub struct ArtifactState {
-    /// Artifact specification.
-    pub spec: ArtifactSpec,
+    /// Runtime-specific deployment specification.
+    pub deploy_spec: Vec<u8>,
     /// Artifact deployment status.
     pub status: ArtifactStatus,
 }
 
 impl ArtifactState {
     /// Create a new artifact state with the given specification and status.
-    pub fn new(spec: ArtifactSpec, status: ArtifactStatus) -> Self {
-        Self { spec, status }
+    pub fn new(deploy_spec: Vec<u8>, status: ArtifactStatus) -> Self {
+        Self {
+            deploy_spec,
+            status,
+        }
     }
 }
 

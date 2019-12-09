@@ -42,6 +42,9 @@ message ArtifactId {
 }
 
 message ArtifactSpec {
+  // Information uniquely identifying the artifact.
+  ArtifactId artifact = 1;
+  // Runtime-specific artifact payload.
   bytes payload = 2;
 }
 
@@ -136,11 +139,11 @@ enum InstanceStatus {
 }
 
 message ArtifactState {
-    exonum.runtime.ArtifactSpec spec = 1;
+    bytes deploy_spec = 1;
     ArtifactStatus status = 2;
 }
 
 message InstanceState {
-    exonum.runtime.InstanceSpec spec = 1;
+    InstanceSpec spec = 1;
     InstanceStatus status = 2;
 }

@@ -19,7 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, ChildAuthorization, Service},
+        rust::{CallContext, ChildAuthorization, DefaultInstance, Service},
         AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };

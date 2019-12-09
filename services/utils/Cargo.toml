@@ -16,11 +16,11 @@ description = "Composability utilities for Exonum, packaged as a service"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.12.0", path = "../../exonum" }
-exonum-crypto = { version = "0.12.0", path = "../../components/crypto" }
-exonum-derive = { version = "0.12.0", path = "../../components/derive" }
-exonum-merkledb = { version = "0.12.0", path = "../../components/merkledb" }
-exonum-proto = { version = "0.12.0", path = "../../components/proto" }
+exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
+exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
+exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
+exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 
 failure = "0.1.5"
 protobuf = "2.8.0"
@@ -29,8 +29,8 @@ serde = "1.0.101"
 serde_derive = "1.0.101"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.12.0", path = "../../test-suite/testkit" }
+exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
 serde_json = "1.0.42"
 
 [build-dependencies]
-exonum-build = { version = "0.12.0", path = "../../components/build" }
+exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }

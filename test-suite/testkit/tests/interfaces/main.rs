@@ -81,7 +81,7 @@ fn test_create_wallet_fallthrough_auth() {
         call.clone().sign(AnyCallService::ID, keypair.0, &keypair.1),
     )
     .unwrap_err();
-    assert_eq!(err.kind, Error::WrongInterfaceCaller.into());
+    assert_eq!(err, ErrorMatch::from_fail(&Error::WrongInterfaceCaller));
 
     // With fallthrough auth, the call should succeed.
     call.fallthrough_auth = true;
@@ -213,7 +213,7 @@ fn test_deposit_invalid_auth() {
         call.clone().sign(AnyCallService::ID, keypair.0, &keypair.1),
     )
     .unwrap_err();
-    assert_eq!(err.kind, Error::UnauthorizedIssuer.into());
+    assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
 
     call.fallthrough_auth = true;
     for i in 0..10 {
@@ -229,7 +229,7 @@ fn test_deposit_invalid_auth() {
         call.clone().sign(AnyCallService::ID, keypair.0, &keypair.1),
     )
     .unwrap_err();
-    assert_eq!(err.kind, Error::UnauthorizedIssuer.into());
+    assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
 }
 
 #[test]
