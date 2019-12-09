@@ -67,7 +67,7 @@ impl ProtobufConvert for Mode {
 impl Mode {
     /// Checks whether deploy should be performed within the network.
     pub fn deploy_approved<T: Access>(
-        &self,
+        self,
         deploy: &DeployRequest,
         deploy_requests: &MultisigIndex<T, DeployRequest>,
         validators: usize,
@@ -87,7 +87,7 @@ impl Mode {
 
     /// Checks whether config can be applied for the network.
     pub fn config_approved<T: Access>(
-        &self,
+        self,
         config_hash: &Hash,
         config_confirms: &MultisigIndex<T, Hash>,
         validators: usize,
