@@ -765,11 +765,11 @@ fn test_check_tx() {
     );
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
-    blockchain.as_ref().check_tx(&correct_tx).unwrap();
+    Blockchain::check_tx(&blockchain.snapshot(), &correct_tx).unwrap();
 
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
     assert_eq!(
-        blockchain.as_ref().check_tx(&incorrect_tx).unwrap_err(),
+        Blockchain::check_tx(&blockchain.snapshot(), &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
     );
 }

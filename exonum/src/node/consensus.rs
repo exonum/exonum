@@ -17,7 +17,7 @@ use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 use std::{collections::HashSet, convert::TryFrom};
 
 use crate::{
-    blockchain::{contains_transaction, Schema},
+    blockchain::{contains_transaction, Blockchain, Schema},
     crypto::{Hash, PublicKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
@@ -626,7 +626,7 @@ impl NodeHandler {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
-        if let Err(e) = self.blockchain.as_ref().check_tx(&msg) {
+        if let Err(e) = Blockchain::check_tx(&self.blockchain.snapshot(), &msg) {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
             // since the latter uses `invalid_txs` to recalculate the validity of proposals.
@@ -703,7 +703,7 @@ impl NodeHandler {
         // and maybe even panic (if most of nodes will approve a block with such a
         // transaction).
         // TODO: Move this check to the `ExplorerApi::add_transaction`. [ECR-3907]
-        if let Err(error) = self.blockchain.as_ref().check_tx(&msg) {
+        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &msg) {
             warn!(
                 "Received incorrect transaction from outside of the network; \
                  skipping it. Info on error: {}",
