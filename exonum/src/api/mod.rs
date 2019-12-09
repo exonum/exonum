@@ -27,7 +27,7 @@ pub mod websocket;
 
 use std::{collections::BTreeMap, fmt};
 
-use chrono::{DateTime, Utc};
+use chrono::{Date, Utc};
 use serde::{de::DeserializeOwned, Serialize};
 
 use self::{
@@ -81,7 +81,7 @@ pub trait ApiBackend: Sized {
         &mut self,
         name: N,
         endpoint: E,
-        discontinued_on: Option<DateTime<Utc>>,
+        discontinued_on: Option<Date<Utc>>,
     ) -> &mut Self
     where
         N: Into<String>,
@@ -100,7 +100,7 @@ pub trait ApiBackend: Sized {
         &mut self,
         name: N,
         endpoint: E,
-        discontinued_on: Option<DateTime<Utc>>,
+        discontinued_on: Option<Date<Utc>>,
     ) -> &mut Self
     where
         N: Into<String>,
@@ -195,7 +195,7 @@ impl ApiScope {
         &mut self,
         name: &'static str,
         endpoint: E,
-        discontinued_on: Option<DateTime<Utc>>,
+        discontinued_on: Option<Date<Utc>>,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -214,7 +214,7 @@ impl ApiScope {
         &mut self,
         name: &'static str,
         endpoint: E,
-        discontinued_on: Option<DateTime<Utc>>,
+        discontinued_on: Option<Date<Utc>>,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,

@@ -62,7 +62,7 @@ pub enum Actuality {
     Actual,
     /// Endpoint is not recommended to use, the support of it will end soon.
     /// Contains optional value denoting the endpoint expiration date.
-    Deprecated(Option<chrono::DateTime<chrono::Utc>>),
+    Deprecated(Option<chrono::Date<chrono::Utc>>),
 }
 
 /// API Endpoint extractor that also contains the endpoint name and its kind.

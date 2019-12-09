@@ -193,6 +193,9 @@ impl ResponseError for api::Error {
     }
 }
 
+/// Creates a `HttpResponse` object from the provided JSON value.
+/// Depending on the `actuality` parameter value, the warning about endpoint
+/// being deprecated can be added.
 fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpResponse {
     let mut response = HttpResponse::Ok();
 
@@ -201,7 +204,10 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
         // but currently it's only a draft. So the conventional way to notify API user
         // about endpoint deprecation is setting the `Warning` header.
         let expiration_note = match discontinued_on {
-            Some(date) => format!("The old API is maintained until {}.", date),
+            Some(date) => format!(
+                "The old API is maintained until {}.",
+                date.format("%Y-%m-%d")
+            ),
             None => "Currently there is no specific date for disabling this endpoint.".into(),
         };
 
@@ -563,28 +569,72 @@ impl From<AllowOrigin> for Cors {
     }
 }
 
-#[test]
-fn allow_origin_from_str() {
-    fn check(text: &str, expected: AllowOrigin) {
-        let from_str = AllowOrigin::from_str(text).unwrap();
-        assert_eq!(from_str, expected);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allow_origin_from_str() {
+        fn check(text: &str, expected: AllowOrigin) {
+            let from_str = AllowOrigin::from_str(text).unwrap();
+            assert_eq!(from_str, expected);
+        }
+
+        check(r#"*"#, AllowOrigin::Any);
+        check(
+            r#"http://example.com"#,
+            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+        );
+        check(
+            r#"http://a.org, http://b.org"#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
+        check(
+            r#"http://a.org, http://b.org, "#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
+        check(
+            r#"http://a.org,http://b.org"#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
     }
 
-    check(r#"*"#, AllowOrigin::Any);
-    check(
-        r#"http://example.com"#,
-        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-    );
-    check(
-        r#"http://a.org, http://b.org"#,
-        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-    );
-    check(
-        r#"http://a.org, http://b.org, "#,
-        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-    );
-    check(
-        r#"http://a.org,http://b.org"#,
-        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-    );
+    fn assert_responses_eq(left: HttpResponse, right: HttpResponse) {
+        assert_eq!(left.status(), right.status());
+        assert_eq!(left.headers(), right.headers());
+        assert_eq!(left.body(), right.body());
+    }
+
+    #[test]
+    fn json_responses() {
+        use chrono::TimeZone;
+
+        let actual_response = json_response(Actuality::Actual, 123);
+        assert_responses_eq(actual_response, HttpResponse::Ok().json(123));
+
+        let deprecated_response_no_deadline = json_response(Actuality::Deprecated(None), 123);
+        let expected_warning = "Deprecated API: This endpoint is deprecated, \
+                                see the documentation to find an alternative. \
+                                Currently there is no specific date for disabling this endpoint.";
+        assert_responses_eq(
+            deprecated_response_no_deadline,
+            HttpResponse::Ok()
+                .header(header::WARNING, expected_warning)
+                .json(123),
+        );
+
+        let deadline = chrono::Utc.ymd(2020, 12, 31);
+
+        let deprecated_response_deadline =
+            json_response(Actuality::Deprecated(Some(deadline)), 123);
+        let expected_warning = "Deprecated API: This endpoint is deprecated, \
+                                see the documentation to find an alternative. \
+                                The old API is maintained until 2020-12-31.";
+        assert_responses_eq(
+            deprecated_response_deadline,
+            HttpResponse::Ok()
+                .header(header::WARNING, expected_warning)
+                .json(123),
+        );
+    }
 }
