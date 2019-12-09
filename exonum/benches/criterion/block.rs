@@ -117,10 +117,10 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, BlockchainData, InstanceId,
+            AnyTx, InstanceId,
         },
     };
-    use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_merkledb::ObjectHash;
     use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
@@ -159,11 +159,7 @@ mod timestamping {
         }
     }
 
-    impl Service for Timestamping {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Timestamping {}
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
@@ -207,14 +203,14 @@ mod timestamping {
 mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
-        crypto::{Hash, PublicKey},
+        crypto::PublicKey,
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, BlockchainData, ErrorKind, InstanceId,
+            AnyTx, ErrorKind, InstanceId,
         },
     };
-    use exonum_merkledb::{access::AccessExt, Snapshot};
+    use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
@@ -304,11 +300,7 @@ mod cryptocurrency {
         }
     }
 
-    impl Service for Cryptocurrency {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Cryptocurrency {}
 
     impl From<Cryptocurrency> for InstanceCollection {
         fn from(t: Cryptocurrency) -> Self {
@@ -394,10 +386,9 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, BlockchainData, InstanceId,
+            AnyTx, InstanceId,
         },
     };
-    use exonum_merkledb::Snapshot;
     use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
@@ -502,11 +493,7 @@ mod foreign_interface_call {
 
     impl ERC30Tokens for Timestamping {}
 
-    impl Service for Timestamping {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Timestamping {}
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {

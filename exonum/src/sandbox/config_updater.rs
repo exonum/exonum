@@ -19,13 +19,12 @@ use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
 use crate::{
     blockchain::{ConsensusConfig, ExecutionError},
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::{PublicKey, SecretKey},
     helpers::Height,
-    merkledb::Snapshot,
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, Transaction},
-        BlockchainData, InstanceId, SUPERVISOR_INSTANCE_ID,
+        InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -54,11 +53,7 @@ impl ConfigUpdaterInterface for ConfigUpdaterService {
     }
 }
 
-impl Service for ConfigUpdaterService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for ConfigUpdaterService {}
 
 impl ConfigUpdaterService {
     pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;

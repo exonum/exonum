@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use exonum_merkledb::MapProof;
 use exonum_proto::ProtobufConvert;
 
 use crate::{
@@ -165,6 +167,19 @@ pub struct BlockProof {
     pub block: Block,
     /// List of `Precommit` messages for the block.
     pub precommits: Vec<Verified<Precommit>>,
+}
+
+/// Proof of authenticity for a single index within the database.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexProof {
+    /// Proof of authenticity for the block header.
+    #[serde(flatten)]
+    pub block_proof: BlockProof,
+
+    /// Proof of authenticity for the index. Must contain a single key - a full index name
+    /// in the form `$service_name.$name_within_service`, e.g., `cryptocurrency.wallets`.
+    /// The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
+    pub index_proof: MapProof<String, Hash>,
 }
 
 #[cfg(test)]

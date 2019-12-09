@@ -22,12 +22,12 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
-        ArtifactId, BlockchainData, DispatcherError, ErrorMatch, ExecutionError, InstanceId,
-        SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
+use exonum_derive::*;
+use exonum_merkledb::{access::AccessExt, ObjectHash};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -67,22 +67,13 @@ impl DefaultInstance for ConfigChangeService {
 #[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
 pub struct DeployableService;
 
-impl Service for DeployableService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for DeployableService {}
 
 #[exonum_interface]
 pub trait DeployableServiceInterface {}
 
 impl DeployableServiceInterface for DeployableService {}
-
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for ConfigChangeService {}
 
 impl Configure for ConfigChangeService {
     type Params = String;

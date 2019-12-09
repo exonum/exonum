@@ -20,10 +20,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
   Error fields were made private and information about a failing call
   was added. (#1585)
-- `ErrorMatch` was introduced to test (e.g., using the testkit) that
-  an `ExecutionError` has an expected type, error message and/or location. (#1585)
 - `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
   and a corresponding derive macro. (#1585)
+- State hash aggregation is now performed automatically by MerkleDB.
+  The relevant methods in `Runtime` and `Service` in Rust runtime
+  have been removed. (#1553)
 
 #### exonum-supervisor
 
@@ -34,6 +35,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
+- `ErrorMatch` was introduced to test (e.g., using the testkit) that
+  an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
+#### exonum-merkledb
+
+- MerkleDB now performs automated state aggregation allowing to construct proofs
+  for its contents. Hashed indexes which are not a part of a group participate
+  in this aggregation. Consult crate docs for more details on how
+  aggregation works. (#1553)
+- Added hashed version of `Entry` called `ProofEntry`, which participates
+  in the state aggregation. (#1553)
 
 - Mechanism to extend block header has been added. Using
 `Dispatcher::get_block_header_entries` is possible to add new entries. (#1602)

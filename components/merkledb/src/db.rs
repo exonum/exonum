@@ -14,128 +14,61 @@
 
 use std::{
     cell::RefCell,
-    cmp::Ordering::{Equal, Greater, Less},
-    collections::{
-        btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter},
-        hash_map::{IntoIter as HmIntoIter, Iter as HmIter},
-        Bound::{Included, Unbounded},
-        HashMap,
-    },
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
     iter::{Iterator as StdIterator, Peekable},
     mem,
-    ops::{Deref, DerefMut},
+    ops::{Bound, Deref, DerefMut},
     rc::Rc,
 };
 
 use crate::{
-    views::{AsReadonly, IndexAddress, RawAccess, View},
-    Error, Result,
+    views::{get_object_hash, AsReadonly, RawAccess, ResolvedAddress, View},
+    Error, Result, SystemSchema,
 };
 
-/// Finds a prefix immediately following the supplied one.
-pub fn next_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
-    let change_idx = prefix.iter().rposition(|&byte| byte < u8::max_value());
-    change_idx.map(|idx| {
-        let mut next_prefix = prefix.to_vec();
-        next_prefix[idx] += 1;
-        for byte in &mut next_prefix[(idx + 1)..] {
-            *byte = 0;
-        }
-        next_prefix
-    })
-}
-
-/// Removes all keys from the table that start with the specified prefix.
-pub fn remove_keys_with_prefix<V>(table: &mut BTreeMap<Vec<u8>, V>, prefix: &[u8]) {
-    if prefix.is_empty() {
-        // If the prefix is empty, we can be more efficient by clearing
-        // the entire changes in the patch.
-        table.clear();
-    } else {
-        // Remove all keys starting from `prefix`.
-        let mut tail = table.split_off(prefix);
-        if let Some(next_prefix) = next_prefix(prefix) {
-            tail = tail.split_off(&next_prefix);
-            table.append(&mut tail);
-        }
-    }
-}
-
-/// Map containing changes with a corresponding key.
-#[derive(Debug, Clone)]
-pub struct Changes {
-    data: BTreeMap<Vec<u8>, Change>,
-    prefixes_to_remove: Vec<Vec<u8>>,
-}
-
-/// Map containing changes with a corresponding key.
+/// Changes related to a specific `View`.
 #[derive(Debug, Clone)]
 pub struct ViewChanges {
+    /// Changes within the view.
     pub(super) data: BTreeMap<Vec<u8>, Change>,
-    empty: bool,
-}
-
-impl Changes {
-    /// Creates a new empty `Changes` instance.
-    fn new() -> Self {
-        Self {
-            data: BTreeMap::new(),
-            prefixes_to_remove: Vec::new(),
-        }
-    }
-
-    /// Returns an iterator over the changes.
-    pub fn iter(&self) -> BtmIter<'_, Vec<u8>, Change> {
-        self.data.iter()
-    }
-
-    /// Returns prefixes of keys that should be removed from the database.
-    pub fn prefixes_to_remove(&self) -> &[Vec<u8>] {
-        &self.prefixes_to_remove
-    }
+    /// Was the view cleared as a part of changes?
+    is_cleared: bool,
+    /// Is the view aggregated into `state_hash` of the database?
+    /// Storing this information directly in the changes allows to avoid relatively expensive
+    /// metadata lookups during state aggregator update in `Fork::into_patch()`.
+    is_aggregated: bool,
 }
 
 impl ViewChanges {
     fn new() -> Self {
         Self {
             data: BTreeMap::new(),
-            empty: false,
+            is_cleared: false,
+            is_aggregated: false,
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.empty
+    pub fn is_cleared(&self) -> bool {
+        self.is_cleared
+    }
+
+    #[cfg(test)]
+    pub fn is_aggregated(&self) -> bool {
+        self.is_aggregated
     }
 
     pub fn clear(&mut self) {
         self.data.clear();
-        self.empty = true;
+        self.is_cleared = true;
     }
-}
 
-/// Iterator over the `Changes` data.
-#[derive(Debug)]
-pub struct ChangesIterator {
-    inner: BtmIntoIter<Vec<u8>, Change>,
-}
-
-impl StdIterator for ChangesIterator {
-    type Item = (Vec<u8>, Change);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+    pub fn set_aggregation(&mut self, is_aggregated: bool) {
+        self.is_aggregated = is_aggregated;
     }
-}
 
-impl IntoIterator for Changes {
-    type Item = (Vec<u8>, Change);
-    type IntoIter = ChangesIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            inner: self.data.into_iter(),
-        }
+    pub fn into_data(self) -> BTreeMap<Vec<u8>, Change> {
+        self.data
     }
 }
 
@@ -144,8 +77,8 @@ impl IntoIterator for Changes {
 type ChangesCell = Option<Rc<ViewChanges>>;
 
 #[derive(Debug, Default)]
-pub struct WorkingPatch {
-    changes: RefCell<HashMap<IndexAddress, ChangesCell>>,
+struct WorkingPatch {
+    changes: RefCell<HashMap<ResolvedAddress, ChangesCell>>,
 }
 
 #[derive(Debug)]
@@ -180,7 +113,7 @@ impl Deref for ChangesRef {
 #[derive(Debug)]
 pub struct ChangesMut<'a> {
     parent: WorkingPatchRef<'a>,
-    key: IndexAddress,
+    key: ResolvedAddress,
     changes: Option<Rc<ViewChanges>>,
 }
 
@@ -224,13 +157,9 @@ impl WorkingPatch {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.changes.borrow().is_empty()
-    }
-
     /// Takes a cell with changes for a specific `View` out of the patch.
     /// The returned cell is guaranteed to contain an `Rc` with an exclusive ownership.
-    fn take_view_changes(&self, address: &IndexAddress) -> ChangesCell {
+    fn take_view_changes(&self, address: &ResolvedAddress) -> ChangesCell {
         let view_changes = {
             let mut changes = self.changes.borrow_mut();
             let view_changes = changes.get_mut(address).map(Option::take);
@@ -256,7 +185,7 @@ impl WorkingPatch {
 
     /// Clones changes for a specific `View` from the patch. Panics if the changes
     /// are mutably borrowed.
-    fn clone_view_changes(&self, address: &IndexAddress) -> Rc<ViewChanges> {
+    fn clone_view_changes(&self, address: &ResolvedAddress) -> Rc<ViewChanges> {
         let mut changes = self.changes.borrow_mut();
         // Get changes for the specified address.
         let changes: &ChangesCell = changes
@@ -274,36 +203,6 @@ impl WorkingPatch {
                 );
             })
             .clone()
-    }
-
-    /// Returns an immutable reference to the changes corresponding to a certain index.
-    ///
-    /// # Panics
-    ///
-    /// If an index with the `address` is already mutably borrowed.
-    pub fn changes(&self, address: &IndexAddress) -> ChangesRef {
-        ChangesRef {
-            inner: self.clone_view_changes(address),
-        }
-    }
-
-    /// Returns a mutable reference to the changes corresponding to a certain index.
-    ///
-    /// # Panics
-    ///
-    /// If an index with the `address` is already borrowed either immutably or mutably.
-    pub fn changes_mut(&self, address: &IndexAddress) -> ChangesMut<'_> {
-        ChangesMut {
-            changes: self.take_view_changes(address),
-            key: address.to_owned(),
-            parent: WorkingPatchRef::Borrowed(self),
-        }
-    }
-
-    pub fn clear(&self, address: &IndexAddress) {
-        let mut changes = self.changes.borrow_mut();
-        let change = changes.entry(address.clone());
-        change.and_modify(|v| *v = None);
     }
 
     // TODO: verify that this method updates `Change`s already in the `Patch` [ECR-2834]
@@ -331,54 +230,23 @@ impl WorkingPatch {
                 );
             });
 
+            if changes.is_aggregated {
+                patch.changed_aggregated_addrs.insert(address.clone());
+            }
+
+            // The patch may already contain changes related to the `address`. If it does,
+            // we extend these changes with the new changes (relying on the fact that
+            // newer changes override older ones), unless the view was cleared (in which case,
+            // the old changes do not matter and should be forgotten).
             let patch_changes = patch
                 .changes
-                .entry(address.name().to_owned())
-                .or_insert_with(Changes::new);
-
-            if changes.is_empty() {
-                let prefix = address.bytes().map_or(vec![], |bytes| bytes.to_vec());
-                remove_keys_with_prefix(&mut patch_changes.data, &prefix);
-
-                // Remember the prefix to be dropped from the database
-                patch_changes.prefixes_to_remove.push(prefix);
-            }
-
-            if address.bytes().is_none() {
-                patch_changes.data.extend(changes.data);
+                .entry(address)
+                .or_insert_with(ViewChanges::new);
+            if changes.is_cleared() {
+                *patch_changes = changes;
             } else {
-                patch_changes.data.extend(
-                    changes
-                        .data
-                        .into_iter()
-                        .map(|(key, value)| (address.keyed(&key).1.into_owned(), value)),
-                );
+                patch_changes.data.extend(changes.data);
             }
-        }
-    }
-}
-
-/// Iterator over the `Patch` data.
-#[derive(Debug)]
-pub struct PatchIterator {
-    inner: HmIntoIter<String, Changes>,
-}
-
-impl StdIterator for PatchIterator {
-    type Item = (String, Changes);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-impl IntoIterator for Patch {
-    type Item = (String, Changes);
-    type IntoIter = PatchIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter {
-            inner: self.changes.into_iter(),
         }
     }
 }
@@ -388,6 +256,7 @@ pub type Iter<'a> = Box<dyn Iterator + 'a>;
 
 /// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(test, derive(Eq, Hash))] // needed for patch equality comparison
 pub enum Change {
     /// Put the specified value into the storage for the corresponding key.
     Put(Vec<u8>),
@@ -482,7 +351,10 @@ pub struct Fork {
 #[derive(Debug)]
 pub struct Patch {
     snapshot: Box<dyn Snapshot>,
-    changes: HashMap<String, Changes>,
+    changes: HashMap<ResolvedAddress, ViewChanges>,
+    /// Addresses of aggregated indexes that were changed within this patch. This information
+    /// is used to update the state aggregator in `Fork::into_patch()`.
+    changed_aggregated_addrs: HashSet<ResolvedAddress>,
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
@@ -540,6 +412,7 @@ pub trait Database: Send + Sync + 'static {
             patch: Patch {
                 snapshot: self.snapshot(),
                 changes: HashMap::new(),
+                changed_aggregated_addrs: HashSet::new(),
             },
             working_patch: WorkingPatch::new(),
         }
@@ -570,6 +443,64 @@ pub trait Database: Send + Sync + 'static {
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
 
+/// Extension trait for `Database`.
+pub trait DatabaseExt: Database {
+    /// Merges a patch into the database and creates a rollback patch that reverses all the merged
+    /// changes.
+    ///
+    /// # Performance notes
+    ///
+    /// This method is linear w.r.t. patch size (i.e., the total number of changes in it) plus,
+    /// for each clear operation, the corresponding index size before clearing. As such,
+    /// the method may be inappropriate to use with large patches.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in the same situations as `Database::merge()`.
+    fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
+        let snapshot = self.snapshot();
+        let changed_aggregated_addrs = patch.changed_aggregated_addrs.clone();
+        let mut rev_changes = HashMap::with_capacity(patch.changes.len());
+
+        for (name, changes) in &patch.changes {
+            let mut view_changes = changes.data.clone();
+            for (key, change) in &mut view_changes {
+                *change = if let Some(value) = snapshot.get(name, key) {
+                    Change::Put(value)
+                } else {
+                    Change::Delete
+                };
+            }
+
+            // Remember all elements that will be deleted.
+            if changes.is_cleared() {
+                let mut iter = snapshot.iter(name, &[]);
+                while let Some((key, value)) = iter.next() {
+                    view_changes.insert(key.to_vec(), Change::Put(value.to_vec()));
+                }
+            }
+
+            rev_changes.insert(
+                name.to_owned(),
+                ViewChanges {
+                    data: view_changes,
+                    is_cleared: false,
+                    is_aggregated: changes.is_aggregated,
+                },
+            );
+        }
+
+        self.merge(patch)?;
+        Ok(Patch {
+            snapshot: self.snapshot(),
+            changes: rev_changes,
+            changed_aggregated_addrs,
+        })
+    }
+}
+
+impl<T: Database> DatabaseExt for T {}
+
 /// A read-only snapshot of a storage backend.
 ///
 /// A `Snapshot` instance is an immutable representation of a certain storage state.
@@ -581,18 +512,18 @@ pub trait Database: Send + Sync + 'static {
 pub trait Snapshot: Send + Sync + 'static {
     /// Returns a value corresponding to the specified key as a raw vector of bytes,
     /// or `None` if it does not exist.
-    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>>;
 
     /// Returns `true` if the snapshot contains a value for the specified key.
     ///
     /// Default implementation checks existence of the value using [`get`](#tymethod.get).
-    fn contains(&self, name: &str, key: &[u8]) -> bool {
+    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         self.get(name, key).is_some()
     }
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_>;
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_>;
 }
 
 /// A trait that defines a streaming iterator over storage view entries. Unlike
@@ -607,19 +538,14 @@ pub trait Iterator {
 }
 
 impl Patch {
-    /// Return changes keyed by the index address.
-    pub fn changes(&self) -> HashMap<String, Changes> {
-        self.changes.clone()
-    }
-
-    /// Return an iterator over the underlying changes.
-    pub fn iter(&self) -> HmIter<'_, String, Changes> {
-        self.changes.iter()
+    /// Iterates over changes in this patch.
+    pub(crate) fn into_changes(self) -> HashMap<ResolvedAddress, ViewChanges> {
+        self.changes
     }
 }
 
 impl Snapshot for Patch {
-    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
         if let Some(changes) = self.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
@@ -631,7 +557,7 @@ impl Snapshot for Patch {
         self.snapshot.get(name, key)
     }
 
-    fn contains(&self, name: &str, key: &[u8]) -> bool {
+    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         if let Some(changes) = self.changes.get(name) {
             if let Some(change) = changes.data.get(key) {
                 match *change {
@@ -643,8 +569,8 @@ impl Snapshot for Patch {
         self.snapshot.contains(name, key)
     }
 
-    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
-        let range = (Included(from), Unbounded);
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+        let range = (Bound::Included(from), Bound::Unbounded);
         let changes = match self.changes.get(name) {
             Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
@@ -654,6 +580,24 @@ impl Snapshot for Patch {
             snapshot: self.snapshot.iter(name, from),
             changes,
         })
+    }
+}
+
+impl RawAccess for &'_ Patch {
+    type Changes = ();
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        *self as &dyn Snapshot
+    }
+
+    fn changes(&self, _address: &ResolvedAddress) -> Self::Changes {}
+}
+
+impl AsReadonly for &'_ Patch {
+    type Readonly = Self;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        self
     }
 }
 
@@ -675,46 +619,19 @@ impl Fork {
     /// Converts the fork into `Patch` consuming the fork instance.
     pub fn into_patch(mut self) -> Patch {
         self.flush();
+
+        // Replacing `changed_aggregated_addrs` has a beneficial side-effect: if the patch
+        // returned by this method is converted back to a `Fork`, we won't need to update
+        // its state aggregator unless the *new* changes in the `Fork` concern aggregated indexes.
+        let changed_aggregated_addrs =
+            mem::replace(&mut self.patch.changed_aggregated_addrs, HashSet::new());
+        let updated_entries = changed_aggregated_addrs
+            .into_iter()
+            .map(|addr| (addr.name.clone(), get_object_hash(&self.patch, addr)));
+
+        SystemSchema::new(&self).update_state_aggregator(updated_entries);
+        self.flush(); // flushes changes in the state aggregator
         self.patch
-    }
-
-    /// Merges a patch from another fork to this fork.
-    ///
-    /// If both forks have changed the same data, this can lead to an inconsistent state. Hence,
-    /// this method is useful only if you are sure that forks interacted with different indices.
-    ///
-    /// # Panics
-    ///
-    /// Panics if a target `Fork` contains unflushed changes.
-    pub fn merge(&mut self, patch: Patch) {
-        assert!(!self.is_dirty(), "cannot merge a dirty fork");
-
-        for (name, changes) in patch {
-            if let Some(in_changes) = self.patch.changes.get_mut(&name) {
-                in_changes.data.extend(changes.into_iter());
-                continue;
-            }
-
-            {
-                self.patch.changes.insert(name.to_owned(), changes);
-            }
-        }
-    }
-
-    /// Checks if a fork has any unflushed changes.
-    pub fn is_dirty(&self) -> bool {
-        !self.working_patch.is_empty()
-    }
-
-    /// Patch containing current changes made in this fork.
-    pub fn working_patch(&self) -> &WorkingPatch {
-        &self.working_patch
-    }
-
-    /// Returns snapshot that also captures flushed changes in the fork,
-    /// but does not capture unflushed changes.
-    pub fn snapshot_without_unflushed_changes(&self) -> &dyn Snapshot {
-        &self.patch
     }
 
     /// Returns a readonly wrapper around the fork. Indices created based on the readonly
@@ -746,8 +663,13 @@ impl<'a> RawAccess for &'a Fork {
         &self.patch
     }
 
-    fn changes(&self, address: &IndexAddress) -> Self::Changes {
-        self.working_patch.changes_mut(address)
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
+        let changes = self.working_patch.take_view_changes(address);
+        ChangesMut {
+            changes,
+            key: address.clone(),
+            parent: WorkingPatchRef::Borrowed(&self.working_patch),
+        }
     }
 }
 
@@ -758,7 +680,7 @@ impl RawAccess for Rc<Fork> {
         &self.patch
     }
 
-    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         let changes = self.working_patch.take_view_changes(address);
         ChangesMut {
             changes,
@@ -835,16 +757,10 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
         &self.0.patch
     }
 
-    fn changes(&self, address: &IndexAddress) -> Self::Changes {
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         ChangesRef {
             inner: self.0.working_patch.clone_view_changes(address),
         }
-    }
-}
-
-impl AsRef<Fork> for Fork {
-    fn as_ref(&self) -> &Fork {
-        self
     }
 }
 
@@ -855,15 +771,15 @@ impl AsRef<dyn Snapshot> for dyn Snapshot {
 }
 
 impl Snapshot for Box<dyn Snapshot> {
-    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
         self.as_ref().get(name, key)
     }
 
-    fn contains(&self, name: &str, key: &[u8]) -> bool {
+    fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         self.as_ref().contains(name, key)
     }
 
-    fn iter(&self, name: &str, from: &[u8]) -> Iter<'_> {
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
         self.as_ref().iter(name, from)
     }
 }
@@ -880,6 +796,8 @@ where
     }
 
     fn step(&mut self) -> NextIterValue {
+        use std::cmp::Ordering::*;
+
         if let Some(ref mut changes) = self.changes {
             match changes.peek() {
                 Some(&(k, change)) => match self.snapshot.peek() {
@@ -1014,7 +932,8 @@ pub const VERSION_NAME: &str = "version";
 pub fn check_database(db: &mut dyn Database) -> Result<()> {
     let fork = db.fork();
     {
-        let mut view = View::new(&fork, DB_METADATA);
+        let addr = ResolvedAddress::system(DB_METADATA);
+        let mut view = View::new(&fork, addr);
         if let Some(saved_version) = view.get::<_, u8>(VERSION_NAME) {
             if saved_version != DB_VERSION {
                 return Err(Error::new(format!(
@@ -1029,4 +948,218 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
         }
     }
     db.merge(fork.into_patch())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{access::AccessExt, ObjectHash, TemporaryDB};
+
+    use std::{collections::HashSet, iter::FromIterator};
+
+    /// Asserts that a patch contains only the specified changes.
+    fn check_patch<'a, I>(patch: &Patch, changes: I)
+    where
+        I: IntoIterator<Item = (&'a str, &'a [u8], Change)>,
+    {
+        let mut patch_set: HashSet<_> = HashSet::new();
+        for (name, changes) in &patch.changes {
+            for (key, value) in &changes.data {
+                patch_set.insert((name.to_owned(), key.as_slice(), value.to_owned()));
+            }
+        }
+        let expected_set: HashSet<_> = changes
+            .into_iter()
+            .map(|(name, key, change)| (ResolvedAddress::system(name), key, change))
+            .collect();
+        assert_eq!(patch_set, expected_set);
+    }
+
+    #[test]
+    fn backup_data_is_correct() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        check_patch(&backup, vec![("foo", &[] as &[u8], Change::Delete)]);
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![2]));
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![3]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![4]);
+            let mut view = View::new(&fork, "bar2");
+            view.put(&vec![5], vec![6]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        check_patch(
+            &backup,
+            vec![
+                ("bar2", &[5_u8] as &[u8], Change::Delete),
+                ("bar", &[1], Change::Delete),
+                ("foo", &[], Change::Put(vec![2])),
+            ],
+        );
+
+        // Check that the old snapshot still corresponds to the same DB state.
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![2]));
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![3]));
+    }
+
+    #[test]
+    fn rollback_via_backup_patches() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![2]);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![3]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![4]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![3]));
+        assert_eq!(backup.get(&"foo".into(), &[]), Some(vec![2]));
+        assert_eq!(backup.get(&"bar".into(), &[1]), None);
+
+        db.merge(backup).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![2]));
+        assert_eq!(snapshot.get(&"bar".into(), &[1]), None);
+
+        // Check that DB continues working as usual after a rollback.
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![4]);
+            view.put(&vec![0, 0], vec![255]);
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![253]);
+        }
+        let backup1 = db.merge_with_backup(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![4]));
+        assert_eq!(snapshot.get(&"foo".into(), &[0, 0]), Some(vec![255]));
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "bar");
+            view.put(&vec![1], vec![254]);
+        }
+        let backup2 = db.merge_with_backup(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![4]));
+        assert_eq!(snapshot.get(&"foo".into(), &[0, 0]), Some(vec![255]));
+        assert_eq!(snapshot.get(&"bar".into(), &[1]), Some(vec![254]));
+
+        // Check patches used as `Snapshot`s.
+        assert_eq!(backup1.get(&"bar".into(), &[1]), None);
+        assert_eq!(backup2.get(&"bar".into(), &[1]), Some(vec![253]));
+        assert_eq!(backup1.get(&"foo".into(), &[]), Some(vec![2]));
+        assert_eq!(backup2.get(&"foo".into(), &[]), Some(vec![4]));
+
+        // Backups should be applied in the reverse order.
+        db.merge(backup2).unwrap();
+        db.merge(backup1).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![2]));
+        assert_eq!(snapshot.get(&"foo".into(), &[0, 0]), None);
+        assert_eq!(snapshot.get(&"bar".into(), &[1]), None);
+    }
+
+    #[test]
+    fn backup_after_clearing_view() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.put(&vec![], vec![1]);
+            view.put(&vec![1], vec![2]);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        {
+            let mut view = View::new(&fork, "foo");
+            view.clear();
+            view.put(&vec![1], vec![3]);
+            view.put(&vec![2], vec![4]);
+        }
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        assert_eq!(backup.get(&"foo".into(), &[]), Some(vec![1]));
+        assert_eq!(backup.get(&"foo".into(), &[1]), Some(vec![2]));
+        assert_eq!(backup.get(&"foo".into(), &[2]), None);
+        db.merge(backup).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![1]));
+        assert_eq!(snapshot.get(&"foo".into(), &[1]), Some(vec![2]));
+        assert_eq!(snapshot.get(&"foo".into(), &[2]), None);
+    }
+
+    #[test]
+    fn updated_addrs_are_efficiently_updated() {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+        fork.get_proof_list("foo").push(1_u64);
+        fork.get_proof_map("bar").put(&1_u64, 2_u64);
+        fork.get_list("baz").push(3_u64);
+        fork.flush();
+
+        let changed_addrs: HashSet<_> = fork
+            .patch
+            .changed_aggregated_addrs
+            .iter()
+            .map(|addr| addr.name.as_str())
+            .collect();
+        assert_eq!(changed_addrs, HashSet::from_iter(vec!["foo", "bar"]));
+
+        let patch = fork.into_patch();
+        assert!(patch.changed_aggregated_addrs.is_empty());
+        let mut fork = Fork::from(patch);
+        fork.get_list("baz").push(3_u64);
+        fork.flush();
+        assert!(fork.patch.changed_aggregated_addrs.is_empty());
+
+        fork.get_proof_list("other_list").push(42_i32);
+        fork.get_proof_map::<_, u64, u64>("bar").clear();
+        fork.flush();
+
+        let changed_addrs: HashSet<_> = fork
+            .patch
+            .changed_aggregated_addrs
+            .iter()
+            .map(|addr| addr.name.as_str())
+            .collect();
+        assert_eq!(changed_addrs, HashSet::from_iter(vec!["bar", "other_list"]));
+
+        let patch = fork.into_patch();
+        let aggregator = SystemSchema::new(&patch).state_aggregator();
+        assert_eq!(
+            aggregator.get(&"foo".to_owned()).unwrap(),
+            patch.get_proof_list::<_, u64>("foo").object_hash()
+        );
+        assert_eq!(
+            aggregator.get(&"bar".to_owned()).unwrap(),
+            patch.get_proof_map::<_, u64, u64>("bar").object_hash()
+        );
+        assert_eq!(
+            aggregator.get(&"other_list".to_owned()).unwrap(),
+            patch.get_proof_list::<_, u64>("other_list").object_hash()
+        );
+    }
 }

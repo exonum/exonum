@@ -18,9 +18,6 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-#[macro_use]
-extern crate serde_json;
-
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{self, Hash, PublicKey, SecretKey},
@@ -29,6 +26,7 @@ use exonum::{
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency_advanced::{
@@ -227,10 +225,8 @@ fn test_transfer_overcharge() {
 #[test]
 fn test_unknown_wallet_request() {
     let (_testkit, api) = create_testkit();
-
     // Transaction is sent by API, but isn't committed.
     let (tx, _) = api.create_wallet(ALICE_NAME);
-
     api.assert_no_wallet(tx.author());
 }
 
@@ -272,7 +268,23 @@ impl CryptocurrencyApi {
             .get::<WalletInfo>("v1/wallets/info")
             .unwrap();
 
-        let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
+        // Check parts of the proof returned together with the wallet.
+        let state_hash = wallet_info.block_proof.block.state_hash;
+        let to_table = wallet_info
+            .wallet_proof
+            .to_table
+            .check_against_hash(state_hash)
+            .unwrap();
+        let table_entries: Vec<_> = to_table.entries().collect();
+        assert_eq!(table_entries.len(), 1);
+        assert_eq!(*table_entries[0].0, format!("{}.wallets", SERVICE_NAME));
+        let table_hash = *table_entries[0].1;
+
+        let to_wallet = wallet_info
+            .wallet_proof
+            .to_wallet
+            .check_against_hash(table_hash)
+            .unwrap();
         let (_, wallet) = to_wallet.all_entries().find(|(&key, _)| key == pub_key)?;
         wallet.cloned()
     }

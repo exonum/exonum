@@ -16,7 +16,7 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator, WellKnownRuntime,
+        Runtime, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -133,10 +133,6 @@ impl Runtime for TestRuntime {
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
-    }
-
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
     }
 
     fn before_transactions(
