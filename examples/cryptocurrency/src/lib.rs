@@ -125,6 +125,13 @@ pub mod transactions {
         pub name: String,
     }
 
+    impl CreateWallet {
+        /// Creates a wallet with the specified name.
+        pub fn new(name: impl Into<String>) -> Self {
+            Self { name: name.into() }
+        }
+    }
+
     /// Transaction type for transferring tokens between two wallets.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
@@ -195,15 +202,11 @@ pub mod contracts {
 
     /// Cryptocurrency service transactions.
     #[exonum_interface]
-    pub trait CryptocurrencyInterface {
+    pub trait CryptocurrencyInterface<Ctx> {
         /// Creates wallet with the given `name`.
-        fn create_wallet(
-            &self,
-            ctx: CallContext<'_>,
-            arg: CreateWallet,
-        ) -> Result<(), ExecutionError>;
+        fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: CallContext<'_>, arg: TxTransfer) -> Result<(), ExecutionError>;
+        fn transfer(&self, ctx: Ctx, arg: TxTransfer) -> _;
     }
 
     /// Cryptocurrency service implementation.
@@ -212,12 +215,10 @@ pub mod contracts {
     #[service_factory(proto_sources = "crate::proto")]
     pub struct CryptocurrencyService;
 
-    impl CryptocurrencyInterface for CryptocurrencyService {
-        fn create_wallet(
-            &self,
-            context: CallContext<'_>,
-            arg: CreateWallet,
-        ) -> Result<(), ExecutionError> {
+    impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
+        type Output = Result<(), ExecutionError>;
+
+        fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Self::Output {
             let author = context
                 .caller()
                 .author()
@@ -234,11 +235,7 @@ pub mod contracts {
             }
         }
 
-        fn transfer(
-            &self,
-            context: CallContext<'_>,
-            arg: TxTransfer,
-        ) -> Result<(), ExecutionError> {
+        fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Self::Output {
             let author = context
                 .caller()
                 .author()

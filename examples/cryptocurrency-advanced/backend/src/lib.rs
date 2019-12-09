@@ -22,7 +22,7 @@ extern crate exonum_derive;
 #[macro_use]
 extern crate serde_derive;
 
-pub use crate::schema::Schema;
+pub use crate::{schema::Schema, transactions::CryptocurrencyInterface};
 
 pub mod api;
 pub mod proto;
@@ -39,7 +39,7 @@ use exonum::{
 };
 use exonum_merkledb::Snapshot;
 
-use crate::{api::PublicApi as CryptocurrencyApi, transactions::CryptocurrencyInterface};
+use crate::api::PublicApi as CryptocurrencyApi;
 
 /// Initial balance of the wallet.
 pub const INITIAL_BALANCE: u64 = 100;

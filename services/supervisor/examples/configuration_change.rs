@@ -14,10 +14,9 @@
 
 use exonum::{
     helpers::Height,
-    messages::Verified,
     runtime::{
-        rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, BlockchainData, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        rust::{CallContext, Service, ServiceFactory},
+        BlockchainData, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_crypto::Hash;
@@ -26,20 +25,18 @@ use exonum_merkledb::{
     access::{Access, AccessExt},
     Entry, ObjectHash, Snapshot,
 };
-use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor};
 use exonum_testkit::{TestKit, TestKitBuilder};
+
+use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor, SupervisorInterface};
 
 const SERVICE_ID: InstanceId = 256;
 const SERVICE_NAME: &str = "config";
 
 // Simple service to provide an example of how to implement the service configuration change.
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(implements("ConfigChangeInterface", "Configure<Params = String>"))]
+#[service_dispatcher(implements(raw = "Configure<Params = String>"))]
 #[service_factory(artifact_name = "config", artifact_version = "1.0.0")]
 pub struct ConfigChangeService;
-
-#[exonum_interface]
-pub trait ConfigChangeInterface {}
 
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
@@ -51,8 +48,6 @@ impl Service for ConfigChangeService {
         vec![]
     }
 }
-
-impl ConfigChangeInterface for ConfigChangeService {}
 
 // To allow service change its configuration we need to implement `Configure` trait.
 impl Configure for ConfigChangeService {
@@ -152,16 +147,17 @@ fn send_and_vote_for_propose(
         .unwrap();
 
     // Create signed transactions for all validators.
-    let signed_txs = testkit
+    let signed_txs: Vec<_> = testkit
         .network()
         .validators()
         .iter()
         .filter(|validator| validator.validator_id() != Some(initiator_id))
         .map(|validator| {
-            let keys = validator.service_keypair();
-            ConfigVote { propose_hash }.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1)
+            validator
+                .service_keypair()
+                .confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote { propose_hash })
         })
-        .collect::<Vec<Verified<AnyTx>>>();
+        .collect();
 
     // Confirm this propose.
     testkit

@@ -50,12 +50,14 @@ pub struct Config {
 }
 
 #[exonum_interface]
-pub trait TimestampingInterface {
-    fn timestamp(&self, ctx: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+pub trait TimestampingInterface<Ctx> {
+    fn timestamp(&self, ctx: Ctx, arg: TxTimestamp) -> _;
 }
 
-impl TimestampingInterface for TimestampingService {
-    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError> {
+impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+    type Output = Result<(), ExecutionError>;
+
+    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Self::Output {
         let (tx_hash, _) = context
             .caller()
             .as_transaction()

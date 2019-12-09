@@ -25,14 +25,16 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        rust::{RustRuntime, ServiceFactory, Transaction},
+        rust::{RustRuntime, ServiceFactory},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
         StateHashAggregator, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
+use exonum_supervisor::{
+    ConfigPropose, DeployRequest, StartService, Supervisor, SupervisorInterface,
+};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -299,20 +301,14 @@ fn main() {
     let handle = thread::spawn(move || {
         let deploy_height = Height(50);
         // Send an artifact `DeployRequest` to the sample runtime.
-        api_sender
-            .broadcast_transaction(
-                DeployRequest {
-                    artifact: "255:sample_artifact".parse().unwrap(),
-                    deadline_height: deploy_height,
-                    spec: Vec::default(),
-                }
-                .sign(
-                    SUPERVISOR_INSTANCE_ID,
-                    service_keypair.0,
-                    &service_keypair.1,
-                ),
-            )
-            .unwrap();
+        let request = DeployRequest {
+            artifact: "255:sample_artifact".parse().unwrap(),
+            deadline_height: deploy_height,
+            spec: Vec::default(),
+        };
+        let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
+        api_sender.broadcast_transaction(tx).unwrap();
+
         // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
 
