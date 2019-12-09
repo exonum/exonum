@@ -402,7 +402,7 @@ fn basic_rust_runtime() {
 
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(spec.clone(), constructor.clone())
+        .initiate_adding_service(spec.clone(), constructor.clone())
         .unwrap();
 
     {
@@ -604,7 +604,7 @@ fn conflicting_service_instances() {
     };
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(spec.clone(), constructor.clone())
+        .initiate_adding_service(spec.clone(), constructor.clone())
         .unwrap();
 
     // Fork #2: same service, but with different ID.
@@ -618,7 +618,7 @@ fn conflicting_service_instances() {
         &mut alternative_fork,
         Caller::Blockchain,
     )
-    .start_adding_service(alternative_spec.clone(), constructor.clone())
+    .initiate_adding_service(alternative_spec.clone(), constructor.clone())
     .unwrap();
 
     commit_block(&mut blockchain, fork);
@@ -797,7 +797,7 @@ fn dependent_service_with_no_dependency() {
     let mut fork = create_block(&blockchain);
     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
     let err = ctx
-        .start_adding_service(inst.instance_spec, inst.constructor)
+        .initiate_adding_service(inst.instance_spec, inst.constructor)
         .unwrap_err();
     assert!(err.to_string().contains("no dependency"));
 
@@ -835,9 +835,9 @@ fn dependent_service_in_same_block() {
     // Deploy both services in the same block after genesis.
     let mut fork = create_block(&blockchain);
     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
-    ctx.start_adding_service(main_inst.instance_spec, main_inst.constructor)
+    ctx.initiate_adding_service(main_inst.instance_spec, main_inst.constructor)
         .unwrap();
-    ctx.start_adding_service(dep_inst.instance_spec, dep_inst.constructor)
+    ctx.initiate_adding_service(dep_inst.instance_spec, dep_inst.constructor)
         .unwrap();
     commit_block(&mut blockchain, fork);
 
@@ -877,7 +877,7 @@ fn dependent_service_in_successive_block() {
 
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(dep_spec.instance_spec, dep_spec.constructor)
+        .initiate_adding_service(dep_spec.instance_spec, dep_spec.constructor)
         .unwrap();
     commit_block(&mut blockchain, fork);
 

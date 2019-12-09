@@ -37,8 +37,8 @@ use crate::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
         ArtifactId, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, MethodId, Runtime,
-        RuntimeIdentifier, StateHashAggregator,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
+        MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -143,8 +143,9 @@ struct SampleRuntime {
     runtime_type: u32,
     instance_id: InstanceId,
     method_id: MethodId,
-    new_services: Vec<InstanceId>,
-    new_service_sender: Sender<(u32, Vec<InstanceId>)>,
+    services: HashMap<InstanceId, InstanceStatus>,
+    new_services: Vec<(InstanceId, InstanceStatus)>,
+    new_service_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
 }
 
 impl SampleRuntime {
@@ -152,12 +153,13 @@ impl SampleRuntime {
         runtime_type: u32,
         instance_id: InstanceId,
         method_id: MethodId,
-        api_changes_sender: Sender<(u32, Vec<InstanceId>)>,
+        api_changes_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
     ) -> Self {
         Self {
             runtime_type,
             instance_id,
             method_id,
+            services: HashMap::new(),
             new_services: vec![],
             new_service_sender: api_changes_sender,
         }
@@ -172,10 +174,12 @@ impl From<SampleRuntime> for Arc<dyn Runtime> {
 
 impl Runtime for SampleRuntime {
     fn on_resume(&mut self) {
-        let changes = mem::replace(&mut self.new_services, vec![]);
-        self.new_service_sender
-            .send((self.runtime_type, changes))
-            .unwrap();
+        if !self.new_services.is_empty() {
+            let changes = mem::replace(&mut self.new_services, vec![]);
+            self.new_service_sender
+                .send((self.runtime_type, changes))
+                .unwrap();
+        }
     }
 
     fn deploy_artifact(
@@ -210,7 +214,18 @@ impl Runtime for SampleRuntime {
         spec: &InstanceSpec,
     ) -> Result<(), ExecutionError> {
         if spec.artifact.runtime_id == self.runtime_type {
-            self.new_services.push(spec.id);
+            let new_status = InstanceStatus::Active;
+
+            let status_changed = if let Some(status) = self.services.get(&spec.id).copied() {
+                status != new_status
+            } else {
+                true
+            };
+
+            if status_changed {
+                self.services.insert(spec.id, new_status);
+                self.new_services.push((spec.id, new_status));
+            }
             Ok(())
         } else {
             Err(DispatcherError::IncorrectRuntime.into())
@@ -339,8 +354,8 @@ fn test_dispatcher_simple() {
     };
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
     context
-        .start_adding_service(rust_service, vec![])
-        .expect("`start_adding_service` failed for rust");
+        .initiate_adding_service(rust_service, vec![])
+        .expect("`initiate_adding_service` failed for rust");
 
     let java_service = InstanceSpec {
         artifact: java_artifact.clone(),
@@ -348,8 +363,8 @@ fn test_dispatcher_simple() {
         name: JAVA_SERVICE_NAME.into(),
     };
     context
-        .start_adding_service(java_service, vec![])
-        .expect("`start_adding_service` failed for java");
+        .initiate_adding_service(java_service, vec![])
+        .expect("`initiate_adding_service` failed for java");
 
     // Since services are not active yet, transactions to them should fail.
     let tx_payload = [0x00_u8; 1];
@@ -371,7 +386,7 @@ fn test_dispatcher_simple() {
 
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
     let err = context
-        .start_adding_service(conflicting_rust_service, vec![])
+        .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(
         err,
@@ -384,7 +399,7 @@ fn test_dispatcher_simple() {
         name: RUST_SERVICE_NAME.to_owned(),
     };
     let err = context
-        .start_adding_service(conflicting_rust_service, vec![])
+        .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(
         err,
@@ -430,8 +445,14 @@ fn test_dispatcher_simple() {
 
     // Check that API changes in the dispatcher contain the started services.
     let expected_new_services = vec![
-        (SampleRuntimes::First as u32, vec![RUST_SERVICE_ID]),
-        (SampleRuntimes::Second as u32, vec![JAVA_SERVICE_ID]),
+        (
+            SampleRuntimes::First as u32,
+            vec![(RUST_SERVICE_ID, InstanceStatus::Active)],
+        ),
+        (
+            SampleRuntimes::Second as u32,
+            vec![(JAVA_SERVICE_ID, InstanceStatus::Active)],
+        ),
     ];
     assert_eq!(
         expected_new_services,
@@ -493,7 +514,7 @@ fn test_dispatcher_rust_runtime_no_service() {
     };
 
     let err = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
-        .start_adding_service(rust_service, vec![])
+        .initiate_adding_service(rust_service, vec![])
         .unwrap_err();
     assert_eq!(
         err,
@@ -920,4 +941,104 @@ fn recoverable_error_during_deployment() {
     // The dispatcher should try to deploy the artifact again despite a previous failure.
     assert!(dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 2);
+}
+
+#[test]
+fn restart_with_stopped_services() {
+    let instance_id = 0;
+
+    // Create blockchain with the sample runtime with the active service instance.
+    let db = Arc::new(TemporaryDB::new());
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender(mpsc::channel(1).0),
+    );
+
+    let (changes_tx, changes_rx) = channel();
+    let runtime = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, changes_tx.clone());
+
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(runtime.runtime_type, runtime.clone())
+        .finalize(&blockchain);
+
+    let mut fork = db.fork();
+
+    let artifact = ArtifactId {
+        runtime_id: SampleRuntimes::First as u32,
+        name: "first".into(),
+    };
+    dispatcher
+        .commit_artifact_sync(&fork, artifact.clone(), vec![])
+        .unwrap();
+
+    let service = InstanceSpec {
+        artifact: artifact.clone(),
+        id: instance_id,
+        name: "supervisor".into(),
+    };
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    context
+        .initiate_adding_service(service, vec![])
+        .expect("`initiate_adding_service` failed");
+
+    debug!("create_genesis_block");
+    // Activate artifact and service.
+    create_genesis_block(&mut dispatcher, &mut fork);
+
+    // Change instance status to stopped.
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    context
+        .initiate_stopping_service(instance_id)
+        .expect("'initiate_stopping_service` failed");
+
+    // Check if transactions are still ready for execution.
+    dispatcher
+        .call(
+            &mut fork,
+            Caller::Service { instance_id: 1 },
+            &CallInfo::new(instance_id, 0),
+            &[],
+        )
+        .expect("Correct transaction");
+
+    // Commit service status
+    debug!("Commit and notify runtimes");
+    dispatcher.activate_pending(&fork);
+    dispatcher.commit_block_and_notify_runtimes(&mut fork);
+    db.merge_sync(fork.into_patch()).unwrap();
+    // Take notification about started service.
+    assert_eq!(
+        changes_rx.iter().take(1).collect::<Vec<_>>(),
+        vec![(
+            SampleRuntimes::First as u32,
+            vec![(instance_id, InstanceStatus::Active)]
+        )]
+    );
+
+    // TODO Check that the runtime actually stops the service instance. [ECR-3762]
+
+    // Emulate dispatcher restart
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(runtime.runtime_type, runtime)
+        .finalize(&blockchain);
+    let mut fork = db.fork();
+    debug!("Initiate restore state");
+    dispatcher
+        .restore_state(fork.snapshot_without_unflushed_changes())
+        .unwrap();
+
+    changes_rx
+        .recv_timeout(Duration::new(0, 0))
+        .expect_err("Changes should be empty.");
+
+    // Check if transactions become incorrect.
+    dispatcher
+        .call(
+            &mut fork,
+            Caller::Service { instance_id: 1 },
+            &CallInfo::new(instance_id, 0),
+            &[],
+        )
+        .expect_err("Incorrect transaction");
 }

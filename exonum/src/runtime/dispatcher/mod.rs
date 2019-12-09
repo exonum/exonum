@@ -129,6 +129,8 @@ impl Dispatcher {
 
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
+        debug!("Restore state");
+
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
         for state in schema.artifacts().values() {
@@ -175,7 +177,7 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
-            .start_adding_service(spec, constructor)?;
+            .initiate_adding_service(spec, constructor)?;
         Ok(())
     }
 
@@ -483,7 +485,7 @@ impl Dispatcher {
     }
 
     /// Commits service instance state in the corresponding runtime.
-    fn commit_service_state(
+    pub(super) fn commit_service_state(
         &mut self,
         snapshot: &dyn Snapshot,
         instance: &InstanceSpec,
@@ -495,6 +497,12 @@ impl Dispatcher {
             .get_mut(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
         // TODO Rewrite runtime API to pass status to runtime.
+        debug!(
+            "commit_service_state {:?}: {} {}",
+            instance,
+            status,
+            status.is_active()
+        );
         if status.is_active() {
             runtime.commit_service(snapshot, instance)?;
         }

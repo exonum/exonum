@@ -634,12 +634,12 @@ impl<'a> ExecutionContext<'a> {
             })
     }
 
-    /// Starts adding a new service instance to the blockchain. The created service is not active
+    /// Initiates adding a new service instance to the blockchain. The created service is not active
     /// (i.e., does not process transactions or the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     ///
     /// This method should be called for the exact context passed to the runtime.
-    pub(crate) fn start_adding_service(
+    pub(crate) fn initiate_adding_service(
         &mut self,
         spec: InstanceSpec,
         constructor: impl BinaryValue,
@@ -663,7 +663,24 @@ impl<'a> ExecutionContext<'a> {
 
         // Add service instance to the dispatcher schema.
         DispatcherSchema::new(&*self.fork)
-            .add_pending_service(spec)
+            .initiate_adding_service(spec)
+            .map_err(From::from)
+    }
+
+    /// Initiates stopping of an existing service instance in the blockchain. The stopping
+    /// service is active (i.e., does process transactions or `after_transactions` hook)
+    /// until the block built on top of the provided `fork` is committed.
+    ///
+    /// This method should be called for the exact context passed to the runtime.
+    pub(crate) fn initiate_stopping_service(
+        &mut self,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        // TODO Runtime part
+
+        // Add information about stopping service to the dispatcher schema.
+        DispatcherSchema::new(&*self.fork)
+            .initiate_stopping_service(instance_id)
             .map_err(From::from)
     }
 

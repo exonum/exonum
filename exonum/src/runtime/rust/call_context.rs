@@ -142,6 +142,6 @@ impl<'a> CallContext<'a> {
 
         self.inner
             .child_context(self.instance.id)
-            .start_adding_service(instance_spec, constructor)
+            .initiate_adding_service(instance_spec, constructor)
     }
 }
