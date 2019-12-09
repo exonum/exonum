@@ -105,8 +105,6 @@ fn test_service_protos_with_incorrect_service() {
 
     match response {
         Ok(_) => panic!("Unexpected OK"),
-        Err(err) => {
-            assert_matches!(err, ApiError::NotFound(ref body) if body == "Unable to find sources for artifact invalid-service:0.0.1")
-        }
+        Err(err) => assert_matches!(err, ApiError::NotFound(ref body) if body == "Unable to find sources for artifact invalid-service:0.0.1"),
     }
 }
