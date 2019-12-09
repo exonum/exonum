@@ -90,8 +90,8 @@ pub trait ApiBackend: Sized {
     fn deprecated_endpoint<N, Q, I, R, F, E>(
         &mut self,
         name: N,
-        endpoint: E,
         discontinued_on: Option<Date<Utc>>,
+        endpoint: E,
     ) -> &mut Self
     where
         N: Into<String>,
@@ -109,8 +109,8 @@ pub trait ApiBackend: Sized {
     fn deprecated_endpoint_mut<N, Q, I, R, F, E>(
         &mut self,
         name: N,
-        endpoint: E,
         discontinued_on: Option<Date<Utc>>,
+        endpoint: E,
     ) -> &mut Self
     where
         N: Into<String>,
@@ -204,8 +204,8 @@ impl ApiScope {
     pub fn deprecated_endpoint<Q, I, R, F, E>(
         &mut self,
         name: &'static str,
-        endpoint: E,
         discontinued_on: Option<Date<Utc>>,
+        endpoint: E,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -215,7 +215,7 @@ impl ApiScope {
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
         self.actix_backend
-            .deprecated_endpoint(name, endpoint, discontinued_on);
+            .deprecated_endpoint(name, discontinued_on, endpoint);
         self
     }
 
@@ -223,8 +223,8 @@ impl ApiScope {
     pub fn deprecated_endpoint_mut<Q, I, R, F, E>(
         &mut self,
         name: &'static str,
-        endpoint: E,
         discontinued_on: Option<Date<Utc>>,
+        endpoint: E,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -234,13 +234,13 @@ impl ApiScope {
         actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
         self.actix_backend
-            .deprecated_endpoint_mut(name, endpoint, discontinued_on);
+            .deprecated_endpoint_mut(name, discontinued_on, endpoint);
         self
     }
 
     /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
     /// to the incoming requests.
-    /// Responce will include a "Location" header denoting a new location of the resourse.
+    /// Response will include a "Location" header denoting a new location of the resourse.
     pub fn moved_permanently(
         &mut self,
         name: &'static str,

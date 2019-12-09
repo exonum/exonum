@@ -14,7 +14,9 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use crate::api::{Error, FutureResult, Result};
+pub use crate::api::{EndpointMutability, Error, FutureResult, Result};
+
+use chrono::{Date, Utc};
 
 use exonum_crypto::PublicKey;
 use exonum_merkledb::{access::Prefixed, Snapshot};
@@ -95,7 +97,7 @@ pub struct ServiceApiScope {
 }
 
 impl ServiceApiScope {
-    /// Create a new service API scope for the specified service instance.
+    /// Creates a new service API scope for the specified service instance.
     pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             inner: ApiScope::new(),
@@ -104,7 +106,7 @@ impl ServiceApiScope {
         }
     }
 
-    /// Add a readonly endpoint handler to the service API scope.
+    /// Adds a readonly endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `GET` requests.
     /// [Read more.](../../../api/struct.ApiScope.html#endpoint)
@@ -132,7 +134,7 @@ impl ServiceApiScope {
         self
     }
 
-    /// Add an endpoint handler to the service API scope.
+    /// Adds an endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `POST` requests.
     /// [Read more.](../../../api/struct.ApiScope.html#endpoint_mut)
@@ -157,6 +159,92 @@ impl ServiceApiScope {
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
+        self
+    }
+
+    /// Same as `endpoint`, but also add a warning about this endpoint being deprecated to the response.
+    pub fn deprecated_endpoint<Q, I, F, R>(
+        &mut self,
+        name: &'static str,
+        discontinued_on: Option<Date<Utc>>,
+        handler: F,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        self.inner.deprecated_endpoint(
+            name,
+            discontinued_on,
+            move |query: Q| -> crate::api::FutureResult<I> {
+                let state = ServiceApiState::from_api_context(
+                    &blockchain,
+                    InstanceDescriptor {
+                        id: descriptor.0,
+                        name: descriptor.1.as_ref(),
+                    },
+                );
+                let result = handler(&state, query);
+                Box::new(result.into_future())
+            },
+        );
+        self
+    }
+
+    /// Same as `endpoint_mut`, but also add a warning about this endpoint being deprecated to the response.
+    pub fn deprecated_endpoint_mut<Q, I, F, R>(
+        &mut self,
+        name: &'static str,
+        discontinued_on: Option<Date<Utc>>,
+        handler: F,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        self.inner.deprecated_endpoint_mut(
+            name,
+            discontinued_on,
+            move |query: Q| -> crate::api::FutureResult<I> {
+                let state = ServiceApiState::from_api_context(
+                    &blockchain,
+                    InstanceDescriptor {
+                        id: descriptor.0,
+                        name: descriptor.1.as_ref(),
+                    },
+                );
+                let result = handler(&state, query);
+                Box::new(result.into_future())
+            },
+        );
+        self
+    }
+
+    /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
+    /// to the incoming requests.
+    /// Response will include a "Location" header denoting a new location of the resourse.
+    pub fn moved_permanently(
+        &mut self,
+        name: &'static str,
+        new_location: &'static str,
+        mutability: EndpointMutability,
+    ) -> &mut Self {
+        self.inner.moved_permanently(name, new_location, mutability);
+        self
+    }
+
+    /// Creates an endpoint which will return "410 Gone" HTTP status code
+    /// to the incoming requests.
+    pub fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self {
+        self.inner.gone(name, mutability);
         self
     }
 
