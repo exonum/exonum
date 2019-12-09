@@ -16,7 +16,7 @@
 
 pub use self::{
     error::Error,
-    with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
+    with::{Actuality, FutureResult, Immutable, Mutable, NamedWith, Result, With},
 };
 
 pub mod backends;
@@ -25,9 +25,10 @@ pub mod manager;
 pub mod node;
 pub mod websocket;
 
-use serde::{de::DeserializeOwned, Serialize};
-
 use std::{collections::BTreeMap, fmt};
+
+use chrono::{DateTime, Utc};
+use serde::{de::DeserializeOwned, Serialize};
 
 use self::{
     backends::actix,
@@ -47,7 +48,7 @@ pub trait ApiBackend: Sized {
     /// Concrete backend API builder.
     type Backend;
 
-    /// Add the given endpoint handler to the backend.
+    /// Adds the given endpoint handler to the backend.
     fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
         N: Into<String>,
@@ -57,11 +58,11 @@ pub trait ApiBackend: Sized {
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
-        let named_with = NamedWith::new(name, endpoint);
+        let named_with = NamedWith::new(name, endpoint, Actuality::Actual);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Add the given mutable endpoint handler to the backend.
+    /// Adds the given mutable endpoint handler to the backend.
     fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
         N: Into<String>,
@@ -71,9 +72,61 @@ pub trait ApiBackend: Sized {
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
-        let named_with = NamedWith::new(name, endpoint);
+        let named_with = NamedWith::new(name, endpoint, Actuality::Actual);
         self.raw_handler(Self::Handler::from(named_with))
     }
+
+    /// Adds the given endpoint handler to the backend, marking it as deprecated.
+    fn deprecated_endpoint<N, Q, I, R, F, E>(
+        &mut self,
+        name: N,
+        endpoint: E,
+        discontinued_on: Option<DateTime<Utc>>,
+    ) -> &mut Self
+    where
+        N: Into<String>,
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
+    {
+        let named_with = NamedWith::new(name, endpoint, Actuality::Deprecated(discontinued_on));
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
+    /// Adds the given mutable endpoint handler to the backend, marking it as deprecated.
+    fn deprecated_endpoint_mut<N, Q, I, R, F, E>(
+        &mut self,
+        name: N,
+        endpoint: E,
+        discontinued_on: Option<DateTime<Utc>>,
+    ) -> &mut Self
+    where
+        N: Into<String>,
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
+    {
+        let named_with = NamedWith::new(name, endpoint, Actuality::Deprecated(discontinued_on));
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
+    /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
+    /// to the incoming requests.
+    /// Responce will include a "Location" header denoting a new location of the resourse.
+    fn moved_permanently(
+        &mut self,
+        name: &'static str,
+        new_location: &'static str,
+        mutable: bool,
+    ) -> &mut Self;
+
+    /// Creates an endpoint which will return "410 Gone" HTTP status code
+    /// to the incoming requests.
+    fn gone(&mut self, name: &'static str, mutable: bool) -> &mut Self;
 
     /// Add the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
@@ -93,12 +146,12 @@ pub struct ApiScope {
 }
 
 impl ApiScope {
-    /// Create a new instance.
+    /// Creates a new instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Add the given endpoint handler to the API scope. These endpoints
+    /// Adds the given endpoint handler to the API scope. These endpoints
     /// are designed for reading operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -118,7 +171,7 @@ impl ApiScope {
         self
     }
 
-    /// Add the given mutable endpoint handler to the API scope. These endpoints
+    /// Adds the given mutable endpoint handler to the API scope. These endpoints
     /// are designed for modification operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -137,7 +190,66 @@ impl ApiScope {
         self
     }
 
-    /// Return a mutable reference to the underlying web backend.
+    /// Same as `endpoint`, but also add a warning about this endpoint being deprecated to the response.
+    pub fn deprecated_endpoint<Q, I, R, F, E>(
+        &mut self,
+        name: &'static str,
+        endpoint: E,
+        discontinued_on: Option<DateTime<Utc>>,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
+    {
+        self.actix_backend
+            .deprecated_endpoint(name, endpoint, discontinued_on);
+        self
+    }
+
+    /// Same as `endpoint_mut`, but also add a warning about this endpoint being deprecated to the response.
+    pub fn deprecated_endpoint_mut<Q, I, R, F, E>(
+        &mut self,
+        name: &'static str,
+        endpoint: E,
+        discontinued_on: Option<DateTime<Utc>>,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
+    {
+        self.actix_backend
+            .deprecated_endpoint_mut(name, endpoint, discontinued_on);
+        self
+    }
+
+    /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
+    /// to the incoming requests.
+    /// Responce will include a "Location" header denoting a new location of the resourse.
+    pub fn moved_permanently(
+        &mut self,
+        name: &'static str,
+        new_location: &'static str,
+        mutable: bool,
+    ) -> &mut Self {
+        self.actix_backend
+            .moved_permanently(name, new_location, mutable);
+        self
+    }
+
+    /// Creates an endpoint which will return "410 Gone" HTTP status code
+    /// to the incoming requests.
+    pub fn gone(&mut self, name: &'static str, mutable: bool) -> &mut Self {
+        self.actix_backend.gone(name, mutable);
+        self
+    }
+
+    /// Returns a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         &mut self.actix_backend
     }

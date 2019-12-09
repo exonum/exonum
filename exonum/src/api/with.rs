@@ -55,6 +55,16 @@ pub struct Immutable;
 #[derive(Debug)]
 pub struct Mutable;
 
+/// Endpoint actuality.
+#[derive(Debug, Clone)]
+pub enum Actuality {
+    /// Endpoint is suitable for use.
+    Actual,
+    /// Endpoint is not recommended to use, the support of it will end soon.
+    /// Contains optional value denoting the endpoint expiration date.
+    Deprecated(Option<chrono::DateTime<chrono::Utc>>),
+}
+
 /// API Endpoint extractor that also contains the endpoint name and its kind.
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F, K> {
@@ -62,12 +72,14 @@ pub struct NamedWith<Q, I, R, F, K> {
     pub name: String,
     /// Extracted endpoint handler.
     pub inner: With<Q, I, R, F>,
+    /// Endpoint actuality.
+    pub actuality: Actuality,
     _kind: PhantomData<K>,
 }
 
 impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
     /// Creates a new instance from the given handler.
-    pub fn new<S, W>(name: S, inner: W) -> Self
+    pub fn new<S, W>(name: S, inner: W, actuality: Actuality) -> Self
     where
         S: Into<String>,
         W: Into<With<Q, I, R, F>>,
@@ -75,6 +87,7 @@ impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
         Self {
             name: name.into(),
             inner: inner.into(),
+            actuality,
             _kind: PhantomData::default(),
         }
     }

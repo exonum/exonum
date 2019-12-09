@@ -33,6 +33,15 @@ pub enum Error {
     #[fail(display = "Bad request: {}", _0)]
     BadRequest(String),
 
+    /// Moved permanently. This error means that resource existed at the specified
+    /// location, but now is moved to the other place.
+    #[fail(display = "Moved permanently; Location: {}", _0)]
+    MovedPermanently(String),
+
+    /// Gone. This error means that resource existed in the past, but now is not present.
+    #[fail(display = "Gone")]
+    Gone,
+
     /// Not found. This error occurs when the server cannot locate the requested
     /// resource.
     #[fail(display = "Not found: {}", _0)]

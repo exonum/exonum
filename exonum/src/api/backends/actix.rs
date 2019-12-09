@@ -21,7 +21,8 @@ pub use actix_web::middleware::cors::Cors;
 
 use actix::{Actor, System};
 use actix_web::{
-    error::ResponseError, AsyncResponder, FromRequest, HttpMessage, HttpResponse, Query,
+    error::ResponseError, http::header, AsyncResponder, FromRequest, HttpMessage, HttpResponse,
+    Query,
 };
 use failure::Error;
 use futures::{sync::mpsc, Future, IntoFuture, Stream};
@@ -42,8 +43,8 @@ use std::{
 use crate::api::{
     self,
     manager::{ApiManager, UpdateEndpoints},
-    ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult, Immutable,
-    Mutable, NamedWith,
+    Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult,
+    Immutable, Mutable, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -94,6 +95,33 @@ impl ApiBackend for ApiBuilder {
     type Handler = RequestHandler;
     type Backend = actix_web::Scope<()>;
 
+    fn moved_permanently(
+        &mut self,
+        name: &'static str,
+        new_location: &'static str,
+        mutable: bool,
+    ) -> &mut Self {
+        let handler = move |_request: HttpRequest| -> FutureResponse {
+            let response = api::Error::MovedPermanently(new_location.to_owned()).into();
+            let response_future = Err(response).into_future();
+
+            Box::new(response_future)
+        };
+
+        self.mount_raw_handler(name, handler, mutable)
+    }
+
+    fn gone(&mut self, name: &'static str, mutable: bool) -> &mut Self {
+        let handler = move |_request: HttpRequest| -> FutureResponse {
+            let response = api::Error::Gone.into();
+            let response_future = Err(response).into_future();
+
+            Box::new(response_future)
+        };
+
+        self.mount_raw_handler(name, handler, mutable)
+    }
+
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
         self.handlers.push(handler);
         self
@@ -107,6 +135,30 @@ impl ApiBackend for ApiBuilder {
             });
         }
         output
+    }
+}
+
+impl ApiBuilder {
+    /// Mounts a given handler to the endpoint, either mutable or immutable.
+    fn mount_raw_handler<F>(&mut self, name: &'static str, handler: F, mutable: bool) -> &mut Self
+    where
+        F: Fn(HttpRequest) -> FutureResponse + Send + Sync + 'static,
+    {
+        use actix_web::http;
+
+        let method = if mutable {
+            http::Method::POST
+        } else {
+            http::Method::GET
+        };
+
+        self.raw_handler(RequestHandler {
+            name: name.to_owned(),
+            method,
+            inner: Arc::from(handler),
+        });
+
+        self
     }
 }
 
@@ -131,10 +183,39 @@ impl ResponseError for api::Error {
             }
             api::Error::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
             api::Error::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            api::Error::Gone => HttpResponse::Gone().finish(),
+            api::Error::MovedPermanently(new_location) => HttpResponse::MovedPermanently()
+                .header(header::LOCATION, new_location.clone())
+                .finish(),
             api::Error::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
             api::Error::Unauthorized => HttpResponse::Unauthorized().finish(),
         }
     }
+}
+
+fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpResponse {
+    let mut response = HttpResponse::Ok();
+
+    if let Actuality::Deprecated(ref discontinued_on) = actuality {
+        // There is a proposal for creating special deprecation header within HTTP,
+        // but currently it's only a draft. So the conventional way to notify API user
+        // about endpoint deprecation is setting the `Warning` header.
+        let expiration_note = match discontinued_on {
+            Some(date) => format!("The old API is maintained until {}.", date),
+            None => "Currently there is no specific date for disabling this endpoint.".into(),
+        };
+
+        let warning_text = format!(
+            "Deprecated API: This endpoint is deprecated, \
+             see the documentation to find an alternative. \
+             {}",
+            expiration_note
+        );
+
+        response.header(header::WARNING, warning_text);
+    }
+
+    response.json(json_value)
 }
 
 impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, Immutable>> for RequestHandler
@@ -145,11 +226,13 @@ where
 {
     fn from(f: NamedWith<Q, I, api::Result<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
+        let actuality = f.actuality;
         let index = move |request: HttpRequest| -> FutureResponse {
+            let actuality = actuality.clone();
             let future = Query::from_request(&request, &Default::default())
                 .map(Query::into_inner)
                 .and_then(|query| handler(query).map_err(From::from))
-                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
+                .and_then(|value| Ok(json_response(actuality, value)))
                 .into_future();
             Box::new(future)
         };
@@ -170,14 +253,16 @@ where
 {
     fn from(f: NamedWith<Q, I, api::Result<I>, F, Mutable>) -> Self {
         let handler = f.inner.handler;
+        let actuality = f.actuality;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
+            let actuality = actuality.clone();
             request
                 .json()
                 .from_err()
                 .and_then(move |query: Q| {
                     handler(query)
-                        .map(|value| HttpResponse::Ok().json(value))
+                        .map(|value| json_response(actuality, value))
                         .map_err(From::from)
                 })
                 .responder()
@@ -199,13 +284,15 @@ where
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
+        let actuality = f.actuality;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
+            let actuality = actuality.clone();
             Query::from_request(&request, &Default::default())
                 .map(Query::into_inner)
                 .into_future()
                 .and_then(move |query| handler(query).map_err(From::from))
-                .map(|value| HttpResponse::Ok().json(value))
+                .map(|value| json_response(actuality, value))
                 .responder()
         };
 
@@ -225,14 +312,16 @@ where
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F, Mutable>) -> Self {
         let handler = f.inner.handler;
+        let actuality = f.actuality;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
+            let actuality = actuality.clone();
             request
                 .json()
                 .from_err()
                 .and_then(move |query: Q| {
                     handler(query)
-                        .map(|value| HttpResponse::Ok().json(value))
+                        .map(|value| json_response(actuality, value))
                         .map_err(From::from)
                 })
                 .responder()
