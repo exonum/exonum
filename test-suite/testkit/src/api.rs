@@ -17,7 +17,10 @@
 pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
-use reqwest::{header, Client, RequestBuilder as ReqwestBuilder, Response, StatusCode};
+use reqwest::{
+    header, Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response,
+    StatusCode,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{
@@ -86,9 +89,15 @@ impl TestKitApi {
     }
 
     pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
+        // Testkit is intended for manual testing, so we don't want `reqwest` to handle redirects
+        // automatically.
+        let test_client = ClientBuilder::new()
+            .redirect(RedirectPolicy::none())
+            .build()
+            .unwrap();
         TestKitApi {
             test_server: create_test_server(aggregator),
-            test_client: Client::new(),
+            test_client,
             api_sender,
         }
     }
@@ -178,31 +187,37 @@ where
     }
 
     /// Sets a query data of the current request.
-    pub fn query<T>(&'a self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
+    pub fn query<T>(self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
         RequestBuilder {
-            test_server_url: self.test_server_url.clone(),
+            test_server_url: self.test_server_url,
             test_client: self.test_client,
             access: self.access,
-            prefix: self.prefix.clone(),
+            prefix: self.prefix,
             query: Some(query),
-            modifier: None,
-            expected_headers: self.expected_headers.clone(),
+            modifier: self.modifier,
+            expected_headers: self.expected_headers,
         }
     }
 
     /// Allows to modify a request before sending it by executing a provided closure.
-    pub fn with<F>(&mut self, f: F) -> &mut Self
+    pub fn with<F>(self, f: F) -> Self
     where
         F: Fn(ReqwestBuilder) -> ReqwestBuilder + 'b,
     {
-        self.modifier = Some(Box::new(f));
-        self
+        Self {
+            modifier: Some(Box::new(f)),
+            ..self
+        }
     }
 
     /// Allows to check that response will contain a specific header.
-    pub fn expect_header(&mut self, header: &str, value: &str) -> &mut Self {
-        self.expected_headers.insert(header.into(), value.into());
-        self
+    pub fn expect_header(self, header: &str, value: &str) -> Self {
+        let mut expected_headers = self.expected_headers;
+        expected_headers.insert(header.into(), value.into());
+        Self {
+            expected_headers,
+            ..self
+        }
     }
 
     /// Sends a get request to the testing API endpoint and decodes response as

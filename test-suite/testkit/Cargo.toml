@@ -21,6 +21,7 @@ travis-ci = { repository = "exonum/exonum" }
 [dependencies]
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }
+chrono = { version = "0.4.6" }
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 failure = "0.1.5"
 futures = "0.1.25"
