@@ -17,10 +17,13 @@
 pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
-use reqwest::{Client, RequestBuilder as ReqwestBuilder, Response, StatusCode};
+use reqwest::{header, Client, RequestBuilder as ReqwestBuilder, Response, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::fmt::{self, Display};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 
 use exonum::{
     api::{
@@ -137,6 +140,7 @@ pub struct RequestBuilder<'a, 'b, Q = ()> {
     prefix: String,
     query: Option<&'b Q>,
     modifier: Option<ReqwestModifier<'b>>,
+    expected_headers: HashMap<String, String>,
 }
 
 impl<'a, 'b, Q> fmt::Debug for RequestBuilder<'a, 'b, Q>
@@ -169,6 +173,7 @@ where
             prefix,
             query: None,
             modifier: None,
+            expected_headers: HashMap::new(),
         }
     }
 
@@ -181,22 +186,23 @@ where
             prefix: self.prefix.clone(),
             query: Some(query),
             modifier: None,
+            expected_headers: self.expected_headers.clone(),
         }
     }
 
     /// Allows to modify a request before sending it by executing a provided closure.
-    pub fn with<F>(&self, f: F) -> Self
+    pub fn with<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(ReqwestBuilder) -> ReqwestBuilder + 'b,
     {
-        RequestBuilder {
-            test_server_url: self.test_server_url.clone(),
-            test_client: self.test_client,
-            access: self.access,
-            prefix: self.prefix.clone(),
-            query: self.query,
-            modifier: Some(Box::new(f)),
-        }
+        self.modifier = Some(Box::new(f));
+        self
+    }
+
+    /// Allows to check that response will contain a specific header.
+    pub fn expect_header(&mut self, header: &str, value: &str) -> &mut Self {
+        self.expected_headers.insert(header.into(), value.into());
+        self
     }
 
     /// Sends a get request to the testing API endpoint and decodes response as
@@ -231,6 +237,7 @@ where
             builder = modifier(builder);
         }
         let response = builder.send().expect("Unable to send request");
+        Self::verify_headers(self.expected_headers, &response);
         Self::response_to_api_result(response)
     }
 
@@ -261,7 +268,23 @@ where
             builder = modifier(builder);
         }
         let response = builder.send().expect("Unable to send request");
+        Self::verify_headers(self.expected_headers, &response);
         Self::response_to_api_result(response)
+    }
+
+    // Checks that response contains headers expected by the request author.
+    fn verify_headers(expected_headers: HashMap<String, String>, response: &Response) {
+        let headers = response.headers();
+        for (header, expected_value) in expected_headers.iter() {
+            let header_value = headers.get(header).unwrap_or_else(|| {
+                panic!(
+                    "Response {:?} was expected to have header {}, but it isn't present",
+                    response, header
+                );
+            });
+
+            assert_eq!(header_value, expected_value);
+        }
     }
 
     /// Converts reqwest Response to api::Result.
@@ -287,21 +310,35 @@ where
             extract_description(&body).unwrap_or(body)
         }
 
-        match response.status() {
-            StatusCode::OK => Ok({
+        let error = match response.status() {
+            StatusCode::OK => {
                 let body = response.text().expect("Unable to get response text");
                 trace!("Body: {}", body);
-                serde_json::from_str(&body).expect("Unable to deserialize body")
-            }),
-            StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => Err(api::Error::Unauthorized),
-            StatusCode::BAD_REQUEST => Err(api::Error::BadRequest(error(response))),
-            StatusCode::NOT_FOUND => Err(api::Error::NotFound(error(response))),
-            s if s.is_server_error() => Err(api::Error::InternalError(format_err!(
-                "{}",
-                error(response)
-            ))),
+                let value = serde_json::from_str(&body).expect("Unable to deserialize body");
+
+                return Ok(value);
+            }
+            StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => api::Error::Unauthorized,
+            StatusCode::BAD_REQUEST => api::Error::BadRequest(error(response)),
+            StatusCode::NOT_FOUND => api::Error::NotFound(error(response)),
+            StatusCode::MOVED_PERMANENTLY => {
+                let location = response
+                    .headers()
+                    .get(header::LOCATION)
+                    .expect("Received a MOVED_PERMANENTLY response without location header")
+                    .to_str()
+                    .unwrap()
+                    .to_owned();
+                api::Error::MovedPermanently(location)
+            }
+            StatusCode::GONE => api::Error::Gone,
+            s if s.is_server_error() => {
+                api::Error::InternalError(format_err!("{}", error(response)))
+            }
             s => panic!("Received non-error response status: {}", s.as_u16()),
-        }
+        };
+
+        Err(error)
     }
 }
 
