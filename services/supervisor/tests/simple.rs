@@ -21,8 +21,9 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, DefaultInstance, Service, ServiceFactory as ServiceFactoryTrait},
-        ArtifactId, BlockchainData, DispatcherError, ExecutionError, InstanceId, SnapshotExt,
+        rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
+        ArtifactId, BlockchainData, DispatcherError, ErrorMatch, ExecutionError, InstanceId,
+        SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -30,7 +31,7 @@ use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, Supervisor,
+    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema, Supervisor,
 };
 
 pub fn sign_config_propose_transaction(
@@ -97,7 +98,7 @@ impl Configure for ConfigChangeService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from),
+            "error" => Err(DispatcherError::malformed_arguments("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -119,9 +120,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => {
-                Err(DispatcherError::malformed_arguments("Error!")).map_err(From::from)
-            }
+            "apply_error" => Err(DispatcherError::malformed_arguments("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -147,7 +146,7 @@ fn change_consensus_config_with_one_confirmation() {
         .with_validators(initial_validator_count)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     let cfg_change_height = Height(5);
@@ -196,7 +195,7 @@ fn service_config_change() {
         .with_validators(2)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .with_default_rust_service(ConfigChangeService)
         .create();
 
@@ -229,7 +228,7 @@ fn incorrect_actual_from_field() {
         .with_validators(2)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .with_default_rust_service(ConfigChangeService)
         .create();
 
@@ -258,7 +257,7 @@ fn discard_config_propose_from_auditor() {
         .with_validators(2)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     let cfg_change_height = Height(5);
@@ -286,11 +285,9 @@ fn discard_config_propose_from_auditor() {
     // Verify that transaction failed.
     let api = testkit.api();
     let system_api = api.exonum_api();
-    let expected_status = Err(exonum::blockchain::ExecutionError {
-        kind: exonum::blockchain::ExecutionErrorKind::Service { code: 1 },
-        description: "Transaction author is not a validator.".into(),
-    });
-    system_api.assert_tx_status(tx_hash, &expected_status.into());
+    let expected_err =
+        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+    system_api.assert_tx_status(tx_hash, Err(&expected_err));
 
     // Verify that no changes have been applied.
     let new_validators = testkit.network().validators();
@@ -307,7 +304,7 @@ fn test_send_proposal_with_api() {
         .with_validators(2)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     let old_validators = testkit.network().validators();
@@ -363,7 +360,7 @@ fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .with_rust_service(DeployableService)
         .create();
 
@@ -407,7 +404,7 @@ fn actual_from_is_zero() {
         .with_validators(initial_validator_count)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     // Change height set to 0

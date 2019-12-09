@@ -26,9 +26,7 @@ fn test_add_nodes_to_validators() {
         .with_validators(1)
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .create();
 
     let new_node_keys = testkit.network_mut().add_node().public_keys();

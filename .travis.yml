@@ -132,7 +132,8 @@ jobs:
   # Unit tests (including test runs for benchmarks).
   - name: unit-test
     script:
-    - cargo test --all --benches
+    - cargo test --all --lib --tests --benches
+    - cargo test --all --doc
 
   # Run examples.
   - name: examples

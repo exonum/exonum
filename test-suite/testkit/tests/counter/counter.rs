@@ -26,7 +26,7 @@ use exonum::{
             api::{ServiceApiBuilder, ServiceApiState},
             CallContext, DefaultInstance, Service,
         },
-        BlockchainData, InstanceId,
+        BlockchainData, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -88,25 +88,29 @@ impl Increment {
     }
 }
 
-#[derive(Debug, IntoExecutionError)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Adding zero does nothing!
     AddingZero = 0,
+    /// What's the question?
+    AnswerToTheUltimateQuestion = 1,
+    /// Number 13 is considered unlucky by some cultures.
+    BadLuck = 2,
 }
 
 #[exonum_interface]
 pub trait CounterServiceInterface {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error>;
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError>;
 
-    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), Error>;
+    fn reset(&self, context: CallContext<'_>, arg: Reset) -> Result<(), ExecutionError>;
 }
 
 impl CounterServiceInterface for CounterService {
-    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), Error> {
+    fn increment(&self, context: CallContext<'_>, arg: Increment) -> Result<(), ExecutionError> {
         if arg.by == 0 {
-            return Err(Error::AddingZero);
+            return Err(Error::AddingZero.into());
         }
 
         let mut schema = CounterSchema::new(context.service_data());
@@ -114,7 +118,7 @@ impl CounterServiceInterface for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), Error> {
+    fn reset(&self, context: CallContext<'_>, _arg: Reset) -> Result<(), ExecutionError> {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -220,6 +224,25 @@ impl DefaultInstance for CounterService {
 impl Service for CounterService {
     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
         vec![]
+    }
+
+    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let mut schema = CounterSchema::new(context.service_data());
+        if schema.counter.get() == Some(13) {
+            schema.counter.set(0);
+            Err(Error::BadLuck.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        let schema = CounterSchema::new(context.service_data());
+        if schema.counter.get() == Some(42) {
+            Err(Error::AnswerToTheUltimateQuestion.into())
+        } else {
+            Ok(())
+        }
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {

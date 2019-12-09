@@ -49,6 +49,7 @@ impl<'a> CallContext<'a> {
         self.instance
     }
 
+    /// Invokes an arbitrary method in the context.
     #[doc(hidden)]
     pub fn call(
         &mut self,
@@ -60,21 +61,8 @@ impl<'a> CallContext<'a> {
             instance_id: self.instance.id,
             method_id,
         };
-        self.inner.call(
-            interface_name.as_ref(),
-            &call_info,
-            arguments.into_bytes().as_ref(),
-        )
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
-    /// Creates a client to call interface methods of the specified service instance.
-    #[doc(hidden)]
-    pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
-    where
-        T: From<CallContext<'s>>,
-    {
-        self.call_context(called).map(Into::into)
+        self.inner
+            .call(interface_name.as_ref(), &call_info, &arguments.into_bytes())
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
@@ -92,6 +80,16 @@ impl<'a> CallContext<'a> {
             inner: self.inner.child_context(self.instance.id),
             instance: descriptor,
         })
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
+    /// Creates a client to call interface methods of the specified service instance.
+    #[doc(hidden)]
+    pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
+    where
+        T: From<CallContext<'s>>,
+    {
+        self.call_context(called).map(Into::into)
     }
 
     /// Provides writeable access to core schema.

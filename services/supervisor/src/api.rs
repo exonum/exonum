@@ -98,10 +98,7 @@ impl PrivateApi for ApiImpl<'_> {
     }
 
     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
-        let config = Schema::new(self.0.service_data())
-            .configuration
-            .get()
-            .expect("Supervisor entity was not configured; unable to load configuration");
+        let config = Schema::new(self.0.service_data()).supervisor_config();
 
         Ok(config)
     }

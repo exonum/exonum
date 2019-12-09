@@ -14,13 +14,15 @@
 
 //! The set of errors for the Dispatcher module.
 
+use exonum_derive::ExecutionFail;
+
 use std::fmt::Display;
 
-use super::ExecutionError;
+use crate::runtime::{ErrorKind, ExecutionError, ExecutionFail};
 
 /// List of possible dispatcher errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, IntoExecutionError)]
-#[execution_error(crate = "crate", kind = "dispatcher")]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[execution_fail(crate = "crate", kind = "dispatcher")]
 pub enum Error {
     /// Runtime identifier is incorrect in this context.
     IncorrectRuntime = 0,
@@ -51,23 +53,27 @@ pub enum Error {
 }
 
 impl Error {
-    /// Create a `NoSuchInterface` error with the specified error message.
-    pub fn no_such_interface(msg: impl Display) -> ExecutionError {
-        (Error::NoSuchInterface, msg).into()
+    /// Creates a `MalformedArguments` error with the user-provided error cause.
+    /// The cause does not need to include the error location; this information is added
+    /// by the framework automatically.
+    pub fn malformed_arguments(cause: impl Display) -> ExecutionError {
+        let description = format!(
+            "Malformed arguments for calling a service interface method: {}",
+            cause
+        );
+        Error::MalformedArguments.with_description(description)
     }
 
-    /// Create a `NoSuchMethod` error with the specified error message.
-    pub fn no_such_method(msg: impl Display) -> ExecutionError {
-        (Error::NoSuchMethod, msg).into()
-    }
-
-    /// Create an `UnauthorizedCaller` error with the specified error message.
-    pub fn unauthorized_caller(msg: impl Display) -> ExecutionError {
-        (Error::UnauthorizedCaller, msg).into()
-    }
-
-    /// Create a `MalformedArguments` error with the specified error message.
-    pub fn malformed_arguments(msg: impl Display) -> ExecutionError {
-        (Error::MalformedArguments, msg).into()
+    pub(crate) fn stack_overflow(max_depth: usize) -> ExecutionError {
+        let description = format!(
+            "Maximum depth of call stack ({}) has been reached.",
+            max_depth
+        );
+        ExecutionError::new(
+            ErrorKind::Dispatcher {
+                code: Error::StackOverflow as u8,
+            },
+            description,
+        )
     }
 }

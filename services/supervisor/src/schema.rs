@@ -56,6 +56,16 @@ impl<T: Access> Schema<T> {
         self.configuration_number.get().unwrap_or(0)
     }
 
+    /// Gets the configuration for the `Supervisor`.
+    pub fn supervisor_config(&self) -> SupervisorConfig {
+        // Configuration is required to be set, and there is no valid way
+        // to obtain `Supervisor` without configuration, thus this expect
+        // is intended to be safe.
+        self.configuration
+            .get()
+            .expect("Supervisor entity was not configured; unable to load configuration")
+    }
+
     /// Returns hashes for tables with proofs.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![

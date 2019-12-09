@@ -298,7 +298,8 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                Err(ExecutionError::new(ErrorKind::service(15), ""))
+                let error_kind = ErrorKind::Service { code: 15 };
+                Err(ExecutionError::new(error_kind, ""))
             }
         }
     }
@@ -393,7 +394,7 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, BlockchainData, DispatcherError, InstanceId, MethodId,
+            AnyTx, BlockchainData, InstanceId,
         },
     };
     use exonum_merkledb::Snapshot;
@@ -429,29 +430,9 @@ mod foreign_interface_call {
         ) -> Result<(), ExecutionError>;
     }
 
+    #[exonum_interface]
     pub trait ForeignInterface {
         fn timestamp(&self, context: CallContext<'_>, arg: SelfTx) -> Result<(), ExecutionError>;
-    }
-
-    impl Interface for dyn ForeignInterface {
-        const INTERFACE_NAME: &'static str = "ForeignInterface";
-
-        fn dispatch(
-            &self,
-            ctx: CallContext<'_>,
-            method: MethodId,
-            payload: &[u8],
-        ) -> Result<(), ExecutionError> {
-            match method {
-                0u32 => {
-                    let bytes = payload.into();
-                    let arg: SelfTx = exonum_merkledb::BinaryValue::from_bytes(bytes)
-                        .map_err(DispatcherError::malformed_arguments)?;
-                    self.timestamp(ctx, arg)
-                }
-                _ => Err(DispatcherError::NoSuchMethod).map_err(From::from),
-            }
-        }
     }
 
     #[derive(Debug)]
@@ -542,10 +523,14 @@ mod foreign_interface_call {
     pub fn self_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
         (0_u32..).map(move |i| {
             let (pub_key, sec_key) = gen_keypair_from_rng(&mut rng);
-            SelfTx {
-                data: i.object_hash(),
-            }
-            .sign(SELF_INTERFACE_SERVICE_ID, pub_key, &sec_key)
+            Transaction::<dyn SelfInterface>::sign(
+                SelfTx {
+                    data: i.object_hash(),
+                },
+                SELF_INTERFACE_SERVICE_ID,
+                pub_key,
+                &sec_key,
+            )
         })
     }
 
@@ -643,7 +628,7 @@ fn execute_block_rocksdb(
         ParameterizedBenchmark::new(
             "transactions",
             move |bencher, &&txs_in_block| {
-                let height: u64 = blockchain.as_ref().last_block().height().next().into();
+                let height: u64 = blockchain.as_ref().last_block().height.next().into();
                 bencher.iter(|| {
                     execute_block(&blockchain, height, &tx_hashes[..txs_in_block]);
                 });

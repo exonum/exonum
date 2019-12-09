@@ -24,7 +24,7 @@ use exonum_merkledb::BinaryValue;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    mode, supervisor_name, ConfigChange, ConfigPropose, Schema, ServiceConfig, Supervisor,
+    supervisor_name, ConfigChange, ConfigPropose, Schema, ServiceConfig, Supervisor,
     SupervisorConfig,
 };
 
@@ -49,34 +49,22 @@ fn initial_configuration() {
     let testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
-    assert_supervisor_config(
-        &testkit,
-        SupervisorConfig {
-            mode: mode::Mode::Simple,
-        },
-    );
+    assert_supervisor_config(&testkit, Supervisor::simple_config());
 
     // Check for decentralized mode.
     let testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .create();
-    assert_supervisor_config(
-        &testkit,
-        SupervisorConfig {
-            mode: mode::Mode::Decentralized,
-        },
-    );
+    assert_supervisor_config(&testkit, Supervisor::decentralized_config());
 }
 
 /// Checks that incorrect configuration is not accepted by `Supervisor::initialize`.
 #[test]
-#[should_panic(expected = "Unable to parse initialization parameters")]
+#[should_panic(expected = "Invalid configuration for supervisor.")]
 fn incorrect_configuration() {
     let incorrect_config = vec![0x12, 0x34]; // Obviously incorrect config.
     let instance_spec = InstanceSpec {
@@ -104,7 +92,7 @@ fn configure_call() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
 
     // Change config to decentralized.
@@ -125,12 +113,7 @@ fn configure_call() {
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
     // Check that supervisor now in the decentralized mode.
-    assert_supervisor_config(
-        &testkit,
-        SupervisorConfig {
-            mode: mode::Mode::Decentralized,
-        },
-    );
+    assert_supervisor_config(&testkit, Supervisor::decentralized_config());
 }
 
 /// Checks that `supervisor-config` works as expected.
@@ -139,7 +122,7 @@ fn supervisor_config_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(Supervisor::simple_config()))
+        .with_instance(Supervisor::simple())
         .create();
     assert_eq!(
         testkit
@@ -147,18 +130,14 @@ fn supervisor_config_api() {
             .private(ApiKind::Service("supervisor"))
             .get::<SupervisorConfig>("supervisor-config")
             .unwrap(),
-        SupervisorConfig {
-            mode: mode::Mode::Simple,
-        },
+        Supervisor::simple_config(),
     );
 
     // Check for decentralized mode.
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::builtin_instance(
-            Supervisor::decentralized_config(),
-        ))
+        .with_instance(Supervisor::decentralized())
         .create();
     assert_eq!(
         testkit
@@ -166,8 +145,6 @@ fn supervisor_config_api() {
             .private(ApiKind::Service("supervisor"))
             .get::<SupervisorConfig>("supervisor-config")
             .unwrap(),
-        SupervisorConfig {
-            mode: mode::Mode::Decentralized,
-        },
+        Supervisor::decentralized_config(),
     );
 }
