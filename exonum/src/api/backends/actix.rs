@@ -43,8 +43,8 @@ use std::{
 use crate::api::{
     self,
     manager::{ApiManager, UpdateEndpoints},
-    Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, ExtendApiBackend, FutureResult,
-    Immutable, Mutable, NamedWith,
+    Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
+    ExtendApiBackend, FutureResult, Immutable, Mutable, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -99,7 +99,7 @@ impl ApiBackend for ApiBuilder {
         &mut self,
         name: &'static str,
         new_location: &'static str,
-        mutable: bool,
+        mutability: EndpointMutability,
     ) -> &mut Self {
         let handler = move |_request: HttpRequest| -> FutureResponse {
             let response = api::Error::MovedPermanently(new_location.to_owned()).into();
@@ -108,10 +108,10 @@ impl ApiBackend for ApiBuilder {
             Box::new(response_future)
         };
 
-        self.mount_raw_handler(name, handler, mutable)
+        self.mount_raw_handler(name, handler, mutability)
     }
 
-    fn gone(&mut self, name: &'static str, mutable: bool) -> &mut Self {
+    fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self {
         let handler = move |_request: HttpRequest| -> FutureResponse {
             let response = api::Error::Gone.into();
             let response_future = Err(response).into_future();
@@ -119,7 +119,7 @@ impl ApiBackend for ApiBuilder {
             Box::new(response_future)
         };
 
-        self.mount_raw_handler(name, handler, mutable)
+        self.mount_raw_handler(name, handler, mutability)
     }
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
@@ -140,16 +140,20 @@ impl ApiBackend for ApiBuilder {
 
 impl ApiBuilder {
     /// Mounts a given handler to the endpoint, either mutable or immutable.
-    fn mount_raw_handler<F>(&mut self, name: &'static str, handler: F, mutable: bool) -> &mut Self
+    fn mount_raw_handler<F>(
+        &mut self,
+        name: &'static str,
+        handler: F,
+        mutability: EndpointMutability,
+    ) -> &mut Self
     where
         F: Fn(HttpRequest) -> FutureResponse + Send + Sync + 'static,
     {
         use actix_web::http;
 
-        let method = if mutable {
-            http::Method::POST
-        } else {
-            http::Method::GET
+        let method = match mutability {
+            EndpointMutability::Mutable => http::Method::POST,
+            EndpointMutability::Immutable => http::Method::GET,
         };
 
         self.raw_handler(RequestHandler {

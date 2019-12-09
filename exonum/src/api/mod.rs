@@ -41,6 +41,16 @@ use crate::{api::node::SharedNodeState, blockchain::Blockchain};
 
 mod with;
 
+/// Mutability of the endpoint. Used for auto-generated endpoints, e.g.
+/// in `moved_permanently` method.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum EndpointMutability {
+    /// Endpoint should process POST requests.
+    Mutable,
+    /// Endpoint should process GET requests.
+    Immutable,
+}
+
 /// This trait is used to implement an API backend for Exonum.
 pub trait ApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
@@ -121,12 +131,12 @@ pub trait ApiBackend: Sized {
         &mut self,
         name: &'static str,
         new_location: &'static str,
-        mutable: bool,
+        mutability: EndpointMutability,
     ) -> &mut Self;
 
     /// Creates an endpoint which will return "410 Gone" HTTP status code
     /// to the incoming requests.
-    fn gone(&mut self, name: &'static str, mutable: bool) -> &mut Self;
+    fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self;
 
     /// Add the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
@@ -235,17 +245,17 @@ impl ApiScope {
         &mut self,
         name: &'static str,
         new_location: &'static str,
-        mutable: bool,
+        mutability: EndpointMutability,
     ) -> &mut Self {
         self.actix_backend
-            .moved_permanently(name, new_location, mutable);
+            .moved_permanently(name, new_location, mutability);
         self
     }
 
     /// Creates an endpoint which will return "410 Gone" HTTP status code
     /// to the incoming requests.
-    pub fn gone(&mut self, name: &'static str, mutable: bool) -> &mut Self {
-        self.actix_backend.gone(name, mutable);
+    pub fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self {
+        self.actix_backend.gone(name, mutability);
         self
     }
 
