@@ -131,12 +131,7 @@ struct ExonumService {
 
 impl ExonumService {
     fn new(mut item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
-        /*
-        if !item_trait.generics.params.is_empty() {
-            let msg = "Generics are not supported";
-            return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params));
-        }
-        */
+        // FIXME: extract context generic from the interface.
 
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
@@ -146,7 +141,7 @@ impl ExonumService {
                 TraitItem::Method(method) => {
                     methods.push(ServiceMethodDescriptor::try_from(i, method)?);
                 }
-                TraitItem::Type(ty) if ty.ident.to_string() == "Output" => {
+                TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {
                         let msg = "`Output` type must not have bounds";
                         return Err(darling::Error::custom(msg).with_span(trait_item));
