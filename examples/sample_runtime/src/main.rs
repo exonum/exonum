@@ -28,7 +28,7 @@ use exonum::{
         rust::{RustRuntime, ServiceFactory},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -189,10 +189,6 @@ impl Runtime for SampleRuntime {
                 Err(err)
             }
         }
-    }
-
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
     }
 
     fn before_transactions(

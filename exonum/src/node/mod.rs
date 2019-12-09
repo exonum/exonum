@@ -1183,7 +1183,6 @@ mod tests {
     use exonum_merkledb::TemporaryDB;
 
     use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
-
     use super::*;
 
     #[test]

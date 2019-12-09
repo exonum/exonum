@@ -14,19 +14,18 @@
 
 use exonum::{
     blockchain::ExecutionError,
-    crypto::Hash,
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
             CallContext, DefaultInstance, Service,
         },
-        BlockchainData, DispatcherError, InstanceId,
+        DispatcherError, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, Snapshot,
+    Entry,
 };
 
 use crate::proto;
@@ -104,10 +103,6 @@ impl PublicApi {
 }
 
 impl Service for IncService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         PublicApi::wire(builder);
     }

@@ -14,7 +14,7 @@
 
 use bit_vec::BitVec;
 use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, TemporaryDB};
+use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, SystemSchema, TemporaryDB};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
@@ -33,7 +33,7 @@ use crate::{
     api::node::SharedNodeState,
     blockchain::{
         contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
-        IndexCoordinates, InstanceCollection, Schema, SchemaOrigin, ValidatorKeys,
+        InstanceCollection, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
@@ -737,10 +737,8 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let mut fork_with_new_block = blockchain.fork();
         let (_, patch) =
             blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
-        fork_with_new_block.merge(patch);
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
@@ -749,7 +747,7 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let block = Schema::new(&fork_with_new_block).last_block();
+        let block = Schema::new(&patch).last_block();
         (block.state_hash, block.error_hash)
     }
 
@@ -763,16 +761,11 @@ impl Sandbox {
             .build()
     }
 
-    pub fn get_proof_to_index(
-        &self,
-        origin: SchemaOrigin,
-        id: u16,
-    ) -> MapProof<IndexCoordinates, Hash> {
+    pub fn get_proof_to_index(&self, index_name: &str) -> MapProof<String, Hash> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        schema
-            .state_hash_aggregator()
-            .get_proof(IndexCoordinates::new(origin, id))
+        SystemSchema::new(&snapshot)
+            .state_aggregator()
+            .get_proof(index_name.to_owned())
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {

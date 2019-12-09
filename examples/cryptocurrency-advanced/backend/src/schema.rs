@@ -32,13 +32,6 @@ pub struct Schema<T: Access> {
     pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
 
-impl<T: Access> Schema<T> {
-    /// Returns the state hash of cryptocurrency service.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.wallets.object_hash()]
-    }
-}
-
 impl<T> Schema<T>
 where
     T: Access,

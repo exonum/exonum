@@ -17,10 +17,10 @@
 pub use crate::interface::Issue;
 
 use exonum::{
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     runtime::{
         rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
-        BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
+        CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
@@ -53,11 +53,7 @@ impl WalletService {
     }
 }
 
-impl Service for WalletService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for WalletService {}
 
 impl WalletInterface<CallContext<'_>> for WalletService {
     type Output = Result<(), ExecutionError>;
@@ -126,11 +122,7 @@ impl DepositService {
     pub const ID: InstanceId = 25;
 }
 
-impl Service for DepositService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for DepositService {}
 
 impl DepositInterface<CallContext<'_>> for DepositService {
     type Output = Result<(), ExecutionError>;
@@ -197,11 +189,7 @@ impl AnyCall<CallContext<'_>> for AnyCallService {
     }
 }
 
-impl Service for AnyCallService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for AnyCallService {}
 
 impl DefaultInstance for AnyCallService {
     const INSTANCE_ID: u32 = Self::ID;

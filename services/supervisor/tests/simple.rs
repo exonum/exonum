@@ -22,12 +22,12 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
-        ArtifactId, BlockchainData, DispatcherError, ErrorMatch, ExecutionError, InstanceId,
-        SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{access::AccessExt, ObjectHash, Snapshot};
+use exonum_derive::*;
+use exonum_merkledb::{access::AccessExt, ObjectHash};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -56,11 +56,7 @@ pub fn sign_config_propose_transaction_by_us(
 #[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
 pub struct DeployableService;
 
-impl Service for DeployableService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for DeployableService {}
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements(raw = "Configure<Params = String>"))]
@@ -72,11 +68,7 @@ impl DefaultInstance for ConfigChangeService {
     const INSTANCE_NAME: &'static str = "config-change";
 }
 
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for ConfigChangeService {}
 
 impl Configure for ConfigChangeService {
     type Params = String;

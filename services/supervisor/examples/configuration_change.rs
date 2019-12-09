@@ -16,14 +16,13 @@ use exonum::{
     helpers::Height,
     runtime::{
         rust::{CallContext, Service, ServiceFactory},
-        BlockchainData, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_crypto::Hash;
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    Entry, ObjectHash, Snapshot,
+    Entry, ObjectHash,
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
@@ -43,11 +42,7 @@ pub struct Schema<T: Access> {
     params: Entry<T::Base, String>,
 }
 
-impl Service for ConfigChangeService {
-    fn state_hash(&self, _data: BlockchainData<'_, &dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for ConfigChangeService {}
 
 // To allow service change its configuration we need to implement `Configure` trait.
 impl Configure for ConfigChangeService {

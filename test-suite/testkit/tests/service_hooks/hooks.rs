@@ -15,14 +15,12 @@
 //! A special service which generates transactions on `after_commit` events.
 use exonum::{
     blockchain::ExecutionError,
-    crypto::Hash,
     runtime::{
         rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
-        BlockchainData, InstanceId,
+        InstanceId,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::Snapshot;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -76,10 +74,6 @@ impl AfterCommitService {
 }
 
 impl Service for AfterCommitService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         let counter = self.counter.fetch_add(1, Ordering::SeqCst);
 

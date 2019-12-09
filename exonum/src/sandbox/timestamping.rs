@@ -14,7 +14,7 @@
 
 pub use crate::proto::schema::tests::TimestampTx;
 
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::{access::AccessExt, BinaryValue};
 use exonum_proto::impl_binary_value_for_pb_message;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
@@ -24,7 +24,7 @@ use crate::{
     messages::Verified,
     runtime::{
         rust::{CallContext, Service},
-        AnyTx, BlockchainData, InstanceId,
+        AnyTx, InstanceId,
     },
 };
 
@@ -54,8 +54,16 @@ impl Timestamping<CallContext<'_>> for TimestampingService {
 }
 
 impl Service for TimestampingService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![Hash::new([127; HASH_SIZE]), Hash::new([128; HASH_SIZE])]
+    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        context
+            .service_data()
+            .get_proof_entry("first")
+            .set(Hash::new([127; HASH_SIZE]));
+        context
+            .service_data()
+            .get_proof_entry("second")
+            .set(Hash::new([128; HASH_SIZE]));
+        Ok(())
     }
 }
 

@@ -179,12 +179,9 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::{
-            rust::{CallContext, Service, ServiceFactory},
-            BlockchainData,
-        },
+        runtime::rust::{CallContext, Service, ServiceFactory},
     };
-    use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_merkledb::ObjectHash;
 
     use std::time::Duration;
 
@@ -216,11 +213,7 @@ mod tests {
         }
     }
 
-    impl Service for SampleService {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for SampleService {}
 
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
