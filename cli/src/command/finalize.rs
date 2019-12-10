@@ -164,7 +164,7 @@ impl ExonumCommand for Finalize {
         let consensus = ConsensusConfig {
             validator_keys: public_configs
                 .iter()
-                .flat_map(|c| c.validator_keys.clone())
+                .flat_map(|c| c.validator_keys)
                 .collect(),
             ..common.consensus
         };
