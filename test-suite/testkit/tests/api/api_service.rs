@@ -39,7 +39,8 @@ pub trait ApiServiceInterface {}
 impl ApiServiceInterface for ApiService {}
 
 /// Sample query supported by API.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct PingQuery {
     pub value: u64,
 }
