@@ -32,8 +32,9 @@ macro_rules! concat_keys {
         let capacity = concat_keys!(@capacity $($key),+);
         let mut buf = Vec::with_capacity(capacity);
 
-        // Unsafe `set_len` here is safe because we never read from `buf`
-        // before we write all elements to it.
+        // SAFETY:
+        // `set_len` here is safe because proper `BinaryKey` implementations do not read
+        // from the provided buffer.
         #[allow(unsafe_code)]
         unsafe {
             buf.set_len(capacity);

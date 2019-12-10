@@ -1144,19 +1144,19 @@ impl Node {
 // TODO implement transaction verification logic [ECR-3253]
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::{BinaryValue, Snapshot, TemporaryDB};
+    use exonum_merkledb::{BinaryValue, TemporaryDB};
     use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
     use crate::{
         blockchain::{config::GenesisConfigBuilder, Schema},
-        crypto::{gen_keypair, Hash},
+        crypto::gen_keypair,
         events::EventHandler,
         helpers,
         messages::AnyTx,
         proto::schema::tests::TxSimple,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            BlockchainData, ExecutionError, InstanceId, RuntimeInstance,
+            ExecutionError, InstanceId, RuntimeInstance,
         },
     };
 
@@ -1187,11 +1187,7 @@ mod tests {
         }
     }
 
-    impl Service for TestService {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for TestService {}
 
     fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
         let mut msg = TxSimple::new();

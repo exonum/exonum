@@ -79,17 +79,16 @@ pub use self::{
 
 use exonum::{
     blockchain::config::InstanceInitParams,
-    crypto::Hash,
     runtime::{
         rust::{
             api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
             ServiceFactory as _,
         },
-        BlockchainData, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
+        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{BinaryValue, Snapshot};
+use exonum_merkledb::BinaryValue;
 
 use mode::Mode;
 
@@ -268,10 +267,6 @@ impl Service for Supervisor {
         schema.configuration.set(config);
 
         Ok(())
-    }
-
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
