@@ -276,7 +276,8 @@ impl ExplorerApi {
             })
     }
 
-    /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
+    /// Checks if transaction is valid. Adds valid transaction into the pool of unconfirmed transactions,
+    /// and broadcasts transaction to other nodes, ignores invalid transactions.
     // TODO move this method to the public system API [ECR-3222]
     pub fn add_transaction(
         snapshot: &dyn Snapshot,
