@@ -53,7 +53,7 @@ impl ServiceMethodDescriptor {
         ctx: &Ident,
         method: &TraitItemMethod,
     ) -> Result<Self, darling::Error> {
-        use syn::{PatType, Path, TypePath};
+        use syn::{PatType, TypePath};
 
         let mut method_args_iter = method.sig.inputs.iter();
 
@@ -107,27 +107,24 @@ impl ServiceMethodDescriptor {
 
         // Check the validity of the return type (should be `Self::Output`).
         if let ReturnType::Type(_, ref ty) = method.sig.output {
-            if let Type::Path(TypePath {
-                path: Path { segments, .. },
-                ..
-            }) = ty.as_ref()
-            {
+            if let Type::Path(type_path) = ty.as_ref() {
+                let segments = &type_path.path.segments;
                 if segments.len() == 2
                     && segments[0].ident == "Self"
                     && segments[1].ident == "Output"
                 {
                     // Seems about right.
                 } else {
-                    // Invalid return type.
+                    // Invalid `type_path`.
                     return Err(invalid_method(segments));
                 }
             } else {
-                // Invalid type format.
+                // Invalid return type format.
                 return Err(invalid_method(ty));
             }
         } else {
             // "Default" return type (i.e., `()`).
-            return Err(invalid_method(&method.sig.output));
+            return Err(invalid_method(&method.sig));
         }
 
         Ok(ServiceMethodDescriptor {
@@ -177,18 +174,19 @@ impl ExonumService {
         use syn::GenericParam;
 
         // Extract context type param from the trait generics.
-        let ctx_ident = if item_trait.generics.params.is_empty() {
+        let params = &item_trait.generics.params;
+        let ctx_ident = if params.is_empty() {
             let msg = "Interface trait needs to have context type param";
             return Err(darling::Error::custom(msg).with_span(&item_trait.ident));
-        } else if item_trait.generics.params.len() > 1 {
+        } else if params.len() > 1 {
             let msg = "Multiple generics are not yet supported";
-            return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params));
-        } else if let GenericParam::Type(ref type_param) = item_trait.generics.params[0] {
+            return Err(darling::Error::custom(msg).with_span(params));
+        } else if let GenericParam::Type(ref type_param) = params[0] {
             &type_param.ident
         } else {
-            let msg = "Unsupported generic param (should be a type param \
-                       denoting execution context)";
-            return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params[0]));
+            let msg = "Unsupported generic param (should be a type param denoting \
+                       execution context)";
+            return Err(darling::Error::custom(msg).with_span(&params[0]));
         };
 
         // Process trait methods.
