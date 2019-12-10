@@ -59,7 +59,8 @@ struct SampleRuntime {
 }
 
 // Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
 #[execution_fail(kind = "runtime")]
 enum SampleRuntimeError {
     /// Incorrect information to call transaction.

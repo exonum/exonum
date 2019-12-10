@@ -40,9 +40,9 @@ pub type InstanceId = u32;
 pub type MethodId = u32;
 
 /// Information for calling the service method.
-#[derive(
-    Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, Serialize, Deserialize,
-)]
+#[derive(Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert)]
 #[protobuf_convert(source = "schema::runtime::CallInfo")]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
@@ -91,7 +91,9 @@ impl CallInfo {
 ///     &keypair.1
 /// );
 /// ```
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert)]
 #[protobuf_convert(source = "schema::runtime::AnyTx")]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
@@ -137,20 +139,9 @@ impl AnyTx {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::ArtifactId")]
 pub struct ArtifactId {
     /// Runtime identifier.
@@ -247,18 +238,9 @@ impl FromStr for ArtifactId {
 }
 
 /// Exhaustive artifact specification.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
@@ -278,18 +260,9 @@ impl ArtifactSpec {
 }
 
 /// Exhaustive service instance specification.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::InstanceSpec")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
@@ -457,7 +430,8 @@ impl ProtobufConvert for InstanceStatus {
 }
 
 /// Current state of artifact in dispatcher.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::ArtifactState")]
 pub struct ArtifactState {
     /// Artifact specification.
@@ -474,18 +448,9 @@ impl ArtifactState {
 }
 
 /// Current state of service instance in dispatcher.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::InstanceState")]
 pub struct InstanceState {
     /// Service instance specification.

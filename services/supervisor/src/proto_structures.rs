@@ -32,9 +32,9 @@ use super::{mode::Mode, proto, transactions::SupervisorInterface};
 
 /// Supervisor service configuration (not to be confused with `ConfigPropose`, which
 /// contains core/service configuration change proposal).
-#[derive(
-    Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Config")]
 pub struct SupervisorConfig {
     /// Supervisor operating mode.
@@ -63,7 +63,8 @@ pub struct DeployConfirmation {
 
 /// Request for the artifact deployment.
 #[protobuf_convert(source = "proto::StartService")]
-#[derive(Debug, Clone, PartialEq, Eq, ProtobufConvert, Hash, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -88,18 +89,9 @@ impl StartService {
 }
 
 /// Configuration parameters of the certain service instance.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ServiceConfig")]
 pub struct ServiceConfig {
     /// Corresponding service instance ID.
@@ -109,18 +101,9 @@ pub struct ServiceConfig {
 }
 
 /// Atomic configuration change.
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    Hash,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigChange", rename(case = "snake_case"))]
 pub enum ConfigChange {
     /// New consensus config.
@@ -132,7 +115,8 @@ pub enum ConfigChange {
 }
 
 /// Request for the configuration change
-#[derive(Debug, Clone, Eq, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigPropose")]
 pub struct ConfigPropose {
     /// The height until which the update configuration procedure should be completed.
@@ -200,9 +184,9 @@ pub struct ConfigVote {
 }
 
 /// Pending config change proposal entry
-#[derive(
-    Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ProtobufConvert, BinaryValue, ObjectHash,
-)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigProposalWithHash")]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.

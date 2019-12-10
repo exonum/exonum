@@ -40,7 +40,9 @@ use std::sync::Arc;
 mod proto;
 
 /// The argument of the `MarkerInterface::mark` method.
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxMarker")]
 pub struct TxMarker {
     mark: i32,

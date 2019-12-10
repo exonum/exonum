@@ -40,7 +40,9 @@ pub const INIT_BALANCE: u64 = 0;
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Wallet")]
 pub struct Wallet {
     pub pub_key: PublicKey,
@@ -92,7 +94,9 @@ impl<T: Access> CurrencySchema<T> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 /// Create a new wallet.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxCreateWallet")]
 pub struct CreateWallet {
     pub name: String,
@@ -105,7 +109,9 @@ impl CreateWallet {
 }
 
 /// Transfer coins between the wallets.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTransfer")]
 pub struct Transfer {
     pub to: PublicKey,

@@ -37,7 +37,9 @@ pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
     pub name: String,
@@ -49,7 +51,9 @@ impl CreateWallet {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
     pub to: PublicKey,

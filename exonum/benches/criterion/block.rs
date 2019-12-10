@@ -269,7 +269,9 @@ mod cryptocurrency {
     }
 
     /// Transfers one unit of currency from `from` to `to`.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::CurrencyTx")]
     pub struct Tx {
         to: PublicKey,

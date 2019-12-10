@@ -50,7 +50,9 @@ pub mod schema {
     //
     // [1]: https://exonum.com/doc/version/latest/architecture/serialization
     /// Wallet struct used to persist data within the service.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::Wallet")]
     pub struct Wallet {
         /// Public key of the wallet owner.
@@ -102,7 +104,9 @@ pub mod transactions {
     use exonum_proto::ProtobufConvert;
 
     /// Service configuration parameters.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::Config")]
     pub struct Config;
 
@@ -110,7 +114,9 @@ pub mod transactions {
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TxCreateWallet")]
     pub struct CreateWallet {
         /// UTF-8 string with the owner's name.
@@ -129,7 +135,9 @@ pub mod transactions {
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
     #[protobuf_convert(source = "proto::TxTransfer")]
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     pub struct TxTransfer {
         /// Public key of the receiver.
         pub to: PublicKey,

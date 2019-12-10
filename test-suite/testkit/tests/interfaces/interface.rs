@@ -21,7 +21,9 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Issue")]
 pub struct Issue {
     pub to: PublicKey,

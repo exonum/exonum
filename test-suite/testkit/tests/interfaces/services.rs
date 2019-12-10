@@ -103,7 +103,9 @@ impl DefaultInstance for WalletService {
 }
 
 #[protobuf_convert(source = "proto::Issue")]
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TxIssue {
     pub to: PublicKey,
     pub amount: u64,
@@ -147,7 +149,9 @@ impl DefaultInstance for DepositService {
     const INSTANCE_NAME: &'static str = "deposit";
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::AnyCall")]
 pub struct TxAnyCall {
     pub call_info: CallInfo,
