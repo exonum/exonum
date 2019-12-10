@@ -18,7 +18,7 @@ use crate::node::ConnectListConfig;
 
 /// Interface of the Config Manager usable for updating node configuration on
 /// the fly.
-pub trait ConfigManager {
+pub trait ConfigManager: Send {
     /// Update connect list in the node configuration.
     fn store_connect_list(&self, connect_list: ConnectListConfig);
 }
