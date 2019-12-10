@@ -36,9 +36,9 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
-        MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
+        ArtifactId, BlockchainData, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema,
+        ErrorKind, ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
+        InstanceSpec, InstanceStatus, MethodId, Runtime, RuntimeIdentifier, StateHashAggregator,
     },
 };
 
@@ -947,6 +947,7 @@ fn recoverable_error_during_deployment() {
 #[test]
 fn restart_with_stopped_services() {
     let instance_id = 0;
+    let instance_name = "supervisor";
 
     // Create blockchain with the sample runtime with the active service instance.
     let db = Arc::new(TemporaryDB::new());
@@ -976,7 +977,7 @@ fn restart_with_stopped_services() {
     let service = InstanceSpec {
         artifact: artifact.clone(),
         id: instance_id,
-        name: "supervisor".into(),
+        name: instance_name.into(),
     };
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
     context
@@ -1003,6 +1004,16 @@ fn restart_with_stopped_services() {
         )
         .expect("Correct transaction");
 
+    let dummy_descriptor = InstanceDescriptor {
+        id: 2,
+        name: "dummy",
+    };
+
+    // Check that service schema is still reachable.
+    BlockchainData::new(&fork, dummy_descriptor)
+        .for_service(instance_name)
+        .expect("Schema should be reachable");
+
     // Commit service status
     debug!("Commit and notify runtimes");
     dispatcher.activate_pending(&fork);
@@ -1019,6 +1030,14 @@ fn restart_with_stopped_services() {
             &[],
         )
         .expect_err("Incorrect transaction");
+
+    // Check that service schema is now unreachable.
+    assert!(
+        BlockchainData::new(&fork, dummy_descriptor)
+            .for_service(instance_name)
+            .is_none(),
+        "Schema should be unreachable"
+    );
 
     // Emulate dispatcher restart
     let mut dispatcher = DispatcherBuilder::new()
@@ -1051,7 +1070,7 @@ fn restart_with_stopped_services() {
         expected_notifications
     );
 
-    // Check if transactions become incorrect.
+    // Check if transactions is incorrect.
     dispatcher
         .call(
             &mut fork,
@@ -1060,4 +1079,12 @@ fn restart_with_stopped_services() {
             &[],
         )
         .expect_err("Incorrect transaction");
+
+    // Check that service schema is now unreachable.
+    assert!(
+        BlockchainData::new(&fork, dummy_descriptor)
+            .for_service(instance_name)
+            .is_none(),
+        "Schema should be unreachable"
+    );
 }
