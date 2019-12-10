@@ -17,8 +17,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, NestedMeta, Receiver,
-    ReturnType, TraitItem, TraitItemMethod, Type,
+    parse_macro_input, spanned::Spanned, Attribute, AttributeArgs, FnArg, Ident, ItemTrait,
+    NestedMeta, Receiver, ReturnType, TraitItem, TraitItemMethod, Type,
 };
 
 use std::convert::TryFrom;
@@ -35,10 +35,29 @@ struct ServiceMethodDescriptor {
 const INVALID_METHOD_MSG: &str =
     "Interface method should have form `fn foo(&self, ctx: Ctx, arg: Bar) -> Self::Output`";
 
+fn invalid_method(span: &impl Spanned) -> darling::Error {
+    darling::Error::custom(INVALID_METHOD_MSG).with_span(span)
+}
+
 impl ServiceMethodDescriptor {
-    fn try_from(index: usize, method: &mut TraitItemMethod) -> Result<Self, darling::Error> {
+    /// Tries to parse a method definition from its declaration in the trait. The method needs
+    /// to correspond to the following form:
+    ///
+    /// ```text
+    /// fn foo(&self, ctx: Ctx, arg: Bar) -> Self::Output;
+    /// ```
+    ///
+    /// where `Ctx` is the context type param defined in the trait.
+    fn try_from(
+        method_id: u32,
+        ctx: &Ident,
+        method: &TraitItemMethod,
+    ) -> Result<Self, darling::Error> {
+        use syn::{PatType, Path, TypePath};
+
         let mut method_args_iter = method.sig.inputs.iter();
 
+        // Check the validity of the first arg (should be `&self`).
         if let Some(arg) = method_args_iter.next() {
             match arg {
                 FnArg::Receiver(Receiver {
@@ -47,49 +66,73 @@ impl ServiceMethodDescriptor {
                     ..
                 }) => {}
                 _ => {
-                    let msg = "The first argument in an interface method should be `&self`";
-                    return Err(darling::Error::custom(msg).with_span(&arg));
+                    return Err(invalid_method(&arg));
                 }
             }
         } else {
-            return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method));
+            return Err(invalid_method(method));
         }
 
-        method_args_iter
+        // Check the validity of the first arg (should be `Ctx`).
+        let ctx_type = method_args_iter
             .next()
-            .ok_or_else(|| darling::Error::custom(INVALID_METHOD_MSG).with_span(method))?;
+            .ok_or_else(|| invalid_method(method))?;
+        if let FnArg::Typed(PatType { ty, .. }) = ctx_type {
+            if let Type::Path(TypePath { path, .. }) = ty.as_ref() {
+                if path.get_ident() != Some(ctx) {
+                    // Invalid argument type.
+                    return Err(invalid_method(path));
+                }
+            } else {
+                // Type is not path-like.
+                return Err(invalid_method(ty));
+            }
+        } else {
+            // Not a typed argument.
+            return Err(invalid_method(ctx_type));
+        }
 
+        // Check the validity of the second arg and extract the type from it.
         let arg_type = method_args_iter
             .next()
-            .ok_or_else(|| darling::Error::custom(INVALID_METHOD_MSG).with_span(method))
+            .ok_or_else(|| invalid_method(method))
             .and_then(|arg| match arg {
                 FnArg::Typed(arg) => Ok(arg.ty.clone()),
-                _ => Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method)),
+                _ => Err(invalid_method(method)),
             })?;
 
         if method_args_iter.next().is_some() {
-            return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(method));
+            return Err(invalid_method(method));
         }
 
-        if let ReturnType::Type(_, ref mut ty) = method.sig.output {
-            let ty: &mut Type = ty.as_mut();
-            match ty {
-                Type::Infer(_) => {
-                    *ty = syn::parse_quote!(Self::Output);
+        // Check the validity of the return type (should be `Self::Output`).
+        if let ReturnType::Type(_, ref ty) = method.sig.output {
+            if let Type::Path(TypePath {
+                path: Path { segments, .. },
+                ..
+            }) = ty.as_ref()
+            {
+                if segments.len() == 2
+                    && segments[0].ident == "Self"
+                    && segments[1].ident == "Output"
+                {
+                    // Seems about right.
+                } else {
+                    // Invalid return type.
+                    return Err(invalid_method(segments));
                 }
-                Type::Path(_) => {} // FIXME: use more thorough check
-                _ => {
-                    let msg = "Unsupported return type; use `_` or `Self::Output`";
-                    return Err(darling::Error::custom(msg).with_span(ty));
-                }
+            } else {
+                // Invalid type format.
+                return Err(invalid_method(ty));
             }
         } else {
-            return Err(darling::Error::custom(INVALID_METHOD_MSG).with_span(&method.sig.output));
+            // "Default" return type (i.e., `()`).
+            return Err(invalid_method(&method.sig.output));
         }
 
         Ok(ServiceMethodDescriptor {
             name: method.sig.ident.clone(),
-            id: index as u32, // TODO: allow to parse `method_id` from attrs
+            id: method_id, // TODO: allow to parse `method_id` from attrs
             arg_type,
         })
     }
@@ -130,23 +173,40 @@ struct ExonumService {
 }
 
 impl ExonumService {
-    fn new(mut item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
-        // FIXME: extract context generic from the interface.
+    fn new(item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
+        use syn::GenericParam;
 
+        // Extract context type param from the trait generics.
+        let ctx_ident = if item_trait.generics.params.is_empty() {
+            let msg = "Interface trait needs to have context type param";
+            return Err(darling::Error::custom(msg).with_span(&item_trait.ident));
+        } else if item_trait.generics.params.len() > 1 {
+            let msg = "Multiple generics are not yet supported";
+            return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params));
+        } else if let GenericParam::Type(ref type_param) = item_trait.generics.params[0] {
+            &type_param.ident
+        } else {
+            let msg = "Unsupported generic param (should be a type param \
+                       denoting execution context)";
+            return Err(darling::Error::custom(msg).with_span(&item_trait.generics.params[0]));
+        };
+
+        // Process trait methods.
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
-
         let mut method_id = 0;
-        for trait_item in &mut item_trait.items {
+
+        for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
-                    methods.push(ServiceMethodDescriptor::try_from(method_id, method)?);
+                    let method = ServiceMethodDescriptor::try_from(method_id, ctx_ident, method)?;
+                    methods.push(method);
                     method_id += 1;
                 }
                 TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {
                         let msg = "`Output` type must not have bounds";
-                        return Err(darling::Error::custom(msg).with_span(trait_item));
+                        return Err(darling::Error::custom(msg).with_span(ty));
                     }
                     has_output = true;
                 }
@@ -158,10 +218,8 @@ impl ExonumService {
         }
 
         if !has_output {
-            item_trait.items.push(syn::parse_quote! {
-                /// Type of items output by the stub.
-                type Output;
-            });
+            let msg = "The trait should have associated `Output` type";
+            return Err(darling::Error::custom(msg).with_span(&item_trait));
         }
 
         Ok(Self {
@@ -184,6 +242,9 @@ impl ExonumService {
         Ident::new(&name, Span::call_site())
     }
 
+    /// Generates `Interface` implementation for the trait object with matching params
+    /// (`CallContext` context and `Result<(), ExecutionError>` output). This will allow to call
+    /// implementation methods from the dispatcher.
     fn impl_interface(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
         let trait_name = &self.item_trait.ident;
@@ -223,6 +284,9 @@ impl ExonumService {
         }
     }
 
+    /// Implements the user trait for any type implementing low-level stubs (`GenericCall` /
+    /// `GenericCallMut`). This means that the trait is implemented for all stub implementations
+    /// (such as keypairs) with zero dedicated code.
     fn impl_trait_for_generic_stub(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
         let trait_name = &self.item_trait.ident;
@@ -264,6 +328,8 @@ impl ExonumService {
         };
 
         let (methods, mut_methods): (Vec<_>, Vec<_>) = self.methods.iter().map(impl_method).unzip();
+        // Since `Ctx` type param is defined by our code, it doesn't have to correspond to the name
+        // chosen by the user.
         quote! {
             impl<Ctx, T: #cr::runtime::rust::GenericCall<Ctx>> #trait_name<Ctx> for T {
                 type Output = <T as #cr::runtime::rust::GenericCall<Ctx>>::Output;
@@ -277,6 +343,8 @@ impl ExonumService {
         }
     }
 
+    /// Creates a mutable version of the trait by appending `Mut` to the trait name and changing
+    /// `&self` receivers in the trait methods to `&mut self`. No other changes are performed.
     fn mut_trait(&self) -> impl ToTokens {
         let mut mut_trait = self.item_trait.clone();
         mut_trait.ident = self.mut_trait_name();
