@@ -261,6 +261,7 @@ fn test_generate_template() {
     env.command("generate-template")
         .with_arg(&output_template_file)
         .with_named_arg("--validators-count", env.validators_count.to_string())
+        .with_named_arg("--supervisor-mode", "simple")
         .run()
         .unwrap();
     assert_config_files_eq(&output_template_file, env.expected_template_file());
@@ -434,6 +435,7 @@ fn test_full_workflow() {
     env.command("generate-template")
         .with_arg(&output_template_file)
         .with_named_arg("--validators-count", env.validators_count.to_string())
+        .with_named_arg("--supervisor-mode", "simple")
         .run()
         .unwrap();
 
@@ -600,7 +602,7 @@ fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failu
     let generate_template = GenerateTemplate {
         common_config: common_config_path.clone(),
         validators_count: 1,
-        supervisor_mode: Some(supervisor_mode),
+        supervisor_mode: supervisor_mode,
     };
     generate_template.execute()?;
 

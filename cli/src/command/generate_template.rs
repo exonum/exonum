@@ -27,9 +27,6 @@ use crate::{
     io::save_config_file,
 };
 
-/// Default supervisor service mode
-pub const DEFAULT_SUPERVISOR_MODE: SupervisorMode = SupervisorMode::Simple;
-
 /// Generate common part of the nodes configuration.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub struct GenerateTemplate {
@@ -39,20 +36,17 @@ pub struct GenerateTemplate {
     #[structopt(long)]
     pub validators_count: u32,
     /// Supervisor service mode. Possible options are "simple" and "decentralized".
-    ///
-    /// Default: simple.
     #[structopt(long)]
-    pub supervisor_mode: Option<SupervisorMode>,
+    pub supervisor_mode: SupervisorMode,
 }
 
 impl ExonumCommand for GenerateTemplate {
     fn execute(self) -> Result<StandardResult, Error> {
-        let supervisor_mode = self.supervisor_mode.unwrap_or(DEFAULT_SUPERVISOR_MODE);
         let config = NodePublicConfig {
             consensus: Default::default(),
             general: GeneralConfig {
                 validators_count: self.validators_count,
-                supervisor_mode,
+                supervisor_mode: self.supervisor_mode,
             },
             validator_keys: None,
         };

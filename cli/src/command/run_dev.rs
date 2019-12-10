@@ -64,7 +64,7 @@ impl ExonumCommand for RunDev {
         let generate_template = GenerateTemplate {
             common_config: common_config.clone(),
             validators_count: 1,
-            supervisor_mode: Some(SupervisorMode::Simple),
+            supervisor_mode: SupervisorMode::Simple,
         };
         generate_template.execute()?;
 

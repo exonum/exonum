@@ -29,8 +29,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::command::generate_template::DEFAULT_SUPERVISOR_MODE;
-
 /// Part of the template configuration.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GeneralConfig {
@@ -40,17 +38,8 @@ pub struct GeneralConfig {
     pub supervisor_mode: SupervisorMode,
 }
 
-impl Default for GeneralConfig {
-    fn default() -> Self {
-        Self {
-            validators_count: 0,
-            supervisor_mode: DEFAULT_SUPERVISOR_MODE,
-        }
-    }
-}
-
 /// Public configuration of the node. Is shared among validators.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NodePublicConfig {
     /// Consensus configuration.
     pub consensus: ConsensusConfig,
