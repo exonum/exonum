@@ -72,8 +72,9 @@ pub enum Error {
 
 #[exonum_interface]
 pub trait Transactions<Ctx> {
-    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
-    fn transfer(&self, ctx: Ctx, arg: Transfer) -> _;
+    type Output;
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

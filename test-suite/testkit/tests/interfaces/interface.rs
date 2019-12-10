@@ -30,5 +30,6 @@ pub struct Issue {
 
 #[exonum_interface(interface = "IssueReceiver")]
 pub trait IssueReceiver<Ctx> {
-    fn issue(&self, ctx: Ctx, arg: Issue) -> _;
+    type Output;
+    fn issue(&self, ctx: Ctx, arg: Issue) -> Self::Output;
 }

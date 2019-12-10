@@ -56,8 +56,10 @@ impl TxMarker {
 /// Marker service transactions interface definition.
 #[exonum_interface]
 pub trait MarkerTransactions<Ctx> {
+    /// Output returned by the interface methods.
+    type Output;
     /// Transaction, which must be executed no later than the specified time (field `time`).
-    fn mark(&self, context: Ctx, arg: TxMarker) -> _;
+    fn mark(&self, context: Ctx, arg: TxMarker) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

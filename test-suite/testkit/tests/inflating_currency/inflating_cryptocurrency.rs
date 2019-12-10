@@ -123,11 +123,12 @@ pub enum Error {
 
 #[exonum_interface]
 pub trait CurrencyInterface<Ctx> {
+    type Output;
     /// Apply logic to the storage when executing the transaction.
-    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn transfer(&self, ctx: Ctx, arg: Transfer) -> _;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
 impl CurrencyInterface<CallContext<'_>> for CurrencyService {

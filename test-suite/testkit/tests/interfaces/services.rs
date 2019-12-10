@@ -37,7 +37,8 @@ use crate::{
 
 #[exonum_interface]
 pub trait WalletInterface<Ctx> {
-    fn create_wallet(&self, ctx: Ctx, username: String) -> _;
+    type Output;
+    fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -110,7 +111,8 @@ pub struct TxIssue {
 
 #[exonum_interface]
 pub trait DepositInterface<Ctx> {
-    fn deposit(&self, context: Ctx, arg: TxIssue) -> _;
+    type Output;
+    fn deposit(&self, context: Ctx, arg: TxIssue) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -155,8 +157,9 @@ pub struct TxAnyCall {
 
 #[exonum_interface]
 pub trait AnyCall<Ctx> {
-    fn call_any(&self, context: Ctx, arg: TxAnyCall) -> _;
-    fn call_recursive(&self, context: Ctx, depth: u64) -> _;
+    type Output;
+    fn call_any(&self, context: Ctx, arg: TxAnyCall) -> Self::Output;
+    fn call_recursive(&self, context: Ctx, depth: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

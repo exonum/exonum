@@ -202,7 +202,8 @@ mod tests {
 
     #[exonum_interface]
     trait SampleInterface<Ctx> {
-        fn timestamp(&self, ctx: Ctx, arg: String) -> _;
+        type Output;
+        fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
     }
 
     impl SampleInterface<CallContext<'_>> for SampleService {

@@ -51,7 +51,8 @@ pub struct Config {
 
 #[exonum_interface]
 pub trait TimestampingInterface<Ctx> {
-    fn timestamp(&self, ctx: Ctx, arg: TxTimestamp) -> _;
+    type Output;
+    fn timestamp(&self, ctx: Ctx, arg: TxTimestamp) -> Self::Output;
 }
 
 impl TimestampingInterface<CallContext<'_>> for TimestampingService {

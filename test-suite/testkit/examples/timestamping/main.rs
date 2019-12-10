@@ -31,7 +31,8 @@ mod proto;
 
 #[exonum_interface]
 trait TimestampingInterface<Ctx> {
-    fn timestamp(&self, ctx: Ctx, arg: String) -> _;
+    type Output;
+    fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

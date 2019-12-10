@@ -32,7 +32,8 @@ pub const DATA_SIZE: usize = 64;
 
 #[exonum_interface(crate = "crate")]
 pub trait Timestamping<Ctx> {
-    fn timestamp(&self, ctx: Ctx, arg: TimestampTx) -> _;
+    type Output;
+    fn timestamp(&self, ctx: Ctx, arg: TimestampTx) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

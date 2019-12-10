@@ -48,7 +48,8 @@
 //!
 //! #[exonum_interface]
 //! pub trait TimestampingInterface<Ctx> {
-//!     fn timestamp(&self, _: Ctx, arg: String) -> _;
+//!     type Output;
+//!     fn timestamp(&self, _: Ctx, arg: String) -> Self::Output;
 //! }
 //!
 //! impl TimestampingInterface<CallContext<'_>> for TimestampingService {
@@ -358,7 +359,8 @@ impl TestKit {
     /// // Suppose we test this service interface:
     /// #[exonum_interface]
     /// pub trait ExampleInterface<Ctx> {
-    ///     fn example_tx(&self, ctx: Ctx, arg: String) -> _;
+    ///     type Output;
+    ///     fn example_tx(&self, ctx: Ctx, arg: String) -> Self::Output;
     /// }
     ///
     /// // ...implemented by this service:

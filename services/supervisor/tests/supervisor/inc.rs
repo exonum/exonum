@@ -64,7 +64,8 @@ where
 
 #[exonum_interface]
 pub trait IncInterface<Ctx> {
-    fn inc(&self, context: Ctx, seed: u64) -> _;
+    type Output;
+    fn inc(&self, context: Ctx, seed: u64) -> Self::Output;
 }
 
 /// Very simple test service that has one tx and one endpoint.

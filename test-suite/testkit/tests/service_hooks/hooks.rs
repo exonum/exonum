@@ -32,7 +32,8 @@ pub const SERVICE_NAME: &str = "after-commit";
 
 #[exonum_interface]
 pub trait AfterCommitInterface<Ctx> {
-    fn after_commit(&self, ctx: Ctx, height: u64) -> _;
+    type Output;
+    fn after_commit(&self, ctx: Ctx, height: u64) -> Self::Output;
 }
 
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]

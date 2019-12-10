@@ -91,12 +91,15 @@ impl CreateWallet {
 /// Cryptocurrency service transactions.
 #[exonum_interface]
 pub trait CryptocurrencyInterface<Ctx> {
+    /// Output returned by the interface methods.
+    type Output;
+
     /// Transfers `amount` of the currency from one wallet to another.
-    fn transfer(&self, ctx: Ctx, arg: Transfer) -> _;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
     /// Issues `amount` of the currency to the `wallet`.
-    fn issue(&self, ctx: Ctx, arg: Issue) -> _;
+    fn issue(&self, ctx: Ctx, arg: Issue) -> Self::Output;
     /// Creates wallet with the given `name`.
-    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
 }
 
 impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {

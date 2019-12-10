@@ -45,8 +45,10 @@ impl TxTime {
 /// Time oracle service transaction.
 #[exonum_interface]
 pub trait TimeOracleInterface<Ctx> {
+    /// Output of the methods in this interface.
+    type Output;
     /// Receives a new time from one of validators.
-    fn report_time(&self, ctx: Ctx, arg: TxTime) -> _;
+    fn report_time(&self, ctx: Ctx, arg: TxTime) -> Self::Output;
 }
 
 impl TimeOracleInterface<CallContext<'_>> for TimeService {

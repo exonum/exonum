@@ -190,10 +190,13 @@ pub mod contracts {
     /// Cryptocurrency service transactions.
     #[exonum_interface]
     pub trait CryptocurrencyInterface<Ctx> {
+        /// Output of the methods in this interface.
+        type Output;
+
         /// Creates wallet with the given `name`.
-        fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> _;
+        fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
         /// Transfers `amount` of the currency from one wallet to another.
-        fn transfer(&self, ctx: Ctx, arg: TxTransfer) -> _;
+        fn transfer(&self, ctx: Ctx, arg: TxTransfer) -> Self::Output;
     }
 
     /// Cryptocurrency service implementation.

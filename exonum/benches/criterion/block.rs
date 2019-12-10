@@ -129,8 +129,9 @@ mod timestamping {
 
     #[exonum_interface]
     pub trait TimestampingInterface<Ctx> {
-        fn timestamp(&self, ctx: Ctx, arg: Hash) -> _;
-        fn timestamp_panic(&self, ctx: Ctx, arg: Hash) -> _;
+        type Output;
+        fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
+        fn timestamp_panic(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
     #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -197,12 +198,14 @@ mod cryptocurrency {
 
     #[exonum_interface]
     pub trait CryptocurrencyInterface<Ctx> {
+        type Output;
+
         /// Transfers one unit of currency from `from` to `to`.
-        fn transfer(&self, ctx: Ctx, arg: Tx) -> _;
+        fn transfer(&self, ctx: Ctx, arg: Tx) -> Self::Output;
         /// Same as `transfer`, but without cryptographic proofs in `execute`.
-        fn transfer_without_proof(&self, ctx: Ctx, arg: Tx) -> _;
+        fn transfer_without_proof(&self, ctx: Ctx, arg: Tx) -> Self::Output;
         /// Same as `transfer_without_proof`, but signals an error 50% of the time.
-        fn transfer_error_sometimes(&self, ctx: Ctx, arg: Tx) -> _;
+        fn transfer_error_sometimes(&self, ctx: Ctx, arg: Tx) -> Self::Output;
     }
 
     #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -340,23 +343,31 @@ mod foreign_interface_call {
 
     #[exonum_interface]
     pub trait SelfInterface<Ctx> {
+        type Output;
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
         fn call_foreign(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
     #[exonum_interface]
     pub trait ForeignInterface<Ctx> {
+        type Output;
         fn foreign_timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
     #[exonum_interface(interface = "Configure")]
-    pub trait Configure<Ctx> {}
+    pub trait Configure<Ctx> {
+        type Output;
+    }
 
     #[exonum_interface(interface = "Events")]
-    pub trait Events<Ctx> {}
+    pub trait Events<Ctx> {
+        type Output;
+    }
 
     #[exonum_interface(interface = "ERC30Tokens")]
-    pub trait ERC30Tokens<Ctx> {}
+    pub trait ERC30Tokens<Ctx> {
+        type Output;
+    }
 
     #[derive(Debug, ServiceFactory, ServiceDispatcher)]
     #[service_dispatcher(implements(

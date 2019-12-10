@@ -30,7 +30,8 @@ use crate::{
 
 #[exonum_interface(crate = "crate")]
 pub trait ConfigUpdater<Ctx> {
-    fn update_config(&self, ctx: Ctx, arg: TxConfig) -> _;
+    type Output;
+    fn update_config(&self, ctx: Ctx, arg: TxConfig) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

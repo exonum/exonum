@@ -82,10 +82,12 @@ pub enum Error {
 
 #[exonum_interface]
 pub trait CounterServiceInterface<Ctx> {
+    type Output;
+
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
-    fn increment(&self, ctx: Ctx, by: u64) -> _;
-    fn reset(&self, ctx: Ctx, _: ()) -> _;
+    fn increment(&self, ctx: Ctx, by: u64) -> Self::Output;
+    fn reset(&self, ctx: Ctx, _: ()) -> Self::Output;
 }
 
 impl CounterServiceInterface<CallContext<'_>> for CounterService {

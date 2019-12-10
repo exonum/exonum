@@ -241,8 +241,9 @@ impl Default for Init {
 
 #[exonum_interface(crate = "crate")]
 trait Test<Ctx> {
-    fn method_a(&self, ctx: Ctx, arg: u64) -> _;
-    fn method_b(&self, ctx: Ctx, arg: u64) -> _;
+    type Output;
+    fn method_a(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    fn method_b(&self, ctx: Ctx, arg: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]

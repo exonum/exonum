@@ -41,9 +41,11 @@ const IDX_NAME: &str = "test_service.val";
 
 #[exonum_interface(crate = "crate")]
 trait TestDispatcher<Ctx> {
-    fn test_execute(&self, ctx: Ctx, arg: u64) -> _;
-    fn test_deploy(&self, ctx: Ctx, arg: u64) -> _;
-    fn test_add(&self, ctx: Ctx, arg: u64) -> _;
+    type Output;
+
+    fn test_execute(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    fn test_deploy(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    fn test_add(&self, ctx: Ctx, arg: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -191,6 +193,7 @@ lazy_static! {
 
 #[exonum_interface(crate = "crate")]
 trait ResultCheck<Ctx> {
+    type Output;
     fn tx_result(&self, ctx: Ctx, arg: u64) -> Self::Output;
 }
 
