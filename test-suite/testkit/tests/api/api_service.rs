@@ -20,17 +20,15 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
     api::{self, EndpointMutability},
-    crypto::Hash,
     runtime::{
         rust::{
             api::{ServiceApiBuilder, ServiceApiState},
             DefaultInstance, Service,
         },
-        BlockchainData, InstanceId,
+        InstanceId,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::Snapshot;
 
 pub const SERVICE_NAME: &str = "api-service";
 pub const SERVICE_ID: InstanceId = 3;
@@ -100,10 +98,6 @@ impl DefaultInstance for ApiService {
 }
 
 impl Service for ApiService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         Api::wire(builder)
     }
