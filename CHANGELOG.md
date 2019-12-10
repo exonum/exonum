@@ -35,8 +35,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
+
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
+- API module now supports creating deprecated endpoints, and also it's now possible
+  to generate endpoints which will return `Gone` or `MovedPermanently` HTTP
+  response. (#1607)
 
 #### exonum-merkledb
 
