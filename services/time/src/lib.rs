@@ -42,14 +42,7 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum::{
-    crypto::Hash,
-    runtime::{
-        rust::{api::ServiceApiBuilder, AfterCommitContext, Service},
-        BlockchainData,
-    },
-};
-use exonum_merkledb::Snapshot;
+use exonum::runtime::rust::{api::ServiceApiBuilder, AfterCommitContext, Service};
 
 use std::sync::Arc;
 
@@ -71,10 +64,6 @@ pub struct TimeService {
 }
 
 impl Service for TimeService {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        TimeSchema::new(data.for_executing_service()).state_hash()
-    }
-
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         if let Some(broadcast) = context.broadcaster() {

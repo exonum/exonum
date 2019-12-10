@@ -50,9 +50,7 @@
 //! )]
 //! struct TimestampingService;
 //!
-//! impl Service for TimestampingService {
-//!     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
-//! }
+//! impl Service for TimestampingService {}
 //!
 //! #[exonum_interface]
 //! pub trait TimestampingInterface {
@@ -372,10 +370,7 @@ impl TestKit {
     /// #     proto_sources = "exonum_testkit::proto",
     /// # )]
     /// # pub struct ExampleService;
-    /// #
-    /// # impl Service for ExampleService {
-    /// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
-    /// # }
+    /// # impl Service for ExampleService {}
     /// #
     /// # #[exonum_interface]
     /// # pub trait ExampleInterface {
@@ -814,10 +809,6 @@ impl TestKit {
 /// # impl AfterCommitInterface for AfterCommitService {}
 /// #
 /// impl Service for AfterCommitService {
-///     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-///         vec![]
-///     }
-///
 ///     fn after_commit(&self, _: AfterCommitContext) {
 ///         self.counter.fetch_add(1, Ordering::SeqCst);
 ///     }

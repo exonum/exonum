@@ -245,7 +245,7 @@ pub trait FromAccess<T: Access>: Sized {
     ///
     /// The default implementation uses `Self::from_access()`.
     fn from_root(access: T) -> Result<Self, AccessError> {
-        Self::from_access(access, IndexAddress::new())
+        Self::from_access(access, IndexAddress::default())
     }
 }
 

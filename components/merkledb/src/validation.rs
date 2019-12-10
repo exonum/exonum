@@ -46,27 +46,27 @@ pub fn is_allowed_index_name_char(c: u8) -> bool {
 // Allow because it's looks more readable.
 #[allow(clippy::if_not_else)]
 fn check_valid_name<F>(
-    addr: IndexAddress,
+    addr: &IndexAddress,
     predicate: F,
     allowed_chars: &'static str,
 ) -> Result<(), AccessError>
 where
     F: Fn(&str) -> bool,
 {
-    let name = &addr.name;
+    let name = addr.name();
 
     if name.is_empty() {
         Err(AccessError {
             kind: AccessErrorKind::EmptyName,
-            addr,
+            addr: addr.to_owned(),
         })
     } else if !predicate(name) {
         Err(AccessError {
             kind: AccessErrorKind::InvalidCharsInName {
-                name: name.clone(),
+                name: name.to_owned(),
                 allowed_chars,
             },
-            addr,
+            addr: addr.to_owned(),
         })
     } else {
         Ok(())
@@ -75,11 +75,9 @@ where
 
 /// Checks that provided address is valid index full name.
 pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
-    let addr = addr.clone();
-
-    if addr.name.starts_with("__") && !addr.name.contains('.') {
+    if addr.name().starts_with("__") && !addr.name().contains('.') {
         return Err(AccessError {
-            addr,
+            addr: addr.to_owned(),
             kind: AccessErrorKind::ReservedName,
         });
     };
@@ -87,16 +85,13 @@ pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), Acc
     check_valid_name(addr, is_valid_identifier, "a-zA-Z0-9 and _-.")
 }
 
-/// Calls the `is_valid_index_name_component` function with the given
-/// name and panics if it returns `false`.
 pub(crate) fn assert_valid_name_component(name: &str) {
-    if let Err(access_error) = check_valid_name(
-        name.into(),
+    check_valid_name(
+        &name.into(),
         is_valid_index_name_component,
         "a-zA-Z0-9 and _-",
-    ) {
-        panic!(access_error.to_string())
-    }
+    )
+    .unwrap();
 }
 
 #[cfg(test)]

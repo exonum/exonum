@@ -37,11 +37,10 @@ pub mod transactions;
 
 use exonum::{
     blockchain::ExecutionError,
-    crypto::Hash,
-    merkledb::{BinaryValue, Snapshot},
+    merkledb::BinaryValue,
     runtime::{
         rust::{api::ServiceApiBuilder, CallContext, Service},
-        BlockchainData, DispatcherError,
+        DispatcherError,
     },
 };
 
@@ -72,10 +71,6 @@ impl Service for TimestampingService {
 
         Schema::new(context.service_data()).config.set(config);
         Ok(())
-    }
-
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        Schema::new(data.for_executing_service()).state_hash()
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
