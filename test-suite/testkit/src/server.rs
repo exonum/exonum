@@ -192,7 +192,9 @@ mod tests {
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::examples::TxTimestamp")]
     struct TxTimestamp {
         message: String,
