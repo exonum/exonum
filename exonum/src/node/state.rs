@@ -161,7 +161,7 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Option<Patch>,
     txs: Vec<Hash>,
-    proposer_id: ValidatorId,
+    proposer_id: Option<ValidatorId>,
 }
 
 /// Incomplete block.
@@ -363,7 +363,7 @@ impl BlockState {
             hash,
             patch: Some(patch),
             txs,
-            proposer_id,
+            proposer_id: Some(proposer_id),
         }
     }
 
@@ -383,7 +383,7 @@ impl BlockState {
     }
 
     /// Returns id of the validator that proposed the block.
-    pub fn proposer_id(&self) -> ValidatorId {
+    pub fn proposer_id(&self) -> Option<ValidatorId> {
         self.proposer_id
     }
 }
@@ -1010,7 +1010,7 @@ impl State {
         block_hash: Hash,
         patch: Patch,
         txs: Vec<Hash>,
-        proposer_id: ValidatorId,
+        proposer_id: Option<ValidatorId>,
     ) -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,

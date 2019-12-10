@@ -29,26 +29,19 @@ use std::borrow::Cow;
 ///
 /// # Usage
 ///
-/// ```ignore
-/// use exonum::blockchain::{Block, BlockHeaderKey};
+/// see [`Block::get_entry()`].
 ///
-/// struct SomeData {}
-///
-/// impl BlockHeaderKey for SomeData {
-///    const NAME: &'static str = "data";
-///    type Value = Self;
-/// }
-///
-/// let mut block = Block { ... };
-///
-/// let data = SomeData {};
-/// block.insert::<SomeData>(data);
-/// ```
+/// [`Block::get_entry()`]: struct.Block.html#method.get_entry
 pub trait BlockHeaderKey {
     /// Key name.
     const NAME: &'static str;
     /// Type of the value associated with this key.
     type Value: BinaryValue;
+}
+
+impl BlockHeaderKey for ValidatorId {
+    const NAME: &'static str = "validator_id";
+    type Value = Self;
 }
 
 /// Expandable set of entries allowed to be added to the block.
@@ -94,8 +87,6 @@ impl BlockHeaderEntries {
 )]
 #[protobuf_convert(source = "proto::Block")]
 pub struct Block {
-    /// Identifier of the leader node which has proposed the block.
-    pub proposer_id: ValidatorId,
     /// Height of the block, which is also the number of this particular
     /// block in the blockchain.
     pub height: Height,
@@ -117,44 +108,47 @@ pub struct Block {
 
 impl Block {
     /// Insert new entry to the block header.
-    ///
-    /// # Usage
-    ///
-    /// ```ignore
-    /// use exonum::blockchain::{Block, BlockHeaderKey};
-    ///
-    /// impl BlockHeaderKey for ActiveServices {
-    ///     const NAME: &'static str = "ACTIVE_SERVICES";
-    ///     type Value = Self;
-    /// }
-    ///
-    /// let mut block = Block { ... };
-    ///
-    /// let services = ActiveServices::new();
-    /// block.insert::<ActiveServices>(services);
-    ///
-    /// ```
-    pub fn add_entry<K: BlockHeaderKey>(&mut self, value: K::Value) {
+    pub(crate) fn add_entry<K: BlockHeaderKey>(&mut self, value: K::Value) {
         self.entries.insert::<K>(value);
     }
 
-    /// Get block header entry for specified key type.
+    /// Get block header entry for specified key type. Key type is specified via
+    /// type parameter.
     ///
     /// # Usage
     ///
-    /// ```ignore
-    /// use exonum::blockchain::{Block, BlockHeaderKey};
+    /// ```
+    /// use exonum::crypto::Hash;
+    /// use exonum::blockchain::{Block, BlockHeaderKey, BlockHeaderEntries};
+    /// use exonum::helpers::Height;
+    /// use exonum::messages::BinaryValue;
+    /// use failure::Error;
+    /// use std::borrow::Cow;
     ///
     /// struct ActiveServices {}
     ///
+    /// impl BinaryValue for ActiveServices {
+    ///     fn to_bytes(&self) -> Vec<u8> { vec![] }
+    ///     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> { Ok(Self {}) }
+    /// }
+    ///
     /// impl BlockHeaderKey for ActiveServices {
-    ///     const NAME: &'static str = "ACTIVE_SERVICES";
+    ///     const NAME: &'static str = "active_services";
     ///     type Value = Self;
     /// }
     ///
-    /// let mut block = Block { ... };
-    /// let services = block.get::<ActiveServices>();
+    /// let mut block = Block {
+    ///     height: Height(0),
+    ///     tx_count: 0,
+    ///     prev_hash: Hash::zero(),
+    ///     tx_hash: Hash::zero(),
+    ///     state_hash: Hash::zero(),
+    ///     error_hash: Hash::zero(),
+    ///     entries: BlockHeaderEntries::new(),
+    /// };
     ///
+    /// let services = block.get_entry::<ActiveServices>().expect("Entry deserialization error");
+    /// assert!(services.is_none())
     /// ```
     pub fn get_entry<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error>
     where
@@ -213,7 +207,6 @@ mod tests {
         let mut entries = BlockHeaderEntries::new();
         entries.insert::<Hash>(hash(&[0u8; 10]));
 
-        let proposer_id = ValidatorId(1024);
         let txs = [4, 5, 6];
         let height = Height(123_345);
         let prev_hash = hash(&[1, 2, 3]);
@@ -223,7 +216,6 @@ mod tests {
 
         let error_hash = hash(&[10, 11]);
         let block = Block {
-            proposer_id,
             height,
             tx_count,
             prev_hash,
@@ -244,7 +236,6 @@ mod tests {
     }
 
     fn create_block(entries: BlockHeaderEntries) -> Block {
-        let proposer_id = ValidatorId(1024);
         let txs = [4, 5, 6];
         let height = Height(123_345);
         let prev_hash = hash(&[1, 2, 3]);
@@ -254,7 +245,6 @@ mod tests {
         let error_hash = hash(&[10, 11]);
 
         Block {
-            proposer_id,
             height,
             tx_count,
             prev_hash,
@@ -294,7 +284,7 @@ mod tests {
     }
 
     impl BlockHeaderKey for ActiveServices {
-        const NAME: &'static str = "ACTIVE_SERVICES";
+        const NAME: &'static str = "active_services";
         type Value = Self;
     }
 
@@ -344,12 +334,12 @@ mod tests {
     fn block_entry_wrong_type() {
         let mut entries: BinaryMap<String, Vec<u8>> = BinaryMap::default();
 
-        entries.0.insert("ACTIVE_SERVICES".into(), vec![]);
+        entries.0.insert("active_services".into(), vec![]);
         let block = create_block(entries.clone());
         let services = block.get_entry::<ActiveServices>();
         assert!(services.unwrap().unwrap().services.is_empty());
 
-        entries.0.insert("ACTIVE_SERVICES".into(), vec![0_u8; 1024]);
+        entries.0.insert("active_services".into(), vec![0_u8; 1024]);
         let block = create_block(entries);
         let services = block.get_entry::<ActiveServices>();
         assert!(services.is_err());

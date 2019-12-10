@@ -26,6 +26,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
 
+- `proposer_id` field in `Block` is now optional and has been moved to
+  block header entries. (#1602)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
@@ -47,8 +50,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
 
-- Mechanism to extend block header has been added. Using
-`Dispatcher::get_block_header_entries` is possible to add new entries. (#1602)
+- Mechanism to extend block header has been added. Block now contains
+  key value storage `entries` which can contain binary data. (#1602)
 
 #### exonum-supervisor
 

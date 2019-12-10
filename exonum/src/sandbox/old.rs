@@ -74,15 +74,17 @@ fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
 }
 
 fn create_block(sandbox: &Sandbox) -> Block {
+    let mut entries = BlockHeaderEntries::new();
+    entries.insert::<ValidatorId>(ValidatorId(2));
+
     Block {
-        proposer_id: ValidatorId(2),
         height: Height(1),
         tx_count: 0,
         prev_hash: sandbox.last_hash(),
         tx_hash: HashTag::empty_list_hash(),
         state_hash: sandbox.last_state_hash(),
         error_hash: HashTag::empty_map_hash(),
-        entries: BlockHeaderEntries::new(),
+        entries,
     }
 }
 

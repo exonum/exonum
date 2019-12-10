@@ -42,7 +42,6 @@ mod tests;
 
 #[derive(Debug)]
 struct ServiceInfo {
-    instance_id: InstanceId,
     runtime_id: u32,
     name: String,
 }
@@ -423,7 +422,6 @@ impl Dispatcher {
         self.service_infos.insert(
             instance.id,
             ServiceInfo {
-                instance_id: instance.id,
                 runtime_id: instance.artifact.runtime_id,
                 name: instance.name.to_owned(),
             },

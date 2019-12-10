@@ -124,7 +124,7 @@ fn tx_pool_size_overflow() {
     );
 
     let mut block = sandbox.create_block(&[tx1.clone()]);
-    block.proposer_id = ValidatorId(2);
+    block.add_entry::<ValidatorId>(ValidatorId(2));
     block.height = Height(1);
 
     sandbox.recv(&propose);

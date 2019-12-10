@@ -329,7 +329,7 @@ impl NodeHandler {
 
         if self.state.block(&block_hash).is_none() {
             let (computed_block_hash, patch) = self.create_block(
-                block.proposer_id,
+                block.get_entry::<ValidatorId>()?,
                 block.height,
                 msg.payload().transactions(),
             );
@@ -345,7 +345,7 @@ impl NodeHandler {
                 computed_block_hash,
                 patch,
                 msg.payload().transactions().to_vec(),
-                block.proposer_id,
+                block.get_entry::<ValidatorId>()?,
             );
         }
         let precommits = into_verified(msg.payload().precommits())?;
@@ -582,7 +582,7 @@ impl NodeHandler {
         info!(
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
             height,
-            proposer,
+            proposer.map_or_else(|| "?".into(), |p| format!("{}", p)),
             round.map_or_else(|| "?".into(), |x| format!("{}", x)),
             committed_txs,
             pool_len,
@@ -915,7 +915,7 @@ impl NodeHandler {
     /// Creates block with given transaction and returns its hash and corresponding changes.
     fn create_block(
         &mut self,
-        proposer_id: ValidatorId,
+        proposer_id: Option<ValidatorId>,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
@@ -943,13 +943,17 @@ impl NodeHandler {
             .into_payload();
 
         let (block_hash, patch) = self.create_block(
-            propose.validator,
+            Some(propose.validator),
             propose.height,
             propose.transactions.as_slice(),
         );
         // Save patch
-        self.state
-            .add_block(block_hash, patch, propose.transactions, propose.validator);
+        self.state.add_block(
+            block_hash,
+            patch,
+            propose.transactions,
+            Some(propose.validator),
+        );
         self.state
             .propose_mut(propose_hash)
             .unwrap()

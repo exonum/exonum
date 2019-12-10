@@ -126,7 +126,6 @@ fn test_block() {
     let tx_count = txs.len() as u32;
 
     let content = Block {
-        proposer_id: ValidatorId::zero(),
         height: Height(500),
         tx_count,
         prev_hash: crypto::hash(&[1]),

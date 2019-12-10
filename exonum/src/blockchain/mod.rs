@@ -250,12 +250,7 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch)?;
 
-        let (_, patch) = self.create_patch(
-            ValidatorId::zero(),
-            Height::zero(),
-            &[],
-            &mut BTreeMap::new(),
-        );
+        let (_, patch) = self.create_patch(None, Height::zero(), &[], &mut BTreeMap::new());
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -273,7 +268,7 @@ impl BlockchainMut {
     /// with the hash of the resulting block.
     pub fn create_patch(
         &self,
-        proposer_id: ValidatorId,
+        proposer_id: Option<ValidatorId>,
         height: Height,
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
@@ -321,7 +316,7 @@ impl BlockchainMut {
     fn create_block_header(
         &self,
         fork: Fork,
-        proposer_id: ValidatorId,
+        proposer_id: Option<ValidatorId>,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Patch, Block) {
@@ -334,8 +329,7 @@ impl BlockchainMut {
         let patch = fork.into_patch();
         let state_hash = SystemSchema::new(&patch).state_hash();
 
-        let block = Block {
-            proposer_id,
+        let mut block = Block {
             height,
             tx_count: tx_hashes.len() as u32,
             prev_hash: last_hash,
@@ -344,6 +338,10 @@ impl BlockchainMut {
             error_hash,
             entries: BlockHeaderEntries::new(),
         };
+
+        if let Some(proposer_id) = proposer_id {
+            block.add_entry::<ValidatorId>(proposer_id);
+        }
 
         (patch, block)
     }

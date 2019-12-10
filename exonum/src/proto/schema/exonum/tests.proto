@@ -113,4 +113,3 @@ message TestServiceInfo {
 message TestActiveServices {
   repeated TestServiceInfo services = 1;
 }
-

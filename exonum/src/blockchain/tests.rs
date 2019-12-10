@@ -26,7 +26,7 @@ use crate::{
         config::{GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainMut, Schema,
     },
-    helpers::{generate_testnet_config, Height, ValidatorId},
+    helpers::{generate_testnet_config, Height},
     messages::Verified,
     node::ApiSender,
     proto::schema::tests::*,
@@ -272,8 +272,7 @@ impl TxResultCheckInterface for TxResultCheckService {
 impl Service for TxResultCheckService {}
 
 fn assert_service_execute(blockchain: &mut BlockchainMut) {
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
+    let (_, patch) = blockchain.create_patch(None, Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
     let index = snapshot.get_list("service_good.val");
@@ -282,8 +281,7 @@ fn assert_service_execute(blockchain: &mut BlockchainMut) {
 }
 
 fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
+    let (_, patch) = blockchain.create_patch(None, Height(1), &[], &mut BTreeMap::new());
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
     assert!(snapshot
@@ -306,12 +304,8 @@ fn execute_transaction(
         })
         .unwrap();
 
-    let (block_hash, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
-        Height::zero(),
-        &[tx_hash],
-        &mut BTreeMap::new(),
-    );
+    let (block_hash, patch) =
+        blockchain.create_patch(None, Height::zero(), &[tx_hash], &mut BTreeMap::new());
 
     blockchain
         .commit(patch, block_hash, vec![], &mut BTreeMap::new())
@@ -379,7 +373,7 @@ fn handling_tx_panic_error() {
     blockchain.merge(fork.into_patch()).unwrap();
 
     let (_, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
+        None,
         Height::zero(),
         &[
             tx_ok1.object_hash(),
@@ -437,7 +431,7 @@ fn handling_tx_panic_storage_error() {
     schema.add_transaction_into_pool(tx_storage_error.clone());
     blockchain.merge(fork.into_patch()).unwrap();
     blockchain.create_patch(
-        ValidatorId::zero(),
+        None,
         Height::zero(),
         &[
             tx_ok1.object_hash(),
@@ -518,12 +512,8 @@ fn error_discards_transaction_changes() {
         schema.add_transaction_into_pool(transaction.clone());
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let (_, patch) = blockchain.create_patch(
-            ValidatorId::zero(),
-            Height(index),
-            &[hash],
-            &mut BTreeMap::new(),
-        );
+        let (_, patch) =
+            blockchain.create_patch(None, Height(index), &[hash], &mut BTreeMap::new());
         db.merge(patch).unwrap();
 
         let snapshot = db.snapshot();

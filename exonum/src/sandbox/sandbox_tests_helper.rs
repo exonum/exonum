@@ -97,10 +97,14 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn build(&self) -> Block {
+        let proposer_id = self
+            .proposer_id
+            .unwrap_or_else(|| self.sandbox.current_leader());
+
+        let mut entries = self.entries.clone().unwrap_or_else(BlockHeaderEntries::new);
+        entries.insert::<ValidatorId>(proposer_id);
+
         Block {
-            proposer_id: self
-                .proposer_id
-                .unwrap_or_else(|| self.sandbox.current_leader()),
             height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
             tx_count: self.tx_count.unwrap_or(0),
             prev_hash: self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
@@ -109,7 +113,7 @@ impl<'a> BlockBuilder<'a> {
                 .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
             error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
-            entries: self.entries.clone().unwrap_or_else(BlockHeaderEntries::new),
+            entries,
         }
     }
 }

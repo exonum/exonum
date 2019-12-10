@@ -84,6 +84,7 @@ where
     }
 }
 
+//TODO: Add generic support to BinaryValue derive macro [ECR-3955].
 impl<K, V> BinaryValue for BinaryMap<K, V>
 where
     K: BinaryValue + Ord,
@@ -102,6 +103,7 @@ where
     }
 }
 
+//TODO: Add generic support to ObjectHash derive macro [ECR-3955].
 impl<K, V> ObjectHash for BinaryMap<K, V>
 where
     K: BinaryValue + Ord,
