@@ -36,7 +36,9 @@ mod proto;
 
 // Simple service implementation.
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTimestamp")]
 struct TxTimestamp {
     message: String,

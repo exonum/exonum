@@ -21,7 +21,8 @@ use std::fmt::Display;
 use crate::runtime::{ErrorKind, ExecutionError, ExecutionFail};
 
 /// List of possible dispatcher errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "dispatcher")]
 pub enum Error {
     /// Runtime identifier is incorrect in this context.
