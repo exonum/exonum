@@ -19,35 +19,35 @@ extern crate pretty_assertions;
 
 use exonum::{
     api::backends::actix::AllowOrigin,
-    crypto::{PublicKey, PUBLIC_KEY_LENGTH},
+    blockchain::ValidatorKeys,
+    crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH},
     node::{ConnectInfo, ConnectListConfig},
 };
-use exonum_cli::command::{Command, ExonumCommand, StandardResult};
+use exonum_cli::{
+    command::{
+        finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
+        run::Run, Command, ExonumCommand, StandardResult,
+    },
+    config::{GeneralConfig, NodeConfig, NodePrivateConfig, NodePublicConfig},
+    config_manager::DefaultConfigManager,
+    io::{load_config_file, save_config_file},
+    password::DEFAULT_MASTER_PASS_ENV_VAR,
+};
+use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::*;
 use structopt::StructOpt;
+use tempfile::TempDir;
 
-use exonum::blockchain::ValidatorKeys;
-use exonum::crypto::gen_keypair;
-use exonum_cli::command::finalize::Finalize;
-use exonum_cli::command::generate_config::GenerateConfig;
-use exonum_cli::command::generate_template::GenerateTemplate;
-use exonum_cli::command::run::Run;
-use exonum_cli::config::{GeneralConfig, NodeConfig, NodePrivateConfig, NodePublicConfig};
-use exonum_cli::config_manager::DefaultConfigManager;
-use exonum_cli::io::{load_config_file, save_config_file};
-use exonum_cli::password::DEFAULT_MASTER_PASS_ENV_VAR;
-use exonum_supervisor::mode::Mode as SupervisorMode;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
-use std::str::FromStr;
 use std::{
     env,
     ffi::OsString,
     fs::{self, OpenOptions},
     panic,
     path::{Path, PathBuf},
+    str::FromStr,
 };
-use tempfile::TempDir;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -573,7 +573,7 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
     let err = finalize.execute().err().unwrap();
     assert!(err
         .to_string()
-        .contains("Found config with different common part"));
+        .contains("Found public configs with different general configuration."));
     Ok(())
 }
 

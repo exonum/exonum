@@ -182,6 +182,5 @@ impl NodeBuilder {
             SupervisorMode::Simple => Supervisor::simple(),
             SupervisorMode::Decentralized => Supervisor::decentralized(),
         }
-        supervisor
     }
 }
