@@ -15,6 +15,7 @@
 //! Standard Exonum CLI command used to run the node with default parameters
 //! for developing purposes.
 
+use exonum_supervisor::mode::Mode as SupervisorMode;
 use failure::{Error, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -63,7 +64,7 @@ impl ExonumCommand for RunDev {
         let generate_template = GenerateTemplate {
             common_config: common_config.clone(),
             validators_count: 1,
-            supervisor_mode: None,
+            supervisor_mode: Some(SupervisorMode::Simple),
         };
         generate_template.execute()?;
 
