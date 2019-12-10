@@ -17,6 +17,7 @@
 
 use exonum::{
     blockchain::ConsensusConfig,
+    crypto::PublicKey,
     node::{ConnectInfo, ConnectListConfig, NodeApiConfig},
 };
 use failure::{bail, format_err, Error};
@@ -68,33 +69,54 @@ struct ValidatedConfigs {
 }
 
 impl Finalize {
-    fn validate_configs(public_configs: Vec<NodePublicConfig>) -> Result<ValidatedConfigs, Error> {
-        let mut map = BTreeMap::new();
-        let mut config_iter = public_configs.into_iter();
+    fn validate_configs(configs: Vec<NodePublicConfig>) -> Result<ValidatedConfigs, Error> {
+        let mut config_iter = configs.into_iter();
+        let mut public_configs = BTreeMap::new();
         let first = config_iter
             .next()
-            .ok_or_else(|| format_err!("Expected at least one config in PUBLIC_CONFIGS"))?;
-        map.insert(first.validator_keys.unwrap().consensus_key, first.clone());
+            .ok_or_else(|| format_err!("Expected at least one config in <public-configs>"))?;
+        let consensus_key = Self::get_consensus_key(&first)?;
+        public_configs.insert(consensus_key, first.clone());
 
         for config in config_iter {
-            if first.consensus != config.consensus || first.general != config.general {
+            if first.consensus != config.consensus {
                 bail!(
-                    "Found config with different common part. {:?} != {:?}",
-                    first,
-                    config
+                    "Found public configs with different consensus configuration.\
+                     Make sure the same template config was used for generation.\
+                     {:#?} \nnot equal to\n {:#?}",
+                    first.consensus,
+                    config.consensus
+                );
+            }
+            if first.general != config.general {
+                bail!(
+                    "Found public configs with different general configuration.\
+                     Make sure the same template config was used for generation.\
+                     {:#?} \nnot equal to\n {:#?}",
+                    first.general,
+                    config.general
                 );
             };
-            if map
-                .insert(config.validator_keys.unwrap().consensus_key, config.clone())
-                .is_some()
-            {
-                bail!("Found duplicate consensus keys in PUBLIC_CONFIGS");
+
+            let consensus_key = Self::get_consensus_key(&config)?;
+            if public_configs.insert(consensus_key, config).is_some() {
+                bail!(
+                    "Found duplicated consensus keys in <public-configs>: {:?}",
+                    consensus_key
+                );
             }
         }
         Ok(ValidatedConfigs {
             common: first,
-            public_configs: map.values().cloned().collect(),
+            public_configs: public_configs.values().cloned().collect(),
         })
+    }
+
+    fn get_consensus_key(config: &NodePublicConfig) -> Result<PublicKey, failure::Error> {
+        Ok(config
+            .validator_keys
+            .ok_or_else(|| format_err!("Expected validator keys in public config: {:#?}", config))?
+            .consensus_key)
     }
 
     fn create_connect_list_config(
