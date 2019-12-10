@@ -45,7 +45,11 @@ pub struct NodePublicConfig {
     pub consensus: ConsensusConfig,
     /// General configuration.
     pub general: GeneralConfig,
-    /// Keys of the node.
+    /// Public keys of the node.
+    ///
+    /// `None` when not yet generated. The keys are generated at
+    /// `generate-config` configuration step. The keys are required for the
+    /// `finalize` step.
     pub validator_keys: Option<ValidatorKeys>,
 }
 
@@ -58,7 +62,7 @@ pub struct NodePrivateConfig {
     pub external_address: String,
     /// Path to the master key file.
     pub master_key_path: PathBuf,
-    /// Api configuration.
+    /// API configuration.
     pub api: NodeApiConfig,
     /// Network configuration.
     pub network: NetworkConfiguration,
@@ -67,9 +71,9 @@ pub struct NodePrivateConfig {
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,
-    /// Transaction Verification Thread Pool size.
+    /// Amount of threads used for transactions verification.
     pub thread_pool_size: Option<u8>,
-    /// Node's ConnectList.
+    /// Information about peers within network.
     pub connect_list: ConnectListConfig,
     /// Validator keys.
     #[serde(skip)]
