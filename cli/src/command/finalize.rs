@@ -171,30 +171,33 @@ impl ExonumCommand for Finalize {
 
         let connect_list = Self::create_connect_list_config(&public_configs, &secret_config);
 
+        let private_config = NodePrivateConfig {
+            listen_address: secret_config.listen_address,
+            external_address: secret_config.external_address,
+            master_key_path: secret_config.master_key_path,
+            api: NodeApiConfig {
+                public_api_address: self.public_api_address,
+                private_api_address: self.private_api_address,
+                public_allow_origin,
+                private_allow_origin,
+                ..secret_config.api
+            },
+            network: secret_config.network,
+            mempool: secret_config.mempool,
+            database: secret_config.database,
+            thread_pool_size: secret_config.thread_pool_size,
+            connect_list,
+            keys: secret_config.keys,
+        };
+        let public_config = NodePublicConfig {
+            consensus,
+            general: common.general,
+            validator_keys: None,
+        };
+
         let config = NodeConfig {
-            private_config: NodePrivateConfig {
-                listen_address: secret_config.listen_address,
-                external_address: secret_config.external_address,
-                master_key_path: secret_config.master_key_path,
-                api: NodeApiConfig {
-                    public_api_address: self.public_api_address,
-                    private_api_address: self.private_api_address,
-                    public_allow_origin,
-                    private_allow_origin,
-                    ..secret_config.api
-                },
-                network: secret_config.network,
-                mempool: secret_config.mempool,
-                database: secret_config.database,
-                thread_pool_size: secret_config.thread_pool_size,
-                connect_list,
-                keys: secret_config.keys,
-            },
-            public_config: NodePublicConfig {
-                consensus,
-                general: common.general,
-                validator_keys: None,
-            },
+            private_config,
+            public_config,
         };
 
         save_config_file(&config, &self.output_config_path)?;
