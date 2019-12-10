@@ -170,7 +170,7 @@ impl TestDispatcherInterface for TestDispatcherService {
             artifact,
         };
 
-        context.start_adding_service(spec, config)
+        context.initiate_adding_service(spec, config)
     }
 }
 

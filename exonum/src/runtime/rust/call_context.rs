@@ -124,14 +124,14 @@ impl<'a> CallContext<'a> {
         Dispatcher::commit_artifact(self.inner.fork, artifact, spec)
     }
 
-    /// Starts adding a service instance to the blockchain.
+    /// Initiates adding a service instance to the blockchain.
     ///
     /// The service is not immediately activated; it activates if / when the block containing
     /// the activation transaction is committed.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn start_adding_service(
+    pub fn initiate_adding_service(
         &mut self,
         instance_spec: InstanceSpec,
         constructor: impl BinaryValue,

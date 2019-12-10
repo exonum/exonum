@@ -106,7 +106,7 @@ enum RuntimeEvent {
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
     StartAdding(InstanceSpec, Vec<u8>),
-    CommitService(Option<Height>, InstanceSpec),
+    CommitService(Option<Height>, InstanceSpec, InstanceStatus),
     AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
     Shutdown,
@@ -183,7 +183,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.events
             .lock()
             .unwrap()
-            .push(RuntimeEvent::CommitService(height, spec.to_owned()));
+            .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
         self.inner.commit_service_status(snapshot, spec, status)
     }
 
@@ -350,7 +350,7 @@ impl DefaultInstance for TestServiceImpl {
     const INSTANCE_NAME: &'static str = SERVICE_INSTANCE_NAME;
 }
 
-/// In this test, we manually instruct the dispatcher to deploy artifacts / create services
+/// In this test, we manually instruct the dispatcher to deploy artifacts / create / stop services
 /// instead of using transactions. We still need to create patches using a `BlockchainMut`
 /// in order to properly emulate the blockchain workflow.
 #[test]
@@ -419,7 +419,7 @@ fn basic_rust_runtime() {
         events,
         vec![
             RuntimeEvent::StartAdding(spec.clone(), constructor.into_bytes()),
-            RuntimeEvent::CommitService(Some(Height(2)), spec.clone()),
+            RuntimeEvent::CommitService(Some(Height(2)), spec.clone(), InstanceStatus::Active),
             RuntimeEvent::AfterCommit(Height(2)),
         ]
     );
@@ -490,6 +490,39 @@ fn basic_rust_runtime() {
             RuntimeEvent::AfterCommit(Height(4)),
         ]
     );
+
+    // Stop service instance.
+    let mut fork = create_block(&blockchain);
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
+        .initiate_stopping_service(SERVICE_INSTANCE_ID)
+        .unwrap();
+    commit_block(&mut blockchain, fork);
+    let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
+
+    assert_eq!(
+        events,
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(4), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(4), SERVICE_INSTANCE_ID),
+            RuntimeEvent::CommitService(Some(Height(5)), spec.clone(), InstanceStatus::Stopped),
+            RuntimeEvent::AfterCommit(Height(5)),
+        ]
+    );
+
+    // Execute transaction method B.
+    let call_info = CallInfo {
+        instance_id: SERVICE_INSTANCE_ID,
+        method_id: 1,
+    };
+    let payload = TxB { value: ARG_B_VALUE }.into_bytes();
+    let caller = Caller::Service {
+        instance_id: SERVICE_INSTANCE_ID,
+    };
+    let mut fork = create_block(&blockchain);
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .expect_err("incorrect transaction");
 }
 
 #[test]
@@ -525,7 +558,11 @@ fn rust_runtime_with_builtin_services() {
                 init_params.clone().instance_spec,
                 constructor.clone().into_bytes()
             ),
-            RuntimeEvent::CommitService(None, init_params.clone().instance_spec),
+            RuntimeEvent::CommitService(
+                None,
+                init_params.clone().instance_spec,
+                InstanceStatus::Active
+            ),
             RuntimeEvent::AfterCommit(Height(0)),
         ]
     );
@@ -558,7 +595,11 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact, vec![]),
             // `Runtime::start_adding_service` is never called for the same service
-            RuntimeEvent::CommitService(Some(Height(1)), init_params.instance_spec),
+            RuntimeEvent::CommitService(
+                Some(Height(1)),
+                init_params.instance_spec,
+                InstanceStatus::Active
+            ),
             // `Runtime::after_commit` is never called for the same block
             RuntimeEvent::Resume,
         ]
@@ -629,7 +670,7 @@ fn conflicting_service_instances() {
         vec![
             RuntimeEvent::StartAdding(spec.clone(), constructor.clone().into_bytes()),
             RuntimeEvent::StartAdding(alternative_spec, constructor.into_bytes()),
-            RuntimeEvent::CommitService(Some(Height(2)), spec),
+            RuntimeEvent::CommitService(Some(Height(2)), spec, InstanceStatus::Active),
             RuntimeEvent::AfterCommit(Height(2)),
         ]
     );

@@ -945,7 +945,7 @@ fn recoverable_error_during_deployment() {
 }
 
 #[test]
-fn restart_with_stopped_services() {
+fn stopped_service_workflow() {
     let instance_id = 0;
     let instance_name = "supervisor";
 
@@ -981,7 +981,7 @@ fn restart_with_stopped_services() {
     };
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
     context
-        .initiate_adding_service(service, vec![])
+        .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
 
     debug!("create_genesis_block");
@@ -1087,4 +1087,10 @@ fn restart_with_stopped_services() {
             .is_none(),
         "Schema should be unreachable"
     );
+
+    // Check that it is impossible to add previously stopped service.
+    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    context
+        .initiate_adding_service(service, vec![])
+        .expect_err("`initiate_adding_service` should failed");
 }
