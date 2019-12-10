@@ -144,13 +144,10 @@ impl Dispatcher {
         }
         // Restart active service instances.
         for state in schema.instances().values() {
-            debug_assert_ne!(
-                state.status,
-                InstanceStatus::None,
-                "BUG: Service instance should has state."
-            );
-
-            self.commit_service_state(snapshot, &state.spec, state.status)?;
+            let status = state
+                .status
+                .expect("BUG: Service instance should has state.");
+            self.commit_service_state(snapshot, &state.spec, status)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {

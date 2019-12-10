@@ -341,7 +341,7 @@ fn main() {
             .for_dispatcher()
             .get_instance(instance_name.as_str())
             .unwrap();
-        assert_eq!(state.status, InstanceStatus::Active);
+        assert_eq!(state.status.unwrap(), InstanceStatus::Active);
         let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender

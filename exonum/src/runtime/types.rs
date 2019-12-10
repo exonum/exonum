@@ -416,8 +416,6 @@ impl ProtobufConvert for ArtifactStatus {
 /// Status of a service instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InstanceStatus {
-    /// The service instance has no status in the dispatcher.
-    None = 0,
     /// The service instance is active.
     Active = 1,
     /// The service instance is stopped.
@@ -434,35 +432,28 @@ impl InstanceStatus {
 impl Display for InstanceStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InstanceStatus::None => f.write_str("none"),
             InstanceStatus::Active => f.write_str("active"),
             InstanceStatus::Stopped => f.write_str("stopped"),
         }
     }
 }
 
-impl Default for InstanceStatus {
-    fn default() -> Self {
-        InstanceStatus::None
-    }
-}
-
-impl ProtobufConvert for InstanceStatus {
-    type ProtoStruct = schema::runtime::InstanceState_Status;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        match self {
-            InstanceStatus::None => schema::runtime::InstanceState_Status::NONE,
-            InstanceStatus::Active => schema::runtime::InstanceState_Status::ACTIVE,
-            InstanceStatus::Stopped => schema::runtime::InstanceState_Status::STOPPED,
+impl InstanceStatus {
+    fn to_pb(status: &Option<InstanceStatus>) -> schema::runtime::InstanceState_Status {
+        match status {
+            None => schema::runtime::InstanceState_Status::NONE,
+            Some(InstanceStatus::Active) => schema::runtime::InstanceState_Status::ACTIVE,
+            Some(InstanceStatus::Stopped) => schema::runtime::InstanceState_Status::STOPPED,
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(
+        pb: schema::runtime::InstanceState_Status,
+    ) -> Result<Option<InstanceStatus>, failure::Error> {
         Ok(match pb {
-            schema::runtime::InstanceState_Status::NONE => InstanceStatus::None,
-            schema::runtime::InstanceState_Status::ACTIVE => InstanceStatus::Active,
-            schema::runtime::InstanceState_Status::STOPPED => InstanceStatus::Stopped,
+            schema::runtime::InstanceState_Status::NONE => None,
+            schema::runtime::InstanceState_Status::ACTIVE => Some(InstanceStatus::Active),
+            schema::runtime::InstanceState_Status::STOPPED => Some(InstanceStatus::Stopped),
         })
     }
 }
@@ -475,7 +466,6 @@ impl BinaryValue for InstanceStatus {
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let code = u32::from_bytes(bytes)?;
         match code {
-            0 => Ok(InstanceStatus::None),
             1 => Ok(InstanceStatus::Active),
             2 => Ok(InstanceStatus::Stopped),
             other => Err(format_err!("Instance status {} is unknown.", other)),
@@ -518,9 +508,11 @@ pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
     /// Service instance activity status.
-    pub status: InstanceStatus,
+    #[protobuf_convert(with = "InstanceStatus")]
+    pub status: Option<InstanceStatus>,
     /// Next status of instance if the value is not `None`.
-    pub next_status: InstanceStatus,
+    #[protobuf_convert(with = "InstanceStatus")]
+    pub next_status: Option<InstanceStatus>,
 }
 
 impl InstanceState {
@@ -528,14 +520,22 @@ impl InstanceState {
     pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
         Self {
             spec,
-            status,
-            next_status: InstanceStatus::None,
+            status: Some(status),
+            next_status: None,
         }
     }
 
     /// Indicates whether the service instance current or pending status is active.
     pub fn is_active(&self) -> bool {
-        self.status.is_active() || self.next_status.is_active()
+        fn is_active(status: &Option<InstanceStatus>) -> bool {
+            if let Some(status) = status {
+                status.is_active()
+            } else {
+                false
+            }
+        }
+
+        is_active(&self.status) || is_active(&self.next_status)
     }
 
     /// Sets next status as current and changes next status to `None`
@@ -544,14 +544,13 @@ impl InstanceState {
     ///
     /// - If next status is already `None`.
     pub(crate) fn commit_next_status(&mut self) {
-        assert_ne!(
-            self.next_status,
-            InstanceStatus::None,
+        assert!(
+            self.next_status.is_some(),
             "Next instance status should not be `None`"
         );
 
         self.status = self.next_status;
-        self.next_status = InstanceStatus::None;
+        self.next_status = None;
     }
 }
 

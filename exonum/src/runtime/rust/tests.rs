@@ -738,11 +738,19 @@ fn dependent_builtin_service() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance(SERVICE_INSTANCE_ID).unwrap().status,
+        schema
+            .get_instance(SERVICE_INSTANCE_ID)
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().status,
+        schema
+            .get_instance("dependent-service")
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
 }
@@ -844,7 +852,11 @@ fn dependent_service_in_same_block() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().status,
+        schema
+            .get_instance("dependent-service")
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
 }
@@ -884,7 +896,11 @@ fn dependent_service_in_successive_block() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().status,
+        schema
+            .get_instance("dependent-service")
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
 }

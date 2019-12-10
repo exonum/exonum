@@ -166,8 +166,8 @@ impl Schema<&Fork> {
             &instance_name,
             InstanceState {
                 spec,
-                status: InstanceStatus::None,
-                next_status,
+                status: None,
+                next_status: Some(next_status),
             },
         );
         self.pending_instances().put(&instance_name, next_status);
@@ -189,10 +189,10 @@ impl Schema<&Fork> {
         let mut state = instances
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
-        // Modify instance status
-        state.next_status = InstanceStatus::Stopped;
-        self.pending_instances()
-            .put(&instance_name, state.next_status);
+        // Modify instance status.
+        let next_status = InstanceStatus::Stopped;
+        state.next_status = Some(next_status);
+        self.pending_instances().put(&instance_name, next_status);
         instances.put(&instance_name, state);
         Ok(())
     }
@@ -210,10 +210,11 @@ impl Schema<&Fork> {
         for (instance, status) in &self.pending_instances() {
             let mut state = instances
                 .get(&instance)
-                .expect("Instance marked as modified is not saved in `instances`");
+                .expect("BUG: Instance marked as modified is not saved in `instances`");
             debug_assert_eq!(
-                status, state.next_status,
-                "Instance status in `pending_instances` should be same as `next_status` \
+                Some(status),
+                state.next_status,
+                "BUG: Instance status in `pending_instances` should be same as `next_status` \
                  in the instance state."
             );
 
@@ -240,7 +241,7 @@ impl Schema<&Fork> {
             .map(|(instance_name, status)| {
                 let state = instances
                     .get(&instance_name)
-                    .expect("Instance marked as modified is not saved in `instances`");
+                    .expect("BUG: Instance marked as modified is not saved in `instances`");
                 (state.spec, status)
             })
             .collect::<Vec<_>>();
