@@ -27,6 +27,9 @@ use crate::{
     io::save_config_file,
 };
 
+/// Default supervisor service mode
+pub const DEFAULT_SUPERVISOR_MODE: SupervisorMode = SupervisorMode::Simple;
+
 /// Generate common part of the nodes configuration.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub struct GenerateTemplate {
@@ -44,7 +47,7 @@ pub struct GenerateTemplate {
 
 impl ExonumCommand for GenerateTemplate {
     fn execute(self) -> Result<StandardResult, Error> {
-        let supervisor_mode = self.supervisor_mode.unwrap_or_default();
+        let supervisor_mode = self.supervisor_mode.unwrap_or(DEFAULT_SUPERVISOR_MODE);
         let config = NodePublicConfig {
             consensus: Default::default(),
             general: GeneralConfig {

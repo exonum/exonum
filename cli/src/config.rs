@@ -29,13 +29,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::command::generate_template::DEFAULT_SUPERVISOR_MODE;
+
 /// Part of the template configuration.
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct GeneralConfig {
     /// Count of the validator nodes in the network.
     pub validators_count: u32,
     /// Supervisor service mode.
     pub supervisor_mode: SupervisorMode,
+}
+
+impl Default for GeneralConfig {
+    fn default() -> Self {
+        Self {
+            validators_count: 0,
+            supervisor_mode: DEFAULT_SUPERVISOR_MODE,
+        }
+    }
 }
 
 /// Public configuration of the node. Is shared among validators.

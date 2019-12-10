@@ -27,10 +27,11 @@ use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
+use failure::{self, format_err};
+
+use std::str::FromStr;
 
 use super::{multisig::MultisigIndex, proto, DeployRequest};
-use failure::{self, format_err};
-use std::str::FromStr;
 
 /// Supervisor operating mode.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -103,12 +104,6 @@ impl Mode {
                 confirmations >= byzantine_quorum(validators)
             }
         }
-    }
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::Simple
     }
 }
 
