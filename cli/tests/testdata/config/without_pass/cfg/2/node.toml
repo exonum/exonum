@@ -68,5 +68,5 @@ consensus_key = "6f3f614692d678b664be7eaafbe280d14e2d4191299ae146874eec389c93ece
 service_key = "7662a94afdaac0b24dc239fd151ed5f9d9a384f5f240540c1e4f382d2b5a526d"
 
 [public_config.general]
-supervisor_mode = "Simple"
+supervisor_mode = "simple"
 validators_count = 4
