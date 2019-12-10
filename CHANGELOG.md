@@ -25,6 +25,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+  
+#### exonum-cli
+
+- `supervisor-mode` parameter has been added for `generate-template` subcommand.
+  (#1598)
 
 #### exonum-supervisor
 
@@ -46,11 +51,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   aggregation works. (#1553)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
-
-#### exonum-cli
-
-- `supervisor-mode` parameter has been added for `generate-template` subcommand.
-  (#1598)
 
 #### exonum-supervisor
 
