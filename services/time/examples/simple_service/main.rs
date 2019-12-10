@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Service, which uses the time oracle.
+//! Service which uses the time oracle.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{

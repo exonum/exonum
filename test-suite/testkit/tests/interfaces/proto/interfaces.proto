@@ -38,7 +38,3 @@ message AnyCall {
   string interface_name = 2;
   bytes args = 3;
 }
-
-message RecursiveCall {
-  uint64 depth = 1;
-}

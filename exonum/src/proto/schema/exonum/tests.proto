@@ -20,8 +20,6 @@ import "google/protobuf/timestamp.proto";
 
 package exonum.tests;
 
-message TimestampTx { bytes data = 1; }
-
 message TxConfig {
   exonum.crypto.PublicKey from = 1;
   bytes config = 2;
@@ -33,11 +31,7 @@ message TxSimple {
   string msg = 2;
 }
 
-message TestServiceTx { uint64 value = 1; }
-
 message TestServiceInit { string msg = 1; }
-
-message BlockchainTestTxA { uint64 a = 1; }
 
 message BlockchainTestTxB {
   uint64 b = 1;

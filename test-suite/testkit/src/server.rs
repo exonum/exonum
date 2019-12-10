@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-    #[service_factory(artifact_name = "sample-service", proto_sources = "crate::proto")]
+    #[service_factory(artifact_name = "sample-service")]
     #[service_dispatcher(implements("SampleInterface"))]
     struct SampleService;
 

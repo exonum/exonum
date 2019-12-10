@@ -20,7 +20,6 @@ use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
-mod proto;
 
 #[test]
 fn test_after_commit() {

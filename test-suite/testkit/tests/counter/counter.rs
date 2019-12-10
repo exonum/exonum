@@ -270,11 +270,7 @@ impl CounterApi {
 // // // // Service // // // //
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "counter-service",
-    artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "counter-service", artifact_version = "1.0.0")]
 #[service_dispatcher(implements("CounterServiceInterface"))]
 pub struct CounterService;
 

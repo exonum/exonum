@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Simple timestamping service implementation.
+
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::ExecutionError,
@@ -25,10 +27,6 @@ use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
-mod proto;
-
-// Simple service implementation.
-
 #[exonum_interface]
 trait TimestampingInterface<Ctx> {
     type Output;
@@ -36,11 +34,7 @@ trait TimestampingInterface<Ctx> {
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "timestamping",
-    artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "timestamping", artifact_version = "1.0.0")]
 #[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 

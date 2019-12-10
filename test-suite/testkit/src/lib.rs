@@ -40,7 +40,6 @@
 //! #[service_factory(
 //!     artifact_name = "timestamping",
 //!     artifact_version = "1.0.0",
-//!     proto_sources = "exonum_testkit::proto",
 //! )]
 //! struct TimestampingService;
 //!
@@ -141,7 +140,6 @@ pub use crate::{
     server::TestKitStatus,
 };
 pub mod compare;
-pub mod proto;
 
 use exonum::{
     api::{
@@ -368,7 +366,6 @@ impl TestKit {
     /// # #[service_factory(
     /// #     artifact_name = "example",
     /// #     artifact_version = "1.0.0",
-    /// #     proto_sources = "exonum_testkit::proto",
     /// # )]
     /// #[service_dispatcher(implements("ExampleInterface"))]
     /// pub struct ExampleService;
@@ -776,7 +773,6 @@ impl TestKit {
 /// # #[service_factory(
 /// #     artifact_name = "after_commit",
 /// #     artifact_version = "1.0.0",
-/// #     proto_sources = "exonum_testkit::proto",
 /// #     service_constructor = "Self::new_instance",
 /// # )]
 /// struct AfterCommitService {

@@ -40,7 +40,6 @@ pub trait AfterCommitInterface<Ctx> {
 #[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
     service_constructor = "Self::new_instance"
 )]
 #[service_dispatcher(implements("AfterCommitInterface"))]

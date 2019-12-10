@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::proto::schema::tests::TimestampTx;
-
-use exonum_merkledb::{access::AccessExt, BinaryValue};
-use exonum_proto::impl_binary_value_for_pb_message;
+use exonum_merkledb::access::AccessExt;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 use crate::{
@@ -33,7 +30,7 @@ pub const DATA_SIZE: usize = 64;
 #[exonum_interface(crate = "crate")]
 pub trait Timestamping<Ctx> {
     type Output;
-    fn timestamp(&self, ctx: Ctx, arg: TimestampTx) -> Self::Output;
+    fn timestamp(&self, ctx: Ctx, arg: Vec<u8>) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -49,7 +46,7 @@ pub struct TimestampingService;
 impl Timestamping<CallContext<'_>> for TimestampingService {
     type Output = Result<(), ExecutionError>;
 
-    fn timestamp(&self, _ctx: CallContext<'_>, _arg: TimestampTx) -> Self::Output {
+    fn timestamp(&self, _ctx: CallContext<'_>, _arg: Vec<u8>) -> Self::Output {
         Ok(())
     }
 }
@@ -71,8 +68,6 @@ impl Service for TimestampingService {
 impl TimestampingService {
     pub const ID: InstanceId = 3;
 }
-
-impl_binary_value_for_pb_message! { TimestampTx }
 
 pub struct TimestampingTxGenerator {
     rand: ThreadRng,
@@ -115,8 +110,6 @@ impl Iterator for TimestampingTxGenerator {
     fn next(&mut self) -> Option<Verified<AnyTx>> {
         let mut data = vec![0; self.data_size];
         self.rand.fill_bytes(&mut data);
-        let mut timestamp = TimestampTx::new();
-        timestamp.set_data(data);
-        Some(self.keypair.timestamp(self.instance_id, timestamp))
+        Some(self.keypair.timestamp(self.instance_id, data))
     }
 }

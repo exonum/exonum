@@ -99,7 +99,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # #[service_factory(
 /// #     artifact_name = "example",
 /// #     artifact_version = "1.0.0",
-/// #     proto_sources = "exonum_testkit::proto",
 /// # )]
 /// # pub struct ExampleService;
 /// # impl Service for ExampleService {}

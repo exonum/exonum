@@ -36,7 +36,6 @@ use crate::counter::{
 };
 
 mod counter;
-mod proto;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKit::for_rust_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
