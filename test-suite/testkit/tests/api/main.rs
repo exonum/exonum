@@ -14,9 +14,8 @@
 
 //! Tests related to the API.
 
-#[macro_use]
-extern crate pretty_assertions;
 use assert_matches::assert_matches;
+use pretty_assertions::assert_eq;
 
 use exonum::api::Error as ApiError;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
