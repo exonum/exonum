@@ -150,6 +150,6 @@ message InstanceState {
   exonum.runtime.InstanceSpec spec = 1;
   // Service instance activity status.
   Status status = 2;
-  // Next status of instance if the value is not `NONE`.
-  Status next_status = 3;
+  // Pending status of instance if the value is not `NONE`.
+  Status pending_status = 3;
 }

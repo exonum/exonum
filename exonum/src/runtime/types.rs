@@ -515,7 +515,7 @@ pub struct InstanceState {
     pub status: Option<InstanceStatus>,
     /// Next status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
-    pub next_status: Option<InstanceStatus>,
+    pub pending_status: Option<InstanceStatus>,
 }
 
 impl InstanceState {
@@ -524,7 +524,7 @@ impl InstanceState {
         Self {
             spec,
             status: Some(status),
-            next_status: None,
+            pending_status: None,
         }
     }
 
@@ -538,7 +538,7 @@ impl InstanceState {
             }
         }
 
-        is_active(self.status) || is_active(self.next_status)
+        is_active(self.status) || is_active(self.pending_status)
     }
 
     /// Sets next status as current and changes next status to `None`
@@ -546,14 +546,14 @@ impl InstanceState {
     /// # Panics
     ///
     /// - If next status is already `None`.
-    pub(crate) fn commit_next_status(&mut self) {
+    pub(crate) fn commit_pending_status(&mut self) {
         assert!(
-            self.next_status.is_some(),
+            self.pending_status.is_some(),
             "Next instance status should not be `None`"
         );
 
-        self.status = self.next_status;
-        self.next_status = None;
+        self.status = self.pending_status;
+        self.pending_status = None;
     }
 }
 

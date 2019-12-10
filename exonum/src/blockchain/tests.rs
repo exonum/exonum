@@ -34,7 +34,8 @@ use crate::{
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory, Transaction},
         AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        ErrorMatch, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -62,6 +63,12 @@ struct TestAdd {
 
 #[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
+struct TestStop {
+    value: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "TestServiceTx")]
 struct TestCallInitialize {
     value: u64,
 }
@@ -77,6 +84,8 @@ trait TestDispatcherInterface {
     fn test_deploy(&self, context: CallContext<'_>, arg: TestDeploy) -> Result<(), ExecutionError>;
 
     fn test_add(&self, context: CallContext<'_>, arg: TestAdd) -> Result<(), ExecutionError>;
+
+    fn test_stop(&self, context: CallContext<'_>, arg: TestStop) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -171,6 +180,11 @@ impl TestDispatcherInterface for TestDispatcherService {
         };
 
         context.initiate_adding_service(spec, config)
+    }
+
+    fn test_stop(&self, mut context: CallContext<'_>, arg: TestStop) -> Result<(), ExecutionError> {
+        let instance_id = arg.value as InstanceId;
+        context.initiate_stopping_service(instance_id)
     }
 }
 
@@ -329,7 +343,7 @@ fn execute_transaction(
 
     let (block_hash, patch) = blockchain.create_patch(
         ValidatorId::zero(),
-        Height::zero(),
+        Height(1),
         &[tx_hash],
         &mut BTreeMap::new(),
     );
@@ -677,7 +691,9 @@ fn test_dispatcher_register_unavailable() {
 }
 
 #[test]
-fn test_dispatcher_start_service_good() {
+fn test_dispatcher_start_stop_service_good() {
+    let _ = crate::helpers::init_logger();
+
     let keypair = crypto::gen_keypair();
     let mut blockchain = create_blockchain(
         vec![TestDispatcherService.into()],
@@ -689,17 +705,41 @@ fn test_dispatcher_start_service_good() {
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
-        .contains(&"good-service-1".to_owned()));
+        .contains("good-service-1"));
     execute_transaction(
         &mut blockchain,
         TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     )
     .unwrap();
     let snapshot = blockchain.snapshot();
-    assert!(DispatcherSchema::new(&snapshot)
-        .instances()
-        .contains(&"good-service-1".to_owned()));
+    assert_eq!(
+        DispatcherSchema::new(&snapshot)
+            .instances()
+            .get("good-service-1")
+            .unwrap()
+            .status,
+        Some(InstanceStatus::Active)
+    );
     assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
+
+    execute_transaction(
+        &mut blockchain,
+        TestStop {
+            value: TEST_SERVICE_ID as u64,
+        }
+        .sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    )
+    .unwrap();
+
+    let snapshot = blockchain.snapshot();
+    assert_eq!(
+        DispatcherSchema::new(&snapshot)
+            .instances()
+            .get(TEST_SERVICE_NAME)
+            .unwrap()
+            .status,
+        Some(InstanceStatus::Stopped)
+    );
 }
 
 #[test]
@@ -768,7 +808,7 @@ fn test_dispatcher_start_service_rollback() {
 #[test]
 fn test_check_tx() {
     let keypair = crypto::gen_keypair();
-    let blockchain = create_blockchain(
+    let mut blockchain = create_blockchain(
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
@@ -781,6 +821,20 @@ fn test_check_tx() {
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
     assert_eq!(
         blockchain.check_tx(&incorrect_tx).unwrap_err(),
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
+
+    execute_transaction(
+        &mut blockchain,
+        TestStop {
+            value: TEST_SERVICE_ID as u64,
+        }
+        .sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
+    )
+    .unwrap();
+    // Check that previously correct transaction become incorrect.
+    assert_eq!(
+        blockchain.check_tx(&correct_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
     );
 }

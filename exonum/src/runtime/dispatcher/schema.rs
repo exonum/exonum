@@ -160,17 +160,17 @@ impl Schema<&Fork> {
 
         let instance_id = spec.id;
         let instance_name = spec.name.clone();
-        let next_status = InstanceStatus::Active;
+        let pending_status = InstanceStatus::Active;
 
         instances.put(
             &instance_name,
             InstanceState {
                 spec,
                 status: None,
-                next_status: Some(next_status),
+                pending_status: Some(pending_status),
             },
         );
-        self.pending_instances().put(&instance_name, next_status);
+        self.pending_instances().put(&instance_name, pending_status);
         instance_ids.put(&instance_id, instance_name);
         Ok(())
     }
@@ -190,9 +190,9 @@ impl Schema<&Fork> {
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
         // Modify instance status.
-        let next_status = InstanceStatus::Stopped;
-        state.next_status = Some(next_status);
-        self.pending_instances().put(&instance_name, next_status);
+        let pending_status = InstanceStatus::Stopped;
+        state.pending_status = Some(pending_status);
+        self.pending_instances().put(&instance_name, pending_status);
         instances.put(&instance_name, state);
         Ok(())
     }
@@ -213,12 +213,12 @@ impl Schema<&Fork> {
                 .expect("BUG: Instance marked as modified is not saved in `instances`");
             debug_assert_eq!(
                 Some(status),
-                state.next_status,
-                "BUG: Instance status in `pending_instances` should be same as `next_status` \
+                state.pending_status,
+                "BUG: Instance status in `pending_instances` should be same as `pending_status` \
                  in the instance state."
             );
 
-            state.commit_next_status();
+            state.commit_pending_status();
             instances.put(&instance, state);
         }
     }

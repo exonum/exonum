@@ -984,7 +984,6 @@ fn stopped_service_workflow() {
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
 
-    debug!("create_genesis_block");
     // Activate artifact and service.
     create_genesis_block(&mut dispatcher, &mut fork);
 
@@ -1015,7 +1014,6 @@ fn stopped_service_workflow() {
         .expect("Schema should be reachable");
 
     // Commit service status
-    debug!("Commit and notify runtimes");
     dispatcher.activate_pending(&fork);
     dispatcher.commit_block_and_notify_runtimes(&mut fork);
     db.merge_sync(fork.into_patch()).unwrap();
@@ -1039,12 +1037,11 @@ fn stopped_service_workflow() {
         "Schema should be unreachable"
     );
 
-    // Emulate dispatcher restart
+    // Emulate dispatcher restart.
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime.runtime_type, runtime)
         .finalize(&blockchain);
     let mut fork = db.fork();
-    debug!("Initiate restore state");
     dispatcher
         .restore_state(fork.snapshot_without_unflushed_changes())
         .unwrap();

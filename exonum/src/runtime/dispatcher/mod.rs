@@ -129,8 +129,6 @@ impl Dispatcher {
 
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
-        debug!("Restore state");
-
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
         for state in schema.artifacts().values() {
@@ -147,7 +145,7 @@ impl Dispatcher {
             let status = state
                 .status
                 .expect("BUG: Service instance should has state.");
-            self.commit_service_state(snapshot, &state.spec, status)?;
+            self.commit_service_status(snapshot, &state.spec, status)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
@@ -400,7 +398,7 @@ impl Dispatcher {
         }
         // Notify runtime about changes in service instances.
         for (spec, status) in schema.take_modified_instances() {
-            self.commit_service_state(snapshot, &spec, status)
+            self.commit_service_status(snapshot, &spec, status)
                 .expect("Cannot commit service");
         }
     }
@@ -481,8 +479,8 @@ impl Dispatcher {
         }
     }
 
-    /// Commits service instance state in the corresponding runtime.
-    pub(super) fn commit_service_state(
+    /// Commits service instance status in the corresponding runtime.
+    pub(super) fn commit_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         instance: &InstanceSpec,
@@ -493,14 +491,6 @@ impl Dispatcher {
             .runtimes
             .get_mut(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
-        // TODO Rewrite runtime API to pass status to runtime.
-        debug!(
-            "commit_service_status {:?}: {} {}",
-            instance,
-            status,
-            status.is_active()
-        );
-
         runtime.commit_service_status(snapshot, instance, status)?;
 
         info!(
