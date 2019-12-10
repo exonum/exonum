@@ -162,7 +162,7 @@ fn update_configs(
                 let (instance_spec, config) = start_service.into_parts(id);
 
                 context
-                    .start_adding_service(instance_spec, config)
+                    .initiate_adding_service(instance_spec, config)
                     .map_err(|err| {
                         log::error!("Service start request failed. {}", err);
                         err

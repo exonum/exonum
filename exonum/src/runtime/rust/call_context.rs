@@ -137,11 +137,31 @@ impl<'a> CallContext<'a> {
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_adding_service` called within a non-supervisor service");
+            panic!("`initiate_adding_service` called within a non-supervisor service");
         }
 
         self.inner
             .child_context(self.instance.id)
             .initiate_adding_service(instance_spec, constructor)
+    }
+
+    /// Initiates stopping a service instance in the blockchain.
+    ///
+    /// The service is not immediately stopped; it stops if / when the block containing
+    /// the stopping transaction is committed.
+    ///
+    /// This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
+    pub fn initiate_stopping_service(
+        &mut self,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`initiate_stopping_service` called within a non-supervisor service");
+        }
+
+        self.inner
+            .child_context(self.instance.id)
+            .initiate_stopping_service(instance_id)
     }
 }
