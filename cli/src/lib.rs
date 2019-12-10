@@ -90,7 +90,7 @@
 pub use structopt;
 
 use exonum::{
-    blockchain::config::GenesisConfigBuilder,
+    blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
     runtime::{rust::ServiceFactory, RuntimeInstance, WellKnownRuntime},
@@ -99,7 +99,7 @@ use exonum_supervisor::{mode::Mode as SupervisorMode, Supervisor};
 
 use std::sync::Arc;
 
-use crate::command::{Command, ExonumCommand, StandardResult};
+use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
 use crate::config_manager::DefaultConfigManager;
 
 pub mod command;
@@ -144,10 +144,7 @@ impl NodeBuilder {
 
         if let StandardResult::Run(run_config) = command.execute()? {
             // Add builtin services to genesis config.
-            let supervisor = match run_config.node_config.public_config.general.supervisor_mode {
-                SupervisorMode::Simple => Supervisor::simple(),
-                SupervisorMode::Decentralized => Supervisor::decentralized(),
-            };
+            let supervisor = Self::supervisor_service(&run_config);
             let genesis_config = GenesisConfigBuilder::with_consensus_config(
                 run_config.node_config.public_config.consensus.clone(),
             )
@@ -178,5 +175,13 @@ impl NodeBuilder {
         } else {
             Ok(())
         }
+    }
+
+    fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {
+        match run_config.node_config.public_config.general.supervisor_mode {
+            SupervisorMode::Simple => Supervisor::simple(),
+            SupervisorMode::Decentralized => Supervisor::decentralized(),
+        }
+        supervisor
     }
 }
