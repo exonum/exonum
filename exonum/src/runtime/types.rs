@@ -439,6 +439,9 @@ impl Display for InstanceStatus {
 }
 
 impl InstanceStatus {
+    // This method must have an exact signature so that is can be used with the
+    // `protobuf_convert(with)`.
+    #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
     fn to_pb(status: &Option<InstanceStatus>) -> schema::runtime::InstanceState_Status {
         match status {
             None => schema::runtime::InstanceState_Status::NONE,
@@ -527,7 +530,7 @@ impl InstanceState {
 
     /// Indicates whether the service instance current or pending status is active.
     pub fn is_active(&self) -> bool {
-        fn is_active(status: &Option<InstanceStatus>) -> bool {
+        fn is_active(status: Option<InstanceStatus>) -> bool {
             if let Some(status) = status {
                 status.is_active()
             } else {
@@ -535,7 +538,7 @@ impl InstanceState {
             }
         }
 
-        is_active(&self.status) || is_active(&self.next_status)
+        is_active(self.status) || is_active(self.next_status)
     }
 
     /// Sets next status as current and changes next status to `None`

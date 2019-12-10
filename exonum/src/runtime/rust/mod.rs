@@ -188,16 +188,16 @@ use crate::{
     blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     crypto::Hash,
     helpers::Height,
-    runtime::WellKnownRuntime,
+    runtime::{
+        dispatcher::{self, Mailbox},
+        error::{catch_panic, ExecutionError, ExecutionFail},
+        ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+        InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, StateHashAggregator,
+        WellKnownRuntime,
+    },
 };
 
 use self::api::ServiceApiBuilder;
-use super::{
-    dispatcher::{self, Mailbox},
-    error::{catch_panic, ExecutionError, ExecutionFail},
-    ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier, StateHashAggregator,
-};
 
 mod call_context;
 mod runtime_api;
@@ -287,6 +287,11 @@ impl RustRuntime {
         self.started_services_by_name
             .insert(instance.name.clone(), instance.id);
         self.started_services.insert(instance.id, instance);
+    }
+
+    fn remove_started_service(&mut self, instance: &InstanceSpec) {
+        self.started_services_by_name.remove(&instance.name);
+        self.started_services.remove(&instance.id);
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
@@ -503,13 +508,22 @@ impl Runtime for RustRuntime {
         catch_panic(|| service.initialize(context, parameters))
     }
 
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(spec)?;
-        self.add_started_service(instance);
+        match status {
+            InstanceStatus::Active => {
+                let instance = self.new_service(spec)?;
+                self.add_started_service(instance);
+            }
+
+            InstanceStatus::Stopped => {
+                self.remove_started_service(spec);
+            }
+        }
         self.new_services_since_last_block = true;
         Ok(())
     }

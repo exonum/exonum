@@ -495,14 +495,13 @@ impl Dispatcher {
             .ok_or(Error::IncorrectRuntime)?;
         // TODO Rewrite runtime API to pass status to runtime.
         debug!(
-            "commit_service_state {:?}: {} {}",
+            "commit_service_status {:?}: {} {}",
             instance,
             status,
             status.is_active()
         );
-        if status.is_active() {
-            runtime.commit_service(snapshot, instance)?;
-        }
+
+        runtime.commit_service_status(snapshot, instance, status)?;
 
         info!(
             "Committing service instance {:?} with status {}",

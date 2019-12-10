@@ -112,15 +112,26 @@ impl Runtime for SampleRuntime {
         self.deployed_artifacts.contains_key(id)
     }
 
-    /// Starts an existing `SampleService` instance with the specified ID.
-    fn commit_service(
+    /// Commits status for the `SampleService` instance with the specified ID.
+    fn commit_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
-        let instance = self.start_service(spec)?;
-        println!("Starting service {}: {:?}", spec, instance);
-        self.started_services.insert(spec.id, instance);
+        match status {
+            InstanceStatus::Active => {
+                let instance = self.start_service(spec)?;
+                println!("Starting service {}: {:?}", spec, instance);
+                self.started_services.insert(spec.id, instance);
+            }
+
+            InstanceStatus::Stopped => {
+                let instance = self.started_services.remove(&spec.id);
+                println!("Stopping service {}: {:?}", spec, instance);
+            }
+        }
+
         Ok(())
     }
 

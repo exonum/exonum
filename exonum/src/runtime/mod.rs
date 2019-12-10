@@ -316,7 +316,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
-    /// Permanently adds a service to the runtime.
+    /// Permanently adds a service to the runtime. TODO [ECR-3762]
     ///
     /// This method is called *once* for a specific service instance during `Runtime` lifetime:
     ///
@@ -350,10 +350,11 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// (The latter kind of errors should be produced during the preceding `start_adding_service`
     /// call.) The error should contain a description allowing the node administrator to determine
     /// the root cause of the error and (ideally) recover the node by eliminating it.
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError>;
 
     /// Dispatches payload to the method of a specific service instance.

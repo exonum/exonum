@@ -164,10 +164,11 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.inner.start_adding_service(context, spec, parameters)
     }
 
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
@@ -183,7 +184,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .lock()
             .unwrap()
             .push(RuntimeEvent::CommitService(height, spec.to_owned()));
-        self.inner.commit_service(snapshot, spec)
+        self.inner.commit_service_status(snapshot, spec, status)
     }
 
     fn execute(

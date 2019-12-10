@@ -15,8 +15,8 @@
 use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
-        Runtime, StateHashAggregator, WellKnownRuntime,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, StateHashAggregator, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -118,10 +118,11 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
+        _status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }

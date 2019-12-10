@@ -208,14 +208,13 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        new_status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         if spec.artifact.runtime_id == self.runtime_type {
-            let new_status = InstanceStatus::Active;
-
             let status_changed = if let Some(status) = self.services.get(&spec.id).copied() {
                 status != new_status
             } else {
@@ -570,10 +569,11 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
+        _status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
@@ -755,10 +755,11 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn commit_service(
+    fn commit_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
+        _status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
@@ -1007,16 +1008,17 @@ fn restart_with_stopped_services() {
     dispatcher.activate_pending(&fork);
     dispatcher.commit_block_and_notify_runtimes(&mut fork);
     db.merge_sync(fork.into_patch()).unwrap();
-    // Take notification about started service.
-    assert_eq!(
-        changes_rx.iter().take(1).collect::<Vec<_>>(),
-        vec![(
-            SampleRuntimes::First as u32,
-            vec![(instance_id, InstanceStatus::Active)]
-        )]
-    );
 
-    // TODO Check that the runtime actually stops the service instance. [ECR-3762]
+    // Check if transactions become incorrect.
+    let mut fork = db.fork();
+    dispatcher
+        .call(
+            &mut fork,
+            Caller::Service { instance_id: 1 },
+            &CallInfo::new(instance_id, 0),
+            &[],
+        )
+        .expect_err("Incorrect transaction");
 
     // Emulate dispatcher restart
     let mut dispatcher = DispatcherBuilder::new()
@@ -1028,9 +1030,26 @@ fn restart_with_stopped_services() {
         .restore_state(fork.snapshot_without_unflushed_changes())
         .unwrap();
 
-    changes_rx
-        .recv_timeout(Duration::new(0, 0))
-        .expect_err("Changes should be empty.");
+    // Check expected notifications.
+    let expected_notifications = vec![
+        (
+            SampleRuntimes::First as u32,
+            vec![(instance_id, InstanceStatus::Active)],
+        ),
+        (
+            SampleRuntimes::First as u32,
+            vec![(instance_id, InstanceStatus::Stopped)],
+        ),
+        (
+            SampleRuntimes::First as u32,
+            vec![(instance_id, InstanceStatus::Stopped)],
+        ),
+    ];
+
+    assert_eq!(
+        changes_rx.iter().take(3).collect::<Vec<_>>(),
+        expected_notifications
+    );
 
     // Check if transactions become incorrect.
     dispatcher
