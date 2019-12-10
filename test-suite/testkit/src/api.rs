@@ -48,7 +48,7 @@ pub enum ApiKind {
     System,
     /// `api/explorer` endpoints of the built-in Exonum REST API.
     Explorer,
-    /// `api/runtimes/rust` endpoints of the built-in Exonum REST API.
+    /// `api/runtimes/rust` endpoints corresponding to Rust runtime of the Exonum REST API.
     RustRuntime,
     /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
