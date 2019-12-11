@@ -210,7 +210,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// COMMIT ::= deploy_artifact* commit_service* after_commit
 /// ```
 ///
-/// The ordering for the "readonly" methods `is_artifact_deployed` and `state_hashes` in relation
+/// The ordering for the "readonly" method `is_artifact_deployed` in relation
 /// to the lifecycle above is not specified.
 ///
 /// # Consensus and Local Methods
@@ -222,11 +222,10 @@ impl From<RuntimeIdentifier> for u32 {
 /// - `execute`
 /// - `after_transactions`
 /// - `start_adding_service`
-/// - `state_hashes`
 ///
-/// All these methods except for `state_hashes` should also produce the same changes
-/// to the storage via provided `ExecutionContext`. Discrepancy in node behavior within
-/// these methods may lead to a consensus failure.
+/// All these methods should also produce the same changes to the storage via
+/// the provided `ExecutionContext`. Discrepancy in node behavior within these methods may lead
+/// to a consensus failure.
 ///
 /// The other `Runtime` methods may execute logic specific to the node.
 ///
@@ -390,9 +389,6 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Gets the state hashes of the every available service in the runtime.
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator;
-
     /// Notifies a service stored in this runtime about the beginning of the block, allowing it
     /// to modify the blockchain state before any transaction in the block will be processed.
     ///
@@ -483,16 +479,6 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
             instance: runtime.into(),
         }
     }
-}
-
-/// An accessory structure that aggregates root object hashes of the service
-/// information schemas of the runtime with the root hash of the runtime information schema itself.
-#[derive(Debug, PartialEq, Default)]
-pub struct StateHashAggregator {
-    /// List of hashes of the root objects of the runtime information schemas.
-    pub runtime: Vec<Hash>,
-    /// List of hashes of the root objects of the service instances schemas.
-    pub instances: Vec<(InstanceId, Vec<Hash>)>,
 }
 
 /// The initiator of the method execution.

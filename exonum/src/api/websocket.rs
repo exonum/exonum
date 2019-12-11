@@ -49,7 +49,8 @@ enum IncomingMessage {
 }
 
 /// Subscription type (new blocks or committed transactions).
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum SubscriptionType {
     /// Subscription to nothing.
@@ -65,7 +66,8 @@ pub enum SubscriptionType {
 
 /// Describe filter for transactions by ID of service and (optionally)
 /// transaction type in service.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
 pub struct TransactionFilter {
     /// ID of service.
     pub service_id: u16,

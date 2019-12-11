@@ -101,11 +101,7 @@
 //!     }
 //! }
 //!
-//! impl Service for PointService {
-//!     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//!         vec![]
-//!     }
-//! }
+//! impl Service for PointService {}
 //! ```
 //!
 //! ## Stateful Service Definition
@@ -151,11 +147,7 @@
 //!
 //! # impl Transactions for StatefulService {}
 //! #
-//! # impl Service for StatefulService {
-//! #     fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-//! #         vec![]
-//! #     }
-//! # }
+//! # impl Service for StatefulService {}
 //! ```
 //!
 //! [ServiceFactory]: trait.ServiceFactory.html
@@ -186,14 +178,12 @@ use std::{
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
-    crypto::Hash,
     helpers::Height,
     runtime::{
         dispatcher::{self, Mailbox},
         error::{catch_panic, ExecutionError, ExecutionFail},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-        InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, StateHashAggregator,
-        WellKnownRuntime,
+        InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 
@@ -236,11 +226,6 @@ impl Instance {
             id: self.id,
             name: &self.name,
         }
-    }
-
-    fn state_hash(&self, snapshot: &dyn Snapshot) -> (InstanceId, Vec<Hash>) {
-        let blockchain_data = BlockchainData::new(snapshot, self.descriptor());
-        (self.id, self.service.state_hash(blockchain_data))
     }
 }
 
@@ -549,17 +534,6 @@ impl Runtime for RustRuntime {
                 payload,
             )
         })
-    }
-
-    fn state_hashes(&self, snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator {
-            runtime: Vec::new(),
-            instances: self
-                .started_services
-                .values()
-                .map(|service| service.state_hash(snapshot))
-                .collect(),
-        }
     }
 
     fn before_transactions(

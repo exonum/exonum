@@ -16,17 +16,17 @@
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
     messages::Verified,
     node::ApiSender,
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory},
-        AnyTx, BlockchainData, ExecutionError, InstanceId,
+        AnyTx, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{ObjectHash, Snapshot, TemporaryDB};
+use exonum_merkledb::{ObjectHash, TemporaryDB};
 use exonum_proto::ProtobufConvert;
 use futures::sync::mpsc;
 use serde_derive::*;
@@ -37,7 +37,9 @@ pub const SERVICE_ID: InstanceId = 4;
 
 mod proto;
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
@@ -53,7 +55,9 @@ impl CreateWallet {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
     pub from: PublicKey,
@@ -115,11 +119,7 @@ impl ExplorerTransactions for MyService {
     }
 }
 
-impl Service for MyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for MyService {}
 
 /// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {

@@ -18,16 +18,16 @@ use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, ObjectHash, RawProofMapIndex,
+    Entry, RawProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
 
 use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
-)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Timestamp")]
 pub struct Timestamp {
     /// Hash of the content.
@@ -48,7 +48,8 @@ impl Timestamp {
 
 /// Timestamp entry.
 #[protobuf_convert(source = "proto::TimestampEntry", serde_pb_convert)]
-#[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,
@@ -74,13 +75,6 @@ impl TimestampEntry {
 pub struct Schema<T: Access> {
     pub config: Entry<T::Base, Config>,
     pub timestamps: RawProofMapIndex<T::Base, Hash, TimestampEntry>,
-}
-
-impl<T: Access> Schema<T> {
-    /// Returns the state hash of the timestamping service.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.timestamps.object_hash()]
-    }
 }
 
 impl<T> Schema<T>

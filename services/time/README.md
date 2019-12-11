@@ -82,13 +82,6 @@ pub struct MarkerSchema<T: Access> {
     pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
 }
 
-impl<T: Access> MarkerSchema<T> {
-    /// Returns hashes for stored table.
-    fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks.object_hash()]
-    }
-}
-
 impl MarkerTransactions for MarkerService {
     fn mark(
       &self,
@@ -113,12 +106,6 @@ impl MarkerTransactions for MarkerService {
             _ => {}
         }
         Ok(())
-    }
-}
-
-impl Service for MarkerService {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        MarkerSchema::new(data.for_executing_service()).state_hash()
     }
 }
 ```

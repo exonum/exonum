@@ -48,7 +48,8 @@ pub enum Error {
 }
 
 /// Transfer `amount` of the currency from one wallet to another.
-#[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer", serde_pb_convert)]
 pub struct Transfer {
     /// `PublicKey` of receiver's wallet.
@@ -62,7 +63,9 @@ pub struct Transfer {
 }
 
 /// Issue `amount` of the currency to the `wallet`.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Issue")]
 pub struct Issue {
     /// Issued amount of currency.
@@ -75,7 +78,9 @@ pub struct Issue {
 
 /// Create wallet with the given `name`.
 #[protobuf_convert(source = "proto::CreateWallet")]
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct CreateWallet {
     /// Name of the new wallet.
     pub name: String,

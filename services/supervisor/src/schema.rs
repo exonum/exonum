@@ -19,7 +19,7 @@ use exonum::{
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, Prefixed},
-    Entry, Fork, ObjectHash, ProofMapIndex,
+    Entry, Fork, ProofEntry, ProofMapIndex,
 };
 
 use super::{
@@ -31,7 +31,7 @@ use super::{
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
     /// Supervisor configuration.
-    pub configuration: Entry<T::Base, SupervisorConfig>,
+    pub configuration: ProofEntry<T::Base, SupervisorConfig>,
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
@@ -64,18 +64,6 @@ impl<T: Access> Schema<T> {
         self.configuration
             .get()
             .expect("Supervisor entity was not configured; unable to load configuration")
-    }
-
-    /// Returns hashes for tables with proofs.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.configuration.object_hash(),
-            self.deploy_requests.object_hash(),
-            self.deploy_confirmations.object_hash(),
-            self.pending_deployments.object_hash(),
-            self.pending_instances.object_hash(),
-            self.config_confirms.object_hash(),
-        ]
     }
 }
 

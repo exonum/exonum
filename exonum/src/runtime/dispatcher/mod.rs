@@ -14,7 +14,7 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{Fork, Snapshot};
+use exonum_merkledb::{Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
@@ -23,7 +23,7 @@ use futures::{
 use std::{collections::BTreeMap, fmt, panic};
 
 use crate::{
-    blockchain::{Blockchain, CallInBlock, IndexCoordinates, Schema as CoreSchema, SchemaOrigin},
+    blockchain::{Blockchain, CallInBlock, Schema as CoreSchema},
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
@@ -174,33 +174,6 @@ impl Dispatcher {
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .initiate_adding_service(spec, constructor)?;
         Ok(())
-    }
-
-    pub(crate) fn state_hash(
-        &self,
-        access: &dyn Snapshot,
-    ) -> impl IntoIterator<Item = (IndexCoordinates, Hash)> {
-        let mut aggregator = Vec::new();
-        // Insert state hash of Dispatcher schema.
-        aggregator.extend(IndexCoordinates::locate(
-            SchemaOrigin::Dispatcher,
-            Schema::new(access).state_hash(),
-        ));
-        // Insert state hashes for the runtimes.
-        for (runtime_id, runtime) in &self.runtimes {
-            let state = runtime.state_hashes(access);
-            aggregator.extend(
-                // Runtime state hash.
-                IndexCoordinates::locate(SchemaOrigin::Runtime(*runtime_id), state.runtime),
-            );
-            for (instance_id, instance_hashes) in state.instances {
-                aggregator.extend(
-                    // Instance state hashes.
-                    IndexCoordinates::locate(SchemaOrigin::Service(instance_id), instance_hashes),
-                );
-            }
-        }
-        aggregator
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy
@@ -382,25 +355,22 @@ impl Dispatcher {
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
-    ///
-    /// **NB.** Changes made to the `fork` in this method MUST be the same for all nodes.
-    /// This is not checked by the consensus algorithm as usual.
-    pub(crate) fn commit_block(&mut self, fork: &mut Fork) {
-        // If the fork is dirty, `snapshot` will be outdated, which can trip
-        // `Runtime::start_service()` calls.
-        fork.flush();
-        let snapshot = fork.snapshot_without_unflushed_changes();
+    pub(crate) fn commit_block(&mut self, fork: Fork) -> Patch {
+        let mut schema = Schema::new(&fork);
+        let pending_artifacts = schema.take_pending_artifacts();
+        let modified_instances = schema.take_modified_instances();
+        let patch = fork.into_patch();
 
         // Block futures with pending deployments.
-        let mut schema = Schema::new(&*fork);
-        for spec in schema.take_pending_artifacts() {
+        for spec in pending_artifacts {
             self.block_until_deployed(spec.artifact, spec.payload);
         }
         // Notify runtime about changes in service instances.
-        for (spec, status) in schema.take_modified_instances() {
-            self.commit_service_status(snapshot, &spec, status)
-                .expect("Cannot commit service");
+        for (spec, status) in modified_instances {
+            self.commit_service_status(&patch, &spec, status)
+                .expect("Cannot commit service status");
         }
+        patch
     }
 
     /// Make pending artifacts and instances active.
@@ -419,14 +389,16 @@ impl Dispatcher {
         }
     }
 
-    /// Performs the complete set of operations after committing a block.
+    /// Performs the complete set of operations after committing a block. Returns a patch
+    /// corresponding to the fork.
     ///
     /// This method should be called for all blocks except for the genesis block. For reasons
     /// described in `BlockchainMut::create_genesis_block()`, the processing of the genesis
     /// block is split into 2 parts.
-    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: &mut Fork) {
-        self.commit_block(fork);
-        self.notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
+    pub(crate) fn commit_block_and_notify_runtimes(&mut self, fork: Fork) -> Patch {
+        let patch = self.commit_block(fork);
+        self.notify_runtimes_about_commit(&patch);
+        patch
     }
 
     /// Return true if the artifact with the given identifier is deployed.

@@ -16,15 +16,13 @@
 use super::proto;
 use exonum::{
     blockchain::ExecutionError,
-    crypto::Hash,
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
-        BlockchainData, InstanceId,
+        InstanceId,
     },
 };
-use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::Snapshot;
+use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
 
 use std::sync::{
@@ -35,9 +33,9 @@ use std::sync::{
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
-)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxAfterCommit")]
 pub struct TxAfterCommit {
     pub height: Height,
@@ -99,10 +97,6 @@ impl AfterCommitService {
 }
 
 impl Service for AfterCommitService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         let counter = self.counter.fetch_add(1, Ordering::SeqCst);
 

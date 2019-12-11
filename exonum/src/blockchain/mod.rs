@@ -22,10 +22,10 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockProof},
+    block::{Block, BlockProof, IndexProof},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
-    schema::{CallInBlock, IndexCoordinates, Schema, SchemaOrigin, TxLocation},
+    schema::{CallInBlock, Schema, TxLocation},
 };
 
 pub mod config;
@@ -33,7 +33,7 @@ pub mod config;
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
-    Snapshot, TemporaryDB,
+    Snapshot, SystemSchema, TemporaryDB,
 };
 use failure::Error;
 use futures::Future;
@@ -247,8 +247,8 @@ impl BlockchainMut {
         // their state should be included into `patch` created below.
         // TODO Unify block creation logic [ECR-3879]
         self.dispatcher.after_transactions(&mut fork);
-        self.dispatcher.commit_block(&mut fork);
-        self.merge(fork.into_patch())?;
+        let patch = self.dispatcher.commit_block(fork);
+        self.merge(patch)?;
 
         let (_, patch) = self.create_patch(
             ValidatorId::zero(),
@@ -256,12 +256,10 @@ impl BlockchainMut {
             &[],
             &mut BTreeMap::new(),
         );
-        let fork = Fork::from(patch);
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
-        self.dispatcher
-            .notify_runtimes_about_commit(fork.snapshot_without_unflushed_changes());
-        self.merge(fork.into_patch())?;
+        self.dispatcher.notify_runtimes_about_commit(&patch);
+        self.merge(patch)?;
 
         log::info!(
             "GENESIS_BLOCK ====== hash={}",
@@ -309,29 +307,10 @@ impl BlockchainMut {
         }
         // Get tx & state hash.
         let schema = Schema::new(&fork);
-        let state_hash = {
-            let mut sum_table = schema.state_hash_aggregator();
-            // Clear old state hash.
-            sum_table.clear();
-            // Collect all state hashes.
-            let state_hashes = self
-                .dispatcher
-                .state_hash(fork.snapshot_without_unflushed_changes())
-                .into_iter()
-                // Add state hash of core table.
-                .chain(IndexCoordinates::locate(
-                    SchemaOrigin::Core,
-                    schema.state_hash(),
-                ));
-            // Insert state hashes into the aggregator table.
-            for (coordinate, hash) in state_hashes {
-                sum_table.put(&coordinate, hash);
-            }
-            sum_table.object_hash()
-        };
-
-        let tx_hash = schema.block_transactions(height).object_hash();
         let error_hash = schema.call_errors(height).object_hash();
+        let tx_hash = schema.block_transactions(height).object_hash();
+        let patch = fork.into_patch();
+        let state_hash = SystemSchema::new(&patch).state_hash();
 
         // Create block.
         let block = Block {
@@ -348,6 +327,7 @@ impl BlockchainMut {
         // Calculate block hash.
         let block_hash = block.object_hash();
         // Update height.
+        let fork = Fork::from(patch);
         let schema = Schema::new(&fork);
         schema.block_hashes_by_height().push(block_hash);
         // Save block.
@@ -398,7 +378,7 @@ impl BlockchainMut {
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {
-        let mut fork: Fork = patch.into();
+        let fork: Fork = patch.into();
         let mut schema = Schema::new(&fork);
         schema.precommits(&block_hash).extend(precommits);
         // Consensus messages cache is useful only during one height, so it should be
@@ -416,8 +396,8 @@ impl BlockchainMut {
             }
         }
 
-        self.dispatcher.commit_block_and_notify_runtimes(&mut fork);
-        self.merge(fork.into_patch())?;
+        let patch = self.dispatcher.commit_block_and_notify_runtimes(fork);
+        self.merge(patch)?;
         Ok(())
     }
 
