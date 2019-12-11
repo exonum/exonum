@@ -26,8 +26,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
 
-- `proposer_id` field in `Block` is now optional and has been moved to
-  block header entries. (#1602)
+- `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
 #### exonum-supervisor
 

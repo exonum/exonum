@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{contains_transaction, ProposerId, ConsensusConfig, ValidatorKeys},
+    blockchain::{contains_transaction, ConsensusConfig, ProposerId, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},

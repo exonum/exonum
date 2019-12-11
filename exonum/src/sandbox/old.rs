@@ -17,7 +17,7 @@ use std::time::Duration;
 use exonum_merkledb::{HashTag, ObjectHash};
 
 use crate::{
-    blockchain::{AdditionalHeaders, ProposerId, Block},
+    blockchain::{AdditionalHeaders, Block, ProposerId},
     helpers::{Height, Round, ValidatorId},
     messages::{Propose, Verified},
 };

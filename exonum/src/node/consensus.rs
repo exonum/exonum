@@ -21,7 +21,7 @@ use crate::{
     blockchain::{contains_transaction, Schema},
     crypto::{Hash, PublicKey},
     events::InternalRequest,
-    helpers::{Height, Round, },
+    helpers::{Height, Round},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest,
         Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
