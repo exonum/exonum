@@ -61,7 +61,7 @@ pub struct DeployConfirmation {
     pub artifact: ArtifactId,
 }
 
-/// Request for the artifact deployment.
+/// Request for the start service instance.
 #[protobuf_convert(source = "proto::StartService")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -72,6 +72,15 @@ pub struct StartService {
     pub name: String,
     /// Instance configuration.
     pub config: Vec<u8>,
+}
+
+/// Request for the stop existing service instance.
+#[protobuf_convert(source = "proto::StopService")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+pub struct StopService {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
 }
 
 impl StartService {
@@ -112,6 +121,8 @@ pub enum ConfigChange {
     Service(ServiceConfig),
     /// New service instance start request.
     StartService(StartService),
+    /// Existing service instance stop request.
+    StopService(StopService),
 }
 
 /// Request for the configuration change
@@ -201,12 +212,14 @@ pub struct ConfigProposalWithHash {
 impl_binary_key_for_binary_value! { DeployRequest }
 impl_binary_key_for_binary_value! { DeployConfirmation }
 impl_binary_key_for_binary_value! { StartService }
+impl_binary_key_for_binary_value! { StopService }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
 
 impl_serde_hex_for_binary_value! { DeployRequest }
 impl_serde_hex_for_binary_value! { DeployConfirmation }
 impl_serde_hex_for_binary_value! { StartService }
+impl_serde_hex_for_binary_value! { StopService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 

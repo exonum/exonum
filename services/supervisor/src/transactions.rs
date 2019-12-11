@@ -23,7 +23,7 @@ use std::collections::HashSet;
 
 use super::{
     ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigureCall,
-    DeployConfirmation, DeployRequest, Error, Schema, StartService, Supervisor,
+    DeployConfirmation, DeployRequest, Error, Schema, StartService, StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -92,26 +92,43 @@ impl StartService {
         let dispatcher_data = context.data().for_dispatcher();
 
         // Check that artifact is deployed.
-        if dispatcher_data
+        dispatcher_data
             .get_artifact(self.artifact.name.as_str())
-            .is_none()
-        {
-            log::trace!(
-                "Discarded start of service {} from the unknown artifact {}.",
-                &self.name,
-                &self.artifact.name,
-            );
-
-            return Err(Error::UnknownArtifact.into());
-        }
+            .ok_or_else(|| {
+                Error::UnknownArtifact.with_description(format!(
+                    "Discarded start of service {} from the unknown artifact {}.",
+                    &self.name, &self.artifact.name,
+                ))
+            })?;
 
         // Check that there is no instance with the same name.
         if dispatcher_data.get_instance(self.name.as_str()).is_some() {
-            log::trace!(
+            return Err(Error::InstanceExists.with_description(format!(
                 "Discarded start of the already running instance {}.",
                 &self.name
-            );
-            return Err(Error::InstanceExists.into());
+            )));
+        }
+
+        Ok(())
+    }
+}
+
+impl StopService {
+    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
+        let instance = context
+            .data()
+            .for_dispatcher()
+            .get_instance(self.instance_id)
+            .ok_or_else(|| {
+                Error::MalformedConfigPropose
+                    .with_description("Instance with the specified ID is absent.")
+            })?;
+
+        if !instance.is_active() {
+            return Err(Error::MalformedConfigPropose.with_description(format!(
+                "Discarded stop of the already stopped instance: {}",
+                instance.spec.name
+            )));
         }
 
         Ok(())
@@ -353,7 +370,7 @@ impl Supervisor {
         // To prevent multiple consensus change proposition in one request
         let mut consensus_propose_added = false;
         // To prevent multiple service change proposition in one request
-        let mut service_ids = HashSet::new();
+        let mut modified_instances = HashSet::new();
         // To prevent multiple services start in one request.
         let mut services_to_start = HashSet::new();
 
@@ -362,10 +379,9 @@ impl Supervisor {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
-                        log::trace!(
-                            "Discarded multiple consensus change proposals in one request."
-                        );
-                        return Err(Error::MalformedConfigPropose.into());
+                        return Err(Error::MalformedConfigPropose.with_description(
+                            "Discarded multiple consensus change proposals in one request.",
+                        ));
                     }
                     consensus_propose_added = true;
                     config
@@ -374,9 +390,10 @@ impl Supervisor {
                 }
 
                 ConfigChange::Service(config) => {
-                    if !service_ids.insert(config.instance_id) {
-                        log::trace!("Discarded multiple service change proposals in one request.");
-                        return Err(Error::MalformedConfigPropose.into());
+                    if !modified_instances.insert(config.instance_id) {
+                        return Err(Error::MalformedConfigPropose.with_description(
+                            "Discarded multiple service change proposals in one request.",
+                        ));
                     }
 
                     context
@@ -386,12 +403,20 @@ impl Supervisor {
 
                 ConfigChange::StartService(start_service) => {
                     if !services_to_start.insert(start_service.name.clone()) {
-                        log::trace!(
-                            "Discarded multiple instances with the same name in one request."
-                        );
-                        return Err(Error::MalformedConfigPropose.into());
+                        return Err(Error::MalformedConfigPropose.with_description(
+                            "Discarded multiple instances with the same name in one request.",
+                        ));
                     }
                     start_service.validate(&context)?;
+                }
+
+                ConfigChange::StopService(stop_service) => {
+                    if !modified_instances.insert(stop_service.instance_id) {
+                        return Err(Error::MalformedConfigPropose.with_description(
+                            "Discarded multiple instances with the same name in one request.",
+                        ));
+                    }
+                    stop_service.validate(&context)?;
                 }
             }
         }
