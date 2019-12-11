@@ -16,11 +16,13 @@
 
 use exonum::{
     messages::{AnyTx, Verified},
-    runtime::{rust::ServiceFactory, ExecutionError},
+    runtime::{
+        rust::ServiceFactory, ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
+    },
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
-use exonum_supervisor::{ConfigPropose, Supervisor};
+use exonum_supervisor::{ConfigPropose, Error, Supervisor};
 
 use crate::{inc::IncService, utils::latest_assigned_instance_id};
 
@@ -42,20 +44,27 @@ fn create_testkit() -> TestKit {
         .create()
 }
 
-#[test]
-fn start_stop_inc_service() {
-    let mut testkit = create_testkit();
+/// Starts service instance and gets its ID
+fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
     let keypair = testkit.us().service_keypair();
-
-    // Start service instance and get its ID.
+    // Start `inc` service instance
     execute_transaction(
-        &mut testkit,
+        testkit,
         ConfigPropose::immediate(0)
             .start_service(IncService.artifact_id().into(), "inc", Vec::default())
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
     .unwrap();
-    let instance_id = latest_assigned_instance_id(&testkit).unwrap();
+    // Get started service instance ID.
+    latest_assigned_instance_id(&testkit).unwrap()
+}
+
+#[test]
+fn start_stop_inc_service() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance_id = start_inc_service(&mut testkit);
     // Stop service instance.
     execute_transaction(
         &mut testkit,
@@ -64,4 +73,83 @@ fn start_stop_inc_service() {
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
     .unwrap()
+}
+
+#[test]
+fn stop_non_existent_service() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance_id = 2;
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .stop_service(instance_id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing("Instance with the specified ID is absent.")
+    )
+}
+
+#[test]
+fn duplicate_stop_service_request() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance_id = start_inc_service(&mut testkit);
+    // An attempt to stop service twice.
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .stop_service(instance_id)
+            .stop_service(instance_id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(
+                "Discarded multiple instances with the same name in one request."
+            )
+    )
+}
+
+#[test]
+fn stop_already_stopped_service() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance_id = start_inc_service(&mut testkit);
+    // Stop service instance.
+    execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .stop_service(instance_id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .unwrap();
+    // Second attempt to stop service instance.
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(2)
+            .stop_service(instance_id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .unwrap_err();
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing("Discarded stop of the already stopped instance.")
+    )
 }

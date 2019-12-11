@@ -152,16 +152,13 @@ impl<'a> CallContext<'a> {
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn initiate_stopping_service(
-        &mut self,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    pub fn initiate_stopping_service(&mut self, instance_id: InstanceId) {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`initiate_stopping_service` called within a non-supervisor service");
         }
 
         self.inner
             .child_context(self.instance.id)
-            .initiate_stopping_service(instance_id)
+            .initiate_stopping_service(instance_id);
     }
 }

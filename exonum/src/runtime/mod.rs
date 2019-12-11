@@ -659,16 +659,8 @@ impl<'a> ExecutionContext<'a> {
     /// until the block built on top of the provided `fork` is committed.
     ///
     /// This method should be called for the exact context passed to the runtime.
-    pub(crate) fn initiate_stopping_service(
-        &mut self,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
-        // TODO Runtime part
-
-        // Add information about stopping service to the dispatcher schema.
-        DispatcherSchema::new(&*self.fork)
-            .initiate_stopping_service(instance_id)
-            .map_err(From::from)
+    pub(crate) fn initiate_stopping_service(&mut self, instance_id: InstanceId) {
+        DispatcherSchema::new(&*self.fork).initiate_stopping_service(instance_id);
     }
 
     fn reborrow(&mut self) -> ExecutionContext<'_> {

@@ -313,7 +313,7 @@ fn test_confirm_config_by_incorrect_validator() {
 }
 
 #[test]
-fn test_try_confirm_non_existing_proposal() {
+fn test_try_confirm_non_existent_proposal() {
     let mut testkit = testkit_with_supervisor(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();
 

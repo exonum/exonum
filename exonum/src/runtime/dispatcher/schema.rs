@@ -167,25 +167,22 @@ impl Schema<&Fork> {
     }
 
     /// Adds information about stopping service instance to the schema.
-    pub(crate) fn initiate_stopping_service(
-        &mut self,
-        instance_id: InstanceId,
-    ) -> Result<(), Error> {
+    pub(crate) fn initiate_stopping_service(&mut self, instance_id: InstanceId) {
+        let mut instances = self.instances();
+
         let instance_name = self
             .instance_ids()
             .get(&instance_id)
-            .ok_or(Error::ServiceNotStarted)?;
-
-        let mut instances = self.instances();
+            .expect("BUG: attempt to stop a nonexistent service instance.");
         let mut state = instances
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
+
         // Modify instance status.
         let pending_status = InstanceStatus::Stopped;
         state.pending_status = Some(pending_status);
         self.pending_instances().put(&instance_name, pending_status);
         instances.put(&instance_name, state);
-        Ok(())
     }
 
     /// Make pending artifacts and instances active.

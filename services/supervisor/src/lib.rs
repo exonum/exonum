@@ -183,12 +183,7 @@ fn update_configs(
                     instance.spec.artifact
                 );
 
-                context
-                    .initiate_stopping_service(stop_service.instance_id)
-                    .map_err(|err| {
-                        log::error!("Service stop request failed. {}", err);
-                        err
-                    })?;
+                context.initiate_stopping_service(stop_service.instance_id);
             }
         }
     }

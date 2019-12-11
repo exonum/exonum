@@ -481,8 +481,7 @@ fn basic_rust_runtime() {
     // Stop service instance.
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .initiate_stopping_service(SERVICE_INSTANCE_ID)
-        .unwrap();
+        .initiate_stopping_service(SERVICE_INSTANCE_ID);
     commit_block(&mut blockchain, fork);
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
 

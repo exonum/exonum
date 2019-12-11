@@ -188,7 +188,8 @@ impl TestDispatcherInterface for TestDispatcherService {
 
     fn test_stop(&self, mut context: CallContext<'_>, arg: TestStop) -> Result<(), ExecutionError> {
         let instance_id = arg.value as InstanceId;
-        context.initiate_stopping_service(instance_id)
+        context.initiate_stopping_service(instance_id);
+        Ok(())
     }
 }
 

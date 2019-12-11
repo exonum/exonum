@@ -978,9 +978,7 @@ fn stopped_service_workflow() {
 
     // Change instance status to stopped.
     let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-    context
-        .initiate_stopping_service(instance_id)
-        .expect("'initiate_stopping_service` failed");
+    context.initiate_stopping_service(instance_id);
 
     // Check if transactions are still ready for execution.
     dispatcher
