@@ -626,7 +626,7 @@ impl NodeHandler {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
-        if let Err(e) = Blockchain::check_tx(&self.blockchain.snapshot(), &msg) {
+        if let Err(e) = Blockchain::check_tx(&snapshot, &msg) {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
             // since the latter uses `invalid_txs` to recalculate the validity of proposals.

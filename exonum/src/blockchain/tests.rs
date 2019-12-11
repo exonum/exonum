@@ -763,13 +763,14 @@ fn test_check_tx() {
             .artifact_id()
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
+    let snapshot = blockchain.snapshot();
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
-    Blockchain::check_tx(&blockchain.snapshot(), &correct_tx).unwrap();
+    Blockchain::check_tx(&snapshot, &correct_tx).unwrap();
 
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
     assert_eq!(
-        Blockchain::check_tx(&blockchain.snapshot(), &incorrect_tx).unwrap_err(),
+        Blockchain::check_tx(&snapshot, &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
     );
 }
