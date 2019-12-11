@@ -381,10 +381,14 @@ where
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.inner.peek() {
-                Some((key, &Change::Put(ref value))) => {
+                Some((key, Change::Put(ref value))) => {
                     return Some((key.as_slice(), value.as_slice()));
                 }
-                Some((_, &Change::Delete)) => {}
+                Some((_, Change::Delete)) => {
+                    // Advance the iterator. Since we've already peeked the value,
+                    // we can safely drop it.
+                    self.inner.next();
+                }
                 None => {
                     return None;
                 }
