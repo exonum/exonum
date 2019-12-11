@@ -143,12 +143,15 @@ pub trait ApiBackend: Sized {
     /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
     /// to the incoming requests.
     /// Response will include a "Location" header denoting a new location of the resource.
-    fn moved_permanently(
+    fn moved_permanently<Q, F>(
         &mut self,
         name: &'static str,
-        new_location: &'static str,
+        redirect_to: F,
         mutability: EndpointMutability,
-    ) -> &mut Self;
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        F: Fn(Q) -> Result<String> + 'static + Send + Sync + Clone;
 
     /// Creates an endpoint which will return "410 Gone" HTTP status code
     /// to the incoming requests.
@@ -257,14 +260,21 @@ impl ApiScope {
     /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
     /// to the incoming requests.
     /// Response will include a "Location" header denoting a new location of the resource.
-    pub fn moved_permanently(
+    ///
+    /// `redirect_to` parameter must be a function that takes a request query as a parameter,
+    /// and returns a result of either `String` with the new location or `api::Error`.
+    pub fn moved_permanently<Q, F>(
         &mut self,
         name: &'static str,
-        new_location: &'static str,
+        redirect_to: F,
         mutability: EndpointMutability,
-    ) -> &mut Self {
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        F: Fn(Q) -> Result<String> + 'static + Send + Sync + Clone,
+    {
         self.actix_backend
-            .moved_permanently(name, new_location, mutability);
+            .moved_permanently(name, redirect_to, mutability);
         self
     }
 

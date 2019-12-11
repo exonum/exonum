@@ -231,13 +231,48 @@ impl ServiceApiScope {
     /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
     /// to the incoming requests.
     /// Response will include a "Location" header denoting a new location of the resource.
-    pub fn moved_permanently(
+    ///
+    /// `redirect_to` parameter must be a function that takes a request query as a parameter,
+    /// and returns a result of either `String` with the new location or `api::Error`.
+    ///
+    /// Example:
+    ///
+    /// ```rust,ignore
+    /// let public_scope = builder.public_scope();
+    /// // ...
+    /// let url_base = public_scope.url_base();
+    /// let moved_mutable_new_location = format!("{}/{}", &url_base, "new-endpoint-mut");
+    /// let moved_immutable_new_location = format!("{}/{}", &url_base, "new-endpoint");
+    /// public_scope
+    ///     .moved_permanently(
+    ///         "moved-mutable",
+    ///         move |_query: MutEndpointQuery| Ok(moved_mutable_new_location.clone()),
+    ///         EndpointMutability::Mutable,
+    ///     )
+    ///     .moved_permanently(
+    ///         "moved-immutable",
+    ///         move |query: EndpointQuery| {
+    ///             let query =
+    ///                 serde_urlencoded::to_string(query).expect("Unable to serialize query.");
+    ///     
+    ///             let new_location = format!("{}?{}", moved_immutable_new_location, query);
+    ///     
+    ///             Ok(new_location)
+    ///         },
+    ///         EndpointMutability::Immutable,
+    ///     );
+    /// ```
+    pub fn moved_permanently<Q, F>(
         &mut self,
         name: &'static str,
-        new_location: &'static str,
+        redirect_to: F,
         mutability: EndpointMutability,
-    ) -> &mut Self {
-        self.inner.moved_permanently(name, new_location, mutability);
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        F: Fn(Q) -> Result<String> + 'static + Send + Sync + Clone,
+    {
+        self.inner.moved_permanently(name, redirect_to, mutability);
         self
     }
 
@@ -251,6 +286,11 @@ impl ServiceApiScope {
     /// Return a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut crate::api::backends::actix::ApiBuilder {
         self.inner.web_backend()
+    }
+
+    /// Returns the base for service URLs, e.g. "/api/services/xnm-token/".
+    pub fn url_base(&self) -> String {
+        format!("/api/services/{}", self.descriptor.1)
     }
 }
 

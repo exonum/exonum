@@ -95,17 +95,41 @@ impl ApiBackend for ApiBuilder {
     type Handler = RequestHandler;
     type Backend = actix_web::Scope<()>;
 
-    fn moved_permanently(
+    fn moved_permanently<Q, F>(
         &mut self,
         name: &'static str,
-        new_location: &'static str,
+        redirect_to: F,
         mutability: EndpointMutability,
-    ) -> &mut Self {
-        let handler = move |_request: HttpRequest| -> FutureResponse {
-            let response = api::Error::MovedPermanently(new_location.to_owned()).into();
-            let response_future = Err(response).into_future();
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        F: Fn(Q) -> api::Result<String> + 'static + Send + Sync + Clone,
+    {
+        let handler = move |request: HttpRequest| -> FutureResponse {
+            let redirect_to = redirect_to.clone();
+            let new_location_future = match mutability {
+                EndpointMutability::Immutable => {
+                    // For immutable requests, extract query from query string.
+                    let future = Query::from_request(&request, &Default::default())
+                        .map(Query::into_inner)
+                        .and_then(|query| redirect_to(query).map_err(From::from))
+                        .into_future();
+                    Box::new(future)
+                }
+                EndpointMutability::Mutable => {
+                    // For mutable requests, extract query from the request body as JSON.
+                    request
+                        .json()
+                        .from_err()
+                        .and_then(move |query: Q| redirect_to(query).map_err(From::from))
+                        .responder()
+                }
+            };
 
-            Box::new(response_future)
+            let response = new_location_future
+                .and_then(|new_location| Err(api::Error::MovedPermanently(new_location).into()));
+
+            Box::new(response)
         };
 
         self.mount_raw_handler(name, handler, mutability)

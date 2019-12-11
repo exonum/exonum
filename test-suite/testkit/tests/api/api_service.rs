@@ -76,11 +76,25 @@ impl Api {
             .gone("gone-immutable", EndpointMutability::Immutable);
 
         // Moved endpoints.
+        let url_base = public_scope.url_base();
+        let moved_mutable_new_location = format!("{}/{}", &url_base, "ping-pong-deprecated-mut");
+        let moved_immutable_new_location = format!("{}/{}", &url_base, "ping-pong");
         public_scope
-            .moved_permanently("moved-mutable", "/ping-pong", EndpointMutability::Mutable)
+            .moved_permanently(
+                "moved-mutable",
+                move |_query: PingQuery| Ok(moved_mutable_new_location.clone()),
+                EndpointMutability::Mutable,
+            )
             .moved_permanently(
                 "moved-immutable",
-                "/ping-pong",
+                move |query: PingQuery| {
+                    let query =
+                        serde_urlencoded::to_string(query).expect("Unable to serialize query.");
+
+                    let new_location = format!("{}?{}", moved_immutable_new_location, query);
+
+                    Ok(new_location)
+                },
                 EndpointMutability::Immutable,
             );
     }
