@@ -1033,7 +1033,7 @@ fn test_explorer_add_transaction_with_invalid_transaction() {
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
-        .unwrap();
+        .expect("Failed to send valid transaction.");
     assert_eq!(response.tx_hash, tx.object_hash());
 
     // Send invalid transaction.
@@ -1044,8 +1044,9 @@ fn test_explorer_add_transaction_with_invalid_transaction() {
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
-        .unwrap_err();
-    let error_body = "Execution error `dispatcher:7` occurred: Suitable runtime for the given service instance ID is not found.";
+        .expect_err("Expected transaction send to finish with error.");
+    let error_body = "Execution error `dispatcher:7` occurred: Suitable runtime \
+                      for the given service instance ID is not found.";
     assert_matches!(
         response,
         ApiError::BadRequest(ref body) if body == error_body
