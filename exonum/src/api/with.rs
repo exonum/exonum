@@ -42,6 +42,8 @@ pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 pub struct With<Q, I, R, F> {
     /// Underlying API handler.
     pub handler: F,
+    /// Endpoint actuality.
+    pub actuality: Actuality,
     _query_type: PhantomData<Q>,
     _item_type: PhantomData<I>,
     _result_type: PhantomData<R>,
@@ -57,6 +59,70 @@ pub enum Actuality {
     Deprecated(Option<chrono::Date<chrono::Utc>>),
 }
 
+/// Wrapper over an endpoint handler, which marks it as deprecated.
+#[derive(Debug, Clone)]
+pub struct Deprecated<Q, I, R, F> {
+    /// Underlying API handler.
+    pub handler: F,
+    /// Optional endpoint expiration date.
+    pub deprecates_on: Option<chrono::Date<chrono::Utc>>,
+    _query_type: PhantomData<Q>,
+    _item_type: PhantomData<I>,
+    _result_type: PhantomData<R>,
+}
+
+impl<Q, I, R, F> Deprecated<Q, I, R, F> {
+    /// Adds an expiration date for endpoint.
+    pub fn with_date(self, deprecates_on: chrono::Date<chrono::Utc>) -> Self {
+        Self {
+            deprecates_on: Some(deprecates_on),
+            ..self
+        }
+    }
+}
+
+impl<Q, I, F> From<F> for Deprecated<Q, I, Result<I>, F>
+where
+    F: Fn(Q) -> Result<I>,
+{
+    fn from(handler: F) -> Self {
+        Self {
+            handler,
+            deprecates_on: None,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
+}
+
+impl<Q, I, F> From<F> for Deprecated<Q, I, FutureResult<I>, F>
+where
+    F: Fn(Q) -> FutureResult<I>,
+{
+    fn from(handler: F) -> Self {
+        Self {
+            handler,
+            deprecates_on: None,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
+}
+
+impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F> {
+    fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
+        Self {
+            handler: deprecated.handler,
+            actuality: Actuality::Deprecated(deprecated.deprecates_on),
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
+}
+
 /// API Endpoint extractor that also contains the endpoint name and its kind.
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F> {
@@ -64,20 +130,13 @@ pub struct NamedWith<Q, I, R, F> {
     pub name: String,
     /// Extracted endpoint handler.
     pub inner: With<Q, I, R, F>,
-    /// Endpoint actuality.
-    pub actuality: Actuality,
     /// Endpoint mutability.
     pub mutability: EndpointMutability,
 }
 
 impl<Q, I, R, F> NamedWith<Q, I, R, F> {
     /// Creates a new instance from the given handler.
-    pub fn new<S, W>(
-        name: S,
-        inner: W,
-        actuality: Actuality,
-        mutability: EndpointMutability,
-    ) -> Self
+    pub fn new<S, W>(name: S, inner: W, mutability: EndpointMutability) -> Self
     where
         S: Into<String>,
         W: Into<With<Q, I, R, F>>,
@@ -85,8 +144,33 @@ impl<Q, I, R, F> NamedWith<Q, I, R, F> {
         Self {
             name: name.into(),
             inner: inner.into(),
-            actuality,
             mutability,
+        }
+    }
+
+    /// Creates a new mutable `NamedWith` from the given handler.
+    pub fn mutable<S, W>(name: S, inner: W) -> Self
+    where
+        S: Into<String>,
+        W: Into<With<Q, I, R, F>>,
+    {
+        Self {
+            name: name.into(),
+            inner: inner.into(),
+            mutability: EndpointMutability::Mutable,
+        }
+    }
+
+    /// Creates a new mutable `NamedWith` from the given handler.
+    pub fn immutable<S, W>(name: S, inner: W) -> Self
+    where
+        S: Into<String>,
+        W: Into<With<Q, I, R, F>>,
+    {
+        Self {
+            name: name.into(),
+            inner: inner.into(),
+            mutability: EndpointMutability::Immutable,
         }
     }
 }
@@ -100,6 +184,7 @@ where
     fn from(handler: F) -> Self {
         Self {
             handler,
+            actuality: Actuality::Actual,
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,
@@ -116,6 +201,7 @@ where
     fn from(handler: F) -> Self {
         Self {
             handler,
+            actuality: Actuality::Actual,
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,

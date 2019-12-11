@@ -59,10 +59,6 @@ impl Api {
         Err(api::Error::Gone)
     }
 
-    // fn moved_permanently(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
-
-    // }
-
     fn wire(builder: &mut ServiceApiBuilder) {
         let public_scope = builder.public_scope();
 
@@ -84,7 +80,7 @@ impl Api {
             .endpoint_mut("gone-mutable", Self::gone)
             .endpoint("gone-immutable", Self::gone);
 
-        // // Moved endpoints.
+        // Moved endpoints.
         let url_base = public_scope.url_base();
         let moved_mutable_new_location = format!("{}/{}", &url_base, "ping-pong-deprecated-mut");
         let moved_immutable_new_location = format!("{}/{}", &url_base, "ping-pong");

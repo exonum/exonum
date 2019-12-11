@@ -16,7 +16,7 @@
 
 pub use self::{
     error::Error,
-    with::{Actuality, FutureResult, NamedWith, Result, With},
+    with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 
 pub mod backends;
@@ -25,10 +25,8 @@ pub mod manager;
 pub mod node;
 pub mod websocket;
 
-use std::{collections::BTreeMap, fmt};
-
-use chrono::{Date, Utc};
 use serde::{de::DeserializeOwned, Serialize};
+use std::{collections::BTreeMap, fmt};
 
 use self::{
     backends::actix,
@@ -67,12 +65,7 @@ pub trait ApiBackend: Sized {
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F>>,
     {
-        let named_with = NamedWith::new(
-            name,
-            endpoint,
-            Actuality::Actual,
-            EndpointMutability::Immutable,
-        );
+        let named_with = NamedWith::immutable(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
@@ -85,58 +78,7 @@ pub trait ApiBackend: Sized {
         E: Into<With<Q, I, R, F>>,
         Self::Handler: From<NamedWith<Q, I, R, F>>,
     {
-        let named_with = NamedWith::new(
-            name,
-            endpoint,
-            Actuality::Actual,
-            EndpointMutability::Mutable,
-        );
-        self.raw_handler(Self::Handler::from(named_with))
-    }
-
-    /// Adds the given endpoint handler to the backend, marking it as deprecated.
-    fn deprecated_endpoint<Q, I, R, F, E>(
-        &mut self,
-        name: &'static str,
-        discontinued_on: Option<Date<Utc>>,
-        endpoint: E,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
-        F: Fn(Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F>>,
-        Self::Handler: From<NamedWith<Q, I, R, F>>,
-    {
-        let named_with = NamedWith::new(
-            name,
-            endpoint,
-            Actuality::Deprecated(discontinued_on),
-            EndpointMutability::Immutable,
-        );
-        self.raw_handler(Self::Handler::from(named_with))
-    }
-
-    /// Adds the given mutable endpoint handler to the backend, marking it as deprecated.
-    fn deprecated_endpoint_mut<Q, I, R, F, E>(
-        &mut self,
-        name: &'static str,
-        discontinued_on: Option<Date<Utc>>,
-        endpoint: E,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
-        F: Fn(Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F>>,
-        Self::Handler: From<NamedWith<Q, I, R, F>>,
-    {
-        let named_with = NamedWith::new(
-            name,
-            endpoint,
-            Actuality::Deprecated(discontinued_on),
-            EndpointMutability::Mutable,
-        );
+        let named_with = NamedWith::mutable(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
@@ -199,44 +141,6 @@ impl ApiScope {
         actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
     {
         self.actix_backend.endpoint_mut(name, endpoint);
-        self
-    }
-
-    /// Same as `endpoint`, but also add a warning about this endpoint being deprecated to the response.
-    pub fn deprecated_endpoint<Q, I, R, F, E>(
-        &mut self,
-        name: &'static str,
-        discontinued_on: Option<Date<Utc>>,
-        endpoint: E,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
-        F: Fn(Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
-    {
-        self.actix_backend
-            .deprecated_endpoint(name, discontinued_on, endpoint);
-        self
-    }
-
-    /// Same as `endpoint_mut`, but also add a warning about this endpoint being deprecated to the response.
-    pub fn deprecated_endpoint_mut<Q, I, R, F, E>(
-        &mut self,
-        name: &'static str,
-        discontinued_on: Option<Date<Utc>>,
-        endpoint: E,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
-        F: Fn(Q) -> R + 'static + Clone,
-        E: Into<With<Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
-    {
-        self.actix_backend
-            .deprecated_endpoint_mut(name, discontinued_on, endpoint);
         self
     }
 

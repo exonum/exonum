@@ -14,14 +14,13 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use crate::api::{EndpointMutability, Error, FutureResult, Result};
+pub use crate::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
 
-use chrono::{Date, Utc};
+use futures::IntoFuture;
+use serde::{de::DeserializeOwned, Serialize};
 
 use exonum_crypto::PublicKey;
 use exonum_merkledb::{access::Prefixed, Snapshot};
-use futures::IntoFuture;
-use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
 use crate::{
@@ -162,11 +161,12 @@ impl ServiceApiScope {
         self
     }
 
-    /// Same as `endpoint`, but also add a warning about this endpoint being deprecated to the response.
+    /// Same as `endpoint`, but the response will contain a warning about endpoint being deprecated.
+    /// Optional endpoint expiration date can be included in the warning.
     pub fn deprecated_endpoint<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        discontinued_on: Option<Date<Utc>>,
+        deprecates_on: Option<chrono::Date<chrono::Utc>>,
         handler: F,
     ) -> &mut Self
     where
@@ -177,29 +177,32 @@ impl ServiceApiScope {
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
-        self.inner.deprecated_endpoint(
-            name,
-            discontinued_on,
-            move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                );
-                let result = handler(&state, query);
-                Box::new(result.into_future())
-            },
-        );
+        let handler = move |query: Q| -> crate::api::FutureResult<I> {
+            let state = ServiceApiState::from_api_context(
+                &blockchain,
+                InstanceDescriptor {
+                    id: descriptor.0,
+                    name: descriptor.1.as_ref(),
+                },
+            );
+            let result = handler(&state, query);
+            Box::new(result.into_future())
+        };
+        // Mark endpoint as deprecated.
+        let mut handler = Deprecated::from(handler);
+        if let Some(deprecates_on) = deprecates_on {
+            handler = handler.with_date(deprecates_on)
+        };
+        self.inner.endpoint(name, handler);
         self
     }
 
-    /// Same as `endpoint_mut`, but also add a warning about this endpoint being deprecated to the response.
+    /// Same as `endpoint_mut`, but the response will contain a warning about endpoint being deprecated.
+    /// Optional endpoint expiration date can be included in the warning.
     pub fn deprecated_endpoint_mut<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        discontinued_on: Option<Date<Utc>>,
+        deprecates_on: Option<chrono::Date<chrono::Utc>>,
         handler: F,
     ) -> &mut Self
     where
@@ -210,21 +213,23 @@ impl ServiceApiScope {
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
-        self.inner.deprecated_endpoint_mut(
-            name,
-            discontinued_on,
-            move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                );
-                let result = handler(&state, query);
-                Box::new(result.into_future())
-            },
-        );
+        let handler = move |query: Q| -> crate::api::FutureResult<I> {
+            let state = ServiceApiState::from_api_context(
+                &blockchain,
+                InstanceDescriptor {
+                    id: descriptor.0,
+                    name: descriptor.1.as_ref(),
+                },
+            );
+            let result = handler(&state, query);
+            Box::new(result.into_future())
+        };
+        // Mark endpoint as deprecated.
+        let mut handler = Deprecated::from(handler);
+        if let Some(deprecates_on) = deprecates_on {
+            handler = handler.with_date(deprecates_on)
+        };
+        self.inner.endpoint_mut(name, handler);
         self
     }
 

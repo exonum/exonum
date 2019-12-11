@@ -211,7 +211,7 @@ where
             let future = handler(query).into_future();
             Box::new(future)
         };
-        let named_with_future = NamedWith::new(f.name, future_endpoint, f.actuality, f.mutability);
+        let named_with_future = NamedWith::new(f.name, future_endpoint, f.mutability);
 
         // Then we can create a `RequestHandler` with the `From` specialization for future result.
         RequestHandler::from(named_with_future)
@@ -252,7 +252,7 @@ where
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
         let handler = f.inner.handler;
-        let actuality = f.actuality;
+        let actuality = f.inner.actuality;
         let mutability = f.mutability;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
