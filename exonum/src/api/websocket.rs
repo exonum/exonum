@@ -346,8 +346,7 @@ impl Handler<Broadcast> for Server {
 impl Handler<Transaction> for Server {
     type Result = Result<TransactionResponse, failure::Error>;
 
-    /// Checks if incoming transaction is valid with Blockchain::check_tx.
-    /// Broadcasts valid transactions and ignores invalid.
+    /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(
         &mut self,
         Transaction { tx }: Transaction,

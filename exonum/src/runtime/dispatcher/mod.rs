@@ -185,6 +185,8 @@ impl Dispatcher {
         snapshot: &dyn Snapshot,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
+        // Currently the only check is that destination service exists, but later
+        // functionality of this method can be extended.
         let call_info = &tx.as_ref().call_info;
         Schema::new(snapshot)
             .get_instance(call_info.instance_id)
