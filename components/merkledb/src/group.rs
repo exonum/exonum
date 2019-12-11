@@ -104,6 +104,25 @@ where
         I::from_access(self.access.clone(), addr)
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
+
+    pub fn iter(&self) {
+        // We need to get all the keys.
+        let keys = ();
+    }
+}
+
+impl<T, K, I> Iterator for Group<T, K, I>
+    where
+        T: Access,
+        K: BinaryKey + ?Sized,
+        I: FromAccess<T>,
+{
+    type Item = I;
+
+    fn next(&mut self) -> Option<Self::Item> {
+//        unimplemented!()
+        let keys = ();
+    }
 }
 
 #[cfg(test)]
@@ -141,5 +160,21 @@ mod tests {
 
         // The next line fails to compile because `Snapshot` cannot be written to:
         // group.get(&3).push("quux".to_owned());
+    }
+
+    #[test]
+    fn group_iter() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        {
+            let group: Group<_, u32, ProofListIndex<_, String>> = fork.get_group("group");
+            let mut list = group.get(&1);
+            list.push("foo".to_owned());
+            list.push("bar".to_owned());
+            group.get(&2).push("baz".to_owned());
+        }
+
+
     }
 }
