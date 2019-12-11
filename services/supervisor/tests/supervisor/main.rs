@@ -363,8 +363,9 @@ fn test_try_run_unregistered_service_instance() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_err =
-        ErrorMatch::from_fail(&TxError::UnknownArtifact).for_service(SUPERVISOR_INSTANCE_ID);
+    let expected_err = ErrorMatch::from_fail(&TxError::UnknownArtifact)
+        .for_service(SUPERVISOR_INSTANCE_ID)
+        .with_any_description();
     system_api.assert_tx_status(hash, Err(&expected_err));
 }
 
@@ -493,8 +494,9 @@ fn test_start_service_instance_twice() {
         testkit.create_block();
 
         let system_api = api.exonum_api();
-        let expected_err =
-            ErrorMatch::from_fail(&TxError::InstanceExists).for_service(SUPERVISOR_INSTANCE_ID);
+        let expected_err = ErrorMatch::from_fail(&TxError::InstanceExists)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description();
         system_api.assert_tx_status(hash, Err(&expected_err));
     }
 }

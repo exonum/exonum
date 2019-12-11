@@ -43,7 +43,9 @@ fn test_multiple_consensus_change_proposes() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -411,7 +413,9 @@ fn test_discard_panicked_service_config_change() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -732,7 +736,9 @@ fn test_services_config_discard_multiple_configs() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
