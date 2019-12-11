@@ -168,6 +168,15 @@ impl Blockchain {
     pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
         &self.service_keypair
     }
+
+    /// Performs several shallow checks that transaction is correct.
+    ///
+    /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
+    /// executed successfully, but returned `Err(..)` value means that this transaction is
+    /// **obviously** incorrect and should be declined as early as possible.
+    pub fn check_tx(snapshot: &dyn Snapshot, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+        Dispatcher::check_tx(snapshot, tx)
+    }
 }
 
 /// Mutable blockchain capable of processing transactions.
@@ -446,15 +455,6 @@ impl BlockchainMut {
         }
         db.merge(fork.into_patch())
             .expect("Cannot update transaction pool");
-    }
-
-    /// Performs several shallow checks that transaction is correct.
-    ///
-    /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
-    /// executed successfully, but returned `Err(..)` value means that this transaction is
-    /// **obviously** incorrect and should be declined as early as possible.
-    pub fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
-        self.dispatcher.check_tx(tx)
     }
 
     /// Shuts down the dispatcher. This should be the last operation performed on this instance.
