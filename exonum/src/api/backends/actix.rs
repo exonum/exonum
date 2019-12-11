@@ -107,29 +107,12 @@ impl ApiBackend for ApiBuilder {
     {
         let handler = move |request: HttpRequest| -> FutureResponse {
             let redirect_to = redirect_to.clone();
-            let new_location_future = match mutability {
-                EndpointMutability::Immutable => {
-                    // For immutable requests, extract query from query string.
-                    let future = Query::from_request(&request, &Default::default())
-                        .map(Query::into_inner)
-                        .and_then(|query| redirect_to(query).map_err(From::from))
-                        .into_future();
-                    Box::new(future)
-                }
-                EndpointMutability::Mutable => {
-                    // For mutable requests, extract query from the request body as JSON.
-                    request
-                        .json()
-                        .from_err()
-                        .and_then(move |query: Q| redirect_to(query).map_err(From::from))
-                        .responder()
-                }
-            };
+            let new_location_future = extract_query(request, mutability)
+                .and_then(move |query| redirect_to(query).map_err(From::from))
+                .and_then(|new_location| Err(api::Error::MovedPermanently(new_location).into()))
+                .responder();
 
-            let response = new_location_future
-                .and_then(|new_location| Err(api::Error::MovedPermanently(new_location).into()));
-
-            Box::new(response)
+            Box::new(new_location_future)
         };
 
         self.mount_raw_handler(name, handler, mutability)
@@ -284,41 +267,41 @@ where
     I: Serialize + 'static,
 {
     fn from(f: NamedWith<Q, I, api::Result<I>, F>) -> Self {
+        // Convert handler that returns a `Result` into handler that will return `FutureResult`.
         let handler = f.inner.handler;
-        let actuality = f.actuality;
-        let mutability = f.mutability;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let handler = handler.clone();
-            let actuality = actuality.clone();
-            match mutability {
-                EndpointMutability::Immutable => {
-                    // For immutable requests, extract query from query string.
-                    let future = Query::from_request(&request, &Default::default())
-                        .map(Query::into_inner)
-                        .and_then(|query| handler(query).map_err(From::from))
-                        .and_then(|value| Ok(json_response(actuality, value)))
-                        .into_future();
-                    Box::new(future)
-                }
-                EndpointMutability::Mutable => {
-                    // For mutable requests, extract query from the request body as JSON.
-                    request
-                        .json()
-                        .from_err()
-                        .and_then(move |query: Q| {
-                            handler(query)
-                                .map(|value| json_response(actuality, value))
-                                .map_err(From::from)
-                        })
-                        .responder()
-                }
-            }
+        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = api::Error>> {
+            let future = handler(query).into_future();
+            Box::new(future)
         };
+        let named_with_future = NamedWith::new(f.name, future_endpoint, f.actuality, f.mutability);
 
-        Self {
-            name: f.name,
-            method: f.mutability.into(),
-            inner: Arc::from(index) as Arc<RawHandler>,
+        // Then we can create a `RequestHandler` with the `From` specialization for future result.
+        RequestHandler::from(named_with_future)
+    }
+}
+
+/// Takes `HttpRequest` as a parameter and extracts query:
+/// - If request is immutable, the query is parsed from query string,
+/// - If request is mutable, the query is parsed from the request body as JSON.
+fn extract_query<Q>(
+    request: HttpRequest,
+    mutability: EndpointMutability,
+) -> Box<dyn Future<Item = Q, Error = actix_web::error::Error>>
+where
+    Q: DeserializeOwned + 'static,
+{
+    match mutability {
+        EndpointMutability::Immutable => {
+            let future = Query::from_request(&request, &Default::default())
+                .map(Query::into_inner)
+                .map_err(From::from)
+                .into_future();
+
+            Box::new(future)
+        }
+        EndpointMutability::Mutable => {
+            let future = request.json().from_err();
+            Box::new(future)
         }
     }
 }
@@ -336,29 +319,13 @@ where
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
             let actuality = actuality.clone();
-            match mutability {
-                EndpointMutability::Immutable => {
-                    // For immutable requests, extract query from query string.
-                    Query::from_request(&request, &Default::default())
-                        .map(Query::into_inner)
-                        .into_future()
-                        .and_then(move |query| handler(query).map_err(From::from))
+            extract_query(request, mutability)
+                .and_then(move |query| {
+                    handler(query)
                         .map(|value| json_response(actuality, value))
-                        .responder()
-                }
-                EndpointMutability::Mutable => {
-                    // For mutable requests, extract query from the request body as JSON.
-                    request
-                        .json()
-                        .from_err()
-                        .and_then(move |query: Q| {
-                            handler(query)
-                                .map(|value| json_response(actuality, value))
-                                .map_err(From::from)
-                        })
-                        .responder()
-                }
-            }
+                        .map_err(From::from)
+                })
+                .responder()
         };
 
         Self {
