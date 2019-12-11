@@ -13,10 +13,8 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::Hash,
     runtime::{
         rust::{api::ServiceApiBuilder, DefaultInstance, Service},
-        BlockchainData,
     },
 };
 
