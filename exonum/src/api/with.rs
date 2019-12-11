@@ -16,7 +16,7 @@ use futures::Future;
 
 use std::marker::PhantomData;
 
-use super::error;
+use super::{error, EndpointMutability};
 
 /// Type alias for the usual synchronous result.
 pub type Result<I> = std::result::Result<I, error::Error>;
@@ -47,14 +47,6 @@ pub struct With<Q, I, R, F> {
     _result_type: PhantomData<R>,
 }
 
-/// Immutable endpoint marker, which enables creating an immutable kind of `NamedWith`.
-#[derive(Debug)]
-pub struct Immutable;
-
-/// Mutable endpoint marker, which enables creating a mutable kind of `NamedWith`.
-#[derive(Debug)]
-pub struct Mutable;
-
 /// Endpoint actuality.
 #[derive(Debug, Clone)]
 pub enum Actuality {
@@ -67,19 +59,25 @@ pub enum Actuality {
 
 /// API Endpoint extractor that also contains the endpoint name and its kind.
 #[derive(Debug)]
-pub struct NamedWith<Q, I, R, F, K> {
+pub struct NamedWith<Q, I, R, F> {
     /// Endpoint name.
     pub name: String,
     /// Extracted endpoint handler.
     pub inner: With<Q, I, R, F>,
     /// Endpoint actuality.
     pub actuality: Actuality,
-    _kind: PhantomData<K>,
+    /// Endpoint mutability.
+    pub mutability: EndpointMutability,
 }
 
-impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
+impl<Q, I, R, F> NamedWith<Q, I, R, F> {
     /// Creates a new instance from the given handler.
-    pub fn new<S, W>(name: S, inner: W, actuality: Actuality) -> Self
+    pub fn new<S, W>(
+        name: S,
+        inner: W,
+        actuality: Actuality,
+        mutability: EndpointMutability,
+    ) -> Self
     where
         S: Into<String>,
         W: Into<With<Q, I, R, F>>,
@@ -88,7 +86,7 @@ impl<Q, I, R, F, K> NamedWith<Q, I, R, F, K> {
             name: name.into(),
             inner: inner.into(),
             actuality,
-            _kind: PhantomData::default(),
+            mutability,
         }
     }
 }

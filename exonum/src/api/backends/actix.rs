@@ -44,7 +44,7 @@ use crate::api::{
     self,
     manager::{ApiManager, UpdateEndpoints},
     Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
-    ExtendApiBackend, FutureResult, Immutable, Mutable, NamedWith,
+    ExtendApiBackend, FutureResult, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -244,118 +244,102 @@ fn create_warning_header(warning_text: &str) -> String {
     format!("{} {} \"{}\"", WARNING_NUMBER, WARNING_AGENT, warning_text)
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, Immutable>> for RequestHandler
+impl From<EndpointMutability> for actix_web::http::Method {
+    fn from(mutability: EndpointMutability) -> Self {
+        match mutability {
+            EndpointMutability::Immutable => actix_web::http::Method::GET,
+            EndpointMutability::Mutable => actix_web::http::Method::POST,
+        }
+    }
+}
+
+impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F>> for RequestHandler
 where
     F: Fn(Q) -> api::Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, api::Result<I>, F, Immutable>) -> Self {
+    fn from(f: NamedWith<Q, I, api::Result<I>, F>) -> Self {
         let handler = f.inner.handler;
         let actuality = f.actuality;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let actuality = actuality.clone();
-            let future = Query::from_request(&request, &Default::default())
-                .map(Query::into_inner)
-                .and_then(|query| handler(query).map_err(From::from))
-                .and_then(|value| Ok(json_response(actuality, value)))
-                .into_future();
-            Box::new(future)
-        };
-
-        Self {
-            name: f.name,
-            method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        }
-    }
-}
-
-impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, Mutable>> for RequestHandler
-where
-    F: Fn(Q) -> api::Result<I> + 'static + Send + Sync + Clone,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, api::Result<I>, F, Mutable>) -> Self {
-        let handler = f.inner.handler;
-        let actuality = f.actuality;
+        let mutability = f.mutability;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
             let actuality = actuality.clone();
-            request
-                .json()
-                .from_err()
-                .and_then(move |query: Q| {
-                    handler(query)
-                        .map(|value| json_response(actuality, value))
-                        .map_err(From::from)
-                })
-                .responder()
+            match mutability {
+                EndpointMutability::Immutable => {
+                    // For immutable requests, extract query from query string.
+                    let future = Query::from_request(&request, &Default::default())
+                        .map(Query::into_inner)
+                        .and_then(|query| handler(query).map_err(From::from))
+                        .and_then(|value| Ok(json_response(actuality, value)))
+                        .into_future();
+                    Box::new(future)
+                }
+                EndpointMutability::Mutable => {
+                    // For mutable requests, extract query from the request body as JSON.
+                    request
+                        .json()
+                        .from_err()
+                        .and_then(move |query: Q| {
+                            handler(query)
+                                .map(|value| json_response(actuality, value))
+                                .map_err(From::from)
+                        })
+                        .responder()
+                }
+            }
         };
 
         Self {
             name: f.name,
-            method: actix_web::http::Method::POST,
+            method: f.mutability.into(),
             inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F, Immutable>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
 where
     F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, FutureResult<I>, F, Immutable>) -> Self {
+    fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
         let handler = f.inner.handler;
         let actuality = f.actuality;
+        let mutability = f.mutability;
         let index = move |request: HttpRequest| -> FutureResponse {
             let handler = handler.clone();
             let actuality = actuality.clone();
-            Query::from_request(&request, &Default::default())
-                .map(Query::into_inner)
-                .into_future()
-                .and_then(move |query| handler(query).map_err(From::from))
-                .map(|value| json_response(actuality, value))
-                .responder()
-        };
-
-        Self {
-            name: f.name,
-            method: actix_web::http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        }
-    }
-}
-
-impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F, Mutable>> for RequestHandler
-where
-    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, FutureResult<I>, F, Mutable>) -> Self {
-        let handler = f.inner.handler;
-        let actuality = f.actuality;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let handler = handler.clone();
-            let actuality = actuality.clone();
-            request
-                .json()
-                .from_err()
-                .and_then(move |query: Q| {
-                    handler(query)
+            match mutability {
+                EndpointMutability::Immutable => {
+                    // For immutable requests, extract query from query string.
+                    Query::from_request(&request, &Default::default())
+                        .map(Query::into_inner)
+                        .into_future()
+                        .and_then(move |query| handler(query).map_err(From::from))
                         .map(|value| json_response(actuality, value))
-                        .map_err(From::from)
-                })
-                .responder()
+                        .responder()
+                }
+                EndpointMutability::Mutable => {
+                    // For mutable requests, extract query from the request body as JSON.
+                    request
+                        .json()
+                        .from_err()
+                        .and_then(move |query: Q| {
+                            handler(query)
+                                .map(|value| json_response(actuality, value))
+                                .map_err(From::from)
+                        })
+                        .responder()
+                }
+            }
         };
 
         Self {
             name: f.name,
-            method: actix_web::http::Method::POST,
+            method: f.mutability.into(),
             inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
