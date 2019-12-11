@@ -222,10 +222,26 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
             expiration_note
         );
 
-        response.header(header::WARNING, warning_text);
+        let warning_string = create_warning_header(&warning_text);
+
+        response.header(header::WARNING, warning_string);
     }
 
     response.json(json_value)
+}
+
+/// Formats warning string according to the following format:
+/// "<warn-code> <warn-agent> \"<warn-text>\" [<warn-date>]"
+/// <warn-code> in our case is 299, which means a miscellaneous persistent warning.
+/// <warn-agent> is optional, so we set it to "-".
+/// <warn-text> is a warning description, which is taken as an only argument.
+/// <warn-date> is not required.
+/// For details you can see RFC 7234, section 5.5: Warning.
+fn create_warning_header(warning_text: &str) -> String {
+    const WARNING_NUMBER: u16 = 299;
+    const WARNING_AGENT: &str = "-";
+
+    format!("{} {} \"{}\"", WARNING_NUMBER, WARNING_AGENT, warning_text)
 }
 
 impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F, Immutable>> for RequestHandler
@@ -610,6 +626,14 @@ mod tests {
     }
 
     #[test]
+    fn test_create_warning_header() {
+        assert_eq!(
+            &create_warning_header("Description"),
+            "299 - \"Description\""
+        );
+    }
+
+    #[test]
     fn json_responses() {
         use chrono::TimeZone;
 
@@ -617,9 +641,11 @@ mod tests {
         assert_responses_eq(actual_response, HttpResponse::Ok().json(123));
 
         let deprecated_response_no_deadline = json_response(Actuality::Deprecated(None), 123);
-        let expected_warning = "Deprecated API: This endpoint is deprecated, \
-                                see the documentation to find an alternative. \
-                                Currently there is no specific date for disabling this endpoint.";
+        let expected_warning_text =
+            "Deprecated API: This endpoint is deprecated, \
+             see the documentation to find an alternative. \
+             Currently there is no specific date for disabling this endpoint.";
+        let expected_warning = create_warning_header(expected_warning_text);
         assert_responses_eq(
             deprecated_response_no_deadline,
             HttpResponse::Ok()
@@ -631,9 +657,10 @@ mod tests {
 
         let deprecated_response_deadline =
             json_response(Actuality::Deprecated(Some(deadline)), 123);
-        let expected_warning = "Deprecated API: This endpoint is deprecated, \
-                                see the documentation to find an alternative. \
-                                The old API is maintained until 2020-12-31.";
+        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
+                                     see the documentation to find an alternative. \
+                                     The old API is maintained until 2020-12-31.";
+        let expected_warning = create_warning_header(expected_warning_text);
         assert_responses_eq(
             deprecated_response_deadline,
             HttpResponse::Ok()
