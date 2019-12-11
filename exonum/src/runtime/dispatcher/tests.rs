@@ -30,7 +30,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, BlockHeaderEntries, Blockchain, Schema as CoreSchema},
+    blockchain::{AdditionalHeaders, Block, Blockchain, Schema as CoreSchema},
     helpers::Height,
     node::ApiSender,
     runtime::{
@@ -57,7 +57,7 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
         tx_hash: Hash::zero(),
         state_hash: Hash::zero(),
         error_hash: Hash::zero(),
-        entries: BlockHeaderEntries::new(),
+        additional_headers: AdditionalHeaders::new(),
     };
 
     let block_hash = block.object_hash();

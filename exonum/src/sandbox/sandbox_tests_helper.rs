@@ -30,7 +30,7 @@ use super::{
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
-use crate::blockchain::BlockHeaderEntries;
+use crate::blockchain::{AdditionalHeaders, ProposerId};
 
 pub type TimestampingSandbox = Sandbox;
 
@@ -47,7 +47,7 @@ pub struct BlockBuilder<'a> {
     state_hash: Option<Hash>,
     error_hash: Option<Hash>,
     tx_count: Option<u32>,
-    entries: Option<BlockHeaderEntries>,
+    entries: Option<AdditionalHeaders>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -101,8 +101,8 @@ impl<'a> BlockBuilder<'a> {
             .proposer_id
             .unwrap_or_else(|| self.sandbox.current_leader());
 
-        let mut entries = self.entries.clone().unwrap_or_else(BlockHeaderEntries::new);
-        entries.insert::<ValidatorId>(proposer_id);
+        let mut headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
+        headers.insert::<ProposerId>(proposer_id.into());
 
         Block {
             height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
@@ -113,7 +113,7 @@ impl<'a> BlockBuilder<'a> {
                 .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
             error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
-            entries,
+            additional_headers: headers,
         }
     }
 }

@@ -34,7 +34,7 @@ use crate::counter::{
     CounterSchema, CounterService, CounterWithProof, Increment, Reset, ADMIN_KEY, SERVICE_ID,
     SERVICE_NAME,
 };
-use exonum::blockchain::BlockHeaderEntries;
+use exonum::blockchain::{AdditionalHeaders, ProposerId};
 use exonum::helpers::ValidatorId;
 
 mod counter;
@@ -488,7 +488,7 @@ fn test_explorer_blocks_basic() {
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
-                "entries": blocks[0].block.entries,
+                "additional_headers": blocks[0].block.additional_headers,
             }],
         })
     );
@@ -501,14 +501,14 @@ fn test_explorer_blocks_basic() {
         .get("v1/blocks?count=10")
         .unwrap();
 
-    let mut entries = BlockHeaderEntries::new();
-    entries.insert::<ValidatorId>(ValidatorId(0));
+    let mut headers = AdditionalHeaders::new();
+    headers.insert::<ProposerId>(ValidatorId(0).into());
 
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(1));
     assert_eq!(blocks[0].block.prev_hash, blocks[1].block.object_hash());
     assert_eq!(blocks[0].block.tx_count, 0);
-    assert_eq!(blocks[0].block.entries, entries);
+    assert_eq!(blocks[0].block.additional_headers, headers);
     assert_eq!(blocks[1].block.height, Height(0));
     assert_eq!(blocks[1].block.prev_hash, crypto::Hash::default());
     assert_eq!(range.start, Height(0));
@@ -538,7 +538,7 @@ fn test_explorer_blocks_basic() {
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
                 "precommits": [precommit],
-                "entries": blocks[0].block.entries,
+                "additional_headers": blocks[0].block.additional_headers,
             }],
         })
     );
@@ -559,7 +559,7 @@ fn test_explorer_blocks_basic() {
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
                 "time": precommit.payload().time(),
-                "entries": blocks[0].block.entries,
+                "additional_headers": blocks[0].block.additional_headers,
             }],
         })
     );

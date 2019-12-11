@@ -17,7 +17,7 @@ use std::time::Duration;
 use exonum_merkledb::{HashTag, ObjectHash};
 
 use crate::{
-    blockchain::{Block, BlockHeaderEntries},
+    blockchain::{AdditionalHeaders, ProposerId, Block},
     helpers::{Height, Round, ValidatorId},
     messages::{Propose, Verified},
 };
@@ -74,8 +74,8 @@ fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
 }
 
 fn create_block(sandbox: &Sandbox) -> Block {
-    let mut entries = BlockHeaderEntries::new();
-    entries.insert::<ValidatorId>(ValidatorId(2));
+    let mut headers = AdditionalHeaders::new();
+    headers.insert::<ProposerId>(ValidatorId(2).into());
 
     Block {
         height: Height(1),
@@ -84,7 +84,7 @@ fn create_block(sandbox: &Sandbox) -> Block {
         tx_hash: HashTag::empty_list_hash(),
         state_hash: sandbox.last_state_hash(),
         error_hash: HashTag::empty_map_hash(),
-        entries,
+        additional_headers: headers,
     }
 }
 

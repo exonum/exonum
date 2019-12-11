@@ -15,7 +15,6 @@
 //! Common widely used type definitions.
 
 use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryValue, ObjectHash};
-use failure::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{borrow::Cow, fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
 use zeroize::Zeroize;
@@ -320,16 +319,6 @@ impl From<ValidatorId> for u16 {
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
         val.0 as usize
-    }
-}
-
-impl BinaryValue for ValidatorId {
-    fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_bytes()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-        Ok(Self(u16::from_bytes(bytes)?))
     }
 }
 

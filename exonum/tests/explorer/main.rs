@@ -190,7 +190,7 @@ fn test_explorer_errors_in_block() {
                 "tx_hash": block.header.tx_hash,
                 "state_hash": block.header.state_hash,
                 "error_hash": block.header.error_hash,
-                "entries": block.header.entries,
+                "additional_headers": block.header.additional_headers,
             },
             "precommits": block.precommits,
             "transactions": [

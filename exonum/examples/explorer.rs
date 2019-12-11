@@ -31,7 +31,7 @@ use serde_json::json;
 use std::{collections::BTreeMap, iter};
 
 use crate::blockchain::{
-    consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
+    consensus_keys, ProposerId, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
 };
 
 #[path = "../tests/explorer/blockchain/mod.rs"]
@@ -259,7 +259,7 @@ fn main() {
     // Determine the number of blocks proposed by a specific validator
     let block_count = explorer
         .blocks(Height(1)..) // skip genesis block
-        .filter(|block| block.header().get_entry::<ValidatorId>().unwrap() == Some(ValidatorId(0)))
+        .filter(|block| block.header().get_header::<ProposerId>().unwrap().unwrap() == ValidatorId(0).into())
         .count();
     assert_eq!(block_count, 1);
 }

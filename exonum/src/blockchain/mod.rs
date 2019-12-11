@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockHeaderEntries, BlockHeaderKey, BlockProof, IndexProof},
+    block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
@@ -250,7 +250,12 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch)?;
 
-        let (_, patch) = self.create_patch(None, Height::zero(), &[], &mut BTreeMap::new());
+        let (_, patch) = self.create_patch(
+            ValidatorId::zero().into(),
+            Height::zero(),
+            &[],
+            &mut BTreeMap::new(),
+        );
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -268,7 +273,7 @@ impl BlockchainMut {
     /// with the hash of the resulting block.
     pub fn create_patch(
         &self,
-        proposer_id: Option<ValidatorId>,
+        proposer_id: ProposerId,
         height: Height,
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
@@ -316,12 +321,11 @@ impl BlockchainMut {
     fn create_block_header(
         &self,
         fork: Fork,
-        proposer_id: Option<ValidatorId>,
+        proposer_id: ProposerId,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Patch, Block) {
-        // Get last hash.
-        let last_hash = self.inner.last_hash();
+        let prev_hash = self.inner.last_hash();
 
         let schema = Schema::new(&fork);
         let error_hash = schema.call_errors(height).object_hash();
@@ -332,16 +336,14 @@ impl BlockchainMut {
         let mut block = Block {
             height,
             tx_count: tx_hashes.len() as u32,
-            prev_hash: last_hash,
+            prev_hash,
             tx_hash,
             state_hash,
             error_hash,
-            entries: BlockHeaderEntries::new(),
+            additional_headers: AdditionalHeaders::new(),
         };
 
-        if let Some(proposer_id) = proposer_id {
-            block.add_entry::<ValidatorId>(proposer_id);
-        }
+        block.add_header::<ProposerId>(proposer_id);
 
         (patch, block)
     }

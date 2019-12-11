@@ -24,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
+    blockchain::{contains_transaction, ProposerId, ConsensusConfig, ValidatorKeys},
     crypto::{Hash, PublicKey, SecretKey},
     events::network::ConnectedPeerAddr,
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
@@ -161,7 +161,7 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Option<Patch>,
     txs: Vec<Hash>,
-    proposer_id: Option<ValidatorId>,
+    proposer_id: ProposerId,
 }
 
 /// Incomplete block.
@@ -358,12 +358,12 @@ impl ProposeState {
 
 impl BlockState {
     /// Creates a new `BlockState` instance with the given parameters.
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
+    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ProposerId) -> Self {
         Self {
             hash,
             patch: Some(patch),
             txs,
-            proposer_id: Some(proposer_id),
+            proposer_id,
         }
     }
 
@@ -383,7 +383,7 @@ impl BlockState {
     }
 
     /// Returns id of the validator that proposed the block.
-    pub fn proposer_id(&self) -> Option<ValidatorId> {
+    pub fn proposer_id(&self) -> ProposerId {
         self.proposer_id
     }
 }
@@ -1010,7 +1010,7 @@ impl State {
         block_hash: Hash,
         patch: Patch,
         txs: Vec<Hash>,
-        proposer_id: Option<ValidatorId>,
+        proposer_id: ProposerId,
     ) -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,

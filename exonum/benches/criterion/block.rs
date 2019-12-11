@@ -51,7 +51,7 @@ use exonum::{
         ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    helpers::{create_rust_runtime_and_genesis_config, Height},
+    helpers::{create_rust_runtime_and_genesis_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
     runtime::SnapshotExt,
@@ -102,7 +102,12 @@ fn create_blockchain(
 }
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
-    blockchain.create_patch(None, Height(height), txs, &mut BTreeMap::new())
+    blockchain.create_patch(
+        ValidatorId::zero().into(),
+        Height(height),
+        txs,
+        &mut BTreeMap::new(),
+    )
 }
 
 mod timestamping {

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure::Error;
+
 use exonum_merkledb::MapProof;
 use exonum_proto::ProtobufConvert;
 
@@ -22,7 +24,7 @@ use crate::{
     proto::{self, BinaryMap},
 };
 use exonum_merkledb::BinaryValue;
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 /// Trait that represents key in block header entry map. Provide
 /// mapping between `NAME` of the entry and its value.
@@ -39,26 +41,52 @@ pub trait BlockHeaderKey {
     type Value: BinaryValue;
 }
 
-impl BlockHeaderKey for ValidatorId {
-    const NAME: &'static str = "validator_id";
+/// Proposer identifier.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ProposerId(pub ValidatorId);
+
+impl fmt::Display for ProposerId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl BinaryValue for ProposerId {
+    fn to_bytes(&self) -> Vec<u8> {
+        (self.0).0.to_bytes()
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
+        Ok(Self(ValidatorId(u16::from_bytes(bytes)?)))
+    }
+}
+
+impl From<ValidatorId> for ProposerId {
+    fn from(validator_id: ValidatorId) -> Self {
+        ProposerId(validator_id)
+    }
+}
+
+impl BlockHeaderKey for ProposerId {
+    const NAME: &'static str = "proposer_id";
     type Value = Self;
 }
 
-/// Expandable set of entries allowed to be added to the block.
-pub type BlockHeaderEntries = BinaryMap<String, Vec<u8>>;
+/// Expandable set of headers allowed to be added to the block.
+pub type AdditionalHeaders = BinaryMap<String, Vec<u8>>;
 
-impl BlockHeaderEntries {
-    /// New instance of `BlockHeaderEntries`.
+impl AdditionalHeaders {
+    /// New instance of `AdditionalHeaders`.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Insert new entry to the map.
+    /// Insert new header to the map.
     pub fn insert<K: BlockHeaderKey>(&mut self, value: K::Value) {
         self.0.insert(K::NAME.into(), value.to_bytes());
     }
 
-    /// Get entry from map.
+    /// Get header from the map.
     pub fn get<K: BlockHeaderKey>(&self) -> Option<&Vec<u8>> {
         self.0.get(K::NAME)
     }
@@ -93,58 +121,65 @@ pub struct Block {
     /// for services.
     pub error_hash: Hash,
     /// Additional information that can be added into the block.
-    pub entries: BlockHeaderEntries,
+    pub additional_headers: AdditionalHeaders,
 }
 
 impl Block {
-    /// Insert new entry to the block header.
-    pub(crate) fn add_entry<K: BlockHeaderKey>(&mut self, value: K::Value) {
-        self.entries.insert::<K>(value);
+    /// Insert new additional header to the block.
+    pub(crate) fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
+        self.additional_headers.insert::<K>(value);
     }
 
-    /// Get block header entry for specified key type. Key type is specified via
+    /// Get block additional header value for specified key type. Key type is specified via
     /// type parameter.
     ///
     /// # Usage
     ///
     /// ```
-    /// use exonum::crypto::Hash;
-    /// use exonum::blockchain::{Block, BlockHeaderKey, BlockHeaderEntries};
-    /// use exonum::helpers::Height;
-    /// use exonum::messages::BinaryValue;
-    /// use failure::Error;
-    /// use std::borrow::Cow;
+    /// # use exonum::crypto::Hash;
+    /// # use exonum::blockchain::{Block, BlockHeaderKey, AdditionalHeaders};
+    /// # use exonum::helpers::Height;
+    /// # use exonum::messages::BinaryValue;
+    /// # use failure::Error;
+    /// # use std::borrow::Cow;
     ///
-    /// struct ActiveServices {}
-    ///
-    /// impl BinaryValue for ActiveServices {
-    ///     fn to_bytes(&self) -> Vec<u8> { vec![] }
-    ///     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> { Ok(Self {}) }
+    /// // Suppose we store a list of active service IDs in a block.
+    /// // We can do this by defining a corresponding BlockHeaderKey implementation.
+    /// struct ActiveServices {
+    ///     service_id: u32,
     /// }
     ///
+    /// # impl BinaryValue for ActiveServices {
+    /// #    fn to_bytes(&self) -> Vec<u8> { vec![] }
+    /// #    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> { Ok(Self { service_id: 0 }) }
+    /// # }
+    ///
+    /// // To implement `BlockHeaderKey` we need to provide the key name and a corresponding
+    /// // value type. In this case it's `Self`.
     /// impl BlockHeaderKey for ActiveServices {
     ///     const NAME: &'static str = "active_services";
     ///     type Value = Self;
     /// }
     ///
+    /// // Create an empty block.
     /// let mut block = Block {
-    ///     height: Height(0),
-    ///     tx_count: 0,
-    ///     prev_hash: Hash::zero(),
-    ///     tx_hash: Hash::zero(),
-    ///     state_hash: Hash::zero(),
-    ///     error_hash: Hash::zero(),
-    ///     entries: BlockHeaderEntries::new(),
+    ///   #  height: Height(0),
+    ///   #  tx_count: 0,
+    ///   #  prev_hash: Hash::zero(),
+    ///   #  tx_hash: Hash::zero(),
+    ///   #  state_hash: Hash::zero(),
+    ///   #  error_hash: Hash::zero(),
+    ///     additional_headers: AdditionalHeaders::new(),
     /// };
     ///
-    /// let services = block.get_entry::<ActiveServices>().expect("Entry deserialization error");
+    /// let services = block.get_header::<ActiveServices>().expect("Entry deserialization error");
     /// assert!(services.is_none())
     /// ```
-    pub fn get_entry<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error>
+    pub fn get_header<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error>
     where
         K::Value: BinaryValue,
     {
-        self.entries
+        self.additional_headers
             .get::<K>()
             .map(|bytes: &Vec<u8>| K::Value::from_bytes(Cow::Borrowed(bytes)))
             .transpose()
@@ -194,8 +229,8 @@ mod tests {
 
     #[test]
     fn block() {
-        let mut entries = BlockHeaderEntries::new();
-        entries.insert::<Hash>(hash(&[0u8; 10]));
+        let mut additional_headers = AdditionalHeaders::new();
+        additional_headers.insert::<Hash>(hash(&[0u8; 10]));
 
         let txs = [4, 5, 6];
         let height = Height(123_345);
@@ -212,7 +247,7 @@ mod tests {
             tx_hash,
             state_hash,
             error_hash,
-            entries,
+            additional_headers,
         };
 
         let json_str = ::serde_json::to_string(&block).unwrap();
@@ -225,7 +260,7 @@ mod tests {
         assert_eq!(block, de_block);
     }
 
-    fn create_block(entries: BlockHeaderEntries) -> Block {
+    fn create_block(additional_headers: AdditionalHeaders) -> Block {
         let txs = [4, 5, 6];
         let height = Height(123_345);
         let prev_hash = hash(&[1, 2, 3]);
@@ -241,16 +276,16 @@ mod tests {
             tx_hash,
             state_hash,
             error_hash,
-            entries,
+            additional_headers,
         }
     }
 
     #[test]
     fn block_object_hash() {
-        let block_without_entries = create_block(BlockHeaderEntries::new());
+        let block_without_entries = create_block(AdditionalHeaders::new());
         let hash_without_entries = block_without_entries.object_hash();
 
-        let mut entries = BlockHeaderEntries::new();
+        let mut entries = AdditionalHeaders::new();
         entries.insert::<Hash>(hash(&[0u8; 10]));
 
         let block_with_entries = create_block(entries);
@@ -280,17 +315,17 @@ mod tests {
 
     #[test]
     fn block_entry_keys() {
-        let mut block = create_block(BlockHeaderEntries::new());
+        let mut block = create_block(AdditionalHeaders::new());
 
-        assert!(block.get_entry::<ActiveServices>().unwrap().is_none());
+        assert!(block.get_header::<ActiveServices>().unwrap().is_none());
 
         let services = ActiveServices {
             services: Vec::new(),
         };
 
-        block.add_entry::<ActiveServices>(services.clone());
+        block.add_header::<ActiveServices>(services.clone());
         let services_2 = block
-            .get_entry::<ActiveServices>()
+            .get_header::<ActiveServices>()
             .expect("Active services not found");
 
         assert_eq!(services, services_2.unwrap());
@@ -312,9 +347,9 @@ mod tests {
         };
 
         // Should override previous entry for `ActiveServices`.
-        block.add_entry::<ActiveServices>(services.clone());
+        block.add_header::<ActiveServices>(services.clone());
         let services_2 = block
-            .get_entry::<ActiveServices>()
+            .get_header::<ActiveServices>()
             .expect("Active services not found");
 
         assert_eq!(services, services_2.unwrap());
@@ -326,12 +361,12 @@ mod tests {
 
         entries.0.insert("active_services".into(), vec![]);
         let block = create_block(entries.clone());
-        let services = block.get_entry::<ActiveServices>();
+        let services = block.get_header::<ActiveServices>();
         assert!(services.unwrap().unwrap().services.is_empty());
 
         entries.0.insert("active_services".into(), vec![0_u8; 1024]);
         let block = create_block(entries);
-        let services = block.get_entry::<ActiveServices>();
+        let services = block.get_header::<ActiveServices>();
         assert!(services.is_err());
     }
 }

@@ -49,7 +49,7 @@ const SERVICE_INSTANCE_NAME: &str = "test_service_name";
 fn create_block(blockchain: &BlockchainMut) -> Fork {
     let height = CoreSchema::new(&blockchain.snapshot()).height();
     let (_, patch) = blockchain.create_patch(
-        Some(ValidatorId(0)),
+        ValidatorId(0).into(),
         height.next(),
         &[],
         &mut BTreeMap::new(),

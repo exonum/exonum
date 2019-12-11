@@ -163,7 +163,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
 
     let mut tx_cache = BTreeMap::new();
     let (block_hash, patch) =
-        blockchain.create_patch(Some(ValidatorId(0)), height, &tx_hashes, &mut tx_cache);
+        blockchain.create_patch(ValidatorId(0).into(), height, &tx_hashes, &mut tx_cache);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
     let propose = Verified::from_value(
