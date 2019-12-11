@@ -68,6 +68,8 @@ impl ViewChanges {
         self.data
     }
 
+    /// Returns a value for the specified key, or an `Err(_)` if the value should be determined
+    /// by the underlying snapshot.
     pub fn get(&self, key: &[u8]) -> StdResult<Option<Vec<u8>>, ()> {
         if let Some(change) = self.data.get(key) {
             return Ok(match *change {
@@ -81,6 +83,8 @@ impl ViewChanges {
         Err(())
     }
 
+    /// Returns whether the view contains the specified `key`. An `Err(_)` is returned if this
+    /// is determined by the underlying snapshot.
     pub fn contains(&self, key: &[u8]) -> StdResult<bool, ()> {
         if let Some(change) = self.data.get(key) {
             return Ok(match *change {
