@@ -32,7 +32,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
+use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -325,18 +325,16 @@ fn main() {
         thread::sleep(Duration::from_secs(5));
 
         // Send a `StartService` request to the sample runtime.
-        let instance_name = "instance".to_owned();
-
-        let start_service = StartService {
-            artifact: "255:sample_artifact".parse().unwrap(),
-            name: instance_name.clone(),
-            config: 10_u64.into_bytes(),
-        };
+        let instance_name = "instance";
 
         api_sender
             .broadcast_transaction(
                 ConfigPropose::immediate(0)
-                    .start_service(start_service)
+                    .start_service(
+                        "255:sample_artifact".parse().unwrap(),
+                        instance_name,
+                        10_u64,
+                    )
                     .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )
             .unwrap();
@@ -347,7 +345,7 @@ fn main() {
         let snapshot = blockchain_ref.snapshot();
         let state = snapshot
             .for_dispatcher()
-            .get_instance(instance_name.as_str())
+            .get_instance(instance_name)
             .unwrap();
         assert_eq!(state.status.unwrap(), InstanceStatus::Active);
         let instance_id = state.spec.id;

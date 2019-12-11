@@ -183,8 +183,26 @@ impl ConfigPropose {
     }
 
     /// Adds service start request to this proposal.
-    pub fn start_service(mut self, start_service: StartService) -> Self {
+    pub fn start_service(
+        mut self,
+        artifact: ArtifactId,
+        name: impl Into<String>,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        let start_service = StartService {
+            artifact,
+            name: name.into(),
+            config: constructor.into_bytes(),
+        };
+
         self.changes.push(ConfigChange::StartService(start_service));
+        self
+    }
+
+    /// Adds service stop request to this proposal.
+    pub fn stop_service(mut self, instance_id: InstanceId) -> Self {
+        self.changes
+            .push(ConfigChange::StopService(StopService { instance_id }));
         self
     }
 }
