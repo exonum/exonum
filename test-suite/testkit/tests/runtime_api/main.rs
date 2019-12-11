@@ -78,7 +78,7 @@ fn test_exonum_protos_without_service() {
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect("Rust runtime Api unexpectedly failed")
         .into_iter()
-        .map(|proto_source| proto_source.name.clone())
+        .map(|proto_source| proto_source.name)
         .collect();
 
     let expected_files: HashSet<String> = vec![
@@ -110,9 +110,7 @@ fn test_service_protos_with_service() {
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect("Rust runtime Api unexpectedly failed");
 
-    const EXPECTED_CONTENT: &str = "syntax = \"proto3\";\n\
-                                    package exonum.testkit;\n\
-                                    message TxMessage { string message = 1; }\n";
+    const EXPECTED_CONTENT: &str = include_str!("proto/test_service.proto");
 
     assert_eq!(proto_files.len(), 1);
     assert_eq!(proto_files[0].name, "test_service.proto".to_string());
