@@ -24,7 +24,7 @@ use exonum_merkledb::{
 
 use super::{
     multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    StartService, SupervisorConfig,
+    SupervisorConfig,
 };
 
 /// Service information schema.
@@ -38,8 +38,6 @@ pub struct Schema<T: Access> {
     pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
     /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
-    /// Service instances to be started.
-    pub pending_instances: MultisigIndex<T, StartService>,
     /// Votes for a configuration change.
     pub config_confirms: MultisigIndex<T, Hash>,
     /// Current pending configuration proposal.
