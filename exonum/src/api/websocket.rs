@@ -346,6 +346,7 @@ impl Handler<Broadcast> for Server {
 impl Handler<Transaction> for Server {
     type Result = Result<TransactionResponse, failure::Error>;
 
+    /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(
         &mut self,
         Transaction { tx }: Transaction,
@@ -353,11 +354,11 @@ impl Handler<Transaction> for Server {
     ) -> Self::Result {
         let msg = SignedMessage::from_hex(tx)?;
         let tx_hash = msg.object_hash();
+        let verified = msg.into_verified()?;
+        Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
+
         // FIXME Don't ignore message error.
-        let _ = self
-            .blockchain
-            .sender()
-            .broadcast_transaction(msg.into_verified()?);
+        let _ = self.blockchain.sender().broadcast_transaction(verified);
         Ok(TransactionResponse { tx_hash })
     }
 }
