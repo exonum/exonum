@@ -398,7 +398,10 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
-        check_index_valid_full_name(index_address)?;
+        check_index_valid_full_name(index_address.resolved_name()).map_err(|kind| AccessError {
+            addr: index_address.to_owned(),
+            kind,
+        })?;
         Self::get_or_create_unchecked(index_access, index_address, index_type)
     }
 
@@ -414,7 +417,7 @@ where
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
         // Actual name.
-        let index_name = index_address.name.clone();
+        let index_name = index_address.resolved_name().to_owned();
         // Full name for internal usage.
         let index_full_name = index_address.fully_qualified_name();
 
@@ -433,6 +436,7 @@ where
 
         let is_aggregated = !is_phantom
             && index_type.is_merkelized()
+            && !index_address.name.starts_with('^') // Exclude migrated indexes
             && index_address.id_in_group.is_none()
             && index_address.name != STATE_AGGREGATOR;
 

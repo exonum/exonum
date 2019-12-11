@@ -113,7 +113,7 @@ impl SystemSchema<&Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, HashTag, TemporaryDB};
 
     #[test]
     fn index_count_is_correct() {
@@ -243,5 +243,36 @@ mod tests {
                 .object_hash()
         );
         assert_eq!(aggregator.object_hash(), system_schema.state_hash());
+    }
+
+    #[test]
+    fn migrated_indexes_do_not_influence_state_hash() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut map = fork.get_map("map");
+            map.put(&1_u64, "foo".to_owned());
+            map.put(&2_u64, "bar".to_owned());
+        }
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        let system_schema = SystemSchema::new(&snapshot);
+        assert_eq!(system_schema.state_hash(), HashTag::empty_map_hash());
+
+        // Create a merkelized index in a migration. It should not be aggregated.
+        let fork = db.fork();
+        {
+            let mut map = fork.get_proof_map("^map");
+            map.put(&1_u64, "1".to_owned());
+            map.put(&3_u64, "3".to_owned());
+
+            let map = fork.get_map::<_, u64, String>("map");
+            assert_eq!(map.get(&1).unwrap(), "foo");
+            assert!(map.get(&3).is_none());
+        }
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        let system_schema = SystemSchema::new(&snapshot);
+        assert_eq!(system_schema.state_hash(), HashTag::empty_map_hash());
     }
 }

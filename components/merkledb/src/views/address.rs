@@ -56,6 +56,17 @@ impl IndexAddress {
         &self.name
     }
 
+    /// Returns a resolved address name, which can be used in `ResolvedAddress`. The resolved
+    /// name corresponds to a usual `name()`, unless it starts with the "next version" char `^`,
+    /// in which case the resolved name does not include this char.
+    pub(super) fn resolved_name(&self) -> &str {
+        if self.name.starts_with('^') {
+            &self.name[1..]
+        } else {
+            &self.name
+        }
+    }
+
     /// Returns the bytes part of `IndexAddress`.
     pub fn id_in_group(&self) -> Option<&[u8]> {
         self.id_in_group.as_ref().map(Vec::as_slice)

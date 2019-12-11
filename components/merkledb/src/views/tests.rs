@@ -895,6 +895,27 @@ fn test_metadata_index_identifiers() {
 }
 
 #[test]
+fn test_metadata_in_migrated_indexes() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+
+    let view: View<_> = ViewWithMetadata::get_or_create(&fork, &"simple".into(), IndexType::Map)
+        .map_err(drop)
+        .unwrap()
+        .into();
+    assert_eq!(view.address.name, "simple");
+    let old_id = view.address.id.unwrap().get();
+
+    let view: View<_> = ViewWithMetadata::get_or_create(&fork, &"^simple".into(), IndexType::List)
+        .map_err(drop)
+        .unwrap()
+        .into();
+    assert_eq!(view.address.name, "simple");
+    let new_id = view.address.id.unwrap().get();
+    assert_ne!(old_id, new_id);
+}
+
+#[test]
 fn test_metadata_incorrect_index_type() {
     let db = TemporaryDB::new();
     let fork = db.fork();
