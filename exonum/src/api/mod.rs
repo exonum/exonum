@@ -59,9 +59,8 @@ pub trait ApiBackend: Sized {
     type Backend;
 
     /// Adds the given endpoint handler to the backend.
-    fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
     where
-        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
@@ -78,9 +77,8 @@ pub trait ApiBackend: Sized {
     }
 
     /// Adds the given mutable endpoint handler to the backend.
-    fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
     where
-        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
@@ -97,14 +95,13 @@ pub trait ApiBackend: Sized {
     }
 
     /// Adds the given endpoint handler to the backend, marking it as deprecated.
-    fn deprecated_endpoint<N, Q, I, R, F, E>(
+    fn deprecated_endpoint<Q, I, R, F, E>(
         &mut self,
-        name: N,
+        name: &'static str,
         discontinued_on: Option<Date<Utc>>,
         endpoint: E,
     ) -> &mut Self
     where
-        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
@@ -121,14 +118,13 @@ pub trait ApiBackend: Sized {
     }
 
     /// Adds the given mutable endpoint handler to the backend, marking it as deprecated.
-    fn deprecated_endpoint_mut<N, Q, I, R, F, E>(
+    fn deprecated_endpoint_mut<Q, I, R, F, E>(
         &mut self,
-        name: N,
+        name: &'static str,
         discontinued_on: Option<Date<Utc>>,
         endpoint: E,
     ) -> &mut Self
     where
-        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
