@@ -103,10 +103,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// #     proto_sources = "exonum_testkit::proto",
 /// # )]
 /// # pub struct ExampleService;
-/// #
-/// # impl Service for ExampleService {
-/// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
-/// # }
+/// # impl Service for ExampleService {}
 /// #
 /// # #[exonum_interface]
 /// # pub trait ExampleInterface {}

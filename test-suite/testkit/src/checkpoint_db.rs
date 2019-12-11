@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{Database, Patch, Result as StorageResult, Snapshot, View};
+use exonum_merkledb::{Database, DatabaseExt, Patch, Result as StorageResult, Snapshot};
 
 use std::sync::{Arc, RwLock};
 
@@ -168,30 +168,11 @@ impl<T: Database> CheckpointDbInner<T> {
     fn merge_with_logging(&mut self, patch: Patch) -> StorageResult<()> {
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
-        let snapshot = self.db.snapshot();
-        let patch_changes = patch.changes();
-        self.db.merge(patch)?;
-
-        let rev_fork = self.db.fork();
-        // Reverse a patch to get a backup patch.
-        for (name, changes) in &patch_changes {
-            let mut view = View::new(&rev_fork, name.clone());
-            for (key, _) in changes.iter() {
-                match snapshot.get(name, key) {
-                    Some(value) => {
-                        view.put(key, value);
-                    }
-                    None => {
-                        view.remove(key);
-                    }
-                }
-            }
-        }
-
+        let backup_patch = self.db.merge_with_backup(patch)?;
         self.backup_stack
             .last_mut()
             .expect("`merge_with_logging` called before checkpoint has been set")
-            .push(rev_fork.into_patch());
+            .push(backup_patch);
         Ok(())
     }
 
@@ -214,54 +195,7 @@ impl<T: Database> CheckpointDbInner<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exonum_merkledb::{Change, TemporaryDB};
-
-    // Same as `Change`, but with trait implementations required for `Patch` comparison.
-    #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
-    enum OrdChange {
-        Put(Vec<u8>),
-        Delete,
-    }
-
-    impl From<Change> for OrdChange {
-        fn from(change: Change) -> Self {
-            match change {
-                Change::Put(value) => OrdChange::Put(value),
-                Change::Delete => OrdChange::Delete,
-            }
-        }
-    }
-
-    impl<'a> From<&'a Change> for OrdChange {
-        fn from(change: &'a Change) -> Self {
-            match *change {
-                Change::Put(ref value) => OrdChange::Put(value.clone()),
-                Change::Delete => OrdChange::Delete,
-            }
-        }
-    }
-
-    /// Asserts that a patch contains only the specified changes.
-    fn check_patch<'a, I>(patch: &Patch, changes: I)
-    where
-        I: IntoIterator<Item = (&'a str, Vec<u8>, Change)>,
-    {
-        use std::collections::BTreeSet;
-        use std::iter::FromIterator;
-
-        let mut patch_set: BTreeSet<(&str, _, _)> = BTreeSet::new();
-        for (name, changes) in patch.iter() {
-            for (key, value) in changes.iter() {
-                patch_set.insert((name, key.clone(), OrdChange::from(value)));
-            }
-        }
-        let expected_set = BTreeSet::from_iter(
-            changes
-                .into_iter()
-                .map(|(name, key, value)| (name, key, OrdChange::from(value))),
-        );
-        assert_eq!(patch_set, expected_set);
-    }
+    use exonum_merkledb::{access::AccessExt, TemporaryDB};
 
     fn stack_len<T>(db: &CheckpointDb<T>) -> usize {
         let inner = db.inner.read().unwrap();
@@ -269,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn test_backup_stack() {
+    fn backup_stack_length() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
 
@@ -287,82 +221,21 @@ mod tests {
     }
 
     #[test]
-    fn test_backup() {
-        let db = CheckpointDb::new(TemporaryDB::new());
-        let handler = db.handler();
-        handler.checkpoint();
-        let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "foo");
-            view.put(&vec![], vec![2]);
-        }
-        db.merge(fork.into_patch()).unwrap();
-        {
-            let inner = db.inner.read().unwrap();
-            let backup = &inner.backup_stack[0];
-            assert_eq!(backup.len(), 1);
-            check_patch(&backup[0], vec![("foo", vec![], Change::Delete)]);
-        }
-
-        let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
-
-        handler.checkpoint();
-        let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "foo");
-            view.put(&vec![], vec![3]);
-            let mut view = View::new(&fork, "bar");
-            view.put(&vec![1], vec![4]);
-            let mut view = View::new(&fork, "bar2");
-            view.put(&vec![5], vec![6]);
-        }
-        db.merge(fork.into_patch()).unwrap();
-        {
-            let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            assert_eq!(stack.len(), 2);
-            let recent_backup = &stack[1];
-            let older_backup = &stack[0];
-            check_patch(&older_backup[0], vec![("foo", vec![], Change::Delete)]);
-            check_patch(
-                &recent_backup[0],
-                vec![
-                    ("bar2", vec![5], Change::Delete),
-                    ("bar", vec![1], Change::Delete),
-                    ("foo", vec![], Change::Put(vec![2])),
-                ],
-            );
-        }
-
-        // Check that the old snapshot still corresponds to the same DB state.
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
-        let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
-    }
-
-    #[test]
     #[allow(clippy::cognitive_complexity)]
-    fn test_rollback() {
+    fn interleaved_rollbacks() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
         let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "foo");
-            view.put(&vec![], vec![2]);
-        }
+        fork.get_list("foo").push(1_u32);
+        fork.get_list("bar").push("...".to_owned());
         db.merge(fork.into_patch()).unwrap();
 
         // Both checkpoints are on purpose.
         handler.checkpoint();
         handler.checkpoint();
         let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "foo");
-            view.put(&vec![], vec![3]);
-            let mut view = View::new(&fork, "bar");
-            view.put(&vec![1], vec![4]);
-        }
+        fork.get_list("foo").push(2_u32);
+        fork.get_list("bar").set(0, "!".to_owned());
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -373,12 +246,30 @@ mod tests {
         }
 
         let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
+        assert_eq!(snapshot.get_list::<_, u32>("foo").len(), 2);
+        assert_eq!(
+            snapshot.get_list("foo").iter().collect::<Vec<u32>>(),
+            vec![1, 2]
+        );
+        assert_eq!(snapshot.get_list::<_, String>("bar").len(), 1);
+        assert_eq!(
+            snapshot.get_list::<_, String>("bar").get(0),
+            Some("!".to_owned())
+        );
         handler.rollback();
 
         let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
-        assert_eq!(snapshot.get("bar", &[1]), None);
+        assert_eq!(snapshot.get_list::<_, u32>("foo").len(), 1);
+        assert_eq!(
+            snapshot.get_list("foo").iter().collect::<Vec<u32>>(),
+            vec![1]
+        );
+        assert_eq!(snapshot.get_list::<_, String>("bar").len(), 1);
+        assert_eq!(
+            snapshot.get_list::<_, String>("bar").get(0),
+            Some("...".to_owned())
+        );
+
         {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
@@ -389,11 +280,9 @@ mod tests {
         // Check that DB continues working as usual after a rollback.
         handler.checkpoint();
         let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "foo");
-            view.put(&vec![], vec![4]);
-            view.put(&vec![0, 0], vec![255]);
-        }
+        fork.get_list("foo").push(3_u32);
+        fork.get_list("bar")
+            .extend(vec!["?".to_owned(), ".".to_owned()]);
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -403,14 +292,12 @@ mod tests {
             assert_eq!(stack[0].len(), 0);
         }
         let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
-        assert_eq!(snapshot.get("foo", &[0, 0]), Some(vec![255]));
+        assert_eq!(snapshot.get_list::<_, u32>("foo").len(), 2);
+        assert_eq!(snapshot.get_list::<_, u32>("bar").len(), 3);
 
         let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "bar");
-            view.put(&vec![1], vec![254]);
-        }
+        fork.get_list("foo").push(4_u32);
+        fork.get_list::<_, String>("bar").clear();
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
@@ -419,12 +306,15 @@ mod tests {
             assert_eq!(stack[1].len(), 2);
             assert_eq!(stack[0].len(), 0);
         }
-        let new_snapshot = db.snapshot();
-        assert_eq!(new_snapshot.get("foo", &[]), Some(vec![4]));
-        assert_eq!(new_snapshot.get("foo", &[0, 0]), Some(vec![255]));
-        assert_eq!(new_snapshot.get("bar", &[1]), Some(vec![254]));
-        handler.rollback();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.get_list::<_, u32>("foo").len(), 3);
+        assert_eq!(
+            snapshot.get_list("foo").iter().collect::<Vec<u32>>(),
+            vec![1, 3, 4]
+        );
+        assert!(snapshot.get_list::<_, String>("bar").is_empty());
 
+        handler.rollback();
         {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
@@ -432,15 +322,18 @@ mod tests {
             assert_eq!(stack[0].len(), 0);
         }
         let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
-        assert_eq!(snapshot.get("foo", &[0, 0]), None);
-        assert_eq!(snapshot.get("bar", &[1]), None);
+        assert_eq!(snapshot.get_list::<_, u32>("foo").len(), 1);
+        assert_eq!(
+            snapshot.get_list("foo").iter().collect::<Vec<u32>>(),
+            vec![1]
+        );
+        assert_eq!(snapshot.get_list::<_, String>("bar").len(), 1);
+        assert_eq!(
+            snapshot.get_list("bar").iter().collect::<Vec<String>>(),
+            vec!["...".to_owned()]
+        );
 
-        assert_eq!(new_snapshot.get("foo", &[]), Some(vec![4]));
-        assert_eq!(new_snapshot.get("foo", &[0, 0]), Some(vec![255]));
-        assert_eq!(new_snapshot.get("bar", &[1]), Some(vec![254]));
         handler.rollback();
-
         {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
@@ -449,28 +342,25 @@ mod tests {
     }
 
     #[test]
-    fn test_handler() {
+    fn rollback_via_handler() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
 
         handler.checkpoint();
         let fork = db.fork();
-        {
-            let mut view = View::new(&fork, "foo");
-            view.put(&vec![], vec![2]);
-        }
+        fork.get_entry("foo").set(42_u32);
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
+        assert_eq!(snapshot.get_entry::<_, u32>("foo").get(), Some(42));
 
         handler.rollback();
         let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), None);
+        assert!(!snapshot.get_entry::<_, u32>("foo").exists());
     }
 
     #[test]
-    #[should_panic]
-    fn test_extra_rollback() {
+    #[should_panic(expected = "Checkpoint has not been set yet")]
+    fn extra_rollback() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
 

@@ -28,7 +28,7 @@ use exonum::{
         rust::{RustRuntime, ServiceFactory, Transaction},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        StateHashAggregator, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -57,7 +57,8 @@ struct SampleRuntime {
 }
 
 // Define runtime specific errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
 #[execution_fail(kind = "runtime")]
 enum SampleRuntimeError {
     /// Incorrect information to call transaction.
@@ -187,10 +188,6 @@ impl Runtime for SampleRuntime {
                 Err(err)
             }
         }
-    }
-
-    fn state_hashes(&self, _snapshot: &dyn Snapshot) -> StateHashAggregator {
-        StateHashAggregator::default()
     }
 
     fn before_transactions(

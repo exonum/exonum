@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     helpers::Height,
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
             CallContext, DefaultInstance, Service,
         },
-        BlockchainData, ExecutionError, InstanceId,
+        ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{access::Access, MapIndex, Snapshot};
+use exonum_merkledb::{access::Access, MapIndex};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -40,7 +40,9 @@ pub const INIT_BALANCE: u64 = 0;
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Wallet")]
 pub struct Wallet {
     pub pub_key: PublicKey,
@@ -92,14 +94,18 @@ impl<T: Access> CurrencySchema<T> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 /// Create a new wallet.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxCreateWallet")]
 pub struct CreateWallet {
     pub name: String,
 }
 
 /// Transfer coins between the wallets.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTransfer")]
 pub struct Transfer {
     pub to: PublicKey,
@@ -211,10 +217,6 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder)
     }

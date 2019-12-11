@@ -17,10 +17,10 @@
 pub use crate::interface::Issue;
 
 use exonum::{
-    crypto::{Hash, PublicKey},
+    crypto::PublicKey,
     runtime::{
         rust::{CallContext, DefaultInstance, Service},
-        BlockchainData, CallInfo, ExecutionError, InstanceId, SnapshotExt,
+        CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
@@ -35,7 +35,9 @@ use crate::{
     schema::{Wallet, WalletSchema},
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct TxCreateWallet {
     pub name: String,
@@ -59,11 +61,7 @@ impl WalletService {
     }
 }
 
-impl Service for WalletService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for WalletService {}
 
 impl WalletInterface for WalletService {
     fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
@@ -111,7 +109,9 @@ impl DefaultInstance for WalletService {
 }
 
 #[protobuf_convert(source = "proto::Issue")]
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TxIssue {
     pub to: PublicKey,
     pub amount: u64,
@@ -131,11 +131,7 @@ impl DepositService {
     pub const ID: InstanceId = 25;
 }
 
-impl Service for DepositService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for DepositService {}
 
 impl DepositInterface for DepositService {
     fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
@@ -153,7 +149,9 @@ impl DefaultInstance for DepositService {
     const INSTANCE_NAME: &'static str = "deposit";
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::AnyCall")]
 pub struct TxAnyCall {
     pub call_info: CallInfo,
@@ -161,7 +159,9 @@ pub struct TxAnyCall {
     pub args: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::RecursiveCall")]
 pub struct TxRecursiveCall {
     pub depth: u64,
@@ -215,11 +215,7 @@ impl AnyCall for AnyCallService {
     }
 }
 
-impl Service for AnyCallService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for AnyCallService {}
 
 impl DefaultInstance for AnyCallService {
     const INSTANCE_ID: u32 = Self::ID;

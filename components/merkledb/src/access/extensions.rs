@@ -5,7 +5,7 @@ use crate::{
     proof_map_index::{Raw, ToProofPath},
     views::IndexType,
     BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
+    ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
 };
 
 /// Extension trait allowing for easy access to indices from any type implementing
@@ -45,8 +45,7 @@ pub trait AccessExt: Access {
         K: BinaryKey + ?Sized,
         I: FromAccess<Self>,
     {
-        // We know that `Group` implementation of `Restore` never fails
-        Group::from_access(self, IndexAddress::with_root(name))
+        Group::from_access(self, IndexAddress::from_root(name))
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
@@ -61,6 +60,19 @@ pub trait AccessExt: Access {
         V: BinaryValue,
     {
         Entry::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+    }
+
+    /// Gets a hashed entry index with the specified address.
+    ///
+    /// # Panics
+    ///
+    /// If the index exists, but is not a hashed entry.
+    fn get_proof_entry<I, V>(self, addr: I) -> ProofEntry<Self::Base, V>
+    where
+        I: Into<IndexAddress>,
+        V: BinaryValue + ObjectHash,
+    {
+        ProofEntry::from_access(self, addr.into()).unwrap()
     }
 
     /// Gets a list index with the specified address.

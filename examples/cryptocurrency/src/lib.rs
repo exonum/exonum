@@ -39,7 +39,7 @@ pub mod proto;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::crypto::{Hash, PublicKey};
+    use exonum::crypto::PublicKey;
     use exonum_merkledb::{access::Access, MapIndex};
     use exonum_proto::ProtobufConvert;
 
@@ -50,7 +50,9 @@ pub mod schema {
     //
     // [1]: https://exonum.com/doc/version/latest/architecture/serialization
     /// Wallet struct used to persist data within the service.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::Wallet")]
     pub struct Wallet {
         /// Public key of the wallet owner.
@@ -92,14 +94,6 @@ pub mod schema {
         /// Correspondence of public keys of users to account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
-
-    impl<T: Access> CurrencySchema<T> {
-        /// Returns the state hash of cryptocurrency service.
-        pub fn state_hash(&self) -> Vec<Hash> {
-            // Since wallets are stored in MapIndex, there is no state hash.
-            vec![]
-        }
-    }
 }
 
 /// Transactions.
@@ -110,7 +104,9 @@ pub mod transactions {
     use exonum_proto::ProtobufConvert;
 
     /// Service configuration parameters.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::Config")]
     pub struct Config;
 
@@ -118,7 +114,9 @@ pub mod transactions {
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TxCreateWallet")]
     pub struct CreateWallet {
         /// UTF-8 string with the owner's name.
@@ -130,7 +128,9 @@ pub mod transactions {
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
     #[protobuf_convert(source = "proto::TxTransfer")]
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     pub struct TxTransfer {
         /// Public key of the receiver.
         pub to: PublicKey,
@@ -173,14 +173,9 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum_merkledb::Snapshot;
-
-    use exonum::{
-        crypto::Hash,
-        runtime::{
-            rust::{api::ServiceApiBuilder, CallContext, Service},
-            BlockchainData, ExecutionError,
-        },
+    use exonum::runtime::{
+        rust::{api::ServiceApiBuilder, CallContext, Service},
+        ExecutionError,
     };
 
     use crate::{
@@ -266,10 +261,6 @@ pub mod contracts {
     }
 
     impl Service for CryptocurrencyService {
-        fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            CurrencySchema::new(data.for_executing_service()).state_hash()
-        }
-
         fn wire_api(&self, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi.wire(builder);
         }
