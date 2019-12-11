@@ -65,9 +65,9 @@ where
     }
 }
 
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
-)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxInc")]
 pub struct Inc {
     pub seed: u64,

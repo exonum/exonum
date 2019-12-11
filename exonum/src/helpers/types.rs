@@ -116,7 +116,8 @@ impl Height {
 }
 
 /// Consensus round index.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -254,7 +255,8 @@ impl BinaryValue for Round {
 impl_object_hash_for_binary_value! { Round }
 
 /// Validators identifier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub struct ValidatorId(pub u16);
 
 impl ValidatorId {

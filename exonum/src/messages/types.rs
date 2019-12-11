@@ -32,7 +32,8 @@ use exonum_proto::ProtobufConvert;
 /// Protobuf based container for any signed messages.
 ///
 /// See module [documentation](index.html#examples) for examples.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "consensus::SignedMessage")]
 pub struct SignedMessage {
     /// Payload of the message.
@@ -165,7 +166,8 @@ impl Status {
 /// A node broadcasts `Propose` if it is a leader and is not locked for a
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "consensus::Propose")]
 pub struct Propose {
     /// The validator id.
@@ -311,7 +313,9 @@ impl Prevote {
 /// ### Generation
 /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
 /// pre-votes and no unknown transactions.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert)]
 #[protobuf_convert(source = "consensus::Precommit")]
 pub struct Precommit {
     /// The validator id.
@@ -722,7 +726,8 @@ impl BlockResponse {
 
 /// This type describes all possible types of Exonum messages
 /// which are used in p2p communications.
-#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(
     source = "consensus::ExonumMessage",
     rename(case = "snake_case"),
