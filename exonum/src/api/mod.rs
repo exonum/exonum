@@ -140,23 +140,6 @@ pub trait ApiBackend: Sized {
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
-    /// to the incoming requests.
-    /// Response will include a "Location" header denoting a new location of the resource.
-    fn moved_permanently<Q, F>(
-        &mut self,
-        name: &'static str,
-        redirect_to: F,
-        mutability: EndpointMutability,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        F: Fn(Q) -> Result<String> + 'static + Send + Sync + Clone;
-
-    /// Creates an endpoint which will return "410 Gone" HTTP status code
-    /// to the incoming requests.
-    fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self;
-
     /// Add the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 
@@ -254,34 +237,6 @@ impl ApiScope {
     {
         self.actix_backend
             .deprecated_endpoint_mut(name, discontinued_on, endpoint);
-        self
-    }
-
-    /// Creates an endpoint which will return "301 Moved Permanently" HTTP status code
-    /// to the incoming requests.
-    /// Response will include a "Location" header denoting a new location of the resource.
-    ///
-    /// `redirect_to` parameter must be a function that takes a request query as a parameter,
-    /// and returns a result of either `String` with the new location or `api::Error`.
-    pub fn moved_permanently<Q, F>(
-        &mut self,
-        name: &'static str,
-        redirect_to: F,
-        mutability: EndpointMutability,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        F: Fn(Q) -> Result<String> + 'static + Send + Sync + Clone,
-    {
-        self.actix_backend
-            .moved_permanently(name, redirect_to, mutability);
-        self
-    }
-
-    /// Creates an endpoint which will return "410 Gone" HTTP status code
-    /// to the incoming requests.
-    pub fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self {
-        self.actix_backend.gone(name, mutability);
         self
     }
 

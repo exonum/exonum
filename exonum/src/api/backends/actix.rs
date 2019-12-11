@@ -95,40 +95,6 @@ impl ApiBackend for ApiBuilder {
     type Handler = RequestHandler;
     type Backend = actix_web::Scope<()>;
 
-    fn moved_permanently<Q, F>(
-        &mut self,
-        name: &'static str,
-        redirect_to: F,
-        mutability: EndpointMutability,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        F: Fn(Q) -> api::Result<String> + 'static + Send + Sync + Clone,
-    {
-        let handler = move |request: HttpRequest| -> FutureResponse {
-            let redirect_to = redirect_to.clone();
-            let new_location_future = extract_query(request, mutability)
-                .and_then(move |query| redirect_to(query).map_err(From::from))
-                .and_then(|new_location| Err(api::Error::MovedPermanently(new_location).into()))
-                .responder();
-
-            Box::new(new_location_future)
-        };
-
-        self.mount_raw_handler(name, handler, mutability)
-    }
-
-    fn gone(&mut self, name: &'static str, mutability: EndpointMutability) -> &mut Self {
-        let handler = move |_request: HttpRequest| -> FutureResponse {
-            let response = api::Error::Gone.into();
-            let response_future = Err(response).into_future();
-
-            Box::new(response_future)
-        };
-
-        self.mount_raw_handler(name, handler, mutability)
-    }
-
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
         self.handlers.push(handler);
         self
@@ -142,34 +108,6 @@ impl ApiBackend for ApiBuilder {
             });
         }
         output
-    }
-}
-
-impl ApiBuilder {
-    /// Mounts a given handler to the endpoint, either mutable or immutable.
-    fn mount_raw_handler<F>(
-        &mut self,
-        name: &'static str,
-        handler: F,
-        mutability: EndpointMutability,
-    ) -> &mut Self
-    where
-        F: Fn(HttpRequest) -> FutureResponse + Send + Sync + 'static,
-    {
-        use actix_web::http;
-
-        let method = match mutability {
-            EndpointMutability::Mutable => http::Method::POST,
-            EndpointMutability::Immutable => http::Method::GET,
-        };
-
-        self.raw_handler(RequestHandler {
-            name: name.to_owned(),
-            method,
-            inner: Arc::from(handler),
-        });
-
-        self
     }
 }
 

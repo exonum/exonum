@@ -19,7 +19,7 @@ use chrono::{TimeZone, Utc};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
-    api::{self, EndpointMutability},
+    api,
     runtime::{
         rust::{
             api::{ServiceApiBuilder, ServiceApiState},
@@ -54,6 +54,15 @@ impl Api {
         Ok(ping.value)
     }
 
+    /// Returns `Gone` error.
+    fn gone(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
+        Err(api::Error::Gone)
+    }
+
+    // fn moved_permanently(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
+
+    // }
+
     fn wire(builder: &mut ServiceApiBuilder) {
         let public_scope = builder.public_scope();
 
@@ -72,30 +81,30 @@ impl Api {
 
         // Gone endpoints.
         public_scope
-            .gone("gone-mutable", EndpointMutability::Mutable)
-            .gone("gone-immutable", EndpointMutability::Immutable);
+            .endpoint_mut("gone-mutable", Self::gone)
+            .endpoint("gone-immutable", Self::gone);
 
-        // Moved endpoints.
+        // // Moved endpoints.
         let url_base = public_scope.url_base();
         let moved_mutable_new_location = format!("{}/{}", &url_base, "ping-pong-deprecated-mut");
         let moved_immutable_new_location = format!("{}/{}", &url_base, "ping-pong");
         public_scope
-            .moved_permanently(
+            .endpoint_mut(
                 "moved-mutable",
-                move |_query: PingQuery| Ok(moved_mutable_new_location.clone()),
-                EndpointMutability::Mutable,
+                move |_state: &ServiceApiState<'_>, _query: PingQuery| -> api::Result<u64> {
+                    Err(api::Error::MovedPermanently(
+                        moved_mutable_new_location.clone(),
+                    ))
+                },
             )
-            .moved_permanently(
+            .endpoint(
                 "moved-immutable",
-                move |query: PingQuery| {
+                move |_state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
                     let query =
                         serde_urlencoded::to_string(query).expect("Unable to serialize query.");
-
                     let new_location = format!("{}?{}", moved_immutable_new_location, query);
-
-                    Ok(new_location)
+                    Err(api::Error::MovedPermanently(new_location))
                 },
-                EndpointMutability::Immutable,
             );
     }
 }
