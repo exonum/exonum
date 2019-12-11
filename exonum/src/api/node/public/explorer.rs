@@ -172,10 +172,25 @@ impl AsRef<[u8]> for TransactionHex {
     }
 }
 
+/// Status of a call.
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct CallInfo {
+    /// Block header as recorded in the blockchain.
+    #[serde(flatten)]
+    pub status: Block,
+
+    /// Precommits authorizing the block.
+    pub proff: Option<Vec<Verified<Precommit>>>,
+}
+
+/// The kind of requested call
 #[derive(Debug, Clone, Copy, Eq, Serialize, Deserialize, PartialEq, Hash)]
 pub enum CallKind{
+    /// Call kind of transaction
     Transaction,
+    /// Call kind of `before_transactions` hook
     BeforeTransactions,
+    /// Call kind of `after_transactions` hook
     AfterTransactions,
 }
 
@@ -184,7 +199,8 @@ pub enum CallKind{
 pub struct CallStatusQuery {
     /// The hash of the transaction to be searched.
     pub hash: Hash,
-    pub call_type: Option<CallKind>,
+    /// If omitted, then returned bunch will contain statuses for all call kinds
+    pub call_kind: Option<CallKind>,
 }
 
 /// Exonum blockchain explorer API.
@@ -292,6 +308,7 @@ impl ExplorerApi {
             })
     }
 
+    /// Return call status of committed transaction.
     pub fn call_status(snapshot: &dyn Snapshot,
                        query: CallStatusQuery,)
             -> Result<HashMap<CallKind, Option<Result<(), ExecutionError>>>, ApiError> {
@@ -379,7 +396,7 @@ impl ExplorerApi {
         };
 
         let mut call_statuses = HashMap::new();
-        if let Some(call_type) = query.call_type {
+        if let Some(call_type) = query.call_kind {
             let status = match call_type {
                 CallKind::BeforeTransactions => {
                     before_tx_status()
