@@ -40,10 +40,6 @@ pub struct TestRuntimeApiService;
 
 /// Implement a `Service` trait for the service.
 impl Service for TestRuntimeApiService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
 }
 

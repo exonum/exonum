@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate assert_matches;
+use assert_matches::assert_matches;
 
 use exonum::{
     api::Error as ApiError,
@@ -37,18 +36,18 @@ pub fn testkit_with_rust_service() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-// Rust-runtime's api returns correct source files of Exonum
+// Rust-runtime api returns correct source files of Exonum
 #[test]
 fn test_exonum_protos_with_service() {
     let (_, api) = testkit_with_rust_service();
 
-    let response = api
+    let response: HashSet<String> = api
         .public(exonum_testkit::ApiKind::RustRuntime)
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect("Rust runtime Api unexpectedly failed")
-        .iter()
-        .map(|proto_source| proto_source.name.clone())
-        .collect::<HashSet<String>>();
+        .into_iter()
+        .map(|proto_source| proto_source.name)
+        .collect();
 
     let expected_files: HashSet<String> = vec![
         "blockchain.proto",
@@ -73,14 +72,14 @@ fn test_exonum_protos_with_service() {
 fn test_exonum_protos_without_service() {
     let mut testkit = TestKitBuilder::validator().with_validators(1).create();
 
-    let response = testkit
+    let response: HashSet<String> = testkit
         .api()
         .public(exonum_testkit::ApiKind::RustRuntime)
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect("Rust runtime Api unexpectedly failed")
-        .iter()
+        .into_iter()
         .map(|proto_source| proto_source.name.clone())
-        .collect::<HashSet<String>>();
+        .collect();
 
     let expected_files: HashSet<String> = vec![
         "blockchain.proto",
@@ -98,7 +97,7 @@ fn test_exonum_protos_without_service() {
     assert_eq!(response, expected_files);
 }
 
-// Rust-runtime's api returns correct source files of the specified artifact
+// Rust-runtime api returns correct source files of the specified artifact
 #[test]
 fn test_service_protos_with_service() {
     let (_, api) = testkit_with_rust_service();
@@ -120,7 +119,7 @@ fn test_service_protos_with_service() {
     assert_eq!(proto_files[0].content, EXPECTED_CONTENT.to_string());
 }
 
-// Rust-runtime's api should return error in case incorrect artifact
+// Rust-runtime api should return error in case incorrect artifact
 #[test]
 fn test_service_protos_with_incorrect_service() {
     let (_, api) = testkit_with_rust_service();
