@@ -553,6 +553,15 @@ impl<'a> BlockchainExplorer<'a> {
         Some(TransactionInfo::Committed(tx))
     }
 
+    pub fn call_status(&self, tx_hash: &Hash, block_height: Height, call_location: &CallInBlock)
+            -> Option<Result<(), ExecutionError>> {
+        let call_result = match self.schema.call_errors(block_height).get(&call_location) {
+            None => Ok(()),
+            Some(e) => Err(e),
+        };
+        Some(call_result)
+    }
+
     /// Return transaction message without proof.
     pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<Verified<AnyTx>> {
         self.schema.transactions().get(tx_hash)
@@ -661,6 +670,7 @@ impl<'a> BlockchainExplorer<'a> {
             back: max(ptr, end_height(heights.end_bound(), max_height)),
         }
     }
+
 }
 
 /// Iterator over blocks in the blockchain.

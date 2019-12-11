@@ -17,7 +17,7 @@
 use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_merkledb::{ObjectHash, Snapshot, MapProof};
 use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
 
@@ -35,7 +35,7 @@ use crate::{
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         ApiBackend, ApiScope, Error as ApiError, FutureResult,
     },
-    blockchain::{Block, Blockchain},
+    blockchain::{Block, Blockchain, CallInBlock, ExecutionError},
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
@@ -43,6 +43,7 @@ use crate::{
     node::{ApiSender, ExternalMessage},
     runtime::CallInfo,
 };
+use std::collections::HashMap;
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -171,6 +172,21 @@ impl AsRef<[u8]> for TransactionHex {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, Serialize, Deserialize, PartialEq, Hash)]
+pub enum CallKind{
+    Transaction,
+    BeforeTransactions,
+    AfterTransactions,
+}
+
+/// Call status query parameters.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct CallStatusQuery {
+    /// The hash of the transaction to be searched.
+    pub hash: Hash,
+    pub call_type: Option<CallKind>,
+}
+
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
 pub struct ExplorerApi {
@@ -274,6 +290,120 @@ impl ExplorerApi {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
                 ApiError::NotFound(description)
             })
+    }
+
+    pub fn call_status(snapshot: &dyn Snapshot,
+                       query: CallStatusQuery,)
+            -> Result<HashMap<CallKind, Option<Result<(), ExecutionError>>>, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+
+        let tx_info = explorer
+            .transaction(&query.hash)
+            .ok_or_else(|| {
+                let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
+                ApiError::NotFound(description)
+            })?;
+        let tx_info = match tx_info {
+            TransactionInfo::Committed(info) => Ok(info),
+            TransactionInfo::InPool {..} => {
+                let description = serde_json::to_string(&json!({ "type": "not committed" })).unwrap();
+                Err(ApiError::NotFound(description))
+            }
+        }?;
+
+        let block_height = tx_info.location().block_height();
+        /*let block_info = explorer.block(block_height).ok_or_else(|| {
+            ApiError::NotFound(format!(
+                "Requested block height ({}) exceeds the blockchain height ({})",
+                tx_info.location().block_height(),
+                explorer.height()
+            ))
+        })?;
+        */
+
+        /*
+        let mut calls_in_block = vec![];
+        match query.call_type {
+            Some(CallKind::BeforeTransactions) => {
+                let before_tx_call: CallInBlock = CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
+                calls_in_block.push(before_tx_call);
+            },
+            Some(CallKind::Transaction) => {
+                let tx_call: CallInBlock = CallInBlock::transaction(tx_info.location().position_in_block());
+                calls_in_block.push(tx_call);
+            },
+            Some(CallKind::AfterTransactions) => {
+                let after_tx_call: CallInBlock = CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
+                calls_in_block.push(after_tx_call);
+            },
+            None => {
+                let before_tx_call: CallInBlock = CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
+                calls_in_block.push(before_tx_call);
+                let tx_call: CallInBlock = CallInBlock::transaction(tx_info.location().position_in_block());
+                calls_in_block.push(tx_call);
+                let after_tx_call: CallInBlock = CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
+                calls_in_block.push(after_tx_call);
+            }
+        }
+
+        let map = calls_in_block.iter().map(|call| {
+            block_info.error_proof(*call)
+        }).collect::<ProofMap>();
+        */
+
+
+        //let fill_call_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>, call_in_block| {
+        //    let status = explorer.call_status(&query.hash, block_height, &call_in_block);
+        //    statuses.insert(call_in_block, status);
+        //};
+
+        //let before_tx_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>| {
+        let before_tx_status = || {
+            let before_tx_call: CallInBlock = CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
+            explorer.call_status(&query.hash, block_height, &before_tx_call)
+            //fill_call_status(statuses, before_tx_call);
+        };
+
+        //let tx_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>| {
+        let tx_status = || {
+            let tx_call: CallInBlock = CallInBlock::transaction(tx_info.location().position_in_block());
+            explorer.call_status(&query.hash, block_height, &tx_call)
+            //fill_call_status(statuses, tx_call);
+        };
+
+        //let after_tx_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>| {
+        let after_tx_status = || {
+            let after_tx_call: CallInBlock = CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
+            explorer.call_status(&query.hash, block_height, &after_tx_call)
+            //fill_call_status(statuses, after_tx_call);
+        };
+
+        let mut call_statuses = HashMap::new();
+        if let Some(call_type) = query.call_type {
+            let status = match call_type {
+                CallKind::BeforeTransactions => {
+                    before_tx_status()
+                },
+                CallKind::Transaction => {
+                    tx_status()
+                },
+                CallKind::AfterTransactions => {
+                    after_tx_status()
+                }
+            };
+            call_statuses.insert(call_type, status);
+        } else {
+            let status = before_tx_status();
+            call_statuses.insert(CallKind::BeforeTransactions, status);
+
+            let status = tx_status();
+            call_statuses.insert(CallKind::Transaction, status);
+
+            let status = after_tx_status();
+            call_statuses.insert(CallKind::AfterTransactions, status);
+        }
+
+        Ok(call_statuses)
     }
 
     /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
@@ -396,6 +526,10 @@ impl ExplorerApi {
             .endpoint("v1/block", {
                 let blockchain = self.blockchain.clone();
                 move |query| Self::block(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/call_status", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::call_status(blockchain.snapshot().as_ref(), query)
             })
             .endpoint("v1/transactions", {
                 let blockchain = self.blockchain.clone();
