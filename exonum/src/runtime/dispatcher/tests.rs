@@ -18,7 +18,7 @@ use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, 
 use futures::{future, sync::mpsc, Future, IntoFuture};
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     mem, panic,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -144,8 +144,9 @@ struct SampleRuntime {
     runtime_type: u32,
     instance_id: InstanceId,
     method_id: MethodId,
-    services: HashMap<InstanceId, InstanceStatus>,
-    new_services: Vec<(InstanceId, InstanceStatus)>,
+    services: BTreeMap<InstanceId, InstanceStatus>,
+    // Make services order predictable.
+    new_services: BTreeMap<InstanceId, InstanceStatus>,
     new_service_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
 }
 
@@ -160,8 +161,8 @@ impl SampleRuntime {
             runtime_type,
             instance_id,
             method_id,
-            services: HashMap::new(),
-            new_services: vec![],
+            services: BTreeMap::new(),
+            new_services: BTreeMap::new(),
             new_service_sender: api_changes_sender,
         }
     }
@@ -176,9 +177,9 @@ impl From<SampleRuntime> for Arc<dyn Runtime> {
 impl Runtime for SampleRuntime {
     fn on_resume(&mut self) {
         if !self.new_services.is_empty() {
-            let changes = mem::replace(&mut self.new_services, vec![]);
+            let changes = mem::replace(&mut self.new_services, BTreeMap::new());
             self.new_service_sender
-                .send((self.runtime_type, changes))
+                .send((self.runtime_type, changes.into_iter().collect()))
                 .unwrap();
         }
     }
@@ -224,7 +225,7 @@ impl Runtime for SampleRuntime {
 
             if status_changed {
                 self.services.insert(spec.id, new_status);
-                self.new_services.push((spec.id, new_status));
+                self.new_services.insert(spec.id, new_status);
             }
             Ok(())
         } else {

@@ -37,7 +37,7 @@ pub enum Error {
     ServiceNameExists = 4,
     /// Specified service identifier is already used.
     ServiceIdExists = 5,
-    /// Specified service is not started.
+    /// Specified service is not active.
     ServiceNotStarted = 6,
     /// Suitable runtime for the given service instance ID is not found.
     IncorrectInstanceId = 7,

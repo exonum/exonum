@@ -20,7 +20,10 @@ use futures::{
     Future,
 };
 
-use std::{collections::HashMap, fmt, panic};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt, panic,
+};
 
 use crate::{
     blockchain::{Blockchain, CallInBlock, Schema as CoreSchema},
@@ -104,7 +107,7 @@ impl CommittedServices {
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
-    runtimes: HashMap<u32, Box<dyn Runtime>>,
+    runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: CommittedServices,
 }
 
@@ -241,11 +244,15 @@ impl Dispatcher {
         // Currently the only check is that destination service exists, but later
         // functionality of this method can be extended.
         let call_info = &tx.as_ref().call_info;
-        Schema::new(snapshot)
+        let instance = Schema::new(snapshot)
             .get_instance(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
 
-        Ok(())
+        if instance.is_active() {
+            Ok(())
+        } else {
+            Err(Error::ServiceNotStarted.into())
+        }
     }
 
     fn report_error(err: &ExecutionError, fork: &Fork, call: CallInBlock) {

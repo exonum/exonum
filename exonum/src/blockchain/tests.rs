@@ -823,8 +823,9 @@ fn test_check_tx() {
     )
     .unwrap();
     // Check that previously correct transaction become incorrect.
+    let snapshot = blockchain.snapshot();
     assert_eq!(
         Blockchain::check_tx(&snapshot, &correct_tx).unwrap_err(),
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+        ErrorMatch::from_fail(&DispatcherError::ServiceNotStarted)
     );
 }
