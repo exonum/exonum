@@ -16,6 +16,7 @@
 
 pub use crate::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
 
+use chrono::{DateTime, Utc};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -166,7 +167,7 @@ impl ServiceApiScope {
     pub fn deprecated_endpoint<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        deprecates_on: Option<chrono::Date<chrono::Utc>>,
+        deprecates_on: Option<DateTime<Utc>>,
         handler: F,
     ) -> &mut Self
     where
@@ -202,7 +203,7 @@ impl ServiceApiScope {
     pub fn deprecated_endpoint_mut<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        deprecates_on: Option<chrono::Date<chrono::Utc>>,
+        deprecates_on: Option<DateTime<Utc>>,
         handler: F,
     ) -> &mut Self
     where
@@ -227,7 +228,7 @@ impl ServiceApiScope {
         // Mark endpoint as deprecated.
         let mut handler = Deprecated::from(handler);
         if let Some(deprecates_on) = deprecates_on {
-            handler = handler.with_date(deprecates_on)
+            handler = handler.with_date(deprecates_on);
         };
         self.inner.endpoint_mut(name, handler);
         self

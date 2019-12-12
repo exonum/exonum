@@ -153,9 +153,10 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
         // but currently it's only a draft. So the conventional way to notify API user
         // about endpoint deprecation is setting the `Warning` header.
         let expiration_note = match discontinued_on {
+            // Date is formatted according to HTTP-date format.
             Some(date) => format!(
                 "The old API is maintained until {}.",
-                date.format("%Y-%m-%d")
+                date.format("%a, %d %b %Y %T GMT")
             ),
             None => "Currently there is no specific date for disabling this endpoint.".into(),
         };
@@ -183,10 +184,7 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
 /// <warn-date> is not required.
 /// For details you can see RFC 7234, section 5.5: Warning.
 fn create_warning_header(warning_text: &str) -> String {
-    const WARNING_NUMBER: u16 = 299;
-    const WARNING_AGENT: &str = "-";
-
-    format!("{} {} \"{}\"", WARNING_NUMBER, WARNING_AGENT, warning_text)
+    format!("299 - \"{}\"", warning_text)
 }
 
 impl From<EndpointMutability> for actix_web::http::Method {
@@ -566,13 +564,14 @@ mod tests {
                 .json(123),
         );
 
-        let deadline = chrono::Utc.ymd(2020, 12, 31);
+        let deadline = chrono::Utc.ymd(2020, 12, 31).and_hms(23, 59, 59);
 
         let deprecated_response_deadline =
             json_response(Actuality::Deprecated(Some(deadline)), 123);
-        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
-                                     see the documentation to find an alternative. \
-                                     The old API is maintained until 2020-12-31.";
+        let expected_warning_text =
+            "Deprecated API: This endpoint is deprecated, \
+             see the documentation to find an alternative. \
+             The old API is maintained until Thu, 31 Dec 2020 23:59:59 GMT.";
         let expected_warning = create_warning_header(expected_warning_text);
         assert_responses_eq(
             deprecated_response_deadline,

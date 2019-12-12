@@ -70,7 +70,7 @@ impl Api {
             .deprecated_endpoint("ping-pong-deprecated", None, Self::ping_pong)
             .deprecated_endpoint(
                 "ping-pong-deprecated-with-deadline",
-                Some(Utc.ymd(2055, 12, 31)),
+                Some(Utc.ymd(2055, 12, 31).and_hms(23, 59, 59)),
                 Self::ping_pong,
             )
             .deprecated_endpoint_mut("ping-pong-deprecated-mut", None, Self::ping_pong);

@@ -56,9 +56,10 @@ fn deprecated() {
          see the documentation to find an alternative. \
          Currently there is no specific date for disabling this endpoint.\"";
 
-    const WARNING_WITH_DEADLINE: &str = "299 - \"Deprecated API: This endpoint is deprecated, \
-                                         see the documentation to find an alternative. \
-                                         The old API is maintained until 2055-12-31.\"";
+    const WARNING_WITH_DEADLINE: &str =
+        "299 - \"Deprecated API: This endpoint is deprecated, \
+         see the documentation to find an alternative. \
+         The old API is maintained until Fri, 31 Dec 2055 23:59:59 GMT.\"";
 
     let pong: u64 = api
         .public(ApiKind::Service("api-service"))

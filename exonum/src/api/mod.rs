@@ -57,7 +57,7 @@ pub trait ApiBackend: Sized {
     type Backend;
 
     /// Adds the given endpoint handler to the backend.
-    fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    fn endpoint<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
@@ -70,7 +70,7 @@ pub trait ApiBackend: Sized {
     }
 
     /// Adds the given mutable endpoint handler to the backend.
-    fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
@@ -113,7 +113,7 @@ impl ApiScope {
     /// - Query parameters should be decodable via `serde_urlencoded`, i.e. from the
     ///   "first_param=value1&second_param=value2" form.
     /// - Response items should be encodable via `serde_json` crate.
-    pub fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    pub fn endpoint<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
@@ -132,7 +132,7 @@ impl ApiScope {
     ///
     /// - Query parameters should be decodable via `serde_json`.
     /// - Response items also should be encodable via `serde_json` crate.
-    pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,

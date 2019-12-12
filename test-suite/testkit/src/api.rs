@@ -298,7 +298,11 @@ where
                 );
             });
 
-            assert_eq!(header_value, expected_value);
+            assert_eq!(
+                header_value, expected_value,
+                "Unexpected value of response header {}",
+                header
+            );
         }
     }
 
