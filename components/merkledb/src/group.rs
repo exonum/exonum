@@ -1,11 +1,15 @@
 use std::marker::PhantomData;
 
-use crate::{access::{Access, AccessError, FromAccess}, views::IndexAddress, BinaryKey, IndexType, BinaryValue, ResolvedAddress};
-use crate::views::{View, ViewWithMetadata, RawAccess, IndexMetadata};
-use std::{fmt, num::NonZeroU64, borrow::Cow};
+use crate::views::{IndexMetadata, RawAccess, View, ViewWithMetadata};
+use crate::{
+    access::{Access, AccessError, FromAccess},
+    views::IndexAddress,
+    BinaryKey, BinaryValue, IndexType, ResolvedAddress,
+};
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::borrow::Borrow;
 use failure::Fail;
+use std::borrow::Borrow;
+use std::{borrow::Cow, fmt, num::NonZeroU64};
 
 // cspell:ignore foob
 
@@ -108,13 +112,12 @@ where
 }
 
 impl<T, K, I> Group<T, K, I>
-    where
-        T: RawAccess,
-        K: BinaryKey + Clone + fmt::Debug,
-        I: FromAccess<T>,
-        <K as std::borrow::ToOwned>::Owned: fmt::Debug,
+where
+    T: RawAccess,
+    K: BinaryKey + Clone,
+    I: FromAccess<T>,
 {
-    pub fn iter<V:BinaryValue + fmt::Debug>(&self) -> GroupIter<K, T, I> {
+    pub fn iter<V: BinaryValue>(&self) -> GroupIter<K, T, I> {
         // We need to get all the keys.
         const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
@@ -123,18 +126,19 @@ impl<T, K, I> Group<T, K, I>
             ResolvedAddress::system(INDEXES_POOL_NAME),
         );
 
-        let index_address = IndexAddress::from(self.prefix.clone());
-        let prefix = index_address.fully_qualified_name();
+        let prefix = IndexAddress::from(self.prefix.clone());
+        let prefix = prefix.fully_qualified_name();
 
         let mut keys = Vec::new();
 
         for entry in view.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
-            let metadata: Result<IndexMetadata<Vec<u8>>, failure::Error> = IndexMetadata::from_bytes(Cow::Owned(entry.1));
+            let metadata: Result<IndexMetadata<Vec<u8>>, failure::Error> =
+                IndexMetadata::from_bytes(Cow::Owned(entry.1));
             let key = entry.0[6..].to_vec();
             let key = K::read(&key);
             let key = key.borrow().clone();
             keys.push(key);
-        };
+        }
 
         GroupIter::new(self.prefix.clone(), keys, self.access.clone())
     }
@@ -147,12 +151,12 @@ pub struct GroupIter<K, T, I> {
     _index: PhantomData<I>,
 }
 
-impl <K, T, I> GroupIter<K, T, I>
-    where
-        T: Access,
-        K: BinaryKey,
-        I: FromAccess<T>, {
-
+impl<K, T, I> GroupIter<K, T, I>
+where
+    T: Access,
+    K: BinaryKey,
+    I: FromAccess<T>,
+{
     fn new(base: IndexAddress, keys: Vec<K>, access: T) -> Self {
         Self {
             base,
@@ -163,7 +167,8 @@ impl <K, T, I> GroupIter<K, T, I>
     }
 }
 
-impl <K, T, I> Iterator for GroupIter<K, T, I> where
+impl<K, T, I> Iterator for GroupIter<K, T, I>
+where
     T: Access,
     K: BinaryKey,
     I: FromAccess<T>,
@@ -240,10 +245,13 @@ mod tests {
         let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group("group");
         let indexes = group.iter::<String>();
 
-        let mut results = indexes.map(|index| {
-            index.get(0).unwrap()
-        }).collect::<Vec<_>>();
+        let mut results = indexes
+            .map(|index| index.get(0).unwrap())
+            .collect::<Vec<_>>();
 
-        assert_eq!(results, vec!["foo".to_owned(), "bar".to_owned(), "baz".to_owned()])
+        assert_eq!(
+            results,
+            vec!["foo".to_owned(), "bar".to_owned(), "baz".to_owned()]
+        )
     }
 }

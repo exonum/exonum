@@ -41,10 +41,13 @@ impl TemporaryDB {
     }
 
     pub fn from_dir(dir: String) -> Self {
-//        let dir = TempDir::new_in(dir).unwrap();
+        //        let dir = TempDir::new_in(dir).unwrap();
         let options = DbOptions::default();
         let inner = RocksDB::open(&dir, &options).unwrap();
-        Self { _dir: TempDir::new().unwrap(), inner }
+        Self {
+            _dir: TempDir::new().unwrap(),
+            inner,
+        }
     }
 }
 
