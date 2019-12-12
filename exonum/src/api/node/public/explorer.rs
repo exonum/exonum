@@ -17,7 +17,7 @@
 use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ObjectHash, Snapshot, MapProof};
+use exonum_merkledb::{MapProof, ObjectHash, Snapshot};
 use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
 
@@ -173,19 +173,19 @@ impl AsRef<[u8]> for TransactionHex {
 }
 
 /// Status of a call.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct CallInfo {
-    /// Block header as recorded in the blockchain.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CallStatusInfo {
+    /// Call status
     #[serde(flatten)]
-    pub status: Block,
+    pub status: Result<(), ExecutionError>,
 
-    /// Precommits authorizing the block.
-    pub proff: Option<Vec<Verified<Precommit>>>,
+    /// Call execution proff
+    pub call_proof: MapProof<CallInBlock, ExecutionError>,
 }
 
 /// The kind of requested call
 #[derive(Debug, Clone, Copy, Eq, Serialize, Deserialize, PartialEq, Hash)]
-pub enum CallKind{
+pub enum CallKind {
     /// Call kind of transaction
     Transaction,
     /// Call kind of `before_transactions` hook
@@ -309,115 +309,66 @@ impl ExplorerApi {
     }
 
     /// Return call status of committed transaction.
-    pub fn call_status(snapshot: &dyn Snapshot,
-                       query: CallStatusQuery,)
-            -> Result<HashMap<CallKind, Option<Result<(), ExecutionError>>>, ApiError> {
+    pub fn call_status(
+        snapshot: &dyn Snapshot,
+        query: CallStatusQuery,
+    ) -> Result<HashMap<CallKind, CallStatusInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
 
-        let tx_info = explorer
-            .transaction(&query.hash)
-            .ok_or_else(|| {
-                let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
-                ApiError::NotFound(description)
-            })?;
+        let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
+            let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
+            ApiError::NotFound(description)
+        })?;
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => Ok(info),
-            TransactionInfo::InPool {..} => {
-                let description = serde_json::to_string(&json!({ "type": "not committed" })).unwrap();
+            TransactionInfo::InPool { .. } => {
+                let description =
+                    serde_json::to_string(&json!({ "type": "not committed" })).unwrap();
                 Err(ApiError::NotFound(description))
             }
         }?;
 
         let block_height = tx_info.location().block_height();
-        /*let block_info = explorer.block(block_height).ok_or_else(|| {
+        let block_info = explorer.block(block_height).ok_or_else(|| {
             ApiError::NotFound(format!(
                 "Requested block height ({}) exceeds the blockchain height ({})",
                 tx_info.location().block_height(),
                 explorer.height()
             ))
         })?;
-        */
-
-        /*
-        let mut calls_in_block = vec![];
-        match query.call_type {
-            Some(CallKind::BeforeTransactions) => {
-                let before_tx_call: CallInBlock = CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
-                calls_in_block.push(before_tx_call);
-            },
-            Some(CallKind::Transaction) => {
-                let tx_call: CallInBlock = CallInBlock::transaction(tx_info.location().position_in_block());
-                calls_in_block.push(tx_call);
-            },
-            Some(CallKind::AfterTransactions) => {
-                let after_tx_call: CallInBlock = CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
-                calls_in_block.push(after_tx_call);
-            },
-            None => {
-                let before_tx_call: CallInBlock = CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
-                calls_in_block.push(before_tx_call);
-                let tx_call: CallInBlock = CallInBlock::transaction(tx_info.location().position_in_block());
-                calls_in_block.push(tx_call);
-                let after_tx_call: CallInBlock = CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
-                calls_in_block.push(after_tx_call);
-            }
-        }
-
-        let map = calls_in_block.iter().map(|call| {
-            block_info.error_proof(*call)
-        }).collect::<ProofMap>();
-        */
-
-
-        //let fill_call_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>, call_in_block| {
-        //    let status = explorer.call_status(&query.hash, block_height, &call_in_block);
-        //    statuses.insert(call_in_block, status);
-        //};
-
-        //let before_tx_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>| {
-        let before_tx_status = || {
-            let before_tx_call: CallInBlock = CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
-            explorer.call_status(&query.hash, block_height, &before_tx_call)
-            //fill_call_status(statuses, before_tx_call);
-        };
-
-        //let tx_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>| {
-        let tx_status = || {
-            let tx_call: CallInBlock = CallInBlock::transaction(tx_info.location().position_in_block());
-            explorer.call_status(&query.hash, block_height, &tx_call)
-            //fill_call_status(statuses, tx_call);
-        };
-
-        //let after_tx_status = |statuses: &mut HashMap<CallInBlock, Option<Result<(), ExecutionError>>>| {
-        let after_tx_status = || {
-            let after_tx_call: CallInBlock = CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
-            explorer.call_status(&query.hash, block_height, &after_tx_call)
-            //fill_call_status(statuses, after_tx_call);
-        };
 
         let mut call_statuses = HashMap::new();
+        let mut fill_call_status = |call_in_block, call_type| {
+            let status = explorer.call_status(block_height, &call_in_block);
+            let call_proof = block_info.error_proof(call_in_block);
+
+            call_statuses.insert(call_type, CallStatusInfo { status, call_proof });
+        };
         if let Some(call_type) = query.call_kind {
-            let status = match call_type {
-                CallKind::BeforeTransactions => {
-                    before_tx_status()
-                },
+            let call_in_block = match call_type {
+                CallKind::BeforeTransactions => CallInBlock::before_transactions(
+                    tx_info.content().payload().call_info.instance_id,
+                ),
                 CallKind::Transaction => {
-                    tx_status()
-                },
-                CallKind::AfterTransactions => {
-                    after_tx_status()
+                    CallInBlock::transaction(tx_info.location().position_in_block())
                 }
+                CallKind::AfterTransactions => CallInBlock::after_transactions(
+                    tx_info.content().payload().call_info.instance_id,
+                ),
             };
-            call_statuses.insert(call_type, status);
+            fill_call_status(call_in_block, call_type);
         } else {
-            let status = before_tx_status();
-            call_statuses.insert(CallKind::BeforeTransactions, status);
+            let call_in_block: CallInBlock =
+                CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
+            fill_call_status(call_in_block, CallKind::BeforeTransactions);
 
-            let status = tx_status();
-            call_statuses.insert(CallKind::Transaction, status);
+            let call_in_block: CallInBlock =
+                CallInBlock::transaction(tx_info.location().position_in_block());
+            fill_call_status(call_in_block, CallKind::Transaction);
 
-            let status = after_tx_status();
-            call_statuses.insert(CallKind::AfterTransactions, status);
+            let call_in_block: CallInBlock =
+                CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
+            fill_call_status(call_in_block, CallKind::AfterTransactions);
         }
 
         Ok(call_statuses)
