@@ -30,5 +30,15 @@ do
   sleep 1
 done
 
-cd ../../frontend
-npm start -- --port=$((start_public_port + 2 * node_count)) --api-root=http://127.0.0.1:${start_public_port}
+echo "Deploying of cryptocurrency-advanced service is in progress..."
+sleep 7
+python3 -m exonum_launcher -i ../../cryptocurrency_advanced.yaml
+
+# TODO ECR-3882; temporary loop until frontend is disabled
+while true; do
+    sleep 300
+done
+
+# TODO ECR-3882; skip frontend part until JS light client is fixed
+#cd ../../frontend
+#npm start -- --port=$((start_public_port + 2 * node_count)) --api-root=http://127.0.0.1:${start_public_port}
