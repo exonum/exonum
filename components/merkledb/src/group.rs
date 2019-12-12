@@ -110,15 +110,13 @@ where
 impl<T, K, I> Group<T, K, I>
     where
         T: RawAccess,
-        K: BinaryKey + fmt::Debug,
+        K: BinaryKey + Clone + fmt::Debug,
         I: FromAccess<T>,
         <K as std::borrow::ToOwned>::Owned: fmt::Debug,
 {
-    pub fn iter<V:BinaryValue + fmt::Debug>(&self) -> I {
+    pub fn iter<V:BinaryValue + fmt::Debug>(&self) -> GroupIter<K, T, I> {
         // We need to get all the keys.
         const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
-
-        println!("iter from prefix {:?}", self.prefix);
 
         let view = View::new(
             self.access.clone(),
@@ -126,20 +124,63 @@ impl<T, K, I> Group<T, K, I>
         );
 
         let index_address = IndexAddress::from(self.prefix.clone());
-
         let prefix = index_address.fully_qualified_name();
 
-        let mut ids = Vec::new();
+        let mut keys = Vec::new();
 
         for entry in view.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
             let metadata: Result<IndexMetadata<Vec<u8>>, failure::Error> = IndexMetadata::from_bytes(Cow::Owned(entry.1));
             let key = entry.0[6..].to_vec();
-            dbg!(&key);
-            ids.push(key)
+            let key = K::read(&key);
+            let key = key.borrow().clone();
+            keys.push(key);
+        };
+
+        GroupIter::new(self.prefix.clone(), keys, self.access.clone())
+    }
+}
+
+pub struct GroupIter<K, T, I> {
+    base: IndexAddress,
+    keys: Vec<K>,
+    access: T,
+    _index: PhantomData<I>,
+}
+
+impl <K, T, I> GroupIter<K, T, I>
+    where
+        T: Access,
+        K: BinaryKey,
+        I: FromAccess<T>, {
+
+    fn new(base: IndexAddress, keys: Vec<K>, access: T) -> Self {
+        Self {
+            base,
+            keys,
+            access,
+            _index: PhantomData,
+        }
+    }
+}
+
+impl <K, T, I> Iterator for GroupIter<K, T, I> where
+    T: Access,
+    K: BinaryKey,
+    I: FromAccess<T>,
+{
+    type Item = I;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.keys.is_empty() {
+            return None;
         }
 
-        let key = K::read(&ids[0]);
-        self.get(key.borrow())
+        let key = self.keys.remove(0);
+        let addr = self.base.clone().append_key(&key);
+        let index = I::from_access(self.access.clone(), addr)
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e));
+
+        Some(index)
     }
 }
 
@@ -187,22 +228,22 @@ mod tests {
 
         {
             let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group("group");
-            let mut list = group.get(&"s1".to_owned());
-            list.push("afsdfasdf".to_owned());
-            list.push("bar".to_owned());
-            list.push("bar2".to_owned());
-            group.get(&"s2".to_owned()).push("baz".to_owned());
-
+            let mut list = group.get(&"g1".to_owned());
+            list.push("foo".to_owned());
+            group.get(&"g2".to_owned()).push("bar".to_owned());
+            group.get(&"g3".to_owned()).push("baz".to_owned());
         }
 
         db.merge(fork.into_patch());
 
         let snapshot = db.snapshot();
-
         let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group("group");
+        let indexes = group.iter::<String>();
 
-        let list = group.iter::<String>();
+        let mut results = indexes.map(|index| {
+            index.get(0).unwrap()
+        }).collect::<Vec<_>>();
 
-        dbg!(list.get(0));
+        assert_eq!(results, vec!["foo".to_owned(), "bar".to_owned(), "baz".to_owned()])
     }
 }

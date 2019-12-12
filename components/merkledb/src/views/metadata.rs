@@ -431,9 +431,6 @@ where
             id: NonZeroU64::new(metadata.identifier),
         };
 
-        dbg!(&addr);
-        dbg!(&index_address);
-
         let is_aggregated = !is_phantom
             && index_type.is_merkelized()
             && index_address.id_in_group.is_none()
