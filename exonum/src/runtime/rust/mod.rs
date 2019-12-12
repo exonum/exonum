@@ -480,7 +480,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
         spec: &InstanceSpec,

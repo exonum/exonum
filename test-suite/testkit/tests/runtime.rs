@@ -108,7 +108,7 @@ impl Runtime for TestRuntime {
         self.tester.is_artifact_deployed(id)
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,

@@ -200,7 +200,7 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
@@ -557,7 +557,7 @@ impl Runtime for ShutdownRuntime {
         false
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
@@ -739,7 +739,7 @@ impl Runtime for DeploymentRuntime {
             .is_deployed
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,

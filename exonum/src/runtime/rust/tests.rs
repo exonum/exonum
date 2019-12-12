@@ -136,7 +136,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.inner.is_artifact_deployed(id)
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
         spec: &InstanceSpec,
@@ -146,7 +146,8 @@ impl<T: Runtime> Runtime for Inspected<T> {
             spec.to_owned(),
             parameters.clone(),
         ));
-        self.inner.start_adding_service(context, spec, parameters)
+        self.inner
+            .initiate_adding_service(context, spec, parameters)
     }
 
     fn commit_service_status(

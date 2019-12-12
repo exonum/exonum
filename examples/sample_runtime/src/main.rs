@@ -137,7 +137,7 @@ impl Runtime for SampleRuntime {
     }
 
     /// Starts a new service instance and sets the counter value for this.
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         spec: &InstanceSpec,
