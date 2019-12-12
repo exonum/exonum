@@ -41,6 +41,11 @@ fn main() {
             "hooks_example_protobuf_mod.rs",
         ),
         (
+            "tests/runtime_api/proto",
+            vec!["tests/runtime_api/proto".into()],
+            "test_runtime_api_protobuf_mod.rs",
+        ),
+        (
             "tests/interfaces/proto",
             vec![
                 "tests/interfaces/proto".into(),
