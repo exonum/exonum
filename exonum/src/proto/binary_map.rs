@@ -18,7 +18,7 @@ use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use protobuf::Message;
 
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{borrow::Cow, cmp::Ordering, collections::BTreeMap, iter::FromIterator};
 
 /// Protobuf wrapper type to store small maps of non-scalar keys and values.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -76,12 +76,21 @@ where
     }
 
     fn from_pb(proto_struct: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        let inner = proto_struct
+        let values = proto_struct
             .inner
             .into_iter()
             .map(key_value_pb_to_pair)
-            .collect::<Result<_, failure::Error>>()?;
-        Ok(Self(inner))
+            .collect::<Result<Vec<(K, V)>, failure::Error>>()?;
+
+        assert!(
+            values.windows(2).all(|k| {
+                let (prev_key, key) = (&k[0].0, &k[1].0);
+                prev_key.partial_cmp(key) == Some(Ordering::Less)
+            }),
+            "Invalid keys ordering or duplicate keys found in BinaryMap"
+        );
+
+        Ok(Self(BTreeMap::from_iter(values.into_iter())))
     }
 }
 
