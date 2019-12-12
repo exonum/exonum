@@ -1,10 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::{
-    access::{Access, AccessError, FromAccess},
-    views::IndexAddress,
-    BinaryKey,
-};
+use crate::{access::{Access, AccessError, FromAccess}, views::IndexAddress, BinaryKey, IndexType, BinaryValue};
+use crate::views::{View, ViewWithMetadata, RawAccess};
+use std::fmt;
 
 // cspell:ignore foob
 
@@ -105,23 +103,28 @@ where
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
-    pub fn iter(&self) {
-        // We need to get all the keys.
-        let keys = ();
-    }
+
 }
 
-impl<T, K, I> Iterator for Group<T, K, I>
+impl<T, K, I> Group<T, K, I>
     where
-        T: Access,
-        K: BinaryKey + ?Sized,
+        T: RawAccess,
+        K: BinaryKey,
         I: FromAccess<T>,
+        <K as std::borrow::ToOwned>::Owned: fmt::Debug,
 {
-    type Item = I;
+    pub fn iter<V:BinaryValue + fmt::Debug>(&self) {
+        // We need to get all the keys.
 
-    fn next(&mut self) -> Option<Self::Item> {
-//        unimplemented!()
-        let keys = ();
+        println!("iter from prefix {:?}", self.prefix);
+
+        let view = View::new(self.access.clone(), self.prefix.name());
+
+        for entry in view.iter::<(), K, V>(&()) {
+            dbg!(&entry);
+        }
+//        let (view, state) = view.into_parts();
+
     }
 }
 
@@ -173,8 +176,9 @@ mod tests {
             list.push("foo".to_owned());
             list.push("bar".to_owned());
             group.get(&2).push("baz".to_owned());
-        }
 
+            group.iter::<String>();
+        }
 
     }
 }
