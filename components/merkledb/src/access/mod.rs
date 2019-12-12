@@ -156,6 +156,10 @@ pub enum AccessErrorKind {
         allowed_chars: &'static str,
     },
 
+    /// Invalid tombstone location.
+    #[fail(display = "Invalid tombstone location. Tombstones can only be created in migrations")]
+    InvalidTombstone,
+
     /// Custom error.
     #[fail(display = "{}", _0)]
     Custom(#[fail(cause)] Error),

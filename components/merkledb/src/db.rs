@@ -636,16 +636,16 @@ impl Fork {
         working_patch.merge_into(&mut self.patch);
     }
 
+    /// Finishes a migration of indexes with the specified prefix.
     pub fn finish_migration(&mut self, prefix: &str) {
         // Mutable `self` reference ensures that no indexes are instantiated in the client code.
         self.flush(); // Flushing is necessary to keep `self.patch` up to date.
 
         let prefix = format!("^{}", prefix);
-        let removed_addrs = IndexesPool::new(&*self).remove_by_prefix(&prefix[1..]);
+        let removed_addrs = IndexesPool::new(&*self).finalize_migration_by_prefix(&prefix);
         for addr in removed_addrs {
             self.patch.changes.entry(addr).or_default().clear();
         }
-        IndexesPool::new(&*self).finalize_migration_by_prefix(&prefix);
     }
 
     /// Rolls back all changes that were made after the latest execution
@@ -1218,6 +1218,11 @@ mod tests {
             assert!(set.contains(&0));
             assert!(!set.contains(&1));
 
+            let list = view.get_proof_list::<_, u64>("name.untouched");
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.get(0), Some(77));
+            assert_eq!(list.iter().collect::<Vec<_>>(), vec![77, 88]);
+
             assert_eq!(view.get_entry("unrelated").get(), Some(1_u64));
             assert_eq!(view.get_entry("name1.unrelated").get(), Some(2_u64));
             let set = view.get_value_set::<_, String>("name.removed");
@@ -1230,6 +1235,8 @@ mod tests {
         fork.get_list("name.list").extend(vec![1_u32, 2, 3]);
         fork.get_map("name.map").put(&1_u64, "!".to_owned());
         fork.get_value_set("name.removed").insert("!!!".to_owned());
+        fork.get_proof_list("name.untouched")
+            .extend(vec![77_u64, 88]);
         fork.get_entry("unrelated").set(1_u64);
         fork.get_entry("name1.unrelated").set(2_u64);
 
@@ -1237,6 +1244,7 @@ mod tests {
         fork.get_proof_list("^name.list").extend(vec![4_u64, 5]);
         fork.get_map("^name.map").put(&1_u64, 42_i32);
         fork.get_key_set("^name.new").insert(0_u8);
+        fork.remove_index("^name.removed");
         fork.finish_migration("name.");
 
         check_indexes(&fork);
@@ -1263,6 +1271,16 @@ mod tests {
             assert_eq!(map.get(&3), Some(7));
             assert_eq!(map.keys().collect::<Vec<_>>(), vec![2, 3]);
 
+            // This entry should be removed.
+            let entry = view.get_entry::<_, String>(("name.family", &1_u8));
+            assert!(!entry.exists());
+            // ...but this one should be retained.
+            let entry = view.get_entry::<_, String>(("name.family", &2_u8));
+            assert_eq!(entry.get().unwrap(), "!!");
+
+            let entry = view.get_proof_entry::<_, String>(("name.untouched", &2_u32));
+            assert_eq!(entry.get().unwrap(), "??");
+
             assert_eq!(view.get_entry("unrelated").get(), Some(1_u64));
             assert_eq!(view.get_entry("name1.unrelated").get(), Some(2_u64));
             let set = view.get_value_set::<_, String>("name.removed");
@@ -1274,6 +1292,10 @@ mod tests {
         let fork = db.fork();
         fork.get_list("name.list").extend(vec![1_u32, 2, 3]);
         fork.get_map("name.map").put(&1_u64, "!".to_owned());
+        fork.get_entry(("name.family", &1_u8)).set("!".to_owned());
+        fork.get_entry(("name.family", &2_u8)).set("!!".to_owned());
+        fork.get_proof_entry(("name.untouched", &2_u32))
+            .set("??".to_owned());
         fork.get_entry("unrelated").set(1_u64);
         fork.get_entry("name1.unrelated").set(2_u64);
         db.merge(fork.into_patch()).unwrap();
@@ -1282,6 +1304,8 @@ mod tests {
         fork.get_proof_list("^name.list").extend(vec![4_u64, 5]);
         fork.get_map("^name.map").put(&1_u64, 42_i32);
         fork.get_key_set("^name.new").insert(0_u8);
+        fork.remove_index(("^name.family", &3_u8));
+        // ^-- Removing non-existing indexes is weird, but should work fine.
         db.merge(fork.into_patch()).unwrap();
 
         let mut fork = db.fork();
@@ -1296,6 +1320,8 @@ mod tests {
             map.clear();
             map.put(&2, 21);
             map.put(&3, 7);
+
+            fork.remove_index(("^name.family", &1_u8));
         }
         fork.finish_migration("name.");
 

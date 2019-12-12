@@ -58,6 +58,8 @@ pub enum IndexType {
     /// Merkelized entry.
     ProofEntry = 9,
 
+    /// Tombstone indicating necessity to remove an index after migration is completed.
+    Tombstone = 254,
     /// Unknown index type.
     #[doc(hidden)]
     Unknown = 255,
@@ -340,60 +342,65 @@ impl<T: RawAccess> IndexesPool<T> {
 }
 
 impl<T: RawAccessMut> IndexesPool<T> {
-    /// Removes metadata for all entries starting with the specified `prefix`.
-    ///
-    /// # Return value
-    ///
-    /// Returns resolved addresses corresponding to the removed indexes.
+    /// Returns a `ResolvedAddress` corresponding to the `full_name` of an index. `min_name_len`
+    /// specifies the minimum known name part of the `full_name` (i.e., the part corresponding
+    /// to `ResolvedAddress.name`.
     #[allow(unsafe_code)]
-    pub(crate) fn remove_by_prefix(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
-        let (addresses, removed_keys): (Vec<_>, Vec<_>) = self
-            .0
-            .iter::<_, Vec<u8>, IndexMetadata>(prefix)
-            .map(|(full_name, metadata)| {
-                debug_assert!(full_name.starts_with(prefix.as_bytes()));
-                let mut cutoff_index = full_name.len();
-                loop {
-                    match full_name.get(cutoff_index) {
-                        Some(0) | None => break,
-                        Some(_) => {
-                            cutoff_index += 1;
-                        }
-                    }
+    fn resolve_address(&self, full_name: &[u8], min_name_len: usize) -> Option<ResolvedAddress> {
+        let metadata = self.0.get::<_, IndexMetadata>(full_name)?;
+        let mut cutoff_index = min_name_len;
+        loop {
+            match full_name.get(cutoff_index) {
+                Some(0) | None => break,
+                Some(_) => {
+                    cutoff_index += 1;
                 }
-
-                let name = full_name[..cutoff_index].to_vec();
-                let resolved = ResolvedAddress {
-                    name: unsafe {
-                        // SAFETY:
-                        // Safe by construction; metadata keys before the `\0` separator
-                        // correspond to the index names, which consist of a subset of
-                        // ASCII chars.
-                        String::from_utf8_unchecked(name)
-                    },
-                    id: NonZeroU64::new(metadata.identifier),
-                };
-                (resolved, full_name)
-            })
-            .unzip();
-
-        for full_name in &removed_keys {
-            self.0.remove(full_name);
+            }
         }
-        addresses
+
+        let name = full_name[..cutoff_index].to_vec();
+        debug_assert!(name.is_ascii());
+        Some(ResolvedAddress {
+            name: unsafe {
+                // SAFETY:
+                // Safe by construction; metadata keys before the `\0` separator
+                // correspond to the index names, which consist of a subset of
+                // ASCII chars.
+                String::from_utf8_unchecked(name)
+            },
+            id: NonZeroU64::new(metadata.identifier),
+        })
     }
 
     /// Moves indexes with the specified prefix from the next version (i.e., `^prefix.*` form)
-    /// to the current version (`prefix.*` form). The older indexes must be removed first
-    /// by calling `remove_by_prefix`; this method does not check this.
-    pub(crate) fn finalize_migration_by_prefix(&mut self, prefix: &str) {
+    /// to the current version (`prefix.*` form). The existing old indexes are replaced, or
+    /// removed if the new index is a `Tombstone`. If there is no overriding index, an old
+    /// index is left in place.
+    ///
+    /// # Return value
+    ///
+    /// Returns resolved addresses of the removed indexes.
+    pub(crate) fn finalize_migration_by_prefix(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
         debug_assert_eq!(&prefix[0..1], "^", "Invalid prefix");
+
         let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(prefix).collect();
+        let mut removed_addrs = Vec::new();
         for (key, metadata) in moved_indexes {
             // `key[1..]` removes `^` char at the beginning of the index.
-            self.0.put(&key[1..], metadata);
+            let migrated_key = &key[1..];
+            debug_assert!(migrated_key.starts_with(prefix[1..].as_bytes()));
+
+            if let Some(resolved) = self.resolve_address(migrated_key, prefix.len() - 1) {
+                removed_addrs.push(resolved);
+            }
+
+            if metadata.index_type != IndexType::Tombstone {
+                self.0.put(migrated_key, metadata);
+            }
+            // Tombstones are removed without replacement.
             self.0.remove(&key);
         }
+        removed_addrs
     }
 }
 
@@ -474,6 +481,13 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
+        if index_type == IndexType::Tombstone && !index_address.name.starts_with('^') {
+            return Err(AccessError {
+                kind: AccessErrorKind::InvalidTombstone,
+                addr: index_address.to_owned(),
+            });
+        }
+
         // Actual name.
         let index_name = index_address.resolved_name().to_owned();
         // Full name for internal usage.

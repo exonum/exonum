@@ -1,6 +1,7 @@
 //! Extension traits to simplify index instantiation.
 
 use super::{Access, AccessError, FromAccess};
+use crate::views::RawAccessMut;
 use crate::{
     proof_map_index::{Raw, ToProofPath},
     views::IndexType,
@@ -231,6 +232,16 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
     {
         self.get_or_create_view(addr.into(), index_type).map(drop)
+    }
+
+    /// Marks an index with the specified address as removed during migration.
+    fn remove_index<I>(self, addr: I)
+    where
+        I: Into<IndexAddress>,
+        Self::Base: RawAccessMut,
+    {
+        self.get_or_create_view(addr.into(), IndexType::Tombstone)
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e));
     }
 }
 
