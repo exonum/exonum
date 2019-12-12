@@ -49,8 +49,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
 
-- Mechanism to extend block header has been added. Block now contains
-  key value storage `entries` which can contain binary data. (#1602)
+- Added mechanism to extend block header. Block now contains
+  key-value storage `additional_headers` which can contain binary data. (#1602)
 
 #### exonum-supervisor
 

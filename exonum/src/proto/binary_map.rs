@@ -21,6 +21,7 @@ use protobuf::Message;
 use std::{borrow::Cow, cmp::Ordering, collections::BTreeMap, iter::FromIterator};
 
 /// Protobuf wrapper type to store small maps of non-scalar keys and values.
+/// Stored keys are ordered and duplicate keys are forbidden.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[derive(Serialize, Deserialize)]
 pub struct BinaryMap<K: Ord, V>(pub BTreeMap<K, V>);

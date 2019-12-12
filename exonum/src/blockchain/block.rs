@@ -87,8 +87,8 @@ impl AdditionalHeaders {
     }
 
     /// Get header from the map.
-    pub fn get<K: BlockHeaderKey>(&self) -> Option<&Vec<u8>> {
-        self.0.get(K::NAME)
+    pub fn get<K: BlockHeaderKey>(&self) -> Option<&[u8]> {
+        self.0.get(K::NAME).map(|v| v.as_slice())
     }
 }
 
@@ -181,7 +181,7 @@ impl Block {
     {
         self.additional_headers
             .get::<K>()
-            .map(|bytes: &Vec<u8>| K::Value::from_bytes(Cow::Borrowed(bytes)))
+            .map(|bytes: &[u8]| K::Value::from_bytes(Cow::Borrowed(bytes)))
             .transpose()
     }
 }
