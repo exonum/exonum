@@ -65,7 +65,7 @@ pub enum IndexType {
 
 impl IndexType {
     /// Checks if the index of this type is Merkelized.
-    fn is_merkelized(self) -> bool {
+    pub fn is_merkelized(self) -> bool {
         match self {
             IndexType::ProofList | IndexType::ProofMap | IndexType::ProofEntry => true,
             _ => false,

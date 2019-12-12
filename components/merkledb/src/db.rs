@@ -1279,7 +1279,7 @@ mod tests {
         fork.get_proof_list("^name.list").extend(vec![4_u64, 5]);
         fork.get_map("^name.map").put(&1_u64, 42_i32);
         fork.get_key_set("^name.new").insert(0_u8);
-        fork.remove_index("^name.removed");
+        fork.create_tombstone("^name.removed");
         fork.finish_migration("name");
 
         check_indexes(&fork);
@@ -1339,7 +1339,7 @@ mod tests {
         fork.get_proof_list("^name.list").extend(vec![4_u64, 5]);
         fork.get_map("^name.map").put(&1_u64, 42_i32);
         fork.get_key_set("^name.new").insert(0_u8);
-        fork.remove_index(("^name.family", &3_u8));
+        fork.create_tombstone(("^name.family", &3_u8));
         // ^-- Removing non-existing indexes is weird, but should work fine.
         db.merge(fork.into_patch()).unwrap();
 
@@ -1356,7 +1356,7 @@ mod tests {
             map.put(&2, 21);
             map.put(&3, 7);
 
-            fork.remove_index(("^name.family", &1_u8));
+            fork.create_tombstone(("^name.family", &1_u8));
         }
         fork.finish_migration("name");
 
@@ -1429,7 +1429,7 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
 
         let mut fork = db.fork();
-        fork.remove_index("^name.other_list");
+        fork.create_tombstone("^name.other_list");
         fork.finish_migration("name");
 
         let patch = fork.into_patch();

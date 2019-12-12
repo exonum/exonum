@@ -235,7 +235,7 @@ pub trait AccessExt: Access {
     }
 
     /// Marks an index with the specified address as removed during migration.
-    fn remove_index<I>(self, addr: I)
+    fn create_tombstone<I>(self, addr: I)
     where
         I: Into<IndexAddress>,
         Self::Base: RawAccessMut,
