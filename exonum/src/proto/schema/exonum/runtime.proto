@@ -125,14 +125,21 @@ message ExecutionStatus {
   }
 }
 
-enum ArtifactStatus {
-  ARTIFACT_PENDING = 0;
-  ARTIFACT_ACTIVE = 1;
-}
-
+// Current state of artifact in dispatcher.
 message ArtifactState {
+  // Status of an artifact deployment.
+  enum Status {
+    // Reserved for the further usage. 
+    NONE = 0;
+    // The artifact is pending deployment.
+    PENDING = 1;
+    // The artifact has been successfully deployed.
+    ACTIVE = 2;
+  }
+  // Artifact specification.
   exonum.runtime.ArtifactSpec spec = 1;
-  ArtifactStatus status = 2;
+  // Artifact deployment status.
+  Status status = 2;
 }
 
 // Current state of service instance in dispatcher.

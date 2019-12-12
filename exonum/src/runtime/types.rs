@@ -352,9 +352,9 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArtifactStatus {
     /// The artifact is pending deployment.
-    Pending = 0,
+    Pending = 1,
     /// The artifact has been successfully deployed.
-    Active = 1,
+    Active = 2,
 }
 
 impl Display for ArtifactStatus {
@@ -367,19 +367,22 @@ impl Display for ArtifactStatus {
 }
 
 impl ProtobufConvert for ArtifactStatus {
-    type ProtoStruct = schema::runtime::ArtifactStatus;
+    type ProtoStruct = schema::runtime::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            ArtifactStatus::Active => schema::runtime::ArtifactStatus::ARTIFACT_ACTIVE,
-            ArtifactStatus::Pending => schema::runtime::ArtifactStatus::ARTIFACT_PENDING,
+            ArtifactStatus::Active => schema::runtime::ArtifactState_Status::ACTIVE,
+            ArtifactStatus::Pending => schema::runtime::ArtifactState_Status::PENDING,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(match pb {
-            schema::runtime::ArtifactStatus::ARTIFACT_ACTIVE => ArtifactStatus::Active,
-            schema::runtime::ArtifactStatus::ARTIFACT_PENDING => ArtifactStatus::Pending,
+            schema::runtime::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
+            schema::runtime::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
+            schema::runtime::ArtifactState_Status::NONE => {
+                bail!("Status `NONE` is reserved for the further usage.")
+            }
         })
     }
 }

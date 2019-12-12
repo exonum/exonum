@@ -67,7 +67,7 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns a pending instances queue used to notify the runtime about service instances
-    /// to be committed with a new status.
+    /// to be updated.
     fn pending_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
