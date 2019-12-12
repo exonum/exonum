@@ -21,9 +21,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
-use super::{
-    system_schema::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
-};
+use super::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View};
 use crate::{
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
@@ -346,21 +344,28 @@ impl<T: RawAccessMut> IndexesPool<T> {
     /// specifies the minimum known name part of the `full_name` (i.e., the part corresponding
     /// to `ResolvedAddress.name`.
     #[allow(unsafe_code)]
-    fn resolve_address(&self, full_name: &[u8], min_name_len: usize) -> Option<ResolvedAddress> {
+    fn resolve_address(
+        &self,
+        full_name: &[u8],
+        min_name_len: usize,
+    ) -> Option<(ResolvedAddress, bool)> {
         let metadata = self.0.get::<_, IndexMetadata>(full_name)?;
+
         let mut cutoff_index = min_name_len;
-        loop {
+        let is_in_group = loop {
             match full_name.get(cutoff_index) {
-                Some(0) | None => break,
+                Some(0) => break true,
+                None => break false,
                 Some(_) => {
                     cutoff_index += 1;
                 }
             }
-        }
+        };
+        let is_aggregated = metadata.index_type.is_merkelized() && !is_in_group;
 
         let name = full_name[..cutoff_index].to_vec();
         debug_assert!(name.is_ascii());
-        Some(ResolvedAddress {
+        let resolved = ResolvedAddress {
             name: unsafe {
                 // SAFETY:
                 // Safe by construction; metadata keys before the `\0` separator
@@ -369,7 +374,8 @@ impl<T: RawAccessMut> IndexesPool<T> {
                 String::from_utf8_unchecked(name)
             },
             id: NonZeroU64::new(metadata.identifier),
-        })
+        };
+        Some((resolved, is_aggregated))
     }
 
     /// Moves indexes with the specified prefix from the next version (i.e., `^prefix.*` form)
@@ -379,19 +385,25 @@ impl<T: RawAccessMut> IndexesPool<T> {
     ///
     /// # Return value
     ///
-    /// Returns resolved addresses of the removed indexes.
-    pub(crate) fn finalize_migration_by_prefix(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
-        debug_assert_eq!(&prefix[0..1], "^", "Invalid prefix");
+    /// Returns resolved addresses of the removed indexes. For each address, we also return a flag
+    /// indicating whether the corresponding index was removed from aggregation (i.e., was
+    /// aggregated and was not replaced by an aggregated index).
+    pub(crate) fn finish_migration(&mut self, prefix: &str) -> Vec<(ResolvedAddress, bool)> {
+        let prefix = format!("^{}.", prefix);
 
-        let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(prefix).collect();
+        let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(&prefix).collect();
         let mut removed_addrs = Vec::new();
         for (key, metadata) in moved_indexes {
             // `key[1..]` removes `^` char at the beginning of the index.
             let migrated_key = &key[1..];
             debug_assert!(migrated_key.starts_with(prefix[1..].as_bytes()));
 
-            if let Some(resolved) = self.resolve_address(migrated_key, prefix.len() - 1) {
-                removed_addrs.push(resolved);
+            if let Some((resolved, was_aggregated)) =
+                self.resolve_address(migrated_key, prefix.len() - 1)
+            {
+                let is_removed_from_aggregation =
+                    was_aggregated && !metadata.index_type.is_merkelized();
+                removed_addrs.push((resolved, is_removed_from_aggregation));
             }
 
             if metadata.index_type != IndexType::Tombstone {
@@ -405,10 +417,18 @@ impl<T: RawAccessMut> IndexesPool<T> {
 }
 
 /// Obtains `object_hash` for an aggregated index.
-pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedAddress) -> Hash {
+pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedAddress, is_migrated: bool) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
-    let index_full_name = addr.name.as_bytes().to_vec();
+    let index_full_name = if is_migrated {
+        let mut name = Vec::with_capacity(1 + addr.name.len());
+        name.push(b'^');
+        name.extend_from_slice(addr.name.as_bytes());
+        name
+    } else {
+        addr.name.as_bytes().to_vec()
+    };
+
     let metadata = IndexesPool::new(access.clone())
         .index_metadata(&index_full_name)
         .unwrap_or_else(|| {
@@ -506,14 +526,16 @@ where
             id: NonZeroU64::new(metadata.identifier),
         };
 
-        let is_aggregated = !is_phantom
-            && index_type.is_merkelized()
-            && !index_address.name.starts_with('^') // Exclude migrated indexes
-            && index_address.id_in_group.is_none()
-            && index_address.name != STATE_AGGREGATOR;
+        let is_aggregated =
+            !is_phantom && index_type.is_merkelized() && index_address.id_in_group.is_none();
+        let namespace = if is_aggregated {
+            Some(index_address.namespace().to_owned())
+        } else {
+            None
+        };
 
         let mut view = View::new(index_access, addr);
-        view.set_or_forget_aggregation(is_aggregated);
+        view.set_or_forget_aggregation(namespace);
         let this = Self {
             view,
             metadata,

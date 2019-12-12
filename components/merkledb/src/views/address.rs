@@ -67,6 +67,23 @@ impl IndexAddress {
         }
     }
 
+    /// Returns the namespace that the address belongs to. For migrated indexes, the namespace
+    /// is defined as the component of the address name up (but not including) the first dot `'.'`
+    /// char in the name (e.g., `foo` for address `^foo.bar`). For non-migrated indexes,
+    /// the namespace is the empty string.
+    pub(super) fn namespace(&self) -> &str {
+        if self.name.starts_with('^') {
+            let dot_position = self.name.bytes().position(|ch| ch == b'.');
+            if let Some(pos) = dot_position {
+                &self.name[1..pos]
+            } else {
+                &self.name[1..]
+            }
+        } else {
+            ""
+        }
+    }
+
     /// Returns the bytes part of `IndexAddress`.
     pub fn id_in_group(&self) -> Option<&[u8]> {
         self.id_in_group.as_ref().map(Vec::as_slice)

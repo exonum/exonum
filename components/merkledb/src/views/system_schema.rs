@@ -1,15 +1,18 @@
 use exonum_crypto::Hash;
 
 use super::{metadata::IndexesPool, AsReadonly, IndexType, RawAccess, ViewWithMetadata};
-use crate::{Fork, IndexAddress, ObjectHash, ProofMapIndex};
+use crate::{Fork, ObjectHash, ProofMapIndex};
 
 /// Name of the state aggregator proof map.
 pub(super) const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
 
-fn get_state_aggregator<T: RawAccess>(access: T) -> ProofMapIndex<T, String, Hash> {
+fn get_state_aggregator<T: RawAccess>(
+    access: T,
+    namespace: &str,
+) -> ProofMapIndex<T, String, Hash> {
     let view = ViewWithMetadata::get_or_create_unchecked(
         access,
-        &IndexAddress::from_root(STATE_AGGREGATOR),
+        &(STATE_AGGREGATOR, namespace).into(),
         IndexType::ProofMap,
     )
     .expect("Internal MerkleDB failure while aggregating state");
@@ -81,7 +84,12 @@ impl<T: RawAccess> SystemSchema<T> {
     ///
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_hash(&self) -> Hash {
-        get_state_aggregator(self.0.clone()).object_hash()
+        get_state_aggregator(self.0.clone(), "").object_hash()
+    }
+
+    /// Returns the state hash of indexes in the specified `namespace`.
+    pub fn namespace_state_hash(&self, namespace: &str) -> Hash {
+        get_state_aggregator(self.0.clone(), namespace).object_hash()
     }
 }
 
@@ -93,20 +101,54 @@ impl<T: RawAccess + AsReadonly> SystemSchema<T> {
     ///
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
-        get_state_aggregator(self.0.as_readonly())
+        get_state_aggregator(self.0.as_readonly(), "")
+    }
+
+    /// Returns the state aggregator for the specified `namespace`.
+    pub fn namespace_state_aggregator(
+        &self,
+        namespace: &str,
+    ) -> ProofMapIndex<T::Readonly, String, Hash> {
+        get_state_aggregator(self.0.as_readonly(), namespace)
     }
 }
 
 impl SystemSchema<&Fork> {
     /// Updates state hash of the database.
-    pub(crate) fn update_state_aggregator(
+    pub(crate) fn update_state_aggregators(
         &mut self,
-        entries: impl IntoIterator<Item = (String, Hash)>,
+        entries: impl IntoIterator<Item = (String, String, Hash)>,
     ) {
-        let mut state_aggregator = get_state_aggregator(self.0);
-        for (index_name, hash) in entries {
-            state_aggregator.put(&index_name, hash);
+        for (ns, index_name, hash) in entries {
+            get_state_aggregator(self.0, &ns).put(&index_name, hash);
         }
+    }
+
+    /// Removes indexes with the specified names from the aggregated indexes
+    /// in the default namespace.
+    pub(crate) fn remove_aggregated_indexes(&mut self, names: impl IntoIterator<Item = String>) {
+        let mut aggregator = get_state_aggregator(self.0, "");
+        for name in names {
+            debug_assert!(
+                aggregator.contains(&name),
+                "Attempting to remove non-existing index {} from aggregation",
+                name
+            );
+            aggregator.remove(&name);
+        }
+    }
+
+    /// Removes an aggregation namespace, moving all aggregated indexes in the namespace into
+    /// the default aggregator.
+    pub(crate) fn remove_namespace(&mut self, namespace: &str) {
+        debug_assert!(!namespace.is_empty(), "Cannot remove default namespace");
+
+        let mut ns_aggregator = get_state_aggregator(self.0, namespace);
+        let mut default_aggregator = get_state_aggregator(self.0, "");
+        for (index_name, hash) in &ns_aggregator {
+            default_aggregator.put(&index_name, hash);
+        }
+        ns_aggregator.clear();
     }
 }
 

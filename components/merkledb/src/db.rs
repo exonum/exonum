@@ -24,6 +24,7 @@ use std::{
 };
 
 use crate::{
+    validation::assert_valid_name_component,
     views::{
         get_object_hash, AsReadonly, ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View,
     },
@@ -40,7 +41,7 @@ pub struct ViewChanges {
     /// Is the view aggregated into `state_hash` of the database?
     /// Storing this information directly in the changes allows to avoid relatively expensive
     /// metadata lookups during state aggregator update in `Fork::into_patch()`.
-    is_aggregated: bool,
+    namespace: Option<String>,
 }
 
 impl ViewChanges {
@@ -54,7 +55,7 @@ impl ViewChanges {
 
     #[cfg(test)]
     pub fn is_aggregated(&self) -> bool {
-        self.is_aggregated
+        self.namespace.as_ref().map_or(false, String::is_empty)
     }
 
     pub fn clear(&mut self) {
@@ -62,8 +63,8 @@ impl ViewChanges {
         self.is_cleared = true;
     }
 
-    pub fn set_aggregation(&mut self, is_aggregated: bool) {
-        self.is_aggregated = is_aggregated;
+    pub fn set_aggregation(&mut self, namespace: Option<String>) {
+        self.namespace = namespace;
     }
 
     pub fn into_data(self) -> BTreeMap<Vec<u8>, Change> {
@@ -253,15 +254,17 @@ impl WorkingPatch {
             });
             // Check that changes are not borrowed immutably (in this case, there is another
             // `Rc<_>` pointer to changes somewhere).
-            let changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
+            let mut changes = Rc::try_unwrap(changes).unwrap_or_else(|_| {
                 panic!(
                     "changes are still immutably borrowed at address {:?}",
                     address
                 );
             });
 
-            if changes.is_aggregated {
-                patch.changed_aggregated_addrs.insert(address.clone());
+            if let Some(namespace) = mem::replace(&mut changes.namespace, None) {
+                patch
+                    .changed_aggregated_addrs
+                    .insert(address.clone(), namespace);
             }
 
             // The patch may already contain changes related to the `address`. If it does,
@@ -384,7 +387,9 @@ pub struct Patch {
     changes: HashMap<ResolvedAddress, ViewChanges>,
     /// Addresses of aggregated indexes that were changed within this patch. This information
     /// is used to update the state aggregator in `Fork::into_patch()`.
-    changed_aggregated_addrs: HashSet<ResolvedAddress>,
+    changed_aggregated_addrs: HashMap<ResolvedAddress, String>,
+    /// Names of removed aggregated indexes.
+    removed_aggregated_addrs: HashSet<String>,
 }
 
 pub(super) struct ForkIter<'a, T: StdIterator> {
@@ -442,7 +447,8 @@ pub trait Database: Send + Sync + 'static {
             patch: Patch {
                 snapshot: self.snapshot(),
                 changes: HashMap::new(),
-                changed_aggregated_addrs: HashSet::new(),
+                changed_aggregated_addrs: HashMap::new(),
+                removed_aggregated_addrs: HashSet::new(),
             },
             working_patch: WorkingPatch::new(),
         }
@@ -488,6 +494,8 @@ pub trait DatabaseExt: Database {
     ///
     /// Returns an error in the same situations as `Database::merge()`.
     fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
+        // FIXME: does this work with migrations?
+
         let snapshot = self.snapshot();
         let changed_aggregated_addrs = patch.changed_aggregated_addrs.clone();
         let mut rev_changes = HashMap::with_capacity(patch.changes.len());
@@ -515,7 +523,7 @@ pub trait DatabaseExt: Database {
                 ViewChanges {
                     data: view_changes,
                     is_cleared: false,
-                    is_aggregated: changes.is_aggregated,
+                    namespace: changes.namespace.clone(),
                 },
             );
         }
@@ -525,6 +533,7 @@ pub trait DatabaseExt: Database {
             snapshot: self.snapshot(),
             changes: rev_changes,
             changed_aggregated_addrs,
+            removed_aggregated_addrs: HashSet::new(),
         })
     }
 }
@@ -638,12 +647,28 @@ impl Fork {
 
     /// Finishes a migration of indexes with the specified prefix.
     pub fn finish_migration(&mut self, prefix: &str) {
+        assert_valid_name_component(prefix);
+
         // Mutable `self` reference ensures that no indexes are instantiated in the client code.
         self.flush(); // Flushing is necessary to keep `self.patch` up to date.
 
-        let prefix = format!("^{}", prefix);
-        let removed_addrs = IndexesPool::new(&*self).finalize_migration_by_prefix(&prefix);
-        for addr in removed_addrs {
+        // Update aggregation attribution of indexes.
+        for namespace in self.patch.changed_aggregated_addrs.values_mut() {
+            if namespace == prefix {
+                namespace.clear();
+            }
+        }
+        // Move aggregated indexes info from the `prefix` namespace into the default namespace.
+        SystemSchema::new(&*self).remove_namespace(prefix);
+
+        let removed_addrs = IndexesPool::new(&*self).finish_migration(&prefix);
+        for (addr, is_removed_from_aggregation) in removed_addrs {
+            if is_removed_from_aggregation {
+                self.patch.changed_aggregated_addrs.remove(&addr);
+                self.patch
+                    .removed_aggregated_addrs
+                    .insert(addr.name.clone());
+            }
             self.patch.changes.entry(addr).or_default().clear();
         }
     }
@@ -662,12 +687,18 @@ impl Fork {
         // returned by this method is converted back to a `Fork`, we won't need to update
         // its state aggregator unless the *new* changes in the `Fork` concern aggregated indexes.
         let changed_aggregated_addrs =
-            mem::replace(&mut self.patch.changed_aggregated_addrs, HashSet::new());
-        let updated_entries = changed_aggregated_addrs
-            .into_iter()
-            .map(|addr| (addr.name.clone(), get_object_hash(&self.patch, addr)));
+            mem::replace(&mut self.patch.changed_aggregated_addrs, HashMap::new());
+        let updated_entries = changed_aggregated_addrs.into_iter().map(|(addr, ns)| {
+            let index_name = addr.name.clone();
+            let index_hash = get_object_hash(&self.patch, addr, !ns.is_empty());
+            (ns, index_name, index_hash)
+        });
+        SystemSchema::new(&self).update_state_aggregators(updated_entries);
 
-        SystemSchema::new(&self).update_state_aggregator(updated_entries);
+        let removed_aggregated_addrs =
+            mem::replace(&mut self.patch.removed_aggregated_addrs, HashSet::new());
+        SystemSchema::new(&self).remove_aggregated_indexes(removed_aggregated_addrs);
+
         self.flush(); // flushes changes in the state aggregator
         self.patch
     }
@@ -991,7 +1022,7 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, ObjectHash, TemporaryDB};
+    use crate::{access::AccessExt, HashTag, ObjectHash, TemporaryDB};
 
     use std::{collections::HashSet, iter::FromIterator};
 
@@ -1162,7 +1193,10 @@ mod tests {
             .patch
             .changed_aggregated_addrs
             .iter()
-            .map(|addr| addr.name.as_str())
+            .map(|(addr, ns)| {
+                assert!(ns.is_empty());
+                addr.name.as_str()
+            })
             .collect();
         assert_eq!(changed_addrs, HashSet::from_iter(vec!["foo", "bar"]));
 
@@ -1181,7 +1215,7 @@ mod tests {
             .patch
             .changed_aggregated_addrs
             .iter()
-            .map(|addr| addr.name.as_str())
+            .map(|(addr, _)| addr.name.as_str())
             .collect();
         assert_eq!(changed_addrs, HashSet::from_iter(vec!["bar", "other_list"]));
 
@@ -1245,7 +1279,7 @@ mod tests {
         fork.get_map("^name.map").put(&1_u64, 42_i32);
         fork.get_key_set("^name.new").insert(0_u8);
         fork.remove_index("^name.removed");
-        fork.finish_migration("name.");
+        fork.finish_migration("name");
 
         check_indexes(&fork);
         // The newly migrated indexes are emptied.
@@ -1323,11 +1357,92 @@ mod tests {
 
             fork.remove_index(("^name.family", &1_u8));
         }
-        fork.finish_migration("name.");
+        fork.finish_migration("name");
 
         check_indexes(&fork);
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
         check_indexes(&snapshot);
+    }
+
+    #[test]
+    fn aggregation_within_migrations() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_list("name.list").push(1_u64);
+        fork.get_proof_list("name.other_list")
+            .extend(vec![1_u64, 2, 3]);
+        fork.get_proof_entry("name.entry").set("!".to_owned());
+        db.merge(fork.into_patch()).unwrap();
+        let state_hash = SystemSchema::new(&db.snapshot()).state_hash();
+
+        let fork = db.fork();
+        fork.get_proof_list("^name.list").extend(vec![2_u64, 3, 4]);
+        fork.get_proof_entry("^name.entry").set("?".to_owned());
+        fork.get_proof_entry("^name.new").set("??".to_owned());
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let new_state_hash = SystemSchema::new(&snapshot).state_hash();
+        assert_eq!(state_hash, new_state_hash);
+        let system_schema = SystemSchema::new(&snapshot);
+        let ns_hash = system_schema.namespace_state_hash("name");
+        assert_ne!(ns_hash, HashTag::empty_map_hash());
+
+        let ns_aggregator = system_schema.namespace_state_aggregator("name");
+        assert_eq!(ns_hash, ns_aggregator.object_hash());
+        assert_eq!(
+            ns_aggregator.keys().collect::<Vec<_>>(),
+            vec!["name.entry", "name.list", "name.new"]
+        );
+
+        let list = snapshot.get_proof_list::<_, u64>("^name.list");
+        assert_eq!(ns_aggregator.get("name.list"), Some(list.object_hash()));
+        let entry = snapshot.get_proof_entry::<_, String>("^name.entry");
+        assert_eq!(ns_aggregator.get("name.entry"), Some(entry.object_hash()));
+    }
+
+    #[test]
+    fn aggregation_after_migrations() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_list("name.list").push(1_u64);
+        fork.get_proof_list("name.other_list")
+            .extend(vec![1_u64, 2, 3]);
+        fork.get_entry("name.entry").set("!".to_owned());
+        let other_entry_hash = {
+            let mut entry = fork.get_proof_entry("name.other_entry");
+            entry.set("!!".to_owned());
+            entry.object_hash()
+        };
+
+        // Migration.
+        fork.get_proof_list("^name.list").extend(vec![2_u64, 3, 4]);
+        fork.get_proof_entry("^name.entry").set("?".to_owned());
+        let modified_entry_hash = fork
+            .get_proof_entry::<_, String>("^name.entry")
+            .object_hash();
+        fork.get_proof_entry("^name.new").set("??".to_owned());
+        let new_entry_hash = fork.get_proof_entry::<_, String>("^name.new").object_hash();
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+        fork.remove_index("^name.other_list");
+        fork.finish_migration("name");
+
+        let patch = fork.into_patch();
+        let system_schema = SystemSchema::new(&patch);
+        assert_eq!(
+            system_schema.namespace_state_hash("name"),
+            HashTag::empty_map_hash()
+        );
+        let aggregator = system_schema.state_aggregator();
+        assert_eq!(
+            aggregator.keys().collect::<Vec<_>>(),
+            vec!["name.entry", "name.list", "name.new", "name.other_entry"]
+        );
+        assert_eq!(aggregator.get("name.entry"), Some(modified_entry_hash));
+        assert_eq!(aggregator.get("name.new"), Some(new_entry_hash));
+        assert_eq!(aggregator.get("name.other_entry"), Some(other_entry_hash));
     }
 }
