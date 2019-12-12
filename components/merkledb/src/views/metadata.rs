@@ -408,8 +408,10 @@ impl<T: RawAccessMut> IndexesPool<T> {
 
             if metadata.index_type != IndexType::Tombstone {
                 self.0.put(migrated_key, metadata);
+            } else {
+                // Tombstones are removed without replacement.
+                self.0.remove(migrated_key);
             }
-            // Tombstones are removed without replacement.
             self.0.remove(&key);
         }
         removed_addrs
@@ -527,7 +529,7 @@ where
         };
 
         let is_aggregated =
-            !is_phantom && index_type.is_merkelized() && index_address.id_in_group.is_none();
+            !is_phantom && real_index_type.is_merkelized() && index_address.id_in_group.is_none();
         let namespace = if is_aggregated {
             Some(index_address.namespace().to_owned())
         } else {

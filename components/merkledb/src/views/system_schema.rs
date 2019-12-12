@@ -129,11 +129,6 @@ impl SystemSchema<&Fork> {
     pub(crate) fn remove_aggregated_indexes(&mut self, names: impl IntoIterator<Item = String>) {
         let mut aggregator = get_state_aggregator(self.0, "");
         for name in names {
-            debug_assert!(
-                aggregator.contains(&name),
-                "Attempting to remove non-existing index {} from aggregation",
-                name
-            );
             aggregator.remove(&name);
         }
     }

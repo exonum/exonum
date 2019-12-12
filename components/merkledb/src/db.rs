@@ -663,8 +663,8 @@ impl Fork {
 
         let removed_addrs = IndexesPool::new(&*self).finish_migration(&prefix);
         for (addr, is_removed_from_aggregation) in removed_addrs {
+            self.patch.changed_aggregated_addrs.remove(&addr);
             if is_removed_from_aggregation {
-                self.patch.changed_aggregated_addrs.remove(&addr);
                 self.patch
                     .removed_aggregated_addrs
                     .insert(addr.name.clone());
@@ -1024,6 +1024,7 @@ mod tests {
     use super::*;
     use crate::{access::AccessExt, HashTag, ObjectHash, TemporaryDB};
 
+    use exonum_crypto::Hash;
     use std::{collections::HashSet, iter::FromIterator};
 
     /// Asserts that a patch contains only the specified changes.
@@ -1406,6 +1407,7 @@ mod tests {
     fn aggregation_after_migrations() {
         let db = TemporaryDB::new();
         let fork = db.fork();
+
         fork.get_proof_list("name.list").push(1_u64);
         fork.get_proof_list("name.other_list")
             .extend(vec![1_u64, 2, 3]);
@@ -1444,5 +1446,17 @@ mod tests {
         assert_eq!(aggregator.get("name.entry"), Some(modified_entry_hash));
         assert_eq!(aggregator.get("name.new"), Some(new_entry_hash));
         assert_eq!(aggregator.get("name.other_entry"), Some(other_entry_hash));
+    }
+
+    #[test]
+    fn index_metadata_is_removed() {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+
+        fork.get_entry("test.foo").set(1_u8);
+        fork.create_tombstone("^test.foo");
+        fork.finish_migration("test");
+        let patch = fork.into_patch();
+        assert_eq!(patch.get_proof_entry::<_, u8>("test.foo").object_hash(), Hash::zero());
     }
 }
