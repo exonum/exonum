@@ -24,7 +24,9 @@ use std::{
 };
 
 use crate::{
-    views::{get_object_hash, AsReadonly, ChangesIter, RawAccess, ResolvedAddress, View},
+    views::{
+        get_object_hash, AsReadonly, ChangesIter, IndexesPool, RawAccess, ResolvedAddress, View,
+    },
     Error, Result, SystemSchema,
 };
 
@@ -634,6 +636,18 @@ impl Fork {
         working_patch.merge_into(&mut self.patch);
     }
 
+    pub fn finish_migration(&mut self, prefix: &str) {
+        // Mutable `self` reference ensures that no indexes are instantiated in the client code.
+        self.flush(); // Flushing is necessary to keep `self.patch` up to date.
+
+        let prefix = format!("^{}", prefix);
+        let removed_addrs = IndexesPool::new(&*self).remove_by_prefix(&prefix[1..]);
+        for addr in removed_addrs {
+            self.patch.changes.entry(addr).or_default().clear();
+        }
+        IndexesPool::new(&*self).finalize_migration_by_prefix(&prefix);
+    }
+
     /// Rolls back all changes that were made after the latest execution
     /// of the `flush` method.
     pub fn rollback(&mut self) {
@@ -1185,5 +1199,109 @@ mod tests {
             aggregator.get(&"other_list".to_owned()).unwrap(),
             patch.get_proof_list::<_, u64>("other_list").object_hash()
         );
+    }
+
+    #[test]
+    fn in_memory_migration() {
+        fn check_indexes<T: RawAccess + Copy>(view: T) {
+            let list = view.get_proof_list::<_, u64>("name.list");
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.get(0), Some(4));
+            assert_eq!(list.get(1), Some(5));
+            assert_eq!(list.get(2), None);
+            assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5]);
+
+            let map = view.get_map::<_, u64, i32>("name.map");
+            assert_eq!(map.get(&1), Some(42));
+
+            let set = view.get_key_set::<_, u8>("name.new");
+            assert!(set.contains(&0));
+            assert!(!set.contains(&1));
+
+            assert_eq!(view.get_entry("unrelated").get(), Some(1_u64));
+            assert_eq!(view.get_entry("name1.unrelated").get(), Some(2_u64));
+            let set = view.get_value_set::<_, String>("name.removed");
+            assert_eq!(set.iter().count(), 0);
+        }
+
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+
+        fork.get_list("name.list").extend(vec![1_u32, 2, 3]);
+        fork.get_map("name.map").put(&1_u64, "!".to_owned());
+        fork.get_value_set("name.removed").insert("!!!".to_owned());
+        fork.get_entry("unrelated").set(1_u64);
+        fork.get_entry("name1.unrelated").set(2_u64);
+
+        // Start migration.
+        fork.get_proof_list("^name.list").extend(vec![4_u64, 5]);
+        fork.get_map("^name.map").put(&1_u64, 42_i32);
+        fork.get_key_set("^name.new").insert(0_u8);
+        fork.finish_migration("name.");
+
+        check_indexes(&fork);
+        // The newly migrated indexes are emptied.
+        assert!(fork.get_proof_list::<_, u64>("^name.list").is_empty());
+
+        // Merge the fork and run the checks again.
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        check_indexes(&snapshot);
+    }
+
+    #[test]
+    fn migration_with_merges() {
+        fn check_indexes<T: RawAccess + Copy>(view: T) {
+            let list = view.get_proof_list::<_, u64>("name.list");
+            assert_eq!(list.len(), 4);
+            assert_eq!(list.get(2), Some(6));
+            assert_eq!(list.iter_from(1).collect::<Vec<_>>(), vec![5, 6, 7]);
+
+            let map = view.get_map::<_, u64, i32>("name.map");
+            assert_eq!(map.get(&1), None);
+            assert_eq!(map.get(&2), Some(21));
+            assert_eq!(map.get(&3), Some(7));
+            assert_eq!(map.keys().collect::<Vec<_>>(), vec![2, 3]);
+
+            assert_eq!(view.get_entry("unrelated").get(), Some(1_u64));
+            assert_eq!(view.get_entry("name1.unrelated").get(), Some(2_u64));
+            let set = view.get_value_set::<_, String>("name.removed");
+            assert_eq!(set.iter().count(), 0);
+        }
+
+        let db = TemporaryDB::new();
+
+        let fork = db.fork();
+        fork.get_list("name.list").extend(vec![1_u32, 2, 3]);
+        fork.get_map("name.map").put(&1_u64, "!".to_owned());
+        fork.get_entry("unrelated").set(1_u64);
+        fork.get_entry("name1.unrelated").set(2_u64);
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        fork.get_proof_list("^name.list").extend(vec![4_u64, 5]);
+        fork.get_map("^name.map").put(&1_u64, 42_i32);
+        fork.get_key_set("^name.new").insert(0_u8);
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+        {
+            let mut list = fork.get_proof_list::<_, u64>("^name.list");
+            assert_eq!(list.len(), 2);
+            list.push(6);
+            list.push(7);
+            assert_eq!(list.len(), 4);
+
+            let mut map = fork.get_map::<_, u64, i32>("^name.map");
+            map.clear();
+            map.put(&2, 21);
+            map.put(&3, 7);
+        }
+        fork.finish_migration("name.");
+
+        check_indexes(&fork);
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        check_indexes(&snapshot);
     }
 }

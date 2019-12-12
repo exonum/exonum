@@ -14,7 +14,9 @@
 
 pub use self::{
     address::{IndexAddress, ResolvedAddress},
-    metadata::{get_object_hash, BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
+    metadata::{
+        get_object_hash, BinaryAttribute, IndexState, IndexType, IndexesPool, ViewWithMetadata,
+    },
     system_schema::SystemSchema,
 };
 

@@ -294,10 +294,10 @@ where
 
 /// Persistent pool used to store indexes metadata in the database.
 /// Pool size is used as an identifier of newly created indexes.
-pub(super) struct IndexesPool<T: RawAccess>(View<T>);
+pub struct IndexesPool<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> IndexesPool<T> {
-    pub(super) fn new(index_access: T) -> Self {
+    pub(crate) fn new(index_access: T) -> Self {
         let view = View::new(index_access, ResolvedAddress::system(INDEXES_POOL_NAME));
         Self(view)
     }
@@ -336,6 +336,64 @@ impl<T: RawAccess> IndexesPool<T> {
         let is_phantom = !self.0.put_or_forget(index_name, metadata.to_bytes());
         self.set_len(len + 1);
         (metadata, is_phantom)
+    }
+}
+
+impl<T: RawAccessMut> IndexesPool<T> {
+    /// Removes metadata for all entries starting with the specified `prefix`.
+    ///
+    /// # Return value
+    ///
+    /// Returns resolved addresses corresponding to the removed indexes.
+    #[allow(unsafe_code)]
+    pub(crate) fn remove_by_prefix(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
+        let (addresses, removed_keys): (Vec<_>, Vec<_>) = self
+            .0
+            .iter::<_, Vec<u8>, IndexMetadata>(prefix)
+            .map(|(full_name, metadata)| {
+                debug_assert!(full_name.starts_with(prefix.as_bytes()));
+                let mut cutoff_index = full_name.len();
+                loop {
+                    match full_name.get(cutoff_index) {
+                        Some(0) | None => break,
+                        Some(_) => {
+                            cutoff_index += 1;
+                        }
+                    }
+                }
+
+                let name = full_name[..cutoff_index].to_vec();
+                let resolved = ResolvedAddress {
+                    name: unsafe {
+                        // SAFETY:
+                        // Safe by construction; metadata keys before the `\0` separator
+                        // correspond to the index names, which consist of a subset of
+                        // ASCII chars.
+                        String::from_utf8_unchecked(name)
+                    },
+                    id: NonZeroU64::new(metadata.identifier),
+                };
+                (resolved, full_name)
+            })
+            .unzip();
+
+        for full_name in &removed_keys {
+            self.0.remove(full_name);
+        }
+        addresses
+    }
+
+    /// Moves indexes with the specified prefix from the next version (i.e., `^prefix.*` form)
+    /// to the current version (`prefix.*` form). The older indexes must be removed first
+    /// by calling `remove_by_prefix`; this method does not check this.
+    pub(crate) fn finalize_migration_by_prefix(&mut self, prefix: &str) {
+        debug_assert_eq!(&prefix[0..1], "^", "Invalid prefix");
+        let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(prefix).collect();
+        for (key, metadata) in moved_indexes {
+            // `key[1..]` removes `^` char at the beginning of the index.
+            self.0.put(&key[1..], metadata);
+            self.0.remove(&key);
+        }
     }
 }
 
