@@ -1,8 +1,11 @@
 use std::marker::PhantomData;
 
-use crate::{access::{Access, AccessError, FromAccess}, views::IndexAddress, BinaryKey, IndexType, BinaryValue};
-use crate::views::{View, ViewWithMetadata, RawAccess};
-use std::fmt;
+use crate::{access::{Access, AccessError, FromAccess}, views::IndexAddress, BinaryKey, IndexType, BinaryValue, ResolvedAddress};
+use crate::views::{View, ViewWithMetadata, RawAccess, IndexMetadata};
+use std::{fmt, num::NonZeroU64, borrow::Cow};
+use byteorder::{LittleEndian, WriteBytesExt};
+use std::borrow::Borrow;
+use failure::Fail;
 
 // cspell:ignore foob
 
@@ -89,7 +92,7 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: Access,
-    K: BinaryKey + ?Sized,
+    K: BinaryKey + ?Sized + fmt::Debug,
     I: FromAccess<T>,
 {
     /// Gets an index corresponding to the specified key.
@@ -102,29 +105,41 @@ where
         I::from_access(self.access.clone(), addr)
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
-
-
 }
 
 impl<T, K, I> Group<T, K, I>
     where
         T: RawAccess,
-        K: BinaryKey,
+        K: BinaryKey + fmt::Debug,
         I: FromAccess<T>,
         <K as std::borrow::ToOwned>::Owned: fmt::Debug,
 {
-    pub fn iter<V:BinaryValue + fmt::Debug>(&self) {
+    pub fn iter<V:BinaryValue + fmt::Debug>(&self) -> I {
         // We need to get all the keys.
+        const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
         println!("iter from prefix {:?}", self.prefix);
 
-        let view = View::new(self.access.clone(), self.prefix.name());
+        let view = View::new(
+            self.access.clone(),
+            ResolvedAddress::system(INDEXES_POOL_NAME),
+        );
 
-        for entry in view.iter::<(), K, V>(&()) {
-            dbg!(&entry);
+        let index_address = IndexAddress::from(self.prefix.clone());
+
+        let prefix = index_address.fully_qualified_name();
+
+        let mut ids = Vec::new();
+
+        for entry in view.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
+            let metadata: Result<IndexMetadata<Vec<u8>>, failure::Error> = IndexMetadata::from_bytes(Cow::Owned(entry.1));
+            let key = entry.0[6..].to_vec();
+            dbg!(&key);
+            ids.push(key)
         }
-//        let (view, state) = view.into_parts();
 
+        let key = K::read(&ids[0]);
+        self.get(key.borrow())
     }
 }
 
@@ -171,14 +186,23 @@ mod tests {
         let fork = db.fork();
 
         {
-            let group: Group<_, u32, ProofListIndex<_, String>> = fork.get_group("group");
-            let mut list = group.get(&1);
-            list.push("foo".to_owned());
+            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group("group");
+            let mut list = group.get(&"s1".to_owned());
+            list.push("afsdfasdf".to_owned());
             list.push("bar".to_owned());
-            group.get(&2).push("baz".to_owned());
+            list.push("bar2".to_owned());
+            group.get(&"s2".to_owned()).push("baz".to_owned());
 
-            group.iter::<String>();
         }
 
+        db.merge(fork.into_patch());
+
+        let snapshot = db.snapshot();
+
+        let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group("group");
+
+        let list = group.iter::<String>();
+
+        dbg!(list.get(0));
     }
 }

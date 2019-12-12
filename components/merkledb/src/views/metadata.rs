@@ -163,7 +163,7 @@ impl Default for IndexType {
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V = Vec<u8>> {
-    identifier: u64,
+    pub identifier: u64,
     index_type: IndexType,
     // `state` may be empty for any possible type. `None` option usually represents
     // a "default" value; it is used on index initialization, or after the index
@@ -432,6 +432,7 @@ where
         };
 
         dbg!(&addr);
+        dbg!(&index_address);
 
         let is_aggregated = !is_phantom
             && index_type.is_merkelized()
