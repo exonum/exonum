@@ -1,3 +1,8 @@
+//! This test checks that migration works properly:
+//!
+//! - Migrated indexes are properly aggregated during and after migration
+//! - Removed indexes are properly cleaned up
+
 use exonum_crypto::Hash;
 use proptest::{
     bool,
@@ -17,15 +22,24 @@ use exonum_merkledb::{
 
 const ACTIONS_MAX_LEN: usize = 20;
 
+/// Constituent action applied to the DB during migration.
 #[derive(Debug, Clone)]
 enum MigrationAction {
+    /// Do some work on a certain index. The index may be in the migration, or outside of it
+    /// (including the case when the index will be replaced / removed by the migration).
     WorkOnIndex {
+        /// Index address.
         addr: IndexAddress,
+        /// Type to initialize index to if it doesn't exist.
         index_type: IndexType,
+        /// Value to insert into the index. If `None`, the index will be cleared instead.
         value: Option<Vec<u8>>,
     },
-    RemoveIndex(IndexAddress),
+    /// Create a tombstone for the specified address.
+    CreateTombstone(IndexAddress),
+    /// Flush the fork.
     FlushFork,
+    /// Merge the fork into the DB.
     MergeFork,
 }
 
@@ -103,6 +117,7 @@ impl MigrationAction {
     }
 }
 
+/// Generates a name for an index participating in migration.
 fn generate_name() -> impl Strategy<Value = IndexAddress> {
     let names = prop_oneof![
         strategy::Just("test.foo"),
@@ -113,6 +128,7 @@ fn generate_name() -> impl Strategy<Value = IndexAddress> {
     names.prop_map(IndexAddress::from_root)
 }
 
+/// Generates a name for an index **not** participating in migration.
 fn generate_unrelated_name() -> impl Strategy<Value = IndexAddress> {
     let names = prop_oneof![
         strategy::Just("test_.foo"),
@@ -122,6 +138,7 @@ fn generate_unrelated_name() -> impl Strategy<Value = IndexAddress> {
     names.prop_map(IndexAddress::from_root)
 }
 
+/// Generates an `IndexAddress` optionally placed in a group.
 fn generate_address<T: Strategy<Value = IndexAddress>>(
     name: fn() -> T,
 ) -> impl Strategy<Value = IndexAddress> {
@@ -144,10 +161,13 @@ fn generate_index_type() -> impl Strategy<Value = IndexType> {
     ]
 }
 
+/// Generates a value to place in the index. if `None` is generated, the index will be cleared
+/// instead.
 fn generate_value() -> impl Strategy<Value = Option<Vec<u8>>> {
     prop_oneof![strategy::Just(None), vec(0_u8..4, 1..=1).prop_map(Some)]
 }
 
+/// Converts the provided address into its migration counterpart.
 fn migration_addr(addr: &IndexAddress) -> IndexAddress {
     let mut new_addr = IndexAddress::from_root(format!("^{}", addr.name()));
     if let Some(bytes) = addr.id_in_group() {
@@ -187,7 +207,7 @@ fn generate_action() -> impl Strategy<Value = MigrationAction> {
             value,
         }),
         generate_address(generate_name)
-            .prop_map(|addr| { MigrationAction::RemoveIndex(migration_addr(&addr)) }),
+            .prop_map(|addr| { MigrationAction::CreateTombstone(migration_addr(&addr)) }),
         strategy::Just(MigrationAction::FlushFork),
         strategy::Just(MigrationAction::MergeFork),
     ]
@@ -202,13 +222,15 @@ fn get_object_hash(snapshot: &dyn Snapshot, name: &str, index_type: IndexType) -
     }
 }
 
+/// Checks the state of a particular state aggregator. `single_indexes` are the expected single
+/// indexes in the DB aggregated within the `namespace`, together with their types.
 fn check_aggregator(
     snapshot: &dyn Snapshot,
     namespace: &str,
     single_indexes: &HashMap<String, IndexType>,
 ) -> TestCaseResult {
     let aggregator = SystemSchema::new(snapshot).namespace_state_aggregator(namespace);
-    let mut expected_aggregation = HashSet::new();
+    let mut expected_names = HashSet::new();
     for (name, index_type) in single_indexes {
         let aggregated_name = if name.starts_with('^') {
             &name[1..]
@@ -216,17 +238,14 @@ fn check_aggregator(
             name
         };
         let maybe_hash = if index_type.is_merkelized() {
-            expected_aggregation.insert(aggregated_name.to_owned());
+            expected_names.insert(aggregated_name.to_owned());
             Some(get_object_hash(snapshot, name, *index_type))
         } else {
             None
         };
         assert_eq!(aggregator.get(aggregated_name), maybe_hash);
     }
-    prop_assert_eq!(
-        aggregator.keys().collect::<HashSet<_>>(),
-        expected_aggregation
-    );
+    prop_assert_eq!(aggregator.keys().collect::<HashSet<_>>(), expected_names);
     Ok(())
 }
 
@@ -249,8 +268,11 @@ fn check_final_consistency(
     let system_schema = SystemSchema::new(snapshot);
     let ns_aggregator = system_schema.namespace_state_aggregator("test");
     prop_assert_eq!(ns_aggregator.keys().count(), 0);
+
     for (name, ty) in single_indexes {
         if *ty == IndexType::Tombstone {
+            // The index should be fully removed, thus creating a `ProofMapIndex` on its place
+            // should succeed and it should have a default `object_hash`.
             prop_assert_eq!(
                 get_object_hash(snapshot, name, IndexType::ProofMap),
                 HashTag::empty_map_hash()
@@ -261,6 +283,8 @@ fn check_final_consistency(
     Ok(())
 }
 
+/// Gets the single indexes and their types from the `snapshot`. This uses the fact that only
+/// a limited amount of indexes may be generated by `MigrationAction`s.
 fn get_single_indexes(snapshot: &dyn Snapshot) -> HashMap<String, IndexType> {
     const POSSIBLE_NAMES: &[&str] = &[
         "test.foo",
@@ -307,7 +331,7 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
                     aggregation.insert(addr.name().to_owned(), real_type);
                 }
             }
-            MigrationAction::RemoveIndex(addr) => {
+            MigrationAction::CreateTombstone(addr) => {
                 let is_in_group = addr.id_in_group().is_some();
                 let index_name = addr.name().to_owned();
                 if fork.touch_index(addr, IndexType::Tombstone).is_ok() && !is_in_group {
@@ -328,6 +352,8 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
 
     fork.finish_migration("test");
 
+    // Compute the final list of indexes. Note that indexes removed in the migration
+    // will have `Tombstone` type.
     let mut aggregation = old_aggregation;
     aggregation.extend(
         new_aggregation

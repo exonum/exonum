@@ -1457,6 +1457,9 @@ mod tests {
         fork.create_tombstone("^test.foo");
         fork.finish_migration("test");
         let patch = fork.into_patch();
-        assert_eq!(patch.get_proof_entry::<_, u8>("test.foo").object_hash(), Hash::zero());
+        assert_eq!(
+            patch.get_proof_entry::<_, u8>("test.foo").object_hash(),
+            Hash::zero()
+        );
     }
 }
