@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Internal data types of Bitcoin anchoring service.
+// Storage with keys and values represented as bytes arrays.
 
 syntax = "proto3";
 
