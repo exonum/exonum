@@ -17,7 +17,7 @@ use exonum_merkledb::{
     Snapshot, SystemSchema,
 };
 
-use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery};
+use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceState};
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
 /// Provides access to blockchain data for the executing service.
@@ -101,7 +101,7 @@ fn mount_point_for_service<'q, T: RawAccess>(
 ) -> Option<Prefixed<'static, T>> {
     let state = DispatcherSchema::new(access.clone())
         .get_instance(id)
-        .filter(|state| state.is_active())?;
+        .filter(InstanceState::is_active)?;
     Some(Prefixed::new(state.spec.name, access))
 }
 

@@ -20,7 +20,7 @@ use futures::{
     Future,
 };
 
-use std::{collections::BTreeMap, fmt, panic};
+use std::{collections::HashMap, fmt, panic};
 
 use crate::{
     blockchain::{Blockchain, CallInBlock, Schema as CoreSchema},
@@ -50,8 +50,8 @@ struct ServiceInfo {
 /// Lookup table for the committed service instances.
 #[derive(Debug, Default)]
 struct CommittedServices {
-    instances: BTreeMap<InstanceId, ServiceInfo>,
-    instance_names: BTreeMap<String, InstanceId>,
+    instances: HashMap<InstanceId, ServiceInfo>,
+    instance_names: HashMap<String, InstanceId>,
 }
 
 impl CommittedServices {
@@ -104,7 +104,7 @@ impl CommittedServices {
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
-    runtimes: BTreeMap<u32, Box<dyn Runtime>>,
+    runtimes: HashMap<u32, Box<dyn Runtime>>,
     service_infos: CommittedServices,
 }
 
@@ -444,14 +444,14 @@ impl Dispatcher {
             })
     }
 
-    /// Notifies the runtimes that it has to shutdown.
+    /// Notifies the runtimes that they have to shut down.
     pub(crate) fn shutdown(&mut self) {
         for runtime in self.runtimes.values_mut() {
             runtime.shutdown();
         }
     }
 
-    /// Commits service instance status in the corresponding runtime.
+    /// Commits service instance status to the corresponding runtime.
     pub(super) fn commit_service_status(
         &mut self,
         snapshot: &dyn Snapshot,

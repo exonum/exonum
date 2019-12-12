@@ -444,7 +444,10 @@ impl BinaryValue for InstanceStatus {
         match code {
             1 => Ok(InstanceStatus::Active),
             2 => Ok(InstanceStatus::Stopped),
-            other => Err(format_err!("Instance status {} is unknown.", other)),
+            other => Err(format_err!(
+                "Instance status with code {} is unknown.",
+                other
+            )),
         }
     }
 }
@@ -478,7 +481,7 @@ pub struct InstanceState {
     /// Service instance activity status.
     #[protobuf_convert(with = "InstanceStatus")]
     pub status: Option<InstanceStatus>,
-    /// Next status of instance if the value is not `None`.
+    /// Pending status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
 }
