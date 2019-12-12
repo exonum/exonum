@@ -18,7 +18,3 @@ members = [
     "components/proto",
 ]
 exclude = [ "exonum/fuzz" ]
-
-# See https://github.com/witnet/protobuf-convert/pull/4
-[patch.crates-io]
-protobuf-convert = { git = "https://github.com/alekseysidorov/protobuf-convert.git", rev = "d4d17d8139796d9ce3f2856eff93f836a94d0947" }
