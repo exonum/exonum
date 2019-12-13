@@ -145,8 +145,7 @@ impl AnyTx {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::runtime::ArtifactId")]
+#[derive(BinaryValue, ObjectHash)]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
