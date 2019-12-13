@@ -37,6 +37,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `before_transactions` hook for services was introduced. (#1577)
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- `explorer/v1/call_status` endpoint was introduced. (#1612)
 
 #### exonum-merkledb
 
