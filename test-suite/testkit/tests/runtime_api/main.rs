@@ -50,6 +50,7 @@ fn test_exonum_protos_with_service() {
         .collect();
 
     let expected_files: HashSet<String> = vec![
+        "binary_map.proto",
         "blockchain.proto",
         "consensus.proto",
         "doc_tests.proto",

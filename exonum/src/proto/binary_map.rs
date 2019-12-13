@@ -83,11 +83,13 @@ where
             .map(key_value_pb_to_pair)
             .collect::<Result<Vec<(K, V)>, failure::Error>>()?;
 
+        let check_key_ordering = |k: &[(K, V)]| {
+            let (prev_key, key) = (&k[0].0, &k[1].0);
+            prev_key.partial_cmp(key) == Some(Ordering::Less)
+        };
+
         assert!(
-            values.windows(2).all(|k| {
-                let (prev_key, key) = (&k[0].0, &k[1].0);
-                prev_key.partial_cmp(key) == Some(Ordering::Less)
-            }),
+            values.windows(2).all(check_key_ordering),
             "Invalid keys ordering or duplicate keys found in BinaryMap"
         );
 
