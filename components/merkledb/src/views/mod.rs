@@ -27,6 +27,7 @@ use super::{
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
+use crate::views::metadata::IndexesPool;
 
 mod address;
 mod metadata;
@@ -341,6 +342,23 @@ impl<T: RawAccessMut> View<T> {
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
         self.changes.as_mut().unwrap().clear();
+    }
+}
+
+//TODO: Wrapper to prevent abstraction leak. Maybe there is better way.
+pub(crate) struct IndexesPoolWrapper<T: RawAccess> {
+    inner: IndexesPool<T>,
+}
+
+impl<T: RawAccess> IndexesPoolWrapper<T> {
+    pub(crate) fn new(index_access: T) -> Self {
+        IndexesPoolWrapper {
+            inner: IndexesPool::new(index_access),
+        }
+    }
+
+    pub(crate) fn suffixes<K: BinaryKey + Clone>(&self, prefix: &IndexAddress) -> Vec<K> {
+        self.inner.suffixes(prefix)
     }
 }
 

@@ -24,11 +24,13 @@ use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 use super::{
     system_schema::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
 };
+use crate::views::address::INDEX_NAME_SEPARATOR;
 use crate::{
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
-    BinaryValue,
+    BinaryKey, BinaryValue,
 };
+use std::borrow::Borrow;
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
@@ -337,6 +339,33 @@ impl<T: RawAccess> IndexesPool<T> {
         self.set_len(len + 1);
         (metadata, is_phantom)
     }
+
+    pub(super) fn suffixes<K: BinaryKey + Clone>(&self, prefix: &IndexAddress) -> Vec<K> {
+        let prefix = prefix.fully_qualified_name();
+        let mut keys = Vec::new();
+
+        for entry in self.0.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
+            let key = get_suffix(entry);
+            keys.push(key);
+        }
+
+        keys
+    }
+}
+
+fn get_suffix<K: BinaryKey + Clone>(entry: (Vec<u8>, Vec<u8>)) -> K {
+    // TODO: simplify this
+    let key = entry
+        .0
+        .split(|b| &[*b] == INDEX_NAME_SEPARATOR)
+        .skip(1)
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    // TODO: change BinaryKey::read signature to avoid panic (ECR-174)
+    let key = K::read(&key);
+    key.borrow().clone()
 }
 
 /// Obtains `object_hash` for an aggregated index.

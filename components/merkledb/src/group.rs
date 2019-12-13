@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::views::{IndexMetadata, RawAccess, View, ViewWithMetadata};
+use crate::views::{IndexMetadata, IndexesPoolWrapper, RawAccess, View, ViewWithMetadata};
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::IndexAddress,
@@ -114,31 +114,13 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: RawAccess,
-    K: BinaryKey + Clone,
+    K: BinaryKey + Clone, //TODO: This clone definitely should be removed.
     I: FromAccess<T>,
 {
     pub fn iter<V: BinaryValue>(&self) -> GroupIter<K, T, I> {
-        // We need to get all the keys.
-        const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
-
-        let view = View::new(
-            self.access.clone(),
-            ResolvedAddress::system(INDEXES_POOL_NAME),
-        );
-
         let prefix = IndexAddress::from(self.prefix.clone());
-        let prefix = prefix.fully_qualified_name();
-
-        let mut keys = Vec::new();
-
-        for entry in view.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
-            let metadata: Result<IndexMetadata<Vec<u8>>, failure::Error> =
-                IndexMetadata::from_bytes(Cow::Owned(entry.1));
-            let key = entry.0[6..].to_vec();
-            let key = K::read(&key);
-            let key = key.borrow().clone();
-            keys.push(key);
-        }
+        let indexes_pool = IndexesPoolWrapper::new(self.access.clone());
+        let keys = indexes_pool.suffixes(&prefix);
 
         GroupIter::new(self.prefix.clone(), keys, self.access.clone())
     }
@@ -228,11 +210,13 @@ mod tests {
 
     #[test]
     fn group_iter() {
+        const GROUP_NAME: &'static str = "group_group";
+
         let db = TemporaryDB::new();
         let fork = db.fork();
 
         {
-            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group("group");
+            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group(GROUP_NAME);
             let mut list = group.get(&"g1".to_owned());
             list.push("foo".to_owned());
             group.get(&"g2".to_owned()).push("bar".to_owned());
@@ -242,7 +226,7 @@ mod tests {
         db.merge(fork.into_patch());
 
         let snapshot = db.snapshot();
-        let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group("group");
+        let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
         let indexes = group.iter::<String>();
 
         let mut results = indexes
