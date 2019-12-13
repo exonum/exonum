@@ -251,7 +251,7 @@
 pub use self::{
     call_context::CallContext,
     error::Error,
-    runtime_api::ArtifactProtobufSpec,
+    runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
     service::{
         AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
         ServiceFactory,

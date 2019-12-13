@@ -63,6 +63,7 @@ fn recv_text_msg(client: &mut Client<TcpStream>) -> Option<String> {
     None
 }
 
+/// Checks that ws client accepts valid transactions and discards transactions with incorrect instance ID.
 #[test]
 fn test_send_transaction() {
     let node_handler = run_node(6330, 8079);
@@ -81,18 +82,37 @@ fn test_send_transaction() {
     let keypair = gen_keypair();
     let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_hash = tx.object_hash();
-    let tx_json =
-        serde_json::to_string(&json!({ "type": "transaction", "payload": { "tx_body": tx }}))
-            .unwrap();
+    let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
+    let tx_json = serde_json::to_string(&tx_body).unwrap();
     client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
 
-    // Check response on set message.
+    // Check response on sent message.
     let resp_text = recv_text_msg(&mut client).unwrap();
+    let response: serde_json::Value = serde_json::from_str(&resp_text).unwrap();
     assert_eq!(
-        serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
+        response,
         json!({
             "result": "success",
             "response": { "tx_hash": tx_hash }
+        })
+    );
+
+    // Send invalid transaction.
+    let (pk, sk) = gen_keypair();
+    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID + 1, pk, &sk);
+    let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
+    let tx_json = serde_json::to_string(&tx_body).unwrap();
+    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+
+    // Check response on sent message.
+    let resp_text = recv_text_msg(&mut client).unwrap();
+    let response: serde_json::Value = serde_json::from_str(&resp_text).unwrap();
+    assert_eq!(
+        response,
+        json!({
+            "result": "error",
+            "description": "Execution error `dispatcher:7` occurred: Suitable runtime \
+             for the given service instance ID is not found."
         })
     );
 

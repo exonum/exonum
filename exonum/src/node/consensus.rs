@@ -17,7 +17,7 @@ use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 use std::{collections::HashSet, convert::TryFrom};
 
 use crate::{
-    blockchain::{contains_transaction, Schema},
+    blockchain::{contains_transaction, Blockchain, Schema},
     crypto::{Hash, PublicKey},
     events::InternalRequest,
     helpers::{Height, Round, ValidatorId},
@@ -608,8 +608,8 @@ impl NodeHandler {
     /// Checks if the transaction is new and adds it to the pool. This may trigger an expedited
     /// `Propose` timeout on this node if transaction count in the pool goes over the threshold.
     ///
-    /// Before adding a transaction into pool, this method calls `BlockchainMut::check_tx` to
-    /// ensure that transaction passes at least basic checks. If `BlockchainMut::check_tx` fails,
+    /// Before adding a transaction into pool, this method calls `Blockchain::check_tx` to
+    /// ensure that transaction passes at least basic checks. If `Blockchain::check_tx` fails,
     /// transaction will be considered invalid and not stored to the pool (instead, its hash will
     /// be stored in the temporary invalid messages set, so we will be able to detect a block/propose
     /// with an invalid tx later; note that the temporary set is cleared every block).
@@ -626,7 +626,7 @@ impl NodeHandler {
             bail!("Received already processed transaction, hash {:?}", hash)
         }
 
-        if let Err(e) = self.blockchain.check_tx(&msg) {
+        if let Err(e) = Blockchain::check_tx(&snapshot, &msg) {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
             // since the latter uses `invalid_txs` to recalculate the validity of proposals.
@@ -696,21 +696,6 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub(crate) fn handle_incoming_tx(&mut self, msg: Verified<AnyTx>) {
         trace!("Handle incoming transaction");
-        // Check transaction before handling it to avoid the broadcasting.
-        // Reaction for an incorrect tx here and in `handle_tx` is different:
-        // here we simply ignore it without notifying the network, but if the
-        // transaction is received from the network, we have to deal with it
-        // and maybe even panic (if most of nodes will approve a block with such a
-        // transaction).
-        // TODO: Move this check to the `ExplorerApi::add_transaction`. [ECR-3907]
-        if let Err(error) = self.blockchain.check_tx(&msg) {
-            warn!(
-                "Received incorrect transaction from outside of the network; \
-                 skipping it. Info on error: {}",
-                error
-            );
-            return;
-        }
 
         match self.handle_tx(msg.clone()) {
             Ok(_) => self.broadcast(msg),

@@ -671,7 +671,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 }
 
-/// Checks that `BlockchainMut::check_tx` discards transactions with incorrect
+/// Checks that `Blockchain::check_tx` discards transactions with incorrect
 /// instance IDs.
 #[test]
 fn test_check_tx() {
@@ -682,12 +682,13 @@ fn test_check_tx() {
             .artifact_id()
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
+    let snapshot = blockchain.snapshot();
 
     let correct_tx = keypair.test_add(TEST_SERVICE_ID, 1);
-    blockchain.check_tx(&correct_tx).unwrap();
+    Blockchain::check_tx(&snapshot, &correct_tx).unwrap();
     let incorrect_tx = keypair.test_add(TEST_SERVICE_ID + 1, 1);
     assert_eq!(
-        blockchain.check_tx(&incorrect_tx).unwrap_err(),
+        Blockchain::check_tx(&snapshot, &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
     );
 }

@@ -22,6 +22,7 @@ use exonum::{
     crypto::{self, gen_keypair, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
+    merkledb::BinaryValue,
     runtime::SnapshotExt,
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
@@ -1007,4 +1008,37 @@ fn test_explorer_with_before_transactions_error() {
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(13));
     // ^-- The changes in `before_transactions` should be reverted.
+}
+
+/// Checks that `ExplorerApi` accepts valid transactions and discards transactions with incorrect instance ID.
+#[test]
+fn test_explorer_add_transaction_with_invalid_transaction() {
+    let (_testkit, api) = init_testkit();
+
+    // Send valid transaction.
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    let data = hex::encode(tx.to_bytes());
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&json!({ "tx_body": data }))
+        .post::<TransactionResponse>("v1/transactions")
+        .expect("Failed to send valid transaction.");
+    assert_eq!(response.tx_hash, tx.object_hash());
+
+    // Send invalid transaction.
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Reset.sign(SERVICE_ID + 1, pubkey, &key);
+    let data = hex::encode(tx.to_bytes());
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&json!({ "tx_body": data }))
+        .post::<TransactionResponse>("v1/transactions")
+        .expect_err("Expected transaction send to finish with error.");
+    let error_body = "Execution error `dispatcher:7` occurred: Suitable runtime \
+                      for the given service instance ID is not found.";
+    assert_matches!(
+        response,
+        ApiError::BadRequest(ref body) if body == error_body
+    );
 }
