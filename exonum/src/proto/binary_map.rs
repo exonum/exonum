@@ -88,7 +88,7 @@ where
             prev_key.partial_cmp(key) == Some(Ordering::Less)
         };
 
-        assert!(
+        ensure!(
             values.windows(2).all(check_key_ordering),
             "Invalid keys ordering or duplicate keys found in BinaryMap"
         );
