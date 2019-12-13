@@ -29,7 +29,8 @@ use super::{
 mod address;
 mod metadata;
 mod system_schema;
-#[cfg(test)]
+//TODO: revert
+#[cfg(test1)]
 mod tests;
 
 /// Represents current view of the database by specified `address` and
