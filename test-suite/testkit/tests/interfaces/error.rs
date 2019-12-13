@@ -15,7 +15,8 @@
 use exonum_derive::ExecutionFail;
 
 /// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
 pub enum Error {
     /// Wallet not found.
     WalletNotFound = 0,

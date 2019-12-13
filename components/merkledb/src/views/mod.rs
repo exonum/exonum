@@ -183,37 +183,19 @@ impl<T: RawAccess> View<T> {
     }
 
     fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(ref changes) = self.changes.as_ref() {
-            if let Some(change) = changes.data.get(key) {
-                match *change {
-                    Change::Put(ref v) => return Some(v.clone()),
-                    Change::Delete => return None,
-                }
-            }
-
-            if changes.is_cleared() {
-                return None;
-            }
-        }
-
-        self.snapshot().get(&self.address, key)
+        self.changes
+            .as_ref()
+            .map_or(Err(()), |changes| changes.get(key))
+            // At this point, `Err(_)` signifies that we need to retrieve data from the snapshot.
+            .unwrap_or_else(|()| self.snapshot().get(&self.address, key))
     }
 
     fn contains_raw_key(&self, key: &[u8]) -> bool {
-        if let Some(ref changes) = self.changes.as_ref() {
-            if let Some(change) = changes.data.get(key) {
-                match *change {
-                    Change::Put(..) => return true,
-                    Change::Delete => return false,
-                }
-            }
-
-            if changes.is_cleared() {
-                return false;
-            }
-        }
-
-        self.snapshot().contains(&self.address, &key)
+        self.changes
+            .as_ref()
+            .map_or(Err(()), |changes| changes.contains(key))
+            // At this point, `Err(_)` signifies that we need to retrieve data from the snapshot.
+            .unwrap_or_else(|()| self.snapshot().contains(&self.address, key))
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
@@ -360,7 +342,7 @@ impl<T: RawAccessMut> View<T> {
     }
 }
 
-struct ChangesIter<'a, T: Iterator + 'a> {
+pub(crate) struct ChangesIter<'a, T: Iterator + 'a> {
     inner: Peekable<T>,
     _lifetime: PhantomData<&'a ()>,
 }
@@ -370,7 +352,7 @@ impl<'a, T> ChangesIter<'a, T>
 where
     T: Iterator<Item = (&'a Vec<u8>, &'a Change)>,
 {
-    fn new(iterator: T) -> Self {
+    pub fn new(iterator: T) -> Self {
         ChangesIter {
             inner: iterator.peekable(),
             _lifetime: PhantomData,
@@ -399,10 +381,14 @@ where
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.inner.peek() {
-                Some((key, &Change::Put(ref value))) => {
+                Some((key, Change::Put(ref value))) => {
                     return Some((key.as_slice(), value.as_slice()));
                 }
-                Some((_, &Change::Delete)) => {}
+                Some((_, Change::Delete)) => {
+                    // Advance the iterator. Since we've already peeked the value,
+                    // we can safely drop it.
+                    self.inner.next();
+                }
                 None => {
                     return None;
                 }

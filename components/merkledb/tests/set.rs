@@ -27,7 +27,7 @@ use std::{collections::HashSet, hash::Hash, rc::Rc};
 use exonum_merkledb::{access::AccessExt, Fork, KeySetIndex, TemporaryDB, ValueSetIndex};
 
 mod common;
-use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
+use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]
 enum SetAction<V> {
@@ -36,14 +36,16 @@ enum SetAction<V> {
     // Should be applied to a small subset of values (like modulo 8 for int).
     Remove(V),
     Clear,
+    FlushFork,
     MergeFork,
 }
 
-impl<V> PartialEq<MergeFork> for SetAction<V> {
-    fn eq(&self, _: &MergeFork) -> bool {
+impl<V> AsForkAction for SetAction<V> {
+    fn as_fork_action(&self) -> Option<ForkAction> {
         match self {
-            SetAction::MergeFork => true,
-            _ => false,
+            SetAction::FlushFork => Some(ForkAction::Flush),
+            SetAction::MergeFork => Some(ForkAction::Merge),
+            _ => None,
         }
     }
 }
@@ -53,6 +55,7 @@ fn generate_action() -> impl Strategy<Value = SetAction<u8>> {
         (0..8u8).prop_map(SetAction::Put),
         (0..8u8).prop_map(SetAction::Remove),
         strategy::Just(SetAction::Clear),
+        strategy::Just(SetAction::FlushFork),
         strategy::Just(SetAction::MergeFork),
     ]
 }

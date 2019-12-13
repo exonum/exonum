@@ -12,26 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    crypto::PublicKey,
-    merkledb::{access::Access, MapIndex},
-};
-use exonum_derive::*;
-use exonum_proto::ProtobufConvert;
-use serde_derive::{Deserialize, Serialize};
+//! Module of the rust-protobuf generated files.
 
-use crate::proto;
+// For protobuf generated files.
+#![allow(bare_trait_objects)]
+#![allow(renamed_and_removed_lints)]
 
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Wallet")]
-pub struct Wallet {
-    pub name: String,
-    pub balance: u64,
-}
-
-#[derive(FromAccess)]
-pub struct WalletSchema<T: Access> {
-    pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
-}
+include!(concat!(
+    env!("OUT_DIR"),
+    "/test_runtime_api_protobuf_mod.rs"
+));
