@@ -277,6 +277,14 @@ impl<T: Access> Schema<T> {
         Height(len - 1)
     }
 
+    /// Returns the height of the block to be committed.
+    ///
+    /// Unlike `height`, this method never panics.
+    pub fn next_height(&self) -> Height {
+        let len = self.block_hashes_by_height().len();
+        Height(len)
+    }
+
     /// Returns an actual consensus configuration of the blockchain.
     ///
     /// # Panics

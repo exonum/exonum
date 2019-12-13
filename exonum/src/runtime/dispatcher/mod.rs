@@ -14,7 +14,7 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{Fork, Patch, Snapshot};
+use exonum_merkledb::{access::RawAccess, Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
@@ -117,9 +117,17 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        // Start the built-in service instance.
+        // Add the service instance to the service.
         ExecutionContext::new(self, fork, Caller::Blockchain)
-            .start_adding_service(spec, constructor)?;
+            .start_adding_service(spec.clone(), constructor)?;
+        // Mark service as active.
+        self.activate_pending(fork);
+        // Start service within runtime.
+        self.start_service((fork as &Fork).snapshot(), &spec)
+            .expect("Cannot start service");
+        // Remove service from pending.
+        let mut schema = Schema::new(fork as &Fork);
+        schema.take_pending_instances();
         Ok(())
     }
 
@@ -196,7 +204,7 @@ impl Dispatcher {
     }
 
     fn report_error(err: &ExecutionError, fork: &Fork, call: CallInBlock) {
-        let height = CoreSchema::new(fork).height().next();
+        let height = CoreSchema::new(fork).next_height();
         if err.kind() == ErrorKind::Unexpected {
             log::error!(
                 "{} at {:?} resulted in unexpected error: {:?}",
