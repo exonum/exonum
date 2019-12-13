@@ -760,6 +760,81 @@ fn handle_precommit_incorrect_tx_received_before_propose() {
 
     // Here majority of precommits is achieved and node should panic.
 }
+
+/// Here, node receives majority of prevotes but has propose with invalid tx.
+///
+/// Normally, after receiving majority of the prevotes node should send a precommit for it.
+/// In our case, propose contains incorrect tx, so we expect node not to send precommit for it.
+#[test]
+fn not_sending_precommit_for_proposal_with_incorrect_tx() {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+    // Create propose.
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx.object_hash()])
+        .build();
+    // Create block.
+    let block = sandbox.create_block(&[tx.clone()]);
+
+    let precommit_1 = sandbox.create_precommit(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+
+    sandbox.recv(&precommit_1);
+    sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(1)),
+        &make_request_propose_from_precommit(&sandbox, precommit_1.as_ref()),
+    );
+    sandbox.send(
+        sandbox.public_key(ValidatorId(1)),
+        &make_request_prevote_from_precommit(&sandbox, precommit_1.as_ref()),
+    );
+
+    let incorrect_tx = gen_incorrect_tx();
+    let incorrect_propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[incorrect_tx.object_hash()])
+        .build();
+    sandbox.recv(&incorrect_propose);
+    sandbox.recv(&incorrect_tx);
+
+    sandbox.recv(&sandbox.create_prevote(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(1)),
+    ));
+    sandbox.assert_lock(NOT_LOCKED, None);
+    sandbox.recv(&sandbox.create_prevote(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(2)),
+    ));
+    sandbox.assert_lock(NOT_LOCKED, None); //do not lock if <2/3 prevotes
+    sandbox.recv(&sandbox.create_prevote(
+        ValidatorId(3),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    sandbox.add_time(Duration::from_millis(0));
+}
+
 /// scenario: // HANDLE PRECOMMIT positive scenario with commit
 #[test]
 fn handle_precommit_positive_scenario_commit() {
