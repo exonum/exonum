@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemSchema, TemporaryDB,
 };
-use failure::Error;
+use failure::{ensure, Error};
 use futures::Future;
 
 use std::{
@@ -255,7 +255,16 @@ impl BlockchainMut {
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
         // TODO Unify block creation logic [ECR-3879]
-        self.dispatcher.after_transactions(&mut fork);
+        let errors = self.dispatcher.after_transactions(&mut fork);
+
+        // If there was at least one error during the genesis block creation, the block shouldn't be
+        // created at all.
+        ensure!(
+            errors.is_empty(),
+            "`after_commit` failed for at least one service, errors: {:?}",
+            &errors
+        );
+
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch)?;
 
