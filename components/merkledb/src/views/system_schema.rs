@@ -88,6 +88,10 @@ impl<T: RawAccess> SystemSchema<T> {
     }
 
     /// Returns the state hash of indexes in the specified `namespace`.
+    ///
+    /// See [migrations] for the context how namespaces are defined and used.
+    ///
+    /// [migrations]: migration/index.html
     pub fn namespace_state_hash(&self, namespace: &str) -> Hash {
         get_state_aggregator(self.0.clone(), namespace).object_hash()
     }
@@ -105,6 +109,10 @@ impl<T: RawAccess + AsReadonly> SystemSchema<T> {
     }
 
     /// Returns the state aggregator for the specified `namespace`.
+    ///
+    /// See [migrations] for the context how namespaces are defined and used.
+    ///
+    /// [migrations]: migration/index.html
     pub fn namespace_state_aggregator(
         &self,
         namespace: &str,
