@@ -204,7 +204,7 @@ where
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
-    fn new(view: ViewWithMetadata<T>) -> Self {
+    pub(crate) fn new(view: ViewWithMetadata<T>) -> Self {
         let (base, state) = view.into_parts();
         Self {
             base,

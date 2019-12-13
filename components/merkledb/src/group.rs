@@ -100,7 +100,7 @@ where
     ///
     /// If the index is present and has a wrong type.
     pub fn get(&self, key: &K) -> I {
-        let addr = self.prefix.clone().append_bytes(key);
+        let addr = self.prefix.clone().append_key(key);
         I::from_access(self.access.clone(), addr)
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }

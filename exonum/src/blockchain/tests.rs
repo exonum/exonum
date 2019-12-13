@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{self as crypto, Hash};
+use exonum_crypto as crypto;
 use exonum_merkledb::{
-    access::AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, Snapshot,
-    TemporaryDB,
+    access::AccessExt, BinaryValue, Database, Error as StorageError, ObjectHash, TemporaryDB,
 };
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
@@ -33,8 +32,8 @@ use crate::{
     proto::schema::tests::*,
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory, Transaction},
-        AnyTx, ArtifactId, BlockchainData, DispatcherError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ErrorKind, ErrorMatch,
+        ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -42,25 +41,33 @@ const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 const TEST_SERVICE_NAME: &str = "test_service";
 const IDX_NAME: &str = "test_service.val";
 
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
 struct TestExecute {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
 struct TestDeploy {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
 struct TestAdd {
     value: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "TestServiceTx")]
 struct TestCallInitialize {
     value: u64,
@@ -99,10 +106,6 @@ impl Service for TestDispatcherService {
             }
         }
         Ok(())
-    }
-
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
     }
 }
 
@@ -190,10 +193,6 @@ pub struct ServiceGoodImpl;
 impl ServiceGood for ServiceGoodImpl {}
 
 impl Service for ServiceGoodImpl {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         let mut index = context.service_data().get_list("val");
         index.push(1);
@@ -217,10 +216,6 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         panic!("42");
     }
@@ -242,10 +237,6 @@ struct ServicePanicStorageErrorImpl;
 impl ServicePanicStorageError for ServicePanicStorageErrorImpl {}
 
 impl Service for ServicePanicStorageErrorImpl {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         panic!(StorageError::new("42"));
     }
@@ -258,7 +249,9 @@ lazy_static! {
 }
 
 #[protobuf_convert(source = "TestServiceTx")]
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 struct TxResult {
     value: u64,
 }
@@ -286,11 +279,7 @@ impl TxResultCheckInterface for TxResultCheckService {
     }
 }
 
-impl Service for TxResultCheckService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for TxResultCheckService {}
 
 fn assert_service_execute(blockchain: &mut BlockchainMut) {
     let (_, patch) =
@@ -763,7 +752,7 @@ fn test_dispatcher_start_service_rollback() {
     assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
 }
 
-/// Checks that `BlockchainMut::check_tx` discards transactions with incorrect
+/// Checks that `Blockchain::check_tx` discards transactions with incorrect
 /// instance IDs.
 #[test]
 fn test_check_tx() {
@@ -774,13 +763,14 @@ fn test_check_tx() {
             .artifact_id()
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
+    let snapshot = blockchain.snapshot();
 
     let correct_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID, keypair.0, &keypair.1);
-    blockchain.check_tx(&correct_tx).unwrap();
+    Blockchain::check_tx(&snapshot, &correct_tx).unwrap();
 
     let incorrect_tx = TestAdd { value: 1 }.sign(TEST_SERVICE_ID + 1, keypair.0, &keypair.1);
     assert_eq!(
-        blockchain.check_tx(&incorrect_tx).unwrap_err(),
+        Blockchain::check_tx(&snapshot, &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
     );
 }

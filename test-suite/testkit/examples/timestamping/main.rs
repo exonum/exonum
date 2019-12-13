@@ -22,13 +22,13 @@ extern crate exonum_derive;
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     blockchain::ExecutionError,
-    crypto::{gen_keypair, Hash},
+    crypto::gen_keypair,
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        BlockchainData, SnapshotExt,
+        SnapshotExt,
     },
 };
-use exonum_merkledb::{ObjectHash, Snapshot};
+use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -36,7 +36,9 @@ mod proto;
 
 // Simple service implementation.
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTimestamp")]
 struct TxTimestamp {
     message: String,
@@ -74,11 +76,7 @@ impl TimestampingInterface for TimestampingService {
     }
 }
 
-impl Service for TimestampingService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-}
+impl Service for TimestampingService {}
 
 fn main() {
     let instance_id = 512;

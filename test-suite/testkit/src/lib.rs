@@ -50,9 +50,7 @@
 //! )]
 //! struct TimestampingService;
 //!
-//! impl Service for TimestampingService {
-//!     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
-//! }
+//! impl Service for TimestampingService {}
 //!
 //! #[exonum_interface]
 //! pub trait TimestampingInterface {
@@ -371,10 +369,7 @@ impl TestKit {
     /// #     proto_sources = "exonum_testkit::proto",
     /// # )]
     /// # pub struct ExampleService;
-    /// #
-    /// # impl Service for ExampleService {
-    /// #     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> { vec![] }
-    /// # }
+    /// # impl Service for ExampleService {}
     /// #
     /// # #[exonum_interface]
     /// # pub trait ExampleInterface {
@@ -614,9 +609,9 @@ impl TestKit {
             .add_transactions_into_pool(iter::once(transaction));
     }
 
-    /// Calls `BlockchainMut::check_tx` and panics on an error.
+    /// Calls `Blockchain::check_tx` and panics on an error.
     fn check_tx(&self, transaction: &Verified<AnyTx>) {
-        if let Err(error) = self.blockchain.check_tx(&transaction) {
+        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
             panic!("Attempt to add invalid tx in the pool: {}", error);
         }
     }
@@ -813,10 +808,6 @@ impl TestKit {
 /// # impl AfterCommitInterface for AfterCommitService {}
 /// #
 /// impl Service for AfterCommitService {
-///     fn state_hash(&self, _: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-///         vec![]
-///     }
-///
 ///     fn after_commit(&self, _: AfterCommitContext) {
 ///         self.counter.fetch_add(1, Ordering::SeqCst);
 ///     }

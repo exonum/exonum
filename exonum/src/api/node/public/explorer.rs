@@ -43,7 +43,6 @@ use crate::{
     node::{ApiSender, ExternalMessage},
     runtime::CallInfo,
 };
-use std::collections::HashMap;
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -173,14 +172,23 @@ impl AsRef<[u8]> for TransactionHex {
 }
 
 /// Status of a call.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CallStatusInfo {
     /// Call status
-    #[serde(flatten)]
     pub status: Result<(), ExecutionError>,
-
     /// Call execution proff
     pub call_proof: MapProof<CallInBlock, ExecutionError>,
+}
+
+/// Call status response.
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub struct CallStatusResponse {
+    /// Status of transaction
+    pub transaction: Option<CallStatusInfo>,
+    /// Status of `before_transaction` hook
+    pub before_transactions: Option<CallStatusInfo>,
+    /// Status of `after_transaction` hook
+    pub after_transactions: Option<CallStatusInfo>,
 }
 
 /// The kind of requested call
@@ -312,7 +320,7 @@ impl ExplorerApi {
     pub fn call_status(
         snapshot: &dyn Snapshot,
         query: CallStatusQuery,
-    ) -> Result<HashMap<CallKind, CallStatusInfo>, ApiError> {
+    ) -> Result<CallStatusResponse, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
 
         let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
@@ -337,53 +345,64 @@ impl ExplorerApi {
             ))
         })?;
 
-        let mut call_statuses = HashMap::new();
-        let mut fill_call_status = |call_in_block, call_type| {
+        let mut call_status_response = CallStatusResponse::default();
+
+        let call_status = |call_in_block| {
             let status = explorer.call_status(block_height, &call_in_block);
             let call_proof = block_info.error_proof(call_in_block);
 
-            call_statuses.insert(call_type, CallStatusInfo { status, call_proof });
+            CallStatusInfo { status, call_proof }
         };
         if let Some(call_type) = query.call_kind {
-            let call_in_block = match call_type {
-                CallKind::BeforeTransactions => CallInBlock::before_transactions(
-                    tx_info.content().payload().call_info.instance_id,
-                ),
-                CallKind::Transaction => {
-                    CallInBlock::transaction(tx_info.location().position_in_block())
+            match call_type {
+                CallKind::BeforeTransactions => {
+                    let call_in_block = CallInBlock::before_transactions(
+                        tx_info.content().payload().call_info.instance_id,
+                    );
+                    call_status_response.before_transactions = Some(call_status(call_in_block));
                 }
-                CallKind::AfterTransactions => CallInBlock::after_transactions(
-                    tx_info.content().payload().call_info.instance_id,
-                ),
+                CallKind::Transaction => {
+                    let call_in_block =
+                        CallInBlock::transaction(tx_info.location().position_in_block());
+                    call_status_response.transaction = Some(call_status(call_in_block));
+                }
+                CallKind::AfterTransactions => {
+                    let call_in_block = CallInBlock::after_transactions(
+                        tx_info.content().payload().call_info.instance_id,
+                    );
+                    call_status_response.after_transactions = Some(call_status(call_in_block));
+                }
             };
-            fill_call_status(call_in_block, call_type);
         } else {
             let call_in_block: CallInBlock =
                 CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
-            fill_call_status(call_in_block, CallKind::BeforeTransactions);
+            call_status_response.before_transactions = Some(call_status(call_in_block));
 
             let call_in_block: CallInBlock =
                 CallInBlock::transaction(tx_info.location().position_in_block());
-            fill_call_status(call_in_block, CallKind::Transaction);
+            call_status_response.transaction = Some(call_status(call_in_block));
 
             let call_in_block: CallInBlock =
                 CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
-            fill_call_status(call_in_block, CallKind::AfterTransactions);
+            call_status_response.after_transactions = Some(call_status(call_in_block));
         }
 
-        Ok(call_statuses)
+        Ok(call_status_response)
     }
 
-    /// Add transaction into the pool of unconfirmed transactions, and broadcast transaction to other nodes.
+    /// Adds transaction into the pool of unconfirmed transactions if it's valid
+    /// and returns an error otherwise.
     // TODO move this method to the public system API [ECR-3222]
     pub fn add_transaction(
+        snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
     ) -> FutureResult<TransactionResponse> {
-        let verify_message = |hex: String| -> Result<_, failure::Error> {
+        let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
             let verified = msg.into_verified()?;
+            Blockchain::check_tx(snapshot, &verified)?;
             Ok((verified, tx_hash))
         };
 
@@ -398,7 +417,7 @@ impl ExplorerApi {
         };
 
         Box::new(
-            verify_message(query.tx_body)
+            verify_message(snapshot, query.tx_body)
                 .into_future()
                 .map_err(|e| ApiError::BadRequest(e.to_string()))
                 .and_then(send_transaction),
@@ -505,7 +524,9 @@ impl ExplorerApi {
             })
             .endpoint_mut("v1/transactions", {
                 let blockchain = self.blockchain.clone();
-                move |query| Self::add_transaction(blockchain.sender(), query)
+                move |query| {
+                    Self::add_transaction(&blockchain.snapshot(), blockchain.sender(), query)
+                }
             })
     }
 }

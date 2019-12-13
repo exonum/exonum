@@ -117,10 +117,10 @@ mod timestamping {
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, BlockchainData, InstanceId,
+            AnyTx, InstanceId,
         },
     };
-    use exonum_merkledb::{ObjectHash, Snapshot};
+    use exonum_merkledb::ObjectHash;
     use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
@@ -159,11 +159,7 @@ mod timestamping {
         }
     }
 
-    impl Service for Timestamping {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Timestamping {}
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {
@@ -171,13 +167,17 @@ mod timestamping {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TimestampTx")]
     pub struct Tx {
         data: Hash,
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TimestampTx")]
     pub struct PanickingTx {
         data: Hash,
@@ -207,14 +207,14 @@ mod timestamping {
 mod cryptocurrency {
     use exonum::{
         blockchain::{ExecutionError, InstanceCollection},
-        crypto::{Hash, PublicKey},
+        crypto::PublicKey,
         messages::Verified,
         runtime::{
             rust::{CallContext, Service, Transaction},
-            AnyTx, BlockchainData, ErrorKind, InstanceId,
+            AnyTx, ErrorKind, InstanceId,
         },
     };
-    use exonum_merkledb::{access::AccessExt, Snapshot};
+    use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
 
@@ -304,11 +304,7 @@ mod cryptocurrency {
         }
     }
 
-    impl Service for Cryptocurrency {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Cryptocurrency {}
 
     impl From<Cryptocurrency> for InstanceCollection {
         fn from(t: Cryptocurrency) -> Self {
@@ -317,7 +313,9 @@ mod cryptocurrency {
     }
 
     /// Transfers one unit of currency from `from` to `to`.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::CurrencyTx")]
     pub struct Tx {
         to: PublicKey,
@@ -325,7 +323,9 @@ mod cryptocurrency {
     }
 
     /// Same as `Tx`, but without cryptographic proofs in `execute`.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::CurrencyTx")]
     pub struct SimpleTx {
         to: PublicKey,
@@ -333,7 +333,9 @@ mod cryptocurrency {
     }
 
     /// Same as `SimpleTx`, but signals an error 50% of the time.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::CurrencyTx")]
     pub struct RollbackTx {
         to: PublicKey,
@@ -394,10 +396,9 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{
             rust::{CallContext, Interface, Service, Transaction},
-            AnyTx, BlockchainData, InstanceId,
+            AnyTx, InstanceId,
         },
     };
-    use exonum_merkledb::Snapshot;
     use exonum_proto::ProtobufConvert;
     use rand::rngs::StdRng;
 
@@ -407,13 +408,17 @@ mod foreign_interface_call {
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TimestampTx")]
     pub struct SelfTx {
         data: Hash,
     }
 
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, ObjectHash, BinaryValue)]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
     #[protobuf_convert(source = "proto::TimestampTx")]
     pub struct ForeignTx {
         data: Hash,
@@ -502,11 +507,7 @@ mod foreign_interface_call {
 
     impl ERC30Tokens for Timestamping {}
 
-    impl Service for Timestamping {
-        fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-            vec![]
-        }
-    }
+    impl Service for Timestamping {}
 
     impl From<Timestamping> for InstanceCollection {
         fn from(t: Timestamping) -> Self {

@@ -16,19 +16,18 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
     blockchain::ExecutionError,
-    crypto::Hash,
     runtime::{
         rust::{
             api::{self, ServiceApiBuilder},
             CallContext, DefaultInstance, Service,
         },
-        BlockchainData, DispatcherError, InstanceId,
+        DispatcherError, InstanceId,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
-    Entry, Snapshot,
+    Entry,
 };
 use exonum_proto::ProtobufConvert;
 
@@ -66,9 +65,9 @@ where
     }
 }
 
-#[derive(
-    Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
-)]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxInc")]
 pub struct Inc {
     pub seed: u64,
@@ -113,10 +112,6 @@ impl PublicApi {
 }
 
 impl Service for IncService {
-    fn state_hash(&self, _data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        vec![]
-    }
-
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         PublicApi::wire(builder);
     }

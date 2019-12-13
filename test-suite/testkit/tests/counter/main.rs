@@ -15,24 +15,27 @@
 use assert_matches::assert_matches;
 use exonum::{
     api::{
-        node::public::explorer::{TransactionQuery, TransactionResponse},
+        node::public::explorer::{CallStatusQuery, TransactionQuery, TransactionResponse},
         Error as ApiError,
     },
-    blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind},
+    blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind, ValidatorKeys},
     crypto::{self, Hash, PublicKey},
     explorer::BlockchainExplorer,
     helpers::Height,
+    merkledb::BinaryValue,
     runtime::{rust::Transaction, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use hex::FromHex;
 use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, Increment, Reset, ADMIN_KEY, SERVICE_ID, SERVICE_NAME,
+    CounterSchema, CounterService, CounterWithProof, Increment, Reset, ADMIN_KEY, SERVICE_ID,
+    SERVICE_NAME,
 };
+use exonum::api::node::public::explorer::{CallStatusResponse, CallKind};
 
 mod counter;
 mod proto;
@@ -41,6 +44,15 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKit::for_rust_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
     let api = testkit.api();
     (testkit, api)
+}
+
+fn get_validator_keys(testkit: &TestKit) -> Vec<ValidatorKeys> {
+    testkit
+        .network()
+        .validators()
+        .iter()
+        .map(TestNode::public_keys)
+        .collect()
 }
 
 fn inc_count(api: &TestKitApi, by: u64) -> Hash {
@@ -71,6 +83,13 @@ fn test_inc_count_create_block() {
         .unwrap();
     assert_eq!(counter, 5);
 
+    let counter_with_proof: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    let validator_keys = get_validator_keys(&testkit);
+    assert_eq!(counter_with_proof.verify(&validator_keys), Some(5));
+
     testkit.create_block_with_transactions(vec![
         Increment::new(4).sign(SERVICE_ID, pubkey, &key),
         Increment::new(1).sign(SERVICE_ID, pubkey, &key),
@@ -81,6 +100,11 @@ fn test_inc_count_create_block() {
         .get("count")
         .unwrap();
     assert_eq!(counter, 10);
+    let counter_with_proof: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    assert_eq!(counter_with_proof.verify(&validator_keys), Some(10));
 }
 
 #[should_panic(expected = "Transaction is already committed")]
@@ -111,6 +135,7 @@ fn test_inc_count_api() {
 #[test]
 fn test_inc_count_with_multiple_transactions() {
     let (mut testkit, api) = init_testkit();
+    let validator_keys = get_validator_keys(&testkit);
 
     for _ in 0..100 {
         inc_count(&api, 1);
@@ -119,6 +144,11 @@ fn test_inc_count_with_multiple_transactions() {
         inc_count(&api, 4);
 
         testkit.create_block();
+        let counter_with_proof: CounterWithProof = api
+            .public(ApiKind::Service("counter"))
+            .get("count-with-proof")
+            .unwrap();
+        counter_with_proof.verify(&validator_keys);
     }
 
     assert_eq!(testkit.height(), Height(100));
@@ -143,12 +173,19 @@ fn test_inc_count_with_manual_tx_control() {
         .unwrap();
     assert_eq!(counter, 0);
 
-    testkit.create_block_with_tx_hashes(&[tx_b.object_hash()]);
-    let counter: u64 = api
+    // The counter is touched by the `before_transactions` handler.
+    let counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
-        .get("count")
+        .get("count-with-proof")
         .unwrap();
-    assert_eq!(counter, 3);
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), None);
+
+    testkit.create_block_with_tx_hashes(&[tx_b.object_hash()]);
+    let counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(3));
 
     testkit.create_block_with_tx_hashes(&[tx_a.object_hash()]);
     let counter: u64 = api
@@ -181,11 +218,41 @@ fn test_private_api() {
     assert_eq!(tx_info.tx_hash, tx.object_hash());
 
     testkit.create_block();
-    let counter: u64 = api
-        .private(ApiKind::Service("counter"))
-        .get("count")
+    let counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
         .unwrap();
-    assert_eq!(counter, 0);
+    assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(0));
+}
+
+#[test]
+#[should_panic(expected = "Insufficient number of precommits")]
+fn counter_proof_without_precommits() {
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    testkit.create_block();
+
+    let mut counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    counter.remove_precommits();
+    counter.verify(&get_validator_keys(&testkit));
+}
+
+#[test]
+#[should_panic(expected = "Invalid counter value in proof")]
+fn counter_proof_with_mauled_value() {
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    testkit.create_block();
+
+    let mut counter: CounterWithProof = api
+        .public(ApiKind::Service("counter"))
+        .get("count-with-proof")
+        .unwrap();
+    counter.maul_value();
+    counter.verify(&get_validator_keys(&testkit));
 }
 
 #[test]
@@ -949,7 +1016,212 @@ fn test_explorer_with_before_transactions_error() {
         .contains("Number 13"));
 
     let snapshot = testkit.snapshot();
-    let schema = CounterSchema::new(snapshot.for_service(SERVICE_ID).unwrap());
+    let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(13));
     // ^-- The changes in `before_transactions` should be reverted.
+}
+
+/// Checks that `ExplorerApi` accepts valid transactions and discards transactions with incorrect instance ID.
+#[test]
+fn test_explorer_add_transaction_with_invalid_transaction() {
+    let (_testkit, api) = init_testkit();
+
+    // Send valid transaction.
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    let data = hex::encode(tx.to_bytes());
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&json!({ "tx_body": data }))
+        .post::<TransactionResponse>("v1/transactions")
+        .expect("Failed to send valid transaction.");
+    assert_eq!(response.tx_hash, tx.object_hash());
+
+    // Send invalid transaction.
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Reset.sign(SERVICE_ID + 1, pubkey, &key);
+    let data = hex::encode(tx.to_bytes());
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&json!({ "tx_body": data }))
+        .post::<TransactionResponse>("v1/transactions")
+        .expect_err("Expected transaction send to finish with error.");
+    let error_body = "Execution error `dispatcher:7` occurred: Suitable runtime \
+                      for the given service instance ID is not found.";
+    assert_matches!(
+        response,
+        ApiError::BadRequest(ref body) if body == error_body
+    );
+}
+
+#[test]
+fn test_explorer_api_with_before_transactions_error() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(13).sign(SERVICE_ID, pubkey, &key);
+
+    // This tx lead to error in before_transaction on the next transaction
+    testkit.create_block_with_transaction(tx.clone());
+
+    let tx = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+    // So perform one more tx to check the error
+    let block = testkit.create_block_with_transaction(tx.clone());
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&CallStatusQuery {
+            hash: tx.object_hash(),
+            call_kind: None,
+        })
+        .get::<CallStatusResponse>("v1/call_status")
+        .expect("Transaction send to finish with error.");
+
+    assert!(response.before_transactions.is_some());
+    assert!(response.transaction.is_some());
+    assert!(response.after_transactions.is_some());
+
+    assert!(response
+        .before_transactions
+        .clone()
+        .unwrap()
+        .status
+        .is_err());
+    assert!(response.transaction.clone().unwrap().status.is_ok());
+    assert!(response.after_transactions.clone().unwrap().status.is_ok());
+
+    let proof = response
+        .before_transactions
+        .map(|info| info.call_proof)
+        .unwrap();
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+}
+
+#[test]
+fn test_explorer_api_with_transaction_error() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(0).sign(SERVICE_ID, pubkey, &key);
+
+    let block = testkit.create_block_with_transaction(tx.clone());
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&CallStatusQuery {
+            hash: tx.object_hash(),
+            call_kind: None,
+        })
+        .get::<CallStatusResponse>("v1/call_status")
+        .expect("Transaction send to finish with error.");
+
+    assert!(response.before_transactions.is_some());
+    assert!(response.transaction.is_some());
+    assert!(response.after_transactions.is_some());
+
+    assert!(response.before_transactions.clone().unwrap().status.is_ok());
+    assert!(response.transaction.clone().unwrap().status.is_err());
+    assert!(response.after_transactions.clone().unwrap().status.is_ok());
+
+    let proof = response.transaction.map(|info| info.call_proof).unwrap();
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+}
+
+#[test]
+fn test_explorer_api_with_after_transactions_error() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(42).sign(SERVICE_ID, pubkey, &key);
+
+    let block = testkit.create_block_with_transaction(tx.clone());
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&CallStatusQuery {
+            hash: tx.object_hash(),
+            call_kind: None,
+        })
+        .get::<CallStatusResponse>("v1/call_status")
+        .expect("Transaction send to finish with error.");
+
+    assert!(response.before_transactions.is_some());
+    assert!(response.transaction.is_some());
+    assert!(response.after_transactions.is_some());
+
+    assert!(response.before_transactions.clone().unwrap().status.is_ok());
+    assert!(response.transaction.clone().unwrap().status.is_ok());
+    assert!(response.after_transactions.clone().unwrap().status.is_err());
+
+    let proof = response
+        .after_transactions
+        .map(|info| info.call_proof)
+        .unwrap();
+    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
+    assert_eq!(proof.entries().count(), 1);
+}
+
+#[test]
+fn test_explorer_api_with_before_transactions_request() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+
+    testkit.create_block_with_transaction(tx.clone());
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&CallStatusQuery {
+            hash: tx.object_hash(),
+            call_kind: Some(CallKind::BeforeTransactions),
+        })
+        .get::<CallStatusResponse>("v1/call_status")
+        .expect("Transaction send to finish with error.");
+
+    assert!(response.before_transactions.is_some());
+    assert!(response.transaction.is_none());
+    assert!(response.after_transactions.is_none());
+}
+
+#[test]
+fn test_explorer_api_with_transaction_request() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+
+    testkit.create_block_with_transaction(tx.clone());
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&CallStatusQuery {
+            hash: tx.object_hash(),
+            call_kind: Some(CallKind::Transaction),
+        })
+        .get::<CallStatusResponse>("v1/call_status")
+        .expect("Transaction send to finish with error.");
+
+    assert!(response.before_transactions.is_none());
+    assert!(response.transaction.is_some());
+    assert!(response.after_transactions.is_none());
+}
+
+#[test]
+fn test_explorer_api_with_after_transactions_request() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    let tx = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+
+    testkit.create_block_with_transaction(tx.clone());
+
+    let response = api
+        .public(ApiKind::Explorer)
+        .query(&CallStatusQuery {
+            hash: tx.object_hash(),
+            call_kind: Some(CallKind::AfterTransactions),
+        })
+        .get::<CallStatusResponse>("v1/call_status")
+        .expect("Transaction send to finish with error.");
+
+    assert!(response.before_transactions.is_none());
+    assert!(response.transaction.is_none());
+    assert!(response.after_transactions.is_some());
 }

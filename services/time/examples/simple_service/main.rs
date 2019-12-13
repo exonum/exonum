@@ -17,13 +17,13 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     blockchain::ExecutionError,
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey},
+    crypto::{gen_keypair, PublicKey, SecretKey},
     helpers::Height,
-    merkledb::{access::Access, ObjectHash, ProofMapIndex, Snapshot},
+    merkledb::{access::Access, ProofMapIndex},
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, BlockchainData, InstanceId, SnapshotExt,
+        AnyTx, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
@@ -41,7 +41,9 @@ use std::sync::Arc;
 mod proto;
 
 /// The argument of the `MarkerInterface::mark` method.
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxMarker")]
 pub struct TxMarker {
     mark: i32,
@@ -70,13 +72,6 @@ pub struct MarkerSchema<T: Access> {
     pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
 }
 
-impl<T: Access> MarkerSchema<T> {
-    /// Returns hashes for stored table.
-    fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks.object_hash()]
-    }
-}
-
 impl MarkerTransactions for MarkerService {
     fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
         let author = context
@@ -100,11 +95,7 @@ impl MarkerTransactions for MarkerService {
     }
 }
 
-impl Service for MarkerService {
-    fn state_hash(&self, data: BlockchainData<&dyn Snapshot>) -> Vec<Hash> {
-        MarkerSchema::new(data.for_executing_service()).state_hash()
-    }
-}
+impl Service for MarkerService {}
 
 // Several helpers for testkit.
 

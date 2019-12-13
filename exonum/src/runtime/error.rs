@@ -88,7 +88,18 @@ use crate::{
 ///
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
 /// [`DispatcherError`]: ../enum.DispatcherError.html
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Deserialize,
+    Serialize,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd
+)]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
     ///
