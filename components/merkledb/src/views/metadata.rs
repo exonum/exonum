@@ -406,11 +406,11 @@ impl<T: RawAccessMut> IndexesPool<T> {
                 removed_addrs.push((resolved, is_removed_from_aggregation));
             }
 
-            if metadata.index_type != IndexType::Tombstone {
-                self.0.put(migrated_key, metadata);
-            } else {
+            if metadata.index_type == IndexType::Tombstone {
                 // Tombstones are removed without replacement.
                 self.0.remove(migrated_key);
+            } else {
+                self.0.put(migrated_key, metadata);
             }
             self.0.remove(&key);
         }
