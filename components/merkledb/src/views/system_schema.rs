@@ -110,8 +110,7 @@ impl SystemSchema<&Fork> {
     }
 }
 
-//TODO: revert
-#[cfg(test1)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{access::AccessExt, Database, TemporaryDB};

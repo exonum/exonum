@@ -29,8 +29,7 @@ use super::{
 mod address;
 mod metadata;
 mod system_schema;
-//TODO: revert
-#[cfg(test1)]
+#[cfg(test)]
 mod tests;
 
 /// Represents current view of the database by specified `address` and
@@ -245,7 +244,7 @@ impl<T: RawAccess> View<T> {
     pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<'_, K, V>
     where
         P: BinaryKey + ?Sized,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
         let iter_prefix = key_bytes(subprefix);
@@ -265,7 +264,7 @@ impl<T: RawAccess> View<T> {
     where
         P: BinaryKey,
         F: BinaryKey + ?Sized,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
         let iter_prefix = key_bytes(subprefix);
@@ -406,7 +405,7 @@ where
 /// [`iter`]: struct.BaseIndex.html#method.iter
 /// [`iter_from`]: struct.BaseIndex.html#method.iter_from
 /// [`BaseIndex`]: struct.BaseIndex.html
-pub struct Iter<'a, K, V> {
+pub struct Iter<'a, K: ?Sized, V> {
     base_iter: BytesIter<'a>,
     prefix: Vec<u8>,
     ended: bool,

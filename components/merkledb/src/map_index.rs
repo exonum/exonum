@@ -18,7 +18,7 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use std::{borrow::Borrow, marker::PhantomData};
+use std::{borrow::Borrow, marker::PhantomData, fmt};
 
 use super::{
     access::{Access, AccessError, FromAccess},
@@ -27,6 +27,7 @@ use super::{
     },
     BinaryKey, BinaryValue,
 };
+use failure::_core::fmt::{Formatter, Error};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -36,7 +37,7 @@ use super::{
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct MapIndex<T: RawAccess, K, V> {
+pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -50,8 +51,7 @@ pub struct MapIndex<T: RawAccess, K, V> {
 /// [`iter`]: struct.MapIndex.html#method.iter
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
 /// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct MapIndexIter<'a, K, V> {
+pub struct MapIndexIter<'a, K: ?Sized, V> {
     base_iter: ViewIter<'a, K, V>,
 }
 
@@ -63,8 +63,7 @@ pub struct MapIndexIter<'a, K, V> {
 /// [`keys`]: struct.MapIndex.html#method.keys
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
 /// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct MapIndexKeys<'a, K> {
+pub struct MapIndexKeys<'a, K: ?Sized> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
@@ -84,7 +83,7 @@ pub struct MapIndexValues<'a, V> {
 impl<T, K, V> FromAccess<T> for MapIndex<T::Base, K, V>
 where
     T: Access,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
@@ -96,7 +95,7 @@ where
 impl<T, K, V> MapIndex<T, K, V>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     fn new(view: ViewWithMetadata<T>) -> Self {
@@ -123,10 +122,7 @@ where
     /// index.put(&1, 2);
     /// assert_eq!(Some(2), index.get(&1));
     /// ```
-    pub fn get<Q>(&self, key: &Q) -> Option<V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
+    pub fn get(&self, key: &K) -> Option<V>
     {
         self.base.get(key)
     }
@@ -146,10 +142,7 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn contains<Q>(&self, key: &Q) -> bool
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
+    pub fn contains(&self, key: &K) -> bool
     {
         self.base.contains(key)
     }
@@ -236,10 +229,7 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<'_, K, V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
+    pub fn iter_from(&self, from: &K) -> MapIndexIter<'_, K, V>
     {
         MapIndexIter {
             base_iter: self.base.iter_from(&(), from),
@@ -262,10 +252,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<'_, K>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
+    pub fn keys_from(&self, from: &K) -> MapIndexKeys<'_, K>
     {
         MapIndexKeys {
             base_iter: self.base.iter_from(&(), from),
@@ -287,10 +274,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<'_, V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
+    pub fn values_from(&self, from: &K) -> MapIndexValues<'_, V>
     {
         MapIndexValues {
             base_iter: self.base.iter_from(&(), from),
@@ -301,7 +285,7 @@ where
 impl<T, K, V> MapIndex<T, K, V>
 where
     T: RawAccessMut,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     /// Inserts a key-value pair into a map.
@@ -318,9 +302,7 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn put<Q>(&mut self, key: &Q, value: V) where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized
+    pub fn put(&mut self, key: &K, value: V) where
     {
         self.base.put(key, value);
     }
@@ -425,148 +407,149 @@ where
     }
 }
 
+impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V> where
+    K: BinaryKey,
+    V: BinaryValue,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        f.debug_struct("MapIndexIter").finish()
+    }
+}
+
+impl<'a, K> fmt::Debug for MapIndexKeys<'a, K> where
+    K: BinaryKey,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        f.debug_struct("MapIndexKeys").finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{access::AccessExt, Database, TemporaryDB};
-    use std::collections::HashMap;
 
     const IDX_NAME: &str = "idx_name";
 
-    //TODO: revert
-//    #[test]
-//    fn test_str_key() {
-//        const KEY: &str = "key_1";
-//        let db = TemporaryDB::default();
-//        let fork = db.fork();
-//
-//        let mut index: MapIndex<_, String, _> = fork.get_map(IDX_NAME);
-//        assert_eq!(false, index.contains(KEY));
-//        index.put(&KEY.to_owned(), 0);
-//        assert_eq!(true, index.contains(KEY));
-//        index.remove(KEY);
-//        assert_eq!(false, index.contains(KEY));
-//    }
-//
-//    #[test]
-//    fn test_u8_slice_key() {
-//        const KEY: &[u8] = &[1, 2, 3];
-//        let db = TemporaryDB::default();
-//        let fork = db.fork();
-//
-//        let mut index: MapIndex<_, Vec<u8>, _> = fork.get_map(IDX_NAME);
-//        assert_eq!(false, index.contains(KEY));
-//
-//        index.put(&KEY.to_owned(), 0);
-//        assert_eq!(true, index.contains(KEY));
-//
-//        index.remove(KEY);
-//        assert_eq!(false, index.contains(KEY));
-//    }
-//
-//    #[test]
-//    fn test_methods() {
-//        let db = TemporaryDB::default();
-//        let fork = db.fork();
-//
-//        let mut map_index = fork.get_map(IDX_NAME);
-//        assert_eq!(map_index.get(&1_u8), None);
-//        assert!(!map_index.contains(&1_u8));
-//
-//        map_index.put(&1_u8, 1_u8);
-//        assert_eq!(map_index.get(&1_u8), Some(1_u8));
-//        assert!(map_index.contains(&1_u8));
-//
-//        map_index.remove(&100_u8);
-//        map_index.remove(&1_u8);
-//        assert!(!map_index.contains(&1_u8));
-//        assert_eq!(map_index.get(&1_u8), None);
-//
-//        map_index.put(&2_u8, 2_u8);
-//        map_index.put(&3_u8, 3_u8);
-//        map_index.clear();
-//        assert!(!map_index.contains(&2_u8));
-//        assert!(!map_index.contains(&3_u8));
-//    }
-//
-//    #[test]
-//    fn test_iter() {
-//        let db = TemporaryDB::default();
-//        let fork = db.fork();
-//        let mut map_index = fork.get_map(IDX_NAME);
-//
-//        map_index.put(&1_u8, 1_u8);
-//        map_index.put(&2_u8, 2_u8);
-//        map_index.put(&3_u8, 3_u8);
-//
-//        assert_eq!(
-//            map_index.iter().collect::<Vec<(u8, u8)>>(),
-//            vec![(1, 1), (2, 2), (3, 3)]
-//        );
-//        assert_eq!(
-//            map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(),
-//            vec![(1, 1), (2, 2), (3, 3)]
-//        );
-//        assert_eq!(
-//            map_index.iter_from(&1).collect::<Vec<(u8, u8)>>(),
-//            vec![(1, 1), (2, 2), (3, 3)]
-//        );
-//        assert_eq!(
-//            map_index.iter_from(&2).collect::<Vec<(u8, u8)>>(),
-//            vec![(2, 2), (3, 3)]
-//        );
-//        assert_eq!(
-//            map_index.iter_from(&4).collect::<Vec<(u8, u8)>>(),
-//            Vec::<(u8, u8)>::new()
-//        );
-//
-//        assert_eq!(map_index.keys().collect::<Vec<u8>>(), vec![1, 2, 3]);
-//
-//        assert_eq!(map_index.keys_from(&0).collect::<Vec<u8>>(), vec![1, 2, 3]);
-//        assert_eq!(map_index.keys_from(&1).collect::<Vec<u8>>(), vec![1, 2, 3]);
-//        assert_eq!(map_index.keys_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
-//        assert_eq!(
-//            map_index.keys_from(&4).collect::<Vec<u8>>(),
-//            Vec::<u8>::new()
-//        );
-//
-//        assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
-//
-//        assert_eq!(
-//            map_index.values_from(&0).collect::<Vec<u8>>(),
-//            vec![1, 2, 3]
-//        );
-//        assert_eq!(
-//            map_index.values_from(&1).collect::<Vec<u8>>(),
-//            vec![1, 2, 3]
-//        );
-//        assert_eq!(map_index.values_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
-//        assert_eq!(
-//            map_index.values_from(&4).collect::<Vec<u8>>(),
-//            Vec::<u8>::new()
-//        );
-//
-//        map_index.remove(&1_u8);
-//        assert_eq!(
-//            map_index.iter_from(&0_u8).collect::<Vec<(u8, u8)>>(),
-//            vec![(2, 2), (3, 3)]
-//        );
-//        assert_eq!(
-//            map_index.iter_from(&1_u8).collect::<Vec<(u8, u8)>>(),
-//            vec![(2, 2), (3, 3)]
-//        );
-//    }
+    #[test]
+    fn test_str_key() {
+        const KEY: &str = "key_1";
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+
+        let mut index = fork.get_map(IDX_NAME);
+        assert_eq!(false, index.contains(KEY));
+        index.put(&KEY, 0);
+        assert_eq!(true, index.contains(KEY));
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
 
     #[test]
-    fn optimal_keys() {
+    fn test_u8_slice_key() {
+        const KEY: &[u8] = &[1, 2, 3];
         let db = TemporaryDB::default();
-        let mut fork = db.fork();
+        let fork = db.fork();
 
-        let mut map: MapIndex<_, &str, _> = fork.get_map("index");
-        map.put("str", 1);
+        let mut index= fork.get_map(IDX_NAME);
+        assert_eq!(false, index.contains(KEY));
 
-        dbg!(map.get("str"));
+        index.put(&KEY, 0);
+        assert_eq!(true, index.contains(KEY));
 
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
 
+    #[test]
+    fn test_methods() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+
+        let mut map_index = fork.get_map(IDX_NAME);
+        assert_eq!(map_index.get(&1_u8), None);
+        assert!(!map_index.contains(&1_u8));
+
+        map_index.put(&1_u8, 1_u8);
+        assert_eq!(map_index.get(&1_u8), Some(1_u8));
+        assert!(map_index.contains(&1_u8));
+
+        map_index.remove(&100_u8);
+        map_index.remove(&1_u8);
+        assert!(!map_index.contains(&1_u8));
+        assert_eq!(map_index.get(&1_u8), None);
+
+        map_index.put(&2_u8, 2_u8);
+        map_index.put(&3_u8, 3_u8);
+        map_index.clear();
+        assert!(!map_index.contains(&2_u8));
+        assert!(!map_index.contains(&3_u8));
+    }
+
+    #[test]
+    fn test_iter() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut map_index = fork.get_map(IDX_NAME);
+
+        map_index.put(&1_u8, 1_u8);
+        map_index.put(&2_u8, 2_u8);
+        map_index.put(&3_u8, 3_u8);
+
+        assert_eq!(
+            map_index.iter().collect::<Vec<(u8, u8)>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&1).collect::<Vec<(u8, u8)>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&2).collect::<Vec<(u8, u8)>>(),
+            vec![(2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&4).collect::<Vec<(u8, u8)>>(),
+            Vec::<(u8, u8)>::new()
+        );
+
+        assert_eq!(map_index.keys().collect::<Vec<u8>>(), vec![1, 2, 3]);
+
+        assert_eq!(map_index.keys_from(&0).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.keys_from(&1).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.keys_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(
+            map_index.keys_from(&4).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
+
+        assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
+
+        assert_eq!(
+            map_index.values_from(&0).collect::<Vec<u8>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            map_index.values_from(&1).collect::<Vec<u8>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(map_index.values_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(
+            map_index.values_from(&4).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
+
+        map_index.remove(&1_u8);
+        assert_eq!(
+            map_index.iter_from(&0_u8).collect::<Vec<(u8, u8)>>(),
+            vec![(2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&1_u8).collect::<Vec<(u8, u8)>>(),
+            vec![(2, 2), (3, 3)]
+        );
     }
 }

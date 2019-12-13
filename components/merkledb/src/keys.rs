@@ -337,8 +337,7 @@ impl BinaryKey for Decimal {
     }
 }
 
-//TODO: revert
-#[cfg(test2)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::access::AccessExt;
