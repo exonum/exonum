@@ -35,7 +35,7 @@ use crate::counter::{
     CounterSchema, CounterService, CounterWithProof, Increment, Reset, ADMIN_KEY, SERVICE_ID,
     SERVICE_NAME,
 };
-use exonum::api::node::public::explorer::{CallStatusResponse, CallKind};
+use exonum::api::node::public::explorer::{CallKind, CallStatusResponse};
 
 mod counter;
 mod proto;
