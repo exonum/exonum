@@ -304,6 +304,85 @@ fn handle_block_response_with_incorrect_tx() {
     // an incorrect tx, node should panic.
 }
 
+/// - should **NOT** process block if tx is incorrect
+/// idea of test is:
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive incorrect tx
+/// - receive BlockResponse with known tx A
+/// - Figure out that block is incorrect
+/// - Node should panic because of committed block with incorrect tx.
+#[test]
+#[should_panic(expected = "Received a block with transaction known as invalid")]
+fn handle_block_response_with_known_incorrect_tx() {
+    let sandbox = timestamping_sandbox();
+
+    // Create correct tx, and then sign with the wrong destination.
+    let incorrect_tx = gen_incorrect_tx();
+    let propose = ProposeBuilder::new(&sandbox).build();
+    let block = sandbox.create_block(&[incorrect_tx.clone()]);
+
+    let precommit_1 = sandbox.create_precommit(
+        ValidatorId(1),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    let precommit_2 = sandbox.create_precommit(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(2)),
+    );
+    let precommit_3 = sandbox.create_precommit(
+        ValidatorId(3),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(3)),
+    );
+
+    sandbox.recv(&sandbox.create_status(
+        sandbox.public_key(ValidatorId(3)),
+        Height(2),
+        block.object_hash(),
+        0,
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    sandbox.recv(&incorrect_tx);
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &sandbox.create_block_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            Height(1),
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+
+    sandbox.recv(&sandbox.create_block_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        vec![incorrect_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    // Here IncompleteBlock will become complete and since it contains
+    // an incorrect tx, node should panic.
+}
+
 /// HANDLE block response
 
 /// - A block with an incorrect transactions order should not be processed
