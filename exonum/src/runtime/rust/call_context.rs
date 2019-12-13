@@ -129,7 +129,9 @@ impl<'a> CallContext<'a> {
     /// The service is not immediately activated; it activates if / when the block containing
     /// the activation transaction is committed.
     ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
+    /// # Panics
+    ///
+    /// - This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
     pub fn initiate_adding_service(
         &mut self,
@@ -138,7 +140,7 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`initiate_adding_service` called within a non-supervisor service");
-        }
+        }        
 
         self.inner
             .child_context(self.instance.id)
@@ -150,7 +152,10 @@ impl<'a> CallContext<'a> {
     /// The service is not immediately stopped; it stops if / when the block containing
     /// the stopping transaction is committed.
     ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
+    /// # Panics
+    ///
+    /// - This method can only be called by the supervisor; the call will panic otherwise.
+    /// - Instance with the specified ID should be exist and active; the call will panic otherwise.
     #[doc(hidden)]
     pub fn initiate_stopping_service(&mut self, instance_id: InstanceId) {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
