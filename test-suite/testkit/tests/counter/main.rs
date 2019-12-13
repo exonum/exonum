@@ -1012,12 +1012,12 @@ fn test_explorer_with_before_transactions_error() {
 
 /// Checks that `ExplorerApi` accepts valid transactions and discards transactions with incorrect instance ID.
 #[test]
-fn test_explorer_add_transaction_with_invalid_transaction() {
+fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
 
     // Send valid transaction.
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    let keypair = gen_keypair();
+    let tx = keypair.reset(SERVICE_ID, ());
     let data = hex::encode(tx.to_bytes());
     let response = api
         .public(ApiKind::Explorer)
@@ -1027,8 +1027,7 @@ fn test_explorer_add_transaction_with_invalid_transaction() {
     assert_eq!(response.tx_hash, tx.object_hash());
 
     // Send invalid transaction.
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Reset.sign(SERVICE_ID + 1, pubkey, &key);
+    let tx = keypair.reset(SERVICE_ID + 1, ());
     let data = hex::encode(tx.to_bytes());
     let response = api
         .public(ApiKind::Explorer)
