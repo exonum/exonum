@@ -150,7 +150,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .initiate_adding_service(context, spec, parameters)
     }
 
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
@@ -170,7 +170,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .lock()
             .unwrap()
             .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
-        self.inner.commit_service_status(snapshot, spec, status)
+        self.inner.update_service_status(snapshot, spec, status)
     }
 
     fn execute(

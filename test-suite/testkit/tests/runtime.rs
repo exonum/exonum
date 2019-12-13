@@ -118,7 +118,7 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,

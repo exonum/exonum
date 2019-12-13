@@ -493,7 +493,7 @@ impl Runtime for RustRuntime {
         catch_panic(|| service.initialize(context, parameters))
     }
 
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,

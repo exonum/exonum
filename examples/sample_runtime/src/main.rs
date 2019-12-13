@@ -114,7 +114,7 @@ impl Runtime for SampleRuntime {
     }
 
     /// Commits status for the `SampleService` instance with the specified ID.
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,

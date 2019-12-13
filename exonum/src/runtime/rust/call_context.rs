@@ -140,7 +140,7 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`initiate_adding_service` called within a non-supervisor service");
-        }        
+        }
 
         self.inner
             .child_context(self.instance.id)

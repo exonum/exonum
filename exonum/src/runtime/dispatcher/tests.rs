@@ -210,7 +210,7 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
@@ -567,7 +567,7 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
@@ -749,7 +749,7 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,

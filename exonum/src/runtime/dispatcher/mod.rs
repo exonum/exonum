@@ -64,7 +64,7 @@ impl CommittedServices {
         self.instance_names.insert(name, id);
     }
 
-    fn get_runtime_for_active_instance(&self, id: InstanceId) -> Option<u32> {
+    fn get_runtime_id_for_active_instance(&self, id: InstanceId) -> Option<u32> {
         self.instances.get(&id).and_then(|info| {
             if info.status.is_active() {
                 Some(info.runtime_id)
@@ -148,7 +148,7 @@ impl Dispatcher {
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined state.");
-            self.commit_service_status(snapshot, &state.spec, status)?;
+            self.update_service_status(snapshot, &state.spec, status)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
@@ -251,7 +251,7 @@ impl Dispatcher {
         if instance.is_active() {
             Ok(())
         } else {
-            Err(Error::ServiceNotStarted.into())
+            Err(Error::ServiceNotActive.into())
         }
     }
 
@@ -378,7 +378,7 @@ impl Dispatcher {
         }
         // Notify runtime about changes in service instances.
         for (spec, status) in modified_instances {
-            self.commit_service_status(&patch, &spec, status)
+            self.update_service_status(&patch, &spec, status)
                 .expect("Cannot commit service status");
         }
         patch
@@ -434,7 +434,7 @@ impl Dispatcher {
     ) -> Option<(u32, &dyn Runtime)> {
         let runtime_id = self
             .service_infos
-            .get_runtime_for_active_instance(instance_id)?;
+            .get_runtime_id_for_active_instance(instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
         Some((runtime_id, runtime))
     }
@@ -444,15 +444,12 @@ impl Dispatcher {
         &'s self,
         id: impl Into<InstanceQuery<'s>>,
     ) -> Option<InstanceDescriptor<'s>> {
-        self.service_infos
-            .get_instance(id)
-            .and_then(|(descriptor, status)| {
-                if status.is_active() {
-                    Some(descriptor)
-                } else {
-                    None
-                }
-            })
+        let (descriptor, status) = self.service_infos.get_instance(id)?;
+        if status.is_active() {
+            Some(descriptor)
+        } else {
+            None
+        }
     }
 
     /// Notifies the runtimes that they have to shut down.
@@ -463,7 +460,7 @@ impl Dispatcher {
     }
 
     /// Commits service instance status to the corresponding runtime.
-    pub(super) fn commit_service_status(
+    pub(super) fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         instance: &InstanceSpec,
@@ -474,7 +471,7 @@ impl Dispatcher {
             .runtimes
             .get_mut(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
-        runtime.commit_service_status(snapshot, instance, status)?;
+        runtime.update_service_status(snapshot, instance, status)?;
 
         info!(
             "Committing service instance {:?} with status {}",

@@ -285,21 +285,21 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The constructor is run *exactly once* during blockchain lifetime for each successfully
     /// initialized service instance. That is to say, it is *not* called on a node restart.
     /// The caveat here is "successfully initialized"; at the point `initiate_adding_service` is called,
-    /// the service is not guaranteed to eventually be added to the blockchain via `commit_service_status`.
+    /// the service is not guaranteed to eventually be added to the blockchain via `update_service_status`.
     /// Indeed, committing the service will not follow if the alternative block proposal without
-    /// the service instantiation was accepted. If the `commit_service_status` call *is* performed, it is
+    /// the service instantiation was accepted. If the `update_service_status` call *is* performed, it is
     /// guaranteed to be performed in the closest committed block, i.e., before the nearest
     /// `Runtime::after_commit()`.
     ///
     /// The dispatcher does not route transactions and `before_transactions` / `after_transactions`
-    /// events to the service until after `commit_service_status()` is called with the same instance spec.
+    /// events to the service until after `update_service_status()` is called with the same instance spec.
     ///
     /// The runtime should discard the instantiated service instance after completing this method,
     /// unless there are compelling reasons to retain it (e.g., creating an instance takes very
     /// long time).
     /// Alternatively, "garbage" services may be removed from `Runtime` in `after_commit`
-    /// because of the time dependence between `commit_service_status` and `after_commit` described above.
-    /// The runtime should commit long-term resources for the service after a `commit_service_status()` call.
+    /// because of the time dependence between `update_service_status` and `after_commit` described above.
+    /// The runtime should commit long-term resources for the service after a `update_service_status()` call.
     /// Since discarded instances persist their state in a discarded fork, no further action
     /// is required to remove this state.
     ///
@@ -313,7 +313,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// will be rolled back after such a signal (the exact logic is determined by the supervisor).
     /// Because an error is one of expected / handled outcomes, verifying prerequisites
     /// for instantiation and reporting corresponding failures should be performed at this stage
-    /// rather than in `commit_service_status`.
+    /// rather than in `update_service_status`.
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
@@ -331,9 +331,9 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// following cases:
     ///
     /// - For newly added instances, or modified existing the method is called when the fork
-    /// with the corresponding changes is committed.
+    ///   with the corresponding changes is committed.
     /// - After a node restart, this method is called for all existing service instances regardless
-    /// of their statuses.
+    ///   of their statuses.
     ///
     /// For newly added instances it is guaranteed that `initiate_adding_service` was called with
     /// the same `spec` earlier and returned `Ok(())`. The results of the call (i.e., changes to
@@ -371,7 +371,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// `initiate_adding_service` call.) The error should contain a description allowing the node
     /// administrator to determine the root cause of the error and (ideally) recover the node by
     /// eliminating it.
-    fn commit_service_status(
+    fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
@@ -448,7 +448,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Notifies the runtime about commitment of a new block.
     ///
-    /// This method is guaranteed to be called *after* all `commit_service_status` calls related
+    /// This method is guaranteed to be called *after* all `update_service_status` calls related
     /// to the same block. The method is called exactly once for each block in the blockchain,
     /// including the genesis block.
     ///

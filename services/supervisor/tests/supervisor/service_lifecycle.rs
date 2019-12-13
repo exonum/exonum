@@ -54,7 +54,7 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
             .start_service(IncService.artifact_id().into(), "inc", Vec::default())
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .unwrap();
+    .expect("Start service transaction should be processed");
     // Get started service instance ID.
     latest_assigned_instance_id(&testkit).unwrap()
 }
@@ -72,7 +72,7 @@ fn start_stop_inc_service() {
             .stop_service(instance_id)
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .unwrap()
+    .expect("Stop service transaction should be processed")
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn stop_non_existent_service() {
             .stop_service(instance_id)
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .unwrap_err();
+    .expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -111,7 +111,7 @@ fn duplicate_stop_service_request() {
             .stop_service(instance_id)
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .unwrap_err();
+    .expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -136,7 +136,7 @@ fn stop_already_stopped_service() {
             .stop_service(instance_id)
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .unwrap();
+    .expect("Transaction should be processed");
     // Second attempt to stop service instance.
     let actual_err = execute_transaction(
         &mut testkit,
@@ -144,7 +144,7 @@ fn stop_already_stopped_service() {
             .stop_service(instance_id)
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .unwrap_err();
+    .expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
