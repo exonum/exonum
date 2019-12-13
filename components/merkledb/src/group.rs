@@ -1,15 +1,12 @@
 use std::marker::PhantomData;
 
-use crate::views::{IndexMetadata, IndexesPoolWrapper, RawAccess, View, ViewWithMetadata};
+use crate::views::{IndexesPoolWrapper, RawAccess};
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::IndexAddress,
-    BinaryKey, BinaryValue, IndexType, ResolvedAddress,
+    BinaryKey, BinaryValue,
 };
-use byteorder::{LittleEndian, WriteBytesExt};
-use failure::Fail;
-use std::borrow::Borrow;
-use std::{borrow::Cow, fmt, num::NonZeroU64};
+use std::fmt;
 
 // cspell:ignore foob
 
@@ -117,6 +114,7 @@ where
     K: BinaryKey + Clone, //TODO: This clone definitely should be removed.
     I: FromAccess<T>,
 {
+    ///TODO: add doc
     pub fn iter<V: BinaryValue>(&self) -> GroupIter<K, T, I> {
         let prefix = IndexAddress::from(self.prefix.clone());
         let indexes_pool = IndexesPoolWrapper::new(self.access.clone());
@@ -126,6 +124,8 @@ where
     }
 }
 
+///TODO: add doc
+#[derive(Debug)]
 pub struct GroupIter<K, T, I> {
     base: IndexAddress,
     keys: Vec<K>,
