@@ -1,6 +1,6 @@
 use exonum_crypto::Hash;
 
-use super::{metadata::IndexesPool, AsReadonly, IndexType, RawAccess, ViewWithMetadata};
+use super::{AsReadonly, IndexType, RawAccess, ViewWithMetadata};
 use crate::{Fork, ObjectHash, ProofMapIndex};
 
 /// Name of the state aggregator proof map.
@@ -31,10 +31,6 @@ fn get_state_aggregator<T: RawAccess>(
 /// fork.get_map(("plain_map", &1)).put(&1_u8, "so plain".to_owned());
 /// fork.get_map(("plain_map", &2)).put(&2_u8, "s0 plane".to_owned());
 ///
-/// let system_schema = SystemSchema::new(&fork);
-/// assert_eq!(system_schema.index_count(), 3);
-/// // ^-- The database may also contain system indexes.
-///
 /// let patch = fork.into_patch();
 /// let state_hash = SystemSchema::new(&patch).state_hash();
 /// // ^-- State hash of the entire database including changes in the `patch`.
@@ -63,18 +59,6 @@ impl<T: RawAccess> SystemSchema<T> {
     /// Creates an instance based on the specified `access`.
     pub fn new(access: T) -> Self {
         SystemSchema(access)
-    }
-
-    /// Returns the total number of indexes in the storage. This information is always up to date
-    /// (even for `Fork`s).
-    ///
-    /// System-defined indexes (e.g., `state_aggregator`) are *excluded* from this count.
-    pub fn index_count(&self) -> u64 {
-        // `state_aggregator` is the only system index so far. (There are more system *views*,
-        // but they do not have view IDs.) It should be created on database initialization
-        // since it involves `check_database()`, which creates a `Fork` and converts it into `Patch`.
-        // We use saturating subtraction just in case.
-        IndexesPool::new(self.0.clone()).len().saturating_sub(1)
     }
 
     /// Returns the state hash of the database. The state hash is up to date for `Snapshot`s
@@ -159,40 +143,6 @@ impl SystemSchema<&Fork> {
 mod tests {
     use super::*;
     use crate::{access::AccessExt, Database, HashTag, TemporaryDB};
-
-    #[test]
-    fn index_count_is_correct() {
-        let db = TemporaryDB::new();
-        let snapshot = db.snapshot();
-        assert_eq!(SystemSchema::new(&snapshot).index_count(), 0);
-
-        let fork = db.fork();
-        fork.get_list("list").push(1_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 1);
-        fork.get_map(("map", &0_u8)).put(&1_u32, "!".to_owned());
-        let system_schema = SystemSchema::new(&fork);
-        assert_eq!(system_schema.index_count(), 2);
-        fork.get_map(("map", &1_u8)).put(&1_u32, "!".to_owned());
-        assert_eq!(system_schema.index_count(), 3);
-
-        fork.get_map(("map", &0_u8)).put(&2_u32, "!".to_owned());
-        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
-        fork.get_list("list").push(5_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
-
-        db.merge_sync(fork.into_patch()).unwrap();
-        let snapshot = db.snapshot();
-        assert_eq!(SystemSchema::new(&snapshot).index_count(), 3);
-
-        let fork = db.fork();
-        fork.get_list("list").push(1_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
-        fork.get_list("other_list").push(1_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 4);
-        assert_eq!(SystemSchema::new(fork.readonly()).index_count(), 4);
-
-        assert_eq!(SystemSchema::new(&snapshot).index_count(), 3);
-    }
 
     fn initial_changes(fork: &Fork) {
         fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);

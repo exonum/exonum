@@ -2,7 +2,7 @@
 //!
 //! # Migration workflow
 //!
-//! **Migration** in MerkleDB refers to the ability to update data in indexes, remove indexes,
+//! **Migration** refers to the ability to update data in indexes, remove indexes,
 //! change index type, create new indexes, and package these changes in a way that they
 //! can be atomically committed or rolled back. Accumulating changes in the migration,
 //! on the other hand, can be performed iteratively, including after a process shutdown.
