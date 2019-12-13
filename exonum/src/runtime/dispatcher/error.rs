@@ -51,6 +51,8 @@ pub enum Error {
     UnauthorizedCaller = 11,
     /// Malformed arguments for calling a service interface method.
     MalformedArguments = 12,
+    /// The service instance is already pending.
+    ServicePending = 13,
 }
 
 impl Error {

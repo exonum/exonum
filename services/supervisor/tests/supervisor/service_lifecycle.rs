@@ -72,7 +72,7 @@ fn start_stop_inc_service() {
             .stop_service(instance_id)
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
-    .expect("Stop service transaction should be processed")
+    .expect("Stop service transaction should be processed");
 }
 
 #[test]

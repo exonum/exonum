@@ -206,7 +206,7 @@ pub struct RustRuntime {
     deployed_artifacts: HashSet<RustArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
-    new_services_since_last_block: bool,
+    changed_services_since_last_block: bool,
 }
 
 #[derive(Debug)]
@@ -248,7 +248,7 @@ impl RustRuntime {
             deployed_artifacts: Default::default(),
             started_services: Default::default(),
             started_services_by_name: Default::default(),
-            new_services_since_last_block: false,
+            changed_services_since_last_block: false,
         }
     }
 
@@ -331,7 +331,7 @@ impl RustRuntime {
     }
 
     fn push_api_changes(&mut self) {
-        if self.new_services_since_last_block {
+        if self.changed_services_since_last_block {
             let user_endpoints = self.api_endpoints();
             // FIXME: this should either be made async, or an unbounded channel should be used.
             if !self.api_notifier.is_closed() {
@@ -342,7 +342,7 @@ impl RustRuntime {
                     .ok();
             }
         }
-        self.new_services_since_last_block = false;
+        self.changed_services_since_last_block = false;
     }
 }
 
@@ -509,7 +509,7 @@ impl Runtime for RustRuntime {
                 self.remove_started_service(spec);
             }
         }
-        self.new_services_since_last_block = true;
+        self.changed_services_since_last_block = true;
         Ok(())
     }
 

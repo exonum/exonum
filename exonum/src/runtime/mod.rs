@@ -676,15 +676,6 @@ impl<'a> ExecutionContext<'a> {
             .map_err(From::from)
     }
 
-    /// Initiates stopping of an existing service instance in the blockchain. The stopping
-    /// service is active (i.e., does process transactions or `after_transactions` hook)
-    /// until the block built on top of the provided `fork` is committed.
-    ///
-    /// This method should be called for the exact context passed to the runtime.
-    pub(crate) fn initiate_stopping_service(&mut self, instance_id: InstanceId) {
-        DispatcherSchema::new(&*self.fork).initiate_stopping_service(instance_id);
-    }
-
     fn reborrow(&mut self) -> ExecutionContext<'_> {
         self.reborrow_with_interface(self.interface_name)
     }

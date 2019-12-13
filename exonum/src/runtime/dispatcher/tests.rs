@@ -953,6 +953,14 @@ fn stopped_service_workflow() {
 
     let mut fork = db.fork();
 
+    // Check that it is impossible to stop nonexistent service instance.
+    let actual_err = Dispatcher::initiate_stopping_service(&fork, instance_id)
+        .expect_err("`initiate_stopping_service` should fail");
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
+
     let artifact = ArtifactId {
         runtime_id: SampleRuntimes::First as u32,
         name: "first".into(),
@@ -978,8 +986,15 @@ fn stopped_service_workflow() {
     let mut fork = db.fork();
 
     // Change instance status to stopped.
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-    context.initiate_stopping_service(instance_id);
+    Dispatcher::initiate_stopping_service(&fork, instance_id).unwrap();
+
+    // Check if second initiation request fails.
+    let actual_err = Dispatcher::initiate_stopping_service(&fork, instance_id)
+        .expect_err("`initiate_stopping_service` should fail");
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&DispatcherError::ServicePending)
+    );
 
     // Check if transactions are still ready for execution.
     dispatcher
@@ -1076,4 +1091,12 @@ fn stopped_service_workflow() {
     context
         .initiate_adding_service(service, vec![])
         .expect_err("`initiate_adding_service` should failed");
+
+    // Check that it is impossible to stop service twice.
+    let actual_err = Dispatcher::initiate_stopping_service(&fork, instance_id)
+        .expect_err("`initiate_stopping_service` should fail");
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&DispatcherError::ServiceNotActive)
+    );
 }

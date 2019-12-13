@@ -220,6 +220,20 @@ impl Dispatcher {
             .map_err(From::from)
     }
 
+    /// Initiates stopping of an existing service instance in the blockchain. The stopping
+    /// service is active (i.e., does process transactions or `after_transactions` hook)
+    /// until the block built on top of the provided `fork` is committed.
+    ///
+    /// This method should be called for the exact context passed to the runtime.
+    pub(crate) fn initiate_stopping_service(
+        fork: &Fork,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .initiate_stopping_service(instance_id)
+            .map_err(From::from)
+    }
+
     fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
             self.deploy_artifact(artifact, payload)
@@ -248,10 +262,9 @@ impl Dispatcher {
             .get_instance(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
 
-        if instance.is_active() {
-            Ok(())
-        } else {
-            Err(Error::ServiceNotActive.into())
+        match instance.status {
+            Some(InstanceStatus::Active) => Ok(()),
+            _ => Err(Error::ServiceNotActive.into()),
         }
     }
 

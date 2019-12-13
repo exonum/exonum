@@ -1,10 +1,13 @@
 use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
-use crate::blockchain::Schema as CoreSchema;
-use crate::runtime::{
-    dispatcher::{Dispatcher, Error as DispatcherError},
-    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+use crate::{
+    blockchain::Schema as CoreSchema,
+    runtime::{
+        dispatcher::{Dispatcher, Error as DispatcherError},
+        ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId,
+        SUPERVISOR_INSTANCE_ID,
+    },
 };
 
 /// Context for the executed call.
@@ -147,7 +150,7 @@ impl<'a> CallContext<'a> {
             .initiate_adding_service(instance_spec, constructor)
     }
 
-    /// Initiates stopping a service instance in the blockchain.
+    /// Initiates stopping an active service instance in the blockchain.
     ///
     /// The service is not immediately stopped; it stops if / when the block containing
     /// the stopping transaction is committed.
@@ -155,15 +158,12 @@ impl<'a> CallContext<'a> {
     /// # Panics
     ///
     /// - This method can only be called by the supervisor; the call will panic otherwise.
-    /// - Instance with the specified ID should be exist and active; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn initiate_stopping_service(&mut self, instance_id: InstanceId) {
+    pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`initiate_stopping_service` called within a non-supervisor service");
         }
 
-        self.inner
-            .child_context(self.instance.id)
-            .initiate_stopping_service(instance_id);
+        Dispatcher::initiate_stopping_service(self.inner.fork, instance_id)
     }
 }

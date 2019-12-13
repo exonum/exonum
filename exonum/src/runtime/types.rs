@@ -499,19 +499,6 @@ impl InstanceState {
         }
     }
 
-    /// Indicates whether the service instance current or pending status is active.
-    pub fn is_active(&self) -> bool {
-        fn is_active(status: Option<InstanceStatus>) -> bool {
-            if let Some(status) = status {
-                status.is_active()
-            } else {
-                false
-            }
-        }
-
-        is_active(self.status) || is_active(self.pending_status)
-    }
-
     /// Sets next status as current and changes next status to `None`
     ///
     /// # Panics

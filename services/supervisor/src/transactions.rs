@@ -14,7 +14,7 @@
 
 use exonum::{
     helpers::{Height, ValidateInput},
-    runtime::{rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec},
+    runtime::{rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -124,14 +124,13 @@ impl StopService {
                     .with_description("Instance with the specified ID is absent.")
             })?;
 
-        if !instance.is_active() {
-            return Err(Error::MalformedConfigPropose.with_description(format!(
+        match instance.status {
+            Some(InstanceStatus::Active) => Ok(()),
+            _ => Err(Error::MalformedConfigPropose.with_description(format!(
                 "Discarded stop of the already stopped instance: {}",
                 instance.spec.name
-            )));
+            ))),
         }
-
-        Ok(())
     }
 }
 

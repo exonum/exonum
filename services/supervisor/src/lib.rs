@@ -183,7 +183,7 @@ fn update_configs(
                     instance.spec.artifact
                 );
 
-                context.initiate_stopping_service(stop_service.instance_id);
+                context.initiate_stopping_service(stop_service.instance_id)?;
             }
         }
     }
