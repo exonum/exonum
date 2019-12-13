@@ -82,7 +82,7 @@
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
 //! 4. Active service instance can be stopped by the corresponding request to the [`Dispatcher`].
-//!   Stopped service no more take participate in the business logic, i.e. it does not execute
+//!   Stopped service no more participates in the business logic, i.e. it does not execute
 //!   transactions, process events, provide user APIs, etc.
 //!   Service data becomes unavailable to other services, but still exists. The name and identifier
 //!   remain reserved for the stopped service and cannot be used again for adding new services.

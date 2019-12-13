@@ -989,7 +989,7 @@ fn stopped_service_workflow() {
             &CallInfo::new(instance_id, 0),
             &[],
         )
-        .expect("Correct transaction");
+        .expect("Service is not stopped yet, transaction should be processed");
 
     let dummy_descriptor = InstanceDescriptor {
         id: 2,
@@ -1015,14 +1015,14 @@ fn stopped_service_workflow() {
             &CallInfo::new(instance_id, 0),
             &[],
         )
-        .expect_err("Incorrect transaction");
+        .expect_err("Service was stopped, transaction shouldn't be processed");
 
     // Check that service schema is now unreachable.
     assert!(
         BlockchainData::new(&fork, dummy_descriptor)
             .for_service(instance_name)
             .is_none(),
-        "Schema should be unreachable"
+        "Schema should be unreachable for stopped service"
     );
 
     // Emulate dispatcher restart.
@@ -1061,14 +1061,14 @@ fn stopped_service_workflow() {
             &CallInfo::new(instance_id, 0),
             &[],
         )
-        .expect_err("Incorrect transaction");
+        .expect_err("Service was stopped before restart, transaction shouldn't be processed");
 
     // Check that service schema is now unreachable.
     assert!(
         BlockchainData::new(&fork, dummy_descriptor)
             .for_service(instance_name)
             .is_none(),
-        "Schema should be unreachable"
+        "Service was stopped before restart, schema should be unreachable"
     );
 
     // Check that it is impossible to add previously stopped service.
