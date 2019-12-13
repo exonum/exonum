@@ -69,7 +69,7 @@ impl ChangeSet for () {
     }
 }
 
-impl ChangeSet for ChangesRef {
+impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
     }

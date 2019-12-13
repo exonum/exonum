@@ -17,6 +17,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt,
     iter::{Iterator as StdIterator, Peekable},
+    marker::PhantomData,
     mem,
     ops::{Bound, Deref, DerefMut},
     rc::Rc,
@@ -128,11 +129,20 @@ impl WorkingPatchRef<'_> {
 }
 
 #[derive(Debug)]
-pub struct ChangesRef {
+pub struct ChangesRef<'a> {
     inner: Rc<ViewChanges>,
+    _lifetime: PhantomData<&'a ()>,
 }
 
-impl Deref for ChangesRef {
+impl Drop for ChangesRef<'_> {
+    fn drop(&mut self) {
+        // Do nothing. The implementation is required to make `View`s based on `ChangesRef`
+        // drop before a mutable operation is performed on a fork (e.g., it's converted
+        // into a patch).
+    }
+}
+
+impl Deref for ChangesRef<'_> {
     type Target = ViewChanges;
 
     fn deref(&self) -> &ViewChanges {
@@ -820,7 +830,7 @@ impl<'a> AsReadonly for &'a Fork {
 }
 
 impl<'a> RawAccess for ReadonlyFork<'a> {
-    type Changes = ChangesRef;
+    type Changes = ChangesRef<'a>;
 
     fn snapshot(&self) -> &dyn Snapshot {
         &self.0.patch
@@ -829,6 +839,7 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
     fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         ChangesRef {
             inner: self.0.working_patch.clone_view_changes(address),
+            _lifetime: PhantomData,
         }
     }
 }
@@ -1026,6 +1037,18 @@ mod tests {
 
     use exonum_crypto::Hash;
     use std::{collections::HashSet, iter::FromIterator};
+
+    #[test]
+    fn readonly_indexes_are_timely_dropped() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_list("list").push(1_u64);
+        {
+            // The code without an additional scope must not compile.
+            let _list = fork.readonly().get_list::<_, u64>("list");
+        }
+        fork.into_patch();
+    }
 
     /// Asserts that a patch contains only the specified changes.
     fn check_patch<'a, I>(patch: &Patch, changes: I)
