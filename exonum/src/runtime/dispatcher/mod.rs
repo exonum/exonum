@@ -147,7 +147,7 @@ impl Dispatcher {
         for state in schema.instances().values() {
             let status = state
                 .status
-                .expect("BUG: Service instance should has state.");
+                .expect("BUG: Stored service instance should have a determined state.");
             self.commit_service_status(snapshot, &state.spec, status)?;
         }
         // Notify runtimes about the end of initialization process.
