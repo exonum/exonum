@@ -17,7 +17,8 @@
 use exonum_derive::ExecutionFail;
 
 /// List of possible Rust runtime errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, ExecutionFail)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "runtime")]
 pub enum Error {
     /// Unable to parse artifact identifier or specified artifact has non-empty spec.

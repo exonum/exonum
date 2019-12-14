@@ -28,7 +28,9 @@ pub enum Error {
 }
 
 /// Transaction that is sent by the validator after the commit of the block.
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxTime")]
 pub struct TxTime {
     /// Time of the validator.

@@ -181,11 +181,15 @@ impl Dispatcher {
     /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
     /// executed successfully, but returned `Err(..)` value means that this transaction is
     /// **obviously** incorrect and should be declined as early as possible.
-    pub(crate) fn check_tx(&self, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
+    pub(crate) fn check_tx(
+        snapshot: &dyn Snapshot,
+        tx: &Verified<AnyTx>,
+    ) -> Result<(), ExecutionError> {
         // Currently the only check is that destination service exists, but later
         // functionality of this method can be extended.
         let call_info = &tx.as_ref().call_info;
-        self.runtime_for_service(call_info.instance_id)
+        Schema::new(snapshot)
+            .get_instance(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
 
         Ok(())

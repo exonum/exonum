@@ -35,7 +35,9 @@ use crate::{
     schema::{Wallet, WalletSchema},
 };
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct TxCreateWallet {
     pub name: String,
@@ -107,7 +109,9 @@ impl DefaultInstance for WalletService {
 }
 
 #[protobuf_convert(source = "proto::Issue")]
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TxIssue {
     pub to: PublicKey,
     pub amount: u64,
@@ -145,7 +149,9 @@ impl DefaultInstance for DepositService {
     const INSTANCE_NAME: &'static str = "deposit";
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::AnyCall")]
 pub struct TxAnyCall {
     pub call_info: CallInfo,
@@ -153,7 +159,9 @@ pub struct TxAnyCall {
     pub args: Vec<u8>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::RecursiveCall")]
 pub struct TxRecursiveCall {
     pub depth: u64,
