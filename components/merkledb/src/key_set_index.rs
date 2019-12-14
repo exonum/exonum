@@ -295,4 +295,25 @@ mod tests {
         index.clear();
         assert!(!index.contains(&2_u8));
     }
+
+    #[test]
+    fn no_infinite_iteration_in_flushed_fork() {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+        {
+            let mut set = fork.get_key_set::<_, u8>(INDEX_NAME);
+            set.insert(4);
+            set.clear();
+        }
+        fork.flush();
+        {
+            let mut set = fork.get_key_set::<_, u8>(INDEX_NAME);
+            set.remove(&1);
+        }
+        fork.flush();
+
+        let set = fork.get_key_set::<_, u8>(INDEX_NAME);
+        let items: Vec<_> = set.iter().collect();
+        assert!(items.is_empty());
+    }
 }
