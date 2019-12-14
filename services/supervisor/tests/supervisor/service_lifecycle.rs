@@ -17,10 +17,11 @@
 use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
-        rust::ServiceFactory, ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
+        rust::{DefaultInstance, ServiceFactory},
+        ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{ConfigPropose, Error, Supervisor};
 
@@ -31,6 +32,15 @@ fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(),
     testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .map_err(Clone::clone)
+}
+
+/// Checks that the `inc` service API is available.
+fn is_inc_service_api_available(testkit: &mut TestKit) -> bool {
+    testkit
+        .api()
+        .public(ApiKind::Service(IncService::INSTANCE_NAME))
+        .get::<()>("v1/ping")
+        .is_ok()
 }
 
 fn create_testkit() -> TestKit {
@@ -51,7 +61,11 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
     execute_transaction(
         testkit,
         ConfigPropose::immediate(0)
-            .start_service(IncService.artifact_id().into(), "inc", Vec::default())
+            .start_service(
+                IncService.artifact_id().into(),
+                IncService::INSTANCE_NAME,
+                Vec::default(),
+            )
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
     .expect("Start service transaction should be processed");
@@ -65,6 +79,10 @@ fn start_stop_inc_service() {
     let keypair = testkit.us().service_keypair();
 
     let instance_id = start_inc_service(&mut testkit);
+    assert!(
+        is_inc_service_api_available(&mut testkit),
+        "Inc service API should be available after starting."
+    );
     // Stop service instance.
     execute_transaction(
         &mut testkit,
@@ -73,6 +91,10 @@ fn start_stop_inc_service() {
             .sign_for_supervisor(keypair.0, &keypair.1),
     )
     .expect("Stop service transaction should be processed");
+    assert!(
+        !is_inc_service_api_available(&mut testkit),
+        "Inc service API should not be available after stopping."
+    );
 }
 
 #[test]

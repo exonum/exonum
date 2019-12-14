@@ -106,8 +106,15 @@ impl PublicApi {
             .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))
     }
 
+    fn ping(_state: &api::ServiceApiState<'_>, _query: ()) -> api::Result<()> {
+        Ok(())
+    }
+
     fn wire(builder: &mut ServiceApiBuilder) {
-        builder.public_scope().endpoint("v1/counter", Self::counter);
+        builder
+            .public_scope()
+            .endpoint("v1/counter", Self::counter)
+            .endpoint("v1/ping", Self::ping);
     }
 }
 

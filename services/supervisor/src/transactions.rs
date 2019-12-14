@@ -14,7 +14,10 @@
 
 use exonum::{
     helpers::{Height, ValidateInput},
-    runtime::{rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus},
+    runtime::{
+        rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec,
+        InstanceStatus,
+    },
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
