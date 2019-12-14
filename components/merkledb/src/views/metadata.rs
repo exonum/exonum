@@ -233,6 +233,42 @@ where
 }
 
 impl IndexMetadata {
+    /// Returns a `ResolvedAddress` corresponding to the `full_name` of an index. `min_name_len`
+    /// specifies the minimum known name part of the `full_name` (i.e., the part corresponding
+    /// to `ResolvedAddress.name`.
+    #[allow(unsafe_code)]
+    fn resolve_address(&self, full_name: &[u8], min_name_len: usize) -> (ResolvedAddress, bool) {
+        let mut cutoff_index = min_name_len;
+        let is_in_group = loop {
+            match full_name.get(cutoff_index) {
+                Some(0) => break true,
+                None => break false,
+                Some(_) => {
+                    cutoff_index += 1;
+                }
+            }
+        };
+
+        let name = if full_name[0] == b'^' {
+            // The `^` initial char is not mapped to the resolved CF name.
+            full_name[1..cutoff_index].to_vec()
+        } else {
+            full_name[..cutoff_index].to_vec()
+        };
+        debug_assert!(name.is_ascii());
+        let resolved = ResolvedAddress {
+            name: unsafe {
+                // SAFETY:
+                // Safe by construction; metadata keys before the `\0` separator
+                // correspond to the index names, which consist of a subset of
+                // ASCII chars.
+                String::from_utf8_unchecked(name)
+            },
+            id: NonZeroU64::new(self.identifier),
+        };
+        (resolved, is_in_group)
+    }
+
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;
         IndexMetadata {
@@ -340,44 +376,6 @@ impl<T: RawAccess> IndexesPool<T> {
 }
 
 impl<T: RawAccessMut> IndexesPool<T> {
-    /// Returns a `ResolvedAddress` corresponding to the `full_name` of an index. `min_name_len`
-    /// specifies the minimum known name part of the `full_name` (i.e., the part corresponding
-    /// to `ResolvedAddress.name`.
-    #[allow(unsafe_code)]
-    fn resolve_address(
-        &self,
-        full_name: &[u8],
-        min_name_len: usize,
-    ) -> Option<(ResolvedAddress, bool)> {
-        let metadata = self.0.get::<_, IndexMetadata>(full_name)?;
-
-        let mut cutoff_index = min_name_len;
-        let is_in_group = loop {
-            match full_name.get(cutoff_index) {
-                Some(0) => break true,
-                None => break false,
-                Some(_) => {
-                    cutoff_index += 1;
-                }
-            }
-        };
-        let is_aggregated = metadata.index_type.is_merkelized() && !is_in_group;
-
-        let name = full_name[..cutoff_index].to_vec();
-        debug_assert!(name.is_ascii());
-        let resolved = ResolvedAddress {
-            name: unsafe {
-                // SAFETY:
-                // Safe by construction; metadata keys before the `\0` separator
-                // correspond to the index names, which consist of a subset of
-                // ASCII chars.
-                String::from_utf8_unchecked(name)
-            },
-            id: NonZeroU64::new(metadata.identifier),
-        };
-        Some((resolved, is_aggregated))
-    }
-
     /// Moves indexes with the specified prefix from the next version (i.e., `^prefix.*` form)
     /// to the current version (`prefix.*` form). The existing old indexes are replaced, or
     /// removed if the new index is a `Tombstone`. If there is no overriding index, an old
@@ -388,9 +386,10 @@ impl<T: RawAccessMut> IndexesPool<T> {
     /// Returns resolved addresses of the removed indexes. For each address, we also return a flag
     /// indicating whether the corresponding index was removed from aggregation (i.e., was
     /// aggregated and was not replaced by an aggregated index).
-    pub(crate) fn finish_migration(&mut self, prefix: &str) -> Vec<(ResolvedAddress, bool)> {
+    pub(crate) fn flush_migration(&mut self, prefix: &str) -> Vec<(ResolvedAddress, bool)> {
         let prefix = format!("^{}.", prefix);
 
+        // TODO: Collecting `moved_indexes` may be inefficient in terms of memory use.
         let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(&prefix).collect();
         let mut removed_addrs = Vec::new();
         for (key, metadata) in moved_indexes {
@@ -398,11 +397,12 @@ impl<T: RawAccessMut> IndexesPool<T> {
             let migrated_key = &key[1..];
             debug_assert!(migrated_key.starts_with(prefix[1..].as_bytes()));
 
-            if let Some((resolved, was_aggregated)) =
-                self.resolve_address(migrated_key, prefix.len() - 1)
-            {
-                let is_removed_from_aggregation =
-                    was_aggregated && !metadata.index_type.is_merkelized();
+            if let Some(old_metadata) = self.0.get::<_, IndexMetadata>(migrated_key) {
+                let (resolved, is_in_group) =
+                    old_metadata.resolve_address(migrated_key, prefix.len() - 1);
+                let is_removed_from_aggregation = !is_in_group
+                    && old_metadata.index_type.is_merkelized()
+                    && !metadata.index_type.is_merkelized();
                 removed_addrs.push((resolved, is_removed_from_aggregation));
             }
 
@@ -413,6 +413,22 @@ impl<T: RawAccessMut> IndexesPool<T> {
                 self.0.put(migrated_key, metadata);
             }
             self.0.remove(&key);
+        }
+        removed_addrs
+    }
+
+    pub(crate) fn rollback_migration(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
+        let prefix = format!("^{}.", prefix);
+        let (removed_names, removed_addrs): (Vec<_>, Vec<_>) = self
+            .0
+            .iter::<_, Vec<u8>, IndexMetadata>(&prefix)
+            .map(|(full_name, metadata)| {
+                let (resolved, _) = metadata.resolve_address(&full_name, prefix.len());
+                (full_name, resolved)
+            })
+            .unzip();
+        for full_name in &removed_names {
+            self.0.remove(full_name);
         }
         removed_addrs
     }

@@ -127,7 +127,7 @@ impl SystemSchema<&Fork> {
 
     /// Removes an aggregation namespace, moving all aggregated indexes in the namespace into
     /// the default aggregator.
-    pub(crate) fn remove_namespace(&mut self, namespace: &str) {
+    pub(crate) fn merge_namespace(&mut self, namespace: &str) {
         debug_assert!(!namespace.is_empty(), "Cannot remove default namespace");
 
         let mut ns_aggregator = get_state_aggregator(self.0, namespace);
@@ -136,6 +136,11 @@ impl SystemSchema<&Fork> {
             default_aggregator.put(&index_name, hash);
         }
         ns_aggregator.clear();
+    }
+
+    /// Removes an aggregation namespace.
+    pub(crate) fn remove_namespace(&mut self, namespace: &str) {
+        get_state_aggregator(self.0, namespace).clear();
     }
 }
 

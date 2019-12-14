@@ -452,7 +452,7 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
         }
     }
 
-    fork.finish_migration("test");
+    fork.flush_migration("test");
 
     // Compute the final list of indexes. Note that indexes removed in the migration
     // will have `Tombstone` type.

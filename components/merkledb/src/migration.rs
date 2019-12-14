@@ -88,7 +88,7 @@
 //!
 //! // The migration can be committed as follows.
 //! let mut fork = db.fork();
-//! fork.finish_migration("test");
+//! fork.flush_migration("test");
 //! db.merge(fork.into_patch())?;
 //! let snapshot = db.snapshot();
 //! assert_eq!(snapshot.get_proof_list::<_, u32>("test.list").len(), 3);

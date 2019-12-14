@@ -228,7 +228,7 @@ fn main() {
     assert_eq!(new_state_hash, system_schema.namespace_state_hash("test"));
 
     let mut fork = db.fork();
-    fork.finish_migration("test");
+    fork.flush_migration("test");
     let patch = fork.into_patch();
 
     // Now, the new indexes have replaced the old ones.

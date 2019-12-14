@@ -656,7 +656,7 @@ impl Fork {
     }
 
     /// Finishes a migration of indexes with the specified prefix.
-    pub fn finish_migration(&mut self, prefix: &str) {
+    pub fn flush_migration(&mut self, prefix: &str) {
         assert_valid_name_component(prefix);
 
         // Mutable `self` reference ensures that no indexes are instantiated in the client code.
@@ -669,9 +669,9 @@ impl Fork {
             }
         }
         // Move aggregated indexes info from the `prefix` namespace into the default namespace.
-        SystemSchema::new(&*self).remove_namespace(prefix);
+        SystemSchema::new(&*self).merge_namespace(prefix);
 
-        let removed_addrs = IndexesPool::new(&*self).finish_migration(&prefix);
+        let removed_addrs = IndexesPool::new(&*self).flush_migration(&prefix);
         for (addr, is_removed_from_aggregation) in removed_addrs {
             self.patch.changed_aggregated_addrs.remove(&addr);
             if is_removed_from_aggregation {
@@ -687,6 +687,19 @@ impl Fork {
     /// of the `flush` method.
     pub fn rollback(&mut self) {
         self.working_patch = WorkingPatch::new();
+    }
+
+    /// Rolls back the migration with the specified name. This will remove all indexes
+    /// within the migration.
+    pub fn rollback_migration(&mut self, prefix: &str) {
+        assert_valid_name_component(prefix);
+        self.flush();
+        SystemSchema::new(&*self).remove_namespace(prefix);
+        let removed_addrs = IndexesPool::new(&*self).rollback_migration(&prefix);
+        for addr in &removed_addrs {
+            self.patch.changed_aggregated_addrs.remove(addr);
+            self.patch.changes.remove(addr);
+        }
     }
 
     /// Converts the fork into `Patch` consuming the fork instance.
@@ -1303,7 +1316,7 @@ mod tests {
         fork.get_map("^name.map").put(&1_u64, 42_i32);
         fork.get_key_set("^name.new").insert(0_u8);
         fork.create_tombstone("^name.removed");
-        fork.finish_migration("name");
+        fork.flush_migration("name");
 
         check_indexes(&fork);
         // The newly migrated indexes are emptied.
@@ -1381,7 +1394,7 @@ mod tests {
 
             fork.create_tombstone(("^name.family", &1_u8));
         }
-        fork.finish_migration("name");
+        fork.flush_migration("name");
 
         check_indexes(&fork);
         db.merge(fork.into_patch()).unwrap();
@@ -1453,7 +1466,7 @@ mod tests {
 
         let mut fork = db.fork();
         fork.create_tombstone("^name.other_list");
-        fork.finish_migration("name");
+        fork.flush_migration("name");
 
         let patch = fork.into_patch();
         let system_schema = SystemSchema::new(&patch);
@@ -1478,11 +1491,53 @@ mod tests {
 
         fork.get_entry("test.foo").set(1_u8);
         fork.create_tombstone("^test.foo");
-        fork.finish_migration("test");
+        fork.flush_migration("test");
         let patch = fork.into_patch();
         assert_eq!(
             patch.get_proof_entry::<_, u8>("test.foo").object_hash(),
             Hash::zero()
         );
+    }
+
+    fn test_migration_rollback(with_merge: bool) {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+
+        fork.get_entry("test.foo").set(1_u8);
+        fork.get_proof_list(("test.list", &1))
+            .extend(vec![1_i32, 2, 3]);
+        fork.get_proof_entry("^test.foo").set(2_u8);
+        fork.create_tombstone(("^test.list", &1));
+        fork.get_value_set("^test.new").insert("test".to_owned());
+
+        if with_merge {
+            db.merge(fork.into_patch()).unwrap();
+            fork = db.fork();
+        }
+        fork.rollback_migration("test");
+        assert_eq!(fork.get_entry::<_, u8>("test.foo").get(), Some(1));
+        let patch = fork.into_patch();
+        assert_eq!(patch.get_entry::<_, u8>("test.foo").get(), Some(1));
+        assert_eq!(
+            patch
+                .get_proof_list::<_, i32>(("test.list", &1))
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![1_i32, 2, 3]
+        );
+        assert!(!patch.get_proof_entry::<_, u8>("^test.foo").exists());
+        // Since migrated indexes don't exist, it should be OK to assign new types to them.
+        assert!(!patch.get_entry::<_, ()>(("^test.list", &1)).exists());
+        assert!(!patch.get_entry::<_, ()>("^test.new").exists());
+    }
+
+    #[test]
+    fn in_memory_migration_rollback() {
+        test_migration_rollback(false);
+    }
+
+    #[test]
+    fn migration_rollback_with_merge() {
+        test_migration_rollback(true);
     }
 }
