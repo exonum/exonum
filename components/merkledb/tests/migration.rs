@@ -12,7 +12,10 @@ use proptest::{
     test_runner::{Config, TestCaseResult},
 };
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    iter::FromIterator,
+};
 
 use exonum_merkledb::{
     access::{AccessErrorKind, AccessExt},
@@ -222,12 +225,18 @@ fn get_object_hash(snapshot: &dyn Snapshot, name: &str, index_type: IndexType) -
     }
 }
 
+#[derive(Debug)]
+struct IndexData {
+    ty: IndexType,
+    values: Vec<Vec<u8>>,
+}
+
 /// Checks the state of a particular state aggregator. `single_indexes` are the expected single
 /// indexes in the DB aggregated within the `namespace`, together with their types.
-fn check_aggregator(
+fn check_aggregator<'a>(
     snapshot: &dyn Snapshot,
     namespace: &str,
-    single_indexes: &HashMap<String, IndexType>,
+    single_indexes: impl Iterator<Item = (&'a str, IndexType)>,
 ) -> TestCaseResult {
     let aggregator = SystemSchema::new(snapshot).namespace_state_aggregator(namespace);
     let mut expected_names = HashSet::new();
@@ -239,7 +248,7 @@ fn check_aggregator(
         };
         let maybe_hash = if index_type.is_merkelized() {
             expected_names.insert(aggregated_name.to_owned());
-            Some(get_object_hash(snapshot, name, *index_type))
+            Some(get_object_hash(snapshot, name, index_type))
         } else {
             None
         };
@@ -249,27 +258,105 @@ fn check_aggregator(
     Ok(())
 }
 
+fn single_indexes(
+    indexes: &HashMap<IndexAddress, IndexData>,
+) -> impl Iterator<Item = (&str, IndexType)> {
+    indexes.iter().filter_map(|(addr, data)| {
+        if addr.id_in_group().is_none() {
+            Some((addr.name(), data.ty))
+        } else {
+            None
+        }
+    })
+}
+
+fn check_contents(
+    snapshot: &dyn Snapshot,
+    new_indexes: &HashMap<IndexAddress, IndexData>,
+) -> TestCaseResult {
+    for (addr, data) in new_indexes {
+        let addr = addr.to_owned();
+        match data.ty {
+            IndexType::Entry => {
+                let val = snapshot.get_entry::<_, Vec<u8>>(addr).get();
+                prop_assert_eq!(val.as_ref(), data.values.last());
+            }
+            IndexType::ProofEntry => {
+                let val = snapshot.get_proof_entry::<_, Vec<u8>>(addr).get();
+                prop_assert_eq!(val.as_ref(), data.values.last());
+            }
+
+            IndexType::List => {
+                let list = snapshot.get_list::<_, Vec<u8>>(addr);
+                prop_assert_eq!(list.len(), data.values.len() as u64);
+                let values = list.iter().collect::<Vec<_>>();
+                prop_assert_eq!(&values, &data.values);
+            }
+            IndexType::ProofList => {
+                let list = snapshot.get_proof_list::<_, Vec<u8>>(addr);
+                prop_assert_eq!(list.len(), data.values.len() as u64);
+                let values = list.iter().collect::<Vec<_>>();
+                prop_assert_eq!(&values, &data.values);
+            }
+
+            IndexType::Map => {
+                let map = snapshot.get_map::<_, u8, Vec<u8>>(addr);
+                let expected_map =
+                    BTreeMap::from_iter(data.values.iter().map(|val| (val[0], val.clone())));
+                // Using `Vec<_>` allows to test for duplicate entries during iteration etc.
+                let expected_map: Vec<_> = expected_map.into_iter().collect();
+                assert_eq!(map.iter().collect::<Vec<_>>(), expected_map);
+            }
+            IndexType::ProofMap => {
+                let map = snapshot.get_proof_map::<_, u8, Vec<u8>>(addr);
+                let expected_map =
+                    BTreeMap::from_iter(data.values.iter().map(|val| (val[0], val.clone())));
+                let expected_map: Vec<_> = expected_map.into_iter().collect();
+                assert_eq!(map.iter().collect::<Vec<_>>(), expected_map);
+            }
+
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 fn check_intermediate_consistency(
     snapshot: &dyn Snapshot,
     old_single_indexes: &HashMap<String, IndexType>,
-    new_single_indexes: &HashMap<String, IndexType>,
+    new_indexes: &HashMap<IndexAddress, IndexData>,
 ) -> TestCaseResult {
-    check_aggregator(snapshot, "", old_single_indexes)?;
-    check_aggregator(snapshot, "test", new_single_indexes)?;
+    check_aggregator(
+        snapshot,
+        "",
+        old_single_indexes
+            .iter()
+            .map(|(name, ty)| (name.as_str(), *ty)),
+    )?;
+    check_aggregator(snapshot, "test", single_indexes(new_indexes))?;
+    check_contents(snapshot, new_indexes)?;
     Ok(())
 }
 
 fn check_final_consistency(
     snapshot: &dyn Snapshot,
-    single_indexes: &HashMap<String, IndexType>,
+    aggregated_indexes: &HashMap<String, IndexType>,
+    new_indexes: &HashMap<IndexAddress, IndexData>,
 ) -> TestCaseResult {
-    check_aggregator(snapshot, "", single_indexes)?;
+    check_contents(snapshot, new_indexes)?;
+    check_aggregator(
+        snapshot,
+        "",
+        aggregated_indexes
+            .iter()
+            .map(|(name, ty)| (name.as_str(), *ty)),
+    )?;
 
     let system_schema = SystemSchema::new(snapshot);
     let ns_aggregator = system_schema.namespace_state_aggregator("test");
     prop_assert_eq!(ns_aggregator.keys().count(), 0);
 
-    for (name, ty) in single_indexes {
+    for (name, ty) in aggregated_indexes {
         if *ty == IndexType::Tombstone {
             // The index should be fully removed, thus creating a `ProofMapIndex` on its place
             // should succeed and it should have a default `object_hash`.
@@ -308,10 +395,12 @@ fn get_single_indexes(snapshot: &dyn Snapshot) -> HashMap<String, IndexType> {
 }
 
 fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseResult {
-    let mut old_aggregation = get_single_indexes(&db.snapshot());
-    let mut new_aggregation = HashMap::new();
-    let mut fork = db.fork();
+    // Original single indexes together with their type.
+    let mut original_indexes = get_single_indexes(&db.snapshot());
+    // All indexes in the migration together with type and expected contents.
+    let mut new_indexes = HashMap::new();
 
+    let mut fork = db.fork();
     for action in actions {
         match action {
             MigrationAction::WorkOnIndex {
@@ -321,29 +410,42 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
             } => {
                 let is_in_group = addr.id_in_group().is_some();
                 let is_in_migration = &addr.name()[0..1] == "^";
-                let real_type = MigrationAction::work(&fork, addr.clone(), index_type, value);
-                if !is_in_group {
-                    let aggregation = if is_in_migration {
-                        &mut new_aggregation
+                let real_type =
+                    MigrationAction::work(&fork, addr.clone(), index_type, value.clone());
+                if is_in_migration {
+                    let entry = new_indexes.entry(addr).or_insert_with(|| IndexData {
+                        ty: real_type,
+                        values: vec![],
+                    });
+
+                    if let Some(value) = value {
+                        entry.values.push(value);
                     } else {
-                        &mut old_aggregation
-                    };
-                    aggregation.insert(addr.name().to_owned(), real_type);
+                        entry.values.clear();
+                    }
+                } else if !is_in_group {
+                    original_indexes.insert(addr.name().to_owned(), real_type);
                 }
             }
+
             MigrationAction::CreateTombstone(addr) => {
-                let is_in_group = addr.id_in_group().is_some();
-                let index_name = addr.name().to_owned();
-                if fork.touch_index(addr, IndexType::Tombstone).is_ok() && !is_in_group {
-                    new_aggregation.insert(index_name, IndexType::Tombstone);
+                if fork.touch_index(addr.clone(), IndexType::Tombstone).is_ok() {
+                    new_indexes.insert(
+                        addr,
+                        IndexData {
+                            ty: IndexType::Tombstone,
+                            values: vec![],
+                        },
+                    );
                 }
             }
+
             MigrationAction::FlushFork => {
                 fork.flush();
             }
             MigrationAction::MergeFork => {
                 let patch = fork.into_patch();
-                check_intermediate_consistency(&patch, &old_aggregation, &new_aggregation)?;
+                check_intermediate_consistency(&patch, &original_indexes, &new_indexes)?;
                 db.merge(patch).unwrap();
                 fork = db.fork();
             }
@@ -354,18 +456,25 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
 
     // Compute the final list of indexes. Note that indexes removed in the migration
     // will have `Tombstone` type.
-    let mut aggregation = old_aggregation;
-    aggregation.extend(
-        new_aggregation
-            .into_iter()
-            .map(|(name, ty)| (name[1..].to_owned(), ty)),
-    );
+    new_indexes = new_indexes
+        .into_iter()
+        .map(|(addr, data)| {
+            // Remove '^' prefix from the address.
+            let mut new_addr = IndexAddress::from_root(&addr.name()[1..]);
+            if let Some(prefix) = addr.id_in_group() {
+                new_addr = new_addr.append_key(prefix);
+            }
+            (new_addr, data)
+        })
+        .collect();
+    let mut aggregated_indexes = original_indexes;
+    aggregated_indexes.extend(single_indexes(&new_indexes).map(|(name, ty)| (name.to_owned(), ty)));
 
     let patch = fork.into_patch();
-    check_final_consistency(&patch, &aggregation)?;
+    check_final_consistency(&patch, &aggregated_indexes, &new_indexes)?;
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
-    check_final_consistency(&snapshot, &aggregation)?;
+    check_final_consistency(&snapshot, &aggregated_indexes, &new_indexes)?;
 
     Ok(())
 }
