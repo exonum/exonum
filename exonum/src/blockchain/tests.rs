@@ -816,7 +816,7 @@ fn test_check_tx() {
     execute_transaction(
         &mut blockchain,
         TestStop {
-            value: TEST_SERVICE_ID as u64,
+            value: u64::from(TEST_SERVICE_ID),
         }
         .sign(TEST_SERVICE_ID, keypair.0, &keypair.1),
     )
