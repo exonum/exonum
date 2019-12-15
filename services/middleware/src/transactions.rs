@@ -106,7 +106,8 @@ fn checked_call_in_json() {
 }
 
 /// Transactions executed in a batch.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "proto::Batch")]
 pub struct Batch {
     /// Transactions included in the batch.
