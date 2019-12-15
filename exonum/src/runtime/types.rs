@@ -87,7 +87,7 @@ impl CallInfo {
 ///             ..CallInfo::default()
 ///         },
 ///         // Transaction payload.
-///         arguments: b"Talk is cheap. Show me the code. – Linus Torvalds".to_vec()
+///         arguments: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
 ///     },
 ///     keypair.0,
 ///     &keypair.1

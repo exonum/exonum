@@ -6,7 +6,8 @@
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
 `exonum-time` is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
-This service allows to determine time, import it from the external world to the blockchain
+This service allows to determine time,
+import it from the external world to the blockchain
 and keep its current value in the blockchain.
 
 ## Usage
@@ -130,7 +131,8 @@ let validator_time = time_schema.validators_times.get(&public_key);
 ## Further Reading
 
 Consult the [service description in Exonum docs](https://exonum.com/doc/version/latest/advanced/time)
-for a more high-level perspective, in particular, the design rationale and the proof of correctness.
+for a more high-level perspective, in particular, the design rationale
+and the proof of correctness.
 
 ## Other languages support
 
@@ -138,6 +140,7 @@ for a more high-level perspective, in particular, the design rationale and the p
 
 ## License
 
-`exonum-time` is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
+`exonum-time` is licensed under the Apache License (Version 2.0).
+See [LICENSE](LICENSE) for details.
 
 [service]: examples/simple_service/main.rs

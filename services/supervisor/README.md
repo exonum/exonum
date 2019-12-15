@@ -5,7 +5,8 @@
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
 `exonum-supervisor` is a main service of the [Exonum blockchain framework](https://exonum.com/).
-It is capable of deploying and starting new services, and changing configuration of the started services.
+It is capable of deploying and starting new services,
+and changing configuration of the started services.
 
 ## Usage
 
@@ -17,7 +18,8 @@ exonum = "0.12.0"
 exonum-supervisor = "0.12.0"
 ```
 
-Consult [the crate docs](https://docs.rs/exonum-supervisor) for more details about the service API.
+Consult [the crate docs](https://docs.rs/exonum-supervisor) for more details
+about the service API.
 
 ## License
 
