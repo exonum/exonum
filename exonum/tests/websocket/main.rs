@@ -99,7 +99,7 @@ fn test_send_transaction() {
 
     // Send invalid transaction.
     let keypair = gen_keypair();
-    let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx = keypair.create_wallet(SERVICE_ID + 1, CreateWallet::new("Bob"));
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
     let tx_json = serde_json::to_string(&tx_body).unwrap();
     client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
