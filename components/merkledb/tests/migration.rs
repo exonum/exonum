@@ -1,13 +1,18 @@
 //! This test checks that migration works properly:
 //!
 //! - Migrated indexes are properly aggregated during and after migration
-//! - Removed indexes are properly cleaned up
+//! - Migrated data is correctly added / replaced / removed after merge
+//! - Migration rollbacks work properly
+//!
+//! **NB.** For performance, some tests initialize the database outside the test. This should
+//! be fine if the test passes, but can lead to weird errors if it fails. In this case,
+//! move database initialization inside the test to extract the sequence of actions failing the test.
 
 use exonum_crypto::Hash;
 use proptest::{
     bool,
     collection::vec,
-    prop_assert_eq, prop_oneof, proptest, strategy,
+    option, prop_assert_eq, prop_oneof, proptest, sample, strategy,
     strategy::Strategy,
     test_runner::{Config, TestCaseResult},
 };
@@ -23,7 +28,20 @@ use exonum_merkledb::{
     TemporaryDB,
 };
 
-const ACTIONS_MAX_LEN: usize = 20;
+const ACTIONS_MAX_LEN: usize = 25;
+
+type Strings = &'static [&'static str];
+
+const NAMESPACES: Strings = &["test", "other", "tes"];
+
+const UNRELATED_NAMESPACES: Strings = &["other_", "unrelated"];
+
+const INDEX_NAMES: Strings = &[
+    "foo",
+    "bar",
+    "b",
+    "overly_long_prefix_still_should_work_though",
+];
 
 /// Constituent action applied to the DB during migration.
 #[derive(Debug, Clone)]
@@ -40,6 +58,8 @@ enum MigrationAction {
     },
     /// Create a tombstone for the specified address.
     CreateTombstone(IndexAddress),
+    /// Roll back the specified migration.
+    Rollback(&'static str),
     /// Flush the fork.
     FlushFork,
     /// Merge the fork into the DB.
@@ -121,35 +141,22 @@ impl MigrationAction {
 }
 
 /// Generates a name for an index participating in migration.
-fn generate_name() -> impl Strategy<Value = IndexAddress> {
-    let names = prop_oneof![
-        strategy::Just("test.foo"),
-        strategy::Just("test.bar"),
-        strategy::Just("test.baz"),
-        strategy::Just("test.buzz"),
-    ];
-    names.prop_map(IndexAddress::from_root)
-}
-
-/// Generates a name for an index **not** participating in migration.
-fn generate_unrelated_name() -> impl Strategy<Value = IndexAddress> {
-    let names = prop_oneof![
-        strategy::Just("test_.foo"),
-        strategy::Just("tes.bar"),
-        strategy::Just("unrelated.baz"),
-    ];
-    names.prop_map(IndexAddress::from_root)
+fn generate_name(namespaces: Strings) -> impl Strategy<Value = IndexAddress> + Clone {
+    let index_name = sample::select(INDEX_NAMES);
+    (sample::select(namespaces), index_name).prop_map(|(namespace, index_name)| {
+        IndexAddress::from_root(namespace).append_name(index_name)
+    })
 }
 
 /// Generates an `IndexAddress` optionally placed in a group.
-fn generate_address<T: Strategy<Value = IndexAddress>>(
-    name: fn() -> T,
+fn generate_address(
+    name: impl Strategy<Value = IndexAddress> + Clone,
 ) -> impl Strategy<Value = IndexAddress> {
     prop_oneof![
         // Non-prefixed addresses
-        name(),
+        name.clone(),
         // Prefixed addresses
-        (name(), 1_u8..8).prop_map(|(addr, prefix)| addr.append_key(&prefix)),
+        (name, 1_u8..8).prop_map(|(addr, prefix)| addr.append_key(&prefix)),
     ]
 }
 
@@ -167,7 +174,7 @@ fn generate_index_type() -> impl Strategy<Value = IndexType> {
 /// Generates a value to place in the index. if `None` is generated, the index will be cleared
 /// instead.
 fn generate_value() -> impl Strategy<Value = Option<Vec<u8>>> {
-    prop_oneof![strategy::Just(None), vec(0_u8..4, 1..=1).prop_map(Some)]
+    option::weighted(0.8, vec(0_u8..4, 1..=1))
 }
 
 /// Converts the provided address into its migration counterpart.
@@ -179,15 +186,19 @@ fn migration_addr(addr: &IndexAddress) -> IndexAddress {
     new_addr
 }
 
-fn generate_action() -> impl Strategy<Value = MigrationAction> {
+/// Generates an atomic migration action.
+///
+/// `namespaces` denotes a list of namespaces in which migrations will be performed. Namespaces
+/// should not intersect with `UNRELATED_NAMESPACES`.
+fn generate_action(namespaces: Strings) -> impl Strategy<Value = MigrationAction> {
     let work_args = (
-        generate_address(generate_name),
+        generate_address(generate_name(namespaces)),
         generate_index_type(),
         generate_value(),
         bool::ANY,
     );
     let unrelated_work_args = (
-        generate_address(generate_unrelated_name),
+        generate_address(generate_name(UNRELATED_NAMESPACES)),
         generate_index_type(),
         generate_value(),
     );
@@ -209,10 +220,17 @@ fn generate_action() -> impl Strategy<Value = MigrationAction> {
             index_type,
             value,
         }),
-        generate_address(generate_name)
+        generate_address(generate_name(namespaces))
             .prop_map(|addr| { MigrationAction::CreateTombstone(migration_addr(&addr)) }),
         strategy::Just(MigrationAction::FlushFork),
         strategy::Just(MigrationAction::MergeFork),
+    ]
+}
+
+fn generate_action_with_rollbacks(namespaces: Strings) -> impl Strategy<Value = MigrationAction> {
+    prop_oneof![
+        9 => generate_action(namespaces),
+        1 => sample::select(namespaces).prop_map(MigrationAction::Rollback),
     ]
 }
 
@@ -227,12 +245,13 @@ fn get_object_hash(snapshot: &dyn Snapshot, name: &str, index_type: IndexType) -
 
 #[derive(Debug)]
 struct IndexData {
+    namespace: &'static str,
     ty: IndexType,
     values: Vec<Vec<u8>>,
 }
 
 /// Checks the state of a particular state aggregator. `single_indexes` are the expected single
-/// indexes in the DB aggregated within the `namespace`, together with their types.
+/// indexes in the DB within the `namespace`, together with their types.
 fn check_aggregator<'a>(
     snapshot: &dyn Snapshot,
     namespace: &str,
@@ -258,11 +277,12 @@ fn check_aggregator<'a>(
     Ok(())
 }
 
-fn single_indexes(
-    indexes: &HashMap<IndexAddress, IndexData>,
-) -> impl Iterator<Item = (&str, IndexType)> {
-    indexes.iter().filter_map(|(addr, data)| {
-        if addr.id_in_group().is_none() {
+fn single_indexes<'a>(
+    indexes: &'a HashMap<IndexAddress, IndexData>,
+    namespace: &'static str,
+) -> impl Iterator<Item = (&'a str, IndexType)> {
+    indexes.iter().filter_map(move |(addr, data)| {
+        if addr.id_in_group().is_none() && data.namespace == namespace {
             Some((addr.name(), data.ty))
         } else {
             None
@@ -323,6 +343,7 @@ fn check_contents(
 
 fn check_intermediate_consistency(
     snapshot: &dyn Snapshot,
+    namespaces: Strings,
     old_single_indexes: &HashMap<String, IndexType>,
     new_indexes: &HashMap<IndexAddress, IndexData>,
 ) -> TestCaseResult {
@@ -333,13 +354,18 @@ fn check_intermediate_consistency(
             .iter()
             .map(|(name, ty)| (name.as_str(), *ty)),
     )?;
-    check_aggregator(snapshot, "test", single_indexes(new_indexes))?;
+
+    for &namespace in namespaces {
+        let indexes = single_indexes(new_indexes, namespace);
+        check_aggregator(snapshot, namespace, indexes)?;
+    }
     check_contents(snapshot, new_indexes)?;
     Ok(())
 }
 
 fn check_final_consistency(
     snapshot: &dyn Snapshot,
+    namespaces: Strings,
     aggregated_indexes: &HashMap<String, IndexType>,
     new_indexes: &HashMap<IndexAddress, IndexData>,
 ) -> TestCaseResult {
@@ -353,8 +379,10 @@ fn check_final_consistency(
     )?;
 
     let system_schema = SystemSchema::new(snapshot);
-    let ns_aggregator = system_schema.namespace_state_aggregator("test");
-    prop_assert_eq!(ns_aggregator.keys().count(), 0);
+    for &namespace in namespaces {
+        let ns_aggregator = system_schema.namespace_state_aggregator(namespace);
+        prop_assert_eq!(ns_aggregator.keys().count(), 0);
+    }
 
     for (name, ty) in aggregated_indexes {
         if *ty == IndexType::Tombstone {
@@ -372,31 +400,42 @@ fn check_final_consistency(
 
 /// Gets the single indexes and their types from the `snapshot`. This uses the fact that only
 /// a limited amount of indexes may be generated by `MigrationAction`s.
-fn get_single_indexes(snapshot: &dyn Snapshot) -> HashMap<String, IndexType> {
-    const POSSIBLE_NAMES: &[&str] = &[
-        "test.foo",
-        "test.bar",
-        "test.baz",
-        "test.buzz",
-        "test_.foo",
-        "tes.bar",
-        "unrelated.baz",
-    ];
-
+fn get_single_indexes(snapshot: &dyn Snapshot, namespaces: Strings) -> HashMap<String, IndexType> {
     let mut indexes = HashMap::new();
-    for &name in POSSIBLE_NAMES {
-        if let Err(e) = snapshot.touch_index(name, IndexType::Unknown) {
-            if let AccessErrorKind::WrongIndexType { actual, .. } = e.kind {
-                indexes.insert(name.to_owned(), actual);
+
+    for &namespace in namespaces.iter().chain(UNRELATED_NAMESPACES) {
+        for &index_name in INDEX_NAMES {
+            let addr = IndexAddress::from_root(namespace).append_name(index_name);
+            let full_name = addr.name().to_owned();
+            if let Err(e) = snapshot.touch_index(addr, IndexType::Unknown) {
+                if let AccessErrorKind::WrongIndexType { actual, .. } = e.kind {
+                    indexes.insert(full_name, actual);
+                }
             }
         }
     }
     indexes
 }
 
-fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseResult {
+/// Gets a namespaces from an address.
+fn get_namespace(addr: &IndexAddress, namespaces: Strings) -> &'static str {
+    namespaces
+        .iter()
+        .find(|&&ns| {
+            let name = addr.name();
+            let ns_end = ns.len() + 1;
+            &name[1..ns_end] == ns && &name[ns_end..=ns_end] == "."
+        })
+        .expect("Index not in the namespace")
+}
+
+fn apply_actions(
+    db: &TemporaryDB,
+    actions: Vec<MigrationAction>,
+    namespaces: Strings,
+) -> TestCaseResult {
     // Original single indexes together with their type.
-    let mut original_indexes = get_single_indexes(&db.snapshot());
+    let mut original_indexes = get_single_indexes(&db.snapshot(), namespaces);
     // All indexes in the migration together with type and expected contents.
     let mut new_indexes = HashMap::new();
 
@@ -413,7 +452,9 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
                 let real_type =
                     MigrationAction::work(&fork, addr.clone(), index_type, value.clone());
                 if is_in_migration {
+                    let namespace = get_namespace(&addr, namespaces);
                     let entry = new_indexes.entry(addr).or_insert_with(|| IndexData {
+                        namespace,
                         ty: real_type,
                         values: vec![],
                     });
@@ -430,9 +471,11 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
 
             MigrationAction::CreateTombstone(addr) => {
                 if fork.touch_index(addr.clone(), IndexType::Tombstone).is_ok() {
+                    let namespace = get_namespace(&addr, namespaces);
                     new_indexes.insert(
                         addr,
                         IndexData {
+                            namespace,
                             ty: IndexType::Tombstone,
                             values: vec![],
                         },
@@ -440,19 +483,31 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
                 }
             }
 
+            MigrationAction::Rollback(namespace) => {
+                fork.rollback_migration(namespace);
+                new_indexes.retain(|_, data| data.namespace != namespace);
+            }
+
             MigrationAction::FlushFork => {
                 fork.flush();
             }
             MigrationAction::MergeFork => {
                 let patch = fork.into_patch();
-                check_intermediate_consistency(&patch, &original_indexes, &new_indexes)?;
+                check_intermediate_consistency(
+                    &patch,
+                    namespaces,
+                    &original_indexes,
+                    &new_indexes,
+                )?;
                 db.merge(patch).unwrap();
                 fork = db.fork();
             }
         }
     }
 
-    fork.flush_migration("test");
+    for &namespace in namespaces {
+        fork.flush_migration(namespace);
+    }
 
     // Compute the final list of indexes. Note that indexes removed in the migration
     // will have `Tombstone` type.
@@ -468,30 +523,65 @@ fn apply_actions(db: &TemporaryDB, actions: Vec<MigrationAction>) -> TestCaseRes
         })
         .collect();
     let mut aggregated_indexes = original_indexes;
-    aggregated_indexes.extend(single_indexes(&new_indexes).map(|(name, ty)| (name.to_owned(), ty)));
+    for &namespace in namespaces {
+        aggregated_indexes.extend(
+            single_indexes(&new_indexes, namespace).map(|(name, ty)| (name.to_owned(), ty)),
+        );
+    }
 
     let patch = fork.into_patch();
-    check_final_consistency(&patch, &aggregated_indexes, &new_indexes)?;
+    check_final_consistency(&patch, namespaces, &aggregated_indexes, &new_indexes)?;
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
-    check_final_consistency(&snapshot, &aggregated_indexes, &new_indexes)?;
+    check_final_consistency(&snapshot, namespaces, &aggregated_indexes, &new_indexes)?;
 
     Ok(())
 }
 
 #[test]
-fn migration_works_with_honest_db_initialization() {
+fn single_migration_with_honest_db_initialization() {
+    const SINGLE_NAMESPACE: Strings = &["test"];
     let config = Config::with_cases(Config::default().cases / 4);
-    proptest!(config, |(actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
+
+    proptest!(config, |(actions in vec(generate_action(SINGLE_NAMESPACE), 1..ACTIONS_MAX_LEN))| {
         let db = TemporaryDB::new();
-        apply_actions(&db, actions)?;
+        apply_actions(&db, actions, SINGLE_NAMESPACE)?;
+    });
+}
+
+/// All migration actions are in a single namespace `test`.
+#[test]
+fn single_migration() {
+    const SINGLE_NAMESPACE: Strings = &["test"];
+    let db = TemporaryDB::new();
+    proptest!(|(actions in vec(generate_action(SINGLE_NAMESPACE), 1..ACTIONS_MAX_LEN))| {
+        apply_actions(&db, actions, SINGLE_NAMESPACE)?;
     });
 }
 
 #[test]
-fn migration_works_with_shared_db() {
+fn single_migration_with_rollbacks() {
+    const SINGLE_NAMESPACE: Strings = &["test"];
     let db = TemporaryDB::new();
-    proptest!(|(actions in vec(generate_action(), 1..ACTIONS_MAX_LEN))| {
-        apply_actions(&db, actions)?;
+    let action = generate_action_with_rollbacks(SINGLE_NAMESPACE);
+    proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
+        apply_actions(&db, actions, SINGLE_NAMESPACE)?;
+    });
+}
+
+#[test]
+fn multiple_migrations_with_synced_end() {
+    let db = TemporaryDB::new();
+    proptest!(|(actions in vec(generate_action(NAMESPACES), 1..ACTIONS_MAX_LEN))| {
+        apply_actions(&db, actions, NAMESPACES)?;
+    });
+}
+
+#[test]
+fn multiple_migrations_with_synced_end_and_rollbacks() {
+    let db = TemporaryDB::new();
+    let action = generate_action_with_rollbacks(NAMESPACES);
+    proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
+        apply_actions(&db, actions, NAMESPACES)?;
     });
 }
