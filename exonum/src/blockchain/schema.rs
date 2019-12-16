@@ -267,7 +267,8 @@ impl<T: Access> Schema<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the "genesis block" was not created.
+    /// Panics if invoked before the genesis block was created, e.g. within
+    /// `after_transactions` hook for genesis block.
     pub fn height(&self) -> Height {
         let len = self.block_hashes_by_height().len();
         assert!(
