@@ -104,7 +104,10 @@ impl<'a> CallContext<'a> {
     }
 }
 
-impl<'a, I: Into<InstanceQuery<'a>>> GenericCallMut<I> for CallContext<'a> {
+impl<'a, I> GenericCallMut<I> for CallContext<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
     type Output = Result<(), ExecutionError>;
 
     fn generic_call_mut(

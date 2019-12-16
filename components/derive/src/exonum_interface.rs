@@ -57,7 +57,7 @@ impl ServiceMethodDescriptor {
 
         let mut method_args_iter = method.sig.inputs.iter();
 
-        // Check the validity of the first arg (should be `&self`).
+        // Check the validity of the method receiver (should be `&self`).
         if let Some(arg) = method_args_iter.next() {
             match arg {
                 FnArg::Receiver(Receiver {
@@ -73,7 +73,8 @@ impl ServiceMethodDescriptor {
             return Err(invalid_method(method));
         }
 
-        // Check the validity of the first arg (should be `Ctx`).
+        // Check the validity of the first arg, excluding the receiver (should be
+        // the context type param).
         let ctx_type = method_args_iter
             .next()
             .ok_or_else(|| invalid_method(method))?;
@@ -92,7 +93,8 @@ impl ServiceMethodDescriptor {
             return Err(invalid_method(ctx_type));
         }
 
-        // Check the validity of the second arg and extract the type from it.
+        // Check the validity of the second arg (excluding the receiver) and extract the type
+        // from it.
         let arg_type = method_args_iter
             .next()
             .ok_or_else(|| invalid_method(method))
@@ -184,7 +186,7 @@ impl ExonumService {
         } else if let GenericParam::Type(ref type_param) = params[0] {
             &type_param.ident
         } else {
-            let msg = "Unsupported generic param (should be a type param denoting \
+            let msg = "Unsupported generic parameter (should be a type parameter denoting \
                        execution context)";
             return Err(darling::Error::custom(msg).with_span(&params[0]));
         };
