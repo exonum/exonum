@@ -29,7 +29,7 @@ use exonum_merkledb::{
 };
 
 use crate::{
-    common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN},
+    common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN},
     key::Key,
 };
 
@@ -43,14 +43,16 @@ enum MapAction<K, V> {
     // Should be applied to a small subset of keys (like modulo 8 for int).
     Remove(K),
     Clear,
+    FlushFork,
     MergeFork,
 }
 
-impl<K, V> PartialEq<MergeFork> for MapAction<K, V> {
-    fn eq(&self, _: &MergeFork) -> bool {
+impl<K, V> AsForkAction for MapAction<K, V> {
+    fn as_fork_action(&self) -> Option<ForkAction> {
         match self {
-            MapAction::MergeFork => true,
-            _ => false,
+            MapAction::FlushFork => Some(ForkAction::Flush),
+            MapAction::MergeFork => Some(ForkAction::Merge),
+            _ => None,
         }
     }
 }
@@ -173,6 +175,7 @@ fn generate_proof_action() -> impl Strategy<Value = MapAction<Key, i32>> {
         ((0..8u8), num::i32::ANY).prop_map(|(i, v)| MapAction::Put([i; 32].into(), v)),
         (0..8u8).prop_map(|i| MapAction::Remove([i; 32].into())),
         strategy::Just(MapAction::Clear),
+        strategy::Just(MapAction::FlushFork),
         strategy::Just(MapAction::MergeFork),
     ]
 }
