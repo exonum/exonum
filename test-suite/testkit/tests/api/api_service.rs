@@ -22,7 +22,7 @@ use exonum::{
     api,
     runtime::{
         rust::{
-            api::{ServiceApiBuilder, ServiceApiState},
+            api::{ServiceApiBuilder, ServiceApiScope, ServiceApiState},
             DefaultInstance, Service,
         },
         InstanceId,
@@ -82,9 +82,10 @@ impl Api {
             .endpoint("gone-immutable", Self::gone);
 
         // Moved endpoints.
-        let url_base = public_scope.url_base();
-        let moved_mutable_new_location = format!("{}/{}", &url_base, "ping-pong-deprecated-mut");
-        let moved_immutable_new_location = format!("{}/{}", &url_base, "ping-pong");
+        let moved_mutable_new_location =
+            ServiceApiScope::relative_to("moved-mutable", "ping-pong-deprecated-mut");
+        let moved_immutable_new_location =
+            ServiceApiScope::relative_to("moved-immutable", "ping-pong");
         public_scope
             .endpoint_mut(
                 "moved-mutable",

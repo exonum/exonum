@@ -249,9 +249,32 @@ impl ServiceApiScope {
         self.inner.web_backend()
     }
 
-    /// Returns the base for service URLs, e.g. "/api/services/xnm-token/".
-    pub fn url_base(&self) -> String {
-        format!("/api/services/{}", self.descriptor.1)
+    /// Takes an old endpoint and a new endpoint as direct URIs, and creates
+    /// a relative path from the old to the new one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::runtime::rust::api::ServiceApiScope;
+    ///
+    /// fn main() {
+    ///    let relative_path = ServiceApiScope::relative_to("hello/world", "exonum/rust/app");
+    ///    assert_eq!(&relative_path, "../../exonum/rust/app");
+    /// }
+    /// ```
+    pub fn relative_to(old_endpoint: &str, new_endpoint: &str) -> String {
+        let endpoint_without_end_slash = old_endpoint.trim_end_matches('/');
+        let mut nesting_level = endpoint_without_end_slash
+            .chars()
+            .filter(|&c| c == '/')
+            .count();
+
+        // Mounting points do not contain the leading slash, e.g. `endpoint("v1/stats")`.
+        nesting_level += 1;
+
+        let path_to_service_root = "../".repeat(nesting_level);
+
+        format!("{}{}", path_to_service_root, new_endpoint)
     }
 }
 

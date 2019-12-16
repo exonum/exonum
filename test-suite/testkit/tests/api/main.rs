@@ -119,7 +119,7 @@ fn moved() {
     let pong_error: ApiError = api
         .public(ApiKind::Service("api-service"))
         .query(&ping)
-        .expect_header("Location", "/api/services/api-service/ping-pong?value=64")
+        .expect_header("Location", "../ping-pong?value=64")
         .get::<u64>("moved-immutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
     assert_matches!(pong_error, ApiError::MovedPermanently(_));
@@ -127,10 +127,7 @@ fn moved() {
     let pong_error: ApiError = api
         .public(ApiKind::Service("api-service"))
         .query(&ping)
-        .expect_header(
-            "Location",
-            "/api/services/api-service/ping-pong-deprecated-mut",
-        )
+        .expect_header("Location", "../ping-pong-deprecated-mut")
         .post::<u64>("moved-mutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
     assert_matches!(pong_error, ApiError::MovedPermanently(_));
