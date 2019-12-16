@@ -299,7 +299,7 @@ fn main() {
         api_sender
             .broadcast_transaction(
                 DeployRequest {
-                    artifact: "255:sample_artifact".parse().unwrap(),
+                    artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
                     deadline_height: deploy_height,
                     spec: Vec::default(),
                 }
@@ -317,7 +317,7 @@ fn main() {
         let instance_name = "instance".to_owned();
 
         let start_service = StartService {
-            artifact: "255:sample_artifact".parse().unwrap(),
+            artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
             name: instance_name.clone(),
             config: 10_u64.into_bytes(),
         };
