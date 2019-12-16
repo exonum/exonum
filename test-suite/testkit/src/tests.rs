@@ -128,7 +128,7 @@ fn testkit_create_block_with_transactions() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Transaction is already committed")]
 fn testkit_create_block_with_transactions_commit_duplicated_transaction() {
     let (mut testkit, _) = init_testkit();
     let tx = gen_tx("tx".to_string());
@@ -169,7 +169,7 @@ fn testkit_create_block_with_transaction() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Transaction is already committed")]
 fn testkit_create_block_with_transaction_commit_duplicated_transaction() {
     let (mut testkit, _) = init_testkit();
     let tx = gen_tx("tx".to_string());
