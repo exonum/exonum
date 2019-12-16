@@ -25,5 +25,5 @@ message KeyValue {
 }
 
 message BinaryMap {
-  repeated KeyValue inner = 1;
+  repeated KeyValue entry = 1;
 }
