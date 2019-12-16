@@ -148,7 +148,7 @@ impl ResponseError for api::Error {
 fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpResponse {
     let mut response = HttpResponse::Ok();
 
-    if let Actuality::Deprecated(ref discontinued_on) = actuality {
+    if let Actuality::Deprecated(ref discontinued_on, ref description) = actuality {
         // There is a proposal for creating special deprecation header within HTTP,
         // but currently it's only a draft. So the conventional way to notify API user
         // about endpoint deprecation is setting the `Warning` header.
@@ -161,12 +161,16 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
             None => "Currently there is no specific date for disabling this endpoint.".into(),
         };
 
-        let warning_text = format!(
+        let mut warning_text = format!(
             "Deprecated API: This endpoint is deprecated, \
-             see the documentation to find an alternative. \
+             see the service documentation to find an alternative. \
              {}",
             expiration_note
         );
+
+        if let Some(description) = description {
+            warning_text = format!("{} Additional information: {}.", warning_text, description);
+        }
 
         let warning_string = create_warning_header(&warning_text);
 
@@ -551,10 +555,10 @@ mod tests {
         let actual_response = json_response(Actuality::Actual, 123);
         assert_responses_eq(actual_response, HttpResponse::Ok().json(123));
 
-        let deprecated_response_no_deadline = json_response(Actuality::Deprecated(None), 123);
+        let deprecated_response_no_deadline = json_response(Actuality::Deprecated(None, None), 123);
         let expected_warning_text =
             "Deprecated API: This endpoint is deprecated, \
-             see the documentation to find an alternative. \
+             see the service documentation to find an alternative. \
              Currently there is no specific date for disabling this endpoint.";
         let expected_warning = create_warning_header(expected_warning_text);
         assert_responses_eq(
@@ -564,13 +568,29 @@ mod tests {
                 .json(123),
         );
 
+        let description = "Docs can be found on docs.rs".to_owned();
+        let deprecated_response_with_description =
+            json_response(Actuality::Deprecated(None, Some(description)), 123);
+        let expected_warning_text =
+            "Deprecated API: This endpoint is deprecated, \
+             see the service documentation to find an alternative. \
+             Currently there is no specific date for disabling this endpoint. \
+             Additional information: Docs can be found on docs.rs.";
+        let expected_warning = create_warning_header(expected_warning_text);
+        assert_responses_eq(
+            deprecated_response_with_description,
+            HttpResponse::Ok()
+                .header(header::WARNING, expected_warning)
+                .json(123),
+        );
+
         let deadline = chrono::Utc.ymd(2020, 12, 31).and_hms(23, 59, 59);
 
         let deprecated_response_deadline =
-            json_response(Actuality::Deprecated(Some(deadline)), 123);
+            json_response(Actuality::Deprecated(Some(deadline), None), 123);
         let expected_warning_text =
             "Deprecated API: This endpoint is deprecated, \
-             see the documentation to find an alternative. \
+             see the service documentation to find an alternative. \
              The old API is maintained until Thu, 31 Dec 2020 23:59:59 GMT.";
         let expected_warning = create_warning_header(expected_warning_text);
         assert_responses_eq(

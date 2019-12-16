@@ -163,47 +163,13 @@ impl ServiceApiScope {
     }
 
     /// Same as `endpoint`, but the response will contain a warning about endpoint being deprecated.
-    /// Optional endpoint expiration date can be included in the warning.
+    /// Optional endpoint expiration date and deprecation-related information (e.g., link to a documentation for
+    /// a new API) can be included in the warning.
     pub fn deprecated_endpoint<Q, I, F, R>(
         &mut self,
         name: &'static str,
         deprecates_on: Option<DateTime<Utc>>,
-        handler: F,
-    ) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
-    {
-        let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
-        let handler = move |query: Q| -> crate::api::FutureResult<I> {
-            let state = ServiceApiState::from_api_context(
-                &blockchain,
-                InstanceDescriptor {
-                    id: descriptor.0,
-                    name: descriptor.1.as_ref(),
-                },
-            );
-            let result = handler(&state, query);
-            Box::new(result.into_future())
-        };
-        // Mark endpoint as deprecated.
-        let mut handler = Deprecated::from(handler);
-        if let Some(deprecates_on) = deprecates_on {
-            handler = handler.with_date(deprecates_on)
-        };
-        self.inner.endpoint(name, handler);
-        self
-    }
-
-    /// Same as `endpoint_mut`, but the response will contain a warning about endpoint being deprecated.
-    /// Optional endpoint expiration date can be included in the warning.
-    pub fn deprecated_endpoint_mut<Q, I, F, R>(
-        &mut self,
-        name: &'static str,
-        deprecates_on: Option<DateTime<Utc>>,
+        description: Option<String>,
         handler: F,
     ) -> &mut Self
     where
@@ -229,7 +195,51 @@ impl ServiceApiScope {
         let mut handler = Deprecated::from(handler);
         if let Some(deprecates_on) = deprecates_on {
             handler = handler.with_date(deprecates_on);
+        }
+        if let Some(description) = description {
+            handler = handler.with_description(description);
+        }
+        self.inner.endpoint(name, handler);
+        self
+    }
+
+    /// Same as `endpoint_mut`, but the response will contain a warning about endpoint being deprecated.
+    /// Optional endpoint expiration date and deprecation-related information (e.g., link to a documentation for
+    /// a new API) can be included in the warning.
+    pub fn deprecated_endpoint_mut<Q, I, F, R>(
+        &mut self,
+        name: &'static str,
+        deprecates_on: Option<DateTime<Utc>>,
+        description: Option<String>,
+        handler: F,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        let handler = move |query: Q| -> crate::api::FutureResult<I> {
+            let state = ServiceApiState::from_api_context(
+                &blockchain,
+                InstanceDescriptor {
+                    id: descriptor.0,
+                    name: descriptor.1.as_ref(),
+                },
+            );
+            let result = handler(&state, query);
+            Box::new(result.into_future())
         };
+        // Mark endpoint as deprecated.
+        let mut handler = Deprecated::from(handler);
+        if let Some(deprecates_on) = deprecates_on {
+            handler = handler.with_date(deprecates_on);
+        }
+        if let Some(description) = description {
+            handler = handler.with_description(description);
+        }
         self.inner.endpoint_mut(name, handler);
         self
     }

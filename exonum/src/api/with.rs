@@ -56,8 +56,9 @@ pub enum Actuality {
     /// Endpoint is suitable for use.
     Actual,
     /// Endpoint is not recommended to use, the support of it will end soon.
-    /// Contains optional value denoting the endpoint expiration date.
-    Deprecated(Option<DateTime<Utc>>),
+    /// Contains optional value denoting the endpoint expiration date, and
+    /// optional additional description.
+    Deprecated(Option<DateTime<Utc>>, Option<String>),
 }
 
 /// Wrapper over an endpoint handler, which marks it as deprecated.
@@ -67,6 +68,8 @@ pub struct Deprecated<Q, I, R, F> {
     pub handler: F,
     /// Optional endpoint expiration date.
     pub deprecates_on: Option<DateTime<Utc>>,
+    /// Optional additional note.
+    pub description: Option<String>,
     _query_type: PhantomData<Q>,
     _item_type: PhantomData<I>,
     _result_type: PhantomData<R>,
@@ -80,6 +83,14 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
             ..self
         }
     }
+
+    /// Adds a description note to the warning, e.g. link to the new API documentation.
+    pub fn with_description<S: Into<String>>(self, description: S) -> Self {
+        Self {
+            description: Some(description.into()),
+            ..self
+        }
+    }
 }
 
 impl<Q, I, F> From<F> for Deprecated<Q, I, Result<I>, F>
@@ -90,6 +101,7 @@ where
         Self {
             handler,
             deprecates_on: None,
+            description: None,
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,
@@ -105,6 +117,7 @@ where
         Self {
             handler,
             deprecates_on: None,
+            description: None,
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,
@@ -116,7 +129,7 @@ impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F>
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,
-            actuality: Actuality::Deprecated(deprecated.deprecates_on),
+            actuality: Actuality::Deprecated(deprecated.deprecates_on, deprecated.description),
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,

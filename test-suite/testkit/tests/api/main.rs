@@ -53,12 +53,12 @@ fn deprecated() {
     let ping = PingQuery { value: 64 };
     const UNBOUND_WARNING: &str =
         "299 - \"Deprecated API: This endpoint is deprecated, \
-         see the documentation to find an alternative. \
+         see the service documentation to find an alternative. \
          Currently there is no specific date for disabling this endpoint.\"";
 
     const WARNING_WITH_DEADLINE: &str =
         "299 - \"Deprecated API: This endpoint is deprecated, \
-         see the documentation to find an alternative. \
+         see the service documentation to find an alternative. \
          The old API is maintained until Fri, 31 Dec 2055 23:59:59 GMT.\"";
 
     let pong: u64 = api
