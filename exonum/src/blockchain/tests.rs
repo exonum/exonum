@@ -35,6 +35,7 @@ use crate::{
         AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
+    skip_for_genesis,
 };
 
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
@@ -217,13 +218,7 @@ impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
     fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
-        // Skip execution for genesis block.
-        let core_schema = context.data().for_core();
-        let next_height = core_schema.next_height();
-        if next_height == Height(0) {
-            return Ok(());
-        }
-
+        skip_for_genesis!(context);
         panic!("42");
     }
 }
