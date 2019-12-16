@@ -299,7 +299,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// According to the principle of the consensus algorithm, the process of forming a new block
     /// takes place in RAM. A patch with changes is then applied to the database. If a block proposal
-    /// is not accepted, a fork with the patch contaning this proposal is discarded from RAM.
+    /// is not accepted, a fork with the patch containing this proposal is discarded from RAM.
     /// The service instances, already discarded by the runtime, persist their state only in the
     /// patch of changes in RAM. Thus, if the fork with this patch is discarded, no further action
     /// is required to remove the new state.
