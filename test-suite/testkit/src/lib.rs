@@ -193,6 +193,9 @@ mod network;
 mod poll_events;
 mod server;
 
+#[cfg(test)]
+mod tests;
+
 type ApiNotifierChannel = (
     mpsc::Sender<UpdateEndpoints>,
     mpsc::Receiver<UpdateEndpoints>,
