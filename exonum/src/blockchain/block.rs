@@ -21,7 +21,7 @@ use crate::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{Precommit, Verified},
-    proto::{self, BinaryMap},
+    proto::{self, OrderedMap},
 };
 use exonum_merkledb::BinaryValue;
 use std::{borrow::Cow, fmt};
@@ -73,7 +73,7 @@ impl BlockHeaderKey for ProposerId {
 }
 
 /// Expandable set of headers allowed to be added to the block.
-pub type AdditionalHeaders = BinaryMap<String, Vec<u8>>;
+pub type AdditionalHeaders = OrderedMap<String, Vec<u8>>;
 
 impl AdditionalHeaders {
     /// New instance of `AdditionalHeaders`.
@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     fn block_entry_wrong_type() {
-        let mut entries: BinaryMap<String, Vec<u8>> = BinaryMap::default();
+        let mut entries: OrderedMap<String, Vec<u8>> = OrderedMap::default();
 
         entries.0.insert("active_services".into(), vec![]);
         let block = create_block(entries.clone());

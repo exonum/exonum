@@ -20,10 +20,10 @@ package exonum;
 
 // Some non-scalar key-value pair.
 message KeyValue {
-  bytes key = 1;
+  string key = 1;
   bytes value = 2;
 }
 
-message BinaryMap {
+message OrderedMap {
   repeated KeyValue entry = 1;
 }

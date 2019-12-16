@@ -16,7 +16,7 @@
 
 use failure::Error;
 
-pub use self::binary_map::BinaryMap;
+pub use self::ordered_map::OrderedMap;
 pub use self::schema::{
     blockchain::{Block, CallInBlock, TxLocation},
     consensus::{
@@ -30,7 +30,7 @@ pub use self::schema::{
 use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
 
-mod binary_map;
+mod ordered_map;
 pub mod schema;
 
 #[cfg(test)]
