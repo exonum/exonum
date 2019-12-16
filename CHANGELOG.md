@@ -25,6 +25,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+- `commit_service` was renamed to the `update_service_status` and now takes
+  `InstanceStatus` as an additional argument.
+  `start_adding_service` has been renamed to `initiate_adding_service` to
+  better distinguish between starting and stopping a service. (#1605)
 
 #### exonum-supervisor
 
@@ -37,6 +41,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `before_transactions` hook for services was introduced. (#1577)
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- Service instances can now be stopped.
+
+  Active service instance can be stopped by the corresponding request by the
+  `Supervisor`. Stopped service no more participates in the business logic,
+  i.e. it does not execute transactions, process events, provide user APIs, etc.
+  Service data becomes unavailable to other services, but still exists. The name
+  and identifier remain reserved for the stopped service and cannot be used again
+  for adding new services. (#1605)
 
 #### exonum-merkledb
 
@@ -51,6 +63,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
+- Added `ConfigChange::StopService` to make requests to stop the service
+  instance. (#1605)  
 
 ## 0.13.0-rc.2 - 2019-12-04
 
