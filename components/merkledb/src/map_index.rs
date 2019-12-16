@@ -27,7 +27,6 @@ use super::{
     },
     BinaryKey, BinaryValue,
 };
-use failure::_core::fmt::{Error, Formatter};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -406,7 +405,7 @@ where
     K: BinaryKey,
     V: BinaryValue,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("MapIndexIter").finish()
     }
 }
@@ -415,7 +414,7 @@ impl<'a, K> fmt::Debug for MapIndexKeys<'a, K>
 where
     K: BinaryKey,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("MapIndexKeys").finish()
     }
 }
