@@ -427,6 +427,9 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
+    ///
+    /// # Panics
+    /// - Panics if any of the transactions is incorrect.
     pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
@@ -457,6 +460,9 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
+    ///
+    /// # Panics
+    /// - Panics if any of the transactions is incorrect.
     pub fn probe(&mut self, transaction: Verified<AnyTx>) -> Box<dyn Snapshot> {
         self.probe_all(vec![transaction])
     }
@@ -519,6 +525,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
+    /// - Panics if any of the transactions is incorrect.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
@@ -560,6 +567,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
+    /// - Panics if any of the transactions is incorrect.
     pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
         self.create_block_with_transactions(txvec![tx])
     }
