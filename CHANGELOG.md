@@ -25,7 +25,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
-- `commit_service` was renamed to the `update_service_status` and now takes
+- `commit_service` has been renamed to the `update_service_status` and now takes
   `InstanceStatus` as an additional argument.
   `start_adding_service` has been renamed to `initiate_adding_service` to
   better distinguish between starting and stopping a service. (#1605)
@@ -63,7 +63,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
-- Added `ConfigChange::StopService` to make requests to stop the service
+- `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
 
 ## 0.13.0-rc.2 - 2019-12-04

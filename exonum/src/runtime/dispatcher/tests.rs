@@ -145,7 +145,7 @@ struct SampleRuntime {
     instance_id: InstanceId,
     method_id: MethodId,
     services: BTreeMap<InstanceId, InstanceStatus>,
-    // Make services order predictable.
+    // `BTreeMap` is used to make services order predictable.
     new_services: BTreeMap<InstanceId, InstanceStatus>,
     new_service_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
 }
