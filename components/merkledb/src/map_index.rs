@@ -18,7 +18,7 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use std::{borrow::Borrow, marker::PhantomData, fmt};
+use std::{borrow::Borrow, fmt, marker::PhantomData};
 
 use super::{
     access::{Access, AccessError, FromAccess},
@@ -27,7 +27,7 @@ use super::{
     },
     BinaryKey, BinaryValue,
 };
-use failure::_core::fmt::{Formatter, Error};
+use failure::_core::fmt::{Error, Formatter};
 
 /// A map of keys and values. Access to the elements of this map is obtained using the keys.
 ///
@@ -122,8 +122,7 @@ where
     /// index.put(&1, 2);
     /// assert_eq!(Some(2), index.get(&1));
     /// ```
-    pub fn get(&self, key: &K) -> Option<V>
-    {
+    pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(key)
     }
 
@@ -142,8 +141,7 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn contains(&self, key: &K) -> bool
-    {
+    pub fn contains(&self, key: &K) -> bool {
         self.base.contains(key)
     }
 
@@ -229,8 +227,7 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> MapIndexIter<'_, K, V>
-    {
+    pub fn iter_from(&self, from: &K) -> MapIndexIter<'_, K, V> {
         MapIndexIter {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -252,8 +249,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> MapIndexKeys<'_, K>
-    {
+    pub fn keys_from(&self, from: &K) -> MapIndexKeys<'_, K> {
         MapIndexKeys {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -274,8 +270,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> MapIndexValues<'_, V>
-    {
+    pub fn values_from(&self, from: &K) -> MapIndexValues<'_, V> {
         MapIndexValues {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -302,8 +297,7 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn put(&mut self, key: &K, value: V) where
-    {
+    pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value);
     }
 
@@ -407,7 +401,8 @@ where
     }
 }
 
-impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V> where
+impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V>
+where
     K: BinaryKey,
     V: BinaryValue,
 {
@@ -416,7 +411,8 @@ impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V> where
     }
 }
 
-impl<'a, K> fmt::Debug for MapIndexKeys<'a, K> where
+impl<'a, K> fmt::Debug for MapIndexKeys<'a, K>
+where
     K: BinaryKey,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
@@ -450,7 +446,7 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index= fork.get_map(IDX_NAME);
+        let mut index = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
 
         index.put(&KEY, 0);

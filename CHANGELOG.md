@@ -46,6 +46,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   aggregation works. (#1553)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
+- Added support of unsized keys to `ProofMapIndex`. (#1621)
 
 #### exonum-supervisor
 
