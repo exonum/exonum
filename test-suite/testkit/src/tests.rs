@@ -47,7 +47,7 @@ fn testkit_add_tx() {
     expected = "Attempt to add invalid tx in the pool: Execution error `dispatcher:7` \
                 occurred: Suitable runtime for the given service instance ID is not found."
 )]
-fn teskit_add_tx_incorrect_transaction() {
+fn testkit_add_tx_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_incorrect_tx("tx".to_string());
     testkit.add_tx(incorrect_tx);
