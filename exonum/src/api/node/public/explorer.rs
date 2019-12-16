@@ -173,22 +173,11 @@ impl AsRef<[u8]> for TransactionHex {
 
 /// Status of a call.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CallStatusInfo {
+pub struct CallStatusResponse {
     /// Call status
     pub status: Result<(), ExecutionError>,
     /// Call execution proff
     pub call_proof: MapProof<CallInBlock, ExecutionError>,
-}
-
-/// Call status response.
-#[derive(Default, Debug, Serialize, Deserialize)]
-pub struct CallStatusResponse {
-    /// Status of transaction
-    pub transaction: Option<CallStatusInfo>,
-    /// Status of `before_transaction` hook
-    pub before_transactions: Option<CallStatusInfo>,
-    /// Status of `after_transaction` hook
-    pub after_transactions: Option<CallStatusInfo>,
 }
 
 /// The kind of requested call
@@ -208,7 +197,7 @@ pub struct CallStatusQuery {
     /// The hash of the transaction to be searched.
     pub hash: Hash,
     /// If omitted, then returned bunch will contain statuses for all call kinds
-    pub call_kind: Option<CallKind>,
+    pub call_kind: CallKind,
 }
 
 /// Exonum blockchain explorer API.
@@ -324,70 +313,42 @@ impl ExplorerApi {
         let explorer = BlockchainExplorer::new(snapshot);
 
         let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
-            let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
-            ApiError::NotFound(description)
+            ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
         })?;
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => Ok(info),
             TransactionInfo::InPool { .. } => {
-                let description =
-                    serde_json::to_string(&json!({ "type": "not committed" })).unwrap();
-                Err(ApiError::NotFound(description))
+                Err(ApiError::NotFound(format!(
+                    "Requested transaction is in pool ({})",
+                    query.hash
+                )))
             }
         }?;
 
+        let call_in_block = match query.call_kind {
+            CallKind::BeforeTransactions => {
+                CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id)
+            }
+            CallKind::Transaction => {
+                CallInBlock::transaction(tx_info.location().position_in_block())
+            }
+            CallKind::AfterTransactions => {
+                CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id)
+            }
+        };
+
         let block_height = tx_info.location().block_height();
         let block_info = explorer.block(block_height).ok_or_else(|| {
-            ApiError::NotFound(format!(
-                "Requested block height ({}) exceeds the blockchain height ({})",
-                tx_info.location().block_height(),
-                explorer.height()
+            ApiError::InternalError(format_err!(
+                "Unable to get block info of transaction {}",
+                query.hash
             ))
         })?;
 
-        let mut call_status_response = CallStatusResponse::default();
+        let status = explorer.call_status(block_height, &call_in_block);
+        let call_proof = block_info.error_proof(call_in_block);
 
-        let call_status = |call_in_block| {
-            let status = explorer.call_status(block_height, &call_in_block);
-            let call_proof = block_info.error_proof(call_in_block);
-
-            CallStatusInfo { status, call_proof }
-        };
-        if let Some(call_type) = query.call_kind {
-            match call_type {
-                CallKind::BeforeTransactions => {
-                    let call_in_block = CallInBlock::before_transactions(
-                        tx_info.content().payload().call_info.instance_id,
-                    );
-                    call_status_response.before_transactions = Some(call_status(call_in_block));
-                }
-                CallKind::Transaction => {
-                    let call_in_block =
-                        CallInBlock::transaction(tx_info.location().position_in_block());
-                    call_status_response.transaction = Some(call_status(call_in_block));
-                }
-                CallKind::AfterTransactions => {
-                    let call_in_block = CallInBlock::after_transactions(
-                        tx_info.content().payload().call_info.instance_id,
-                    );
-                    call_status_response.after_transactions = Some(call_status(call_in_block));
-                }
-            };
-        } else {
-            let call_in_block: CallInBlock =
-                CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id);
-            call_status_response.before_transactions = Some(call_status(call_in_block));
-
-            let call_in_block: CallInBlock =
-                CallInBlock::transaction(tx_info.location().position_in_block());
-            call_status_response.transaction = Some(call_status(call_in_block));
-
-            let call_in_block: CallInBlock =
-                CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id);
-            call_status_response.after_transactions = Some(call_status(call_in_block));
-        }
-
-        Ok(call_status_response)
+        Ok(CallStatusResponse { status, call_proof })
     }
 
     /// Adds transaction into the pool of unconfirmed transactions if it's valid
