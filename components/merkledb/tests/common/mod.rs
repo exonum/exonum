@@ -29,7 +29,14 @@ pub trait FromFork {
     fn clear(&mut self);
 }
 
-pub struct MergeFork;
+pub enum ForkAction {
+    Flush,
+    Merge,
+}
+
+pub trait AsForkAction {
+    fn as_fork_action(&self) -> Option<ForkAction>;
+}
 
 pub fn compare_collections<A, R, T>(
     db: &TemporaryDB,
@@ -37,7 +44,7 @@ pub fn compare_collections<A, R, T>(
     compare: impl Fn(&T, &R) -> TestCaseResult,
 ) -> TestCaseResult
 where
-    A: Clone + PartialEq<MergeFork> + Modifier<R> + Modifier<T>,
+    A: Clone + AsForkAction + Modifier<R> + Modifier<T> + std::fmt::Debug,
     R: Default,
     T: FromFork,
 {
@@ -49,15 +56,21 @@ where
     let mut reference = R::default();
 
     for action in actions {
-        if *action == MergeFork {
-            let patch = Rc::try_unwrap(fork).expect("fork ref leaked").into_patch();
-            db.merge(patch).unwrap();
-            fork = Rc::new(db.fork());
-        } else {
-            let mut collection = T::from_fork(fork.clone());
-            action.clone().modify(&mut collection);
-            action.clone().modify(&mut reference);
-            compare(&collection, &reference)?;
+        match action.as_fork_action() {
+            Some(ForkAction::Merge) => {
+                let patch = Rc::try_unwrap(fork).expect("fork ref leaked").into_patch();
+                db.merge(patch).unwrap();
+                fork = Rc::new(db.fork());
+            }
+            Some(ForkAction::Flush) => {
+                Rc::get_mut(&mut fork).expect("fork ref leaked").flush();
+            }
+            None => {
+                let mut collection = T::from_fork(fork.clone());
+                action.clone().modify(&mut collection);
+                action.clone().modify(&mut reference);
+                compare(&collection, &reference)?;
+            }
         }
     }
     let collection = T::from_fork(fork);

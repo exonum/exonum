@@ -53,6 +53,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
 
+### Bug Fixes
+
+#### exonum-merkledb
+
+- `Snapshot` implementation for `Patch` has been fixed. The previous implementation
+  could lead to stale reads from a `Patch` or a `Fork`. (#1611)
+
 ## 0.13.0-rc.2 - 2019-12-04
 
 ### Breaking changes
