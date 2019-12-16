@@ -14,11 +14,14 @@
 
 //! Rust runtime specific API endpoints.
 
+use semver::Version;
+
 use std::collections::HashMap;
 
 use crate::{
     api::{self, ApiBuilder},
     proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
+    runtime::{ArtifactId, RuntimeIdentifier},
 };
 
 use super::RustRuntime;
@@ -33,11 +36,18 @@ pub struct ProtoSourceFile {
 }
 
 /// Protobuf sources query parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProtoSourcesQuery {
-    /// Artifact identifier, if specified, query returns the source files of the artifact,
-    /// otherwise it returns source files of Exonum itself.
-    pub artifact: Option<String>,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ProtoSourcesQuery {
+    /// Query core Protobuf sources.
+    Core,
+    /// Query Protobuf sources for a certain artifact.
+    Artifact {
+        /// Artifact name.
+        name: String,
+        /// Artifact version.
+        version: Version,
+    },
 }
 
 /// Artifact Protobuf specification for the Exonum clients.
@@ -135,8 +145,12 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         // otherwise it returns source files of Exonum itself.
         .endpoint("proto-sources", {
             move |query: ProtoSourcesQuery| -> Result<Vec<ProtoSourceFile>, api::Error> {
-                if let Some(artifact_id) = query.artifact {
-                    let artifact_id = artifact_id.parse()?;
+                if let ProtoSourcesQuery::Artifact { name, version } = query {
+                    let artifact_id = ArtifactId {
+                        runtime_id: RuntimeIdentifier::Rust as _,
+                        name,
+                        version,
+                    };
                     filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
                         api::Error::NotFound(format!(
                             "Unable to find sources for artifact {}",
