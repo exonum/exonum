@@ -122,12 +122,15 @@ impl Dispatcher {
             .start_adding_service(spec.clone(), constructor)?;
         // Mark service as active.
         self.activate_pending(fork);
+        // Remove service from pending.
+        Schema::new(fork as &Fork).take_pending_instances();
+        // Flush changes, so the snapshot will be created with all the recently added changes.
+        // We can do it safely, since any failure on the genesis block level will result in the
+        // overall blockchain creation failure.
+        fork.flush();
         // Start service within runtime.
         self.start_service((fork as &Fork).snapshot(), &spec)
             .expect("Cannot start service");
-        // Remove service from pending.
-        let mut schema = Schema::new(fork as &Fork);
-        schema.take_pending_instances();
         Ok(())
     }
 

@@ -86,6 +86,7 @@ use exonum::{
         },
         ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
+    skip_for_genesis,
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
@@ -299,11 +300,13 @@ impl Service for Supervisor {
     }
 
     fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
+        skip_for_genesis!(context);
+
         let mut schema = Schema::new(context.service_data());
         let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
-        let validator_count = core_schema.consensus_config().validator_keys.len();
         let height = core_schema.height();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
 
         // Check if we should apply a new config.
         let entry = schema.pending_proposal.get();

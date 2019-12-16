@@ -216,7 +216,36 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
+    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        // Skip execution for genesis block.
+        let core_schema = context.data().for_core();
+        let next_height = core_schema.next_height();
+        if next_height == Height(0) {
+            return Ok(());
+        }
+
+        panic!("42");
+    }
+}
+
+#[exonum_interface(crate = "crate")]
+trait ServiceGenesisPanic {}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServiceGenesisPanic"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "panic_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema"
+)]
+struct ServiceGenesisPanicImpl;
+
+impl ServiceGenesisPanic for ServiceGenesisPanicImpl {}
+
+impl Service for ServiceGenesisPanicImpl {
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+        // Panics even on genesis level.
         panic!("42");
     }
 }
@@ -287,8 +316,10 @@ fn assert_service_execute(blockchain: &mut BlockchainMut) {
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
     let index = snapshot.get_list("service_good.val");
-    assert_eq!(index.len(), 1);
+    // One time `after_transactions` was invoked on the genesis block, and then we created one more block.
+    assert_eq!(index.len(), 2);
     assert_eq!(index.get(0), Some(1));
+    assert_eq!(index.get(1), Some(1));
 }
 
 fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
@@ -459,8 +490,8 @@ fn after_transactions_invoked_on_genesis() {
 #[test]
 fn after_transactions_failure_causes_genesis_failure() {
     let blockchain_result = maybe_create_blockchain(
-        vec![ServicePanicImpl.into()],
-        vec![ServicePanicImpl
+        vec![ServiceGenesisPanicImpl.into()],
+        vec![ServiceGenesisPanicImpl
             .artifact_id()
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );

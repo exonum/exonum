@@ -156,7 +156,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     ) -> Result<(), ExecutionError> {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
-            .unwrap();
+            .unwrap_or_else(|| panic!("Can't obtain an instance with ID {}", spec.id));
         let core_schema = CoreSchema::new(snapshot);
         let height = if core_schema.block_hashes_by_height().is_empty() {
             None
@@ -198,7 +198,13 @@ impl<T: Runtime> Runtime for Inspected<T> {
         context: ExecutionContext<'_>,
         instance_id: u32,
     ) -> Result<(), ExecutionError> {
-        let height = CoreSchema::new(&*context.fork).height();
+        let schema = CoreSchema::new(&*context.fork);
+        // Skip genesis block execution.
+        if schema.next_height() == Height(0) {
+            return self.inner.after_transactions(context, instance_id);
+        }
+
+        let height = schema.height();
         self.events
             .lock()
             .unwrap()
@@ -486,7 +492,7 @@ fn rust_runtime_with_builtin_services() {
         .into_mut(genesis_config.clone())
         .with_runtime(runtime)
         .build()
-        .unwrap();
+        .expect("Can't create a blockchain instance");
 
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
@@ -521,9 +527,14 @@ fn rust_runtime_with_builtin_services() {
         .into_mut(genesis_config)
         .with_runtime(runtime)
         .build()
-        .unwrap();
+        .expect("Can't create a blockchain");
 
-    let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
+    let events = mem::replace(
+        &mut *event_handle
+            .lock()
+            .expect("Can't obtain lock on a event handle"),
+        vec![],
+    );
     assert_eq!(
         events,
         vec![
