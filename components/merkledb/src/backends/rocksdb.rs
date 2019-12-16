@@ -16,12 +16,12 @@
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
-
+use crossbeam::sync::ShardedLock;
 use rocksdb::{
     self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
 };
 use smallvec::SmallVec;
+use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
 use crate::{
     db::{check_database, Change},
@@ -39,7 +39,7 @@ const ID_SIZE: usize = mem::size_of::<u64>();
 /// This structure is required to potentially adapt the interface to
 /// use different databases.
 pub struct RocksDB {
-    db: Arc<rocksdb::DB>,
+    db: Arc<ShardedLock<rocksdb::DB>>,
     options: DbOptions,
 }
 
@@ -62,7 +62,7 @@ impl From<&DbOptions> for RocksDbOptions {
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: rocksdb::Snapshot<'static>,
-    db: Arc<rocksdb::DB>,
+    db: Arc<ShardedLock<rocksdb::DB>>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -90,15 +90,15 @@ impl RocksDB {
             }
         };
         let mut db = Self {
-            db: Arc::new(inner),
+            db: Arc::new(ShardedLock::new(inner)),
             options: *options,
         };
         check_database(&mut db)?;
         Ok(db)
     }
 
-    pub(super) fn rocksdb(&self) -> &rocksdb::DB {
-        self.db.as_ref()
+    pub(super) fn rocksdb(&self) -> Arc<ShardedLock<rocksdb::DB>> {
+        self.db.clone()
     }
 
     /// Creates checkpoint of this database in the given directory. See [RocksDB docs] for
@@ -108,21 +108,38 @@ impl RocksDB {
     ///
     /// [RocksDB docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
-        let checkpoint = Checkpoint::new(&*self.db)?;
+        let checkpoint = Checkpoint::new(&*self.db.read().expect("Couldn't get read lock to DB"))?;
         checkpoint.create_checkpoint(path)?;
         Ok(())
+    }
+
+    fn cf_exists(&self, cf_name: &str) -> bool {
+        self.db
+            .read()
+            .expect("Couldn't get read lock to DB")
+            .cf_handle(cf_name)
+            .is_some()
+    }
+
+    fn create_cf(&self, cf_name: &str) -> crate::Result<()> {
+        self.db
+            .write()
+            .expect("Couldn't get write lock to DB")
+            .create_cf(cf_name, &self.options.into())
+            .map_err(Into::into)
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
         for (resolved, changes) in patch.into_changes() {
-            let cf = match self.db.cf_handle(&resolved.name) {
-                Some(cf) => cf,
-                None => self
-                    .db
-                    .create_cf(&resolved.name, &self.options.into())
-                    .unwrap(),
-            };
+            let cf_exists = self.cf_exists(&resolved.name);
+
+            if !cf_exists {
+                self.create_cf(&resolved.name)?;
+            }
+
+            let db_reader = self.db.read().expect("Couldn't get read lock to DB");
+            let cf = db_reader.cf_handle(&resolved.name).unwrap();
 
             if changes.is_cleared() {
                 self.clear_prefix(&mut batch, cf, &resolved)?;
@@ -156,14 +173,18 @@ impl RocksDB {
             }
         }
 
-        self.db.write_opt(batch, w_opts).map_err(Into::into)
+        self.db
+            .read()
+            .expect("Couldn't get read lock to DB")
+            .write_opt(batch, w_opts)
+            .map_err(Into::into)
     }
 
     /// Removes all keys with a specified prefix from a column family.
     fn clear_prefix(
         &self,
         batch: &mut WriteBatch,
-        cf: ColumnFamily<'_>,
+        cf: &ColumnFamily,
         resolved: &ResolvedAddress,
     ) -> crate::Result<()> {
         let snapshot = self.rocksdb_snapshot();
@@ -181,7 +202,14 @@ impl RocksDB {
             // SAFETY:
             // The snapshot carries an `Arc` to the database to make sure that database
             // is not dropped before the snapshot.
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+            snapshot: unsafe {
+                mem::transmute(
+                    self.db
+                        .read()
+                        .expect("Couldn't get read lock to DB")
+                        .snapshot(),
+                )
+            },
             db: Arc::clone(&self.db),
         }
     }
@@ -192,7 +220,12 @@ impl RocksDBSnapshot {
         use rocksdb::{Direction, IteratorMode};
 
         let from = name.keyed(from);
-        let iter = match self.db.cf_handle(&name.name) {
+        let iter = match self
+            .db
+            .read()
+            .expect("Couldn't get read lock to DB")
+            .cf_handle(&name.name)
+        {
             Some(cf) => self
                 .snapshot
                 .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward))
@@ -228,7 +261,12 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self.db.cf_handle(&resolved_addr.name) {
+        if let Some(cf) = self
+            .db
+            .read()
+            .expect("Couldn't get read lock to DB")
+            .cf_handle(&resolved_addr.name)
+        {
             match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
                 Ok(value) => value.map(|v| v.to_vec()),
                 Err(e) => panic!(e),

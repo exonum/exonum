@@ -55,13 +55,15 @@ impl TemporaryDB {
         // For some reason, using a `WriteBatch` is significantly faster than using `DB::drop_cf`,
         // both in debug and release modes.
         let mut batch = WriteBatch::default();
+        let db = self.inner.rocksdb();
+        let db_reader = db.read().expect("Couldn't get read lock to DB");
         for name in &names {
             if name != DEFAULT_CF && name != DB_METADATA {
-                let cf_handle = self.inner.rocksdb().cf_handle(name).ok_or_else(|| {
+                let cf_handle = db_reader.cf_handle(name).ok_or_else(|| {
                     let message = format!("Cannot access column family {}", name);
                     crate::Error::new(message)
                 })?;
-                let mut iter = self.inner.rocksdb().raw_iterator_cf(cf_handle.clone())?;
+                let mut iter = db_reader.raw_iterator_cf(cf_handle.clone())?;
                 iter.seek_to_last();
                 if iter.valid() {
                     if let Some(key) = iter.key() {
@@ -82,8 +84,7 @@ impl TemporaryDB {
         }
 
         let write_options = WriteOptions::default();
-        self.inner
-            .rocksdb()
+        db_reader
             .write_opt(batch, &write_options)
             .map_err(Into::into)
     }
