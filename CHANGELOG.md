@@ -43,7 +43,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
 - Service instances can now be stopped.
 
-  Active service instance can be stopped by the corresponding request by the
+  Active service instance can be stopped by the corresponding request to the
   `Supervisor`. Stopped service no more participates in the business logic,
   i.e. it does not execute transactions, process events, provide user APIs, etc.
   Service data becomes unavailable to other services, but still exists. The name

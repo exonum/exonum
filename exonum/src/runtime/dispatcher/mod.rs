@@ -221,10 +221,8 @@ impl Dispatcher {
     }
 
     /// Initiates stopping of an existing service instance in the blockchain. The stopping
-    /// service is active (i.e., does process transactions or `after_transactions` hook)
+    /// service is active (i.e., processes transactions and the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
-    ///
-    /// This method should be called for the exact context passed to the runtime.
     pub(crate) fn initiate_stopping_service(
         fork: &Fork,
         instance_id: InstanceId,

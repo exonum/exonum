@@ -45,7 +45,6 @@ fn is_inc_service_api_available(testkit: &mut TestKit) -> bool {
 
 fn create_testkit() -> TestKit {
     TestKitBuilder::validator()
-        .with_logger()
         .with_rust_service(Supervisor)
         .with_rust_service(IncService)
         .with_artifact(Supervisor.artifact_id())
@@ -172,6 +171,8 @@ fn stop_already_stopped_service() {
         actual_err,
         ErrorMatch::from_fail(&Error::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing("Discarded stop of the already stopped instance")
+            .with_description_containing(
+                "Discarded an attempt to stop the already stopped service instance"
+            )
     )
 }

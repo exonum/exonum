@@ -68,7 +68,7 @@ impl<T: Access> Schema<T> {
 
     /// Returns a pending instances queue used to notify the runtime about service instances
     /// to be updated.
-    fn pending_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
+    fn modified_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
@@ -161,7 +161,8 @@ impl Schema<&Fork> {
                 pending_status: Some(pending_status),
             },
         );
-        self.pending_instances().put(&instance_name, pending_status);
+        self.modified_instances()
+            .put(&instance_name, pending_status);
         instance_ids.put(&instance_id, instance_name);
         Ok(())
     }
@@ -172,7 +173,7 @@ impl Schema<&Fork> {
         instance_id: InstanceId,
     ) -> Result<(), Error> {
         let mut instances = self.instances();
-        let mut pending_instances = self.pending_instances();
+        let mut modified_instances = self.modified_instances();
 
         let instance_name = self
             .instance_ids()
@@ -194,8 +195,11 @@ impl Schema<&Fork> {
 
         // Modify instance status.
         let pending_status = InstanceStatus::Stopped;
+        // Because we guarantee that the stopping service will process all transactions and other
+        // events in the block,  we cannot stop it immediately. But we must account these changes
+        // in the state hash, therefore we use pending status.
         state.pending_status = Some(pending_status);
-        pending_instances.put(&instance_name, pending_status);
+        modified_instances.put(&instance_name, pending_status);
         instances.put(&instance_name, state);
         Ok(())
     }
@@ -210,14 +214,14 @@ impl Schema<&Fork> {
         }
         // Commit new statuses for pending instances.
         let mut instances = self.instances();
-        for (instance, status) in &self.pending_instances() {
+        for (instance, status) in &self.modified_instances() {
             let mut state = instances
                 .get(&instance)
                 .expect("BUG: Instance marked as modified is not saved in `instances`");
             debug_assert_eq!(
                 Some(status),
                 state.pending_status,
-                "BUG: Instance status in `pending_instances` should be same as `pending_status` \
+                "BUG: Instance status in `modified_instances` should be same as `pending_status` \
                  in the instance state."
             );
 
@@ -236,7 +240,7 @@ impl Schema<&Fork> {
 
     /// Takes modified service instances from queue.
     pub(super) fn take_modified_instances(&mut self) -> Vec<(InstanceSpec, InstanceStatus)> {
-        let mut modified_instances = self.pending_instances();
+        let mut modified_instances = self.modified_instances();
         let instances = self.instances();
 
         let output = modified_instances

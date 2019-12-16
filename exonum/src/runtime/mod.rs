@@ -209,11 +209,11 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// ```text
 /// LIFE ::= initialize (GENESIS | RESUME) BLOCK* shutdown
-/// GENESIS ::= (deploy_artifact | initiate_adding_service commit_service)* after_commit
-/// RESUME ::= (deploy_artifact | commit_service)* on_resume
-/// BLOCK* ::= PROPOSAL+ COMMIT
+/// GENESIS ::= (deploy_artifact | initiate_adding_service update_service_status)* after_commit
+/// RESUME ::= (deploy_artifact | update_service_status)* on_resume
+/// BLOCK* ::= PROPOSAL + COMMIT
 /// PROPOSAL ::= before_transactions* (execute | initiate_adding_service)* after_transactions*
-/// COMMIT ::= deploy_artifact* commit_service* after_commit
+/// COMMIT ::= deploy_artifact* update_service_status* after_commit
 /// ```
 ///
 /// The ordering for the "readonly" method `is_artifact_deployed` in relation

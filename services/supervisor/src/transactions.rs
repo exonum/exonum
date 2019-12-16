@@ -107,7 +107,7 @@ impl StartService {
         // Check that there is no instance with the same name.
         if dispatcher_data.get_instance(self.name.as_str()).is_some() {
             return Err(Error::InstanceExists.with_description(format!(
-                "Discarded start of the already running instance {}.",
+                "Discarded an attempt to start of the already started instance {}.",
                 &self.name
             )));
         }
@@ -130,7 +130,7 @@ impl StopService {
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
             _ => Err(Error::MalformedConfigPropose.with_description(format!(
-                "Discarded stop of the already stopped instance: {}",
+                "Discarded an attempt to stop the already stopped service instance: {}",
                 instance.spec.name
             ))),
         }
