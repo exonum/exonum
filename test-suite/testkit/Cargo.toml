@@ -44,7 +44,6 @@ pretty_assertions = "0.6.1"
 assert_matches = "1.2.0"
 thread_local = "1.0.0"
 lazy_static = "1.0.0"
-exonum-cryptocurrency = { version = "0.0.0", path = "../../examples/cryptocurrency" }
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }

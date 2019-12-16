@@ -12,22 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::*;
-use crate::{TestKit, TestKitApi, TestKitBuilder};
+use crate::{proto, TestKit, TestKitApi, TestKitBuilder};
 use exonum::{
     crypto::gen_keypair,
     explorer::CommittedTransaction,
     messages::{AnyTx, Verified},
-    runtime::rust::Transaction,
+    runtime::{
+        rust::{CallContext, Service, ServiceFactory, Transaction},
+        ExecutionError, SnapshotExt,
+    },
 };
-use exonum_cryptocurrency::contracts::CryptocurrencyService;
-use exonum_cryptocurrency::transactions::CreateWallet;
+use exonum_merkledb::ObjectHash;
+use exonum_proto::ProtobufConvert;
 
 const SERVICE_ID: u32 = 2;
-const SERVICE_NAME: &str = "cryptocurrency";
+const SERVICE_NAME: &str = "sample";
+
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::examples::TxTimestamp")]
+struct TxTimestamp {
+    message: String,
+}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "sample-service", proto_sources = "crate::proto")]
+#[service_dispatcher(implements("SampleServiceInterface"))]
+struct SampleService;
+
+#[exonum_interface]
+trait SampleServiceInterface {
+    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+}
+
+impl SampleServiceInterface for SampleService {
+    fn timestamp(
+        &self,
+        _context: CallContext<'_>,
+        _arg: TxTimestamp,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+}
+
+impl Service for SampleService {}
 
 fn init_testkit() -> (TestKit, TestKitApi) {
-    let service = CryptocurrencyService;
+    let service = SampleService;
     let artifact = service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_artifact(artifact.clone())
@@ -38,14 +70,14 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn gen_tx(name: String) -> Verified<AnyTx> {
+fn gen_tx(message: String) -> Verified<AnyTx> {
     let (pubkey, key) = gen_keypair();
-    CreateWallet { name: name }.sign(SERVICE_ID, pubkey, &key)
+    TxTimestamp { message }.sign(SERVICE_ID, pubkey, &key)
 }
 
-fn gen_incorrect_tx(name: String) -> Verified<AnyTx> {
+fn gen_incorrect_tx(message: String) -> Verified<AnyTx> {
     let (pubkey, key) = gen_keypair();
-    CreateWallet { name: name }.sign(SERVICE_ID + 1, pubkey, &key)
+    TxTimestamp { message }.sign(SERVICE_ID + 1, pubkey, &key)
 }
 
 #[test]
