@@ -32,7 +32,7 @@ use exonum_merkledb::{
 };
 
 mod common;
-use crate::common::{compare_collections, FromFork, MergeFork, ACTIONS_MAX_LEN};
+use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]
 enum ListAction<V> {
@@ -44,14 +44,16 @@ enum ListAction<V> {
     // Applied to index modulo `collection.len()`.
     Set(u64, V),
     Clear,
+    FlushFork,
     MergeFork,
 }
 
-impl<V> PartialEq<MergeFork> for ListAction<V> {
-    fn eq(&self, _: &MergeFork) -> bool {
+impl<V> AsForkAction for ListAction<V> {
+    fn as_fork_action(&self) -> Option<ForkAction> {
         match self {
-            ListAction::MergeFork => true,
-            _ => false,
+            ListAction::FlushFork => Some(ForkAction::Flush),
+            ListAction::MergeFork => Some(ForkAction::Merge),
+            _ => None,
         }
     }
 }
@@ -183,6 +185,7 @@ fn generate_action() -> impl Strategy<Value = ListAction<i32>> {
         num::u64::ANY.prop_map(ListAction::Truncate),
         (num::u64::ANY, num::i32::ANY).prop_map(|(i, v)| ListAction::Set(i, v)),
         strategy::Just(ListAction::Clear),
+        strategy::Just(ListAction::FlushFork),
         strategy::Just(ListAction::MergeFork),
     ]
 }
