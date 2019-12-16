@@ -25,7 +25,7 @@ use actix_web::{
     Query,
 };
 use failure::Error;
-use futures::{sync::mpsc, Future, IntoFuture, Stream};
+use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
 use serde::{
     de::{self, DeserializeOwned},
     ser, Serialize,
@@ -222,7 +222,7 @@ where
 fn extract_query<Q>(
     request: HttpRequest,
     mutability: EndpointMutability,
-) -> Box<dyn Future<Item = Q, Error = actix_web::error::Error>>
+) -> impl Future<Item = Q, Error = actix_web::error::Error>
 where
     Q: DeserializeOwned + 'static,
 {
@@ -233,11 +233,11 @@ where
                 .map_err(From::from)
                 .into_future();
 
-            Box::new(future)
+            Either::A(future)
         }
         EndpointMutability::Mutable => {
             let future = request.json().from_err();
-            Box::new(future)
+            Either::B(future)
         }
     }
 }
