@@ -15,6 +15,7 @@
 //! Macros useful for developing `rust` services.
 
 /// Skips the invocation of the service hook for the genesis block.
+/// This macro is intended to be used within `rust` service hooks.
 #[macro_export]
 macro_rules! skip_for_genesis {
     ($ctx:ident) => {

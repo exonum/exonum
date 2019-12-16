@@ -454,7 +454,7 @@ fn blockchain_height_panics_before_genesis() {
 
 /// Checks that before genesis creation `Schema::next_height` doesn't panic.
 #[test]
-fn blockchain_next_height_doesnt_panic_before_genesis() {
+fn blockchain_next_height_does_not_panic_before_genesis() {
     let service_keypair = crypto::gen_keypair();
 
     // Create a blockchain *without* creating a genesis block.
