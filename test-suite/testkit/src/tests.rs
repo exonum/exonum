@@ -89,10 +89,7 @@ fn testkit_add_tx() {
 }
 
 #[test]
-#[should_panic(
-    expected = "Attempt to add invalid tx in the pool: Execution error `dispatcher:7` \
-                occurred: Suitable runtime for the given service instance ID is not found."
-)]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
 fn testkit_add_tx_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_incorrect_tx("tx".to_string());
@@ -113,10 +110,7 @@ fn testkit_probe_all() {
 }
 
 #[test]
-#[should_panic(
-    expected = "Attempt to add invalid tx in the pool: Execution error `dispatcher:7` \
-                occurred: Suitable runtime for the given service instance ID is not found."
-)]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
 fn testkit_probe_all_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_incorrect_tx("tx".to_string());
@@ -133,10 +127,7 @@ fn testkit_probe() {
 }
 
 #[test]
-#[should_panic(
-    expected = "Attempt to add invalid tx in the pool: Execution error `dispatcher:7` \
-                occurred: Suitable runtime for the given service instance ID is not found."
-)]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
 fn testkit_probe_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_incorrect_tx("tx".to_string());
@@ -183,10 +174,7 @@ fn testkit_create_block_with_transactions_commit_duplicated_transaction() {
 }
 
 #[test]
-#[should_panic(
-    expected = "Attempt to add invalid tx in the pool: Execution error `dispatcher:7` \
-                occurred: Suitable runtime for the given service instance ID is not found."
-)]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
 fn testkit_create_block_with_transactions_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_incorrect_tx("tx".to_string());
@@ -224,10 +212,7 @@ fn testkit_create_block_with_transaction_commit_duplicated_transaction() {
 }
 
 #[test]
-#[should_panic(
-    expected = "Attempt to add invalid tx in the pool: Execution error `dispatcher:7` \
-                occurred: Suitable runtime for the given service instance ID is not found."
-)]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
 fn testkit_create_block_with_transaction_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_incorrect_tx("tx".to_string());
