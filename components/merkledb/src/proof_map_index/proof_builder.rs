@@ -77,7 +77,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
 
 /// Encapsulation of a Merkle Patricia tree allowing to access its terminal and intermediate
 /// nodes.
-pub trait MerklePatriciaTree<K, V> {
+pub trait MerklePatriciaTree<K: ?Sized, V> {
     /// Gets the root node of the tree.
     fn root_node(&self) -> Option<(ProofPath, Node)>;
 
