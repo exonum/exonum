@@ -20,6 +20,7 @@ use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
 
+use crate::blockchain::ProposerId;
 use crate::{
     helpers::{Height, Round, ValidatorId},
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
@@ -94,7 +95,7 @@ fn test_queue_propose_message_from_next_height() {
     let sandbox_state = SandboxState::new();
     let tx = gen_timestamping_tx();
     let mut block_at_first_height = sandbox.create_block(&[tx.clone()]);
-    block_at_first_height.proposer_id = ValidatorId(0);
+    block_at_first_height.add_header::<ProposerId>(ValidatorId(0).into());
 
     let future_propose = sandbox.create_propose(
         ValidatorId(0),
