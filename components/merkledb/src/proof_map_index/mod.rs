@@ -200,7 +200,7 @@ pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ?Sized,
+    K: BinaryKey + ?Sized + ToOwned,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -313,9 +313,8 @@ where
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: &K) -> MapProof<K, V, KeyMode> {
-//        self.create_proof(key)
-        unimplemented!()
+    pub fn get_proof(&self, key: &K) -> MapProof<K::Owned, V, KeyMode> {
+        self.create_proof(&key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -331,9 +330,10 @@ where
     ///
     /// let proof = index.get_multiproof(vec!["foo".to_owned(), "bar".to_owned()]);
     /// ```
-    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, KeyMode>
+    //TODO: revert
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K::Owned, V, KeyMode>
     where
-        KI: IntoIterator<Item = K>,
+        KI: IntoIterator<Item = K::Owned>,
     {
         unimplemented!()
 //        self.create_multiproof(keys)
@@ -969,5 +969,23 @@ where
         } else {
             f.debug_struct("ProofMapIndex").finish()
         }
+    }
+}
+
+mod tests2 {
+    use crate::{TemporaryDB, Database, MapProof};
+    use crate::access::AccessExt;
+
+    fn test_proof() -> MapProof<i32, i32> {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        let mut index = fork.get_proof_map("index");
+
+        index.put(&1, 1);
+
+        let proof = index.get_proof(&1);
+
+        proof
     }
 }
