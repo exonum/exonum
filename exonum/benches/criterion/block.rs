@@ -298,7 +298,9 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                let error_kind = ErrorKind::Service { code: 15 };
+                let error_kind = ErrorKind::Service {
+                    local_error_code: 15,
+                };
                 Err(ExecutionError::new(error_kind, ""))
             }
         }

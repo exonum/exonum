@@ -482,6 +482,7 @@ fn test_dispatcher_rust_runtime_no_service() {
             .wait()
             .unwrap_err(),
         ErrorMatch::from_fail(&RustRuntimeError::UnableToDeploy)
+            .with_description_containing("Runtime failed to deploy artifact with id")
     );
 
     let mut fork = db.fork();

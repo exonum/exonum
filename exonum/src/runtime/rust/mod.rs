@@ -281,13 +281,13 @@ impl RustRuntime {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
         if !self.available_artifacts.contains_key(&artifact) {
-            let descritption = format!(
-                "Rust runtime failed to deploy artifact with id {}, \
+            let description = format!(
+                "Runtime failed to deploy artifact with id {}, \
                  it is not listed among available artifacts. Available artifacts: {}",
                 artifact,
                 self.artifacts_to_pretty_string()
             );
-            let error = ExecutionError::runtime(Error::UnableToDeploy as u8, descritption);
+            let error = ExecutionError::runtime(Error::UnableToDeploy as u8, description);
             return Err(error);
         }
 

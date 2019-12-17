@@ -260,7 +260,7 @@ fn execution_result_serde_presentation() {
         serde_json::to_value(result).unwrap(),
         json!({
             "type": "service_error",
-            "local_error_code": 3,
+            "code": 3,
             "runtime_id": 1,
             "call_site": {
                 "instance_id": 100,
@@ -288,7 +288,7 @@ fn execution_result_serde_presentation() {
         json!({
             "type": "dispatcher_error",
             "description": "!",
-            "local_error_code": 8,
+            "code": 8,
             "runtime_id": 0,
             "call_site": {
                 "instance_id": 100,
