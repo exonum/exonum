@@ -14,7 +14,7 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{access::RawAccess, Fork, Patch, Snapshot};
+use exonum_merkledb::{Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
@@ -104,9 +104,9 @@ impl Dispatcher {
 
     /// Add a built-in service with the predefined identifier.
     ///
-    /// This method must be followed by the `after_commit()` call in order to persist information
-    /// about deployed artifacts / services. Multiple `add_builtin_service()` calls can be covered
-    /// by a single `after_commit()`.
+    /// This method must be followed by the `start_builtin_instances()` call in order
+    /// to persist information about deployed artifacts / services.
+    /// Multiple `add_builtin_service()` calls can be covered by a single `start_builtin_instances()`.
     ///
     /// # Panics
     ///
@@ -122,16 +122,21 @@ impl Dispatcher {
             .start_adding_service(spec.clone(), constructor)?;
         // Mark service as active.
         self.activate_pending(fork);
-        // Remove service from pending.
-        Schema::new(fork as &Fork).take_pending_instances();
-        // Flush changes, so the snapshot will be created with all the recently added changes.
-        // We can do it safely, since any failure within the genesis block will result in the
-        // overall blockchain creation failure.
-        fork.flush();
-        // Start service within runtime.
-        self.start_service((fork as &Fork).snapshot(), &spec)
-            .expect("Cannot start service");
         Ok(())
+    }
+
+    /// Starts all the built-in instances, creating a `Patch` with persisted changes.
+    pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
+        let mut schema = Schema::new(&fork);
+        let pending_instances = schema.take_pending_instances();
+        let patch = fork.into_patch();
+
+        // Start pending services.
+        for spec in pending_instances {
+            self.start_service(&patch, &spec)
+                .expect("Cannot start service");
+        }
+        patch
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy

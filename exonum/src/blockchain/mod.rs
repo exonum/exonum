@@ -251,6 +251,13 @@ impl BlockchainMut {
             self.dispatcher
                 .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
         }
+        // Activate services and persist changes.
+        let patch = self.dispatcher.start_builtin_instances(fork);
+        self.merge(patch)?;
+
+        // Create a new fork to collect the changes from `after_transactions` hook.
+        let mut fork = self.fork();
+
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
