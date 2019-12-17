@@ -16,11 +16,12 @@ use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 
 use std::{collections::HashSet, convert::TryFrom};
 
+use crate::blockchain::ProposerId;
 use crate::{
     blockchain::{contains_transaction, Blockchain, Schema},
     crypto::{Hash, PublicKey},
     events::InternalRequest,
-    helpers::{Height, Round, ValidatorId},
+    helpers::{Height, Round},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest,
         Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
@@ -328,11 +329,12 @@ impl NodeHandler {
         let block_hash = block.object_hash();
 
         if self.state.block(&block_hash).is_none() {
-            let (computed_block_hash, patch) = self.create_block(
-                block.proposer_id,
-                block.height,
-                msg.payload().transactions(),
-            );
+            let proposer_id = block
+                .get_header::<ProposerId>()?
+                .ok_or_else(|| format_err!("Proposer_id is not found in the block"))?;
+
+            let (computed_block_hash, patch) =
+                self.create_block(proposer_id, block.height, msg.payload().transactions());
             // Verify block_hash.
             assert!(
                 computed_block_hash == block_hash,
@@ -341,11 +343,15 @@ impl NodeHandler {
                 msg
             );
 
+            let proposer_id = block
+                .get_header::<ProposerId>()?
+                .ok_or_else(|| format_err!("Proposer_id is not found in the block"))?;
+
             self.state.add_block(
                 computed_block_hash,
                 patch,
                 msg.payload().transactions().to_vec(),
-                block.proposer_id,
+                proposer_id,
             );
         }
         let precommits = into_verified(msg.payload().precommits())?;
@@ -900,7 +906,7 @@ impl NodeHandler {
     /// Creates block with given transaction and returns its hash and corresponding changes.
     fn create_block(
         &mut self,
-        proposer_id: ValidatorId,
+        proposer_id: ProposerId,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
@@ -928,13 +934,17 @@ impl NodeHandler {
             .into_payload();
 
         let (block_hash, patch) = self.create_block(
-            propose.validator,
+            propose.validator.into(),
             propose.height,
             propose.transactions.as_slice(),
         );
         // Save patch
-        self.state
-            .add_block(block_hash, patch, propose.transactions, propose.validator);
+        self.state.add_block(
+            block_hash,
+            patch,
+            propose.transactions,
+            propose.validator.into(),
+        );
         self.state
             .propose_mut(propose_hash)
             .unwrap()
