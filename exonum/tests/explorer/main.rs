@@ -113,7 +113,12 @@ fn test_explorer_basics() {
 
     let tx_info = block.transaction(0).unwrap();
     let err = tx_info.status().unwrap_err();
-    assert_eq!(err.kind(), ErrorKind::Service { code: 0 });
+    assert_eq!(
+        err.kind(),
+        ErrorKind::Service {
+            local_error_code: 0
+        }
+    );
     assert_eq!(err.description(), "Not allowed!");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),

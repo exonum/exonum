@@ -31,17 +31,23 @@ pub(super) struct ExecutionStatus {
 impl From<Result<(), &ExecutionError>> for ExecutionStatus {
     fn from(inner: Result<(), &ExecutionError>) -> Self {
         if let Err(err) = inner {
-            let (typ, code) = match err.kind {
+            let (typ, local_error_code) = match err.kind {
                 ErrorKind::Unexpected => (ExecutionType::UnexpectedError, None),
-                ErrorKind::Dispatcher { code } => (ExecutionType::DispatcherError, Some(code)),
-                ErrorKind::Runtime { code } => (ExecutionType::RuntimeError, Some(code)),
-                ErrorKind::Service { code } => (ExecutionType::ServiceError, Some(code)),
+                ErrorKind::Dispatcher { local_error_code } => {
+                    (ExecutionType::DispatcherError, Some(local_error_code))
+                }
+                ErrorKind::Runtime { local_error_code } => {
+                    (ExecutionType::RuntimeError, Some(local_error_code))
+                }
+                ErrorKind::Service { local_error_code } => {
+                    (ExecutionType::ServiceError, Some(local_error_code))
+                }
             };
 
             ExecutionStatus {
                 typ,
                 description: err.description.clone(),
-                code,
+                code: local_error_code,
                 runtime_id: err.runtime_id,
                 call_site: err.call_site.clone(),
             }
@@ -72,13 +78,13 @@ impl ExecutionStatus {
                     ErrorKind::Unexpected
                 }
                 ExecutionType::DispatcherError => ErrorKind::Dispatcher {
-                    code: self.code.ok_or("No code specified")?,
+                    local_error_code: self.code.ok_or("No code specified")?,
                 },
                 ExecutionType::RuntimeError => ErrorKind::Runtime {
-                    code: self.code.ok_or("No code specified")?,
+                    local_error_code: self.code.ok_or("No code specified")?,
                 },
                 ExecutionType::ServiceError => ErrorKind::Service {
-                    code: self.code.ok_or("No code specified")?,
+                    local_error_code: self.code.ok_or("No code specified")?,
                 },
                 ExecutionType::Success => unreachable!(),
             };

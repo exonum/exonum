@@ -103,21 +103,21 @@ pub enum ErrorKind {
         /// Error code. Available values can be found in the [description] of dispatcher errors.
         ///
         /// [description]: ../enum.DispatcherError.html
-        code: u8,
+        local_error_code: u8,
     },
 
     /// An error in the runtime logic. For example, the runtime could not compile an artifact.
     Runtime {
         /// Runtime-specific error code.
         /// Error codes can have different meanings for different runtimes.
-        code: u8,
+        local_error_code: u8,
     },
 
     /// An error in the service code reported to the blockchain users.
     Service {
         /// User-defined error code.
         /// Error codes can have different meanings for different services.
-        code: u8,
+        local_error_code: u8,
     },
 }
 
@@ -125,22 +125,31 @@ impl ErrorKind {
     fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
             ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
-            ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
-            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
+            ErrorKind::Dispatcher { local_error_code } => {
+                (runtime_proto::ErrorKind::DISPATCHER, local_error_code)
+            }
+            ErrorKind::Runtime { local_error_code } => {
+                (runtime_proto::ErrorKind::RUNTIME, local_error_code)
+            }
+            ErrorKind::Service { local_error_code } => {
+                (runtime_proto::ErrorKind::SERVICE, local_error_code)
+            }
         }
     }
 
-    fn from_raw(kind: runtime_proto::ErrorKind, code: u8) -> Result<Self, failure::Error> {
+    fn from_raw(
+        kind: runtime_proto::ErrorKind,
+        local_error_code: u8,
+    ) -> Result<Self, failure::Error> {
         use runtime_proto::ErrorKind::*;
         let kind = match kind {
             UNEXPECTED => {
-                ensure!(code == 0, "Error code for panic should be zero");
+                ensure!(local_error_code == 0, "Error code for panic should be zero");
                 ErrorKind::Unexpected
             }
-            DISPATCHER => ErrorKind::Dispatcher { code },
-            RUNTIME => ErrorKind::Runtime { code },
-            SERVICE => ErrorKind::Service { code },
+            DISPATCHER => ErrorKind::Dispatcher { local_error_code },
+            RUNTIME => ErrorKind::Runtime { local_error_code },
+            SERVICE => ErrorKind::Service { local_error_code },
         };
         Ok(kind)
     }
@@ -150,9 +159,11 @@ impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorKind::Unexpected => f.write_str("unexpected"),
-            ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
-            ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
-            ErrorKind::Service { code } => write!(f, "service:{}", code),
+            ErrorKind::Dispatcher { local_error_code } => {
+                write!(f, "dispatcher:{}", local_error_code)
+            }
+            ErrorKind::Runtime { local_error_code } => write!(f, "runtime:{}", local_error_code),
+            ErrorKind::Service { local_error_code } => write!(f, "service:{}", local_error_code),
         }
     }
 }
@@ -452,8 +463,13 @@ impl ExecutionError {
     }
 
     /// Creates an execution error for use in service code.
-    pub fn service(code: u8, description: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Service { code }, description)
+    pub fn service(local_error_code: u8, description: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Service { local_error_code }, description)
+    }
+
+    /// Creates a runtime error for use in runtime code.
+    pub fn runtime(local_error_code: u8, description: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Runtime { local_error_code }, description)
     }
 
     /// Creates an execution error from the panic description.
