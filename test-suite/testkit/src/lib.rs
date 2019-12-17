@@ -475,7 +475,7 @@ impl TestKit {
 
         let guard = self.processing_lock.lock().unwrap();
         let (block_hash, patch) = self.blockchain.create_patch(
-            validator_id,
+            validator_id.into(),
             new_block_height,
             tx_hashes,
             &mut BTreeMap::new(),
