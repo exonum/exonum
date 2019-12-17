@@ -164,20 +164,23 @@ impl ContourNode {
 /// [`MerklePatriciaTree`]: trait.MerklePatriciaTree.html
 pub trait BuildProof<K: ToOwned + ?Sized, V, KeyMode> {
     /// Creates a proof of existence / absence for a single key.
-    fn create_proof(&self, key: &K) -> MapProof<K::Owned, V, KeyMode>;
+    fn create_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode>;
 
-  //  /// Creates a proof of existence / absence for multiple keys.
-    fn create_multiproof(&self, keys: impl IntoIterator<Item = K::Owned>) -> MapProof<K::Owned, V, KeyMode>;
+    //  /// Creates a proof of existence / absence for multiple keys.
+    fn create_multiproof(
+        &self,
+        keys: impl IntoIterator<Item = K::Owned>,
+    ) -> MapProof<K::Owned, V, KeyMode>;
 }
 
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
     K: ToOwned + ?Sized,
-    T: MerklePatriciaTree<K, V>,
+    T: MerklePatriciaTree<K::Owned, V>,
     KeyMode: ToProofPath<K>,
 {
-    fn create_proof(&self, key: &K) -> MapProof<K::Owned, V, KeyMode> {
-        let searched_path = KeyMode::transform_key(&key);
+    fn create_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
+        let searched_path = KeyMode::transform_key(key.borrow());
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut left_hashes = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
@@ -212,7 +215,7 @@ where
                                 // need to return it.
                                 let value = self.value(&key);
                                 break MapProof::new()
-                                    .add_entry(key.to_owned(), value)
+                                    .add_entry(key, value)
                                     .add_proof_entries(combine_hashes(left_hashes, right_hashes));
                             }
                         }
@@ -225,7 +228,7 @@ where
                         }
 
                         break MapProof::new()
-                            .add_missing(key.to_owned())
+                            .add_missing(key)
                             .add_proof_entries(combine_hashes(left_hashes, right_hashes));
                     }
                 }
@@ -234,20 +237,23 @@ where
             Some((root_path, Node::Leaf(hash))) => {
                 if root_path == searched_path {
                     let value = self.value(&key);
-                    MapProof::new().add_entry(key.to_owned(), value)
+                    MapProof::new().add_entry(key, value)
                 } else {
                     MapProof::new()
-                        .add_missing(key.to_owned())
+                        .add_missing(key)
                         .add_proof_entry(root_path, hash)
                 }
             }
 
-            None => MapProof::new().add_missing(key.to_owned()),
+            None => MapProof::new().add_missing(key),
         }
     }
 
     //TODO: revert
-    fn create_multiproof(&self, keys: impl IntoIterator<Item = K::Owned>) -> MapProof<K::Owned, V, KeyMode> {
+    fn create_multiproof(
+        &self,
+        keys: impl IntoIterator<Item = K::Owned>,
+    ) -> MapProof<K::Owned, V, KeyMode> {
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut proof: MapProof<K::Owned, V, KeyMode> = MapProof::new();
@@ -277,47 +283,38 @@ where
                     proof = proof.process_key(self, &mut contour, &proof_path, key);
                     last_searched_path = Some(proof_path);
                 }
-//
-//                // Eject remaining entries from the contour
-//                while let Some(node) = contour.pop() {
-//                    proof = node.add_to_proof(proof);
-//                }
-//                proof
 
-                unimplemented!()
+                // Eject remaining entries from the contour
+                while let Some(node) = contour.pop() {
+                    proof = node.add_to_proof(proof);
+                }
+                proof
             }
-            _ => {
-                unimplemented!()
+            Some((root_path, Node::Leaf(root_hash))) => {
+                let mut proof = MapProof::new();
+                // (One of) keys corresponding to the existing table entry.
+                let mut found_key: Option<K::Owned> = None;
+
+                for key in keys {
+                    let searched_path = KeyMode::transform_key(key.borrow());
+                    if root_path == searched_path {
+                        found_key = Some(key);
+                    } else {
+                        proof = proof.add_missing(key);
+                    }
+                }
+
+                if let Some(key) = found_key {
+                    let value = self.value(&key);
+                    proof.add_entry(key, value)
+                } else {
+                    proof.add_proof_entry(root_path, root_hash)
+                }
             }
+
+            None => keys
+                .into_iter()
+                .fold(MapProof::new(), MapProof::add_missing),
         }
     }
-
-//
-//            Some((root_path, Node::Leaf(root_hash))) => {
-//                let mut proof = MapProof::new();
-//                // (One of) keys corresponding to the existing table entry.
-//                let mut found_key: Option<K> = None;
-//
-//                for key in keys {
-//                    let searched_path = KeyMode::transform_key(&key);
-//                    if root_path == searched_path {
-//                        found_key = Some(key);
-//                    } else {
-//                        proof = proof.add_missing(key);
-//                    }
-//                }
-//
-//                if let Some(key) = found_key {
-//                    let value = self.value(&key);
-//                    proof.add_entry(key, value)
-//                } else {
-//                    proof.add_proof_entry(root_path, root_hash)
-//                }
-//            }
-//
-//            None => keys
-//                .into_iter()
-//                .fold(MapProof::new(), MapProof::add_missing),
-//        }
-//    }
 }

@@ -48,7 +48,7 @@ mod tests;
 impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ?Sized,
+    K: BinaryKey + ToOwned + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -200,7 +200,7 @@ pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ?Sized + ToOwned,
+    K: BinaryKey +  ToOwned + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -313,8 +313,11 @@ where
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: &K) -> MapProof<K::Owned, V, KeyMode> {
-        self.create_proof(&key)
+    pub fn get_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode>
+    {
+        self.create_proof(key)
+
+//        unimplemented!()
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -336,7 +339,7 @@ where
         KI: IntoIterator<Item = K::Owned>,
     {
         unimplemented!()
-//        self.create_multiproof(keys)
+//                self.create_multiproof(keys)
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
@@ -973,8 +976,8 @@ where
 }
 
 mod tests2 {
-    use crate::{TemporaryDB, Database, MapProof};
     use crate::access::AccessExt;
+    use crate::{Database, MapProof, TemporaryDB};
 
     fn test_proof() -> MapProof<i32, i32> {
         let db = TemporaryDB::new();
@@ -984,7 +987,7 @@ mod tests2 {
 
         index.put(&1, 1);
 
-        let proof = index.get_proof(&1);
+        let proof = index.get_proof(1);
 
         proof
     }
