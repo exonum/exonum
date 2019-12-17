@@ -24,7 +24,7 @@ use exonum_merkledb::{access::Prefixed, Snapshot};
 
 use super::Broadcaster;
 use crate::{
-    api::{error::MovedPermanentlyErrorBuilder, ApiBuilder, ApiScope},
+    api::{error::MovedPermanentlyError, ApiBuilder, ApiScope},
     blockchain::{Blockchain, Schema as CoreSchema},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
@@ -39,7 +39,7 @@ pub struct ServiceApiState<'a> {
     broadcaster: Broadcaster<'a>,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
-    /// Endpoint relative URL.
+    /// Endpoint path relative to the service root
     endpoint: String,
 }
 
@@ -94,10 +94,10 @@ impl<'a> ServiceApiState<'a> {
     }
 
     /// Creates a new builder for `MovedPermanently` response.
-    pub fn moved_permanently(&self, new_endpoint: &str) -> MovedPermanentlyErrorBuilder {
+    pub fn moved_permanently(&self, new_endpoint: &str) -> MovedPermanentlyError {
         let new_url = Self::relative_to(&self.endpoint, new_endpoint);
 
-        MovedPermanentlyErrorBuilder::new(new_url)
+        MovedPermanentlyError::new(new_url)
     }
 
     /// Takes an old endpoint and a new endpoint as direct URIs, and creates

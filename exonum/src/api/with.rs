@@ -58,7 +58,7 @@ pub enum Actuality {
     /// Endpoint is not recommended to use, the support of it will end soon.
     Deprecated {
         /// Optional value denoting the endpoint expiration date.
-        deprecates_on: Option<DateTime<Utc>>,
+        discontinued_on: Option<DateTime<Utc>>,
         /// Optional additional description.
         description: Option<String>,
     },
@@ -70,7 +70,7 @@ pub struct Deprecated<Q, I, R, F> {
     /// Underlying API handler.
     pub handler: F,
     /// Optional endpoint expiration date.
-    pub deprecates_on: Option<DateTime<Utc>>,
+    pub discontinued_on: Option<DateTime<Utc>>,
     /// Optional additional note.
     pub description: Option<String>,
     _query_type: PhantomData<Q>,
@@ -83,7 +83,7 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     pub fn new(handler: F) -> Self {
         Self {
             handler,
-            deprecates_on: None,
+            discontinued_on: None,
             description: None,
             _query_type: PhantomData,
             _item_type: PhantomData,
@@ -92,9 +92,9 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 
     /// Adds an expiration date for endpoint.
-    pub fn with_date(self, deprecates_on: DateTime<Utc>) -> Self {
+    pub fn with_date(self, discontinued_on: DateTime<Utc>) -> Self {
         Self {
-            deprecates_on: Some(deprecates_on),
+            discontinued_on: Some(discontinued_on),
             ..self
         }
     }
@@ -111,7 +111,7 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     pub fn with_different_handler<F1>(self, handler: F1) -> Deprecated<Q, I, R, F1> {
         Deprecated {
             handler,
-            deprecates_on: self.deprecates_on,
+            discontinued_on: self.discontinued_on,
             description: self.description,
 
             _query_type: PhantomData,
@@ -144,7 +144,7 @@ impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F>
         Self {
             handler: deprecated.handler,
             actuality: Actuality::Deprecated {
-                deprecates_on: deprecated.deprecates_on,
+                discontinued_on: deprecated.discontinued_on,
                 description: deprecated.description,
             },
             _query_type: PhantomData,

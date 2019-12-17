@@ -149,14 +149,14 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
     let mut response = HttpResponse::Ok();
 
     if let Actuality::Deprecated {
-        ref deprecates_on,
+        ref discontinued_on,
         ref description,
     } = actuality
     {
         // There is a proposal for creating special deprecation header within HTTP,
         // but currently it's only a draft. So the conventional way to notify API user
         // about endpoint deprecation is setting the `Warning` header.
-        let expiration_note = match deprecates_on {
+        let expiration_note = match discontinued_on {
             // Date is formatted according to HTTP-date format.
             Some(date) => format!(
                 "The old API is maintained until {}.",
@@ -561,7 +561,7 @@ mod tests {
 
         let deprecated_response_no_deadline = json_response(
             Actuality::Deprecated {
-                deprecates_on: None,
+                discontinued_on: None,
                 description: None,
             },
             123,
@@ -581,7 +581,7 @@ mod tests {
         let description = "Docs can be found on docs.rs".to_owned();
         let deprecated_response_with_description = json_response(
             Actuality::Deprecated {
-                deprecates_on: None,
+                discontinued_on: None,
                 description: Some(description),
             },
             123,
@@ -603,7 +603,7 @@ mod tests {
 
         let deprecated_response_deadline = json_response(
             Actuality::Deprecated {
-                deprecates_on: Some(deadline),
+                discontinued_on: Some(deadline),
                 description: None,
             },
             123,

@@ -61,13 +61,15 @@ pub enum Error {
 /// A helper structure allowing to build `MovedPermanently` response from the
 /// composite parts.
 #[derive(Debug)]
-pub struct MovedPermanentlyErrorBuilder {
+pub struct MovedPermanentlyError {
     location: String,
     query_part: Option<String>,
 }
 
-impl MovedPermanentlyErrorBuilder {
+impl MovedPermanentlyError {
     /// Creates a new builder object with base url.
+    /// Note that query parameters should **not** be added to the location url,
+    /// for this purpose use `with_query` method.
     pub fn new(location: String) -> Self {
         Self {
             location,
@@ -84,12 +86,13 @@ impl MovedPermanentlyErrorBuilder {
             ..self
         }
     }
+}
 
-    /// Finalizes the building process.
-    pub fn build(self) -> Error {
-        let full_location = match self.query_part {
-            Some(query) => format!("{}?{}", self.location, query),
-            None => self.location,
+impl From<MovedPermanentlyError> for Error {
+    fn from(e: MovedPermanentlyError) -> Self {
+        let full_location = match e.query_part {
+            Some(query) => format!("{}?{}", e.location, query),
+            None => e.location,
         };
 
         Error::MovedPermanently(full_location)

@@ -85,7 +85,7 @@ impl Api {
             .endpoint_mut(
                 "moved-mutable",
                 move |state: &ServiceApiState<'_>, _query: PingQuery| -> api::Result<u64> {
-                    Err(state.moved_permanently("ping-pong-deprecated-mut").build())
+                    Err(state.moved_permanently("ping-pong-deprecated-mut").into())
                 },
             )
             .endpoint(
@@ -94,7 +94,7 @@ impl Api {
                     Err(state
                         .moved_permanently("ping-pong")
                         .with_query(query)
-                        .build())
+                        .into())
                 },
             );
     }
