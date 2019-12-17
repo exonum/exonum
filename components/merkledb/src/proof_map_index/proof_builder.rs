@@ -173,6 +173,22 @@ pub trait BuildProof<K: ToOwned + ?Sized, V, KeyMode> {
     ) -> MapProof<K::Owned, V, KeyMode>;
 }
 
+pub trait BuildProof2<K: ToOwned + ?Sized, V, KeyMode> {
+    /// Creates a proof of existence / absence for a single key.
+    fn create_proof2(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode>;
+}
+
+impl<K, V, T, KeyMode> BuildProof2<K, V, KeyMode> for T
+where
+    K: ToOwned + ?Sized,
+    T: MerklePatriciaTree<K::Owned, V>,
+    KeyMode: ToProofPath<K>,
+{
+    fn create_proof2(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
+        unimplemented!()
+    }
+}
+
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
     K: ToOwned + ?Sized,
