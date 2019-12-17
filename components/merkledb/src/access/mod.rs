@@ -16,7 +16,7 @@ mod extensions;
 ///
 /// This trait is not intended to be implemented by the types outside the crate; indeed,
 /// it instantiates `ViewWithMetadata`, which is crate-private. Correspondingly, `Access` methods
-/// rarely need to be used directly; use [its extention trait][`AccessExt`] instead.
+/// rarely need to be used directly; use [its extension trait][`AccessExt`] instead.
 ///
 /// [`AccessExt`]: trait.AccessExt.html
 ///

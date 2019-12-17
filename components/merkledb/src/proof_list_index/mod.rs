@@ -653,7 +653,7 @@ where
 }
 
 /// `object_hash` for a list depends on all list items. It explicitly commits to the list length
-/// in order to be able to more easily prove absence of elements and to prevent second preimage
+/// in order to be able to more easily prove absence of elements and to prevent second pre-image
 /// attacks.
 ///
 /// # Specification

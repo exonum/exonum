@@ -854,7 +854,7 @@ where
 /// LEB128(<bit_length>) || <bytes>,
 /// ```
 ///
-/// where `bytes` contains the minimum necessary number of bytes to accomodate `bit_length` bits,
+/// where `bytes` contains the minimum necessary number of bytes to accommodate `bit_length` bits,
 /// and is zero-padded if necessary.
 ///
 /// # Examples
