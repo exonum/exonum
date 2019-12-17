@@ -145,14 +145,29 @@ impl AnyTx {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
-#[derive(BinaryValue, ObjectHash)]
+#[derive(BinaryValue, ObjectHash, ProtobufConvert)]
+#[protobuf_convert(source = "schema::runtime::ArtifactId")]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
+    /// Semantic version of the artifact.
     /// Artifact name.
     pub name: String,
     /// Semantic version of the artifact.
+    #[protobuf_convert(with = "self::pb_version")]
     pub version: Version,
+}
+
+mod pb_version {
+    use super::*;
+
+    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
+        pb.parse().map_err(From::from)
+    }
+
+    pub fn to_pb(value: &Version) -> String {
+        value.to_string()
+    }
 }
 
 impl ArtifactId {
@@ -179,31 +194,6 @@ impl ArtifactId {
         name: impl Into<String>,
     ) -> InstanceInitParams {
         InstanceInitParams::new(id, name, self, ())
-    }
-}
-
-impl ProtobufConvert for ArtifactId {
-    type ProtoStruct = schema::runtime::ArtifactId;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut pb = Self::ProtoStruct::new();
-        pb.set_runtime_id(self.runtime_id);
-        pb.set_name(self.name.clone());
-        pb.set_version(self.version.to_string());
-        pb
-    }
-
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        let runtime_id = pb.get_runtime_id();
-        let name = pb.take_name();
-        let version = pb.get_version().parse()?;
-        let this = Self {
-            runtime_id,
-            name,
-            version,
-        };
-        this.validate()?;
-        Ok(this)
     }
 }
 

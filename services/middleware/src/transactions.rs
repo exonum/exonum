@@ -35,36 +35,28 @@ pub enum Error {
 }
 
 /// Checked call to the service.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(BinaryValue, ProtobufConvert)]
+#[protobuf_convert(source = "proto::CheckedCall")]
 pub struct CheckedCall {
     /// Expected name of the artifact.
     pub artifact_name: String,
     /// Version requirement(s) on the artifact.
+    #[protobuf_convert(with = "self::pb_version_req")]
     pub artifact_version: VersionReq,
     /// The call contents.
     pub inner: AnyTx,
 }
 
-impl ProtobufConvert for CheckedCall {
-    type ProtoStruct = proto::CheckedCall;
+mod pb_version_req {
+    use super::*;
 
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut pb = Self::ProtoStruct::new();
-        pb.set_artifact_name(self.artifact_name.clone());
-        pb.set_artifact_version(self.artifact_version.to_string());
-        pb.set_inner(self.inner.to_pb());
-        pb
+    pub fn from_pb(pb: String) -> Result<VersionReq, failure::Error> {
+        pb.parse().map_err(From::from)
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        let artifact_name = pb.take_artifact_name();
-        let artifact_version = pb.get_artifact_version().parse()?;
-        let inner = AnyTx::from_pb(pb.take_inner())?;
-        Ok(Self {
-            artifact_name,
-            artifact_version,
-            inner,
-        })
+    pub fn to_pb(value: &VersionReq) -> String {
+        value.to_string()
     }
 }
 
