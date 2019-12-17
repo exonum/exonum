@@ -16,8 +16,8 @@ Include `exonum-middleware-service` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.13"
-exonum-middleware-service = "0.13"
+exonum = "0.13.0-rc.2"
+exonum-middleware-service = "0.13.0-rc.2"
 ```
 
 Consult [the crate docs](https://docs.rs/exonum-middleware-service)

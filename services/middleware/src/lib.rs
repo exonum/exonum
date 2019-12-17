@@ -61,5 +61,5 @@ impl Service for MiddlewareService {}
 
 impl DefaultInstance for MiddlewareService {
     const INSTANCE_ID: InstanceId = 1;
-    const INSTANCE_NAME: &'static str = "utils";
+    const INSTANCE_NAME: &'static str = "middleware";
 }

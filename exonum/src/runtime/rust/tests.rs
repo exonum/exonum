@@ -602,6 +602,8 @@ fn state_aggregation() {
 
 #[test]
 fn multiple_service_versions() {
+    const NEW_INSTANCE_ID: InstanceId = SERVICE_INSTANCE_ID + 1;
+
     let runtime = RustRuntime::new(mpsc::channel(1).0)
         .with_factory(TestServiceImpl)
         .with_factory(TestServiceImplV2);
@@ -647,7 +649,7 @@ fn multiple_service_versions() {
     let mut fork = blockchain.fork();
     let spec = InstanceSpec {
         artifact: new_artifact.clone(),
-        id: SERVICE_INSTANCE_ID + 1,
+        id: NEW_INSTANCE_ID,
         name: "new_service".to_owned(),
     };
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
@@ -680,13 +682,12 @@ fn multiple_service_versions() {
         .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap();
-    call_info.instance_id += 1;
+    call_info.instance_id = NEW_INSTANCE_ID;
     let err = blockchain
         .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap_err();
     // `method_a` is removed from the newer service version.
-    // FIXME: Use a purpose-built error variant.
     assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
 
     {
@@ -698,13 +699,13 @@ fn multiple_service_versions() {
     }
 
     call_info.method_id = 1;
-    call_info.instance_id -= 1;
+    call_info.instance_id = SERVICE_INSTANCE_ID;
     let payload = TxB { value: 12 }.into_bytes();
     blockchain
         .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap();
-    call_info.instance_id += 1;
+    call_info.instance_id = NEW_INSTANCE_ID;
     blockchain
         .dispatcher()
         .call(&mut fork, caller, &call_info, &payload)

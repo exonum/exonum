@@ -123,7 +123,7 @@ impl ToTokens for ServiceFactory {
             impl #impl_generics #cr::runtime::rust::ServiceFactory for #name #ty_generics #where_clause {
                 fn artifact_id(&self) -> #cr::runtime::ArtifactId {
                     #cr::runtime::ArtifactId {
-                        runtime_id: 0,
+                        runtime_id: #cr::runtime::RuntimeIdentifier::Rust as _,
                         name: #artifact_name.to_string(),
                         version: #artifact_version.parse().expect("Cannot parse artifact version"),
                     }

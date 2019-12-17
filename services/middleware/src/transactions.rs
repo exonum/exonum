@@ -72,39 +72,6 @@ impl ProtobufConvert for CheckedCall {
     }
 }
 
-#[test]
-fn checked_call_in_json() {
-    use exonum::runtime::CallInfo;
-    use serde_json::json;
-
-    let mut checked_call = CheckedCall {
-        artifact_name: "test-artifact".to_string(),
-        artifact_version: "^1.0.0".parse().unwrap(),
-        inner: AnyTx {
-            call_info: CallInfo::new(100, 0),
-            arguments: vec![],
-        },
-    };
-    assert_eq!(
-        serde_json::to_value(&checked_call).unwrap(),
-        json!({
-            "artifact_name": "test-artifact",
-            "artifact_version": "^1.0.0",
-            "inner": checked_call.inner,
-        })
-    );
-
-    checked_call.artifact_version = ">=0.9, <2".parse().unwrap();
-    assert_eq!(
-        serde_json::to_value(&checked_call).unwrap(),
-        json!({
-            "artifact_name": "test-artifact",
-            "artifact_version": ">= 0.9, < 2",
-            "inner": checked_call.inner,
-        })
-    );
-}
-
 /// Transactions executed in a batch.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
@@ -185,8 +152,42 @@ impl UtilsInterface for MiddlewareService {
         for call in arg.inner {
             context
                 .call_context(call.call_info.instance_id, ChildAuthorization::Fallthrough)?
+                // TODO: use interface name from `call_info` once it's added there
                 .call("", call.call_info.method_id, call.arguments)?;
         }
         Ok(())
     }
+}
+
+#[test]
+fn checked_call_in_json() {
+    use exonum::runtime::CallInfo;
+    use serde_json::json;
+
+    let mut checked_call = CheckedCall {
+        artifact_name: "test-artifact".to_string(),
+        artifact_version: "^1.0.0".parse().unwrap(),
+        inner: AnyTx {
+            call_info: CallInfo::new(100, 0),
+            arguments: vec![],
+        },
+    };
+    assert_eq!(
+        serde_json::to_value(&checked_call).unwrap(),
+        json!({
+            "artifact_name": "test-artifact",
+            "artifact_version": "^1.0.0",
+            "inner": checked_call.inner,
+        })
+    );
+
+    checked_call.artifact_version = ">=0.9, <2".parse().unwrap();
+    assert_eq!(
+        serde_json::to_value(&checked_call).unwrap(),
+        json!({
+            "artifact_name": "test-artifact",
+            "artifact_version": ">= 0.9, < 2",
+            "inner": checked_call.inner,
+        })
+    );
 }

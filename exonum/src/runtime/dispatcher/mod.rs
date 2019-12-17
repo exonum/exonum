@@ -151,12 +151,12 @@ impl Dispatcher {
     pub(crate) fn commit_artifact(
         fork: &Fork,
         artifact: ArtifactId,
-        payload: Vec<u8>,
+        deploy_spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork)
-            .add_pending_artifact(artifact, payload)
+            .add_pending_artifact(artifact, deploy_spec)
             .map_err(From::from)
     }
 

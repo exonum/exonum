@@ -127,7 +127,7 @@ impl AnyTx {
 /// - `artifact_name` is the name of the artifact
 /// - `version` is the artifact semantic version
 ///
-/// Artifact name may contain the following characters: `a-zA-Z0-9` and `_-.`.
+/// Artifact name may contain the following characters: `a-zA-Z0-9` and `_.-`.
 ///
 /// [runtime identifier]: enum.RuntimeIdentifier.html
 ///
@@ -215,7 +215,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             is_valid_identifier(&self.name),
-            "Artifact name ({}) contains an illegal character, use only: a-zA-Z0-9 and one of _-.",
+            "Artifact name ({}) contains an illegal character, use only: `a-zA-Z0-9` and `_.-`",
             &self.name,
         );
         Ok(())

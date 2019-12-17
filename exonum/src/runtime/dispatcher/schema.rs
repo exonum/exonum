@@ -104,7 +104,7 @@ impl Schema<&Fork> {
     pub(super) fn add_pending_artifact(
         &mut self,
         artifact: ArtifactId,
-        payload: Vec<u8>,
+        deploy_spec: Vec<u8>,
     ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact) {
@@ -114,7 +114,7 @@ impl Schema<&Fork> {
         self.artifacts().put(
             &artifact,
             ArtifactState {
-                deploy_spec: payload,
+                deploy_spec,
                 status: ArtifactStatus::Pending,
             },
         );

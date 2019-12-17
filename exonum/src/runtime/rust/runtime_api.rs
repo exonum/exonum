@@ -146,11 +146,10 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         .endpoint("proto-sources", {
             move |query: ProtoSourcesQuery| -> Result<Vec<ProtoSourceFile>, api::Error> {
                 if let ProtoSourcesQuery::Artifact { name, version } = query {
-                    let artifact_id = ArtifactId {
-                        runtime_id: RuntimeIdentifier::Rust as _,
-                        name,
-                        version,
-                    };
+                    let artifact_id = ArtifactId::new(RuntimeIdentifier::Rust, name, version)
+                        .map_err(|e| {
+                            api::Error::BadRequest(format!("Invalid artifact query: {}", e))
+                        })?;
                     filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
                         api::Error::NotFound(format!(
                             "Unable to find sources for artifact {}",
