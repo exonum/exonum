@@ -126,10 +126,10 @@ impl Finalize {
         let peers = public_configs
             .iter()
             .filter(|config| {
-                config.validator_keys.unwrap().consensus_key != secret_config.keys.consensus_pk()
+                get_consensus_key(config) != secret_config.keys.consensus_pk()
             })
             .map(|config| ConnectInfo {
-                public_key: config.validator_keys.unwrap().consensus_key,
+                public_key: get_consensus_key(config),
                 address: secret_config.external_address.clone(),
             })
             .collect();
