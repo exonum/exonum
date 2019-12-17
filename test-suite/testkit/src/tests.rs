@@ -158,23 +158,6 @@ fn testkit_create_block_with_transactions() {
 }
 
 #[test]
-#[should_panic(expected = "Transaction is already committed")]
-fn testkit_create_block_with_transactions_commit_duplicated_transaction() {
-    let (mut testkit, _) = init_testkit();
-    let tx = gen_tx("tx".to_string());
-    testkit.create_block_with_transactions(vec![tx.clone()]);
-    testkit.create_block_with_transactions(vec![tx.clone()]);
-}
-
-#[test]
-#[should_panic(expected = "Attempt to add invalid tx in the pool")]
-fn testkit_create_block_with_transactions_incorrect_transaction() {
-    let (mut testkit, _) = init_testkit();
-    let incorrect_tx = gen_incorrect_tx("tx".to_string());
-    testkit.create_block_with_transactions(vec![incorrect_tx]);
-}
-
-#[test]
 fn testkit_create_block_with_transaction() {
     let (mut testkit, _) = init_testkit();
     let tx = gen_tx("tx".to_string());
