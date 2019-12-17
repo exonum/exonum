@@ -39,7 +39,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
 
-- New types of error were added to `api::Error`: `Gone` and `MovedPermanently`. (#1607)
+- New `api::Error` variants were added: `Gone` and `MovedPermanently`. (#1607)
 
 - API endpoints are now can be marked as deprecated. (#1607)
 
