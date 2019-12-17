@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockProof, IndexProof},
+    block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
@@ -260,7 +260,7 @@ impl BlockchainMut {
         self.merge(patch)?;
 
         let (_, patch) = self.create_patch(
-            ValidatorId::zero(),
+            ValidatorId::zero().into(),
             Height::zero(),
             &[],
             &mut BTreeMap::new(),
@@ -282,15 +282,13 @@ impl BlockchainMut {
     /// with the hash of the resulting block.
     pub fn create_patch(
         &self,
-        proposer_id: ValidatorId,
+        proposer_id: ProposerId,
         height: Height,
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
-        // Get last hash.
-        let last_hash = self.inner.last_hash();
 
         // Skip execution for genesis block.
         if height > Height(0) {
@@ -314,23 +312,8 @@ impl BlockchainMut {
                 call_errors.put(&location, error);
             }
         }
-        // Get tx & state hash.
-        let schema = Schema::new(&fork);
-        let error_hash = schema.call_errors(height).object_hash();
-        let tx_hash = schema.block_transactions(height).object_hash();
-        let patch = fork.into_patch();
-        let state_hash = SystemSchema::new(&patch).state_hash();
 
-        // Create block.
-        let block = Block {
-            proposer_id,
-            height,
-            tx_count: tx_hashes.len() as u32,
-            prev_hash: last_hash,
-            tx_hash,
-            state_hash,
-            error_hash,
-        };
+        let (patch, block) = self.create_block_header(fork, proposer_id, height, tx_hashes);
         log::trace!("Executing {:?}", block);
 
         // Calculate block hash.
@@ -342,6 +325,36 @@ impl BlockchainMut {
         // Save block.
         schema.blocks().put(&block_hash, block);
         (block_hash, fork.into_patch())
+    }
+
+    fn create_block_header(
+        &self,
+        fork: Fork,
+        proposer_id: ProposerId,
+        height: Height,
+        tx_hashes: &[Hash],
+    ) -> (Patch, Block) {
+        let prev_hash = self.inner.last_hash();
+
+        let schema = Schema::new(&fork);
+        let error_hash = schema.call_errors(height).object_hash();
+        let tx_hash = schema.block_transactions(height).object_hash();
+        let patch = fork.into_patch();
+        let state_hash = SystemSchema::new(&patch).state_hash();
+
+        let mut block = Block {
+            height,
+            tx_count: tx_hashes.len() as u32,
+            prev_hash,
+            tx_hash,
+            state_hash,
+            error_hash,
+            additional_headers: AdditionalHeaders::new(),
+        };
+
+        block.add_header::<ProposerId>(proposer_id);
+
+        (patch, block)
     }
 
     fn execute_transaction(
