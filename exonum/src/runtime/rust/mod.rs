@@ -190,8 +190,6 @@ use super::{
     InstanceSpec, Runtime, RuntimeIdentifier,
 };
 
-#[macro_use]
-pub mod macros;
 mod call_context;
 mod runtime_api;
 mod service;

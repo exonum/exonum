@@ -261,7 +261,7 @@ impl BlockchainMut {
         // created at all.
         ensure!(
             errors.is_empty(),
-            "`after_commit` failed for at least one service, errors: {:?}",
+            "`after_transactions` failed for at least one service, errors: {:?}",
             &errors
         );
 

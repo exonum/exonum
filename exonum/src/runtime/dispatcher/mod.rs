@@ -125,7 +125,7 @@ impl Dispatcher {
         // Remove service from pending.
         Schema::new(fork as &Fork).take_pending_instances();
         // Flush changes, so the snapshot will be created with all the recently added changes.
-        // We can do it safely, since any failure on the genesis block level will result in the
+        // We can do it safely, since any failure within the genesis block will result in the
         // overall blockchain creation failure.
         fork.flush();
         // Start service within runtime.

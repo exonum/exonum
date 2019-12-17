@@ -199,7 +199,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         instance_id: u32,
     ) -> Result<(), ExecutionError> {
         let schema = CoreSchema::new(&*context.fork);
-        // Skip genesis block execution.
+        // Skip adding events during genesis block execution.
         if schema.next_height() == Height(0) {
             return self.inner.after_transactions(context, instance_id);
         }

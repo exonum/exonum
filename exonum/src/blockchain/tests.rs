@@ -35,7 +35,6 @@ use crate::{
         AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
-    skip_for_genesis,
 };
 
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
@@ -218,7 +217,9 @@ impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
     fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
-        skip_for_genesis!(context);
+        if context.in_genesis_block() {
+            return Ok(());
+        }
         panic!("42");
     }
 }
@@ -240,7 +241,7 @@ impl ServiceGenesisPanic for ServiceGenesisPanicImpl {}
 
 impl Service for ServiceGenesisPanicImpl {
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
-        // Panics even on genesis level.
+        // Panics even on the genesis block.
         panic!("42");
     }
 }
@@ -480,7 +481,7 @@ fn after_transactions_invoked_on_genesis() {
     assert_eq!(index.get(0), Some(1));
 }
 
-/// Checks that if `after_transactions` fails on the genesis level,
+/// Checks that if `after_transactions` fails on the genesis block,
 /// the blockchain is not created.
 #[test]
 fn after_transactions_failure_causes_genesis_failure() {
@@ -491,16 +492,18 @@ fn after_transactions_failure_causes_genesis_failure() {
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
-    const EXPECTED_ERR_TEXT: &str =
-        "`after_commit` failed for at least one service, errors: \
-         [(AfterTransactions { id: 0 }, ExecutionError { kind: Unexpected, \
-         description: \"42\", runtime_id: Some(0), call_site: Some(CallSite \
-         { instance_id: 0, call_type: AfterTransactions }) })]";
+    const EXPECTED_ERR_TEXT: &str = "`after_transactions` failed for at least one service";
     let actual_err = blockchain_result
         .expect_err("Blockchain shouldn't be created after failure within genesis block");
 
     // Unfortunately, `failure::Error` doesn't implement `PartialEq`, so we have to string-compare them.
-    assert_eq!(&format!("{}", actual_err), EXPECTED_ERR_TEXT);
+    let error_string = format!("{}", actual_err);
+
+    assert_eq!(
+        error_string.contains(EXPECTED_ERR_TEXT),
+        true,
+        "Expected error should be caused by `after_transactions` hook"
+    );
 }
 
 #[test]
