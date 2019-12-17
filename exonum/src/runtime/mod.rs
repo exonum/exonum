@@ -212,7 +212,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Consensus and Local Methods
 ///
-/// The following methods should return the same result if provided arguments the same for all
+/// The following methods should return the same result if provided arguments are the same for all
 /// the nodes in the blockchain network:
 ///
 /// - `before_transactions`
@@ -245,9 +245,9 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// node restart. Re-initialization includes restoring the deployed artifacts / started service
     /// instances for all the runtimes.
     ///
-    /// This method is called *maximum once* during the `Runtime` lifetime. To call the method,
-    /// the blockchain must have a genesis block when the node is started. The blockchain state
-    /// will remain the same between the `initialize` and `on_resume` calls.
+    /// This method is called *maximum once* during the `Runtime` lifetime. It is called iff
+    /// the genesis block was already created before the node start (e.g. after node relaunch).
+    /// The blockchain state will remain the same between the `initialize` and `on_resume` calls.
     ///
     /// The default implementation does nothing.
     fn on_resume(&mut self) {}
