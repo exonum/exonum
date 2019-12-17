@@ -100,8 +100,8 @@
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
-//!     let explorer_api = api.public(ApiKind::Explorer);
-//!     let response: BlocksRange = explorer_api
+//!     let response: BlocksRange = api
+//!         .public(ApiKind::Explorer)
 //!         .query(&BlocksQuery {
 //!             count: 10,
 //!             ..Default::default()
@@ -113,7 +113,8 @@
 //!     assert_eq!(range.start, Height(0));
 //!     assert_eq!(range.end, Height(3));
 //!
-//!     let info = explorer_api
+//!     let info = api
+//!         .public(ApiKind::Explorer)
 //!         .query(&TransactionQuery::new(tx1.object_hash()))
 //!         .get::<TransactionInfo>("v1/transactions")
 //!         .unwrap();
