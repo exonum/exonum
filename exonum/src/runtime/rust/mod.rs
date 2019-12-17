@@ -281,7 +281,14 @@ impl RustRuntime {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
         if !self.available_artifacts.contains_key(&artifact) {
-            return Err(Error::UnableToDeploy.into());
+            let descritption = format!(
+                "Rust runtime failed to deploy artifact with id {}, \
+                 it is not listed among available artifacts. Available artifacts: {}",
+                artifact,
+                self.artifacts_to_pretty_string()
+            );
+            let error = ExecutionError::runtime(Error::UnableToDeploy as u8, descritption);
+            return Err(error);
         }
 
         trace!("Deployed artifact: {}", artifact);
@@ -339,6 +346,18 @@ impl RustRuntime {
             }
         }
         self.new_services_since_last_block = false;
+    }
+
+    fn artifacts_to_pretty_string(&self) -> String {
+        if self.available_artifacts.is_empty() {
+            return "None".to_string();
+        }
+
+        self.available_artifacts
+            .keys()
+            .map(|id| format!("{}", id))
+            .collect::<Vec<String>>()
+            .join(", ")
     }
 }
 
