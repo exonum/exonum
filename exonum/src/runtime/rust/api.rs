@@ -14,16 +14,17 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use crate::api::{Error, FutureResult, Result};
+pub use crate::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
 
-use exonum_crypto::PublicKey;
-use exonum_merkledb::{access::Prefixed, Snapshot};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
+use exonum_crypto::PublicKey;
+use exonum_merkledb::{access::Prefixed, Snapshot};
+
 use super::Broadcaster;
 use crate::{
-    api::{ApiBuilder, ApiScope},
+    api::{error::MovedPermanentlyError, ApiBuilder, ApiScope},
     blockchain::{Blockchain, Schema as CoreSchema},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
@@ -38,11 +39,17 @@ pub struct ServiceApiState<'a> {
     broadcaster: Broadcaster<'a>,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
+    /// Endpoint path relative to the service root
+    endpoint: String,
 }
 
 impl<'a> ServiceApiState<'a> {
     /// Create service API state snapshot from the given blockchain and instance descriptor.
-    pub fn from_api_context(blockchain: &'a Blockchain, instance: InstanceDescriptor<'a>) -> Self {
+    pub fn from_api_context<S: Into<String>>(
+        blockchain: &'a Blockchain,
+        instance: InstanceDescriptor<'a>,
+        endpoint: S,
+    ) -> Self {
         Self {
             broadcaster: Broadcaster::new(
                 instance,
@@ -50,6 +57,7 @@ impl<'a> ServiceApiState<'a> {
                 blockchain.sender(),
             ),
             snapshot: blockchain.snapshot(),
+            endpoint: endpoint.into(),
         }
     }
 
@@ -84,6 +92,30 @@ impl<'a> ServiceApiState<'a> {
     pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
     }
+
+    /// Creates a new builder for `MovedPermanently` response.
+    pub fn moved_permanently(&self, new_endpoint: &str) -> MovedPermanentlyError {
+        let new_url = Self::relative_to(&self.endpoint, new_endpoint);
+
+        MovedPermanentlyError::new(new_url)
+    }
+
+    /// Takes an old endpoint and a new endpoint as direct URIs, and creates
+    /// a relative path from the old to the new one.
+    fn relative_to(old_endpoint: &str, new_endpoint: &str) -> String {
+        let endpoint_without_end_slash = old_endpoint.trim_end_matches('/');
+        let mut nesting_level = endpoint_without_end_slash
+            .chars()
+            .filter(|&c| c == '/')
+            .count();
+
+        // Mounting points do not contain the leading slash, e.g. `endpoint("v1/stats")`.
+        nesting_level += 1;
+
+        let path_to_service_root = "../".repeat(nesting_level);
+
+        format!("{}{}", path_to_service_root, new_endpoint)
+    }
 }
 
 /// Exonum API builder for the concrete service API scope.
@@ -95,7 +127,7 @@ pub struct ServiceApiScope {
 }
 
 impl ServiceApiScope {
-    /// Create a new service API scope for the specified service instance.
+    /// Creates a new service API scope for the specified service instance.
     pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
         Self {
             inner: ApiScope::new(),
@@ -104,7 +136,7 @@ impl ServiceApiScope {
         }
     }
 
-    /// Add a readonly endpoint handler to the service API scope.
+    /// Adds a readonly endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `GET` requests.
     /// [Read more.](../../../api/struct.ApiScope.html#endpoint)
@@ -119,20 +151,15 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                );
+                let descriptor = (descriptor.0, descriptor.1.as_ref());
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
         self
     }
 
-    /// Add an endpoint handler to the service API scope.
+    /// Adds an endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `POST` requests.
     /// [Read more.](../../../api/struct.ApiScope.html#endpoint_mut)
@@ -147,16 +174,69 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                );
+                let descriptor = (descriptor.0, descriptor.1.as_ref());
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
+        self
+    }
+
+    /// Same as `endpoint`, but the response will contain a warning about endpoint being deprecated.
+    /// Optional endpoint expiration date and deprecation-related information (e.g., link to a documentation for
+    /// a new API) can be included in the warning.
+    pub fn deprecated_endpoint<Q, I, F, R>(
+        &mut self,
+        name: &'static str,
+        deprecated: Deprecated<Q, I, R, F>,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        let inner = deprecated.handler.clone();
+        let handler = move |query: Q| -> crate::api::FutureResult<I> {
+            let descriptor = (descriptor.0, descriptor.1.as_ref());
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            let result = inner(&state, query);
+            Box::new(result.into_future())
+        };
+        // Mark endpoint as deprecated.
+        let handler = deprecated.with_different_handler(handler);
+        self.inner.endpoint(name, handler);
+        self
+    }
+
+    /// Same as `endpoint_mut`, but the response will contain a warning about endpoint being deprecated.
+    /// Optional endpoint expiration date and deprecation-related information (e.g., link to a documentation for
+    /// a new API) can be included in the warning.
+    pub fn deprecated_endpoint_mut<Q, I, F, R>(
+        &mut self,
+        name: &'static str,
+        deprecated: Deprecated<Q, I, R, F>,
+    ) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        let inner = deprecated.handler.clone();
+        let handler = move |query: Q| -> crate::api::FutureResult<I> {
+            let descriptor = (descriptor.0, descriptor.1.as_ref());
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            let result = inner(&state, query);
+            Box::new(result.into_future())
+        };
+        // Mark endpoint as deprecated.
+        let handler = deprecated.with_different_handler(handler);
+        self.inner.endpoint_mut(name, handler);
         self
     }
 
