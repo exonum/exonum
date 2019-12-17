@@ -25,7 +25,7 @@ use exonum_merkledb::{access::Prefixed, Snapshot};
 
 use super::Broadcaster;
 use crate::{
-    api::{ApiBuilder, ApiScope},
+    api::{error::MovedPermanentlyErrorBuilder, ApiBuilder, ApiScope},
     blockchain::{Blockchain, Schema as CoreSchema},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
@@ -40,11 +40,17 @@ pub struct ServiceApiState<'a> {
     broadcaster: Broadcaster<'a>,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
+    /// Endpoint relative URL.
+    endpoint: String,
 }
 
 impl<'a> ServiceApiState<'a> {
     /// Create service API state snapshot from the given blockchain and instance descriptor.
-    pub fn from_api_context(blockchain: &'a Blockchain, instance: InstanceDescriptor<'a>) -> Self {
+    pub fn from_api_context<S: Into<String>>(
+        blockchain: &'a Blockchain,
+        instance: InstanceDescriptor<'a>,
+        endpoint: S,
+    ) -> Self {
         Self {
             broadcaster: Broadcaster::new(
                 instance,
@@ -52,6 +58,7 @@ impl<'a> ServiceApiState<'a> {
                 blockchain.sender(),
             ),
             snapshot: blockchain.snapshot(),
+            endpoint: endpoint.into(),
         }
     }
 
@@ -85,6 +92,30 @@ impl<'a> ServiceApiState<'a> {
     /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
     pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
+    }
+
+    /// Creates a new builder for `MovedPermanently` response.
+    pub fn moved_permanently(&self, new_endpoint: &str) -> MovedPermanentlyErrorBuilder {
+        let new_url = Self::relative_to(&self.endpoint, new_endpoint);
+
+        MovedPermanentlyErrorBuilder::new(new_url)
+    }
+
+    /// Takes an old endpoint and a new endpoint as direct URIs, and creates
+    /// a relative path from the old to the new one.
+    fn relative_to(old_endpoint: &str, new_endpoint: &str) -> String {
+        let endpoint_without_end_slash = old_endpoint.trim_end_matches('/');
+        let mut nesting_level = endpoint_without_end_slash
+            .chars()
+            .filter(|&c| c == '/')
+            .count();
+
+        // Mounting points do not contain the leading slash, e.g. `endpoint("v1/stats")`.
+        nesting_level += 1;
+
+        let path_to_service_root = "../".repeat(nesting_level);
+
+        format!("{}{}", path_to_service_root, new_endpoint)
     }
 }
 
@@ -127,6 +158,7 @@ impl ServiceApiScope {
                         id: descriptor.0,
                         name: descriptor.1.as_ref(),
                     },
+                    name,
                 );
                 let result = handler(&state, query);
                 Box::new(result.into_future())
@@ -155,6 +187,7 @@ impl ServiceApiScope {
                         id: descriptor.0,
                         name: descriptor.1.as_ref(),
                     },
+                    name,
                 );
                 let result = handler(&state, query);
                 Box::new(result.into_future())
@@ -187,6 +220,7 @@ impl ServiceApiScope {
                     id: descriptor.0,
                     name: descriptor.1.as_ref(),
                 },
+                name,
             );
             let result = handler(&state, query);
             Box::new(result.into_future())
@@ -228,6 +262,7 @@ impl ServiceApiScope {
                     id: descriptor.0,
                     name: descriptor.1.as_ref(),
                 },
+                name,
             );
             let result = handler(&state, query);
             Box::new(result.into_future())
@@ -247,34 +282,6 @@ impl ServiceApiScope {
     /// Return a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut crate::api::backends::actix::ApiBuilder {
         self.inner.web_backend()
-    }
-
-    /// Takes an old endpoint and a new endpoint as direct URIs, and creates
-    /// a relative path from the old to the new one.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::runtime::rust::api::ServiceApiScope;
-    ///
-    /// fn main() {
-    ///    let relative_path = ServiceApiScope::relative_to("hello/world", "exonum/rust/app");
-    ///    assert_eq!(&relative_path, "../../exonum/rust/app");
-    /// }
-    /// ```
-    pub fn relative_to(old_endpoint: &str, new_endpoint: &str) -> String {
-        let endpoint_without_end_slash = old_endpoint.trim_end_matches('/');
-        let mut nesting_level = endpoint_without_end_slash
-            .chars()
-            .filter(|&c| c == '/')
-            .count();
-
-        // Mounting points do not contain the leading slash, e.g. `endpoint("v1/stats")`.
-        nesting_level += 1;
-
-        let path_to_service_root = "../".repeat(nesting_level);
-
-        format!("{}{}", path_to_service_root, new_endpoint)
     }
 }
 

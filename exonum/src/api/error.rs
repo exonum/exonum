@@ -14,6 +14,7 @@
 
 //! The set of errors for the Exonum API module.
 
+use serde::Serialize;
 use std::io;
 
 /// List of possible API errors.
@@ -55,6 +56,44 @@ pub enum Error {
     /// authentication credentials.
     #[fail(display = "Unauthorized")]
     Unauthorized,
+}
+
+/// A helper structure allowing to build `MovedPermanently` response from the
+/// composite parts.
+#[derive(Debug)]
+pub struct MovedPermanentlyErrorBuilder {
+    location: String,
+    query_part: Option<String>,
+}
+
+impl MovedPermanentlyErrorBuilder {
+    /// Creates a new builder object with base url.
+    pub fn new(location: String) -> Self {
+        Self {
+            location,
+            query_part: None,
+        }
+    }
+
+    /// Appends a query to the url.
+    pub fn with_query<Q: Serialize>(self, query: Q) -> Self {
+        let serialized_query =
+            serde_urlencoded::to_string(query).expect("Unable to serialize query.");
+        Self {
+            query_part: Some(serialized_query),
+            ..self
+        }
+    }
+
+    /// Finalizes the building process.
+    pub fn build(self) -> Error {
+        let full_location = match self.query_part {
+            Some(query) => format!("{}?{}", self.location, query),
+            None => self.location,
+        };
+
+        Error::MovedPermanently(full_location)
+    }
 }
 
 impl From<io::Error> for Error {

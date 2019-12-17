@@ -56,10 +56,10 @@ pub enum Actuality {
     /// Endpoint is suitable for use.
     Actual,
     /// Endpoint is not recommended to use, the support of it will end soon.
-    /// Contains optional value denoting the endpoint expiration date, and
-    /// optional additional description.
     Deprecated {
+        /// Optional value denoting the endpoint expiration date.
         deprecates_on: Option<DateTime<Utc>>,
+        /// Optional additional description.
         description: Option<String>,
     },
 }

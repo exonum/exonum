@@ -22,7 +22,7 @@ use exonum::{
     api,
     runtime::{
         rust::{
-            api::{ServiceApiBuilder, ServiceApiScope, ServiceApiState},
+            api::{ServiceApiBuilder, ServiceApiState},
             DefaultInstance, Service,
         },
         InstanceId,
@@ -82,26 +82,20 @@ impl Api {
             .endpoint("gone-immutable", Self::gone);
 
         // Moved endpoints.
-        let moved_mutable_new_location =
-            ServiceApiScope::relative_to("moved-mutable", "ping-pong-deprecated-mut");
-        let moved_immutable_new_location =
-            ServiceApiScope::relative_to("moved-immutable", "ping-pong");
         public_scope
             .endpoint_mut(
                 "moved-mutable",
-                move |_state: &ServiceApiState<'_>, _query: PingQuery| -> api::Result<u64> {
-                    Err(api::Error::MovedPermanently(
-                        moved_mutable_new_location.clone(),
-                    ))
+                move |state: &ServiceApiState<'_>, _query: PingQuery| -> api::Result<u64> {
+                    Err(state.moved_permanently("ping-pong-deprecated-mut").build())
                 },
             )
             .endpoint(
                 "moved-immutable",
-                move |_state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
-                    let query =
-                        serde_urlencoded::to_string(query).expect("Unable to serialize query.");
-                    let new_location = format!("{}?{}", moved_immutable_new_location, query);
-                    Err(api::Error::MovedPermanently(new_location))
+                move |state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
+                    Err(state
+                        .moved_permanently("ping-pong")
+                        .with_query(query)
+                        .build())
                 },
             );
     }
