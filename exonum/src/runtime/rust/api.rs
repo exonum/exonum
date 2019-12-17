@@ -16,7 +16,6 @@
 
 pub use crate::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
 
-use chrono::{DateTime, Utc};
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -152,14 +151,8 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                    name,
-                );
+                let descriptor = (descriptor.0, descriptor.1.as_ref());
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
@@ -181,14 +174,8 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    InstanceDescriptor {
-                        id: descriptor.0,
-                        name: descriptor.1.as_ref(),
-                    },
-                    name,
-                );
+                let descriptor = (descriptor.0, descriptor.1.as_ref());
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
@@ -201,9 +188,7 @@ impl ServiceApiScope {
     pub fn deprecated_endpoint<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        deprecates_on: Option<DateTime<Utc>>,
-        description: Option<String>,
-        handler: F,
+        deprecated: Deprecated<Q, I, R, F>,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -213,26 +198,15 @@ impl ServiceApiScope {
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
+        let inner = deprecated.handler.clone();
         let handler = move |query: Q| -> crate::api::FutureResult<I> {
-            let state = ServiceApiState::from_api_context(
-                &blockchain,
-                InstanceDescriptor {
-                    id: descriptor.0,
-                    name: descriptor.1.as_ref(),
-                },
-                name,
-            );
-            let result = handler(&state, query);
+            let descriptor = (descriptor.0, descriptor.1.as_ref());
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            let result = inner(&state, query);
             Box::new(result.into_future())
         };
         // Mark endpoint as deprecated.
-        let mut handler = Deprecated::from(handler);
-        if let Some(deprecates_on) = deprecates_on {
-            handler = handler.with_date(deprecates_on);
-        }
-        if let Some(description) = description {
-            handler = handler.with_description(description);
-        }
+        let handler = deprecated.with_different_handler(handler);
         self.inner.endpoint(name, handler);
         self
     }
@@ -243,9 +217,7 @@ impl ServiceApiScope {
     pub fn deprecated_endpoint_mut<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        deprecates_on: Option<DateTime<Utc>>,
-        description: Option<String>,
-        handler: F,
+        deprecated: Deprecated<Q, I, R, F>,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -255,26 +227,15 @@ impl ServiceApiScope {
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
+        let inner = deprecated.handler.clone();
         let handler = move |query: Q| -> crate::api::FutureResult<I> {
-            let state = ServiceApiState::from_api_context(
-                &blockchain,
-                InstanceDescriptor {
-                    id: descriptor.0,
-                    name: descriptor.1.as_ref(),
-                },
-                name,
-            );
-            let result = handler(&state, query);
+            let descriptor = (descriptor.0, descriptor.1.as_ref());
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            let result = inner(&state, query);
             Box::new(result.into_future())
         };
         // Mark endpoint as deprecated.
-        let mut handler = Deprecated::from(handler);
-        if let Some(deprecates_on) = deprecates_on {
-            handler = handler.with_date(deprecates_on);
-        }
-        if let Some(description) = description {
-            handler = handler.with_description(description);
-        }
+        let handler = deprecated.with_different_handler(handler);
         self.inner.endpoint_mut(name, handler);
         self
     }

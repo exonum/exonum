@@ -79,6 +79,18 @@ pub struct Deprecated<Q, I, R, F> {
 }
 
 impl<Q, I, R, F> Deprecated<Q, I, R, F> {
+    /// Creates a new `Deprecated` object.
+    pub fn new(handler: F) -> Self {
+        Self {
+            handler,
+            deprecates_on: None,
+            description: None,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
+
     /// Adds an expiration date for endpoint.
     pub fn with_date(self, deprecates_on: DateTime<Utc>) -> Self {
         Self {
@@ -94,6 +106,18 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
             ..self
         }
     }
+
+    pub fn with_different_handler<F1>(self, handler: F1) -> Deprecated<Q, I, R, F1> {
+        Deprecated {
+            handler,
+            deprecates_on: self.deprecates_on,
+            description: self.description,
+
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
 }
 
 impl<Q, I, F> From<F> for Deprecated<Q, I, Result<I>, F>
@@ -101,14 +125,7 @@ where
     F: Fn(Q) -> Result<I>,
 {
     fn from(handler: F) -> Self {
-        Self {
-            handler,
-            deprecates_on: None,
-            description: None,
-            _query_type: PhantomData,
-            _item_type: PhantomData,
-            _result_type: PhantomData,
-        }
+        Self::new(handler)
     }
 }
 
@@ -117,14 +134,7 @@ where
     F: Fn(Q) -> FutureResult<I>,
 {
     fn from(handler: F) -> Self {
-        Self {
-            handler,
-            deprecates_on: None,
-            description: None,
-            _query_type: PhantomData,
-            _item_type: PhantomData,
-            _result_type: PhantomData,
-        }
+        Self::new(handler)
     }
 }
 
