@@ -20,7 +20,7 @@ use exonum::{
     crypto::PublicKey,
     node::{ConnectInfo, ConnectListConfig, NodeApiConfig},
 };
-use failure::{bail, format_err, Error};
+use failure::{bail, ensure, format_err, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -79,24 +79,22 @@ impl Finalize {
         public_configs.insert(consensus_key, first.clone());
 
         for config in config_iter {
-            if first.consensus != config.consensus {
-                bail!(
-                    "Found public configs with different consensus configuration.\
-                     Make sure the same template config was used for generation.\
-                     {:#?} \nnot equal to\n {:#?}",
-                    first.consensus,
-                    config.consensus
-                );
-            }
-            if first.general != config.general {
-                bail!(
-                    "Found public configs with different general configuration.\
-                     Make sure the same template config was used for generation.\
-                     {:#?} \nnot equal to\n {:#?}",
-                    first.general,
-                    config.general
-                );
-            };
+            ensure!(
+                first.consensus == config.consensus,
+                "Found public configs with different consensus configuration.\
+                 Make sure the same template config was used for generation.\
+                 {:#?} \nnot equal to\n {:#?}",
+                first.consensus,
+                config.consensus
+            );
+            ensure!(
+                first.general == config.general,
+                "Found public configs with different general configuration.\
+                 Make sure the same template config was used for generation.\
+                 {:#?} \nnot equal to\n {:#?}",
+                first.general,
+                config.general
+            );
 
             let consensus_key = Self::get_consensus_key(&config)?;
             if public_configs.insert(consensus_key, config).is_some() {
@@ -126,10 +124,10 @@ impl Finalize {
         let peers = public_configs
             .iter()
             .filter(|config| {
-                get_consensus_key(config) != secret_config.keys.consensus_pk()
+                Self::get_consensus_key(config).unwrap() != secret_config.keys.consensus_pk()
             })
             .map(|config| ConnectInfo {
-                public_key: get_consensus_key(config),
+                public_key: Self::get_consensus_key(config).unwrap(),
                 address: secret_config.external_address.clone(),
             })
             .collect();
@@ -157,9 +155,12 @@ impl ExonumCommand for Finalize {
 
         let validators_count = common.general.validators_count as usize;
 
-        if validators_count != public_configs.len() {
-            bail!("The number of validators does not match the number of validators keys.");
-        }
+        ensure!(
+            validators_count == public_configs.len(),
+            "The number of validators ({}) does not match the number of validators keys ({}).",
+            validators_count,
+            public_configs.len()
+        );
 
         let consensus = ConsensusConfig {
             validator_keys: public_configs
