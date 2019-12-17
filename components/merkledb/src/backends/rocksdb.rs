@@ -97,12 +97,12 @@ impl RocksDB {
         Ok(db)
     }
 
-    /// Creates checkpoint of this database in the given directory. (see [RocksDb docs][1] for
-    /// details).
+    /// Creates checkpoint of this database in the given directory. see [RocksDB docs] for
+    /// details.
     ///
     /// Successfully created checkpoint can be opened using `RocksDB::open`.
     ///
-    /// [1]: https://github.com/facebook/rocksdb/wiki/Checkpoints
+    /// [RocksDB docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
         let checkpoint = Checkpoint::new(&*self.db)?;
         checkpoint.create_checkpoint(path)?;
