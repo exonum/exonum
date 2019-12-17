@@ -58,7 +58,10 @@ pub enum Actuality {
     /// Endpoint is not recommended to use, the support of it will end soon.
     /// Contains optional value denoting the endpoint expiration date, and
     /// optional additional description.
-    Deprecated(Option<DateTime<Utc>>, Option<String>),
+    Deprecated {
+        deprecates_on: Option<DateTime<Utc>>,
+        description: Option<String>,
+    },
 }
 
 /// Wrapper over an endpoint handler, which marks it as deprecated.
@@ -129,7 +132,10 @@ impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F>
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,
-            actuality: Actuality::Deprecated(deprecated.deprecates_on, deprecated.description),
+            actuality: Actuality::Deprecated {
+                deprecates_on: deprecated.deprecates_on,
+                description: deprecated.description,
+            },
             _query_type: PhantomData,
             _item_type: PhantomData,
             _result_type: PhantomData,

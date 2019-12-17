@@ -148,11 +148,15 @@ impl ResponseError for api::Error {
 fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpResponse {
     let mut response = HttpResponse::Ok();
 
-    if let Actuality::Deprecated(ref discontinued_on, ref description) = actuality {
+    if let Actuality::Deprecated {
+        ref deprecates_on,
+        ref description,
+    } = actuality
+    {
         // There is a proposal for creating special deprecation header within HTTP,
         // but currently it's only a draft. So the conventional way to notify API user
         // about endpoint deprecation is setting the `Warning` header.
-        let expiration_note = match discontinued_on {
+        let expiration_note = match deprecates_on {
             // Date is formatted according to HTTP-date format.
             Some(date) => format!(
                 "The old API is maintained until {}.",
@@ -555,7 +559,13 @@ mod tests {
         let actual_response = json_response(Actuality::Actual, 123);
         assert_responses_eq(actual_response, HttpResponse::Ok().json(123));
 
-        let deprecated_response_no_deadline = json_response(Actuality::Deprecated(None, None), 123);
+        let deprecated_response_no_deadline = json_response(
+            Actuality::Deprecated {
+                deprecates_on: None,
+                description: None,
+            },
+            123,
+        );
         let expected_warning_text =
             "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
@@ -569,8 +579,13 @@ mod tests {
         );
 
         let description = "Docs can be found on docs.rs".to_owned();
-        let deprecated_response_with_description =
-            json_response(Actuality::Deprecated(None, Some(description)), 123);
+        let deprecated_response_with_description = json_response(
+            Actuality::Deprecated {
+                deprecates_on: None,
+                description: Some(description),
+            },
+            123,
+        );
         let expected_warning_text =
             "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
@@ -586,8 +601,13 @@ mod tests {
 
         let deadline = chrono::Utc.ymd(2020, 12, 31).and_hms(23, 59, 59);
 
-        let deprecated_response_deadline =
-            json_response(Actuality::Deprecated(Some(deadline), None), 123);
+        let deprecated_response_deadline = json_response(
+            Actuality::Deprecated {
+                deprecates_on: Some(deadline),
+                description: None,
+            },
+            123,
+        );
         let expected_warning_text =
             "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
