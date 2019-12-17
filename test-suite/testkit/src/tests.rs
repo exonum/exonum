@@ -15,7 +15,6 @@
 use crate::{proto, TestKit, TestKitApi, TestKitBuilder};
 use exonum::{
     crypto::gen_keypair,
-    explorer::CommittedTransaction,
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
