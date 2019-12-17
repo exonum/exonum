@@ -97,7 +97,7 @@ impl RocksDB {
         Ok(db)
     }
 
-    /// Creates checkpoint of this database in the given directory. see [RocksDB docs] for
+    /// Creates checkpoint of this database in the given directory. See [RocksDB docs] for
     /// details.
     ///
     /// Successfully created checkpoint can be opened using `RocksDB::open`.
