@@ -307,8 +307,12 @@ impl TxResultCheckInterface for TxResultCheckService {
 impl Service for TxResultCheckService {}
 
 fn assert_service_execute(blockchain: &mut BlockchainMut) {
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
+    let (_, patch) = blockchain.create_patch(
+        ValidatorId::zero().into(),
+        Height(1),
+        &[],
+        &mut BTreeMap::new(),
+    );
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
     let index = snapshot.get_list("service_good.val");
@@ -319,8 +323,12 @@ fn assert_service_execute(blockchain: &mut BlockchainMut) {
 }
 
 fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height(1), &[], &mut BTreeMap::new());
+    let (_, patch) = blockchain.create_patch(
+        ValidatorId::zero().into(),
+        Height(1),
+        &[],
+        &mut BTreeMap::new(),
+    );
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
     assert!(snapshot
@@ -344,7 +352,7 @@ fn execute_transaction(
         .unwrap();
 
     let (block_hash, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
+        ValidatorId::zero().into(),
         Height::zero(),
         &[tx_hash],
         &mut BTreeMap::new(),
@@ -527,7 +535,7 @@ fn handling_tx_panic_error() {
     blockchain.merge(fork.into_patch()).unwrap();
 
     let (_, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
+        ValidatorId::zero().into(),
         Height::zero(),
         &[
             tx_ok1.object_hash(),
@@ -585,7 +593,7 @@ fn handling_tx_panic_storage_error() {
     schema.add_transaction_into_pool(tx_storage_error.clone());
     blockchain.merge(fork.into_patch()).unwrap();
     blockchain.create_patch(
-        ValidatorId::zero(),
+        ValidatorId::zero().into(),
         Height::zero(),
         &[
             tx_ok1.object_hash(),
@@ -667,7 +675,7 @@ fn error_discards_transaction_changes() {
         blockchain.merge(fork.into_patch()).unwrap();
 
         let (_, patch) = blockchain.create_patch(
-            ValidatorId::zero(),
+            ValidatorId::zero().into(),
             Height(index),
             &[hash],
             &mut BTreeMap::new(),

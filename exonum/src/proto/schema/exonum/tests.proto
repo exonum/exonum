@@ -103,3 +103,13 @@ message TestFixedArrays {
   bytes fixed_array_16 = 2;
   bytes fixed_array_32 = 3;
 }
+
+message TestServiceInfo {
+  uint32 instance_id = 1;
+  uint32 runtime_id = 2;
+  string name = 3;
+}
+
+message TestActiveServices {
+  repeated TestServiceInfo services = 1;
+}

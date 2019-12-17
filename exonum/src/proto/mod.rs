@@ -16,6 +16,7 @@
 
 use failure::Error;
 
+pub use self::ordered_map::OrderedMap;
 pub use self::schema::{
     blockchain::{Block, CallInBlock, TxLocation},
     consensus::{
@@ -25,9 +26,11 @@ pub use self::schema::{
     },
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
+
 use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
 
+mod ordered_map;
 pub mod schema;
 
 #[cfg(test)]
