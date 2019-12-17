@@ -40,12 +40,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
+
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
 - New `blockchain::Schema` method `next_height` was added as a non-panicking
   alternative to `height`. (#1619)
 - New method `in_genesis_block` was added to the `CallContext` to check if the service
   hook is being executed for the genesis block. (#1619)
+
+- New `api::Error` variants were added: `Gone` and `MovedPermanently`. (#1607)
+
+- API endpoints are now can be marked as deprecated. (#1607)
 
 #### exonum-merkledb
 

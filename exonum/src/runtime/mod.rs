@@ -692,3 +692,9 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
         (descriptor.id, descriptor.name.to_owned())
     }
 }
+
+impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
+    fn from((id, name): (InstanceId, &'a str)) -> Self {
+        InstanceDescriptor { id, name }
+    }
+}
