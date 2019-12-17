@@ -16,7 +16,7 @@
 
 use exonum::runtime::{
     rust::{CallContext, ChildAuthorization},
-    AnyTx, ExecutionError, InstanceStatus,
+    AnyTx, DispatcherError, ExecutionError, InstanceStatus,
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -28,14 +28,10 @@ use crate::{proto, MiddlewareService};
 /// Errors of the `MiddlewareService`.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
 pub enum Error {
-    /// The service instance targeted by the checked call does not exist.
-    NoService = 0,
-    /// The service instance targeted by the checked call is not active.
-    ServiceIsNotActive = 1,
     /// The called service instance has an unexpected artifact.
-    ArtifactMismatch = 2,
+    ArtifactMismatch = 0,
     /// The called service instance has an unsupported version.
-    VersionMismatch = 3,
+    VersionMismatch = 1,
 }
 
 /// Checked call to the service.
@@ -130,9 +126,9 @@ impl UtilsInterface for MiddlewareService {
         let dispatcher_schema = context.data().for_dispatcher();
         let state = dispatcher_schema
             .get_instance(instance_id)
-            .ok_or(Error::NoService)?;
+            .ok_or(DispatcherError::IncorrectInstanceId)?;
         if state.status != InstanceStatus::Active {
-            return Err(Error::ServiceIsNotActive.into());
+            return Err(DispatcherError::ServiceNotStarted.into());
         }
 
         let artifact = &state.spec.artifact;

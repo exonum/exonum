@@ -106,7 +106,10 @@ fn checked_call_for_non_existing_service() {
 
     let block = testkit.create_block_with_transaction(checked_call);
     let err = block[0].status().unwrap_err();
-    assert_eq!(*err, ErrorMatch::from_fail(&TxError::NoService));
+    assert_eq!(
+        *err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
 }
 
 #[test]
