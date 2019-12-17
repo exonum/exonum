@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Utility service providing ways to compose transactions from the simpler building blocks.
+//! Middleware service providing ways to compose transactions from the simpler building blocks.
 //!
 //! # Functionality overview
 //!
@@ -29,8 +29,8 @@
 //! the `services` endpoint of the node HTTP API), using checked calls is most failsafe; by design,
 //! it cannot suffer from [TOCTOU] issues. It does impose a certain overhead on the execution, though.
 //!
-//! [Batching]: trait.UtilsInterface.html#tymethod.batch
-//! [Checked call]: trait.UtilsInterface.html#tymethod.checked_call
+//! [Batching]: trait.MiddlewareInterface.html#tymethod.batch
+//! [Checked call]: trait.MiddlewareInterface.html#tymethod.checked_call
 //! [TOCTOU]: https://en.wikipedia.org/wiki/Time-of-check_to_time-of-use
 
 #![deny(
@@ -40,7 +40,7 @@
     missing_debug_implementations
 )]
 
-pub use self::transactions::{Batch, CheckedCall, Error, UtilsInterface};
+pub use self::transactions::{Batch, CheckedCall, Error, MiddlewareInterface};
 
 pub mod proto;
 mod transactions;
@@ -53,7 +53,7 @@ use exonum_derive::*;
 
 /// Middleware service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("UtilsInterface"))]
+#[service_dispatcher(implements("MiddlewareInterface"))]
 #[service_factory(proto_sources = "proto")]
 pub struct MiddlewareService;
 

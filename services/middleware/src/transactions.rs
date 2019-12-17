@@ -84,7 +84,7 @@ impl Batch {
 
 /// Transactional interface of the utilities service.
 #[exonum_interface]
-pub trait UtilsInterface {
+pub trait MiddlewareInterface {
     /// Performs a checked call to the service. The call is dispatched only if the version
     /// of the service matches the version requirement mentioned in the call.
     ///
@@ -108,7 +108,7 @@ pub trait UtilsInterface {
     fn batch(&self, context: CallContext<'_>, arg: Batch) -> Result<(), ExecutionError>;
 }
 
-impl UtilsInterface for MiddlewareService {
+impl MiddlewareInterface for MiddlewareService {
     fn checked_call(
         &self,
         mut context: CallContext<'_>,
@@ -133,6 +133,7 @@ impl UtilsInterface for MiddlewareService {
 
         context
             .call_context(instance_id, ChildAuthorization::Fallthrough)?
+            // TODO: use interface name from `call_info` once it's added there
             .call("", arg.inner.call_info.method_id, arg.inner.arguments)
     }
 

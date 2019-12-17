@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package exonum.service.utils;
+package exonum.service.middleware;
 
 import "runtime.proto";
 
