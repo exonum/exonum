@@ -652,41 +652,72 @@ where
     }
 }
 
+/// `object_hash` for a list depends on all list items. It explicitly commits to the list length
+/// in order to be able to more easily prove absence of elements and to prevent second preimage
+/// attacks.
+///
+/// # Specification
+///
+/// The `object_hash` is calculated as follows:
+///
+/// ```text
+/// h = sha-256( HashTag::ListNode || len as u64 || merkle_root )
+/// ```
+///
+/// In particular, for an empty list
+///
+/// ```text
+/// h = sha-256( HashTag::ListNode || 0 || Hash::zero() )
+/// ```
+///
+/// Here, `merkle_root` is defined recursively based on the binary Merkle tree corresponding
+/// to the list. The tree is built so that left children at each level are filled up first,
+/// and the depth of each leaf node is the same. For example, here's the structure of a tree
+/// with 6 leaves:
+///
+/// ```text
+///       root (0..6)
+///      /        \
+///    0..4      4..6
+///   /    \       |
+/// 0..2  2..4   4..6
+/// /  \  /  \   /  \
+/// 0  1  2  3   4  5
+/// ```
+///
+/// For branch nodes of the tree,
+///
+/// ```text
+/// node_hash = sha-256( HashTag::ListBranchNode || left_hash || right_hash? )
+/// ```
+///
+/// where `left_hash` is the hash of the left child and `right_hash` is the optional hash
+/// of the right child, which may be absent if the tree is not balanced.
+///
+/// For leaves, the hash is `object_hash` of the corresponding object.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{
+/// #     access::AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash,
+/// # };
+/// # use exonum_crypto::Hash;
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let mut index = fork.get_proof_list("name");
+///
+/// let default_hash = index.object_hash();
+/// assert_eq!(HashTag::empty_list_hash(), default_hash);
+/// index.push(1);
+/// let hash = index.object_hash();
+/// assert_ne!(hash, default_hash);
+/// ```
 impl<T, V> ObjectHash for ProofListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
-    /// Returns a list hash of the proof list or a hash value of the empty list.
-    ///
-    /// List hash is calculated as follows:
-    ///
-    /// ```text
-    /// h = sha-256( HashTag::List || len as u64 || merkle_root )
-    /// ```
-    ///
-    /// Empty list hash:
-    ///
-    /// ```text
-    /// h = sha-256( HashTag::List || 0 || Hash::default() )
-    /// ```
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let mut index = fork.get_proof_list("name");
-    ///
-    /// let default_hash = index.object_hash();
-    /// assert_eq!(HashTag::empty_list_hash(), default_hash);
-    /// index.push(1);
-    /// let hash = index.object_hash();
-    /// assert_ne!(hash, default_hash);
-    /// ```
     fn object_hash(&self) -> Hash {
         HashTag::hash_list_node(self.len(), self.merkle_root())
     }
