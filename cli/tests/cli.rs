@@ -602,7 +602,7 @@ fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failu
     let generate_template = GenerateTemplate {
         common_config: common_config_path.clone(),
         validators_count: 1,
-        supervisor_mode: supervisor_mode,
+        supervisor_mode,
     };
     generate_template.execute()?;
 
