@@ -14,8 +14,9 @@
 
 //! The current runtime is for running native services written in Rust.
 //!
-//! In the Rust runtime a set of service artifacts that you want to deploy is static. The set is defined at the time
-//! of compilation. Once the set is created, you can change it only by the node binary recompilation.
+//! In the Rust runtime a set of service artifacts that you may want to deploy is static. The set
+//! is defined at the time of compilation. Once the set is created, you can change it only by
+//! the node binary recompilation.
 //!
 //! Beware of removing artifacts from the Rust runtime. An attempt to remove an artifact
 //! from an instance that is already running can cause the blockchain to break. It is only safe
@@ -63,8 +64,6 @@
 //!
 //! // Define a transaction interface for your service by creating a `Transactions` trait with
 //! // the following attribute and method signatures.
-//! // This attribute implements the `Interface` trait for the `Transactions` trait and a `Transaction`
-//! // trait for each method argument.
 //! #[exonum_interface]
 //! pub trait Transactions {
 //!     // Each method of the trait should have a signature of the following format. The argument
@@ -450,7 +449,7 @@ impl Runtime for RustRuntime {
         self.blockchain = Some(blockchain.clone());
     }
 
-    // Propagate changes in the services immediately after initialization.
+    // Propagates changes in the services immediately after initialization.
     fn on_resume(&mut self) {
         self.push_api_changes();
     }

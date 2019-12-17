@@ -21,8 +21,8 @@
 //!
 //! # Artifacts
 //!
-//! Each runtime has its own [artifacts] registry. Users can create services from the stored artifacts.
-//! An artifact identifier is required by the runtime to construct service instances.
+//! Each runtime has its own [artifacts] registry. Users can create services from the stored
+//! artifacts. An artifact identifier is required by the runtime to construct service instances.
 //! In other words, an artifact identifier is similar to a class name, and a specific
 //! service instance - to a class instance. A single artifact may be used to instantiate
 //! zero or more services.
@@ -44,7 +44,8 @@
 //! 3. For each node, an artifact may be deployed either asynchronously or synchronously, that is
 //!   in a blocking manner. The supervisor usually first commands a node to deploy the artifact
 //!   asynchronously via [`Mailbox`], once the decision to start deployment is reached
-//!   by the blockchain administrators. Asynchronous deployment speed and outcome may differ among nodes.
+//!   by the blockchain administrators. Asynchronous deployment speed and outcome may differ among
+//!   nodes.
 //!
 //! 4. The supervisor translates the local deployment outcomes into a consensus-agreed result.
 //!   For example, the supervisor may collect confirmations from the validator nodes that have
@@ -81,17 +82,12 @@
 //!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
-//! Warning: the services, instantiated within a block, do not affect the state hash of that block. The
-//! only exception is the genesis block. The object hashes of the built-in services are included
-//! into the resulting state hash of the genesis block. This behavior difference will be unified in
-//! the following release.
-//!
 //! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
 //! # Transaction Lifecycle
 //!
 //! 1. An Exonum client creates a transaction message which includes two parts. The first part is
-//!   the [`CallInfo`] information about the corresponding method to call. The second part is the
+//!   the [`CallInfo`] - information about a method to call. The second part is the
 //!   serialized method parameters as a payload.
 //!   The client then signs the message using the Ed25519 signature system.
 //!
@@ -115,7 +111,7 @@
 //! allows deploying artifacts and instantiating new services after the blockchain is launched
 //! and running. Other than that, it looks like an ordinary service.
 //! To enable adding new artifacts / services to the blockchain after its start, the supervisor
-//! must be present in the system binary file during the blockchain start.
+//! must be one of the builtin service instances.
 //!
 //! The supervisor service is distinguished by its numerical ID, which must be set
 //! to [`SUPERVISOR_INSTANCE_ID`]. Services may assume that transactions originating from
@@ -193,8 +189,8 @@ impl From<RuntimeIdentifier> for u32 {
 /// Using this trait, you can extend the Exonum blockchain with the services written in
 /// different languages. It assumes that the deployment procedure of a new service may be
 /// complex and long and even may fail. Therefore, an additional entity is introduced - *artifacts*.
-/// Each artifact has a unique identifier. Depending on the runtime, an artifact may have an additional
-/// specification required for its deployment; e.g., files to be compiled.
+/// Each artifact has a unique identifier. Depending on the runtime, an artifact may have an
+/// additional specification required for its deployment; e.g., files to be compiled.
 /// An artifact creates corresponding service instances similar to classes in object-oriented
 /// programming.
 ///
@@ -216,7 +212,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Consensus and Local Methods
 ///
-/// The following methods should return the same result if they contain the same arguments for all
+/// The following methods should return the same result if provided arguments the same for all
 /// the nodes in the blockchain network:
 ///
 /// - `before_transactions`
@@ -232,22 +228,22 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// # Handling Panics
 ///
-/// Panics in the `Runtime` methods are **not** caught. A panic in the runtime method will cause the node termination.
-/// To catch panics in the Rust code and convert them to unchecked execution errors, use the
-/// [`catch_panic`](error/fn.catch_panic.html) method.
+/// Panics in the `Runtime` methods are **not** caught. A panic in the runtime method will cause
+/// the node termination. To catch panics in the Rust code and convert them to unchecked execution
+/// errors, use the [`catch_panic`](error/fn.catch_panic.html) method.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
     ///
-    /// Calling this method always takes place before calling any other `Runtime` methods. The `initialize`
-    ///  method is called *exactly once* during the `Runtime` lifetime.
+    /// Calling this method always takes place before calling any other `Runtime` methods.
+    /// The `initialize` method is called *exactly once* during the `Runtime` lifetime.
     ///
     /// The default implementation does nothing.
     fn initialize(&mut self, blockchain: &Blockchain) {}
 
     /// Notifies the runtime that the dispatcher has completed re-initialization after the
-    /// node restart. Re-initialization includes restoring the deployed artifacts / started service instances
-    /// for all the runtimes.
+    /// node restart. Re-initialization includes restoring the deployed artifacts / started service
+    /// instances for all the runtimes.
     ///
     /// This method is called *maximum once* during the `Runtime` lifetime. To call the method,
     /// the blockchain must have a genesis block when the node is started. The blockchain state
@@ -256,7 +252,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The default implementation does nothing.
     fn on_resume(&mut self) {}
 
-    /// A request to deploy an artifact with the given identifier and an additional deploy specification.
+    /// A request to deploy an artifact with the given identifier and an additional deploy
+    /// specification.
     ///
     /// This method is called *once* for a specific artifact during the `Runtime` lifetime:
     ///
@@ -278,40 +275,37 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// check for dependencies, etc.
     ///
     /// The constructor runs *exactly once* during the blockchain lifetime for each successfully
-    /// initialized service instance. That is to say, the constructor is *not* called on a node restart.
+    /// initialized service instance. That is to say, the constructor is *not* called on a node
+    /// restart.
     ///
     /// At the same time, when `start_adding_service` is called,
-    /// there is no guarantee that the service will eventually get to the blockchain via `commit_service`.
-    /// If the consensus accepts an alternative block proposal without the service inside,
-    /// commit of the service will fail.
-
+    /// there is no guarantee that the service will eventually get to the blockchain via
+    /// `commit_service`. The consensus may accept an alternative block proposal, in which
+    /// the service is not instantiated or instantiated with different parameters.
+    ///
     /// The `commit_service` call always takes place
     /// in the closest committed block, i.e., before the nearest `Runtime::after_commit()`.
     /// The dispatcher routes transactions and `before_transactions` / `after_transactions`
-    /// events to the service only after `commit_service()` is called with the same instance specification.
+    /// events to the service only after `commit_service()` is called with the same instance
+    /// specification.
     ///
     /// The runtime should discard the instantiated service instance after completing this method.
-    /// Otherwise, if the service is successfully committed in the block, it will duplicate the one instantiated
-    /// in the runtime. There may be compelling reasons for the runtime to retain the instantiated
-    /// service. For example, if creating an instance takes very long time.
+    /// Otherwise, if the service is successfully committed in the block, it will duplicate the one
+    /// instantiated in the runtime. There may be compelling reasons for the runtime to retain
+    /// the instantiated service. For example, if creating an instance takes very long time.
     /// In this case, the "garbage" services may be removed from the runtime in `after_commit`
     /// because of the time dependence between `commit_service` and `after_commit` described above.
     ///
-    /// According to the principle of the consensus algorithm, the process of forming a new block
-    /// takes place in RAM. A patch with changes is then applied to the database. If a block proposal
-    /// is not accepted, a fork with the patch containing this proposal is discarded from RAM.
-    /// The service instances, already discarded by the runtime, persist their state only in the
-    /// patch of changes in RAM. Thus, if the fork with this patch is discarded, no further action
-    /// is required to remove the new state.
-    ///
-    /// The runtime should commit long-term resources for the service only after the `commit_service()` call.
-    /// In other words, the runtime must be sure that the service has been committed to the blockchain.
+    /// The runtime should commit long-term resources for the service only after the
+    /// `commit_service()` call. In other words, the runtime must be sure that the service
+    /// has been committed to the blockchain.
     ///
     /// # Return Value
     ///
     /// Returning an error is a signal of `Runtime` that the
-    /// service instantiation has failed. As a rule of a thumb, changes made by the `start_adding_service` method
-    /// will be rolled back after such a signal. The exact logic of the rollback is determined by the supervisor.
+    /// service instantiation has failed. As a rule of a thumb, changes made by the
+    /// `start_adding_service` method will be rolled back after such a signal. The exact logic of
+    /// the rollback is determined by the supervisor.
     ///
     /// An error is one of the expected / handled outcomes of the service instantiation procedure.
     /// Thus, verifying prerequisites
@@ -332,9 +326,9 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///   `start_adding_service()` call is committed.
     /// - After a node restart, the method is called for all existing service instances.
     ///
-    /// Calling this method guarantees that `start_adding_service()` has been called with the same `spec`
-    /// already and returned `Ok(())`. The results of the call (i.e., changes to the blockchain state)
-    /// will be persisted from the call.
+    /// Invocation of this method guarantees that `start_adding_service()` has been called with
+    /// the same `spec` already and returned `Ok(())`. The results of the call (i.e., changes
+    /// to the blockchain state) will be persisted from the call.
     ///
     /// # Arguments
     ///
@@ -359,8 +353,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// the root cause of the error and recover the node(s) by eliminating the cause.
     ///
     /// This error / panic must not be common to all nodes in the network.
-    /// The errors common for the whole network should be produced during the preceding `start_adding_service`
-    /// call.
+    /// The errors common for the whole network should be produced during the preceding
+    /// `start_adding_service` call.
     fn commit_service(
         &mut self,
         snapshot: &dyn Snapshot,
@@ -400,8 +394,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 
-    /// Notifies a service stored in the present runtime about the beginning of the block. Allows the service
-    /// to modify the blockchain state before any transaction in the block is processed.
+    /// Notifies a service stored in the present runtime about the beginning of the block. Allows
+    /// the service to modify the blockchain state before any transaction in the block is processed.
     ///
     /// `before_transactions` is called for every service active at the beginning of the block
     /// exactly once for each block. Services that will be instantiated within the block do **not**
@@ -441,7 +435,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// A block is not yet persisted when this method is called. The `snapshot` provides an up-to-date
     /// block information. It corresponds exactly to the information
-    /// eventually persisted. This means that no modifying operations are performed on the block.
+    /// eventually persisted.
     ///
     /// `mailbox` is used to send async commands to the dispatcher. This mechanism is used, e.g.,
     /// by the supervisor service to enqueue artifact deployment. A runtime may ignore `mailbox`
