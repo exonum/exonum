@@ -412,8 +412,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// `after_transactions` is called for every service active at the beginning of the block
     /// (i.e., services instantiated within the block do **not** receive a call) exactly
     /// once for each block.
-    /// Note that services instantiated within genesis block are activated **immediately** and
-    /// thus `after_transactions` is invoked for them.
+    /// Services instantiated within genesis block are activated **immediately** and
+    /// thus `after_transactions` is invoked for them in the genesis block.
     ///
     /// # Return value
     ///

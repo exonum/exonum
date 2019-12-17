@@ -497,11 +497,8 @@ fn after_transactions_failure_causes_genesis_failure() {
         .expect_err("Blockchain shouldn't be created after failure within genesis block");
 
     // Unfortunately, `failure::Error` doesn't implement `PartialEq`, so we have to string-compare them.
-    let error_string = format!("{}", actual_err);
-
-    assert_eq!(
-        error_string.contains(EXPECTED_ERR_TEXT),
-        true,
+    assert!(
+        actual_err.to_string().contains(EXPECTED_ERR_TEXT),
         "Expected error should be caused by `after_transactions` hook"
     );
 }
