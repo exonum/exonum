@@ -27,7 +27,7 @@ Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:demo
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:v0.13.0-rc.2
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
@@ -86,12 +86,11 @@ exonum-cryptocurrency-advanced generate-config example/common.toml  example/3 --
 exonum-cryptocurrency-advanced generate-config example/common.toml  example/4 --peer-address 127.0.0.1:6334 -n
 ```
 
-Note that in case of copying files with consensus and service keys to the other machines, you must change the access permissions of these files for every machine.
+Note that in case of copying file with master key to the other machines, you must change the access permissions of this file for every machine.
 For example:
 
 ```sh
-sudo chmod 600 consensus.toml
-sudo chmod 600 service.toml
+sudo chmod 600 master.key.toml
 ```
 
 Finalize configs:

@@ -584,4 +584,29 @@ mod tests {
         let list: ListIndex<_, u32> = fork.readonly().get_list(IDX_NAME);
         assert!(list.is_empty());
     }
+
+    #[test]
+    fn after_clearing_and_flushing() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut list = fork.get_list::<_, u32>(IDX_NAME);
+            list.extend(vec![1, 2]);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+        {
+            let mut list = fork.get_list::<_, u32>(IDX_NAME);
+            list.clear();
+            list.push(3);
+        }
+        fork.flush();
+
+        let list = fork.get_list::<_, u32>(IDX_NAME);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list.get(0), Some(3));
+        assert_eq!(list.get(1), None);
+        assert_eq!(list.iter().collect::<Vec<_>>(), vec![3]);
+    }
 }

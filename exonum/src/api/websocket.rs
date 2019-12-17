@@ -49,7 +49,8 @@ enum IncomingMessage {
 }
 
 /// Subscription type (new blocks or committed transactions).
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum SubscriptionType {
     /// Subscription to nothing.
@@ -65,7 +66,8 @@ pub enum SubscriptionType {
 
 /// Describe filter for transactions by ID of service and (optionally)
 /// transaction type in service.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
 pub struct TransactionFilter {
     /// ID of service.
     pub service_id: u16,
@@ -344,6 +346,7 @@ impl Handler<Broadcast> for Server {
 impl Handler<Transaction> for Server {
     type Result = Result<TransactionResponse, failure::Error>;
 
+    /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(
         &mut self,
         Transaction { tx }: Transaction,
@@ -351,11 +354,11 @@ impl Handler<Transaction> for Server {
     ) -> Self::Result {
         let msg = SignedMessage::from_hex(tx)?;
         let tx_hash = msg.object_hash();
+        let verified = msg.into_verified()?;
+        Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
+
         // FIXME Don't ignore message error.
-        let _ = self
-            .blockchain
-            .sender()
-            .broadcast_transaction(msg.into_verified()?);
+        let _ = self.blockchain.sender().broadcast_transaction(verified);
         Ok(TransactionResponse { tx_hash })
     }
 }

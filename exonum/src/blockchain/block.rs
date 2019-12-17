@@ -30,19 +30,9 @@ use crate::{
 ///
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
-#[derive(
-    Clone,
-    PartialEq,
-    Eq,
-    Ord,
-    PartialOrd,
-    Debug,
-    Serialize,
-    Deserialize,
-    ProtobufConvert,
-    BinaryValue,
-    ObjectHash,
-)]
+#[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Block")]
 pub struct Block {
     /// Identifier of the leader node which has proposed the block.

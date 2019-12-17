@@ -62,9 +62,9 @@ define_names!(
 /// Transaction location in a block.
 /// The given entity defines the block where the transaction was
 /// included and the position of this transaction in that block.
-#[derive(
-    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, ProtobufConvert, BinaryValue, ObjectHash,
-)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.

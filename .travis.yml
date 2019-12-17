@@ -13,6 +13,7 @@ addons:
     sources:
     - sourceline: 'ppa:maarten-fonville/protobuf'
     - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
+    - sourceline: 'ppa:exonum/rocksdb'
     - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/18.04/prod bionic main'
       key_url: https://packages.microsoft.com/keys/microsoft.asc
     packages:
@@ -26,7 +27,7 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb-dev
+    - librocksdb6.2
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
@@ -161,9 +162,9 @@ jobs:
     - nvm install 8 && nvm use 8
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
+    - cargo build --manifest-path $TRAVIS_BUILD_DIR/examples/cryptocurrency/Cargo.toml --example demo
     script:
     - python3 -m exonum_tests -v
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency && cargo build --example demo
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
     - cd $TRAVIS_BUILD_DIR

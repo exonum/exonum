@@ -1,0 +1,3 @@
+syntax = "proto3";
+package exonum.testkit;
+message TxMessage { string message = 1; }

@@ -20,15 +20,16 @@ use std::{
     mem,
     ops::{Bound, Deref, DerefMut},
     rc::Rc,
+    result::Result as StdResult,
 };
 
 use crate::{
-    views::{get_object_hash, AsReadonly, RawAccess, ResolvedAddress, View},
+    views::{get_object_hash, AsReadonly, ChangesIter, RawAccess, ResolvedAddress, View},
     Error, Result, SystemSchema,
 };
 
 /// Changes related to a specific `View`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct ViewChanges {
     /// Changes within the view.
     pub(super) data: BTreeMap<Vec<u8>, Change>,
@@ -42,11 +43,7 @@ pub struct ViewChanges {
 
 impl ViewChanges {
     fn new() -> Self {
-        Self {
-            data: BTreeMap::new(),
-            is_cleared: false,
-            is_aggregated: false,
-        }
+        Self::default()
     }
 
     pub fn is_cleared(&self) -> bool {
@@ -69,6 +66,37 @@ impl ViewChanges {
 
     pub fn into_data(self) -> BTreeMap<Vec<u8>, Change> {
         self.data
+    }
+
+    /// Returns a value for the specified key, or an `Err(_)` if the value should be determined
+    /// by the underlying snapshot.
+    pub fn get(&self, key: &[u8]) -> StdResult<Option<Vec<u8>>, ()> {
+        if let Some(change) = self.data.get(key) {
+            return Ok(match *change {
+                Change::Put(ref v) => Some(v.clone()),
+                Change::Delete => None,
+            });
+        }
+        if self.is_cleared() {
+            return Ok(None);
+        }
+        Err(())
+    }
+
+    /// Returns whether the view contains the specified `key`. An `Err(_)` is returned if this
+    /// is determined by the underlying snapshot.
+    pub fn contains(&self, key: &[u8]) -> StdResult<bool, ()> {
+        if let Some(change) = self.data.get(key) {
+            return Ok(match *change {
+                Change::Put(..) => true,
+                Change::Delete => false,
+            });
+        }
+
+        if self.is_cleared() {
+            return Ok(false);
+        }
+        Err(())
     }
 }
 
@@ -546,40 +574,36 @@ impl Patch {
 
 impl Snapshot for Patch {
     fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.changes.get(name) {
-            if let Some(change) = changes.data.get(key) {
-                match *change {
-                    Change::Put(ref v) => return Some(v.clone()),
-                    Change::Delete => return None,
-                }
-            }
-        }
-        self.snapshot.get(name, key)
+        self.changes
+            .get(name)
+            .map_or(Err(()), |changes| changes.get(key))
+            // At this point, `Err(_)` signifies that we need to retrieve data from the snapshot.
+            .unwrap_or_else(|()| self.snapshot.get(name, key))
     }
 
     fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
-        if let Some(changes) = self.changes.get(name) {
-            if let Some(change) = changes.data.get(key) {
-                match *change {
-                    Change::Put(..) => return true,
-                    Change::Delete => return false,
-                }
-            }
-        }
-        self.snapshot.contains(name, key)
+        self.changes
+            .get(name)
+            .map_or(Err(()), |changes| changes.contains(key))
+            // At this point, `Err(_)` signifies that we need to retrieve data from the snapshot.
+            .unwrap_or_else(|()| self.snapshot.contains(name, key))
     }
 
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
-        let range = (Bound::Included(from), Bound::Unbounded);
-        let changes = match self.changes.get(name) {
-            Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
-            None => None,
-        };
+        let maybe_changes = self.changes.get(name);
+        let changes_iter = maybe_changes.map(|changes| {
+            changes
+                .data
+                .range::<[u8], _>((Bound::Included(from), Bound::Unbounded))
+        });
 
-        Box::new(ForkIter {
-            snapshot: self.snapshot.iter(name, from),
-            changes,
-        })
+        let is_cleared = maybe_changes.map_or(false, ViewChanges::is_cleared);
+        if is_cleared {
+            // Ignore all changes from the snapshot.
+            Box::new(ChangesIter::new(changes_iter.unwrap()))
+        } else {
+            Box::new(ForkIter::new(self.snapshot.iter(name, from), changes_iter))
+        }
     }
 }
 
