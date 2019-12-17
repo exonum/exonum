@@ -426,7 +426,7 @@ fn blockchain_height() {
 
     // Create one block.
     let (_, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
+        ValidatorId::zero().into(),
         Height::zero(),
         &[],
         &mut BTreeMap::new(),
