@@ -250,7 +250,7 @@ where
     fn create_multiproof(&self, keys: impl IntoIterator<Item = K::Owned>) -> MapProof<K::Owned, V, KeyMode> {
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
-//                let mut proof = MapProof::new();
+                let mut proof: MapProof<K::Owned, V, KeyMode> = MapProof::new();
 
                 let searched_paths = {
                     let mut keys: Vec<_> = keys
@@ -268,15 +268,15 @@ where
                 let mut contour = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
                 contour.push(ContourNode::new(root_path, root_branch));
 
-//                let mut last_searched_path: Option<ProofPath> = None;
-//                for (proof_path, key) in searched_paths {
-//                    if last_searched_path == Some(proof_path) {
-//                        // The key has already been looked up; skipping.
-//                        continue;
-//                    }
-//                    proof = proof.process_key(self, &mut contour, &proof_path, key);
-//                    last_searched_path = Some(proof_path);
-//                }
+                let mut last_searched_path: Option<ProofPath> = None;
+                for (proof_path, key) in searched_paths {
+                    if last_searched_path == Some(proof_path) {
+                        // The key has already been looked up; skipping.
+                        continue;
+                    }
+                    proof = proof.process_key(self, &mut contour, &proof_path, key);
+                    last_searched_path = Some(proof_path);
+                }
 //
 //                // Eject remaining entries from the contour
 //                while let Some(node) = contour.pop() {
