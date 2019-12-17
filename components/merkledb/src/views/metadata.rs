@@ -234,20 +234,17 @@ where
 
 impl IndexMetadata {
     /// Returns a `ResolvedAddress` corresponding to the `full_name` of an index. `min_name_len`
-    /// specifies the minimum known name part of the `full_name` (i.e., the part corresponding
-    /// to `ResolvedAddress.name`.
+    /// specifies the minimum known length of the name part of `full_name` (i.e., the part
+    /// corresponding to `ResolvedAddress.name`.
     #[allow(unsafe_code)]
     fn resolve_address(&self, full_name: &[u8], min_name_len: usize) -> (ResolvedAddress, bool) {
-        let mut cutoff_index = min_name_len;
-        let is_in_group = loop {
-            match full_name.get(cutoff_index) {
-                Some(0) => break true,
-                None => break false,
-                Some(_) => {
-                    cutoff_index += 1;
-                }
-            }
-        };
+        let (cutoff_index, is_in_group) = full_name[min_name_len..]
+            .iter()
+            .position(|&byte| byte == 0)
+            .map_or_else(
+                || (full_name.len(), false),
+                |pos| (pos + min_name_len, true),
+            );
 
         let name = if full_name[0] == b'^' {
             // The `^` initial char is not mapped to the resolved CF name.
@@ -387,9 +384,12 @@ impl<T: RawAccessMut> IndexesPool<T> {
     /// indicating whether the corresponding index was removed from aggregation (i.e., was
     /// aggregated and was not replaced by an aggregated index).
     pub(crate) fn flush_migration(&mut self, prefix: &str) -> Vec<(ResolvedAddress, bool)> {
-        let prefix = format!("^{}.", prefix);
+        let prefix = ["^", prefix, "."].concat();
+        // Minimum length of the name part for the original indexes, i.e., ones for which
+        // the name part of the address doesn't start with '^'. Since the '^' char is removed from
+        // the name, this length is one lesser than the length of the `prefix`.
+        let min_name_len = prefix.len() - 1;
 
-        // TODO: Collecting `moved_indexes` may be inefficient in terms of memory use.
         let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(&prefix).collect();
         let mut removed_addrs = Vec::new();
         for (key, metadata) in moved_indexes {
@@ -399,7 +399,7 @@ impl<T: RawAccessMut> IndexesPool<T> {
 
             if let Some(old_metadata) = self.0.get::<_, IndexMetadata>(migrated_key) {
                 let (resolved, is_in_group) =
-                    old_metadata.resolve_address(migrated_key, prefix.len() - 1);
+                    old_metadata.resolve_address(migrated_key, min_name_len);
                 let is_removed_from_aggregation = !is_in_group
                     && old_metadata.index_type.is_merkelized()
                     && !metadata.index_type.is_merkelized();
@@ -435,10 +435,14 @@ impl<T: RawAccessMut> IndexesPool<T> {
 }
 
 /// Obtains `object_hash` for an aggregated index.
-pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedAddress, is_migrated: bool) -> Hash {
+pub fn get_object_hash<T: RawAccess>(
+    access: T,
+    addr: ResolvedAddress,
+    is_in_migration: bool,
+) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
-    let index_full_name = if is_migrated {
+    let index_full_name = if is_in_migration {
         let mut name = Vec::with_capacity(1 + addr.name.len());
         name.push(b'^');
         name.extend_from_slice(addr.name.as_bytes());
@@ -663,5 +667,36 @@ mod tests {
                 .unwrap()
                 .view;
         assert!(!view.changes.is_aggregated());
+    }
+
+    #[test]
+    fn address_resolution() {
+        let metadata = IndexMetadata {
+            identifier: 1,
+            index_type: IndexType::List,
+            state: None,
+        };
+        {
+            let (addr, is_in_group) = metadata.resolve_address(b"some.list", 0);
+            assert_eq!(addr.name, "some.list");
+            assert_eq!(addr.id, NonZeroU64::new(1));
+            assert!(!is_in_group);
+        }
+        {
+            let (addr, is_in_group) = metadata.resolve_address(b"some.list", 9);
+            assert_eq!(addr.name, "some.list");
+            assert_eq!(addr.id, NonZeroU64::new(1));
+            assert!(!is_in_group);
+        }
+
+        let metadata = IndexMetadata {
+            identifier: 100,
+            index_type: IndexType::List,
+            state: None,
+        };
+        let (addr, is_in_group) = metadata.resolve_address(b"some.list\0key", 9);
+        assert_eq!(addr.name, "some.list");
+        assert_eq!(addr.id, NonZeroU64::new(100));
+        assert!(is_in_group);
     }
 }

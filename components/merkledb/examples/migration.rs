@@ -1,4 +1,28 @@
-//! Shows how to migrate database data.
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Shows how to migrate database data. The migration follows the following scenario:
+//!
+//! 1. We define the old data schema in the `v1` module and fill the database with some
+//!   random data.
+//! 2. We define the new data schema in the `v2` module.
+//! 3. We perform migration of the old data with the help of the `create_migration` method.
+//!   The method transforms the data in the old schema to conform to the new schema.
+//!   The old data is **not** removed at this stage; rather, it exists alongside
+//!   the migrated data. This is useful in case the migration needs to be reverted for some reason.
+//! 4. We complete the migration by calling `Fork::flush_migration`. This moves the migrated data
+//!   to its intended place and removes the old data marked for removal.
 
 use failure::Error;
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -148,7 +172,7 @@ mod v2 {
     }
 }
 
-fn migrate(new_data: Prefixed<&Fork>, old_data: Prefixed<ReadonlyFork>) {
+fn create_migration(new_data: Prefixed<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     println!("\nStarted migration");
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data.clone());
@@ -205,7 +229,7 @@ fn main() {
         println!("Before migration:");
         old_schema.print_wallets();
     }
-    migrate(new_data, old_data);
+    create_migration(new_data, old_data);
     db.merge(fork.into_patch()).unwrap();
 
     // For now, the old data is still present in the storage.

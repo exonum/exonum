@@ -25,15 +25,22 @@
 //! they are placed in a separate namespace, the aggregator and state hash for which can be
 //! obtained via respective [`SystemSchema`] methods.
 //!
-//! To finalize a migration, one needs to call [`Fork::finish_migration`]. This will replace
+//! It is possible to periodically persist migrated data to the database
+//! (indeed, this is a best practice to avoid out-of-memory errors). It is even possible
+//! to restart the process handling the migration, provided it can recover from such a restart
+//! on the application level.
+//!
+//! To finalize a migration, one needs to call [`Fork::flush_migration`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
-//! to the default state aggregator.
+//! to the default state aggregator. To roll back a migration, use [`Fork::rollback_migration`].
+//! This will remove the new index data and corresponding metadata.
 //!
 //! [`Prefixed`]: ../access/struct.Prefixed.html
 //! [`create_tombstone`]: ../access/trait.AccessExt.html#method.create_tombstone
 //! [aggregated]: ../index.html#state-aggregation
 //! [`SystemSchema`]: ../struct.SystemSchema.html
-//! [`Fork::finish_migration`]: ../struct.Fork.html#method.finish_migration
+//! [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
+//! [`Fork::rollback_migration`]: ../struct.Fork.html#method.rollback_migration
 //!
 //! # Examples
 //!
@@ -153,6 +160,11 @@ impl Migration {
 
     /// Merges the changes to the migrated data to the database. Returns an error
     /// if the merge has failed.
+    ///
+    /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
+    /// Use [`Fork::flush_migration`] to flush the migrated data.
+    ///
+    /// [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
     pub fn merge(&mut self) -> crate::Result<()> {
         let fork = mem::replace(&mut self.fork, self.db.fork());
         self.db.merge(fork.into_patch())?;
@@ -162,6 +174,11 @@ impl Migration {
 
     /// Merges the changes to the migrated data to the database.
     /// Returns hash representing migrated data state, or an error if the merge has failed.
+    ///
+    /// `finish` does not flush the migration; the migrated data remains in a separate namespace.
+    /// Use [`Fork::flush_migration`] to flush the migrated data.
+    ///
+    /// [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
     pub fn finish(self) -> crate::Result<Hash> {
         let patch = self.fork.into_patch();
         let hash = SystemSchema::new(&patch).namespace_state_hash(&self.namespace);

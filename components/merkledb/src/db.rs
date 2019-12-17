@@ -504,7 +504,7 @@ pub trait DatabaseExt: Database {
     ///
     /// Returns an error in the same situations as `Database::merge()`.
     fn merge_with_backup(&self, patch: Patch) -> Result<Patch> {
-        // FIXME: does this work with migrations?
+        // FIXME: does this work with migrations? (ECR-4005)
 
         let snapshot = self.snapshot();
         let changed_aggregated_addrs = patch.changed_aggregated_addrs.clone();
@@ -713,7 +713,8 @@ impl Fork {
             mem::replace(&mut self.patch.changed_aggregated_addrs, HashMap::new());
         let updated_entries = changed_aggregated_addrs.into_iter().map(|(addr, ns)| {
             let index_name = addr.name.clone();
-            let index_hash = get_object_hash(&self.patch, addr, !ns.is_empty());
+            let is_in_migration = !ns.is_empty();
+            let index_hash = get_object_hash(&self.patch, addr, is_in_migration);
             (ns, index_name, index_hash)
         });
         SystemSchema::new(&self).update_state_aggregators(updated_entries);

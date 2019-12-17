@@ -73,7 +73,7 @@ impl IndexAddress {
     /// the namespace is the empty string.
     pub(super) fn namespace(&self) -> &str {
         if self.name.starts_with('^') {
-            let dot_position = self.name.bytes().position(|ch| ch == b'.');
+            let dot_position = self.name.find('.');
             if let Some(pos) = dot_position {
                 &self.name[1..pos]
             } else {
