@@ -142,17 +142,11 @@ fn testkit_create_block_with_transactions() {
     let block = testkit.create_block_with_transactions(vec![tx0.clone(), tx1.clone()]);
 
     assert!(
-        block
-            .iter()
-            .map(CommittedTransaction::content)
-            .any(|tx| *tx == tx0),
+        *block[0].content() == tx0,
         "Transaction tx0 should be in the block."
     );
     assert!(
-        block
-            .iter()
-            .map(CommittedTransaction::content)
-            .any(|tx| *tx == tx1),
+        *block[1].content() == tx1,
         "Transaction tx1 should be in the block."
     );
 
@@ -186,11 +180,9 @@ fn testkit_create_block_with_transaction() {
     let (mut testkit, _) = init_testkit();
     let tx = gen_tx("tx".to_string());
     let block = testkit.create_block_with_transaction(tx.clone());
+
     assert!(
-        block
-            .iter()
-            .map(CommittedTransaction::content)
-            .any(|in_tx| *in_tx == tx),
+        *block[0].content() == tx,
         "Transaction tx should be in the block."
     );
 
