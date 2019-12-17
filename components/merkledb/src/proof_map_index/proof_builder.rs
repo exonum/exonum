@@ -249,7 +249,6 @@ where
         }
     }
 
-    //TODO: revert
     fn create_multiproof(
         &self,
         keys: impl IntoIterator<Item = K::Owned>,

@@ -971,21 +971,3 @@ where
         }
     }
 }
-
-mod tests2 {
-    use crate::access::AccessExt;
-    use crate::{Database, MapProof, TemporaryDB};
-
-    fn test_proof() -> MapProof<i32, i32> {
-        let db = TemporaryDB::new();
-        let fork = db.fork();
-
-        let mut index = fork.get_proof_map("index");
-
-        index.put(&1, 1);
-
-        let proof = index.get_proof(1);
-
-        proof
-    }
-}
