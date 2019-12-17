@@ -26,6 +26,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
 
+- `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
@@ -35,8 +37,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
+
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
+- New `api::Error` variants were added: `Gone` and `MovedPermanently`. (#1607)
+
+- API endpoints are now can be marked as deprecated. (#1607)
 
 #### exonum-merkledb
 
@@ -47,6 +54,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
 - Added support of unsized keys to `MapIndex`. (#1621)
+
+- Added mechanism to extend block header. Block now contains
+  key-value storage `additional_headers` which can contain binary data. (#1602)
 
 #### exonum-supervisor
 

@@ -19,6 +19,7 @@ use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
 
+use crate::blockchain::ProposerId;
 use crate::{
     crypto::{gen_keypair, Hash},
     helpers::{Height, Milliseconds, Round, ValidatorId},
@@ -124,7 +125,7 @@ fn tx_pool_size_overflow() {
     );
 
     let mut block = sandbox.create_block(&[tx1.clone()]);
-    block.proposer_id = ValidatorId(2);
+    block.add_header::<ProposerId>(ValidatorId(2).into());
     block.height = Height(1);
 
     sandbox.recv(&propose);
