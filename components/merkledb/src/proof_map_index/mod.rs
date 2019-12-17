@@ -28,7 +28,6 @@ use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
-use crate::proof_map_index::proof_builder::BuildProof2;
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::{
@@ -316,10 +315,6 @@ where
     /// ```
     pub fn get_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
        self.create_proof(key)
-    }
-
-    fn get_proof2(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
-        self.create_proof2(key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
