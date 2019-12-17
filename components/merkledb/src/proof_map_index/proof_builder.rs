@@ -10,6 +10,7 @@ use super::{
     node::{BranchNode, Node},
     MapProof, ToProofPath,
 };
+use crate::BinaryKey;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -175,8 +176,8 @@ pub trait BuildProof<K: ToOwned + ?Sized, V, KeyMode> {
 
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
-    K: ToOwned + ?Sized,
-    T: MerklePatriciaTree<K::Owned, V>,
+    K: BinaryKey + ToOwned + ?Sized,
+    T: MerklePatriciaTree<K, V>,
     KeyMode: ToProofPath<K>,
 {
     fn create_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
@@ -213,7 +214,7 @@ where
                                 // We have reached the leaf node and haven't diverged!
                                 // The key is there, we've just gotten the value, so we just
                                 // need to return it.
-                                let value = self.value(&key);
+                                let value = self.value(key.borrow());
                                 break MapProof::new()
                                     .add_entry(key, value)
                                     .add_proof_entries(combine_hashes(left_hashes, right_hashes));
@@ -236,7 +237,7 @@ where
 
             Some((root_path, Node::Leaf(hash))) => {
                 if root_path == searched_path {
-                    let value = self.value(&key);
+                    let value = self.value(key.borrow());
                     MapProof::new().add_entry(key, value)
                 } else {
                     MapProof::new()
@@ -304,7 +305,7 @@ where
                 }
 
                 if let Some(key) = found_key {
-                    let value = self.value(&key);
+                    let value = self.value(key.borrow());
                     proof.add_entry(key, value)
                 } else {
                     proof.add_proof_entry(root_path, root_hash)
