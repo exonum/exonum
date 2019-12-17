@@ -1,6 +1,8 @@
 //! Building `MapProof`s. See README.md in the module directory for high-level explanation
 //! how the proofs are built.
 
+use std::borrow::Borrow;
+
 use exonum_crypto::Hash;
 
 use super::{
@@ -246,28 +248,26 @@ where
 
     //TODO: revert
     fn create_multiproof(&self, keys: impl IntoIterator<Item = K::Owned>) -> MapProof<K::Owned, V, KeyMode> {
-        unimplemented!()
-    }
-//        match self.root_node() {
-//            Some((root_path, Node::Branch(root_branch))) => {
+        match self.root_node() {
+            Some((root_path, Node::Branch(root_branch))) => {
 //                let mut proof = MapProof::new();
-//
-//                let searched_paths = {
-//                    let mut keys: Vec<_> = keys
-//                        .into_iter()
-//                        .map(|k| (KeyMode::transform_key(&k), k))
-//                        .collect();
-//
-//                    keys.sort_unstable_by(|x, y| {
-//                        // `unwrap` is safe here because all keys start from the same position `0`
-//                        x.0.partial_cmp(&y.0).unwrap()
-//                    });
-//                    keys
-//                };
-//
-//                let mut contour = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
-//                contour.push(ContourNode::new(root_path, root_branch));
-//
+
+                let searched_paths = {
+                    let mut keys: Vec<_> = keys
+                        .into_iter()
+                        .map(|k| (KeyMode::transform_key(k.borrow()), k))
+                        .collect();
+
+                    keys.sort_unstable_by(|x, y| {
+                        // `unwrap` is safe here because all keys start from the same position `0`
+                        x.0.partial_cmp(&y.0).unwrap()
+                    });
+                    keys
+                };
+
+                let mut contour = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
+                contour.push(ContourNode::new(root_path, root_branch));
+
 //                let mut last_searched_path: Option<ProofPath> = None;
 //                for (proof_path, key) in searched_paths {
 //                    if last_searched_path == Some(proof_path) {
@@ -283,7 +283,15 @@ where
 //                    proof = node.add_to_proof(proof);
 //                }
 //                proof
-//            }
+
+                unimplemented!()
+            }
+            _ => {
+                unimplemented!()
+            }
+        }
+    }
+
 //
 //            Some((root_path, Node::Leaf(root_hash))) => {
 //                let mut proof = MapProof::new();
