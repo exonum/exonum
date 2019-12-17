@@ -58,7 +58,7 @@ pub struct NodePublicConfig {
 pub struct NodePrivateConfig {
     /// Network listening address.
     pub listen_address: SocketAddr,
-    /// Remote Network address used by this node.
+    /// The address advertised by the node for peers to connect to.
     pub external_address: String,
     /// Path to the master key file.
     pub master_key_path: PathBuf,
