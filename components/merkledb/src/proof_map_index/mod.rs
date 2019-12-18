@@ -331,7 +331,6 @@ where
     ///
     /// let proof = index.get_multiproof(vec!["foo".to_owned(), "bar".to_owned()]);
     /// ```
-    //TODO: revert
     pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K::Owned, V, KeyMode>
     where
         KI: IntoIterator<Item = K::Owned>,
