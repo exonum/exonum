@@ -6,7 +6,7 @@
 
 Exonum-supervisor is a main service of the [Exonum blockchain framework](https://exonum.com/).
 
-It is capable of deploying and starting new services.
+It is capable of deploying / starting new services and stopping existing ones.
 
 ## License
 

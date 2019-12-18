@@ -37,8 +37,8 @@ pub enum Error {
     ServiceNameExists = 4,
     /// Specified service identifier is already used.
     ServiceIdExists = 5,
-    /// Specified service is not started.
-    ServiceNotStarted = 6,
+    /// Specified service is not active.
+    ServiceNotActive = 6,
     /// Suitable runtime for the given service instance ID is not found.
     IncorrectInstanceId = 7,
     /// The interface is absent in the service.
@@ -51,6 +51,8 @@ pub enum Error {
     UnauthorizedCaller = 11,
     /// Malformed arguments for calling a service interface method.
     MalformedArguments = 12,
+    /// Service instance is already transitioning to a new status.
+    ServicePending = 13,
 }
 
 impl Error {

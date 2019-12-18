@@ -71,7 +71,7 @@ pub use self::{
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-        DeployRequest, ServiceConfig, StartService, SupervisorConfig,
+        DeployRequest, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -159,11 +159,29 @@ fn update_configs(
                 let (instance_spec, config) = start_service.into_parts(id);
 
                 context
-                    .start_adding_service(instance_spec, config)
+                    .initiate_adding_service(instance_spec, config)
                     .map_err(|err| {
                         log::error!("Service start request failed. {}", err);
                         err
                     })?;
+            }
+
+            ConfigChange::StopService(stop_service) => {
+                let instance = context
+                    .data()
+                    .for_dispatcher()
+                    .get_instance(stop_service.instance_id)
+                    .expect(
+                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
+                    );
+
+                log::trace!(
+                    "Request stop service with name {:?} from artifact {:?}",
+                    instance.spec.name,
+                    instance.spec.artifact
+                );
+
+                context.initiate_stopping_service(stop_service.instance_id)?;
             }
         }
     }

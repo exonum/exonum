@@ -31,7 +31,7 @@ use crate::{
     runtime::{
         rust::{CallContext, RustRuntime, Service, ServiceFactory},
         AnyTx, ArtifactId, DispatcherError, DispatcherSchema, ErrorKind, ErrorMatch,
-        ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -46,6 +46,7 @@ trait TestDispatcher<Ctx> {
     fn test_execute(&self, ctx: Ctx, arg: u64) -> Self::Output;
     fn test_deploy(&self, ctx: Ctx, arg: u64) -> Self::Output;
     fn test_add(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    fn test_stop(&self, ctx: Ctx, instance_id: InstanceId) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -131,7 +132,12 @@ impl TestDispatcher<CallContext<'_>> for TestDispatcherService {
             name: instance_name,
             artifact,
         };
-        ctx.start_adding_service(spec, config)
+
+        ctx.initiate_adding_service(spec, config)
+    }
+
+    fn test_stop(&self, ctx: CallContext<'_>, instance_id: InstanceId) -> Self::Output {
+        ctx.initiate_stopping_service(instance_id)
     }
 }
 
@@ -286,7 +292,7 @@ fn execute_transaction(
 
     let (block_hash, patch) = blockchain.create_patch(
         ValidatorId::zero().into(),
-        Height::zero(),
+        Height(1),
         &[tx_hash],
         &mut BTreeMap::new(),
     );
@@ -753,13 +759,34 @@ fn test_dispatcher_start_service_good() {
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .instances()
-        .contains(&"good-service-1".to_owned()));
+        .contains("good-service-1"));
     execute_transaction(&mut blockchain, gen_keypair().test_add(TEST_SERVICE_ID, 1)).unwrap();
     let snapshot = blockchain.snapshot();
-    assert!(DispatcherSchema::new(&snapshot)
-        .instances()
-        .contains(&"good-service-1".to_owned()));
+    assert_eq!(
+        DispatcherSchema::new(&snapshot)
+            .instances()
+            .get("good-service-1")
+            .unwrap()
+            .status,
+        Some(InstanceStatus::Active)
+    );
     assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
+
+    execute_transaction(
+        &mut blockchain,
+        gen_keypair().test_stop(TEST_SERVICE_ID, TEST_SERVICE_ID),
+    )
+    .unwrap();
+
+    let snapshot = blockchain.snapshot();
+    assert_eq!(
+        DispatcherSchema::new(&snapshot)
+            .instances()
+            .get(TEST_SERVICE_NAME)
+            .unwrap()
+            .status,
+        Some(InstanceStatus::Stopped)
+    );
 }
 
 #[test]
@@ -817,7 +844,7 @@ fn test_dispatcher_start_service_rollback() {
 #[test]
 fn test_check_tx() {
     let keypair = gen_keypair();
-    let blockchain = create_blockchain(
+    let mut blockchain = create_blockchain(
         vec![TestDispatcherService.into()],
         vec![TestDispatcherService
             .artifact_id()
@@ -831,5 +858,17 @@ fn test_check_tx() {
     assert_eq!(
         Blockchain::check_tx(&snapshot, &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
+
+    execute_transaction(
+        &mut blockchain,
+        keypair.test_stop(TEST_SERVICE_ID, TEST_SERVICE_ID),
+    )
+    .unwrap();
+    // Check that previously correct transaction become incorrect.
+    let snapshot = blockchain.snapshot();
+    assert_eq!(
+        Blockchain::check_tx(&snapshot, &correct_tx).unwrap_err(),
+        ErrorMatch::from_fail(&DispatcherError::ServiceNotActive)
     );
 }

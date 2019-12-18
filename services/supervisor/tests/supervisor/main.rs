@@ -25,7 +25,7 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    ConfigPropose, DeployConfirmation, DeployRequest, Error as TxError, StartService, Supervisor,
+    ConfigPropose, DeployConfirmation, DeployRequest, Error as TxError, Supervisor,
     SupervisorInterface,
 };
 
@@ -39,6 +39,7 @@ mod config_api;
 mod consensus_config;
 mod inc;
 mod proto;
+mod service_lifecycle;
 mod supervisor_config;
 mod utils;
 
@@ -168,13 +169,7 @@ fn start_service_request(
     name: impl Into<String>,
     deadline_height: Height,
 ) -> ConfigPropose {
-    let request = StartService {
-        artifact,
-        name: name.into(),
-        config: Vec::default(),
-    };
-
-    ConfigPropose::new(0, deadline_height).start_service(request)
+    ConfigPropose::new(0, deadline_height).start_service(artifact, name, Vec::default())
 }
 
 fn deploy_default(testkit: &mut TestKit) {
@@ -363,8 +358,9 @@ fn test_try_run_unregistered_service_instance() {
     testkit.create_block();
 
     let system_api = api.exonum_api();
-    let expected_err =
-        ErrorMatch::from_fail(&TxError::UnknownArtifact).for_service(SUPERVISOR_INSTANCE_ID);
+    let expected_err = ErrorMatch::from_fail(&TxError::UnknownArtifact)
+        .for_service(SUPERVISOR_INSTANCE_ID)
+        .with_any_description();
     system_api.assert_tx_status(hash, Err(&expected_err));
 }
 
@@ -493,8 +489,9 @@ fn test_start_service_instance_twice() {
         testkit.create_block();
 
         let system_api = api.exonum_api();
-        let expected_err =
-            ErrorMatch::from_fail(&TxError::InstanceExists).for_service(SUPERVISOR_INSTANCE_ID);
+        let expected_err = ErrorMatch::from_fail(&TxError::InstanceExists)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description();
         system_api.assert_tx_status(hash, Err(&expected_err));
     }
 }
@@ -514,20 +511,9 @@ fn test_start_two_services_in_one_request() {
     let artifact = artifact_default();
     let deadline = testkit.height().next();
 
-    let request_1 = StartService {
-        artifact: artifact.clone(),
-        name: instance_name_1.into(),
-        config: Vec::default(),
-    };
-    let request_2 = StartService {
-        artifact: artifact.clone(),
-        name: instance_name_2.into(),
-        config: Vec::default(),
-    };
-
     let request = ConfigPropose::new(0, deadline)
-        .start_service(request_1)
-        .start_service(request_2);
+        .start_service(artifact.clone(), instance_name_1, Vec::default())
+        .start_service(artifact.clone(), instance_name_2, Vec::default());
 
     let hash = start_service(&api, request);
     testkit.create_block();
@@ -968,20 +954,9 @@ fn test_id_assignment() {
     let artifact = artifact_default();
     let deadline = testkit.height().next();
 
-    let request_1 = StartService {
-        artifact: artifact.clone(),
-        name: instance_name_1.into(),
-        config: Vec::default(),
-    };
-    let request_2 = StartService {
-        artifact: artifact.clone(),
-        name: instance_name_2.into(),
-        config: Vec::default(),
-    };
-
     let request = ConfigPropose::new(0, deadline)
-        .start_service(request_1)
-        .start_service(request_2);
+        .start_service(artifact.clone(), instance_name_1, Vec::default())
+        .start_service(artifact.clone(), instance_name_2, Vec::default());
 
     let api = testkit.api();
     start_service(&api, request);
@@ -1017,13 +992,11 @@ fn test_id_assignment_sparse() {
     let deadline = testkit.height().next();
 
     let instance_name = "inc2";
-    let request = StartService {
-        artifact: artifact.clone(),
-        name: instance_name.into(),
-        config: Vec::default(),
-    };
-
-    let request = ConfigPropose::new(0, deadline).start_service(request);
+    let request = ConfigPropose::new(0, deadline).start_service(
+        artifact.clone(),
+        instance_name,
+        Vec::default(),
+    );
 
     let api = testkit.api();
     start_service(&api, request);

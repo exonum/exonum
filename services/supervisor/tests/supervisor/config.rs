@@ -40,7 +40,9 @@ fn test_multiple_consensus_change_proposes() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -308,7 +310,7 @@ fn test_confirm_config_by_incorrect_validator() {
 }
 
 #[test]
-fn test_try_confirm_non_existing_proposal() {
+fn test_try_confirm_non_existent_proposal() {
     let mut testkit = testkit_with_supervisor(4);
     let initiator_id = testkit.network().us().validator_id().unwrap();
 
@@ -408,7 +410,9 @@ fn test_discard_panicked_service_config_change() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }
@@ -724,7 +728,9 @@ fn test_services_config_discard_multiple_configs() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }

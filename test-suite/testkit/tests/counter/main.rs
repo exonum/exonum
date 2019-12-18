@@ -23,6 +23,7 @@ use exonum::{
     explorer::BlockchainExplorer,
     helpers::Height,
     merkledb::BinaryValue,
+    messages::{AnyTx, Verified},
     runtime::SnapshotExt,
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
@@ -66,6 +67,30 @@ fn inc_count(api: &TestKitApi, by: u64) -> Hash {
 
 fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a> {
     CounterSchema::new(snapshot.for_service(SERVICE_NAME).unwrap())
+}
+
+fn gen_inc_tx(by: u64) -> Verified<AnyTx> {
+    gen_keypair().increment(SERVICE_ID, by)
+}
+
+fn gen_inc_incorrect_tx(by: u64) -> Verified<AnyTx> {
+    gen_keypair().increment(SERVICE_ID + 1, by)
+}
+
+#[test]
+fn test_inc_add_tx() {
+    let (mut testkit, _) = init_testkit();
+    let tx = gen_inc_tx(5);
+    testkit.add_tx(tx.clone());
+    assert!(testkit.is_tx_in_pool(&tx.object_hash()));
+}
+
+#[test]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
+fn test_inc_add_tx_incorrect_transaction() {
+    let (mut testkit, _) = init_testkit();
+    let incorrect_tx = gen_inc_incorrect_tx(5);
+    testkit.add_tx(incorrect_tx);
 }
 
 #[test]
@@ -116,6 +141,14 @@ fn test_inc_count_create_block_with_committed_transaction() {
     testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
     // Create another block with the same transaction
     testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
+}
+
+#[test]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
+fn test_inc_count_create_block_with_transaction_incorrect_transaction() {
+    let (mut testkit, _) = init_testkit();
+    let incorrect_tx = gen_inc_incorrect_tx(5);
+    testkit.create_block_with_transaction(incorrect_tx);
 }
 
 #[test]
@@ -390,6 +423,14 @@ fn test_probe_duplicate_tx() {
     let snapshot = testkit.probe_all(vec![tx, other_tx]);
     let schema = get_schema(&snapshot);
     assert_eq!(schema.counter.get(), Some(12));
+}
+
+#[test]
+#[should_panic(expected = "Attempt to add invalid tx in the pool")]
+fn test_probe_incorrect_transaction() {
+    let (mut testkit, _) = init_testkit();
+    let incorrect_tx = gen_inc_incorrect_tx(5);
+    testkit.probe(incorrect_tx);
 }
 
 #[test]

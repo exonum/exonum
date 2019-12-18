@@ -895,6 +895,29 @@ fn test_metadata_index_identifiers() {
 }
 
 #[test]
+fn test_metadata_in_migrated_indexes() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+
+    let view: View<_> = ViewWithMetadata::get_or_create(&fork, &"simple".into(), IndexType::Map)
+        .map_err(drop)
+        .unwrap()
+        .into();
+    assert_eq!(view.address.name, "simple");
+    let old_id = view.address.id.unwrap().get();
+
+    let mut addr = IndexAddress::from_root("simple");
+    addr.set_in_migration();
+    let view: View<_> = ViewWithMetadata::get_or_create(&fork, &addr, IndexType::List)
+        .map_err(drop)
+        .unwrap()
+        .into();
+    assert_eq!(view.address.name, "simple");
+    let new_id = view.address.id.unwrap().get();
+    assert_ne!(old_id, new_id);
+}
+
+#[test]
 fn test_metadata_incorrect_index_type() {
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -931,6 +954,51 @@ fn test_metadata_index_wrong_type() {
         AccessError { ref addr, kind: AccessErrorKind::WrongIndexType { .. } }
             if *addr == IndexAddress::from("simple")
     );
+}
+
+#[test]
+fn test_valid_tombstone() {
+    use crate::{
+        access::{AccessErrorKind, FromAccess},
+        migration::Migration,
+        ListIndex,
+    };
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let migration = Migration::new("foo", &fork);
+
+    // Valid tombstone in a fork.
+    migration.touch_index("bar", IndexType::Tombstone).unwrap();
+    // Check that index cannot be reinterpreted with another type.
+    let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
+    assert_matches!(
+        err.kind,
+        AccessErrorKind::WrongIndexType { actual, .. } if actual == IndexType::Tombstone
+    );
+
+    // ...even after the fork is merged.
+    db.merge(fork.into_patch()).unwrap();
+    let snapshot = db.snapshot();
+    let migration = Migration::new("foo", &snapshot);
+    let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
+    assert_matches!(
+        err.kind,
+        AccessErrorKind::WrongIndexType { actual, .. } if actual == IndexType::Tombstone
+    );
+}
+
+#[test]
+fn test_invalid_tombstone() {
+    use crate::access::AccessErrorKind;
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    // A tombstone cannot be created outside the migration!
+    let err = fork
+        .touch_index("foo.bar", IndexType::Tombstone)
+        .unwrap_err();
+    assert_matches!(err.kind, AccessErrorKind::InvalidTombstone);
 }
 
 #[test]

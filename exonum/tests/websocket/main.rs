@@ -443,3 +443,82 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
         let _ = client.shutdown();
     }
 }
+
+#[test]
+fn test_blocks_and_tx_both_subscribe() {
+    let node_handler = run_node(6338, 8087);
+
+    // Open block ws first
+    let mut block_client = create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
+        .expect("Cannot connect to node");
+    block_client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+
+    // Get one message and check that it is text.
+    let block_resp_text = recv_text_msg(&mut block_client).unwrap();
+
+    let block_notification = serde_json::from_str::<Notification>(&block_resp_text).unwrap();
+    match block_notification {
+        Notification::Block(_) => (),
+        other => panic!("Incorrect notification type (expected Block): {:?}", other),
+    }
+    block_client.shutdown().unwrap();
+
+    // Open tx ws and test it
+    let mut tx_client =
+        create_ws_client("ws://localhost:8087/api/explorer/v1/transactions/subscribe")
+            .expect("Cannot connect to node");
+    tx_client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+
+    let alice = gen_keypair();
+    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx_json = json!({ "tx_body": tx });
+    let http_client = reqwest::Client::new();
+    let _res = http_client
+        .post("http://localhost:8087/api/explorer/v1/transactions")
+        .json(&tx_json)
+        .send()
+        .unwrap();
+
+    let tx_resp_text = recv_text_msg(&mut tx_client).unwrap();
+
+    let tx_notification = serde_json::from_str::<Notification>(&tx_resp_text).unwrap();
+    match tx_notification {
+        Notification::Transaction(_) => (),
+        other => panic!(
+            "Incorrect notification type (expected Transaction): {:?}",
+            other
+        ),
+    };
+    tx_client.shutdown().unwrap();
+
+    // Open block ws and check it receives data again
+    let mut block_again_client =
+        create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
+            .expect("Cannot connect to node");
+    block_again_client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+
+    let block_again_resp_text = recv_text_msg(&mut block_again_client).unwrap();
+
+    let block_again_notification =
+        serde_json::from_str::<Notification>(&block_again_resp_text).unwrap();
+    match block_again_notification {
+        Notification::Block(_) => (),
+        other => panic!("Incorrect notification type (expected Block): {:?}", other),
+    }
+    block_again_client.shutdown().unwrap();
+
+    node_handler
+        .api_tx
+        .send_external_message(ExternalMessage::Shutdown)
+        .unwrap();
+    node_handler.node_thread.join().unwrap();
+}

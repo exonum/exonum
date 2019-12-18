@@ -361,9 +361,9 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArtifactStatus {
     /// The artifact is pending deployment.
-    Pending = 0,
+    Pending = 1,
     /// The artifact has been successfully deployed.
-    Active = 1,
+    Active = 2,
 }
 
 impl Display for ArtifactStatus {
@@ -376,56 +376,91 @@ impl Display for ArtifactStatus {
 }
 
 impl ProtobufConvert for ArtifactStatus {
-    type ProtoStruct = schema::runtime::ArtifactStatus;
+    type ProtoStruct = schema::runtime::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            ArtifactStatus::Active => schema::runtime::ArtifactStatus::ARTIFACT_ACTIVE,
-            ArtifactStatus::Pending => schema::runtime::ArtifactStatus::ARTIFACT_PENDING,
+            ArtifactStatus::Active => schema::runtime::ArtifactState_Status::ACTIVE,
+            ArtifactStatus::Pending => schema::runtime::ArtifactState_Status::PENDING,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(match pb {
-            schema::runtime::ArtifactStatus::ARTIFACT_ACTIVE => ArtifactStatus::Active,
-            schema::runtime::ArtifactStatus::ARTIFACT_PENDING => ArtifactStatus::Pending,
+            schema::runtime::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
+            schema::runtime::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
+            schema::runtime::ArtifactState_Status::NONE => {
+                bail!("Status `NONE` is reserved for the further usage.")
+            }
         })
     }
 }
 
+// TODO Investigate boilerplate-less approach of enums usage as binary values and keys. [ECR-3941]
+
 /// Status of a service instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InstanceStatus {
-    /// The service instance is pending deployment.
-    Pending = 0,
-    /// The service instance has been successfully deployed.
+    /// The service instance is active.
     Active = 1,
+    /// The service instance is stopped.
+    Stopped = 2,
+}
+
+impl InstanceStatus {
+    /// Indicates whether the service instance status is active.
+    pub fn is_active(self) -> bool {
+        self == InstanceStatus::Active
+    }
 }
 
 impl Display for InstanceStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InstanceStatus::Active => f.write_str("active"),
-            InstanceStatus::Pending => f.write_str("pending"),
+            InstanceStatus::Stopped => f.write_str("stopped"),
         }
     }
 }
 
-impl ProtobufConvert for InstanceStatus {
-    type ProtoStruct = schema::runtime::InstanceStatus;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        match self {
-            InstanceStatus::Active => schema::runtime::InstanceStatus::SERVICE_ACTIVE,
-            InstanceStatus::Pending => schema::runtime::InstanceStatus::SERVICE_PENDING,
+impl InstanceStatus {
+    // This method must have an exact signature so that is can be used with the
+    // `protobuf_convert(with)`.
+    #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
+    fn to_pb(status: &Option<InstanceStatus>) -> schema::runtime::InstanceState_Status {
+        match status {
+            None => schema::runtime::InstanceState_Status::NONE,
+            Some(InstanceStatus::Active) => schema::runtime::InstanceState_Status::ACTIVE,
+            Some(InstanceStatus::Stopped) => schema::runtime::InstanceState_Status::STOPPED,
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(
+        pb: schema::runtime::InstanceState_Status,
+    ) -> Result<Option<InstanceStatus>, failure::Error> {
         Ok(match pb {
-            schema::runtime::InstanceStatus::SERVICE_ACTIVE => InstanceStatus::Active,
-            schema::runtime::InstanceStatus::SERVICE_PENDING => InstanceStatus::Pending,
+            schema::runtime::InstanceState_Status::NONE => None,
+            schema::runtime::InstanceState_Status::ACTIVE => Some(InstanceStatus::Active),
+            schema::runtime::InstanceState_Status::STOPPED => Some(InstanceStatus::Stopped),
         })
+    }
+}
+
+impl BinaryValue for InstanceStatus {
+    fn to_bytes(&self) -> Vec<u8> {
+        (*self as u32).to_bytes()
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        let code = u32::from_bytes(bytes)?;
+        match code {
+            1 => Ok(InstanceStatus::Active),
+            2 => Ok(InstanceStatus::Stopped),
+            other => Err(format_err!(
+                "Instance status with code {} is unknown.",
+                other
+            )),
+        }
     }
 }
 
@@ -456,13 +491,36 @@ pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
     /// Service instance activity status.
-    pub status: InstanceStatus,
+    #[protobuf_convert(with = "InstanceStatus")]
+    pub status: Option<InstanceStatus>,
+    /// Pending status of instance if the value is not `None`.
+    #[protobuf_convert(with = "InstanceStatus")]
+    pub pending_status: Option<InstanceStatus>,
 }
 
 impl InstanceState {
     /// Creates a new instance state with the given specification and status.
     pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
-        Self { spec, status }
+        Self {
+            spec,
+            status: Some(status),
+            pending_status: None,
+        }
+    }
+
+    /// Sets next status as current and changes next status to `None`
+    ///
+    /// # Panics
+    ///
+    /// - If next status is already `None`.
+    pub(crate) fn commit_pending_status(&mut self) {
+        assert!(
+            self.pending_status.is_some(),
+            "Next instance status should not be `None`"
+        );
+
+        self.status = self.pending_status;
+        self.pending_status = None;
     }
 }
 
