@@ -15,14 +15,13 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! incorrect messages.
 
-use exonum_crypto::Hash;
-use exonum_merkledb::ObjectHash;
-
-use crate::{
+use exonum::{
     helpers::{Height, Round, ValidatorId},
     messages::{Propose, Verified},
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
+use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
+use exonum_crypto::Hash;
+use exonum_merkledb::ObjectHash;
 
 /// HANDLE message
 /// - verify signature

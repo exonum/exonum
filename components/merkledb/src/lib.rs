@@ -185,7 +185,7 @@ extern crate failure;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[macro_use]
-pub mod macros;
+mod macros;
 mod backends;
 mod db;
 mod error;
