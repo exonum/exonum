@@ -72,7 +72,7 @@ impl Error {
         );
         ExecutionError::new(
             ErrorKind::Dispatcher {
-                local_error_code: Error::StackOverflow as u8,
+                code: Error::StackOverflow as u8,
             },
             description,
         )

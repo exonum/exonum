@@ -204,7 +204,7 @@ impl ExecutionFail {
         let match_arms = self.variants.iter().map(|variant| {
             let ident = &variant.ident;
             let id = &variant.id;
-            quote!(#name::#ident => #cr::runtime::error::ErrorKind::#kind { local_error_code: #id },)
+            quote!(#name::#ident => #cr::runtime::error::ErrorKind::#kind { code: #id },)
         });
 
         quote! {
