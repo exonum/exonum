@@ -14,6 +14,7 @@
 
 //! The set of errors for the Exonum API module.
 
+use serde::Serialize;
 use std::io;
 
 /// List of possible API errors.
@@ -33,6 +34,15 @@ pub enum Error {
     #[fail(display = "Bad request: {}", _0)]
     BadRequest(String),
 
+    /// Moved permanently. This error means that resource existed at the specified
+    /// location, but now is moved to the other place.
+    #[fail(display = "Moved permanently; Location: {}", _0)]
+    MovedPermanently(String),
+
+    /// Gone. This error means that resource existed in the past, but now is not present.
+    #[fail(display = "Gone")]
+    Gone,
+
     /// Not found. This error occurs when the server cannot locate the requested
     /// resource.
     #[fail(display = "Not found: {}", _0)]
@@ -46,6 +56,47 @@ pub enum Error {
     /// authentication credentials.
     #[fail(display = "Unauthorized")]
     Unauthorized,
+}
+
+/// A helper structure allowing to build `MovedPermanently` response from the
+/// composite parts.
+#[derive(Debug)]
+pub struct MovedPermanentlyError {
+    location: String,
+    query_part: Option<String>,
+}
+
+impl MovedPermanentlyError {
+    /// Creates a new builder object with base url.
+    /// Note that query parameters should **not** be added to the location url,
+    /// for this purpose use `with_query` method.
+    pub fn new(location: String) -> Self {
+        Self {
+            location,
+            query_part: None,
+        }
+    }
+
+    /// Appends a query to the url.
+    pub fn with_query<Q: Serialize>(self, query: Q) -> Self {
+        let serialized_query =
+            serde_urlencoded::to_string(query).expect("Unable to serialize query.");
+        Self {
+            query_part: Some(serialized_query),
+            ..self
+        }
+    }
+}
+
+impl From<MovedPermanentlyError> for Error {
+    fn from(e: MovedPermanentlyError) -> Self {
+        let full_location = match e.query_part {
+            Some(query) => format!("{}?{}", e.location, query),
+            None => e.location,
+        };
+
+        Error::MovedPermanently(full_location)
+    }
 }
 
 impl From<io::Error> for Error {

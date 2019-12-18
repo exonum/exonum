@@ -14,11 +14,12 @@
 
 //! The current runtime is for running native services written in Rust.
 //!
-//! A set of artifacts available to deploy in the Rust runtime is static. The set is defined at the time
-//! of compilation. Once created, the set can be changed only by the node binary recompilation.
+//! In the Rust runtime a set of service artifacts that you may want to deploy is static. The set
+//! is defined at the time of compilation. Once the set is created, you can change it only by
+//! the node binary recompilation.
 //!
-//! Beware of removing the artifacts from the Rust runtime. An attempt to remove an artifact
-//! from an instance that is already running can cause blockchain to break. It is only safe
+//! Beware of removing artifacts from the Rust runtime. An attempt to remove an artifact
+//! from an instance that is already running can cause the blockchain to break. It is only safe
 //! to add new artifacts.
 //!
 //! The Rust runtime does not provide any level of service isolation from the operation system.
@@ -61,10 +62,8 @@
 //!     WalletAlreadyExists = 1,
 //! }
 //!
-//! // Define the transaction interface for your service by creating a trait with
+//! // Define a transaction interface for your service by creating a `Transactions` trait with
 //! // the following attribute and method signatures.
-//! // This attribute implements `Interface` trait for this trait and `Transaction`
-//! // trait for each argument.
 //! #[exonum_interface]
 //! pub trait Transactions {
 //!     // Each method of the trait should have a signature of the following format. The argument
@@ -350,7 +349,7 @@ impl WellKnownRuntime for RustRuntime {
     const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
-/// The unique identifier of the Rust artifact, containing the name and version of the artifact.
+/// A unique identifier of the Rust artifact, containing the name and version of the artifact.
 ///
 /// As a string, the artifact name is represented as follows:
 ///
@@ -358,7 +357,7 @@ impl WellKnownRuntime for RustRuntime {
 /// and `artifact_version` is a semantic version identifier.
 ///
 /// * Artifact name can contain only the following characters: `a-zA-Z0-9` and one of `_-.`.
-/// * Artifact version identifier must conform to the semantic version scheme (major.minor.patch).
+/// * Artifact version identifier must conform to the semantic versioning scheme (major.minor.patch).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactId {
     /// Artifact name.
@@ -381,7 +380,7 @@ impl RustArtifactId {
         }
     }
 
-    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    /// Converts into `InstanceInitParams` with the given ID, name and empty constructor.
     pub fn into_default_instance(
         self,
         id: InstanceId,
@@ -454,7 +453,7 @@ impl Runtime for RustRuntime {
         self.blockchain = Some(blockchain.clone());
     }
 
-    // We need to propagate changes in the services immediately after initialization.
+    // Propagates changes in the services immediately after initialization.
     fn on_resume(&mut self) {
         self.push_api_changes();
     }
@@ -573,7 +572,7 @@ impl Runtime for RustRuntime {
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
         self.push_api_changes();
 
-        // By convention, services don't handle `after_commit()` on the genesis block.
+        // By convention, services do not handle `after_commit()` on the genesis block.
         let core_schema = CoreSchema::new(snapshot);
         if core_schema.height() == Height(0) {
             return;

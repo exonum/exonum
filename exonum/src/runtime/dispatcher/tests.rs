@@ -30,8 +30,8 @@ use std::{
 };
 
 use crate::{
-    blockchain::{Block, Blockchain, Schema as CoreSchema},
-    helpers::{Height, ValidatorId},
+    blockchain::{AdditionalHeaders, Block, Blockchain, Schema as CoreSchema},
+    helpers::Height,
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
@@ -51,14 +51,15 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
     dispatcher.activate_pending(&fork);
 
     let block = Block {
-        proposer_id: ValidatorId(0),
         height: Height(0),
         tx_count: 0,
         prev_hash: Hash::zero(),
         tx_hash: Hash::zero(),
         state_hash: Hash::zero(),
         error_hash: Hash::zero(),
+        additional_headers: AdditionalHeaders::new(),
     };
+
     let block_hash = block.object_hash();
     let schema = CoreSchema::new(&fork);
     schema.block_hashes_by_height().push(block_hash);
