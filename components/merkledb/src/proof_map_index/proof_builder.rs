@@ -170,7 +170,7 @@ pub trait BuildProof<K: ToOwned + ?Sized, V, KeyMode> {
     /// Creates a proof of existence / absence for a single key.
     fn create_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode>;
 
-    //  /// Creates a proof of existence / absence for multiple keys.
+    /// Creates a proof of existence / absence for multiple keys.
     fn create_multiproof(
         &self,
         keys: impl IntoIterator<Item = K::Owned>,
