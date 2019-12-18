@@ -95,7 +95,7 @@ enum RuntimeEvent {
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
     StartAdding(InstanceSpec, Vec<u8>),
-    CommitService(Height, InstanceSpec),
+    CommitService(Height, InstanceSpec, InstanceStatus),
     AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
     Shutdown,
@@ -141,7 +141,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.inner.is_artifact_deployed(id)
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
         spec: &InstanceSpec,
@@ -151,25 +151,27 @@ impl<T: Runtime> Runtime for Inspected<T> {
             spec.to_owned(),
             parameters.clone(),
         ));
-        self.inner.start_adding_service(context, spec, parameters)
+        self.inner
+            .initiate_adding_service(context, spec, parameters)
     }
 
-    fn commit_service(
+    fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
-            .unwrap_or_else(|| panic!("Can't obtain an instance with ID {}", spec.id));
+            .unwrap();
         let core_schema = CoreSchema::new(snapshot);
         let height = core_schema.next_height();
 
         self.events
             .lock()
             .unwrap()
-            .push(RuntimeEvent::CommitService(height, spec.to_owned()));
-        self.inner.commit_service(snapshot, spec)
+            .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
+        self.inner.update_service_status(snapshot, spec, status)
     }
 
     fn execute(
@@ -340,7 +342,7 @@ impl DefaultInstance for TestServiceImpl {
     }
 }
 
-/// In this test, we manually instruct the dispatcher to deploy artifacts / create services
+/// In this test, we manually instruct the dispatcher to deploy artifacts / create / stop services
 /// instead of using transactions. We still need to create patches using a `BlockchainMut`
 /// in order to properly emulate the blockchain workflow.
 #[test]
@@ -391,7 +393,7 @@ fn basic_rust_runtime() {
 
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(spec.clone(), constructor.clone())
+        .initiate_adding_service(spec.clone(), constructor.clone())
         .unwrap();
 
     {
@@ -407,7 +409,7 @@ fn basic_rust_runtime() {
         events,
         vec![
             RuntimeEvent::StartAdding(spec.clone(), constructor.into_bytes()),
-            RuntimeEvent::CommitService(Height(3), spec.clone()),
+            RuntimeEvent::CommitService(Height(3), spec.clone(), InstanceStatus::Active),
             RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
@@ -478,6 +480,37 @@ fn basic_rust_runtime() {
             RuntimeEvent::AfterCommit(Height(5)),
         ]
     );
+
+    // Stop service instance.
+    let fork = create_block(&blockchain);
+    Dispatcher::initiate_stopping_service(&fork, SERVICE_INSTANCE_ID).unwrap();
+    commit_block(&mut blockchain, fork);
+    let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
+
+    assert_eq!(
+        events,
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(5), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(5), SERVICE_INSTANCE_ID),
+            RuntimeEvent::CommitService(Height(6), spec.clone(), InstanceStatus::Stopped),
+            RuntimeEvent::AfterCommit(Height(6)),
+        ]
+    );
+
+    // Execute transaction method B.
+    let call_info = CallInfo {
+        instance_id: SERVICE_INSTANCE_ID,
+        method_id: 1,
+    };
+    let payload = TxB { value: ARG_B_VALUE }.into_bytes();
+    let caller = Caller::Service {
+        instance_id: SERVICE_INSTANCE_ID,
+    };
+    let mut fork = create_block(&blockchain);
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .expect_err("incorrect transaction");
 }
 
 #[test]
@@ -499,7 +532,7 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact.clone(), vec![]),
             RuntimeEvent::StartAdding(instance_spec.clone(), Init::default().into_bytes()),
-            RuntimeEvent::CommitService(Height(0), instance_spec.clone()),
+            RuntimeEvent::CommitService(Height(0), instance_spec.clone(), InstanceStatus::Active),
             RuntimeEvent::AfterTransactions(Height(0), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(1)),
         ]
@@ -524,7 +557,7 @@ fn rust_runtime_with_builtin_services() {
         .into_mut(genesis_config)
         .with_runtime(runtime)
         .build()
-        .expect("Can't create a blockchain");
+        .unwrap();
 
     let events = mem::replace(
         &mut *event_handle
@@ -538,7 +571,7 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact, vec![]),
             // `Runtime::start_adding_service` is never called for the same service
-            RuntimeEvent::CommitService(Height(2), instance_spec),
+            RuntimeEvent::CommitService(Height(2), instance_spec, InstanceStatus::Active),
             // `Runtime::after_commit` is never called for the same block
             RuntimeEvent::Resume,
         ]
@@ -608,7 +641,7 @@ fn conflicting_service_instances() {
     let constructor = Init::default();
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(spec.clone(), constructor.clone())
+        .initiate_adding_service(spec.clone(), constructor.clone())
         .unwrap();
 
     // Fork #2: same service, but with different ID.
@@ -622,7 +655,7 @@ fn conflicting_service_instances() {
         &mut alternative_fork,
         Caller::Blockchain,
     )
-    .start_adding_service(alternative_spec.clone(), constructor.clone())
+    .initiate_adding_service(alternative_spec.clone(), constructor.clone())
     .unwrap();
 
     commit_block(&mut blockchain, fork);
@@ -632,7 +665,7 @@ fn conflicting_service_instances() {
         vec![
             RuntimeEvent::StartAdding(spec.clone(), constructor.clone().into_bytes()),
             RuntimeEvent::StartAdding(alternative_spec, constructor.into_bytes()),
-            RuntimeEvent::CommitService(Height(3), spec),
+            RuntimeEvent::CommitService(Height(3), spec, InstanceStatus::Active),
             RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
@@ -738,11 +771,19 @@ fn dependent_builtin_service() {
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance(SERVICE_INSTANCE_ID).unwrap().status,
+        schema
+            .get_instance(SERVICE_INSTANCE_ID)
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().status,
+        schema
+            .get_instance("dependent-service")
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
 }
@@ -797,7 +838,7 @@ fn dependent_service_with_no_dependency() {
     let mut fork = create_block(&blockchain);
     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
     let err = ctx
-        .start_adding_service(inst.instance_spec, inst.constructor)
+        .initiate_adding_service(inst.instance_spec, inst.constructor)
         .unwrap_err();
     assert!(err.to_string().contains("no dependency"));
 
@@ -835,16 +876,20 @@ fn dependent_service_in_same_block() {
     // Deploy both services in the same block after genesis.
     let mut fork = create_block(&blockchain);
     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
-    ctx.start_adding_service(main_inst.instance_spec, main_inst.constructor)
+    ctx.initiate_adding_service(main_inst.instance_spec, main_inst.constructor)
         .unwrap();
-    ctx.start_adding_service(dep_inst.instance_spec, dep_inst.constructor)
+    ctx.initiate_adding_service(dep_inst.instance_spec, dep_inst.constructor)
         .unwrap();
     commit_block(&mut blockchain, fork);
 
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().status,
+        schema
+            .get_instance("dependent-service")
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
 }
@@ -872,14 +917,18 @@ fn dependent_service_in_successive_block() {
 
     let mut fork = create_block(&blockchain);
     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-        .start_adding_service(dep_spec.instance_spec, dep_spec.constructor)
+        .initiate_adding_service(dep_spec.instance_spec, dep_spec.constructor)
         .unwrap();
     commit_block(&mut blockchain, fork);
 
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert_eq!(
-        schema.get_instance("dependent-service").unwrap().status,
+        schema
+            .get_instance("dependent-service")
+            .unwrap()
+            .status
+            .unwrap(),
         InstanceStatus::Active
     );
 }
