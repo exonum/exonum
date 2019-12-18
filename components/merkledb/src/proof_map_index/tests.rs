@@ -1207,16 +1207,18 @@ fn test_merkle_root_leaf() {
 }
 
 fn check_map_proof<K, V, S>(
-    proof: &MapProof<K, V, S>,
+    proof: &MapProof<K::Owned, V, S>,
     key: Option<K>,
     table: &ProofMapIndex<&Fork, K, V, S>,
 ) where
-    K: BinaryKey + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
+    K: BinaryKey,
+    K::Owned: Serialize + DeserializeOwned + PartialEq + Debug + Clone,
     V: BinaryValue + ObjectHash + PartialEq + Debug + Serialize + DeserializeOwned,
-    S: ToProofPath<K>,
+    S: ToProofPath<K> + ToProofPath<K::Owned>,
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
-    let deserialized_proof: MapProof<K, V, S> = serde_json::from_value(serialized_proof).unwrap();
+    let deserialized_proof: MapProof<K::Owned, V, S> =
+        serde_json::from_value(serialized_proof).unwrap();
 
     let entries = match key {
         Some(key) => {
@@ -1228,10 +1230,13 @@ fn check_map_proof<K, V, S>(
 
     let proof = proof.check().unwrap();
     assert_eq!(
-        proof.entries().collect::<Vec<_>>(),
+        proof
+            .entries()
+            .map(|(k, v)| (k.to_owned(), v))
+            .collect::<Vec<_>>(),
         entries
             .iter()
-            .map(|&(ref k, ref v)| (k, v))
+            .map(|(k, v)| (k.to_owned(), v))
             .collect::<Vec<_>>()
     );
     assert_eq!(proof.index_hash(), table.object_hash());
@@ -1314,12 +1319,12 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
 fn check_proofs_for_data<K, V>(db: &dyn Database, data: &[(K, V)], nonexisting_keys: &[K])
 where
-    K: BinaryKey + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
+    K: BinaryKey<Owned = K> + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize + DeserializeOwned,
 {
     let fork = db.fork();
     let mut table = fork.get_proof_map(IDX_NAME);
-    for &(ref key, ref value) in data {
+    for (key, value) in data {
         table.put(key, value.clone());
     }
 
@@ -1333,14 +1338,14 @@ where
 
     for i in indexes {
         let key = data[i].0.clone();
-        let proof = table.get_proof(key.clone());
+        let proof = table.get_proof(key.to_owned());
         check_map_proof(&proof, Some(key), &table);
     }
 
     for key in nonexisting_keys {
         if !table.contains(&key) {
             // The check is largely redundant, but better be here anyway
-            let proof = table.get_proof(key.clone());
+            let proof = table.get_proof(key.to_owned());
             check_map_proof(&proof, None, &table);
         }
     }
@@ -1348,7 +1353,7 @@ where
 
 fn check_multiproofs_for_data<K, V>(db: &dyn Database, data: &[(K, V)], nonexisting_keys: &[K])
 where
-    K: BinaryKey + ObjectHash + Clone + Ord + PartialEq + StdHash + Debug + Serialize,
+    K: BinaryKey<Owned = K> + ObjectHash + Clone + Ord + PartialEq + StdHash + Debug + Serialize,
     V: BinaryValue + ObjectHash + Clone + PartialEq + Debug + Serialize,
 {
     let fork = db.fork();

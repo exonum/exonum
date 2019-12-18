@@ -18,13 +18,16 @@ const DEFAULT_PROOF_CAPACITY: usize = 8;
 impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     /// Includes a proof of existence / absence of a single key when a proof of multiple
     /// keys is requested.
-    fn process_key(
+    fn process_key<Q: ?Sized>(
         mut self,
-        tree: &impl MerklePatriciaTree<K, V>,
+        tree: &impl MerklePatriciaTree<Q, V>,
         contour: &mut Vec<ContourNode>,
         proof_path: &ProofPath,
         key: K,
-    ) -> Self {
+    ) -> Self
+    where
+        K: Borrow<Q>,
+    {
         // `unwrap()` is safe: there is at least 1 element in the contour by design
         let common_prefix = proof_path.common_prefix_len(&contour.last().unwrap().key);
 
@@ -70,7 +73,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
                 }
                 Node::Leaf(_) => {
                     // We have reached the leaf node and haven't diverged!
-                    let value = tree.value(&key);
+                    let value = tree.value(key.borrow());
                     break self.add_entry(key, value);
                 }
             }

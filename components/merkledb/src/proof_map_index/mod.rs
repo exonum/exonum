@@ -314,7 +314,7 @@ where
     /// let proof = index.get_proof(Hash::default());
     /// ```
     pub fn get_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
-       self.create_proof(key)
+        self.create_proof(key)
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -335,8 +335,7 @@ where
     where
         KI: IntoIterator<Item = K::Owned>,
     {
-        unimplemented!()
-        //                self.create_multiproof(keys)
+        self.create_multiproof(keys)
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
