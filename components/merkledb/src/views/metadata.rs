@@ -499,7 +499,10 @@ where
         index_access: T,
         index_address: &IndexAddress,
     ) -> Result<Option<IndexMetadata>, AccessError> {
-        check_index_valid_full_name(index_address)?;
+        check_index_valid_full_name(index_address.name()).map_err(|kind| AccessError {
+            addr: index_address.to_owned(),
+            kind,
+        })?;
         let index_full_name = index_address.fully_qualified_name();
         let pool = IndexesPool::new(index_access);
         Ok(pool.index_metadata(&index_full_name))
