@@ -60,9 +60,8 @@
 // - update lock
 use std::time::Duration;
 
-use crate::helpers::{Height, ValidatorId};
-use crate::sandbox::sandbox_tests_helper::gen_timestamping_tx;
-use crate::sandbox::timestamping_sandbox;
+use exonum::helpers::{Height, ValidatorId};
+use exonum_consensus_tests::{sandbox_tests_helper::gen_timestamping_tx, timestamping_sandbox};
 use exonum_crypto::Hash;
 
 // Receive status with pool_size = 1

@@ -216,7 +216,32 @@ struct ServicePanicImpl;
 impl ServicePanic for ServicePanicImpl {}
 
 impl Service for ServicePanicImpl {
+    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+        if context.in_genesis_block() {
+            return Ok(());
+        }
+        panic!("42");
+    }
+}
+
+#[exonum_interface(crate = "crate")]
+trait ServiceGenesisPanic {}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(crate = "crate", implements("ServiceGenesisPanic"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "panic_service",
+    artifact_version = "1.0.0",
+    proto_sources = "crate::proto::schema"
+)]
+struct ServiceGenesisPanicImpl;
+
+impl ServiceGenesisPanic for ServiceGenesisPanicImpl {}
+
+impl Service for ServiceGenesisPanicImpl {
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+        // Panics even on the genesis block.
         panic!("42");
     }
 }
@@ -291,8 +316,10 @@ fn assert_service_execute(blockchain: &mut BlockchainMut) {
     blockchain.merge(patch).unwrap();
     let snapshot = blockchain.snapshot();
     let index = snapshot.get_list("service_good.val");
-    assert_eq!(index.len(), 1);
+    // One time `after_transactions` was invoked on the genesis block, and then we created one more block.
+    assert_eq!(index.len(), 2);
     assert_eq!(index.get(0), Some(1));
+    assert_eq!(index.get(1), Some(1));
 }
 
 fn assert_service_execute_panic(blockchain: &mut BlockchainMut) {
@@ -340,10 +367,12 @@ fn execute_transaction(
     schema.transaction_result(location).unwrap()
 }
 
-fn create_blockchain(
+/// Attempts to create a blockchain, returning an error if the genesis block
+/// was not created.
+fn maybe_create_blockchain(
     services: Vec<Box<dyn ServiceFactory>>,
     instances: Vec<impl Into<InstanceInitParams>>,
-) -> BlockchainMut {
+) -> Result<BlockchainMut, failure::Error> {
     let config = generate_testnet_config(1, 0)[0].clone();
     let service_keypair = config.service_keypair();
 
@@ -370,7 +399,116 @@ fn create_blockchain(
         .into_mut(genesis_config)
         .with_runtime(rust_runtime)
         .build()
-        .unwrap()
+}
+
+/// Creates a blockchain from provided services and instances.
+/// Panics if genesis block was not created.
+fn create_blockchain(
+    services: Vec<Box<dyn ServiceFactory>>,
+    instances: Vec<impl Into<InstanceInitParams>>,
+) -> BlockchainMut {
+    maybe_create_blockchain(services, instances).unwrap()
+}
+
+/// Checks that `Schema::height` and `Schema::next_height` work as expected.
+#[test]
+fn blockchain_height() {
+    let mut blockchain = create_blockchain(
+        Vec::<Box<dyn ServiceFactory>>::new(),
+        Vec::<InstanceInitParams>::new(),
+    );
+
+    // Check that height is 0 after genesis creation.
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    assert_eq!(schema.height(), Height(0));
+    assert_eq!(schema.next_height(), Height(1));
+
+    // Create one block.
+    let (_, patch) = blockchain.create_patch(
+        ValidatorId::zero().into(),
+        Height::zero(),
+        &[],
+        &mut BTreeMap::new(),
+    );
+    blockchain.merge(patch).unwrap();
+
+    // Check that height is 1.
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    assert_eq!(schema.height(), Height(1));
+    assert_eq!(schema.next_height(), Height(2));
+}
+
+/// Checks that before genesis creation `Schema::height` panics.
+#[test]
+#[should_panic(
+    expected = "An attempt to get the actual `height` during creating the genesis block"
+)]
+fn blockchain_height_panics_before_genesis() {
+    let service_keypair = crypto::gen_keypair();
+
+    // Create a blockchain *without* creating a genesis block.
+    let blockchain = Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed());
+
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    let _height = schema.height();
+}
+
+/// Checks that before genesis creation `Schema::next_height` doesn't panic.
+#[test]
+fn blockchain_next_height_does_not_panic_before_genesis() {
+    let service_keypair = crypto::gen_keypair();
+
+    // Create a blockchain *without* creating a genesis block.
+    let blockchain = Blockchain::new(TemporaryDB::new(), service_keypair, ApiSender::closed());
+
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    let height = schema.next_height();
+    assert_eq!(height, Height(0))
+}
+
+/// Checks that `after_transactions` is invoked for services added
+/// within genesis block.
+#[test]
+fn after_transactions_invoked_on_genesis() {
+    // `ServiceGoodImpl` sets the value in schema within `after_transactions`.
+    let blockchain = create_blockchain(
+        vec![ServiceGoodImpl.into()],
+        vec![ServiceGoodImpl
+            .artifact_id()
+            .into_default_instance(3, "service_good")],
+    );
+
+    // After creation of the genesis block, check that value was set.
+    let snapshot = blockchain.snapshot();
+    let index = snapshot.get_list("service_good.val");
+    assert_eq!(index.len(), 1);
+    assert_eq!(index.get(0), Some(1));
+}
+
+/// Checks that if `after_transactions` fails on the genesis block,
+/// the blockchain is not created.
+#[test]
+fn after_transactions_failure_causes_genesis_failure() {
+    let blockchain_result = maybe_create_blockchain(
+        vec![ServiceGenesisPanicImpl.into()],
+        vec![ServiceGenesisPanicImpl
+            .artifact_id()
+            .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
+    );
+
+    const EXPECTED_ERR_TEXT: &str = "`after_transactions` failed for at least one service";
+    let actual_err = blockchain_result
+        .expect_err("Blockchain shouldn't be created after failure within genesis block");
+
+    // Unfortunately, `failure::Error` doesn't implement `PartialEq`, so we have to string-compare them.
+    assert!(
+        actual_err.to_string().contains(EXPECTED_ERR_TEXT),
+        "Expected error should be caused by `after_transactions` hook"
+    );
 }
 
 #[test]

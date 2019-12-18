@@ -14,9 +14,9 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-pub use self::node::{BranchNode, Node};
+pub(crate) use self::key::ProofPath;
 pub use self::{
-    key::{Hashed, ProofPath, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    key::{Hashed, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
@@ -26,6 +26,7 @@ use exonum_crypto::Hash;
 
 use self::{
     key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
+    node::{BranchNode, Node},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
 use crate::{
@@ -804,6 +805,76 @@ where
     }
 }
 
+/// `object_hash()` of a proof map is uniquely determined by its contents (i.e.,
+/// keys and corresponding values). It does not depend on the order of key insertion.
+///
+/// # Specification
+///
+/// The `object_hash` is defined as
+///
+/// ```text
+/// h = sha-256( HashTag::MapNode || merkle_root )
+/// ```
+///
+/// where `merkle_root` is computed according to one of the three cases as follows.
+///
+/// ## Empty map
+///
+/// ```text
+/// merkle_root = Hash::zero().
+/// ```
+///
+/// ## Map with a single entry
+///
+/// ```text
+/// merkle_root = sha-256( HashTag::MapBranchNode || <path> || <child_hash> ).
+/// ```
+///
+/// Here, the map contains a single `path` (see `ProofPath`), and `child_hash` is the hash
+/// of the object under this key. `path` is always serialized as 32 bytes.
+///
+/// ## Map with multiple entries
+///
+/// ```text
+/// merkle_root = sha-256(
+///     HashTag::MapBranchNode
+///     || <left_path> || <right_path>
+///     || <left_hash> || <right_hash>
+/// ).
+/// ```
+///
+/// Here, the root node in the Merkle Patricia tree corresponding to the map has `left_path` /
+/// `right_path` as child `ProofPath`s, and `left_hash` / `right_hash` are hashes of child nodes.
+/// These hashes are defined according to the same formula for branch nodes, and per
+/// `object_hash` implementation if a node is a leaf.
+///
+/// `ProofPath`s are serialized in this case as
+///
+/// ```text
+/// LEB128(<bit_length>) || <bytes>,
+/// ```
+///
+/// where `bytes` contains the minimum necessary number of bytes to accommodate `bit_length` bits,
+/// and is zero-padded if necessary.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{
+/// #     access::AccessExt, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash,
+/// # };
+/// # use exonum_crypto::Hash;
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let mut index = fork.get_proof_map("name");
+///
+/// let default_hash = index.object_hash();
+/// assert_eq!(HashTag::empty_map_hash(), default_hash);
+///
+/// index.put(&default_hash, 100);
+/// let hash = index.object_hash();
+/// assert_ne!(hash, default_hash);
+/// ```
 impl<T, K, V, KeyMode> ObjectHash for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
@@ -811,29 +882,6 @@ where
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
-    /// Returns the hash of the proof map object. See [`HashTag::hash_map_node`].
-    /// For hash of the empty map see [`HashTag::empty_map_hash`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash};
-    /// use exonum_crypto::Hash;
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let mut index = fork.get_proof_map("name");
-    ///
-    /// let default_hash = index.object_hash();
-    /// assert_eq!(HashTag::empty_map_hash(), default_hash);
-    ///
-    /// index.put(&default_hash, 100);
-    /// let hash = index.object_hash();
-    /// assert_ne!(hash, default_hash);
-    /// ```
-    ///
-    /// [`HashTag::hash_map_node`]: ../enum.HashTag.html#method.hash_map_node
-    /// [`HashTag::empty_map_hash`]: ../enum.HashTag.html#method.empty_map_hash
     fn object_hash(&self) -> Hash {
         HashTag::hash_map_node(self.merkle_root())
     }

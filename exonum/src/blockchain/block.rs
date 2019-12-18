@@ -125,8 +125,8 @@ pub struct Block {
 }
 
 impl Block {
-    /// Insert new additional header to the block.
-    pub(crate) fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
+    /// Inserts new additional header to the block.
+    pub fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
         self.additional_headers.insert::<K>(value);
     }
 

@@ -292,28 +292,40 @@ pub enum Change {
     Delete,
 }
 
-/// A combination of a database snapshot and a sequence of changes on top of it.
+/// A combination of a database snapshot and changes on top of it.
 ///
-/// A `Fork` provides both immutable and mutable operations over the database. Like [`Snapshot`],
-/// `Fork` provides read isolation. When mutable operations ([`put`], [`remove`] and
-/// [`remove_by_prefix`]) are applied to a fork, the subsequent reads act as if the changes
+/// A `Fork` provides both immutable and mutable operations over the database by implementing
+/// the [`RawAccessMut`] trait. Like [`Snapshot`], `Fork` provides read isolation.
+/// When mutable operations are applied to a fork, the subsequent reads act as if the changes
 /// are applied to the database; in reality, these changes are accumulated in memory.
 ///
-/// To apply changes to the database, you need to convert a `Fork` into a [`Patch`] using
+/// To apply the changes to the database, you need to convert a `Fork` into a [`Patch`] using
 /// [`into_patch`] and then atomically [`merge`] it into the database. If two
 /// conflicting forks are merged into a database, this can lead to an inconsistent state. If you
 /// need to consistently apply several sets of changes to the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
-/// `Fork` also supports checkpoints ([`flush`] and
-/// [`rollback`] methods), which allows rolling back some of the latest changes (e.g., after
-/// a runtime error). Checkpoint is created automatically after calling the `flush` method.
+/// `Fork` also supports checkpoints ([`flush`] and [`rollback`] methods), which allows
+/// rolling back the latest changes. A checkpoint is created automatically after calling
+/// the `flush` method.
 ///
-/// `Fork` provides methods for both reading and writing data. Thus, `&Fork` is used
-/// as a storage view for creating read-write indices representation.
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, Database, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let mut fork = db.fork();
+/// fork.get_list("list").extend(vec![1_u32, 2]);
+/// fork.flush();
+/// fork.get_list("list").push(3_u32);
+/// fork.rollback();
+/// // The changes after the latest `flush()` are now forgotten.
+/// let list = fork.get_list::<_, u32>("list");
+/// assert_eq!(list.len(), 2);
+/// # assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2]);
+/// ```
 ///
-/// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
-/// to a full key (a string column family name + key as an array of bytes within the family).
+/// In order to convert a fork into `&dyn Snapshot` presentation, convert it into a `Patch`
+/// and use a reference to it (`Patch` implements `Snapshot`). Using `<Fork as RawAccess>::snapshot`
+/// for this purpose is logically incorrect and may lead to hard-to-debug errors.
 ///
 /// # Borrow checking
 ///
@@ -353,10 +365,8 @@ pub enum Change {
 /// a shared reference to an index if there is an exclusive reference to the same index,
 /// and vice versa.
 ///
+/// [`RawAccessMut`]: access/trait.RawAccessMut.html
 /// [`Snapshot`]: trait.Snapshot.html
-/// [`put`]: #method.put
-/// [`remove`]: #method.remove
-/// [`remove_by_prefix`]: #method.remove_by_prefix
 /// [`Patch`]: struct.Patch.html
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
@@ -371,11 +381,28 @@ pub struct Fork {
     working_patch: WorkingPatch,
 }
 
-/// A set of serial changes that should be applied to a storage atomically.
+/// A set of changes that can be atomically applied to a `Database`.
 ///
-/// This set can contain changes from multiple tables. When a block is added to
-/// the blockchain, changes are first collected into a patch and then applied to
-/// the storage.
+/// This set can contain changes from multiple indexes. Changes can be read from the `Patch`
+/// using its `RawAccess` implementation.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{
+/// #     access::AccessExt, Database, ObjectHash, Patch, SystemSchema, TemporaryDB,
+/// # };
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// fork.get_proof_list("list").extend(vec![1_i32, 2, 3]);
+/// let patch: Patch = fork.into_patch();
+/// // The patch contains changes recorded in the fork.
+/// let list = patch.get_proof_list::<_, i32>("list");
+/// assert_eq!(list.len(), 3);
+/// // Unlike `Fork`, `Patch`es have consistent aggregated state.
+/// let aggregator = SystemSchema::new(&patch).state_aggregator();
+/// assert_eq!(aggregator.get("list").unwrap(), list.object_hash());
+/// ```
 #[derive(Debug)]
 pub struct Patch {
     snapshot: Box<dyn Snapshot>,
@@ -406,7 +433,7 @@ enum NextIterValue {
 /// A `Database` instance is shared across different threads, so it must be `Sync` and `Send`.
 ///
 /// There is no way to directly interact with data in the database; use [`snapshot`], [`fork`]
-/// and [`merge`] methods for indirect interaction. See [the module documentation](index.html)
+/// and [`merge`] methods for indirect interaction. See [the crate-level documentation](index.html)
 /// for more details.
 ///
 /// Note that `Database` effectively has [interior mutability][interior-mut];
@@ -429,7 +456,7 @@ enum NextIterValue {
 /// [`snapshot`]: #tymethod.snapshot
 /// [`fork`]: #method.fork
 /// [`merge`]: #tymethod.merge
-/// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
+/// [interior-mut]: https://doc.rust-lang.org/book/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
     fn snapshot(&self) -> Box<dyn Snapshot>;
@@ -534,17 +561,14 @@ impl<T: Database> DatabaseExt for T {}
 /// A `Snapshot` instance is an immutable representation of a certain storage state.
 /// It provides read isolation, so consistency is guaranteed even if the data in
 /// the database changes between reads.
-///
-/// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
-/// to a full key (a string column family name + key as an array of bytes within the family).
 pub trait Snapshot: Send + Sync + 'static {
-    /// Returns a value corresponding to the specified key as a raw vector of bytes,
+    /// Returns a value corresponding to the specified address and key as a raw vector of bytes,
     /// or `None` if it does not exist.
     fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>>;
 
-    /// Returns `true` if the snapshot contains a value for the specified key.
+    /// Returns `true` if the snapshot contains a value for the specified address and key.
     ///
-    /// Default implementation checks existence of the value using [`get`](#tymethod.get).
+    /// The default implementation checks existence of the value using [`get`](#tymethod.get).
     fn contains(&self, name: &ResolvedAddress, key: &[u8]) -> bool {
         self.get(name, key).is_some()
     }
