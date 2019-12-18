@@ -30,7 +30,7 @@ use super::TestKit;
 pub struct TestKitActor(TestKit);
 
 impl TestKitActor {
-    pub fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
+    pub(crate) fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
         let mut api_aggregator = testkit.update_aggregator();
 
         // Spawn the testkit actor on the new `actix` system.

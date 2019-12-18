@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
-extern crate pretty_assertions;
-
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
@@ -29,6 +24,7 @@ use exonum::{
 use exonum_merkledb::{access::Access, Snapshot};
 use exonum_supervisor::{ConfigPropose, Supervisor};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use pretty_assertions::assert_eq;
 
 use std::{collections::HashMap, iter::FromIterator};
 

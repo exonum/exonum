@@ -177,10 +177,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::server::TestKitActor;
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
+    server::TestKitActor,
 };
 
 mod api;
