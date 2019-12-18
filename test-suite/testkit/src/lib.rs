@@ -417,6 +417,12 @@ impl TestKit {
         self.db_handler.rollback()
     }
 
+    ///
+    /// # Panics
+    /// - Panics if any of the transactions is incorrect.
+    ///
+    /// # Panics
+    /// - Panics if any of the transactions is incorrect.
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
@@ -475,6 +481,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
+    /// - Panics if any of the transactions is incorrect.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
@@ -516,6 +523,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
+    /// - Panics if any of the transactions is incorrect.
     pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
         self.create_block_with_transactions(vec![tx])
     }
