@@ -140,7 +140,7 @@ impl Block {
     /// # use exonum::crypto::Hash;
     /// # use exonum::blockchain::{Block, BlockHeaderKey, AdditionalHeaders};
     /// # use exonum::helpers::Height;
-    /// # use exonum::messages::BinaryValue;
+    /// # use exonum::merkledb::BinaryValue;
     /// # use failure::Error;
     /// # use std::borrow::Cow;
     ///
