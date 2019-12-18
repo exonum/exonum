@@ -28,12 +28,29 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
-
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
+- The following public APIs were removed/made private: (#1629)
+  - `helpers::path_relative_from` function;
+  - `messages::BinaryValue` public re-export;
+  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
+    `Blockchain::remove_peer_with_pubkey` methods;
+  - `node::state` module (constants from `node::state` are now accessible in
+    `node::constants` module).
+
+#### exonum-merkledb
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
 
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
+
+### exonum-testkit
+
+- The following public APIs were removed/made private: (#1629)
+  - `compare` module;
+  - `txvec` macro;
+  - `TestKit::probe_all` and `TestKit::probe` methods.
 
 ### New features
 
@@ -69,6 +86,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
+
+### Internal Improvements
+
+#### exonum
+
+- `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
 
 ### Bug Fixes
 
