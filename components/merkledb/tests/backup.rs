@@ -344,3 +344,13 @@ fn backup_with_honest_db_initialization() {
         apply_actions(&db, init_actions, main_actions)?;
     });
 }
+
+#[test]
+fn backup_with_db_clearing() {
+    let db = TemporaryDB::new();
+    let actions = vec(generate_action(), 1..ACTIONS_MAX_LEN);
+    proptest!(|(init_actions in actions.clone(), main_actions in actions)| {
+        apply_actions(&db, init_actions, main_actions)?;
+        db.clear().unwrap();
+    });
+}
