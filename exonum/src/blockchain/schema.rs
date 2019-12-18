@@ -268,7 +268,8 @@ impl<T: Access> Schema<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the "genesis block" was not created.
+    /// Panics if invoked before the genesis block was created, e.g. within
+    /// `after_transactions` hook for genesis block.
     pub fn height(&self) -> Height {
         let len = self.block_hashes_by_height().len();
         assert!(
@@ -276,6 +277,14 @@ impl<T: Access> Schema<T> {
             "An attempt to get the actual `height` during creating the genesis block."
         );
         Height(len - 1)
+    }
+
+    /// Returns the height of the block to be committed.
+    ///
+    /// Unlike `height`, this method never panics.
+    pub fn next_height(&self) -> Height {
+        let len = self.block_hashes_by_height().len();
+        Height(len)
     }
 
     /// Returns an actual consensus configuration of the blockchain.
