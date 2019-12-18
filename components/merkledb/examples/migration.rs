@@ -242,13 +242,14 @@ fn main() {
     let system_schema = SystemSchema::new(&snapshot);
     let state = system_schema.state_aggregator();
     assert_eq!(state.keys().collect::<Vec<_>>(), vec!["unrelated.list"]);
-    let state = system_schema.namespace_state_aggregator("test");
+    let migration_view = Migration::new("test", &snapshot);
+    let state = migration_view.state_aggregator();
     assert_eq!(
         state.keys().collect::<Vec<_>>(),
         vec!["test.config", "test.wallets"]
     );
     let new_state_hash = state.object_hash();
-    assert_eq!(new_state_hash, system_schema.namespace_state_hash("test"));
+    assert_eq!(new_state_hash, migration_view.state_hash());
 
     let mut fork = db.fork();
     fork.flush_migration("test");

@@ -7,14 +7,16 @@
 //! can be atomically committed or rolled back. Accumulating changes in the migration,
 //! on the other hand, can be performed iteratively, including after a process shutdown.
 //!
-//! Each migration is confined to a *namespace*, defined in the same way as for [`Prefixed`]
+//! Each migration is confined to a *namespace*, defined in a similar way as [`Prefixed`]
 //! accesses. For example, namespace `test` concerns indexes with an address starting with
 //! `test.`, such as `test.foo` or `(test.bar, 1_u32)`, but not `test` or `test_.foo`.
+//! The namespace can be accessed via [`Migration`].
 //!
 //! Migration is non-destructive, i.e., does not remove the old versions of migrated indexes.
-//! Instead, new indexes are created with a different address of form `^test.foo` (notice
-//! the caret char `^`, which can be read as "the next version of"). Indexes `^test.foo` and
-//! `test.foo` can peacefully coexist and have separate data and even different types.
+//! Instead, new indexes are created in a separate namespace. For example, index `foo`
+//! in the migration namespace `test` and the original `test.foo` index can peacefully coexist
+//! and have separate data and even different types. The movement of data is performed only
+//! when the migration is finalized.
 //!
 //! Retaining an index in the migration is a no op. *Removing* an index is explicit; it needs
 //! to be performed via [`create_tombstone`] method. Although tombstones do not contain data,
@@ -23,22 +25,24 @@
 //!
 //! Indexes created within a migration are not [aggregated] in the default state hash. Instead,
 //! they are placed in a separate namespace, the aggregator and state hash for which can be
-//! obtained via respective [`SystemSchema`] methods.
+//! obtained via respective [`Migration`] methods.
 //!
 //! It is possible to periodically persist migrated data to the database
 //! (indeed, this is a best practice to avoid out-of-memory errors). It is even possible
 //! to restart the process handling the migration, provided it can recover from such a restart
 //! on the application level.
 //!
+//! # Finalizing Migration
+//!
 //! To finalize a migration, one needs to call [`Fork::flush_migration`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
 //! to the default state aggregator. To roll back a migration, use [`Fork::rollback_migration`].
 //! This will remove the new index data and corresponding metadata.
 //!
+//! [`Migration`]: struct.Migration.html
 //! [`Prefixed`]: ../access/struct.Prefixed.html
-//! [`create_tombstone`]: ../access/trait.AccessExt.html#method.create_tombstone
+//! [`create_tombstone`]: struct.Migration.html#method.create_tombstone
 //! [aggregated]: ../index.html#state-aggregation
-//! [`SystemSchema`]: ../struct.SystemSchema.html
 //! [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
 //! [`Fork::rollback_migration`]: ../struct.Fork.html#method.rollback_migration
 //!
@@ -46,7 +50,7 @@
 //!
 //! ```
 //! # use exonum_merkledb::{access::AccessExt, Database, SystemSchema, TemporaryDB};
-//! # use exonum_merkledb::migration::MigrationHelper;
+//! # use exonum_merkledb::migration::{Migration, MigrationHelper};
 //! # use std::sync::Arc;
 //! # fn main() -> exonum_merkledb::Result<()> {
 //! let db = Arc::new(TemporaryDB::new());
@@ -76,7 +80,7 @@
 //! assert_eq!(intermediate_state_hash, initial_state_hash);
 //! // Instead, they influence the state hash for the migration namespace
 //! // (i.e., `test` in this case).
-//! let aggregated = SystemSchema::new(&snapshot).namespace_state_aggregator("test");
+//! let aggregated = Migration::new("test", &snapshot).state_aggregator();
 //! assert!(aggregated.contains("test.list"));
 //! assert!(!aggregated.contains("test.entry"));
 //!
@@ -91,7 +95,8 @@
 //! // For now, migrated and original data co-exist in the storage.
 //! let snapshot = db.snapshot();
 //! assert_eq!(snapshot.get_list::<_, u32>("test.list").len(), 3);
-//! assert_eq!(snapshot.get_proof_list::<_, u32>("^test.list").len(), 3);
+//! let migration = Migration::new("test", &snapshot);
+//! assert_eq!(migration.get_proof_list::<_, u32>("list").len(), 3);
 //!
 //! // The migration can be committed as follows.
 //! let mut fork = db.fork();
@@ -112,23 +117,68 @@ use exonum_crypto::Hash;
 use std::{fmt, mem, sync::Arc};
 
 use crate::{
-    access::{Access, AccessError, Prefixed},
+    access::{Access, AccessError, Prefixed, RawAccess},
     validation::assert_valid_name_component,
-    views::{IndexAddress, IndexType, RawAccessMut, ViewWithMetadata},
-    Database, Fork, ReadonlyFork, SystemSchema,
+    views::{
+        get_state_aggregator, AsReadonly, IndexAddress, IndexType, RawAccessMut, ViewWithMetadata,
+    },
+    Database, Fork, ObjectHash, ProofMapIndex, ReadonlyFork,
 };
 
-/// TODO.
+/// Access to migrated indexes.
+///
+/// `Migration` is conceptually similar to a [`Prefixed`] access. For example, an index with
+/// address `"list"` in a migration `Migration::new("foo", _)` will map to the address `"foo.list"`
+/// after the migration is flushed. The major difference with `Prefixed` is that the indexes
+/// in a migration cannot be accessed in any other way. That is, it is impossible to access
+/// an index in a migration without constructing a `Migration` object first.
+///
+/// [`Prefixed`]: ../access/struct.Prefixed.html
 #[derive(Debug, Clone, Copy)]
 pub struct Migration<'a, T> {
     access: T,
     namespace: &'a str,
 }
 
-impl<'a, T: Access> Migration<'a, T> {
+impl<'a, T: RawAccess> Migration<'a, T> {
     /// Creates a migration in the specified namespace.
     pub fn new(namespace: &'a str, access: T) -> Self {
         Self { namespace, access }
+    }
+
+    /// Returns the state hash of indexes within the migration. The state hash is up to date
+    /// for `Snapshot`s (including `Patch`es), but is generally stale for `Fork`s.
+    pub fn state_hash(&self) -> Hash {
+        get_state_aggregator(self.access.clone(), self.namespace).object_hash()
+    }
+}
+
+impl<T: RawAccess + AsReadonly> Migration<'_, T> {
+    /// Returns the state aggregator for the indexes within the migration. The aggregator
+    /// is up to date for `Snapshot`s (including `Patch`es), but is generally stale for `Fork`s.
+    ///
+    /// Note that keys in the aggregator are *full* addresses, which include the migration namespace,
+    /// as is the case for the [default aggregator].
+    ///
+    /// [default aggregator]: ../struct.SystemSchema.html#method.state_aggregator
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use exonum_merkledb::{access::AccessExt, migration::Migration, Database, TemporaryDB};
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// {
+    ///     let migration = Migration::new("migration", &fork);
+    ///     migration.get_proof_entry("entry").set(42);
+    /// }
+    /// let patch = fork.into_patch();
+    /// let migration_view = Migration::new("migration", &patch);
+    /// let aggregator = migration_view.state_aggregator();
+    /// assert!(aggregator.contains("migration.entry")); // Not `entry`!
+    /// ```
+    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
+        get_state_aggregator(self.access.as_readonly(), self.namespace)
     }
 }
 
@@ -143,8 +193,8 @@ impl<T: RawAccessMut> Migration<'_, T> {
     }
 }
 
-impl<T: Access> Access for Migration<'_, T> {
-    type Base = T::Base;
+impl<T: RawAccess> Access for Migration<'_, T> {
+    type Base = T;
 
     fn get_or_create_view(
         self,
@@ -169,7 +219,7 @@ pub struct MigrationHelper {
 impl fmt::Debug for MigrationHelper {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter
-            .debug_tuple("Migration")
+            .debug_tuple("MigrationHelper")
             .field(&self.namespace)
             .finish()
     }
@@ -222,7 +272,7 @@ impl MigrationHelper {
     /// [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
     pub fn finish(self) -> crate::Result<Hash> {
         let patch = self.fork.into_patch();
-        let hash = SystemSchema::new(&patch).namespace_state_hash(&self.namespace);
+        let hash = Migration::new(&self.namespace, &patch).state_hash();
         self.db.merge(patch).map(|()| hash)
     }
 }
@@ -232,7 +282,7 @@ mod tests {
     use super::*;
     use crate::{
         access::{AccessExt, RawAccess},
-        HashTag, ObjectHash, TemporaryDB,
+        HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
 
     #[test]
@@ -391,18 +441,17 @@ mod tests {
         let snapshot = db.snapshot();
         let new_state_hash = SystemSchema::new(&snapshot).state_hash();
         assert_eq!(state_hash, new_state_hash);
-        let system_schema = SystemSchema::new(&snapshot);
-        let ns_hash = system_schema.namespace_state_hash("name");
-        assert_ne!(ns_hash, HashTag::empty_map_hash());
 
-        let ns_aggregator = system_schema.namespace_state_aggregator("name");
+        let migration = Migration::new("name", &snapshot);
+        let ns_hash = migration.state_hash();
+        assert_ne!(ns_hash, HashTag::empty_map_hash());
+        let ns_aggregator = migration.state_aggregator();
         assert_eq!(ns_hash, ns_aggregator.object_hash());
         assert_eq!(
             ns_aggregator.keys().collect::<Vec<_>>(),
             vec!["name.entry", "name.list", "name.new"]
         );
 
-        let migration = Migration::new("name", &snapshot);
         let list = migration.get_proof_list::<_, u64>("list");
         assert_eq!(ns_aggregator.get("name.list"), Some(list.object_hash()));
         let entry = migration.get_proof_entry::<_, String>("entry");
@@ -440,11 +489,11 @@ mod tests {
         fork.flush_migration("name");
 
         let patch = fork.into_patch();
-        let system_schema = SystemSchema::new(&patch);
         assert_eq!(
-            system_schema.namespace_state_hash("name"),
+            Migration::new("name", &patch).state_hash(),
             HashTag::empty_map_hash()
         );
+        let system_schema = SystemSchema::new(&patch);
         let aggregator = system_schema.state_aggregator();
         assert_eq!(
             aggregator.keys().collect::<Vec<_>>(),

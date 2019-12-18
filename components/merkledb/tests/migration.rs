@@ -318,8 +318,8 @@ fn check_namespace_aggregator<'a>(
     namespace: &str,
     single_indexes: impl Iterator<Item = (&'a str, IndexType)>,
 ) -> TestCaseResult {
-    let aggregator = SystemSchema::new(snapshot).namespace_state_aggregator(namespace);
     let migration = Migration::new(namespace, snapshot);
+    let aggregator = migration.state_aggregator();
 
     let mut expected_names = HashSet::new();
     for (name, index_type) in single_indexes {
@@ -409,9 +409,8 @@ fn check_final_consistency(
             .map(|(name, ty)| (name.as_str(), *ty)),
     )?;
 
-    let system_schema = SystemSchema::new(snapshot);
     for &namespace in namespaces {
-        let ns_aggregator = system_schema.namespace_state_aggregator(namespace);
+        let ns_aggregator = Migration::new(namespace, snapshot).state_aggregator();
         prop_assert_eq!(ns_aggregator.keys().count(), 0);
     }
 

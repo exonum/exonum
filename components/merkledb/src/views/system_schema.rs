@@ -4,9 +4,9 @@ use super::{AsReadonly, IndexType, RawAccess, ViewWithMetadata};
 use crate::{Fork, ObjectHash, ProofMapIndex};
 
 /// Name of the state aggregator proof map.
-pub(super) const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
+const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
 
-fn get_state_aggregator<T: RawAccess>(
+pub fn get_state_aggregator<T: RawAccess>(
     access: T,
     namespace: &str,
 ) -> ProofMapIndex<T, String, Hash> {
@@ -70,15 +70,6 @@ impl<T: RawAccess> SystemSchema<T> {
     pub fn state_hash(&self) -> Hash {
         get_state_aggregator(self.0.clone(), "").object_hash()
     }
-
-    /// Returns the state hash of indexes in the specified `namespace`.
-    ///
-    /// See [migrations] for the context how namespaces are defined and used.
-    ///
-    /// [migrations]: migration/index.html
-    pub fn namespace_state_hash(&self, namespace: &str) -> Hash {
-        get_state_aggregator(self.0.clone(), namespace).object_hash()
-    }
 }
 
 impl<T: RawAccess + AsReadonly> SystemSchema<T> {
@@ -90,18 +81,6 @@ impl<T: RawAccess + AsReadonly> SystemSchema<T> {
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
         get_state_aggregator(self.0.as_readonly(), "")
-    }
-
-    /// Returns the state aggregator for the specified `namespace`.
-    ///
-    /// See [migrations] for the context how namespaces are defined and used.
-    ///
-    /// [migrations]: migration/index.html
-    pub fn namespace_state_aggregator(
-        &self,
-        namespace: &str,
-    ) -> ProofMapIndex<T::Readonly, String, Hash> {
-        get_state_aggregator(self.0.as_readonly(), namespace)
     }
 }
 

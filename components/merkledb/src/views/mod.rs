@@ -17,7 +17,7 @@ pub use self::{
     metadata::{
         get_object_hash, BinaryAttribute, IndexState, IndexType, IndexesPool, ViewWithMetadata,
     },
-    system_schema::SystemSchema,
+    system_schema::{get_state_aggregator, SystemSchema},
 };
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
