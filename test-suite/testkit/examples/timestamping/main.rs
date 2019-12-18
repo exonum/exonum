@@ -96,8 +96,7 @@ fn main() {
     let tx3 = TxTimestamp::new("Dropping Like Flies").sign(instance_id, keypair.0, &keypair.1);
 
     // Commit them into blockchain.
-    let block =
-        testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone(),]);
+    let block = testkit.create_block_with_transactions(vec![tx1.clone(), tx2.clone(), tx3.clone()]);
     assert_eq!(block.len(), 3);
     assert!(block.iter().all(|transaction| transaction.status().is_ok()));
 

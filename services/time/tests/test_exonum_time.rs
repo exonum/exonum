@@ -88,7 +88,7 @@ fn test_exonum_time_service_with_3_validators() {
         let (pub_key, sec_key) = validators[0].service_keypair();
         TxTime { time: time0 }.sign(INSTANCE_ID, pub_key, &sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx0]);
+    testkit.create_block_with_transactions(vec![tx0]);
 
     assert_storage_times_eq(
         &testkit.snapshot(),
@@ -110,7 +110,7 @@ fn test_exonum_time_service_with_3_validators() {
         let (pub_key, sec_key) = validators[1].service_keypair();
         TxTime { time: time1 }.sign(INSTANCE_ID, pub_key, &sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx1]);
+    testkit.create_block_with_transactions(vec![tx1]);
 
     assert_storage_times_eq(
         &testkit.snapshot(),
@@ -153,7 +153,7 @@ fn test_exonum_time_service_with_4_validators() {
         let (pub_key, sec_key) = validators[0].service_keypair();
         TxTime { time: time0 }.sign(INSTANCE_ID, pub_key, &sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx0]);
+    testkit.create_block_with_transactions(vec![tx0]);
 
     assert_storage_times_eq(
         &testkit.snapshot(),
@@ -175,7 +175,7 @@ fn test_exonum_time_service_with_4_validators() {
         let (pub_key, sec_key) = validators[1].service_keypair();
         TxTime { time: time1 }.sign(INSTANCE_ID, pub_key, &sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx1]);
+    testkit.create_block_with_transactions(vec![tx1]);
 
     assert_storage_times_eq(
         &testkit.snapshot(),
@@ -197,7 +197,7 @@ fn test_exonum_time_service_with_4_validators() {
         let (pub_key, sec_key) = validators[2].service_keypair();
         TxTime { time: time2 }.sign(INSTANCE_ID, pub_key, &sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx2]);
+    testkit.create_block_with_transactions(vec![tx2]);
 
     assert_storage_times_eq(
         &testkit.snapshot(),
@@ -219,7 +219,7 @@ fn test_exonum_time_service_with_4_validators() {
         let (pub_key, sec_key) = validators[3].service_keypair();
         TxTime { time: time3 }.sign(INSTANCE_ID, pub_key, &sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx3]);
+    testkit.create_block_with_transactions(vec![tx3]);
 
     assert_storage_times_eq(
         &testkit.snapshot(),
@@ -512,9 +512,9 @@ fn test_endpoint_api() {
 
     let time0 = Utc::now();
     let (pub_key, sec_key) = validators[0].service_keypair();
-    testkit.create_block_with_transactions(txvec![
+    testkit.create_block_with_transactions(vec![
         //
-        TxTime { time: time0 }.sign(INSTANCE_ID, pub_key, &sec_key)
+        TxTime { time: time0 }.sign(INSTANCE_ID, pub_key, &sec_key),
     ]);
     current_validators_times.insert(pub_key, Some(time0));
     all_validators_times.insert(pub_key, Some(time0));

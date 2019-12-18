@@ -124,7 +124,7 @@ fn test_api_get_timestamp_proof() {
     // Create timestamp
     let content = Timestamp::new(&Hash::zero(), "metadata");
     let tx = TxTimestamp { content }.sign(SERVICE_ID, keypair.0, &keypair.1);
-    testkit.create_block_with_transactions(txvec![tx.clone()]);
+    testkit.create_block_with_transactions(vec![tx.clone()]);
 
     // Get proof.
     let api = testkit.api();
@@ -148,7 +148,7 @@ fn test_api_get_timestamp_entry() {
         content: content.clone(),
     }
     .sign(SERVICE_ID, keypair.0, &keypair.1);
-    testkit.create_block_with_transactions(txvec![tx.clone()]);
+    testkit.create_block_with_transactions(vec![tx.clone()]);
 
     let api = testkit.api();
     let entry: Option<TimestampEntry> = api
