@@ -27,7 +27,7 @@ use crate::blockchain::ProposerId;
 use crate::{
     helpers::{Height, Round, ValidatorId},
     messages::{PrevotesRequest, TransactionsRequest, Verified},
-    node::state::{
+    node::constants::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
     sandbox::{self, sandbox_tests_helper::*, timestamping_sandbox},

@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    node::state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
+    node::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 

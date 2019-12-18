@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use crate::{
     helpers::{Height, Round, ValidatorId},
-    node::state::PROPOSE_REQUEST_TIMEOUT,
+    node::constants::PROPOSE_REQUEST_TIMEOUT,
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
 };
 

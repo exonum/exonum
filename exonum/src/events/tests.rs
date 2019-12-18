@@ -36,7 +36,7 @@ use crate::{
     },
     helpers::user_agent,
     messages::{BinaryValue, Connect, SignedMessage, Verified},
-    node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
+    node::{ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel, SharedConnectList},
 };
 
 #[derive(Debug)]

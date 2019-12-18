@@ -24,7 +24,7 @@ use crate::{
     crypto::{gen_keypair, Hash},
     helpers::{Height, Milliseconds, Round, ValidatorId},
     messages::{AnyTx, Verified},
-    node::state::TRANSACTIONS_REQUEST_TIMEOUT,
+    node::constants::TRANSACTIONS_REQUEST_TIMEOUT,
     sandbox::{
         config_updater::TxConfig,
         sandbox_tests_helper::*,
