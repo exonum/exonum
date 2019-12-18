@@ -17,25 +17,31 @@
 use crate::access::{AccessError, AccessErrorKind};
 use crate::IndexAddress;
 
-/// Validates index name.
+/// Validates that an index `name` consists of allowed chars. This method does not check
+/// if `name` is empty.
 pub fn is_valid_identifier(name: &str) -> bool {
     name.as_bytes()
         .iter()
         .all(|&c| is_allowed_index_name_char(c) || c == b'.')
 }
 
-/// Validates index name prefix, it shouldn't contain the dot.
-pub fn is_valid_index_name_component(name: &str) -> bool {
-    name.as_bytes()
+/// Validates that a `prefix` consists of chars allowed for an index prefix.
+///
+/// Unlike [full names], prefixes are not allowed to contain a dot char `'.'`.
+///
+/// [full names]: fn.is_valid_identifier.html
+pub fn is_valid_index_name_component(prefix: &str) -> bool {
+    prefix
+        .as_bytes()
         .iter()
         .copied()
         .all(is_allowed_index_name_char)
 }
 
-/// Checks that character is allowed in index name.
-/// Only these combination of symbols are allowed:
+/// Checks that a character is allowed in an index name.
 ///
-/// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`
+/// Only these combination of symbols are allowed:
+/// `[0-9]`, `[a-z]`, `[A-Z]`, `_`, `-`.
 pub fn is_allowed_index_name_char(c: u8) -> bool {
     match c {
         b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' => true,

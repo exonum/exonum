@@ -16,7 +16,7 @@
 
 pub use self::{
     error::Error,
-    with::{FutureResult, Immutable, Mutable, NamedWith, Result, With},
+    with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 
 pub mod backends;
@@ -26,7 +26,6 @@ pub mod node;
 pub mod websocket;
 
 use serde::{de::DeserializeOwned, Serialize};
-
 use std::{collections::BTreeMap, fmt};
 
 use self::{
@@ -40,6 +39,16 @@ use crate::{api::node::SharedNodeState, blockchain::Blockchain};
 
 mod with;
 
+/// Mutability of the endpoint. Used for auto-generated endpoints, e.g.
+/// in `moved_permanently` method.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum EndpointMutability {
+    /// Endpoint should process POST requests.
+    Mutable,
+    /// Endpoint should process GET requests.
+    Immutable,
+}
+
 /// This trait is used to implement an API backend for Exonum.
 pub trait ApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
@@ -47,31 +56,29 @@ pub trait ApiBackend: Sized {
     /// Concrete backend API builder.
     type Backend;
 
-    /// Add the given endpoint handler to the backend.
-    fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    /// Adds the given endpoint handler to the backend.
+    fn endpoint<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
-        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
-        Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
+        Self::Handler: From<NamedWith<Q, I, R, F>>,
     {
-        let named_with = NamedWith::new(name, endpoint);
+        let named_with = NamedWith::immutable(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
-    /// Add the given mutable endpoint handler to the backend.
-    fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    /// Adds the given mutable endpoint handler to the backend.
+    fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
-        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
-        Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
+        Self::Handler: From<NamedWith<Q, I, R, F>>,
     {
-        let named_with = NamedWith::new(name, endpoint);
+        let named_with = NamedWith::mutable(name, endpoint);
         self.raw_handler(Self::Handler::from(named_with))
     }
 
@@ -93,12 +100,12 @@ pub struct ApiScope {
 }
 
 impl ApiScope {
-    /// Create a new instance.
+    /// Creates a new instance.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Add the given endpoint handler to the API scope. These endpoints
+    /// Adds the given endpoint handler to the API scope. These endpoints
     /// are designed for reading operations.
     ///
     /// For now there is only web backend and it has the following requirements:
@@ -106,38 +113,38 @@ impl ApiScope {
     /// - Query parameters should be decodable via `serde_urlencoded`, i.e. from the
     ///   "first_param=value1&second_param=value2" form.
     /// - Response items should be encodable via `serde_json` crate.
-    pub fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    pub fn endpoint<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
     {
         self.actix_backend.endpoint(name, endpoint);
         self
     }
 
-    /// Add the given mutable endpoint handler to the API scope. These endpoints
+    /// Adds the given mutable endpoint handler to the API scope. These endpoints
     /// are designed for modification operations.
     ///
     /// For now there is only web backend and it has the following requirements:
     ///
     /// - Query parameters should be decodable via `serde_json`.
     /// - Response items also should be encodable via `serde_json` crate.
-    pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(Q) -> R + 'static + Clone,
         E: Into<With<Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
     {
         self.actix_backend.endpoint_mut(name, endpoint);
         self
     }
 
-    /// Return a mutable reference to the underlying web backend.
+    /// Returns a mutable reference to the underlying web backend.
     pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         &mut self.actix_backend
     }

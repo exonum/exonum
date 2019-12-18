@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::access::AccessExt;
-use rand::{rngs::ThreadRng, thread_rng, RngCore};
+pub use crate::proto::TimestampTx;
 
-use crate::{
+use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
@@ -24,22 +23,24 @@ use crate::{
         AnyTx, InstanceId,
     },
 };
+use exonum_derive::*;
+use exonum_merkledb::access::AccessExt;
+use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;
 
-#[exonum_interface(crate = "crate")]
+#[exonum_interface]
 pub trait Timestamping<Ctx> {
     type Output;
     fn timestamp(&self, ctx: Ctx, arg: Vec<u8>) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("Timestamping"))]
+#[service_dispatcher(implements("Timestamping"))]
 #[service_factory(
-    crate = "crate",
     artifact_name = "timestamping",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema"
+    proto_sources = "crate::proto"
 )]
 pub struct TimestampingService;
 
@@ -69,6 +70,8 @@ impl TimestampingService {
     pub const ID: InstanceId = 3;
 }
 
+/// Generator of timestamping transactions.
+#[derive(Debug)]
 pub struct TimestampingTxGenerator {
     rand: ThreadRng,
     data_size: usize,

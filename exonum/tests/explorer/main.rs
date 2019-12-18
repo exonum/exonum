@@ -179,13 +179,13 @@ fn test_explorer_errors_in_block() {
         serde_json::to_value(&block).unwrap(),
         json!({
             "block": {
-                "proposer_id": block.header.proposer_id,
                 "height": 1,
                 "tx_count": 1,
                 "prev_hash": block.header.prev_hash,
                 "tx_hash": block.header.tx_hash,
                 "state_hash": block.header.state_hash,
                 "error_hash": block.header.error_hash,
+                "additional_headers": block.header.additional_headers,
             },
             "precommits": block.precommits,
             "transactions": [

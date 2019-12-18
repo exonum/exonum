@@ -93,7 +93,21 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// act similarly on different nodes. In other words, the service should only use data available
     /// in the provided `CallContext`.
     ///
+    /// Note that if service was added within genesis block, it will be activated **immediately** and
+    /// thus `after_transactions` will be invoked for such a service after the genesis block creation.
+    /// If you aren't interested in the processing of for the genesis block, you can use
+    /// [`CallContext::in_genesis_block`] method and exit early if `true` is returned.
+    ///
+    /// Also note that invocation of [`blockchain::Schema::height`] will **panic** if invoked within
+    /// `after_transactions` of the genesis block. If you are going to process the genesis
+    /// block and need to know current height, use [`blockchain::Schema::next_height`] to infer the
+    /// current blockchain height.
+    ///
     /// Services should not rely on a particular ordering of `Service::after_transactions` invocations.
+    ///
+    /// [`blockchain::Schema::height`]: ../../blockchain/schema/struct.Schema.html#method.height
+    /// [`blockchain::Schema::height`]: ../../blockchain/schema/struct.Schema.html#method.next_height
+    /// [`CallContext::in_genesis_block`]: struct.CallContext.html#method.in_genesis_block
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
