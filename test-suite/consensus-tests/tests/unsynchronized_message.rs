@@ -15,16 +15,16 @@
 //! Tests in this module are designed to test ability of the node to handle
 //! message that arrive at the wrong time.
 
+use exonum::{
+    blockchain::ProposerId,
+    helpers::{Height, Round, ValidatorId},
+};
+use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
 use exonum_crypto::Hash;
 use exonum_merkledb::ObjectHash;
+use log::info;
 
 use std::time::Duration;
-
-use crate::blockchain::ProposerId;
-use crate::{
-    helpers::{Height, Round, ValidatorId},
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
-};
 
 #[test]
 fn test_queue_message_from_future_round() {

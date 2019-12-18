@@ -12,30 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![warn(missing_debug_implementations, unsafe_code, bare_trait_objects)]
+
+pub mod config_updater;
+pub mod proto;
+pub mod sandbox_tests_helper;
+pub mod timestamping;
+
 use bit_vec::BitVec;
-use exonum_keys::Keys;
-use exonum_merkledb::{BinaryValue, Fork, MapProof, ObjectHash, SystemSchema, TemporaryDB};
-use futures::{sync::mpsc, Async, Future, Sink, Stream};
-
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
-    convert::TryFrom,
-    fmt::Debug,
-    iter::FromIterator,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::{AddAssign, Deref, DerefMut},
-    sync::{Arc, Mutex},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-
-use crate::{
+use exonum::{
     api::node::SharedNodeState,
     blockchain::{
-        contains_transaction, Block, BlockProof, Blockchain, BlockchainMut, ConsensusConfig,
-        InstanceCollection, Schema, ValidatorKeys,
+        contains_transaction, Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
     },
-    crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
@@ -51,22 +42,33 @@ use crate::{
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-        ListenerConfig, NodeHandler, NodeSender, PeerAddress, ServiceConfig, State,
-        SystemStateProvider,
+        ListenerConfig, NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
     },
-    sandbox::{
-        config_updater::ConfigUpdaterService,
-        sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
-        timestamping::TimestampingService,
-    },
+    runtime::{ForkExt, SnapshotExt},
+};
+use exonum_keys::Keys;
+use exonum_merkledb::{
+    BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
+};
+use futures::{sync::mpsc, Async, Future, Sink, Stream};
+
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    convert::TryFrom,
+    fmt::Debug,
+    iter::FromIterator,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::{AddAssign, Deref, DerefMut},
+    sync::{Arc, Mutex},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-mod config_updater;
-mod consensus;
-mod old;
-mod requests;
-mod sandbox_tests_helper;
-mod timestamping;
+use crate::{
+    config_updater::ConfigUpdaterService,
+    sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
+    timestamping::TimestampingService,
+};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -196,6 +198,7 @@ impl SandboxInner {
     }
 }
 
+#[derive(Debug)]
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,
@@ -693,7 +696,7 @@ impl Sandbox {
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = snapshot.for_core();
         let schema_transactions = schema.transactions();
         txs.into_iter()
             .filter(|elem| {
@@ -726,7 +729,7 @@ impl Sandbox {
         let mut hashes = vec![];
         let mut recover = BTreeSet::new();
         let fork = blockchain.fork();
-        let mut schema = Schema::new(&fork);
+        let mut schema = fork.for_core_writeable();
         for raw in txs {
             let hash = raw.object_hash();
             hashes.push(hash);
@@ -741,13 +744,13 @@ impl Sandbox {
             blockchain.create_patch(ValidatorId(0).into(), height, &hashes, &mut BTreeMap::new());
 
         let fork = blockchain.fork();
-        let mut schema = Schema::new(&fork);
+        let mut schema = fork.for_core_writeable();
         for hash in recover {
             schema.reject_transaction(&hash).unwrap();
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let block = Schema::new(&patch).last_block();
+        let block = (&patch as &dyn Snapshot).for_core().last_block();
         (block.state_hash, block.error_hash)
     }
 
@@ -770,13 +773,13 @@ impl Sandbox {
 
     pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = snapshot.for_core();
         schema.consensus_config().object_hash()
     }
 
     pub fn cfg(&self) -> ConsensusConfig {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = snapshot.for_core();
         schema.consensus_config()
     }
 
@@ -799,7 +802,7 @@ impl Sandbox {
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = snapshot.for_core();
         let idx = schema.transactions_pool();
 
         let mut vec: Vec<Hash> = idx.iter().collect();
@@ -813,7 +816,7 @@ impl Sandbox {
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let snapshot = self.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = snapshot.for_core();
         schema.block_and_precommits(height)
     }
 
@@ -835,8 +838,8 @@ impl Sandbox {
     }
 
     pub fn assert_pool_len(&self, expected: u64) {
-        let view = self.blockchain().snapshot();
-        let schema = Schema::new(&view);
+        let snapshot = self.blockchain().snapshot();
+        let schema = snapshot.for_core();
         assert_eq!(expected, schema.transactions_pool_len());
     }
 
@@ -901,7 +904,14 @@ impl Sandbox {
             internal_requests: internal_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
-        let connect_list = ConnectList::from_peers(inner.handler.state.peers());
+        let connect_list = ConnectList::from_peers(
+            inner
+                .handler
+                .state
+                .peers()
+                .iter()
+                .map(|(public_key, connect)| (*public_key, connect.clone())),
+        );
 
         let keys = Keys::from_keys(
             inner.handler.state.consensus_public_key(),
@@ -930,8 +940,7 @@ impl Sandbox {
             shared_time: SharedTime::new(Mutex::new(time)),
         };
 
-        let mut blockchain = inner.handler.blockchain;
-        blockchain.inner().api_sender = ApiSender::new(api_channel.0.clone());
+        let blockchain = inner.handler.blockchain;
         let mut handler = NodeHandler::new(
             blockchain,
             &address.to_string(),
@@ -971,46 +980,9 @@ impl Sandbox {
     fn node_secret_key(&self) -> SecretKey {
         self.node_state().consensus_secret_key().clone()
     }
-
-    fn add_peer_to_connect_list(&self, addr: SocketAddr, validator_keys: ValidatorKeys) {
-        let public_key = validator_keys.consensus_key;
-        let config = {
-            let inner = &self.inner.borrow_mut();
-            let state = &inner.handler.state;
-            let mut config = state.config().clone();
-            config.validator_keys.push(validator_keys);
-            config
-        };
-
-        self.update_config(config);
-        self.inner
-            .borrow_mut()
-            .handler
-            .state
-            .add_peer_to_connect_list(ConnectInfo {
-                address: addr.to_string(),
-                public_key,
-            });
-    }
-
-    fn update_config(&self, config: ConsensusConfig) {
-        self.inner.borrow_mut().handler.state.update_config(config);
-    }
 }
 
-impl ConnectList {
-    /// Helper method to populate ConnectList after sandbox node restarts and
-    /// we have access only to peers stored in `node::state`.
-    #[doc(hidden)]
-    pub fn from_peers(peers: &HashMap<PublicKey, Verified<Connect>>) -> Self {
-        let peers: BTreeMap<PublicKey, PeerAddress> = peers
-            .iter()
-            .map(|(p, c)| (*p, PeerAddress::new(c.payload().host.clone())))
-            .collect();
-        ConnectList { peers }
-    }
-}
-
+#[derive(Debug)]
 pub struct SandboxBuilder {
     initialize: bool,
     services: Vec<InstanceCollection>,
@@ -1018,9 +990,9 @@ pub struct SandboxBuilder {
     consensus_config: ConsensusConfig,
 }
 
-impl SandboxBuilder {
-    pub fn new() -> Self {
-        SandboxBuilder {
+impl Default for SandboxBuilder {
+    fn default() -> Self {
+        Self {
             initialize: true,
             services: Vec::new(),
             validators_count: 4,
@@ -1036,6 +1008,12 @@ impl SandboxBuilder {
                 validator_keys: Vec::default(),
             },
         }
+    }
+}
+
+impl SandboxBuilder {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn do_not_initialize_connections(mut self) -> Self {
@@ -1074,8 +1052,12 @@ impl SandboxBuilder {
     }
 }
 
-impl Schema<&Fork> {
+pub trait SchemaExt {
     /// Removes transaction from the persistent pool.
+    fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()>;
+}
+
+impl SchemaExt for Schema<&Fork> {
     fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool().contains(hash);
         self.transactions_pool().remove(hash);
@@ -1161,8 +1143,7 @@ fn sandbox_with_services_uninitialized(
     let (rust_runtime, genesis_config) =
         create_rust_runtime_and_genesis_config(mpsc::channel(1).0, genesis, services);
 
-    let blockchain = blockchain
-        .into_mut(genesis_config)
+    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
         .build()
         .unwrap();
@@ -1255,7 +1236,36 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 
 #[cfg(test)]
 mod tests {
+    use exonum_crypto::gen_keypair;
+
     use super::*;
+
+    impl Sandbox {
+        fn add_peer_to_connect_list(&self, addr: SocketAddr, validator_keys: ValidatorKeys) {
+            let public_key = validator_keys.consensus_key;
+            let config = {
+                let inner = &self.inner.borrow_mut();
+                let state = &inner.handler.state;
+                let mut config = state.config().clone();
+                config.validator_keys.push(validator_keys);
+                config
+            };
+
+            self.update_config(config);
+            self.inner
+                .borrow_mut()
+                .handler
+                .state
+                .add_peer_to_connect_list(ConnectInfo {
+                    address: addr.to_string(),
+                    public_key,
+                });
+        }
+
+        fn update_config(&self, config: ConsensusConfig) {
+            self.inner.borrow_mut().handler.state.update_config(config);
+        }
+    }
 
     #[test]
     fn test_sandbox_init() {

@@ -20,7 +20,10 @@ use futures::{
     Future,
 };
 
-use std::{collections::BTreeMap, fmt, panic};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt, panic,
+};
 
 use crate::{
     blockchain::{Blockchain, CallInBlock, Schema as CoreSchema},
@@ -44,13 +47,68 @@ mod tests;
 struct ServiceInfo {
     runtime_id: u32,
     name: String,
+    status: InstanceStatus,
+}
+
+/// Lookup table for the committed service instances.
+#[derive(Debug, Default)]
+struct CommittedServices {
+    instances: HashMap<InstanceId, ServiceInfo>,
+    instance_names: HashMap<String, InstanceId>,
+}
+
+impl CommittedServices {
+    fn insert(&mut self, id: InstanceId, info: ServiceInfo) {
+        let name = info.name.clone();
+        self.instances.insert(id, info);
+        self.instance_names.insert(name, id);
+    }
+
+    fn get_runtime_id_for_active_instance(&self, id: InstanceId) -> Option<u32> {
+        self.instances.get(&id).and_then(|info| {
+            if info.status.is_active() {
+                Some(info.runtime_id)
+            } else {
+                None
+            }
+        })
+    }
+
+    fn get_instance<'s>(
+        &'s self,
+        id: impl Into<InstanceQuery<'s>>,
+    ) -> Option<(InstanceDescriptor<'s>, InstanceStatus)> {
+        match id.into() {
+            InstanceQuery::Id(id) => {
+                let info = self.instances.get(&id)?;
+                let name = info.name.as_str();
+                Some((InstanceDescriptor { id, name }, info.status))
+            }
+
+            InstanceQuery::Name(name) => {
+                let id = *self.instance_names.get(name)?;
+                let status = self.instances.get(&id)?.status;
+                Some((InstanceDescriptor { id, name }, status))
+            }
+        }
+    }
+
+    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
+        self.instances.iter().filter_map(|(&id, info)| {
+            if info.status.is_active() {
+                Some((id, info.runtime_id))
+            } else {
+                None
+            }
+        })
+    }
 }
 
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
-    service_infos: BTreeMap<InstanceId, ServiceInfo>,
+    service_infos: CommittedServices,
 }
 
 impl Dispatcher {
@@ -64,7 +122,7 @@ impl Dispatcher {
                 .into_iter()
                 .map(|runtime| (runtime.id, runtime.instance))
                 .collect(),
-            service_infos: BTreeMap::new(),
+            service_infos: CommittedServices::default(),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -87,12 +145,10 @@ impl Dispatcher {
         }
         // Restart active service instances.
         for state in schema.instances().values() {
-            debug_assert_eq!(
-                state.status,
-                InstanceStatus::Active,
-                "BUG: Service instance should not be in pending state."
-            );
-            self.start_service(snapshot, &state.spec)?;
+            let status = state
+                .status
+                .expect("BUG: Stored service instance should have a determined state.");
+            self.update_service_status(snapshot, &state.spec, status)?;
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
@@ -104,9 +160,9 @@ impl Dispatcher {
 
     /// Add a built-in service with the predefined identifier.
     ///
-    /// This method must be followed by the `after_commit()` call in order to persist information
-    /// about deployed artifacts / services. Multiple `add_builtin_service()` calls can be covered
-    /// by a single `after_commit()`.
+    /// This method must be followed by the `start_builtin_instances()` call in order
+    /// to persist information about deployed artifacts / services.
+    /// Multiple `add_builtin_service()` calls can be covered by a single `start_builtin_instances()`.
     ///
     /// # Panics
     ///
@@ -119,8 +175,28 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         // Start the built-in service instance.
         ExecutionContext::new(self, fork, Caller::Blockchain)
-            .start_adding_service(spec, constructor)?;
+            .initiate_adding_service(spec, constructor)?;
         Ok(())
+    }
+
+    /// Starts all the built-in instances, creating a `Patch` with persisted changes.
+    pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
+        // Mark services as active.
+        self.activate_pending(&fork);
+        // Start pending services.
+        let mut schema = Schema::new(&fork);
+        let pending_instances = schema.take_modified_instances();
+        let patch = fork.into_patch();
+        for (spec, status) in pending_instances {
+            debug_assert_eq!(
+                status,
+                InstanceStatus::Active,
+                "BUG: The built-in service instance must have an active status at startup."
+            );
+            self.update_service_status(&patch, &spec, status)
+                .expect("Cannot start service");
+        }
+        patch
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy
@@ -164,6 +240,18 @@ impl Dispatcher {
             .map_err(From::from)
     }
 
+    /// Initiates stopping of an existing service instance in the blockchain. The stopping
+    /// service is active (i.e., processes transactions and the `after_transactions` hook)
+    /// until the block built on top of the provided `fork` is committed.
+    pub(crate) fn initiate_stopping_service(
+        fork: &Fork,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .initiate_stopping_service(instance_id)
+            .map_err(From::from)
+    }
+
     fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
             self.deploy_artifact(artifact, payload)
@@ -188,15 +276,18 @@ impl Dispatcher {
         // Currently the only check is that destination service exists, but later
         // functionality of this method can be extended.
         let call_info = &tx.as_ref().call_info;
-        Schema::new(snapshot)
+        let instance = Schema::new(snapshot)
             .get_instance(call_info.instance_id)
             .ok_or(Error::IncorrectInstanceId)?;
 
-        Ok(())
+        match instance.status {
+            Some(InstanceStatus::Active) => Ok(()),
+            _ => Err(Error::ServiceNotActive.into()),
+        }
     }
 
     fn report_error(err: &ExecutionError, fork: &Fork, call: CallInBlock) {
-        let height = CoreSchema::new(fork).height().next();
+        let height = CoreSchema::new(fork).next_height();
         if err.kind() == ErrorKind::Unexpected {
             log::error!(
                 "{} at {:?} resulted in unexpected error: {:?}",
@@ -252,8 +343,8 @@ impl Dispatcher {
         call_type: CallType,
     ) -> Vec<(CallInBlock, ExecutionError)> {
         self.service_infos
-            .iter()
-            .filter_map(|(&instance_id, info)| {
+            .active_instances()
+            .filter_map(|(instance_id, runtime_id)| {
                 let context = ExecutionContext::new(self, fork, Caller::Blockchain);
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
@@ -261,18 +352,13 @@ impl Dispatcher {
                     _ => unreachable!(),
                 };
 
-                let res = call_fn(
-                    self.runtimes[&info.runtime_id].as_ref(),
-                    context,
-                    instance_id,
-                );
+                let res = call_fn(self.runtimes[&runtime_id].as_ref(), context, instance_id);
                 if let Err(mut err) = res {
                     fork.rollback();
-                    err.set_runtime_id(info.runtime_id)
-                        .set_call_site(|| CallSite {
-                            instance_id,
-                            call_type: call_type.clone(),
-                        });
+                    err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                        instance_id,
+                        call_type: call_type.clone(),
+                    });
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
@@ -314,17 +400,17 @@ impl Dispatcher {
     pub(crate) fn commit_block(&mut self, fork: Fork) -> Patch {
         let mut schema = Schema::new(&fork);
         let pending_artifacts = schema.take_pending_artifacts();
-        let pending_instances = schema.take_pending_instances();
+        let modified_instances = schema.take_modified_instances();
         let patch = fork.into_patch();
 
         // Block futures with pending deployments.
         for spec in pending_artifacts {
             self.block_until_deployed(spec.artifact, spec.payload);
         }
-        // Start pending services.
-        for spec in pending_instances {
-            self.start_service(&patch, &spec)
-                .expect("Cannot start service");
+        // Notify runtime about changes in service instances.
+        for (spec, status) in modified_instances {
+            self.update_service_status(&patch, &spec, status)
+                .expect("Cannot commit service status");
         }
         patch
     }
@@ -377,28 +463,23 @@ impl Dispatcher {
         &self,
         instance_id: InstanceId,
     ) -> Option<(u32, &dyn Runtime)> {
-        let ServiceInfo { runtime_id, .. } = self.service_infos.get(&instance_id)?;
+        let runtime_id = self
+            .service_infos
+            .get_runtime_id_for_active_instance(instance_id)?;
         let runtime = self.runtimes[&runtime_id].as_ref();
-        Some((*runtime_id, runtime))
+        Some((runtime_id, runtime))
     }
 
     /// Returns the service matching the specified query.
     pub(crate) fn get_service<'s>(
         &'s self,
-        fork: &Fork,
         id: impl Into<InstanceQuery<'s>>,
     ) -> Option<InstanceDescriptor<'s>> {
-        match id.into() {
-            InstanceQuery::Id(id) => {
-                let name = self.service_infos.get(&id)?.name.as_str();
-                Some(InstanceDescriptor { id, name })
-            }
-
-            InstanceQuery::Name(name) => {
-                // TODO: This may be slow.
-                let id = Schema::new(fork).instances().get(name)?.spec.id;
-                Some(InstanceDescriptor { id, name })
-            }
+        let (descriptor, status) = self.service_infos.get_instance(id)?;
+        if status.is_active() {
+            Some(descriptor)
+        } else {
+            None
         }
     }
 
@@ -409,25 +490,31 @@ impl Dispatcher {
         }
     }
 
-    /// Start a previously committed service instance.
-    fn start_service(
+    /// Commits service instance status to the corresponding runtime.
+    pub(super) fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         instance: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         // Notify the runtime that the service has been committed.
         let runtime = self
             .runtimes
             .get_mut(&instance.artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
-        runtime.commit_service(snapshot, instance)?;
+        runtime.update_service_status(snapshot, instance, status)?;
 
-        info!("Running service instance {:?}", instance);
+        info!(
+            "Committing service instance {:?} with status {}",
+            instance, status
+        );
+
         self.service_infos.insert(
             instance.id,
             ServiceInfo {
                 runtime_id: instance.artifact.runtime_id,
                 name: instance.name.to_owned(),
+                status,
             },
         );
         Ok(())

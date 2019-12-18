@@ -189,6 +189,7 @@ fn test_api_can_not_add_same_content_hash() {
         &api,
         &tx_err,
         &json!({
+            "type": "service_error",
             "call_site": {
                 "call_type": "method",
                 "instance_id": 3,

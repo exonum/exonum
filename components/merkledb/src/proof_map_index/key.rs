@@ -16,6 +16,7 @@
 // `PROOF_PATH_KEY_POS` is currently equal to 1. If we turn on this lint,
 // the statements like `inner[PROOF_PATH_KEY_POS..PROOF_PATH_KEY_POS + KEY_SIZE]`
 // will be less clear.
+
 #![allow(clippy::range_plus_one)]
 
 use std::{
@@ -63,17 +64,36 @@ fn reset_bits(value: &mut u8, pos: u16) {
     *value &= reset_bits_mask;
 }
 
-/// Hashed variant of proof map key.
+/// Hashed variant of a key, representing the transform via SHA-256 hash function.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Hashed;
 
-/// Raw variant of proof map key.
+/// Raw variant of a key, representing the identity transform.
+///
+/// This variant supports only a handful of key types, which have a natural mapping to
+/// `[u8; 32]`, such as SHA-256 hashes and Ed25519 public keys.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Raw;
 
-/// Trait defining key transforming function used to transform key to `ProofPath`.
+/// Trait defining key transformation into the format usable in Merkle Patricia trees.
+///
+/// Merkle Patricia trees can only use keys of a fixed byte length (32 bytes).
+/// Since maps frequently have a key type that does not provide an *obvious* mapping to `[u8; 32]`,
+/// keys need to be transformed. This transform is encapsulated in the `ToProofPath` trait.
+///
+/// There are two supported transforms:
+///
+/// - [`Hashed`] hashes the key serialized according to [`BinaryKey`] implementation
+///   using the SHA-256 function. The resulting output has the exact length needed
+///   for the Merkle Patricia tree.
+/// - [`Raw`] is the identity transform and is thus defined only for types with natural
+///   mapping to `[u8; 32]`.
+///
+/// [`Hashed`]: struct.Hashed.html
+/// [`Raw`]: struct.Raw.html
+/// [`BinaryKey`]: ../trait.BinaryKey.html
 pub trait ToProofPath<K: ?Sized> {
-    /// Transforms key to `ProofPath`.
+    /// Transforms the provided key.
     fn transform_key(key: &K) -> ProofPath;
 }
 

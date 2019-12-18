@@ -1,15 +1,18 @@
 use exonum_crypto::Hash;
 
-use super::{metadata::IndexesPool, AsReadonly, IndexType, RawAccess, ViewWithMetadata};
-use crate::{Fork, IndexAddress, ObjectHash, ProofMapIndex};
+use super::{AsReadonly, IndexType, RawAccess, ViewWithMetadata};
+use crate::{Fork, ObjectHash, ProofMapIndex};
 
 /// Name of the state aggregator proof map.
-pub(super) const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
+const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
 
-fn get_state_aggregator<T: RawAccess>(access: T) -> ProofMapIndex<T, String, Hash> {
+pub fn get_state_aggregator<T: RawAccess>(
+    access: T,
+    namespace: &str,
+) -> ProofMapIndex<T, String, Hash> {
     let view = ViewWithMetadata::get_or_create_unchecked(
         access,
-        &IndexAddress::from_root(STATE_AGGREGATOR),
+        &(STATE_AGGREGATOR, namespace).into(),
         IndexType::ProofMap,
     )
     .expect("Internal MerkleDB failure while aggregating state");
@@ -27,10 +30,6 @@ fn get_state_aggregator<T: RawAccess>(access: T) -> ProofMapIndex<T, String, Has
 /// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
 /// fork.get_map(("plain_map", &1)).put(&1_u8, "so plain".to_owned());
 /// fork.get_map(("plain_map", &2)).put(&2_u8, "s0 plane".to_owned());
-///
-/// let system_schema = SystemSchema::new(&fork);
-/// assert_eq!(system_schema.index_count(), 3);
-/// // ^-- The database may also contain system indexes.
 ///
 /// let patch = fork.into_patch();
 /// let state_hash = SystemSchema::new(&patch).state_hash();
@@ -62,18 +61,6 @@ impl<T: RawAccess> SystemSchema<T> {
         SystemSchema(access)
     }
 
-    /// Returns the total number of indexes in the storage. This information is always up to date
-    /// (even for `Fork`s).
-    ///
-    /// System-defined indexes (e.g., `state_aggregator`) are *excluded* from this count.
-    pub fn index_count(&self) -> u64 {
-        // `state_aggregator` is the only system index so far. (There are more system *views*,
-        // but they do not have view IDs.) It should be created on database initialization
-        // since it involves `check_database()`, which creates a `Fork` and converts it into `Patch`.
-        // We use saturating subtraction just in case.
-        IndexesPool::new(self.0.clone()).len().saturating_sub(1)
-    }
-
     /// Returns the state hash of the database. The state hash is up to date for `Snapshot`s
     /// (including `Patch`es), but is generally stale for `Fork`s.
     ///
@@ -81,7 +68,7 @@ impl<T: RawAccess> SystemSchema<T> {
     ///
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_hash(&self) -> Hash {
-        get_state_aggregator(self.0.clone()).object_hash()
+        get_state_aggregator(self.0.clone(), "").object_hash()
     }
 }
 
@@ -93,61 +80,53 @@ impl<T: RawAccess + AsReadonly> SystemSchema<T> {
     ///
     /// [state aggregation]: index.html#state-aggregation
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
-        get_state_aggregator(self.0.as_readonly())
+        get_state_aggregator(self.0.as_readonly(), "")
     }
 }
 
 impl SystemSchema<&Fork> {
     /// Updates state hash of the database.
-    pub(crate) fn update_state_aggregator(
+    pub(crate) fn update_state_aggregators(
         &mut self,
-        entries: impl IntoIterator<Item = (String, Hash)>,
+        entries: impl IntoIterator<Item = (String, String, Hash)>,
     ) {
-        let mut state_aggregator = get_state_aggregator(self.0);
-        for (index_name, hash) in entries {
-            state_aggregator.put(&index_name, hash);
+        for (ns, index_name, hash) in entries {
+            get_state_aggregator(self.0, &ns).put(&index_name, hash);
         }
+    }
+
+    /// Removes indexes with the specified names from the aggregated indexes
+    /// in the default namespace.
+    pub(crate) fn remove_aggregated_indexes(&mut self, names: impl IntoIterator<Item = String>) {
+        let mut aggregator = get_state_aggregator(self.0, "");
+        for name in names {
+            aggregator.remove(&name);
+        }
+    }
+
+    /// Removes an aggregation namespace, moving all aggregated indexes in the namespace into
+    /// the default aggregator.
+    pub(crate) fn merge_namespace(&mut self, namespace: &str) {
+        debug_assert!(!namespace.is_empty(), "Cannot remove default namespace");
+
+        let mut ns_aggregator = get_state_aggregator(self.0, namespace);
+        let mut default_aggregator = get_state_aggregator(self.0, "");
+        for (index_name, hash) in &ns_aggregator {
+            default_aggregator.put(&index_name, hash);
+        }
+        ns_aggregator.clear();
+    }
+
+    /// Removes an aggregation namespace.
+    pub(crate) fn remove_namespace(&mut self, namespace: &str) {
+        get_state_aggregator(self.0, namespace).clear();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, TemporaryDB};
-
-    #[test]
-    fn index_count_is_correct() {
-        let db = TemporaryDB::new();
-        let snapshot = db.snapshot();
-        assert_eq!(SystemSchema::new(&snapshot).index_count(), 0);
-
-        let fork = db.fork();
-        fork.get_list("list").push(1_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 1);
-        fork.get_map(("map", &0_u8)).put(&1_u32, "!".to_owned());
-        let system_schema = SystemSchema::new(&fork);
-        assert_eq!(system_schema.index_count(), 2);
-        fork.get_map(("map", &1_u8)).put(&1_u32, "!".to_owned());
-        assert_eq!(system_schema.index_count(), 3);
-
-        fork.get_map(("map", &0_u8)).put(&2_u32, "!".to_owned());
-        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
-        fork.get_list("list").push(5_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
-
-        db.merge_sync(fork.into_patch()).unwrap();
-        let snapshot = db.snapshot();
-        assert_eq!(SystemSchema::new(&snapshot).index_count(), 3);
-
-        let fork = db.fork();
-        fork.get_list("list").push(1_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 3);
-        fork.get_list("other_list").push(1_u32);
-        assert_eq!(SystemSchema::new(&fork).index_count(), 4);
-        assert_eq!(SystemSchema::new(fork.readonly()).index_count(), 4);
-
-        assert_eq!(SystemSchema::new(&snapshot).index_count(), 3);
-    }
+    use crate::{access::AccessExt, migration::Migration, Database, HashTag, TemporaryDB};
 
     fn initial_changes(fork: &Fork) {
         fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
@@ -243,5 +222,37 @@ mod tests {
                 .object_hash()
         );
         assert_eq!(aggregator.object_hash(), system_schema.state_hash());
+    }
+
+    #[test]
+    fn migrated_indexes_do_not_influence_state_hash() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        {
+            let mut map = fork.get_map("test.map");
+            map.put(&1_u64, "foo".to_owned());
+            map.put(&2_u64, "bar".to_owned());
+        }
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        let system_schema = SystemSchema::new(&snapshot);
+        assert_eq!(system_schema.state_hash(), HashTag::empty_map_hash());
+
+        // Create a merkelized index in a migration. It should not be aggregated.
+        let fork = db.fork();
+        {
+            let migration = Migration::new("test", &fork);
+            let mut map = migration.get_proof_map("map");
+            map.put(&1_u64, "1".to_owned());
+            map.put(&3_u64, "3".to_owned());
+
+            let map = fork.get_map::<_, u64, String>("test.map");
+            assert_eq!(map.get(&1).unwrap(), "foo");
+            assert!(map.get(&3).is_none());
+        }
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        let system_schema = SystemSchema::new(&snapshot);
+        assert_eq!(system_schema.state_hash(), HashTag::empty_map_hash());
     }
 }
