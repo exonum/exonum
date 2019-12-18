@@ -15,7 +15,11 @@ pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 /// key (for example, `ProofListIndex` with the transaction history of a wallet keyed by the
 /// `PublicKey` of the wallet).
 ///
+/// In contrast with [`ResolvedAddress`], `IndexAddress` is a high-level logical construct;
+/// it does not directly map to key-value storage abstractions (column families and their keys).
+///
 /// [`Group`]: struct.Group.html
+/// [`ResolvedAddress`]: struct.ResolvedAddress.html
 ///
 /// # Examples
 ///
@@ -160,14 +164,19 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
 
 /// Resolved address of a view.
 ///
-/// While an `IndexAddress` is a logical location of a view, a `ResolvedAddress`
-/// represents its location in the key-value storage. Mapping between `IndexAddress`es
+/// While an [`IndexAddress`] is a logical location of a view, a `ResolvedAddress`
+/// represents its location in the key-value storage. The mapping between `IndexAddress`es
 /// and `ResolvedAddress`es is internal to the database logic.
+///
+/// [`IndexAddress`]: struct.IndexAddress.html
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ResolvedAddress {
     /// Name of the column family where the view is stored.
     pub name: String,
-    /// Index identifier within a column family.
+    /// Index identifier within a column family. If set to `None`, then the column family contains
+    /// a single view. If `id` is `Some(_)`, then its value should be used to split key spaces
+    /// for different views in the same column family. In other words, key spaces for two addresses
+    /// with equal `name` and `id`s `Some(x)` and `Some(y)`, `x != y`, must not intersect.
     pub id: Option<NonZeroU64>,
 }
 

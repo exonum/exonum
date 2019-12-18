@@ -11,6 +11,13 @@ use crate::{
 /// Extension trait allowing for easy access to indices from any type implementing
 /// `Access`.
 ///
+/// # Implementation details
+///
+/// This trait is essentially a thin wrapper around [`FromAccess`]. Where `FromAccess` returns
+/// an access error, the methods of this trait will `unwrap()` the error and panic.
+///
+/// [`FromAccess`]: trait.FromAccess.html
+///
 /// # Examples
 ///
 /// ```
@@ -23,14 +30,23 @@ use crate::{
 ///     let mut list: ListIndex<_, String> = fork.get_list("list");
 ///     list.push("foo".to_owned());
 /// }
+///
 /// // ...and on `Snapshot`s:
 /// let snapshot = db.snapshot();
 /// assert!(snapshot
 ///     .get_map::<_, u64, String>("map")
 ///     .get(&0)
 ///     .is_none());
+///
 /// // ...and on `ReadonlyFork`s:
-/// let list = fork.readonly().get_list::<_, String>("list");
+/// {
+///     let list = fork.readonly().get_list::<_, String>("list");
+///     assert_eq!(list.len(), 1);
+/// }
+///
+/// // ...and on `Patch`es:
+/// let patch = fork.into_patch();
+/// let list = patch.get_list::<_, String>("list");
 /// assert_eq!(list.len(), 1);
 /// ```
 pub trait AccessExt: Access {
@@ -226,6 +242,10 @@ pub trait AccessExt: Access {
     }
 
     /// Touches an index at the specified address, asserting that it has a specific type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the index has in invalid type.
     fn touch_index<I>(self, addr: I, index_type: IndexType) -> Result<(), AccessError>
     where
         I: Into<IndexAddress>,
