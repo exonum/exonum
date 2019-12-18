@@ -25,6 +25,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+- `after_transactions` hook is now invoked on the genesis block for the builtin
+  services. Note that calling `blockchain::Schema::height` within `after_transactions`
+  hook will cause a panic for a builtin service. (#1619)
 
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
@@ -40,6 +43,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- New `blockchain::Schema` method `next_height` was added as a non-panicking
+  alternative to `height`. (#1619)
+- New method `in_genesis_block` was added to the `CallContext` to check if the service
+  hook is being executed for the genesis block. (#1619)
 
 - New `api::Error` variants were added: `Gone` and `MovedPermanently`. (#1607)
 
