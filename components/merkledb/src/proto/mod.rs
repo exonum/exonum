@@ -21,7 +21,7 @@ use failure::Error;
 use protobuf::{well_known_types::Empty, RepeatedField};
 use std::borrow::Cow;
 
-use crate::{indexes::proof_map_index::ProofPath, BinaryKey, BinaryValue};
+use crate::{proof_map_index::ProofPath, BinaryKey, BinaryValue};
 use exonum_crypto::proto::*;
 use exonum_proto::ProtobufConvert;
 
