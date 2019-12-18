@@ -46,7 +46,7 @@ use exonum::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         ListenerConfig, NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
     },
-    runtime::{ForkExt, SnapshotExt},
+    runtime::SnapshotExt,
 };
 use exonum_keys::Keys;
 use exonum_merkledb::{
@@ -703,7 +703,7 @@ impl Sandbox {
         let mut hashes = vec![];
         let mut recover = BTreeSet::new();
         let fork = blockchain.fork();
-        let mut schema = fork.for_core_writeable();
+        let mut schema = Schema::new(&fork);
         for raw in txs {
             let hash = raw.object_hash();
             hashes.push(hash);
@@ -718,7 +718,7 @@ impl Sandbox {
             blockchain.create_patch(ValidatorId(0).into(), height, &hashes, &mut BTreeMap::new());
 
         let fork = blockchain.fork();
-        let mut schema = fork.for_core_writeable();
+        let mut schema = Schema::new(&fork);
         for hash in recover {
             reject_transaction(&mut schema, &hash).unwrap();
         }

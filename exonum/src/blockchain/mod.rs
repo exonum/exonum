@@ -502,6 +502,7 @@ impl BlockchainMut {
 
 /// Returns transaction from the persistent pool. If transaction is not present in the pool, tries
 /// to return it from the transactions cache.
+#[doc(hidden)]
 pub fn get_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
@@ -511,6 +512,7 @@ pub fn get_transaction<T: RawAccess>(
 }
 
 /// Check that transaction exists in the persistent pool or in the transaction cache.
+#[doc(hidden)]
 pub fn contains_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
