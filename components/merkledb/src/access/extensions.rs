@@ -8,7 +8,7 @@ use crate::{
     ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,
 };
 
-/// Extension trait allowing for easy access to indices from any type implementing
+/// Extension trait allowing for easy access to indexes from any type implementing
 /// `Access`.
 ///
 /// # Implementation details

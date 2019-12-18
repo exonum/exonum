@@ -57,12 +57,12 @@ impl BinaryAttribute for SparseListSize {
 }
 
 /// A list of items similar to the [`ListIndex`], however, it may contain "spaces". For instance,
-/// a list might contain six elements with indices: "1, 2, 3, 5, 7, 8" (missing 4 and 6). And if you
+/// a list might contain six elements with indexes: "1, 2, 3, 5, 7, 8" (missing 4 and 6). And if you
 /// try to get the element for index 4 or 6, you'll get `None`.
 ///
 /// Later, elements can be added to the
 /// spaces, if required. Elements in this list are added to the end of the list and are
-/// removed either from the end of the list or from certain indices.
+/// removed either from the end of the list or from certain indexes.
 ///
 /// `SparseListIndex` has length and capacity. Length is the number of non-empty
 /// elements in the list. Capacity is the number of all elements in the list, both
@@ -93,12 +93,12 @@ pub struct SparseListIndexIter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
-/// Returns an iterator over the indices of a `SparseListIndex`.
+/// Returns an iterator over the indexes of a `SparseListIndex`.
 ///
-/// This struct is created by the [`indices`] method on [`SparseListIndex`].
+/// This struct is created by the [`indexes`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`indices`]: struct.SparseListIndex.html#method.indices
+/// [`indexes`]: struct.SparseListIndex.html#method.indexes
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexKeys<'a> {
@@ -262,7 +262,7 @@ where
         }
     }
 
-    /// Returns an iterator over the indices of the 'SparseListIndex'.
+    /// Returns an iterator over the indexes of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -275,11 +275,11 @@ where
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
-    /// for val in index.indices() {
+    /// for val in index.indexes() {
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn indices(&self) -> SparseListIndexKeys<'_> {
+    pub fn indexes(&self) -> SparseListIndexKeys<'_> {
         SparseListIndexKeys {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
@@ -655,7 +655,7 @@ mod tests {
 
         list_index.extend(vec![1_u8, 15, 25, 2, 3]);
         assert_eq!(
-            list_index.indices().collect::<Vec<u64>>(),
+            list_index.indexes().collect::<Vec<u64>>(),
             vec![0_u64, 1, 2, 3, 4]
         );
         assert_eq!(
@@ -685,7 +685,7 @@ mod tests {
         );
 
         assert_eq!(
-            list_index.indices().collect::<Vec<u64>>(),
+            list_index.indexes().collect::<Vec<u64>>(),
             vec![0_u64, 3, 4]
         );
         assert_eq!(list_index.values().collect::<Vec<u8>>(), vec![1_u8, 2, 3]);
