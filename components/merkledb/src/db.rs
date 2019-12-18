@@ -1242,6 +1242,19 @@ mod tests {
     }
 
     #[test]
+    fn backup_reverting_index_creation() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_entry("foo").set(1_u32);
+        db.merge(fork.into_patch()).unwrap();
+        let fork = db.fork();
+        fork.get_entry(("foo", &1_u8)).set(2_u32);
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        assert!(backup.index_type(("foo", &1_u8)).is_none());
+        assert!(backup.get_list::<_, u32>(("foo", &1_u8)).is_empty());
+    }
+
+    #[test]
     fn updated_addrs_are_efficiently_updated() {
         let db = TemporaryDB::new();
         let mut fork = db.fork();
