@@ -131,7 +131,7 @@
 //! [`Mailbox`]: struct.Mailbox.html
 
 pub use self::{
-    blockchain_data::{BlockchainData, SnapshotExt},
+    blockchain_data::{BlockchainData, ForkExt, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail},
     types::{
