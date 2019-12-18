@@ -20,10 +20,7 @@ use failure::{self, format_err};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 use exonum_crypto::{self, hash, Hash};
-use exonum_merkledb::{
-    impl_object_hash_for_binary_value, proof_map_index::BranchNode, BinaryKey, BinaryValue,
-    ObjectHash,
-};
+use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryKey, BinaryValue, ObjectHash};
 
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 32] = [100; 32];
@@ -132,10 +129,6 @@ fn gen_cursor_data() -> CursorData {
     })
 }
 
-fn gen_branch_node_data() -> BranchNode {
-    BranchNode::empty()
-}
-
 fn bench_binary_value<F, V>(c: &mut Criterion, name: &str, f: F)
 where
     F: Fn() -> V + 'static + Clone + Copy,
@@ -203,6 +196,5 @@ pub fn bench_encoding(c: &mut Criterion) {
     bench_binary_value(c, "bytes", gen_bytes_data);
     bench_binary_value(c, "simple", gen_sample_data);
     bench_binary_value(c, "cursor", gen_cursor_data);
-    bench_binary_value(c, "branch_node", gen_branch_node_data);
     c.bench_function("encoding/storage_key/concat", bench_binary_key_concat);
 }

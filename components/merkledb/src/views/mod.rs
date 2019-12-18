@@ -85,17 +85,21 @@ impl ChangeSet for ChangesMut<'_> {
     }
 }
 
-/// Allows to read data from the database.
+/// Allows to read data from the database. The data consists of a snapshot and
+/// changes relative to this snapshot. Depending on the implementation, the changes
+/// can be empty, immutable or mutable.
 ///
 /// This trait is rarely needs to be used directly; [`Access`] is a more high-level trait
-/// encompassing access to database.
+/// encompassing access to database. In particular, using `snapshot()` method to convert
+/// the implementation into `&dyn Snapshot` is logically incorrect, because the snapshot
+/// may not reflect the most recent state of `RawAccess`.
 ///
 /// [`Access`]: trait.Access.html
 pub trait RawAccess: Clone {
     /// Type of the `changes()` that will be applied to the database.
     type Changes: ChangeSet;
 
-    /// Reference to a `Snapshot`.
+    /// Reference to a `Snapshot`. This is the base relative to which the changes are defined.
     fn snapshot(&self) -> &dyn Snapshot;
     /// Returns changes related to specific `address` compared to the `snapshot()`.
     fn changes(&self, address: &ResolvedAddress) -> Self::Changes;
@@ -244,7 +248,7 @@ impl<T: RawAccess> View<T> {
     pub fn iter<P, K, V>(&self, subprefix: &P) -> Iter<'_, K, V>
     where
         P: BinaryKey + ?Sized,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
         let iter_prefix = key_bytes(subprefix);
@@ -264,7 +268,7 @@ impl<T: RawAccess> View<T> {
     where
         P: BinaryKey,
         F: BinaryKey + ?Sized,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
         let iter_prefix = key_bytes(subprefix);
@@ -405,7 +409,7 @@ where
 /// [`iter`]: struct.BaseIndex.html#method.iter
 /// [`iter_from`]: struct.BaseIndex.html#method.iter_from
 /// [`BaseIndex`]: struct.BaseIndex.html
-pub struct Iter<'a, K, V> {
+pub struct Iter<'a, K: ?Sized, V> {
     base_iter: BytesIter<'a>,
     prefix: Vec<u8>,
     ended: bool,

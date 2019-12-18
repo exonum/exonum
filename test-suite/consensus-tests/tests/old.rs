@@ -14,18 +14,16 @@
 
 use std::time::Duration;
 
-use exonum_merkledb::{HashTag, ObjectHash};
-
-use crate::{
-    blockchain::Block,
+use exonum::{
+    blockchain::{AdditionalHeaders, Block, ProposerId},
     helpers::{Height, Round, ValidatorId},
     messages::{Propose, Verified},
 };
-
-use super::{
+use exonum_consensus_tests::{
     sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
     timestamping_sandbox, Sandbox,
 };
+use exonum_merkledb::{HashTag, ObjectHash};
 
 #[test]
 fn test_send_propose_and_prevote() {
@@ -74,14 +72,17 @@ fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
 }
 
 fn create_block(sandbox: &Sandbox) -> Block {
+    let mut headers = AdditionalHeaders::new();
+    headers.insert::<ProposerId>(ValidatorId(2).into());
+
     Block {
-        proposer_id: ValidatorId(2),
         height: Height(1),
         tx_count: 0,
         prev_hash: sandbox.last_hash(),
         tx_hash: HashTag::empty_list_hash(),
         state_hash: sandbox.last_state_hash(),
         error_hash: HashTag::empty_map_hash(),
+        additional_headers: headers,
     }
 }
 
