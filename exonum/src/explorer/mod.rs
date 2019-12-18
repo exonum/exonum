@@ -557,7 +557,7 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn call_status(
         &self,
         block_height: Height,
-        call_location: &CallInBlock,
+        call_location: CallInBlock,
     ) -> Result<(), ExecutionError> {
         match self.schema.call_errors(block_height).get(&call_location) {
             None => Ok(()),

@@ -1122,7 +1122,7 @@ fn test_explorer_api_with_before_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let proof = response.call_proof;
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();
@@ -1140,9 +1140,10 @@ fn test_explorer_api_with_before_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_err());
+    assert!(response.status.0.is_err());
     assert!(response
         .status
+        .0
         .unwrap_err()
         .description()
         .contains("Number 13"));
@@ -1158,7 +1159,7 @@ fn test_explorer_api_with_before_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed 3");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
@@ -1168,7 +1169,7 @@ fn test_explorer_api_with_before_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed 4");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 }
 
 #[test]
@@ -1186,9 +1187,10 @@ fn test_explorer_api_with_transaction_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_err());
+    assert!(response.status.0.is_err());
     assert!(response
         .status
+        .0
         .unwrap_err()
         .description()
         .contains("Adding zero does nothing!"));
@@ -1205,7 +1207,7 @@ fn test_explorer_api_with_transaction_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
@@ -1215,7 +1217,7 @@ fn test_explorer_api_with_transaction_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 }
 
 #[test]
@@ -1234,9 +1236,10 @@ fn test_explorer_api_with_after_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_err());
+    assert!(response.status.0.is_err());
     assert!(response
         .status
+        .0
         .unwrap_err()
         .description()
         .contains("What's the question?"));
@@ -1253,7 +1256,7 @@ fn test_explorer_api_with_after_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
@@ -1262,7 +1265,7 @@ fn test_explorer_api_with_after_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 }
 
 #[test]
@@ -1281,7 +1284,7 @@ fn test_explorer_api_without_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
@@ -1290,7 +1293,7 @@ fn test_explorer_api_without_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
@@ -1300,7 +1303,7 @@ fn test_explorer_api_without_error() {
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.is_ok());
+    assert!(response.status.0.is_ok());
 
     let proof = response.call_proof;
     let proof = proof.check_against_hash(block.header.error_hash).unwrap();

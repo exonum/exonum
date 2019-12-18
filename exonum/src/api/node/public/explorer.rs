@@ -36,7 +36,7 @@ use crate::{
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         ApiBackend, ApiScope, Error as ApiError, FutureResult,
     },
-    blockchain::{Block, Blockchain, CallInBlock, ExecutionError},
+    blockchain::{Block, Blockchain, CallInBlock, ExecutionError, ExecutionStatus},
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
@@ -176,8 +176,8 @@ impl AsRef<[u8]> for TransactionHex {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CallStatusResponse {
     /// Call status
-    pub status: Result<(), ExecutionError>,
-    /// Call execution proff
+    pub status: ExecutionStatus,
+    /// Call execution proof
     pub call_proof: MapProof<CallInBlock, ExecutionError>,
 }
 
@@ -367,7 +367,7 @@ impl ExplorerApi {
                 let tx_info = match tx_info {
                     TransactionInfo::Committed(info) => Ok(info),
                     TransactionInfo::InPool { .. } => Err(ApiError::NotFound(format!(
-                        "Requested transaction is in pool ({})",
+                        "Requested transaction ({}) is not executed yet",
                         tx_hash
                     ))),
                 }?;
@@ -383,7 +383,7 @@ impl ExplorerApi {
             ApiError::InternalError(format_err!("Unable to get block info of height {}", height))
         })?;
 
-        let status = explorer.call_status(height, &call_in_block);
+        let status = ExecutionStatus(explorer.call_status(height, call_in_block));
         let call_proof = block_info.error_proof(call_in_block);
 
         Ok(CallStatusResponse { status, call_proof })
