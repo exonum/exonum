@@ -1,6 +1,6 @@
 //! Extension traits to simplify index instantiation.
 
-use super::{Access, AccessError, FromAccess};
+use super::{Access, FromAccess};
 use crate::{
     proof_map_index::{Raw, ToProofPath},
     views::IndexType,
@@ -241,16 +241,14 @@ pub trait AccessExt: Access {
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
-    /// Touches an index at the specified address, asserting that it has a specific type.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the index has in invalid type.
-    fn touch_index<I>(self, addr: I, index_type: IndexType) -> Result<(), AccessError>
+    /// Gets index type at the specified address, or `None` if there is no index.
+    fn index_type<I>(self, addr: I) -> Option<IndexType>
     where
         I: Into<IndexAddress>,
     {
-        self.get_or_create_view(addr.into(), index_type).map(drop)
+        self.get_index_metadata(addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .map(|metadata| metadata.index_type())
     }
 }
 

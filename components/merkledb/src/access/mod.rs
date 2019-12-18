@@ -8,7 +8,7 @@ pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
 use crate::validation::assert_valid_name_component;
-use crate::views::{IndexAddress, IndexType, ViewWithMetadata};
+use crate::views::{IndexAddress, IndexMetadata, IndexType, ViewWithMetadata};
 
 mod extensions;
 
@@ -43,6 +43,9 @@ pub trait Access: Clone {
     /// Raw access serving as the basis for created indices.
     type Base: RawAccess;
 
+    /// Gets index metadata at the specified address, or `None` if there is no index.
+    fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError>;
+
     /// Gets or creates a generic view with the specified address.
     fn get_or_create_view(
         self,
@@ -53,6 +56,10 @@ pub trait Access: Clone {
 
 impl<T: RawAccess> Access for T {
     type Base = Self;
+
+    fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
+        ViewWithMetadata::get_metadata(self, &addr)
+    }
 
     fn get_or_create_view(
         self,
@@ -105,6 +112,11 @@ impl<'a, T: Access> Prefixed<'a, T> {
 
 impl<T: Access> Access for Prefixed<'_, T> {
     type Base = T::Base;
+
+    fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
+        let prefixed_addr = addr.prepend_name(self.prefix.as_ref());
+        self.access.get_index_metadata(prefixed_addr)
+    }
 
     fn get_or_create_view(
         self,
@@ -333,13 +345,9 @@ mod tests {
         // in the different `Prefixed` instances.
         let fork = db.fork();
         let foo_space = Prefixed::new("foo", &fork);
-        foo_space
-            .touch_index(("fam", &1_u32), IndexType::List)
-            .unwrap();
+        foo_space.get_list::<_, u32>(("fam", &1_u32));
         let bar_space = Prefixed::new("bar", &fork);
-        bar_space
-            .touch_index(("fam", &1_u32), IndexType::ProofMap)
-            .unwrap();
+        bar_space.get_proof_map::<_, u32, u32>(("fam", &1_u32));
         db.merge_sync(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();

@@ -232,6 +232,13 @@ where
     }
 }
 
+impl<V> IndexMetadata<V> {
+    /// Returns the index type.
+    pub fn index_type(&self) -> IndexType {
+        self.index_type
+    }
+}
+
 impl IndexMetadata {
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;
@@ -484,6 +491,18 @@ where
             kind,
         })?;
         Self::get_or_create_unchecked(index_access, index_address, index_type)
+    }
+
+    /// Gets index metadata. Unlike `get_or_create`, this method will not create an index
+    /// if it does not exist.
+    pub(crate) fn get_metadata(
+        index_access: T,
+        index_address: &IndexAddress,
+    ) -> Result<Option<IndexMetadata>, AccessError> {
+        check_index_valid_full_name(index_address)?;
+        let index_full_name = index_address.fully_qualified_name();
+        let pool = IndexesPool::new(index_access);
+        Ok(pool.index_metadata(&index_full_name))
     }
 
     /// Gets an index with the specified address and type. Unlike `get_or_create`, this method
