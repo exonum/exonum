@@ -15,30 +15,30 @@
 //! Functions with reusable code used for sandbox tests.
 
 use bit_vec::BitVec;
-use exonum_crypto::Hash;
-use exonum_merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB};
-
-use std::{cell::RefCell, collections::BTreeMap, time::Duration};
-
-use crate::{
-    blockchain::Block,
+use exonum::{
+    blockchain::{AdditionalHeaders, Block, ProposerId},
     helpers::{Height, Milliseconds, Round, ValidatorId},
     messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Verified},
 };
+use exonum_crypto::Hash;
+use exonum_merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB};
+use log::trace;
+
+use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
 use super::{
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
-use crate::blockchain::{AdditionalHeaders, ProposerId};
 
 pub type TimestampingSandbox = Sandbox;
 
 pub const NOT_LOCKED: Round = Round(0);
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
-// Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
-// default data from sandbox and, possibly, update few fields with custom data.
+/// Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
+/// default data from sandbox and, possibly, update few fields with custom data.
+#[derive(Debug)]
 pub struct BlockBuilder<'a> {
     proposer_id: Option<ValidatorId>,
     height: Option<Height>,
@@ -120,6 +120,7 @@ impl<'a> BlockBuilder<'a> {
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Propose with
 // default data from sandbox and, possibly, update few fields with custom data.
+#[derive(Debug)]
 pub struct ProposeBuilder<'a> {
     validator_id: Option<ValidatorId>,
     height: Option<Height>,
@@ -183,6 +184,7 @@ impl<'a> ProposeBuilder<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct SandboxState {
     pub accepted_propose_hash: RefCell<Hash>,
     pub accepted_block_hash: RefCell<Hash>,

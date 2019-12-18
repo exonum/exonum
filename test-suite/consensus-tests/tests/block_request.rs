@@ -14,15 +14,14 @@
 
 //! Tests in this module are designed to test communication related to block requests.
 
+use exonum::{
+    helpers::{Height, Round, ValidatorId},
+    node::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
+};
+use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
 use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
-
-use crate::{
-    helpers::{Height, Round, ValidatorId},
-    node::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
-};
 
 /// Handle block response:
 ///

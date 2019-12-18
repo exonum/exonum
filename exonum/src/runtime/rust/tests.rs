@@ -95,13 +95,14 @@ enum RuntimeEvent {
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
     StartAdding(InstanceSpec, Vec<u8>),
-    CommitService(Option<Height>, InstanceSpec),
+    CommitService(Height, InstanceSpec),
     AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
     Shutdown,
 }
 
 /// Test runtime wrapper logging all the events (as `RuntimeEvent`) happening within it.
+/// For service hooks the logged height is the height of the block **being processed**.
 /// Other than logging, it just redirects all the calls to the inner runtime.
 /// Used to test that workflow invariants are respected.
 #[derive(Debug, Clone)]
@@ -160,13 +161,9 @@ impl<T: Runtime> Runtime for Inspected<T> {
     ) -> Result<(), ExecutionError> {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
-            .unwrap();
+            .unwrap_or_else(|| panic!("Can't obtain an instance with ID {}", spec.id));
         let core_schema = CoreSchema::new(snapshot);
-        let height = if core_schema.block_hashes_by_height().is_empty() {
-            None
-        } else {
-            Some(core_schema.height())
-        };
+        let height = core_schema.next_height();
 
         self.events
             .lock()
@@ -189,7 +186,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         context: ExecutionContext<'_>,
         instance_id: u32,
     ) -> Result<(), ExecutionError> {
-        let height = CoreSchema::new(&*context.fork).height();
+        let height = CoreSchema::new(&*context.fork).next_height();
         self.events
             .lock()
             .unwrap()
@@ -202,7 +199,8 @@ impl<T: Runtime> Runtime for Inspected<T> {
         context: ExecutionContext<'_>,
         instance_id: u32,
     ) -> Result<(), ExecutionError> {
-        let height = CoreSchema::new(&*context.fork).height();
+        let schema = CoreSchema::new(&*context.fork);
+        let height = schema.next_height();
         self.events
             .lock()
             .unwrap()
@@ -211,7 +209,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
-        let height = CoreSchema::new(snapshot).height();
+        let height = CoreSchema::new(snapshot).next_height();
         self.events
             .lock()
             .unwrap()
@@ -366,7 +364,7 @@ fn basic_rust_runtime() {
         events,
         vec![
             RuntimeEvent::Initialize,
-            RuntimeEvent::AfterCommit(Height(0))
+            RuntimeEvent::AfterCommit(Height(1))
         ]
     );
 
@@ -379,7 +377,7 @@ fn basic_rust_runtime() {
         events,
         vec![
             RuntimeEvent::DeployArtifact(artifact.clone(), vec![]),
-            RuntimeEvent::AfterCommit(Height(1)),
+            RuntimeEvent::AfterCommit(Height(2)),
         ]
     );
 
@@ -409,8 +407,8 @@ fn basic_rust_runtime() {
         events,
         vec![
             RuntimeEvent::StartAdding(spec.clone(), constructor.into_bytes()),
-            RuntimeEvent::CommitService(Some(Height(2)), spec.clone()),
-            RuntimeEvent::AfterCommit(Height(2)),
+            RuntimeEvent::CommitService(Height(3), spec.clone()),
+            RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
 
@@ -443,9 +441,9 @@ fn basic_rust_runtime() {
     assert_eq!(
         events,
         vec![
-            RuntimeEvent::BeforeTransactions(Height(2), SERVICE_INSTANCE_ID),
-            RuntimeEvent::AfterTransactions(Height(2), SERVICE_INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(3)),
+            RuntimeEvent::BeforeTransactions(Height(3), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(3), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(4)),
         ]
     );
 
@@ -475,9 +473,9 @@ fn basic_rust_runtime() {
     assert_eq!(
         events,
         vec![
-            RuntimeEvent::BeforeTransactions(Height(3), SERVICE_INSTANCE_ID),
-            RuntimeEvent::AfterTransactions(Height(3), SERVICE_INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(4)),
+            RuntimeEvent::BeforeTransactions(Height(4), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(4), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(5)),
         ]
     );
 }
@@ -490,7 +488,7 @@ fn rust_runtime_with_builtin_services() {
         .into_mut(genesis_config.clone())
         .with_runtime(runtime)
         .build()
-        .unwrap();
+        .expect("Can't create a blockchain instance");
 
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
     let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
@@ -501,42 +499,9 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(artifact.clone(), vec![]),
             RuntimeEvent::StartAdding(instance_spec.clone(), Init::default().into_bytes()),
-            RuntimeEvent::CommitService(None, instance_spec.clone()),
-            RuntimeEvent::AfterCommit(Height(0)),
-        ]
-    );
-
-    let fork = create_block(&blockchain);
-    commit_block(&mut blockchain, fork);
-    let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
-    assert_eq!(
-        events,
-        vec![
-            RuntimeEvent::BeforeTransactions(Height(0), SERVICE_INSTANCE_ID),
+            RuntimeEvent::CommitService(Height(0), instance_spec.clone()),
             RuntimeEvent::AfterTransactions(Height(0), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(1)),
-        ]
-    );
-
-    // Emulate node restart.
-    let blockchain = blockchain.inner().to_owned();
-    let (runtime, event_handle) = create_runtime();
-    let mut blockchain = blockchain
-        .into_mut(genesis_config)
-        .with_runtime(runtime)
-        .build()
-        .unwrap();
-
-    let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
-    assert_eq!(
-        events,
-        vec![
-            RuntimeEvent::Initialize,
-            RuntimeEvent::DeployArtifact(artifact, vec![]),
-            // `Runtime::start_adding_service` is never called for the same service
-            RuntimeEvent::CommitService(Some(Height(1)), instance_spec),
-            // `Runtime::after_commit` is never called for the same block
-            RuntimeEvent::Resume,
         ]
     );
 
@@ -549,6 +514,45 @@ fn rust_runtime_with_builtin_services() {
             RuntimeEvent::BeforeTransactions(Height(1), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterTransactions(Height(1), SERVICE_INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(2)),
+        ]
+    );
+
+    // Emulate node restart.
+    let blockchain = blockchain.inner().to_owned();
+    let (runtime, event_handle) = create_runtime();
+    let mut blockchain = blockchain
+        .into_mut(genesis_config)
+        .with_runtime(runtime)
+        .build()
+        .expect("Can't create a blockchain");
+
+    let events = mem::replace(
+        &mut *event_handle
+            .lock()
+            .expect("Can't obtain lock on a event handle"),
+        vec![],
+    );
+    assert_eq!(
+        events,
+        vec![
+            RuntimeEvent::Initialize,
+            RuntimeEvent::DeployArtifact(artifact, vec![]),
+            // `Runtime::start_adding_service` is never called for the same service
+            RuntimeEvent::CommitService(Height(2), instance_spec),
+            // `Runtime::after_commit` is never called for the same block
+            RuntimeEvent::Resume,
+        ]
+    );
+
+    let fork = create_block(&blockchain);
+    commit_block(&mut blockchain, fork);
+    let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
+    assert_eq!(
+        events,
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(2), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(2), SERVICE_INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
 }
@@ -628,8 +632,8 @@ fn conflicting_service_instances() {
         vec![
             RuntimeEvent::StartAdding(spec.clone(), constructor.clone().into_bytes()),
             RuntimeEvent::StartAdding(alternative_spec, constructor.into_bytes()),
-            RuntimeEvent::CommitService(Some(Height(2)), spec),
-            RuntimeEvent::AfterCommit(Height(2)),
+            RuntimeEvent::CommitService(Height(3), spec),
+            RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
 

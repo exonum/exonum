@@ -18,20 +18,22 @@
 //! handling such as correct round state transition.
 
 use bit_vec::BitVec;
-use exonum_crypto::Hash;
-use exonum_merkledb::ObjectHash;
-
-use std::{collections::HashSet, convert::TryFrom, time::Duration};
-
-use crate::blockchain::ProposerId;
-use crate::{
+use exonum::{
+    blockchain::ProposerId,
     helpers::{Height, Round, ValidatorId},
     messages::{PrevotesRequest, TransactionsRequest, Verified},
     node::constants::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
-    sandbox::{self, sandbox_tests_helper::*, timestamping_sandbox},
 };
+use exonum_consensus_tests::{
+    self, sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder,
+};
+use exonum_crypto::Hash;
+use exonum_merkledb::ObjectHash;
+use log::info;
+
+use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
 /// check scenario:
 /// HANDLE FULL PROPOSE
@@ -1721,7 +1723,7 @@ fn handle_tx_ignore_invalid_tx() {
 
 #[test]
 fn handle_precommit_remove_propose_request() {
-    let sandbox = sandbox::timestamping_sandbox_builder().build();
+    let sandbox = timestamping_sandbox_builder().build();
 
     let tx = gen_timestamping_tx();
 
@@ -1778,7 +1780,7 @@ fn handle_precommit_remove_propose_request() {
 
 #[test]
 fn handle_precommit_remove_propose_request_ask_prevoters() {
-    let sandbox = sandbox::timestamping_sandbox_builder().build();
+    let sandbox = timestamping_sandbox_builder().build();
 
     let tx = gen_timestamping_tx();
 
@@ -1859,7 +1861,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 
 #[test]
 fn handle_precommit_remove_propose_request_ask_precommitters() {
-    let sandbox = sandbox::timestamping_sandbox_builder().build();
+    let sandbox = timestamping_sandbox_builder().build();
 
     let tx = gen_timestamping_tx();
 

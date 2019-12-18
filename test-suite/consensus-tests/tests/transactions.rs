@@ -15,23 +15,22 @@
 //! Tests in this module are designed to test details of transaction handling.
 
 use bit_vec::BitVec;
-use exonum_merkledb::ObjectHash;
-
-use std::time::Duration;
-
-use crate::blockchain::ProposerId;
-use crate::{
+use exonum::{
+    blockchain::ProposerId,
     crypto::{gen_keypair, Hash},
     helpers::{Height, Milliseconds, Round, ValidatorId},
-    messages::{AnyTx, Verified},
+    messages::{AnyTx, Verified, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
     node::constants::TRANSACTIONS_REQUEST_TIMEOUT,
-    sandbox::{
-        config_updater::TxConfig,
-        sandbox_tests_helper::*,
-        timestamping::{TimestampingTxGenerator, DATA_SIZE},
-        timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
-    },
 };
+use exonum_consensus_tests::{
+    config_updater::TxConfig,
+    sandbox_tests_helper::*,
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
+    timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
+};
+use exonum_merkledb::{BinaryValue, ObjectHash};
+
+use std::time::Duration;
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
 const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
@@ -294,9 +293,6 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use crate::messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD};
-    use exonum_merkledb::BinaryValue;
-
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
     // Create 4 transactions.
