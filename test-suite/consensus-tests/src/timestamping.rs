@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::proto::TimestampTx;
-
 use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
