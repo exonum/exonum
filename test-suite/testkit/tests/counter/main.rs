@@ -15,7 +15,9 @@
 use assert_matches::assert_matches;
 use exonum::{
     api::{
-        node::public::explorer::{CallStatusQuery, TransactionQuery, TransactionResponse},
+        node::public::explorer::{
+            CallKind, CallStatusQuery, CallStatusResponse, TransactionQuery, TransactionResponse,
+        },
         Error as ApiError,
     },
     blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind, ValidatorKeys},
@@ -36,7 +38,6 @@ use crate::counter::{
     SERVICE_NAME,
 };
 
-use exonum::api::node::public::explorer::{CallKind, CallStatusResponse};
 use exonum::blockchain::{AdditionalHeaders, ProposerId};
 use exonum::helpers::ValidatorId;
 
@@ -1072,9 +1073,9 @@ fn test_explorer_api_with_before_transactions_error() {
     let block = testkit.create_block_with_transaction(tx.clone());
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::BeforeTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::BeforeTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1090,9 +1091,9 @@ fn test_explorer_api_with_before_transactions_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::BeforeTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 2,
+            call: CallKind::BeforeTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1109,22 +1110,21 @@ fn test_explorer_api_with_before_transactions_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::Transaction,
+        .query(&CallStatusQuery::TransactionHash {
+            tx_hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status")
-        .expect("Explorer Api unexpectedly failed");
+        .expect("Explorer Api unexpectedly failed 3");
     assert!(response.status.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::AfterTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::AfterTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
-        .expect("Explorer Api unexpectedly failed");
+        .expect("Explorer Api unexpectedly failed 4");
     assert!(response.status.is_ok());
 }
 
@@ -1138,9 +1138,8 @@ fn test_explorer_api_with_transaction_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::Transaction,
+        .query(&CallStatusQuery::TransactionHash {
+            tx_hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1157,9 +1156,9 @@ fn test_explorer_api_with_transaction_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::BeforeTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::BeforeTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1167,9 +1166,9 @@ fn test_explorer_api_with_transaction_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::AfterTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::AfterTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1186,9 +1185,9 @@ fn test_explorer_api_with_after_transactions_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::AfterTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::AfterTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1205,9 +1204,9 @@ fn test_explorer_api_with_after_transactions_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::BeforeTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::BeforeTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1215,9 +1214,8 @@ fn test_explorer_api_with_after_transactions_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::Transaction,
+        .query(&CallStatusQuery::TransactionHash {
+            tx_hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1234,9 +1232,9 @@ fn test_explorer_api_without_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::BeforeTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::BeforeTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1244,9 +1242,8 @@ fn test_explorer_api_without_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::Transaction,
+        .query(&CallStatusQuery::TransactionHash {
+            tx_hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");
@@ -1254,9 +1251,9 @@ fn test_explorer_api_without_error() {
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            hash: tx.object_hash(),
-            call_kind: CallKind::AfterTransactions,
+        .query(&CallStatusQuery::CallWithHeight {
+            height: 1,
+            call: CallKind::AfterTransactions { id: SERVICE_ID },
         })
         .get::<CallStatusResponse>("v1/call_status")
         .expect("Explorer Api unexpectedly failed");

@@ -20,6 +20,7 @@ use chrono::{DateTime, Utc};
 use exonum_merkledb::{MapProof, ObjectHash, Snapshot};
 use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
+use serde::de::{self, Deserialize};
 
 use std::{
     ops::{Bound, Range},
@@ -180,24 +181,69 @@ pub struct CallStatusResponse {
     pub call_proof: MapProof<CallInBlock, ExecutionError>,
 }
 
-/// The kind of requested call
-#[derive(Debug, Clone, Copy, Eq, Serialize, Deserialize, PartialEq, Hash)]
-pub enum CallKind {
-    /// Call kind of transaction
-    Transaction,
-    /// Call kind of `before_transactions` hook
-    BeforeTransactions,
-    /// Call kind of `after_transactions` hook
-    AfterTransactions,
+/// Call status query parameters.
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CallStatusQuery {
+    /// To check a transaction status
+    TransactionHash {
+        /// Transaction hash
+        tx_hash: Hash,
+    },
+    /// To check `before_transactions` or `after_transactions` call
+    CallWithHeight {
+        /// Height of a block
+        #[serde(deserialize_with = "from_str")]
+        height: u64,
+        /// Location of an call within a block.
+        #[serde(flatten)]
+        call: CallKind,
+    },
 }
 
-/// Call status query parameters.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub struct CallStatusQuery {
-    /// The hash of the transaction to be searched.
-    pub hash: Hash,
-    /// If omitted, then returned bunch will contain statuses for all call kinds
-    pub call_kind: CallKind,
+/// The kind of requested call
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CallKind {
+    /// Call of a transaction within the block.
+    Transaction {
+        /// Zero-based transaction index.
+        #[serde(deserialize_with = "from_str")]
+        index: u64,
+    },
+    /// Call kind of `before_transactions` hook
+    BeforeTransactions {
+        /// Numerical service identifier.
+        #[serde(deserialize_with = "from_str")]
+        id: u32,
+    },
+    /// Call kind of `after_transactions` hook
+    AfterTransactions {
+        /// Numerical service identifier.
+        #[serde(deserialize_with = "from_str")]
+        id: u32,
+    },
+}
+
+impl From<CallKind> for CallInBlock {
+    fn from(call: CallKind) -> Self {
+        match call {
+            CallKind::Transaction { index } => CallInBlock::transaction(index),
+            CallKind::BeforeTransactions { id } => CallInBlock::before_transactions(id),
+            CallKind::AfterTransactions { id } => CallInBlock::after_transactions(id),
+        }
+    }
+}
+
+fn from_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+    D: de::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    T::from_str(&s).map_err(de::Error::custom)
 }
 
 /// Exonum blockchain explorer API.
@@ -312,40 +358,32 @@ impl ExplorerApi {
     ) -> Result<CallStatusResponse, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
 
-        let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
-            ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
-        })?;
-        let tx_info = match tx_info {
-            TransactionInfo::Committed(info) => Ok(info),
-            TransactionInfo::InPool { .. } => {
-                Err(ApiError::NotFound(format!(
-                    "Requested transaction is in pool ({})",
-                    query.hash
-                )))
-            }
-        }?;
+        let (call_in_block, height) = match query {
+            CallStatusQuery::CallWithHeight { height, call } => (call.into(), Height(height)),
+            CallStatusQuery::TransactionHash { tx_hash } => {
+                let tx_info = explorer.transaction(&tx_hash).ok_or_else(|| {
+                    ApiError::NotFound(format!("Unknown transaction hash ({})", tx_hash))
+                })?;
+                let tx_info = match tx_info {
+                    TransactionInfo::Committed(info) => Ok(info),
+                    TransactionInfo::InPool { .. } => Err(ApiError::NotFound(format!(
+                        "Requested transaction is in pool ({})",
+                        tx_hash
+                    ))),
+                }?;
+                let call_in_block =
+                    CallInBlock::transaction(tx_info.location().position_in_block());
 
-        let call_in_block = match query.call_kind {
-            CallKind::BeforeTransactions => {
-                CallInBlock::before_transactions(tx_info.content().payload().call_info.instance_id)
-            }
-            CallKind::Transaction => {
-                CallInBlock::transaction(tx_info.location().position_in_block())
-            }
-            CallKind::AfterTransactions => {
-                CallInBlock::after_transactions(tx_info.content().payload().call_info.instance_id)
+                let block_height = tx_info.location().block_height();
+                (call_in_block, block_height)
             }
         };
 
-        let block_height = tx_info.location().block_height();
-        let block_info = explorer.block(block_height).ok_or_else(|| {
-            ApiError::InternalError(format_err!(
-                "Unable to get block info of transaction {}",
-                query.hash
-            ))
+        let block_info = explorer.block(height).ok_or_else(|| {
+            ApiError::InternalError(format_err!("Unable to get block info of height {}", height))
         })?;
 
-        let status = explorer.call_status(block_height, &call_in_block);
+        let status = explorer.call_status(height, &call_in_block);
         let call_proof = block_info.error_proof(call_in_block);
 
         Ok(CallStatusResponse { status, call_proof })
