@@ -58,8 +58,9 @@ fn generate_action() -> impl Strategy<Value = Action> + Clone {
 }
 
 fn check_index_does_not_exist<S: Access>(snapshot: S, addr: IndexAddress) -> TestCaseResult {
-    let maybe_type = snapshot.index_type(addr);
-    prop_assert!(maybe_type.is_none(), "{:?}", maybe_type.unwrap());
+    if let Some(index_type) = snapshot.index_type(addr) {
+        prop_assert!(false, "{:?}", index_type);
+    }
     Ok(())
 }
 
