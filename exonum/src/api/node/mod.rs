@@ -247,8 +247,8 @@ impl SharedNodeState {
 
     pub(crate) fn shutdown_broadcast_server(&self) {
         let state = self.node.read().expect("Expected read lock");
-        for address in state.broadcast_server_addresses.iter() {
-            address.do_send(websocket::Terminate);
+        for server in state.broadcast_server_addresses.iter() {
+            server.do_send(websocket::Terminate);
         }
     }
 
