@@ -720,7 +720,7 @@ impl Sandbox {
         let fork = blockchain.fork();
         let mut schema = fork.for_core_writeable();
         for hash in recover {
-            schema.reject_transaction(&hash).unwrap();
+            reject_transaction(&mut schema, &hash).unwrap();
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
@@ -1026,24 +1026,17 @@ impl SandboxBuilder {
     }
 }
 
-pub trait SchemaExt {
-    /// Removes transaction from the persistent pool.
-    fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()>;
-}
+fn reject_transaction(schema: &mut Schema<&Fork>, hash: &Hash) -> Result<(), ()> {
+    let contains = schema.transactions_pool().contains(hash);
+    schema.transactions_pool().remove(hash);
+    schema.transactions().remove(hash);
 
-impl SchemaExt for Schema<&Fork> {
-    fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
-        let contains = self.transactions_pool().contains(hash);
-        self.transactions_pool().remove(hash);
-        self.transactions().remove(hash);
-
-        if contains {
-            let x = self.transactions_pool_len_index().get().unwrap();
-            self.transactions_pool_len_index().set(x - 1);
-            Ok(())
-        } else {
-            Err(())
-        }
+    if contains {
+        let x = schema.transactions_pool_len_index().get().unwrap();
+        schema.transactions_pool_len_index().set(x - 1);
+        Ok(())
+    } else {
+        Err(())
     }
 }
 
