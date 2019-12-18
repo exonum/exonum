@@ -53,6 +53,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   aggregation works. (#1553)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
+- Added support of unsized keys to `MapIndex`. (#1621)
 
 - Added mechanism to extend block header. Block now contains
   key-value storage `additional_headers` which can contain binary data. (#1602)
