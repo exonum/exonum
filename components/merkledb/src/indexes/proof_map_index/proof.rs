@@ -27,7 +27,7 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-use crate::proof_map_index::key::{Hashed, ToProofPath};
+use crate::indexes::proof_map_index::key::{Hashed, ToProofPath};
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>

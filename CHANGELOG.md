@@ -52,6 +52,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
 
+### Internal Improvements
+
+#### exonum-merkledb
+
+- All indexes has been moved to separate module `indexes`. All index modules has
+become private except for `ProofListIndex` and `ProofMapIndex` because they export
+some additional types such as `MapProof`, `ListProof` and others.
+
 ### Bug Fixes
 
 #### exonum-merkledb

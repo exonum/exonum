@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 
 use exonum_crypto::Hash;
 
-use super::{
+use crate::{
     access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,

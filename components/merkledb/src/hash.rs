@@ -16,7 +16,7 @@ use exonum_crypto::{Hash, HashStream};
 use failure::Fail;
 use hex::FromHex;
 
-use crate::{proof_map_index::ProofPath, BinaryValue};
+use crate::{indexes::proof_map_index::ProofPath, BinaryValue};
 
 const EMPTY_LIST_HASH: &str = "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9";
 const EMPTY_MAP_HASH: &str = "7324b5c72b51bb5d4c180f1109cfd347b60473882145841c39f3e584576296f9";

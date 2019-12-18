@@ -724,7 +724,7 @@ mod proto {
     use std::borrow::Cow;
 
     use super::{HashedEntry, ListProof, ProofListKey};
-    use crate::{proof_list_index::MAX_INDEX, BinaryValue};
+    use crate::{indexes::proof_list_index::MAX_INDEX, BinaryValue};
     use exonum_proto::ProtobufConvert;
 
     impl ProtobufConvert for ProofListKey {

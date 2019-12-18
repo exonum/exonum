@@ -16,7 +16,7 @@ use serde_derive::*;
 
 use std::cmp::Ordering;
 
-use super::super::BinaryKey;
+use crate::BinaryKey;
 
 const HEIGHT_SHIFT: u64 = 56;
 pub(crate) const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1

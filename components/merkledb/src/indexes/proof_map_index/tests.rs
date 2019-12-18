@@ -31,7 +31,7 @@ use super::{
     node::BranchNode,
     MapProof, MapProofError, ProofPath,
 };
-use crate::proof_map_index::{Hashed, ProofMapIndex, Raw, ToProofPath};
+use crate::indexes::proof_map_index::{Hashed, ProofMapIndex, Raw, ToProofPath};
 use crate::{
     access::AccessExt, BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };

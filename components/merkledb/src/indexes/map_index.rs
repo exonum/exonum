@@ -20,7 +20,7 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{
+use crate::{
     access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,

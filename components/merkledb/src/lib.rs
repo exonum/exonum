@@ -159,19 +159,14 @@
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
-    entry::Entry,
     error::Error,
-    group::Group,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
-    key_set_index::KeySetIndex,
+    indexes::{
+        Entry, Group, KeySetIndex, ListIndex, MapIndex, ProofEntry, SparseListIndex, ValueSetIndex,
+    },
     keys::BinaryKey,
     lazy::Lazy,
-    list_index::ListIndex,
-    map_index::MapIndex,
     options::DbOptions,
-    proof_entry::ProofEntry,
-    sparse_list_index::SparseListIndex,
-    value_set_index::ValueSetIndex,
     values::BinaryValue,
     views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress, SystemSchema},
 };
@@ -179,8 +174,8 @@ pub use self::{
 // does not exist!'
 #[doc(no_inline)]
 pub use self::{
-    proof_list_index::{ListProof, ProofListIndex},
-    proof_map_index::{MapProof, ProofMapIndex, RawProofMapIndex},
+    indexes::proof_list_index::{ListProof, ProofListIndex},
+    indexes::proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},
 };
 
 #[macro_use]
@@ -193,26 +188,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub mod macros;
 mod backends;
 mod db;
-mod entry;
 mod error;
-mod group;
 mod hash;
+mod indexes;
 mod keys;
 mod lazy;
 mod options;
-mod proof_entry;
 mod values;
 mod views;
 
 pub mod access;
-pub mod key_set_index;
-pub mod list_index;
-pub mod map_index;
-pub mod proof_list_index;
-pub mod proof_map_index;
-pub mod sparse_list_index;
+
 pub mod validation;
-pub mod value_set_index;
 
 #[cfg(feature = "with-protobuf")]
 pub mod proto;
