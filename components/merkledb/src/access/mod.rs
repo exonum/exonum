@@ -189,7 +189,7 @@ pub enum AccessErrorKind {
 ///
 /// #[derive(FromAccess)]
 /// struct InsertOnlyMap<T: Access> {
-///     map: MapIndex<T::Base, String, String>,
+///     map: MapIndex<T::Base, str, String>,
 ///     len: Entry<T::Base, u64>,
 /// }
 ///
@@ -226,7 +226,7 @@ pub enum AccessErrorKind {
 /// group_of_maps.get(&2).insert("baz", "BUZZ".to_owned());
 /// # assert_eq!(group_of_maps.get(&1).len.get(), Some(1));
 /// # assert_eq!(
-/// #     fork.get_map::<_, String, String>(("test_group.map", &2_u16)).get("baz").unwrap(),
+/// #     fork.get_map::<_, str, String>(("test_group.map", &2_u16)).get("baz").unwrap(),
 /// #     "BUZZ"
 /// # );
 /// # Ok(())
