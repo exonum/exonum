@@ -22,7 +22,7 @@ pub use crate::runtime::{
 };
 
 pub use self::{
-    block::{Block, BlockProof, IndexProof},
+    block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
     builder::{BlockchainBuilder, InstanceCollection},
     config::{ConsensusConfig, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
@@ -35,7 +35,7 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemSchema, TemporaryDB,
 };
-use failure::Error;
+use failure::{ensure, Error};
 use futures::Future;
 
 use std::{
@@ -251,16 +251,32 @@ impl BlockchainMut {
             self.dispatcher
                 .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
         }
+        // Activate services and persist changes.
+        let patch = self.dispatcher.start_builtin_instances(fork);
+        self.merge(patch)?;
+
+        // Create a new fork to collect the changes from `after_transactions` hook.
+        let mut fork = self.fork();
+
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
         // TODO Unify block creation logic [ECR-3879]
-        self.dispatcher.after_transactions(&mut fork);
+        let errors = self.dispatcher.after_transactions(&mut fork);
+
+        // If there was at least one error during the genesis block creation, the block shouldn't be
+        // created at all.
+        ensure!(
+            errors.is_empty(),
+            "`after_transactions` failed for at least one service, errors: {:?}",
+            &errors
+        );
+
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch)?;
 
         let (_, patch) = self.create_patch(
-            ValidatorId::zero(),
+            ValidatorId::zero().into(),
             Height::zero(),
             &[],
             &mut BTreeMap::new(),
@@ -282,15 +298,13 @@ impl BlockchainMut {
     /// with the hash of the resulting block.
     pub fn create_patch(
         &self,
-        proposer_id: ValidatorId,
+        proposer_id: ProposerId,
         height: Height,
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
-        // Get last hash.
-        let last_hash = self.inner.last_hash();
 
         // Skip execution for genesis block.
         if height > Height(0) {
@@ -314,23 +328,8 @@ impl BlockchainMut {
                 call_errors.put(&location, error);
             }
         }
-        // Get tx & state hash.
-        let schema = Schema::new(&fork);
-        let error_hash = schema.call_errors(height).object_hash();
-        let tx_hash = schema.block_transactions(height).object_hash();
-        let patch = fork.into_patch();
-        let state_hash = SystemSchema::new(&patch).state_hash();
 
-        // Create block.
-        let block = Block {
-            proposer_id,
-            height,
-            tx_count: tx_hashes.len() as u32,
-            prev_hash: last_hash,
-            tx_hash,
-            state_hash,
-            error_hash,
-        };
+        let (patch, block) = self.create_block_header(fork, proposer_id, height, tx_hashes);
         log::trace!("Executing {:?}", block);
 
         // Calculate block hash.
@@ -342,6 +341,36 @@ impl BlockchainMut {
         // Save block.
         schema.blocks().put(&block_hash, block);
         (block_hash, fork.into_patch())
+    }
+
+    fn create_block_header(
+        &self,
+        fork: Fork,
+        proposer_id: ProposerId,
+        height: Height,
+        tx_hashes: &[Hash],
+    ) -> (Patch, Block) {
+        let prev_hash = self.inner.last_hash();
+
+        let schema = Schema::new(&fork);
+        let error_hash = schema.call_errors(height).object_hash();
+        let tx_hash = schema.block_transactions(height).object_hash();
+        let patch = fork.into_patch();
+        let state_hash = SystemSchema::new(&patch).state_hash();
+
+        let mut block = Block {
+            height,
+            tx_count: tx_hashes.len() as u32,
+            prev_hash,
+            tx_hash,
+            state_hash,
+            error_hash,
+            additional_headers: AdditionalHeaders::new(),
+        };
+
+        block.add_header::<ProposerId>(proposer_id);
+
+        (patch, block)
     }
 
     fn execute_transaction(
@@ -485,9 +514,9 @@ impl BlockchainMut {
     }
 }
 
-/// Return transaction from persistent pool. If transaction is not present in pool, try
-/// to return it from transactions cache.
-pub(crate) fn get_transaction<T: RawAccess>(
+/// Returns transaction from the persistent pool. If transaction is not present in the pool, tries
+/// to return it from the transactions cache.
+pub fn get_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
@@ -496,7 +525,7 @@ pub(crate) fn get_transaction<T: RawAccess>(
 }
 
 /// Check that transaction exists in the persistent pool or in the transaction cache.
-pub(crate) fn contains_transaction<T: RawAccess>(
+pub fn contains_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,

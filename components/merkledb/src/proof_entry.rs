@@ -202,28 +202,28 @@ where
     }
 }
 
+/// `object_hash` is computed as SHA-256 of the entry serialization, or `Hash::zero()` if
+/// the entry is not set.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry, ObjectHash};
+/// # use exonum_crypto::{self, Hash};
+/// let db = TemporaryDB::new();
+/// let fork = db.fork();
+/// let mut index = fork.get_proof_entry("name");
+/// assert_eq!(Hash::default(), index.object_hash());
+///
+/// let value = 10;
+/// index.set(value);
+/// assert_eq!(exonum_crypto::hash(&[value]), index.object_hash());
+/// ```
 impl<T, V> ObjectHash for ProofEntry<T, V>
 where
     T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
-    /// Returns hash of the entry or default hash value if does not exist.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, Entry, ObjectHash};
-    /// use exonum_crypto::{self, Hash};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let mut index = fork.get_proof_entry("name");
-    /// assert_eq!(Hash::default(), index.object_hash());
-    ///
-    /// let value = 10;
-    /// index.set(value);
-    /// assert_eq!(exonum_crypto::hash(&[value]), index.object_hash());
-    /// ```
     fn object_hash(&self) -> Hash {
         self.state.get().unwrap_or_default()
     }

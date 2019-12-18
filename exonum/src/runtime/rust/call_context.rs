@@ -1,10 +1,14 @@
 use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
-use crate::blockchain::Schema as CoreSchema;
-use crate::runtime::{
-    dispatcher::{Dispatcher, Error as DispatcherError},
-    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+use crate::{
+    blockchain::Schema as CoreSchema,
+    helpers::Height,
+    runtime::{
+        dispatcher::{Dispatcher, Error as DispatcherError},
+        ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId,
+        SUPERVISOR_INSTANCE_ID,
+    },
 };
 
 /// Context for the executed call.
@@ -47,6 +51,12 @@ impl<'a> CallContext<'a> {
     /// Returns a descriptor of the executing service instance.
     pub fn instance(&self) -> InstanceDescriptor<'_> {
         self.instance
+    }
+
+    /// Returns `true` if currently processed block is a genesis block.
+    pub fn in_genesis_block(&self) -> bool {
+        let core_schema = self.data().for_core();
+        core_schema.next_height() == Height(0)
     }
 
     /// Invokes an arbitrary method in the context.

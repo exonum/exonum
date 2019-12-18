@@ -16,8 +16,11 @@
 
 use std::collections::BTreeMap;
 
-use crate::crypto::PublicKey;
-use crate::node::{ConnectInfo, ConnectListConfig};
+use crate::{
+    crypto::PublicKey,
+    messages::{Connect, Verified},
+    node::{ConnectInfo, ConnectListConfig},
+};
 
 /// Network address of the peer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +54,18 @@ impl ConnectList {
             .collect();
 
         ConnectList { peers }
+    }
+
+    /// Creates `ConnectList` from the previously saved list of peers.
+    pub fn from_peers(peers: impl IntoIterator<Item = (PublicKey, Verified<Connect>)>) -> Self {
+        Self {
+            peers: peers
+                .into_iter()
+                .map(|(public_key, connect)| {
+                    (public_key, PeerAddress::new(connect.payload().host.clone()))
+                })
+                .collect(),
+        }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
