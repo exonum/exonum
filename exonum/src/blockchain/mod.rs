@@ -101,15 +101,12 @@ impl Blockchain {
     }
 
     /// Returns the hash of the latest committed block.
-    ///
-    /// # Panics
-    ///
-    /// If the genesis block was not committed.
+    /// If genesis block was not committed returns `Hash::zero()`.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
             .block_hashes_by_height()
             .last()
-            .unwrap_or_else(Hash::default)
+            .unwrap_or_else(Hash::zero)
     }
 
     /// Returns the latest committed block.
@@ -117,24 +114,13 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    // TODO: remove
-    // This method is needed for EJB.
-    #[doc(hidden)]
-    pub fn broadcast_raw_transaction(&self, tx: AnyTx) -> Result<(), Error> {
-        self.api_sender.broadcast_transaction(Verified::from_value(
-            tx,
-            self.service_keypair.0,
-            &self.service_keypair.1,
-        ))
-    }
-
     /// Returns the transactions pool size.
-    pub fn pool_size(&self) -> u64 {
+    pub(crate) fn pool_size(&self) -> u64 {
         Schema::new(&self.snapshot()).transactions_pool_len()
     }
 
     /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
+    pub(crate) fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
         let snapshot = self.snapshot();
         Schema::new(&snapshot).peers_cache().iter().collect()
     }
@@ -490,7 +476,7 @@ impl BlockchainMut {
     }
 
     /// Removes from the cache the `Connect` message from a peer.
-    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
+    pub(crate) fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
         let fork = self.fork();
         Schema::new(&fork).peers_cache().remove(key);
         self.merge(fork.into_patch())

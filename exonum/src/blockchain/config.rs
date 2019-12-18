@@ -209,8 +209,7 @@ impl ConsensusConfig {
     ///
     /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
     /// method, but some values can decrease consensus performance.
-    #[doc(hidden)]
-    pub fn warn_if_nonoptimal(&self) {
+    fn warn_if_nonoptimal(&self) {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 

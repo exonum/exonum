@@ -14,8 +14,6 @@
 
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate exonum_testkit;
 
 use exonum::{
     api::node::public::explorer::{TransactionQuery, TransactionResponse},
