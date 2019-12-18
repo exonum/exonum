@@ -10,26 +10,38 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
 - `before_transactions` and `after_transactions` hooks in Rust services
   now return a `Result`. The semantics is the same as for transactions;
   an error or panic in the hook will lead to the rollback of the blockchain
   state. (#1576)
+
 - Errors occurring while executing transactions and `before_transactions` /
   `after_transactions` hooks are now aggregated within each block, rather than
   globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+
 - The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
   Error fields were made private and information about a failing call
   was added. (#1585)
+
 - `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
   and a corresponding derive macro. (#1585)
+
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
 
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
+
+- Interaction with services from the Rust runtime has been changed. Instead of
+  using the `Transaction` trait, it is now possible to use service interfaces
+  directly as Rust traits. These interface traits can be applied to a keypair
+  (to generate signed transactions), to `CallContext` (to call another service)
+  and some other types. See Rust runtime docs for more details. (#1606)
 
 #### exonum-supervisor
 
