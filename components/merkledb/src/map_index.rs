@@ -18,7 +18,7 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use std::{borrow::Borrow, marker::PhantomData};
+use std::{borrow::Borrow, fmt, marker::PhantomData};
 
 use super::{
     access::{Access, AccessError, FromAccess},
@@ -36,7 +36,7 @@ use super::{
 /// [`BinaryKey`]: ../trait.BinaryKey.html
 /// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
-pub struct MapIndex<T: RawAccess, K, V> {
+pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -50,8 +50,7 @@ pub struct MapIndex<T: RawAccess, K, V> {
 /// [`iter`]: struct.MapIndex.html#method.iter
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
 /// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct MapIndexIter<'a, K, V> {
+pub struct MapIndexIter<'a, K: ?Sized, V> {
     base_iter: ViewIter<'a, K, V>,
 }
 
@@ -63,8 +62,7 @@ pub struct MapIndexIter<'a, K, V> {
 /// [`keys`]: struct.MapIndex.html#method.keys
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
 /// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct MapIndexKeys<'a, K> {
+pub struct MapIndexKeys<'a, K: ?Sized> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
@@ -84,7 +82,7 @@ pub struct MapIndexValues<'a, V> {
 impl<T, K, V> FromAccess<T> for MapIndex<T::Base, K, V>
 where
     T: Access,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
@@ -96,7 +94,7 @@ where
 impl<T, K, V> MapIndex<T, K, V>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     fn new(view: ViewWithMetadata<T>) -> Self {
@@ -123,11 +121,7 @@ where
     /// index.put(&1, 2);
     /// assert_eq!(Some(2), index.get(&1));
     /// ```
-    pub fn get<Q>(&self, key: &Q) -> Option<V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(key)
     }
 
@@ -146,11 +140,7 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn contains<Q>(&self, key: &Q) -> bool
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn contains(&self, key: &K) -> bool {
         self.base.contains(key)
     }
 
@@ -236,11 +226,7 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<'_, K, V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn iter_from(&self, from: &K) -> MapIndexIter<'_, K, V> {
         MapIndexIter {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -262,11 +248,7 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<'_, K>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn keys_from(&self, from: &K) -> MapIndexKeys<'_, K> {
         MapIndexKeys {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -287,11 +269,7 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<'_, V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn values_from(&self, from: &K) -> MapIndexValues<'_, V> {
         MapIndexValues {
             base_iter: self.base.iter_from(&(), from),
         }
@@ -301,7 +279,7 @@ where
 impl<T, K, V> MapIndex<T, K, V>
 where
     T: RawAccessMut,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     /// Inserts a key-value pair into a map.
@@ -422,9 +400,27 @@ where
     }
 }
 
+impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V>
+where
+    K: BinaryKey,
+    V: BinaryValue,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("MapIndexIter").finish()
+    }
+}
+
+impl<'a, K> fmt::Debug for MapIndexKeys<'a, K>
+where
+    K: BinaryKey,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("MapIndexKeys").finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{access::AccessExt, Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
@@ -435,9 +431,9 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, String, _> = fork.get_map(IDX_NAME);
+        let mut index = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
-        index.put(&KEY.to_owned(), 0);
+        index.put(&KEY, 0);
         assert_eq!(true, index.contains(KEY));
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
@@ -449,10 +445,10 @@ mod tests {
         let db = TemporaryDB::default();
         let fork = db.fork();
 
-        let mut index: MapIndex<_, Vec<u8>, _> = fork.get_map(IDX_NAME);
+        let mut index = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
 
-        index.put(&KEY.to_owned(), 0);
+        index.put(&KEY, 0);
         assert_eq!(true, index.contains(KEY));
 
         index.remove(KEY);

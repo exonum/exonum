@@ -14,6 +14,12 @@ mod extensions;
 
 /// High-level access to database data.
 ///
+/// This trait is not intended to be implemented by the types outside the crate; indeed,
+/// it instantiates `ViewWithMetadata`, which is crate-private. Correspondingly, `Access` methods
+/// rarely need to be used directly; use [its extension trait][`AccessExt`] instead.
+///
+/// [`AccessExt`]: trait.AccessExt.html
+///
 /// # Examples
 ///
 /// `Access` can be used as a bound on structured database objects and their
@@ -37,7 +43,7 @@ pub trait Access: Clone {
     /// Raw access serving as the basis for created indices.
     type Base: RawAccess;
 
-    /// Gets or creates a generic `View` with the specified address.
+    /// Gets or creates a generic view with the specified address.
     fn get_or_create_view(
         self,
         addr: IndexAddress,
@@ -57,7 +63,12 @@ impl<T: RawAccess> Access for T {
     }
 }
 
-/// Access that prepends the specified prefix to each created view.
+/// Access that prepends the specified prefix to each created view. The prefix is separated
+/// from user-provided names with a dot char `'.'`.
+///
+/// Since the prefix itself cannot contain a dot, `Prefixed` accesses provide namespace
+/// separation. A set of indexes to which `Prefixed` provides access does not intersect
+/// with a set of indexes accessed by a `Prefixed` instance with another prefix.
 ///
 /// # Examples
 ///
@@ -78,11 +89,13 @@ pub struct Prefixed<'a, T> {
 }
 
 impl<'a, T: Access> Prefixed<'a, T> {
-    /// Creates new prefixed access.
+    /// Creates a new prefixed access.
     ///
     /// # Panics
     ///
-    /// Will panic if the prefix does not conform to valid names for indexes.
+    /// - Will panic if the prefix is not a [valid prefix name].
+    ///
+    /// [valid prefix name]: ../validation/fn.is_valid_index_name_component.html
     pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
         let prefix = prefix.into();
         assert_valid_name_component(prefix.as_ref());
@@ -103,7 +116,7 @@ impl<T: Access> Access for Prefixed<'_, T> {
     }
 }
 
-/// Error together with location information.
+/// Access error together with the location information.
 #[derive(Debug, Fail)]
 pub struct AccessError {
     /// Address of the index where the error has occurred.
@@ -121,6 +134,9 @@ impl fmt::Display for AccessError {
 }
 
 /// Error that can be emitted during accessing an object from the database.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
 pub enum AccessErrorKind {
     /// Index has wrong type.
@@ -159,16 +175,19 @@ pub enum AccessErrorKind {
     /// Custom error.
     #[fail(display = "{}", _0)]
     Custom(#[fail(cause)] Error),
+
+    #[doc(hidden)]
+    #[fail(display = "")] // Never actually generated.
+    __NonExhaustive,
 }
 
 /// Constructs an object atop the database. The constructed object provides access to data
 /// in the DB, akin to an object-relational mapping.
 ///
 /// The access to DB can be readonly or read-write, depending on the `T: Access` type param.
-/// Most object should implement `FromAccess<T>` for all `T: Access`, unless there are compelling
-/// reasons not to.
+/// Most object should implement `FromAccess<T>` for all `T: Access`.
 ///
-/// Simplest `FromAccess` implementors are indexes; it is implemented for [`Lazy`] and [`Group`].
+/// Simplest `FromAccess` implementors are indexes; it is also implemented for [`Lazy`] and [`Group`].
 /// `FromAccess` can be implemented for more complex *components*. Thus, `FromAccess` can
 /// be used to compose storage objects from simpler ones.
 ///
@@ -189,7 +208,7 @@ pub enum AccessErrorKind {
 ///
 /// #[derive(FromAccess)]
 /// struct InsertOnlyMap<T: Access> {
-///     map: MapIndex<T::Base, String, String>,
+///     map: MapIndex<T::Base, str, String>,
 ///     len: Entry<T::Base, u64>,
 /// }
 ///
@@ -226,7 +245,7 @@ pub enum AccessErrorKind {
 /// group_of_maps.get(&2).insert("baz", "BUZZ".to_owned());
 /// # assert_eq!(group_of_maps.get(&1).len.get(), Some(1));
 /// # assert_eq!(
-/// #     fork.get_map::<_, String, String>(("test_group.map", &2_u16)).get("baz").unwrap(),
+/// #     fork.get_map::<_, str, String>(("test_group.map", &2_u16)).get("baz").unwrap(),
 /// #     "BUZZ"
 /// # );
 /// # Ok(())
@@ -243,7 +262,7 @@ pub trait FromAccess<T: Access>: Sized {
 
     /// Constructs the object from the root of the `access`.
     ///
-    /// The default implementation uses `Self::from_access()`.
+    /// The default implementation uses `Self::from_access()` with an empty address.
     fn from_root(access: T) -> Result<Self, AccessError> {
         Self::from_access(access, IndexAddress::default())
     }

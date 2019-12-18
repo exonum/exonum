@@ -141,7 +141,7 @@
 //! [`Mailbox`]: struct.Mailbox.html
 
 pub use self::{
-    blockchain_data::{BlockchainData, SnapshotExt},
+    blockchain_data::{BlockchainData, ForkExt, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail},
     types::{
@@ -438,6 +438,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// `after_transactions` is called for every service active at the beginning of the block
     /// exactly once for each block. Services instantiated within the block do **not** receive a call.
+    /// Services instantiated within genesis block are activated **immediately** and
+    /// thus `after_transactions` is invoked for them in the genesis block.
     ///
     /// # Return value
     ///

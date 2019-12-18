@@ -160,9 +160,9 @@ impl Dispatcher {
 
     /// Add a built-in service with the predefined identifier.
     ///
-    /// This method must be followed by the `after_commit()` call in order to persist information
-    /// about deployed artifacts / services. Multiple `add_builtin_service()` calls can be covered
-    /// by a single `after_commit()`.
+    /// This method must be followed by the `start_builtin_instances()` call in order
+    /// to persist information about deployed artifacts / services.
+    /// Multiple `add_builtin_service()` calls can be covered by a single `start_builtin_instances()`.
     ///
     /// # Panics
     ///
@@ -177,6 +177,26 @@ impl Dispatcher {
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .initiate_adding_service(spec, constructor)?;
         Ok(())
+    }
+
+    /// Starts all the built-in instances, creating a `Patch` with persisted changes.
+    pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
+        // Mark services as active.
+        self.activate_pending(&fork);
+        // Start pending services.
+        let mut schema = Schema::new(&fork);
+        let pending_instances = schema.take_modified_instances();
+        let patch = fork.into_patch();
+        for (spec, status) in pending_instances {
+            debug_assert_eq!(
+                status,
+                InstanceStatus::Active,
+                "BUG: The built-in service instance must have an active status at startup."
+            );
+            self.update_service_status(&patch, &spec, status)
+                .expect("Cannot start service");
+        }
+        patch
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy
@@ -267,7 +287,7 @@ impl Dispatcher {
     }
 
     fn report_error(err: &ExecutionError, fork: &Fork, call: CallInBlock) {
-        let height = CoreSchema::new(fork).height().next();
+        let height = CoreSchema::new(fork).next_height();
         if err.kind() == ErrorKind::Unexpected {
             log::error!(
                 "{} at {:?} resulted in unexpected error: {:?}",
@@ -463,7 +483,7 @@ impl Dispatcher {
         }
     }
 
-    /// Notifies the runtimes that they have to shut down.
+    /// Notify the runtimes that it has to shutdown.
     pub(crate) fn shutdown(&mut self) {
         for runtime in self.runtimes.values_mut() {
             runtime.shutdown();
