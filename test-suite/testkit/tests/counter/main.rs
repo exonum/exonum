@@ -305,24 +305,6 @@ fn test_duplicate_tx() {
     assert_eq!(counter, 5);
 }
 
-}
-
-#[test]
-#[should_panic(expected = "Attempt to add invalid tx in the pool")]
-fn test_probe_incorrect_transaction() {
-    let (mut testkit, _) = init_testkit();
-    let incorrect_tx = gen_inc_incorrect_tx(5);
-    testkit.probe(incorrect_tx);
-fn create_sample_block(testkit: &mut TestKit) {
-    let height = testkit.height().next().0;
-    if height == 2 || height == 5 {
-        let (pubkey, key) = crypto::gen_keypair();
-        let tx = Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key);
-        testkit.api().send(tx.clone());
-    }
-    testkit.create_block();
-}
-
 #[test]
 fn test_explorer_blocks_basic() {
     use exonum::api::node::public::explorer::BlocksRange;
@@ -453,6 +435,16 @@ fn test_explorer_api_block_request() {
         response,
         ApiError::NotFound(ref body) if body == "Requested block height (10) exceeds the blockchain height (1)"
     );
+}
+
+fn create_sample_block(testkit: &mut TestKit) {
+    let height = testkit.height().next().0;
+    if height == 2 || height == 5 {
+        let (pubkey, key) = crypto::gen_keypair();
+        let tx = Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key);
+        testkit.api().send(tx.clone());
+    }
+    testkit.create_block();
 }
 
 #[test]
