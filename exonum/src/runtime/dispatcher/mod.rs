@@ -117,7 +117,7 @@ impl Dispatcher {
         spec: InstanceSpec,
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        // Add the service instance to the service.
+        // Add the service instance to the runtime.
         ExecutionContext::new(self, fork, Caller::Blockchain)
             .start_adding_service(spec.clone(), constructor)?;
         // Mark service as active.
