@@ -733,6 +733,7 @@ impl BlockResponse {
     rename(case = "snake_case"),
     impl_from_trait
 )]
+#[allow(clippy::large_enum_variant)]
 pub enum ExonumMessage {
     /// Exonum transaction.
     AnyTx(AnyTx),

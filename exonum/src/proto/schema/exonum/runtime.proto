@@ -23,8 +23,8 @@ import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.
 message CallInfo {
-  // Unique service instance identifier. The dispatcher uses this identifier to find the
-  // corresponding runtime to execute a transaction.
+  // Unique service instance identifier. The dispatcher uses this identifier to
+  // find the corresponding runtime to execute a transaction.
   uint32 instance_id = 1;
   // Identifier of the method in the service interface required for the call.
   uint32 method_id = 2;
@@ -115,8 +115,8 @@ message CallSite {
   uint32 instance_id = 2;
   // Numeric ID of the method. Set only for `call_type == METHOD`.
   uint32 method_id = 3;
-  // Name of the interface defining the method. This field is empty for the default service
-  // interface. Set only for `call_type == METHOD`.
+  // Name of the interface defining the method. This field is empty for the
+  // default service interface. Set only for `call_type == METHOD`.
   string interface = 4;
 }
 
@@ -128,22 +128,41 @@ message ExecutionStatus {
   }
 }
 
-enum ArtifactStatus {
-    ARTIFACT_PENDING = 0;
-    ARTIFACT_ACTIVE = 1;
-}
-
-enum InstanceStatus {
-    SERVICE_PENDING = 0;
-    SERVICE_ACTIVE = 1;
-}
-
+// Current state of artifact in dispatcher.
 message ArtifactState {
-    bytes deploy_spec = 1;
-    ArtifactStatus status = 2;
+  // Status of an artifact deployment.
+  enum Status {
+    // Reserved for the further usage.
+    NONE = 0;
+    // The artifact is pending deployment.
+    PENDING = 1;
+    // The artifact has been successfully deployed.
+    ACTIVE = 2;
+  }
+
+  // Runtime-specific artifact specification.
+  bytes deploy_spec = 1;
+  // Artifact deployment status.
+  Status status = 2;
 }
 
+// Current state of service instance in dispatcher.
 message InstanceState {
-    InstanceSpec spec = 1;
-    InstanceStatus status = 2;
+  // Status of a service instance.
+  enum Status {
+    // The service instance has no status, i.e. this value corresponds to
+    // `Option::None` on the Rust code level and other corresponds to
+    // `Some(...)`.
+    NONE = 0;
+    // The service instance is active.
+    ACTIVE = 1;
+    // The service instance is stopped.
+    STOPPED = 2;
+  }
+  // Service instance specification.
+  exonum.runtime.InstanceSpec spec = 1;
+  // Service instance activity status.
+  Status status = 2;
+  // Pending status of instance if the value is not `NONE`.
+  Status pending_status = 3;
 }

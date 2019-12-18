@@ -25,6 +25,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+- `commit_service` has been renamed to the `update_service_status` and now takes
+  `InstanceStatus` as an additional argument.
+  `start_adding_service` has been renamed to `initiate_adding_service` to
+  better distinguish between starting and stopping a service. (#1605)
+- `after_transactions` hook is now invoked on the genesis block for the builtin
+  services. Note that calling `blockchain::Schema::height` within `after_transactions`
+  hook will cause a panic for a builtin service. (#1619)
+
+- `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
 #### exonum-supervisor
 
@@ -35,8 +44,25 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_transactions` hook for services was introduced. (#1577)
+
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- Service instances can now be stopped.
+
+  Active service instance can be stopped by the corresponding request to the
+  `Supervisor`. Stopped service no more participates in the business logic,
+  i.e. it does not execute transactions, process events, provide user APIs, etc.
+  Service data becomes unavailable to other services, but still exists. The name
+  and identifier remain reserved for the stopped service and cannot be used again
+  for adding new services. (#1605)
+- New `blockchain::Schema` method `next_height` was added as a non-panicking
+  alternative to `height`. (#1619)
+- New method `in_genesis_block` was added to the `CallContext` to check if the service
+  hook is being executed for the genesis block. (#1619)
+
+- New `api::Error` variants were added: `Gone` and `MovedPermanently`. (#1607)
+
+- API endpoints are now can be marked as deprecated. (#1607)
 
 #### exonum-merkledb
 
@@ -46,11 +72,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   aggregation works. (#1553)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
+- Added support of unsized keys to `MapIndex`. (#1621)
+
+- Added mechanism to extend block header. Block now contains
+  key-value storage `additional_headers` which can contain binary data. (#1602)
 
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
+- `ConfigChange::StopService` has been added to make requests to stop the service
+  instance. (#1605)  
 
 ### Bug Fixes
 

@@ -16,7 +16,7 @@
 
 use exonum::runtime::{
     rust::{CallContext, ChildAuthorization},
-    AnyTx, DispatcherError, ExecutionError, InstanceStatus,
+    AnyTx, DispatcherError, ExecutionError,
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -119,9 +119,6 @@ impl MiddlewareInterface for MiddlewareService {
         let state = dispatcher_schema
             .get_instance(instance_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
-        if state.status != InstanceStatus::Active {
-            return Err(DispatcherError::ServiceNotStarted.into());
-        }
 
         let artifact = &state.spec.artifact;
         if arg.artifact_name != artifact.name {

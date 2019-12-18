@@ -80,6 +80,7 @@ markdownlint
 memlimit
 memorydb
 mempool
+Merkelize
 Merkelized
 Merkle
 merkledb

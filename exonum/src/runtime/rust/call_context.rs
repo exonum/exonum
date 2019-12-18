@@ -1,10 +1,14 @@
 use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
-use crate::blockchain::Schema as CoreSchema;
-use crate::runtime::{
-    dispatcher::{Dispatcher, Error as DispatcherError},
-    ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-    InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+use crate::{
+    blockchain::Schema as CoreSchema,
+    helpers::Height,
+    runtime::{
+        dispatcher::{Dispatcher, Error as DispatcherError},
+        ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId,
+        SUPERVISOR_INSTANCE_ID,
+    },
 };
 
 /// Context for the executed call.
@@ -59,6 +63,12 @@ impl<'a> CallContext<'a> {
         self.instance
     }
 
+    /// Returns `true` if currently processed block is a genesis block.
+    pub fn in_genesis_block(&self) -> bool {
+        let core_schema = self.data().for_core();
+        core_schema.next_height() == Height(0)
+    }
+
     /// Invokes an arbitrary method in the context.
     #[doc(hidden)]
     pub fn call(
@@ -96,7 +106,7 @@ impl<'a> CallContext<'a> {
         let descriptor = self
             .inner
             .dispatcher
-            .get_service(self.inner.fork, called_id)
+            .get_service(called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         Ok(CallContext {
             inner: self.inner.child_context(match auth {
@@ -139,24 +149,43 @@ impl<'a> CallContext<'a> {
         Dispatcher::commit_artifact(self.inner.fork, artifact, spec)
     }
 
-    /// Starts adding a service instance to the blockchain.
+    /// Initiates adding a service instance to the blockchain.
     ///
     /// The service is not immediately activated; it activates if / when the block containing
     /// the activation transaction is committed.
     ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
+    /// # Panics
+    ///
+    /// - This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn start_adding_service(
+    pub fn initiate_adding_service(
         &mut self,
         instance_spec: InstanceSpec,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_adding_service` called within a non-supervisor service");
+            panic!("`initiate_adding_service` called within a non-supervisor service");
         }
 
         self.inner
             .child_context(Some(self.instance.id))
-            .start_adding_service(instance_spec, constructor)
+            .initiate_adding_service(instance_spec, constructor)
+    }
+
+    /// Initiates stopping an active service instance in the blockchain.
+    ///
+    /// The service is not immediately stopped; it stops if / when the block containing
+    /// the stopping transaction is committed.
+    ///
+    /// # Panics
+    ///
+    /// - This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
+    pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`initiate_stopping_service` called within a non-supervisor service");
+        }
+
+        Dispatcher::initiate_stopping_service(self.inner.fork, instance_id)
     }
 }

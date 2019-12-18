@@ -32,7 +32,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_supervisor::{ConfigPropose, DeployRequest, StartService, Supervisor};
+use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor};
 use futures::{Future, IntoFuture};
 
 use std::{
@@ -113,20 +113,31 @@ impl Runtime for SampleRuntime {
         self.deployed_artifacts.contains_key(id)
     }
 
-    /// Starts an existing `SampleService` instance with the specified ID.
-    fn commit_service(
+    /// Commits status for the `SampleService` instance with the specified ID.
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
-        let instance = self.start_service(spec)?;
-        println!("Starting service {}: {:?}", spec, instance);
-        self.started_services.insert(spec.id, instance);
+        match status {
+            InstanceStatus::Active => {
+                let instance = self.start_service(spec)?;
+                println!("Starting service {}: {:?}", spec, instance);
+                self.started_services.insert(spec.id, instance);
+            }
+
+            InstanceStatus::Stopped => {
+                let instance = self.started_services.remove(&spec.id);
+                println!("Stopping service {}: {:?}", spec, instance);
+            }
+        }
+
         Ok(())
     }
 
-    /// Starts a new service instance and sets the counter value for this.
-    fn start_adding_service(
+    /// Initiates adding a new service and sets the counter value for this.
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         spec: &InstanceSpec,
@@ -314,18 +325,16 @@ fn main() {
         thread::sleep(Duration::from_secs(5));
 
         // Send a `StartService` request to the sample runtime.
-        let instance_name = "instance".to_owned();
-
-        let start_service = StartService {
-            artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
-            name: instance_name.clone(),
-            config: 10_u64.into_bytes(),
-        };
+        let instance_name = "instance";
 
         api_sender
             .broadcast_transaction(
                 ConfigPropose::immediate(0)
-                    .start_service(start_service)
+                    .start_service(
+                        "255:sample_artifact:0.1.0".parse().unwrap(),
+                        instance_name,
+                        10_u64,
+                    )
                     .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )
             .unwrap();
@@ -336,9 +345,9 @@ fn main() {
         let snapshot = blockchain_ref.snapshot();
         let state = snapshot
             .for_dispatcher()
-            .get_instance(instance_name.as_str())
+            .get_instance(instance_name)
             .unwrap();
-        assert_eq!(state.status, InstanceStatus::Active);
+        assert_eq!(state.status.unwrap(), InstanceStatus::Active);
         let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender

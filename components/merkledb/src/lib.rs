@@ -84,7 +84,7 @@
 //!
 //! # State aggregation
 //!
-//! Database automatically aggregates its contents into a single `state_hash`, which commits
+//! The database automatically aggregates its contents into a single `state_hash`, which commits
 //! to the entire Merkelized database contents. For example, this is used in [Exonum] to achieve
 //! consensus as to the database state.
 //!
@@ -100,6 +100,12 @@
 //! Thus, `Snapshot`s (including `Patch`es!) are always consistent with respect
 //! to the aggregated state; the index hashes in the `state_aggregator` match their actual values.
 //! This is **not** the case for `Fork`s, in which `state_aggregator` may be stale.
+//!
+//! # Migrations
+//!
+//! The database [provides tooling](migration/index.html) for data migrations. With the help
+//! of migration, it is possible to gradually accumulate changes to a set of indexes (including
+//! across process restarts) and then atomically apply or discard these changes.
 //!
 //! [`Database`]: trait.Database.html
 //! [`RocksDB`]: struct.RocksDB.html
@@ -190,7 +196,7 @@ extern crate failure;
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[macro_use]
-pub mod macros;
+mod macros;
 mod backends;
 mod db;
 mod entry;
@@ -208,6 +214,7 @@ pub mod access;
 pub mod key_set_index;
 pub mod list_index;
 pub mod map_index;
+pub mod migration;
 pub mod proof_list_index;
 pub mod proof_map_index;
 pub mod sparse_list_index;

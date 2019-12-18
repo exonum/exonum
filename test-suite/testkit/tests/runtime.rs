@@ -15,8 +15,8 @@
 use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, Mailbox,
-        Runtime, WellKnownRuntime,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -110,7 +110,7 @@ impl Runtime for TestRuntime {
         self.tester.is_artifact_deployed(id)
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
@@ -120,10 +120,11 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn commit_service(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
+        _status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
         Ok(())
     }

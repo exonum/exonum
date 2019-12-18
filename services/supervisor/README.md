@@ -6,7 +6,7 @@
 
 `exonum-supervisor` is a main service of the [Exonum blockchain framework](https://exonum.com/).
 It is capable of deploying and starting new services,
-and changing configuration of the started services.
+stopping existing services, and changing configuration of the started services.
 
 ## Usage
 
@@ -14,8 +14,8 @@ Include `exonum-supervisor` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.12.0"
-exonum-supervisor = "0.12.0"
+exonum = "0.13.0-rc.2"
+exonum-supervisor = "0.13.0-rc.2"
 ```
 
 Consult [the crate docs](https://docs.rs/exonum-supervisor) for more details

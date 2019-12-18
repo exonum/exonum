@@ -12,6 +12,7 @@ members = [
     "services/time",
     "services/supervisor",
 
+    "test-suite/consensus-tests",
     "test-suite/testkit",
     "test-suite/testkit/server",
 

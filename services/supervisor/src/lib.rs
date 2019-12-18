@@ -71,7 +71,7 @@ pub use self::{
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-        DeployRequest, ServiceConfig, StartService, SupervisorConfig,
+        DeployRequest, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -161,11 +161,29 @@ fn update_configs(
                 let (instance_spec, config) = start_service.into_parts(id);
 
                 context
-                    .start_adding_service(instance_spec, config)
+                    .initiate_adding_service(instance_spec, config)
                     .map_err(|err| {
                         log::error!("Service start request failed. {}", err);
                         err
                     })?;
+            }
+
+            ConfigChange::StopService(stop_service) => {
+                let instance = context
+                    .data()
+                    .for_dispatcher()
+                    .get_instance(stop_service.instance_id)
+                    .expect(
+                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
+                    );
+
+                log::trace!(
+                    "Request stop service with name {:?} from artifact {:?}",
+                    instance.spec.name,
+                    instance.spec.artifact
+                );
+
+                context.initiate_stopping_service(stop_service.instance_id)?;
             }
         }
     }
@@ -302,13 +320,13 @@ impl Service for Supervisor {
         let mut schema = Schema::new(context.service_data());
         let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
+        let next_height = core_schema.next_height();
         let validator_count = core_schema.consensus_config().validator_keys.len();
-        let height = core_schema.height();
 
         // Check if we should apply a new config.
         let entry = schema.pending_proposal.get();
         if let Some(entry) = entry {
-            if entry.config_propose.actual_from == height.next() {
+            if entry.config_propose.actual_from == next_height {
                 // Config should be applied at the next height.
                 if configuration.mode.config_approved(
                     &entry.propose_hash,
