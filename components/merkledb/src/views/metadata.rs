@@ -664,4 +664,17 @@ mod tests {
                 .view;
         assert!(!view.changes.is_aggregated());
     }
+
+    #[test]
+    fn index_type_does_not_create_indexes() {
+        use crate::access::AccessExt;
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let index_count = IndexesPool::new(&fork).len();
+        assert!(fork.index_type("foo").is_none());
+        let pool = IndexesPool::new(&fork);
+        assert!(pool.index_metadata(b"foo").is_none());
+        assert_eq!(pool.len(), index_count);
+    }
 }
