@@ -140,11 +140,9 @@ extern crate exonum_derive;
 pub use crate::{
     api::{ApiKind, TestKitApi},
     builder::{InstanceCollection, TestKitBuilder},
-    compare::ComparableSnapshot,
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
-pub mod compare;
 pub mod proto;
 
 use exonum::{

@@ -26,7 +26,7 @@ use exonum::{
     runtime::{rust::Transaction, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
@@ -268,44 +268,6 @@ fn test_duplicate_tx() {
         .get("count")
         .unwrap();
     assert_eq!(counter, 5);
-}
-
-#[test]
-fn test_snapshot_comparison() {
-    let (mut testkit, api) = init_testkit();
-
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
-
-    testkit.checkpoint();
-    testkit.create_block_with_transactions(vec![tx.clone()]);
-    let snapshot = testkit.snapshot();
-    testkit.rollback();
-
-    snapshot
-        .compare(testkit.snapshot())
-        .map(|snapshot| get_schema(snapshot))
-        .map(|schema| schema.counter.get())
-        .assert_before("Counter does not exist", Option::is_none)
-        .assert_after("Counter has been set", |&c| c == Some(5));
-
-    api.send(tx);
-    testkit.create_block();
-
-    let (pubkey, key) = crypto::gen_keypair();
-    let other_tx = Increment::new(3).sign(SERVICE_ID, pubkey, &key);
-
-    testkit.checkpoint();
-    testkit.create_block_with_transactions(vec![other_tx]);
-    let snapshot = testkit.snapshot();
-    testkit.rollback();
-
-    snapshot
-        .compare(testkit.snapshot())
-        .map(|snapshot| get_schema(snapshot))
-        .map(|schema| schema.counter.get())
-        .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| new == old + 3);
 }
 
 fn create_sample_block(testkit: &mut TestKit) {
