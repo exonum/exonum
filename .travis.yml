@@ -103,6 +103,8 @@ jobs:
     - touch target/doc/std/option/enum.Option.html
     - touch target/doc/std/primitive.usize.html
     - touch target/doc/std/primitive.char.html
+    - touch target/doc/exonum_merkledb/proof_map_index/trait.BinaryKey.html
+    - touch target/doc/exonum_merkledb/proof_map_index/trait.BinaryValue.html
     - cargo deadlinks --dir target/doc
 
     # Run kcov.

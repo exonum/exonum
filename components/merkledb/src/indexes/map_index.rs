@@ -33,8 +33,8 @@ use crate::{
 /// `MapIndex` requires that keys implement the [`BinaryKey`] trait and values implement
 /// the [`BinaryValue`] trait.
 ///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryKey`]: trait.BinaryKey.html
+/// [`BinaryValue`]: trait.BinaryValue.html
 #[derive(Debug)]
 pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,

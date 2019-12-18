@@ -35,7 +35,7 @@ use crate::{
 /// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
 /// `ValueSetIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryValue`]: trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T: RawAccess, V> {
     base: View<T>,
@@ -181,7 +181,7 @@ where
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order. The iterator element type
-    /// is [Hash](../../exonum_crypto/struct.Hash.html).
+    /// is [Hash](../exonum_crypto/struct.Hash.html).
     ///
     /// # Examples
     ///
@@ -203,7 +203,7 @@ where
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order starting from the specified
-    /// hash. The iterator element type is [Hash](../../exonum_crypto/struct.Hash.html).
+    /// hash. The iterator element type is [Hash](../exonum_crypto/struct.Hash.html).
     ///
     /// # Examples
     ///

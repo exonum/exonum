@@ -114,13 +114,13 @@
 //! [`BinaryValue`]: trait.BinaryValue.html
 //! [`Entry`]: struct.Entry.html
 //! [`ProofEntry`]: struct.ProofEntry.html
-//! [`ListIndex`]: list_index/struct.ListIndex.html
-//! [`SparseListIndex`]: sparse_list_index/struct.SparseListIndex.html
-//! [`MapIndex`]: map_index/struct.MapIndex.html
-//! [`ProofListIndex`]: proof_list_index/struct.ProofListIndex.html
-//! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
-//! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
-//! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
+//! [`ListIndex`]: struct.ListIndex.html
+//! [`SparseListIndex`]: struct.SparseListIndex.html
+//! [`MapIndex`]: struct.MapIndex.html
+//! [`ProofListIndex`]: struct.ProofListIndex.html
+//! [`ProofMapIndex`]: struct.ProofMapIndex.html
+//! [`KeySetIndex`]: struct.KeySetIndex.html
+//! [`ValueSetIndex`]: struct.ValueSetIndex.html
 //! [`ObjectHash`]: trait.ObjectHash.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
@@ -172,7 +172,7 @@ pub use self::{
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'
-#[doc(no_inline)]
+#[doc(inline)]
 pub use self::{
     indexes::proof_list_index::{ListProof, ProofListIndex},
     indexes::proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},

@@ -72,8 +72,8 @@ impl BinaryAttribute for SparseListSize {
 /// as an index.
 /// `SparseListIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
-/// [`ListIndex`]: <../list_index/struct.ListIndex.html>
+/// [`BinaryValue`]: trait.BinaryValue.html
+/// [`ListIndex`]: struct.ListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndex<T: RawAccess, V> {
     base: View<T>,

@@ -44,14 +44,14 @@ pub enum HashTag {
     /// [`BinaryValue`]: trait.BinaryValue.html
     Blob = 0,
     /// Hash prefix of a branch node in a Merkle tree built for
-    /// a [Merkelized list](proof_list_index/struct.ProofListIndex.html).
+    /// a [Merkelized list](struct.ProofListIndex.html).
     ListBranchNode = 1,
-    /// Hash prefix of a [Merkelized list](proof_list_index/struct.ProofListIndex.html).
+    /// Hash prefix of a [Merkelized list](struct.ProofListIndex.html).
     ListNode = 2,
-    /// Hash prefix of a [Merkelized map](proof_map_index/struct.ProofMapIndex.html).
+    /// Hash prefix of a [Merkelized map](struct.ProofMapIndex.html).
     MapNode = 3,
     /// Hash prefix of a branch node in a Merkle Patricia tree built for
-    /// a [Merkelized map](proof_map_index/struct.ProofMapIndex.html).
+    /// a [Merkelized map](struct.ProofMapIndex.html).
     MapBranchNode = 4,
 }
 
