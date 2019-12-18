@@ -1697,3 +1697,23 @@ fn test_tree_with_hashed_key() {
         )
     );
 }
+
+#[test]
+fn unsized_key() {
+    let db = TemporaryDB::default();
+    let fork = db.fork();
+    let mut table = fork.get_proof_map::<_, str, _>(IDX_NAME);
+    table.put("key1", vec![1]);
+
+    let proof = table.get_proof("key1".to_owned());
+    assert_eq!(proof.proof_unchecked(), vec![]);
+
+    // Check missing key.
+    let proof = table.get_multiproof(vec!["key2".to_owned(), "key3".to_owned()]);
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![(Hashed::transform_key("key1"), HashTag::hash_leaf(&[1]))]
+    );
+
+    assert!(proof.check().is_ok());
+}

@@ -181,7 +181,7 @@ impl BinaryAttribute for ProofPath {
 impl<T, K, V, KeyMode> FromAccess<T> for ProofMapIndex<T::Base, K, V, KeyMode>
 where
     T: Access,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
