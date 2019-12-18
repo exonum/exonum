@@ -906,7 +906,9 @@ fn test_metadata_in_migrated_indexes() {
     assert_eq!(view.address.name, "simple");
     let old_id = view.address.id.unwrap().get();
 
-    let view: View<_> = ViewWithMetadata::get_or_create(&fork, &"^simple".into(), IndexType::List)
+    let mut addr = IndexAddress::from_root("simple");
+    addr.set_in_migration();
+    let view: View<_> = ViewWithMetadata::get_or_create(&fork, &addr, IndexType::List)
         .map_err(drop)
         .unwrap()
         .into();
@@ -958,16 +960,18 @@ fn test_metadata_index_wrong_type() {
 fn test_valid_tombstone() {
     use crate::{
         access::{AccessErrorKind, FromAccess},
+        migration::Migration,
         ListIndex,
     };
 
     let db = TemporaryDB::new();
     let fork = db.fork();
+    let migration = Migration::new("foo", &fork);
 
     // Valid tombstone in a fork.
-    fork.touch_index("^foo.bar", IndexType::Tombstone).unwrap();
+    migration.touch_index("bar", IndexType::Tombstone).unwrap();
     // Check that index cannot be reinterpreted with another type.
-    let err = ListIndex::<_, u64>::from_access(&fork, "^foo.bar".into()).unwrap_err();
+    let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
     assert_matches!(
         err.kind,
         AccessErrorKind::WrongIndexType { actual, .. } if actual == IndexType::Tombstone
@@ -976,7 +980,8 @@ fn test_valid_tombstone() {
     // ...even after the fork is merged.
     db.merge(fork.into_patch()).unwrap();
     let snapshot = db.snapshot();
-    let err = ListIndex::<_, u64>::from_access(&snapshot, "^foo.bar".into()).unwrap_err();
+    let migration = Migration::new("foo", &snapshot);
+    let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
     assert_matches!(
         err.kind,
         AccessErrorKind::WrongIndexType { actual, .. } if actual == IndexType::Tombstone

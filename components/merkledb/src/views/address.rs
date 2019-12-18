@@ -6,6 +6,9 @@ pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)
 }
 
+const SEPARATOR_CHAR: u8 = 0;
+const MIGRATION_CHAR: u8 = b'^';
+
 /// Represents the address of an index in the database.
 ///
 /// An address has a string *name* and an optional byte *key*. An index is uniquely identified
@@ -40,6 +43,7 @@ pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
 pub struct IndexAddress {
     pub(super) name: String,
     pub(super) id_in_group: Option<Vec<u8>>,
+    pub(super) in_migration: bool,
 }
 
 impl IndexAddress {
@@ -48,6 +52,7 @@ impl IndexAddress {
         Self {
             name: root.into(),
             id_in_group: None,
+            in_migration: false,
         }
     }
 
@@ -56,28 +61,17 @@ impl IndexAddress {
         &self.name
     }
 
-    /// Returns a resolved address name, which can be used in `ResolvedAddress`. The resolved
-    /// name corresponds to a usual `name()`, unless it starts with the "next version" char `^`,
-    /// in which case the resolved name does not include this char.
-    pub(super) fn resolved_name(&self) -> &str {
-        if self.name.starts_with('^') {
-            &self.name[1..]
-        } else {
-            &self.name
-        }
-    }
-
     /// Returns the namespace that the address belongs to. For migrated indexes, the namespace
     /// is defined as the component of the address name up (but not including) the first dot `'.'`
     /// char in the name (e.g., `foo` for address `^foo.bar`). For non-migrated indexes,
     /// the namespace is the empty string.
     pub(super) fn namespace(&self) -> &str {
-        if self.name.starts_with('^') {
+        if self.in_migration {
             let dot_position = self.name.find('.');
             if let Some(pos) = dot_position {
-                &self.name[1..pos]
+                &self.name[..pos]
             } else {
-                &self.name[1..]
+                &self.name
             }
         } else {
             ""
@@ -107,10 +101,8 @@ impl IndexAddress {
             // Because `concat` is faster than `format!("...")` in all cases.
             [prefix, ".", self.name()].concat()
         };
-        Self {
-            name,
-            id_in_group: self.id_in_group,
-        }
+
+        Self { name, ..self }
     }
 
     /// Appends a name part to `IndexAddress`. The name is separated from the existing name
@@ -131,15 +123,12 @@ impl IndexAddress {
             // Because `concat` is faster than `format!("...")` in all cases.
             [self.name(), ".", suffix].concat()
         };
-        Self {
-            name,
-            id_in_group: self.id_in_group,
-        }
+
+        Self { name, ..self }
     }
 
     /// Appends a key to the `IndexAddress`.
     pub fn append_key<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
-        let name = self.name;
         let bytes = if let Some(ref bytes) = self.id_in_group {
             concat_keys!(bytes, suffix)
         } else {
@@ -147,26 +136,96 @@ impl IndexAddress {
         };
 
         Self {
-            name,
             id_in_group: Some(bytes),
+            ..self
         }
+    }
+
+    pub(crate) fn set_in_migration(&mut self) {
+        self.in_migration = true;
     }
 
     /// Full address with a separator between `name` and `bytes` represented as byte array.
-    pub(crate) fn fully_qualified_name(&self) -> Vec<u8> {
+    pub(super) fn fully_qualified_name(&self) -> Vec<u8> {
         /// Separator between the name and the additional bytes in family indexes.
-        const INDEX_NAME_SEPARATOR: &[u8] = &[0];
+        const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
+        const MIGRATION_PREFIX: &[u8] = &[MIGRATION_CHAR];
 
-        if let Some(bytes) = self.id_in_group() {
-            concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes)
-        } else {
-            concat_keys!(self.name())
+        match (self.in_migration, self.id_in_group()) {
+            (true, Some(bytes)) => {
+                concat_keys!(MIGRATION_PREFIX, self.name(), INDEX_NAME_SEPARATOR, bytes)
+            }
+            (false, Some(bytes)) => concat_keys!(self.name(), INDEX_NAME_SEPARATOR, bytes),
+            (true, None) => concat_keys!(MIGRATION_PREFIX, self.name()),
+            (false, None) => self.name.as_bytes().to_vec(),
         }
+    }
+
+    /// Infers the name part of the fully qualified name that was obtained with
+    /// `fully_qualified_name`. This is the part corresponding to `ResolvedAddress.name`.
+    /// `min_name_len` specifies the minimum known length of the name part.
+    ///
+    /// # Return value
+    ///
+    /// Returns the restored name part of the index address and a bool flag indicating whether
+    /// the index is a part of a group.
+    #[allow(unsafe_code)]
+    pub(super) fn parse_fully_qualified_name(
+        qualified_name: &[u8],
+        min_name_len: usize,
+    ) -> (String, bool) {
+        let (cutoff_index, is_in_group) = qualified_name[min_name_len..]
+            .iter()
+            .position(|&byte| byte == SEPARATOR_CHAR)
+            .map_or_else(
+                || (qualified_name.len(), false),
+                |pos| (pos + min_name_len, true),
+            );
+
+        let name = if qualified_name[0] == MIGRATION_CHAR {
+            // The `^` initial char is not mapped to the resolved CF name.
+            qualified_name[1..cutoff_index].to_vec()
+        } else {
+            qualified_name[..cutoff_index].to_vec()
+        };
+        debug_assert!(
+            name.is_ascii(),
+            "BUG: non-ASCII chars in the name part of a fully qualified index name \
+             (qualified name = {:?}, inferred name part = {})",
+            qualified_name,
+            String::from_utf8_lossy(&name)
+        );
+
+        let name = unsafe {
+            // SAFETY:
+            // Safe by construction; metadata keys before the `\0` separator
+            // correspond to the index names, which consist of a subset of
+            // ASCII chars.
+            String::from_utf8_unchecked(name)
+        };
+        (name, is_in_group)
+    }
+
+    /// Converts a migration namespace into the form that all indexes in the namespace
+    /// begin with.
+    #[inline]
+    pub(super) fn qualify_migration_namespace(namespace: &str) -> Vec<u8> {
+        ["^", namespace, "."].concat().into_bytes()
+    }
+
+    #[inline]
+    pub(super) fn migrate_qualified_name(qualified_name: &[u8]) -> &[u8] {
+        debug_assert_eq!(
+            qualified_name[0], MIGRATION_CHAR,
+            "Qualified name {:?} is not in migration",
+            qualified_name
+        );
+        &qualified_name[1..]
     }
 }
 
-impl<'a> From<&'a str> for IndexAddress {
-    fn from(name: &'a str) -> Self {
+impl From<&str> for IndexAddress {
+    fn from(name: &str) -> Self {
         Self::from_root(name)
     }
 }
@@ -182,6 +241,7 @@ impl<'a, K: BinaryKey + ?Sized> From<(&'a str, &'a K)> for IndexAddress {
         Self {
             name: name.to_owned(),
             id_in_group: Some(key_bytes(key)),
+            in_migration: false,
         }
     }
 }
@@ -231,5 +291,25 @@ impl ResolvedAddress {
 impl From<&str> for ResolvedAddress {
     fn from(name: &str) -> Self {
         Self::system(name)
+    }
+}
+
+#[test]
+fn address_resolution() {
+    {
+        let (name, is_in_group) = IndexAddress::parse_fully_qualified_name(b"some.list", 0);
+        assert_eq!(name, "some.list");
+        assert!(!is_in_group);
+    }
+    {
+        let (name, is_in_group) = IndexAddress::parse_fully_qualified_name(b"some.list", 9);
+        assert_eq!(name, "some.list");
+        assert!(!is_in_group);
+    }
+    {
+        let (name, is_in_group) =
+            IndexAddress::parse_fully_qualified_name(b"some.list\0key\xa0", 9);
+        assert_eq!(name, "some.list");
+        assert!(is_in_group);
     }
 }

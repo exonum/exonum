@@ -233,39 +233,6 @@ where
 }
 
 impl IndexMetadata {
-    /// Returns a `ResolvedAddress` corresponding to the `full_name` of an index. `min_name_len`
-    /// specifies the minimum known length of the name part of `full_name` (i.e., the part
-    /// corresponding to `ResolvedAddress.name`.
-    #[allow(unsafe_code)]
-    fn resolve_address(&self, full_name: &[u8], min_name_len: usize) -> (ResolvedAddress, bool) {
-        let (cutoff_index, is_in_group) = full_name[min_name_len..]
-            .iter()
-            .position(|&byte| byte == 0)
-            .map_or_else(
-                || (full_name.len(), false),
-                |pos| (pos + min_name_len, true),
-            );
-
-        let name = if full_name[0] == b'^' {
-            // The `^` initial char is not mapped to the resolved CF name.
-            full_name[1..cutoff_index].to_vec()
-        } else {
-            full_name[..cutoff_index].to_vec()
-        };
-        debug_assert!(name.is_ascii());
-        let resolved = ResolvedAddress {
-            name: unsafe {
-                // SAFETY:
-                // Safe by construction; metadata keys before the `\0` separator
-                // correspond to the index names, which consist of a subset of
-                // ASCII chars.
-                String::from_utf8_unchecked(name)
-            },
-            id: NonZeroU64::new(self.identifier),
-        };
-        (resolved, is_in_group)
-    }
-
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;
         IndexMetadata {
@@ -384,7 +351,7 @@ impl<T: RawAccessMut> IndexesPool<T> {
     /// indicating whether the corresponding index was removed from aggregation (i.e., was
     /// aggregated and was not replaced by an aggregated index).
     pub(crate) fn flush_migration(&mut self, prefix: &str) -> Vec<(ResolvedAddress, bool)> {
-        let prefix = ["^", prefix, "."].concat();
+        let prefix = IndexAddress::qualify_migration_namespace(prefix);
         // Minimum length of the name part for the original indexes, i.e., ones for which
         // the name part of the address doesn't start with '^'. Since the '^' char is removed from
         // the name, this length is one lesser than the length of the `prefix`.
@@ -393,13 +360,19 @@ impl<T: RawAccessMut> IndexesPool<T> {
         let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(&prefix).collect();
         let mut removed_addrs = Vec::new();
         for (key, metadata) in moved_indexes {
-            // `key[1..]` removes `^` char at the beginning of the index.
-            let migrated_key = &key[1..];
-            debug_assert!(migrated_key.starts_with(prefix[1..].as_bytes()));
+            let migrated_key = IndexAddress::migrate_qualified_name(&key);
+            debug_assert!({
+                let migrated_prefix = IndexAddress::migrate_qualified_name(&prefix);
+                migrated_key.starts_with(migrated_prefix)
+            });
 
             if let Some(old_metadata) = self.0.get::<_, IndexMetadata>(migrated_key) {
-                let (resolved, is_in_group) =
-                    old_metadata.resolve_address(migrated_key, min_name_len);
+                let (name, is_in_group) =
+                    IndexAddress::parse_fully_qualified_name(migrated_key, min_name_len);
+                let resolved = ResolvedAddress {
+                    name,
+                    id: NonZeroU64::new(old_metadata.identifier),
+                };
                 let is_removed_from_aggregation = !is_in_group
                     && old_metadata.index_type.is_merkelized()
                     && !metadata.index_type.is_merkelized();
@@ -418,13 +391,17 @@ impl<T: RawAccessMut> IndexesPool<T> {
     }
 
     pub(crate) fn rollback_migration(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
-        let prefix = format!("^{}.", prefix);
+        let prefix = IndexAddress::qualify_migration_namespace(prefix);
         let (removed_names, removed_addrs): (Vec<_>, Vec<_>) = self
             .0
             .iter::<_, Vec<u8>, IndexMetadata>(&prefix)
-            .map(|(full_name, metadata)| {
-                let (resolved, _) = metadata.resolve_address(&full_name, prefix.len());
-                (full_name, resolved)
+            .map(|(key, metadata)| {
+                let (name, _) = IndexAddress::parse_fully_qualified_name(&key, prefix.len());
+                let resolved = ResolvedAddress {
+                    name,
+                    id: NonZeroU64::new(metadata.identifier),
+                };
+                (key, resolved)
             })
             .unzip();
         for full_name in &removed_names {
@@ -442,14 +419,11 @@ pub fn get_object_hash<T: RawAccess>(
 ) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
-    let index_full_name = if is_in_migration {
-        let mut name = Vec::with_capacity(1 + addr.name.len());
-        name.push(b'^');
-        name.extend_from_slice(addr.name.as_bytes());
-        name
-    } else {
-        addr.name.as_bytes().to_vec()
-    };
+    let mut original_addr = IndexAddress::from_root(&addr.name);
+    if is_in_migration {
+        original_addr.in_migration = true;
+    }
+    let index_full_name = original_addr.fully_qualified_name();
 
     let metadata = IndexesPool::new(access.clone())
         .index_metadata(&index_full_name)
@@ -505,7 +479,7 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
-        check_index_valid_full_name(index_address.resolved_name()).map_err(|kind| AccessError {
+        check_index_valid_full_name(&index_address.name).map_err(|kind| AccessError {
             addr: index_address.to_owned(),
             kind,
         })?;
@@ -523,7 +497,7 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
-        if index_type == IndexType::Tombstone && !index_address.name.starts_with('^') {
+        if index_type == IndexType::Tombstone && !index_address.in_migration {
             return Err(AccessError {
                 kind: AccessErrorKind::InvalidTombstone,
                 addr: index_address.to_owned(),
@@ -531,7 +505,7 @@ where
         }
 
         // Actual name.
-        let index_name = index_address.resolved_name().to_owned();
+        let index_name = index_address.name().to_owned();
         // Full name for internal usage.
         let index_full_name = index_address.fully_qualified_name();
 
@@ -667,36 +641,5 @@ mod tests {
                 .unwrap()
                 .view;
         assert!(!view.changes.is_aggregated());
-    }
-
-    #[test]
-    fn address_resolution() {
-        let metadata = IndexMetadata {
-            identifier: 1,
-            index_type: IndexType::List,
-            state: None,
-        };
-        {
-            let (addr, is_in_group) = metadata.resolve_address(b"some.list", 0);
-            assert_eq!(addr.name, "some.list");
-            assert_eq!(addr.id, NonZeroU64::new(1));
-            assert!(!is_in_group);
-        }
-        {
-            let (addr, is_in_group) = metadata.resolve_address(b"some.list", 9);
-            assert_eq!(addr.name, "some.list");
-            assert_eq!(addr.id, NonZeroU64::new(1));
-            assert!(!is_in_group);
-        }
-
-        let metadata = IndexMetadata {
-            identifier: 100,
-            index_type: IndexType::List,
-            state: None,
-        };
-        let (addr, is_in_group) = metadata.resolve_address(b"some.list\0key", 9);
-        assert_eq!(addr.name, "some.list");
-        assert_eq!(addr.id, NonZeroU64::new(100));
-        assert!(is_in_group);
     }
 }

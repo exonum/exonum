@@ -147,7 +147,7 @@ impl SystemSchema<&Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, HashTag, TemporaryDB};
+    use crate::{access::AccessExt, migration::Migration, Database, HashTag, TemporaryDB};
 
     fn initial_changes(fork: &Fork) {
         fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
@@ -250,7 +250,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         {
-            let mut map = fork.get_map("map");
+            let mut map = fork.get_map("test.map");
             map.put(&1_u64, "foo".to_owned());
             map.put(&2_u64, "bar".to_owned());
         }
@@ -262,11 +262,12 @@ mod tests {
         // Create a merkelized index in a migration. It should not be aggregated.
         let fork = db.fork();
         {
-            let mut map = fork.get_proof_map("^map");
+            let migration = Migration::new("test", &fork);
+            let mut map = migration.get_proof_map("map");
             map.put(&1_u64, "1".to_owned());
             map.put(&3_u64, "3".to_owned());
 
-            let map = fork.get_map::<_, u64, String>("map");
+            let map = fork.get_map::<_, u64, String>("test.map");
             assert_eq!(map.get(&1).unwrap(), "foo");
             assert!(map.get(&3).is_none());
         }

@@ -88,22 +88,6 @@ impl<'a, T: Access> Prefixed<'a, T> {
         assert_valid_name_component(prefix.as_ref());
         Self { access, prefix }
     }
-
-    /// Creates a prefixed access for a migration.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if the prefix does not conform to valid names for indexes.
-    pub fn for_migration(prefix: &str, access: T) -> Self {
-        assert_valid_name_component(prefix);
-        let mut full_prefix = String::with_capacity(1 + prefix.len());
-        full_prefix.push('^');
-        full_prefix.push_str(prefix);
-        Self {
-            access,
-            prefix: Cow::Owned(full_prefix),
-        }
-    }
 }
 
 impl<T: Access> Access for Prefixed<'_, T> {

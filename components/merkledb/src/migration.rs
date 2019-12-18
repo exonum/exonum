@@ -46,7 +46,7 @@
 //!
 //! ```
 //! # use exonum_merkledb::{access::AccessExt, Database, SystemSchema, TemporaryDB};
-//! # use exonum_merkledb::migration::Migration;
+//! # use exonum_merkledb::migration::MigrationHelper;
 //! # use std::sync::Arc;
 //! # fn main() -> exonum_merkledb::Result<()> {
 //! let db = Arc::new(TemporaryDB::new());
@@ -60,7 +60,7 @@
 //! let initial_state_hash = SystemSchema::new(&db.snapshot()).state_hash();
 //!
 //! // Create migration helper.
-//! let mut migration = Migration::new(Arc::clone(&db) as Arc<dyn Database>, "test");
+//! let mut migration = MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test");
 //! {
 //!     // Merkelize the data in the list.
 //!     let old_list = migration.old_data().get_list::<_, u32>("list");
@@ -112,20 +112,61 @@ use exonum_crypto::Hash;
 use std::{fmt, mem, sync::Arc};
 
 use crate::{
-    access::Prefixed, validation::assert_valid_name_component, Database, Fork, ReadonlyFork,
-    SystemSchema,
+    access::{Access, AccessError, Prefixed},
+    validation::assert_valid_name_component,
+    views::{IndexAddress, IndexType, RawAccessMut, ViewWithMetadata},
+    Database, Fork, ReadonlyFork, SystemSchema,
 };
+
+/// TODO.
+#[derive(Debug, Clone, Copy)]
+pub struct Migration<'a, T> {
+    access: T,
+    namespace: &'a str,
+}
+
+impl<'a, T: Access> Migration<'a, T> {
+    /// Creates a migration in the specified namespace.
+    pub fn new(namespace: &'a str, access: T) -> Self {
+        Self { namespace, access }
+    }
+}
+
+impl<T: RawAccessMut> Migration<'_, T> {
+    /// Marks an index with the specified address as removed during migration.
+    pub fn create_tombstone<I>(self, addr: I)
+    where
+        I: Into<IndexAddress>,
+    {
+        self.get_or_create_view(addr.into(), IndexType::Tombstone)
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e));
+    }
+}
+
+impl<T: Access> Access for Migration<'_, T> {
+    type Base = T::Base;
+
+    fn get_or_create_view(
+        self,
+        addr: IndexAddress,
+        index_type: IndexType,
+    ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
+        let mut prefixed_addr = addr.prepend_name(self.namespace.as_ref());
+        prefixed_addr.set_in_migration();
+        self.access.get_or_create_view(prefixed_addr, index_type)
+    }
+}
 
 /// Migration helper.
 ///
 /// See the [module docs](index.html) for examples of usage.
-pub struct Migration {
+pub struct MigrationHelper {
     db: Arc<dyn Database>,
     fork: Fork,
     namespace: String,
 }
 
-impl fmt::Debug for Migration {
+impl fmt::Debug for MigrationHelper {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         formatter
             .debug_tuple("Migration")
@@ -134,7 +175,7 @@ impl fmt::Debug for Migration {
     }
 }
 
-impl Migration {
+impl MigrationHelper {
     /// Creates a new helper.
     pub fn new(db: impl Into<Arc<dyn Database>>, namespace: &str) -> Self {
         assert_valid_name_component(namespace);
@@ -149,8 +190,8 @@ impl Migration {
     }
 
     /// Returns full access to the new version of migrated data.
-    pub fn new_data(&self) -> Prefixed<'_, &Fork> {
-        Prefixed::for_migration(&self.namespace, &self.fork)
+    pub fn new_data(&self) -> Migration<'_, &Fork> {
+        Migration::new(&self.namespace, &self.fork)
     }
 
     /// Returns readonly access to the old version of migrated data.
@@ -183,5 +224,294 @@ impl Migration {
         let patch = self.fork.into_patch();
         let hash = SystemSchema::new(&patch).namespace_state_hash(&self.namespace);
         self.db.merge(patch).map(|()| hash)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        access::{AccessExt, RawAccess},
+        HashTag, ObjectHash, TemporaryDB,
+    };
+
+    #[test]
+    fn in_memory_migration() {
+        fn check_indexes<T: RawAccess + Copy>(view: T) {
+            let list = view.get_proof_list::<_, u64>("name.list");
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.get(0), Some(4));
+            assert_eq!(list.get(1), Some(5));
+            assert_eq!(list.get(2), None);
+            assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5]);
+
+            let map = view.get_map::<_, u64, i32>("name.map");
+            assert_eq!(map.get(&1), Some(42));
+
+            let set = view.get_key_set::<_, u8>("name.new");
+            assert!(set.contains(&0));
+            assert!(!set.contains(&1));
+
+            let list = view.get_proof_list::<_, u64>("name.untouched");
+            assert_eq!(list.len(), 2);
+            assert_eq!(list.get(0), Some(77));
+            assert_eq!(list.iter().collect::<Vec<_>>(), vec![77, 88]);
+
+            assert_eq!(view.get_entry("unrelated").get(), Some(1_u64));
+            assert_eq!(view.get_entry("name1.unrelated").get(), Some(2_u64));
+            let set = view.get_value_set::<_, String>("name.removed");
+            assert_eq!(set.iter().count(), 0);
+        }
+
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+
+        fork.get_list("name.list").extend(vec![1_u32, 2, 3]);
+        fork.get_map("name.map").put(&1_u64, "!".to_owned());
+        fork.get_value_set("name.removed").insert("!!!".to_owned());
+        fork.get_proof_list("name.untouched")
+            .extend(vec![77_u64, 88]);
+        fork.get_entry("unrelated").set(1_u64);
+        fork.get_entry("name1.unrelated").set(2_u64);
+
+        // Start migration.
+        let migration = Migration::new("name", &fork);
+        migration.get_proof_list("list").extend(vec![4_u64, 5]);
+        migration.get_map("map").put(&1_u64, 42_i32);
+        migration.get_key_set("new").insert(0_u8);
+        migration.create_tombstone("removed");
+
+        fork.flush_migration("name");
+
+        check_indexes(&fork);
+        // The newly migrated indexes are emptied.
+        let migration = Migration::new("name", &fork);
+        assert!(migration.get_proof_list::<_, u64>("list").is_empty());
+
+        // Merge the fork and run the checks again.
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        check_indexes(&snapshot);
+    }
+
+    #[test]
+    fn migration_with_merges() {
+        fn check_indexes<T: RawAccess + Copy>(view: T) {
+            let list = view.get_proof_list::<_, u64>("name.list");
+            assert_eq!(list.len(), 4);
+            assert_eq!(list.get(2), Some(6));
+            assert_eq!(list.iter_from(1).collect::<Vec<_>>(), vec![5, 6, 7]);
+
+            let map = view.get_map::<_, u64, i32>("name.map");
+            assert_eq!(map.get(&1), None);
+            assert_eq!(map.get(&2), Some(21));
+            assert_eq!(map.get(&3), Some(7));
+            assert_eq!(map.keys().collect::<Vec<_>>(), vec![2, 3]);
+
+            // This entry should be removed.
+            let entry = view.get_entry::<_, String>(("name.family", &1_u8));
+            assert!(!entry.exists());
+            // ...but this one should be retained.
+            let entry = view.get_entry::<_, String>(("name.family", &2_u8));
+            assert_eq!(entry.get().unwrap(), "!!");
+
+            let entry = view.get_proof_entry::<_, String>(("name.untouched", &2_u32));
+            assert_eq!(entry.get().unwrap(), "??");
+
+            assert_eq!(view.get_entry("unrelated").get(), Some(1_u64));
+            assert_eq!(view.get_entry("name1.unrelated").get(), Some(2_u64));
+            let set = view.get_value_set::<_, String>("name.removed");
+            assert_eq!(set.iter().count(), 0);
+        }
+
+        let db = TemporaryDB::new();
+
+        let fork = db.fork();
+        fork.get_list("name.list").extend(vec![1_u32, 2, 3]);
+        fork.get_map("name.map").put(&1_u64, "!".to_owned());
+        fork.get_entry(("name.family", &1_u8)).set("!".to_owned());
+        fork.get_entry(("name.family", &2_u8)).set("!!".to_owned());
+        fork.get_proof_entry(("name.untouched", &2_u32))
+            .set("??".to_owned());
+        fork.get_entry("unrelated").set(1_u64);
+        fork.get_entry("name1.unrelated").set(2_u64);
+        db.merge(fork.into_patch()).unwrap();
+
+        let fork = db.fork();
+        let migration = Migration::new("name", &fork);
+        migration.get_proof_list("list").extend(vec![4_u64, 5]);
+        migration.get_map("map").put(&1_u64, 42_i32);
+        migration.get_key_set("new").insert(0_u8);
+        migration.create_tombstone(("name.family", &3_u8));
+        // ^-- Removing non-existing indexes is weird, but should work fine.
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+        {
+            let migration = Migration::new("name", &fork);
+            let mut list = migration.get_proof_list::<_, u64>("list");
+            assert_eq!(list.len(), 2);
+            list.push(6);
+            list.push(7);
+            assert_eq!(list.len(), 4);
+
+            let mut map = migration.get_map::<_, u64, i32>("map");
+            map.clear();
+            map.put(&2, 21);
+            map.put(&3, 7);
+
+            migration.create_tombstone(("family", &1_u8));
+        }
+        fork.flush_migration("name");
+
+        check_indexes(&fork);
+        db.merge(fork.into_patch()).unwrap();
+        let snapshot = db.snapshot();
+        check_indexes(&snapshot);
+    }
+
+    #[test]
+    fn aggregation_within_migrations() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_list("name.list").push(1_u64);
+        fork.get_proof_list("name.other_list")
+            .extend(vec![1_u64, 2, 3]);
+        fork.get_proof_entry("name.entry").set("!".to_owned());
+        db.merge(fork.into_patch()).unwrap();
+        let state_hash = SystemSchema::new(&db.snapshot()).state_hash();
+
+        let fork = db.fork();
+        let migration = Migration::new("name", &fork);
+        migration.get_proof_list("list").extend(vec![2_u64, 3, 4]);
+        migration.get_proof_entry("entry").set("?".to_owned());
+        migration.get_proof_entry("new").set("??".to_owned());
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let new_state_hash = SystemSchema::new(&snapshot).state_hash();
+        assert_eq!(state_hash, new_state_hash);
+        let system_schema = SystemSchema::new(&snapshot);
+        let ns_hash = system_schema.namespace_state_hash("name");
+        assert_ne!(ns_hash, HashTag::empty_map_hash());
+
+        let ns_aggregator = system_schema.namespace_state_aggregator("name");
+        assert_eq!(ns_hash, ns_aggregator.object_hash());
+        assert_eq!(
+            ns_aggregator.keys().collect::<Vec<_>>(),
+            vec!["name.entry", "name.list", "name.new"]
+        );
+
+        let migration = Migration::new("name", &snapshot);
+        let list = migration.get_proof_list::<_, u64>("list");
+        assert_eq!(ns_aggregator.get("name.list"), Some(list.object_hash()));
+        let entry = migration.get_proof_entry::<_, String>("entry");
+        assert_eq!(ns_aggregator.get("name.entry"), Some(entry.object_hash()));
+    }
+
+    #[test]
+    fn aggregation_after_migrations() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        fork.get_proof_list("name.list").push(1_u64);
+        fork.get_proof_list("name.other_list")
+            .extend(vec![1_u64, 2, 3]);
+        fork.get_entry("name.entry").set("!".to_owned());
+        let other_entry_hash = {
+            let mut entry = fork.get_proof_entry("name.other_entry");
+            entry.set("!!".to_owned());
+            entry.object_hash()
+        };
+
+        // Migration.
+        let migration = Migration::new("name", &fork);
+        migration.get_proof_list("list").extend(vec![2_u64, 3, 4]);
+        migration.get_proof_entry("entry").set("?".to_owned());
+        let modified_entry_hash = migration
+            .get_proof_entry::<_, String>("entry")
+            .object_hash();
+        migration.get_proof_entry("new").set("??".to_owned());
+        let new_entry_hash = migration.get_proof_entry::<_, String>("new").object_hash();
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+        Migration::new("name", &fork).create_tombstone("other_list");
+        fork.flush_migration("name");
+
+        let patch = fork.into_patch();
+        let system_schema = SystemSchema::new(&patch);
+        assert_eq!(
+            system_schema.namespace_state_hash("name"),
+            HashTag::empty_map_hash()
+        );
+        let aggregator = system_schema.state_aggregator();
+        assert_eq!(
+            aggregator.keys().collect::<Vec<_>>(),
+            vec!["name.entry", "name.list", "name.new", "name.other_entry"]
+        );
+        assert_eq!(aggregator.get("name.entry"), Some(modified_entry_hash));
+        assert_eq!(aggregator.get("name.new"), Some(new_entry_hash));
+        assert_eq!(aggregator.get("name.other_entry"), Some(other_entry_hash));
+    }
+
+    #[test]
+    fn index_metadata_is_removed() {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+
+        fork.get_entry("test.foo").set(1_u8);
+        Migration::new("test", &fork).create_tombstone("foo");
+        fork.flush_migration("test");
+        let patch = fork.into_patch();
+        assert_eq!(
+            patch.get_proof_entry::<_, u8>("test.foo").object_hash(),
+            Hash::zero()
+        );
+    }
+
+    fn test_migration_rollback(with_merge: bool) {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+
+        fork.get_entry("test.foo").set(1_u8);
+        fork.get_proof_list(("test.list", &1))
+            .extend(vec![1_i32, 2, 3]);
+        let migration = Migration::new("test", &fork);
+        migration.get_proof_entry("foo").set(2_u8);
+        migration.create_tombstone(("list", &1));
+        migration.get_value_set("new").insert("test".to_owned());
+
+        if with_merge {
+            db.merge(fork.into_patch()).unwrap();
+            fork = db.fork();
+        }
+        fork.rollback_migration("test");
+        assert_eq!(fork.get_entry::<_, u8>("test.foo").get(), Some(1));
+        let patch = fork.into_patch();
+        assert_eq!(patch.get_entry::<_, u8>("test.foo").get(), Some(1));
+        assert_eq!(
+            patch
+                .get_proof_list::<_, i32>(("test.list", &1))
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![1_i32, 2, 3]
+        );
+
+        let migration = Migration::new("test", &patch);
+        assert!(!migration.get_proof_entry::<_, u8>("foo").exists());
+        // Since migrated indexes don't exist, it should be OK to assign new types to them.
+        assert!(!migration.get_entry::<_, ()>(("list", &1)).exists());
+        assert!(!migration.get_entry::<_, ()>("new").exists());
+    }
+
+    #[test]
+    fn in_memory_migration_rollback() {
+        test_migration_rollback(false);
+    }
+
+    #[test]
+    fn migration_rollback_with_merge() {
+        test_migration_rollback(true);
     }
 }

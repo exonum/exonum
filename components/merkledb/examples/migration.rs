@@ -34,9 +34,10 @@ use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, AccessExt, Prefixed},
-    impl_object_hash_for_binary_value, BinaryValue, Database, Entry, Fork, Group, ListIndex,
-    MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex, ReadonlyFork, SystemSchema,
-    TemporaryDB,
+    impl_object_hash_for_binary_value,
+    migration::Migration,
+    BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
+    ProofListIndex, ProofMapIndex, ReadonlyFork, SystemSchema, TemporaryDB,
 };
 
 const USER_COUNT: usize = 10_000;
@@ -172,10 +173,10 @@ mod v2 {
     }
 }
 
-fn create_migration(new_data: Prefixed<&Fork>, old_data: Prefixed<ReadonlyFork>) {
+fn create_migration(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     println!("\nStarted migration");
     let old_schema = v1::Schema::new(old_data);
-    let mut new_schema = v2::Schema::new(new_data.clone());
+    let mut new_schema = v2::Schema::new(new_data);
 
     // Move `ticker` and `divisibility` to `config`.
     let config = v2::Config {
@@ -184,17 +185,15 @@ fn create_migration(new_data: Prefixed<&Fork>, old_data: Prefixed<ReadonlyFork>)
     };
     new_schema.config.set(config);
     // Mark these two indexes for removal.
-    new_data.clone().create_tombstone("ticker");
-    new_data.clone().create_tombstone("divisibility");
+    new_data.create_tombstone("ticker");
+    new_data.create_tombstone("divisibility");
 
     // Migrate wallets.
     for (i, (public_key, wallet)) in old_schema.wallets.iter().enumerate() {
         if wallet.username == "Eve" {
             // We don't like Eves 'round these parts. Remove her transaction history
             // and don't migrate the wallet.
-            new_data
-                .clone()
-                .create_tombstone(("histories", &public_key));
+            new_data.create_tombstone(("histories", &public_key));
         } else {
             // Merkelize the wallet history.
             let mut history = new_schema.histories.get(&public_key);
@@ -222,7 +221,7 @@ fn main() {
     db.merge(fork.into_patch()).unwrap();
 
     let fork = db.fork();
-    let new_data = Prefixed::for_migration("test", &fork);
+    let new_data = Migration::new("test", &fork);
     let old_data = Prefixed::new("test", fork.readonly());
     {
         let old_schema = v1::Schema::new(old_data.clone());
@@ -237,7 +236,7 @@ fn main() {
     let old_schema = v1::Schema::new(Prefixed::new("test", &snapshot));
     assert_eq!(old_schema.ticker.get().unwrap(), "XNM");
     // The new data is present, too, in the unmerged form.
-    let new_schema = v2::Schema::new(Prefixed::for_migration("test", &snapshot));
+    let new_schema = v2::Schema::new(Migration::new("test", &snapshot));
     assert_eq!(new_schema.config.get().unwrap().ticker, "XNM");
 
     let system_schema = SystemSchema::new(&snapshot);
