@@ -171,7 +171,8 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
-    pub(crate) fn transactions_pool_len_index(&self) -> Entry<T::Base, u64> {
+    #[doc(hidden)]
+    pub fn transactions_pool_len_index(&self) -> Entry<T::Base, u64> {
         self.access.clone().get_entry(TRANSACTIONS_POOL_LEN)
     }
 

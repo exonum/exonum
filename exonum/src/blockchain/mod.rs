@@ -498,9 +498,9 @@ impl BlockchainMut {
     }
 }
 
-/// Return transaction from persistent pool. If transaction is not present in pool, try
-/// to return it from transactions cache.
-pub(crate) fn get_transaction<T: RawAccess>(
+/// Returns transaction from the persistent pool. If transaction is not present in the pool, tries
+/// to return it from the transactions cache.
+pub fn get_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
@@ -509,7 +509,7 @@ pub(crate) fn get_transaction<T: RawAccess>(
 }
 
 /// Check that transaction exists in the persistent pool or in the transaction cache.
-pub(crate) fn contains_transaction<T: RawAccess>(
+pub fn contains_transaction<T: RawAccess>(
     hash: &Hash,
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,

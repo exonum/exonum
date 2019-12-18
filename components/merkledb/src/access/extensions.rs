@@ -97,7 +97,7 @@ pub trait AccessExt: Access {
     fn get_map<I, K, V>(self, addr: I) -> MapIndex<Self::Base, K, V>
     where
         I: Into<IndexAddress>,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
         MapIndex::from_access(self, addr.into()).unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
