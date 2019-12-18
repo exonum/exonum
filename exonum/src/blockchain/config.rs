@@ -26,7 +26,8 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
-    messages::{BinaryValue, SIGNED_MESSAGE_MIN_SIZE},
+    merkledb::BinaryValue,
+    messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::{blockchain, runtime},
     runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };

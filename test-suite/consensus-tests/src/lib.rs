@@ -15,9 +15,11 @@
 #![warn(missing_debug_implementations, unsafe_code, bare_trait_objects)]
 
 pub mod config_updater;
-pub mod proto;
 pub mod sandbox_tests_helper;
 pub mod timestamping;
+
+mod guarded_queue;
+mod proto;
 
 use bit_vec::BitVec;
 use exonum::{
@@ -66,6 +68,7 @@ use std::{
 
 use crate::{
     config_updater::ConfigUpdaterService,
+    guarded_queue::GuardedQueue,
     sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
     timestamping::TimestampingService,
 };
@@ -87,35 +90,6 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 
     fn listen_address(&self) -> SocketAddr {
         self.listen_address
-    }
-}
-
-/// Guarded queue for messages sent by the sandbox. If the queue is not empty when dropped,
-/// it panics.
-#[derive(Debug, Default)]
-pub struct GuardedQueue(VecDeque<(PublicKey, Message)>);
-
-impl Deref for GuardedQueue {
-    type Target = VecDeque<(PublicKey, Message)>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for GuardedQueue {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Drop for GuardedQueue {
-    fn drop(&mut self) {
-        if !std::thread::panicking() {
-            if let Some((addr, msg)) = self.0.pop_front() {
-                panic!("Sent unexpected message {:?} to {}", msg, addr);
-            }
-        }
     }
 }
 

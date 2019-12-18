@@ -17,10 +17,11 @@ use std::mem;
 use crate::{
     blockchain::{get_transaction, Schema},
     crypto::{Hash, PublicKey},
+    merkledb::BinaryValue,
     messages::{
-        BinaryValue, BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest,
-        ProposeRequest, Requests, TransactionsRequest, TransactionsResponse, Verified,
-        TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
+        BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest, ProposeRequest,
+        Requests, TransactionsRequest, TransactionsResponse, Verified, TX_RES_EMPTY_SIZE,
+        TX_RES_PB_OVERHEAD_PAYLOAD,
     },
 };
 

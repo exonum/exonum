@@ -35,7 +35,8 @@ use crate::{
         NetworkEvent, NetworkRequest,
     },
     helpers::user_agent,
-    messages::{BinaryValue, Connect, SignedMessage, Verified},
+    merkledb::BinaryValue,
+    messages::{Connect, SignedMessage, Verified},
     node::{ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel, SharedConnectList},
 };
 

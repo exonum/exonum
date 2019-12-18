@@ -91,9 +91,8 @@
 //!
 
 pub use self::{signed::Verified, types::*};
-pub use exonum_merkledb::BinaryValue;
 
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 
 use std::borrow::Cow;
 

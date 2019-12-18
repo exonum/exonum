@@ -23,10 +23,10 @@ use exonum::{
     api::node::public::explorer::TransactionResponse,
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Verified},
+    messages::{AnyTx, Verified},
     runtime::rust::Transaction,
 };
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 use serde_json::json;

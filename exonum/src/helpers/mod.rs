@@ -22,8 +22,6 @@ pub mod user_agent;
 use env_logger::Builder;
 use log::SetLoggerError;
 
-use std::path::{Component, Path, PathBuf};
-
 use crate::{
     api::manager::UpdateEndpoints,
     blockchain::{
@@ -100,53 +98,6 @@ pub trait ValidateInput: Sized {
     }
 }
 
-/// This routine is adapted from the *old* Path's `path_relative_from`
-/// function, which works differently from the new `relative_from` function.
-/// In particular, this handles the case on unix where both paths are
-/// absolute but with only the root as the common directory.
-///
-/// @see https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
-pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Option<PathBuf> {
-    let path = path.as_ref();
-    let base = base.as_ref();
-
-    if path.is_absolute() != base.is_absolute() {
-        if path.is_absolute() {
-            Some(PathBuf::from(path))
-        } else {
-            None
-        }
-    } else {
-        let mut ita = path.components();
-        let mut itb = base.components();
-        let mut comps: Vec<Component<'_>> = vec![];
-        loop {
-            match (ita.next(), itb.next()) {
-                (None, None) => break,
-                (Some(a), None) => {
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
-                }
-                (None, _) => comps.push(Component::ParentDir),
-                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
-                (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
-                (Some(_), Some(b)) if b == Component::ParentDir => return None,
-                (Some(a), Some(_)) => {
-                    comps.push(Component::ParentDir);
-                    for _ in itb {
-                        comps.push(Component::ParentDir);
-                    }
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
-                }
-            }
-        }
-        Some(comps.iter().map(|c| c.as_os_str()).collect())
-    }
-}
-
 /// Clears consensus messages cache.
 ///
 /// Used in `exonum-cli` to implement `clear-cache` maintenance action.
@@ -181,19 +132,4 @@ pub fn create_rust_runtime_and_genesis_config(
     }
 
     (rust_runtime, config_builder.build())
-}
-
-#[test]
-fn test_path_relative_from() {
-    let cases = vec![
-        ("/b", "/c", Some("../b".into())),
-        ("/a/b", "/a/c", Some("../b".into())),
-        ("/a", "/a/c", Some("../".into())),
-        ("/a/b/c", "/a/b", Some("c".into())),
-        ("/a/b/c", "/a/b/d", Some("../c".into())),
-        ("./a/b", "./a/c", Some("../b".into())),
-    ];
-    for c in cases {
-        assert_eq!(path_relative_from(c.0, c.1), c.2);
-    }
 }
