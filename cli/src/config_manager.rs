@@ -28,7 +28,6 @@ use crate::{
 /// Structure that handles work with config file at runtime.
 #[derive(Debug)]
 pub struct DefaultConfigManager {
-    handle: thread::JoinHandle<()>,
     tx: mpsc::Sender<UpdateRequest>,
 }
 
@@ -43,7 +42,7 @@ impl DefaultConfigManager {
         P: AsRef<Path> + Send + 'static,
     {
         let (tx, rx) = mpsc::channel();
-        let handle = thread::spawn(move || {
+        thread::spawn(move || {
             for UpdateRequest(connect_list) in rx {
                 let res = Self::update_connect_list(connect_list, &path);
 
@@ -53,7 +52,7 @@ impl DefaultConfigManager {
             }
         });
 
-        Self { handle, tx }
+        Self { tx }
     }
 
     // Updates ConnectList on file system synchronously.
