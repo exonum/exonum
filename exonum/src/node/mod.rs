@@ -1104,6 +1104,7 @@ impl Node {
         let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
             .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
+
         network_thread.join().unwrap()
     }
 

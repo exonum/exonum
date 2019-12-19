@@ -22,6 +22,7 @@ pub use self::user_agent::user_agent;
 // `Milliseconds` is just `u64`, but more readable within context.
 pub(crate) use self::types::Milliseconds;
 
+#[doc(hidden)]
 pub mod config;
 
 use env_logger::Builder;

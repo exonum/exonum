@@ -1108,14 +1108,12 @@ fn create_genesis_config(
         |builder, instance| builder.with_instance(instance),
     );
 
-    let genesis_config = artifacts
+    artifacts
         .into_iter()
         .fold(genesis_config_builder, |builder, (artifact, payload)| {
             builder.with_parametric_artifact(artifact, payload)
         })
-        .build();
-
-    genesis_config
+        .build()
 }
 
 /// Constructs an uninitialized instance of a `Sandbox`.
