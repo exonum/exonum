@@ -407,8 +407,8 @@ impl TestKit {
     /// testkit.rollback();
     ///
     /// testkit.checkpoint();
-    /// testkit.create_block_with_transactions(vec![tx_a.clone()]);
-    /// testkit.create_block_with_transactions(vec![tx_b.clone()]);
+    /// testkit.create_block_with_transaction(tx_a);
+    /// testkit.create_block_with_transaction(tx_b);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
     /// # }
@@ -417,12 +417,6 @@ impl TestKit {
         self.db_handler.rollback()
     }
 
-    ///
-    /// # Panics
-    /// - Panics if any of the transactions is incorrect.
-    ///
-    /// # Panics
-    /// - Panics if any of the transactions is incorrect.
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
