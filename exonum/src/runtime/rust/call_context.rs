@@ -23,6 +23,16 @@ pub struct CallContext<'a> {
     instance: InstanceDescriptor<'a>,
 }
 
+/// Authorization for a child call.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
+pub enum ChildAuthorization {
+    /// Fallthrough authorization: the child call retains `Caller` information of the parent call.
+    Fallthrough,
+    /// Authorization with the authority of the service executing the parent call.
+    Service,
+}
+
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
@@ -110,7 +120,7 @@ impl<'a> CallContext<'a> {
         }
 
         self.inner
-            .child_context(self.instance.id)
+            .child_context(Some(self.instance.id))
             .initiate_adding_service(instance_spec, constructor)
     }
 
@@ -154,8 +164,10 @@ where
             instance_id: descriptor.id,
             method_id: method.id,
         };
-        self.inner
-            .child_context(self.instance.id)
-            .call(method.interface_name, &call_info, &args)
+        self.inner.child_context(Some(self.instance.id)).call(
+            method.interface_name,
+            &call_info,
+            &args,
+        )
     }
 }

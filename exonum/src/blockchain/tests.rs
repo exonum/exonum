@@ -89,9 +89,9 @@ impl TestDispatcher<CallContext<'_>> for TestDispatcherService {
         ctx.service_data().get_entry("val").set(arg);
 
         let artifact = if arg == 24 {
-            ServicePanicImpl.artifact_id().into()
+            ServicePanicImpl.artifact_id()
         } else {
-            ServiceGoodImpl.artifact_id().into()
+            ServiceGoodImpl.artifact_id()
         };
         ctx.start_artifact_registration(artifact, vec![])?;
         if arg == 42 {
@@ -121,9 +121,9 @@ impl TestDispatcher<CallContext<'_>> for TestDispatcherService {
         };
 
         let artifact = if arg == 24 {
-            ServicePanicImpl.artifact_id().into()
+            ServicePanicImpl.artifact_id()
         } else {
-            TestDispatcherService.artifact_id().into()
+            TestDispatcherService.artifact_id()
         };
 
         let instance_name = format!("good-service-{}", arg);
@@ -643,7 +643,7 @@ fn test_dispatcher_deploy_good() {
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
-    let artifact_id = ServiceGoodImpl.artifact_id().into();
+    let artifact_id = ServiceGoodImpl.artifact_id();
 
     // Tests deployment procedure for the available artifact.
     assert!(!blockchain.dispatcher.is_artifact_deployed(&artifact_id));
@@ -658,7 +658,7 @@ fn test_dispatcher_deploy_good() {
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .artifacts()
-        .contains(&artifact_id.name));
+        .contains(&artifact_id));
     execute_transaction(
         &mut blockchain,
         gen_keypair().test_deploy(TEST_SERVICE_ID, 1),
@@ -667,7 +667,7 @@ fn test_dispatcher_deploy_good() {
     let snapshot = blockchain.snapshot();
     assert!(DispatcherSchema::new(&snapshot)
         .artifacts()
-        .contains(&artifact_id.name));
+        .contains(&artifact_id));
     assert_eq!(snapshot.get_entry(IDX_NAME).get(), Some(1_u64));
 }
 
@@ -684,8 +684,7 @@ fn test_dispatcher_already_deployed() {
                 .into_default_instance(11, "good"),
         ],
     );
-
-    let artifact_id = ServiceGoodImpl.artifact_id().into();
+    let artifact_id = ServiceGoodImpl.artifact_id();
 
     // Tests that we get an error if we try to deploy already deployed artifact.
     assert!(blockchain.dispatcher.is_artifact_deployed(&artifact_id));
@@ -721,7 +720,7 @@ fn test_dispatcher_register_unavailable() {
             .into_default_instance(TEST_SERVICE_ID, TEST_SERVICE_NAME)],
     );
 
-    let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id().into();
+    let artifact_id: ArtifactId = ServiceGoodImpl.artifact_id();
     blockchain
         .dispatcher
         .deploy_artifact(artifact_id.clone(), vec![])
@@ -737,7 +736,7 @@ fn test_dispatcher_register_unavailable() {
     let snapshot = blockchain.snapshot();
     assert!(!DispatcherSchema::new(&snapshot)
         .artifacts()
-        .contains(&artifact_id.name));
+        .contains(&artifact_id));
     assert!(!snapshot.get_entry::<_, u64>(IDX_NAME).exists());
     // Tests that an unavailable artifact will not be registered.
     execute_transaction(

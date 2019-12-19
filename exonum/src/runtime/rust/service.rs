@@ -34,9 +34,8 @@ use crate::{
 };
 
 use super::{
-    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, RustArtifactId,
+    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, MethodDescriptor,
 };
-use crate::runtime::rust::MethodDescriptor;
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -136,7 +135,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 /// [`ServiceFactory`](index.html#examples) macro.
 pub trait ServiceFactory: Send + Debug + 'static {
     /// Returns the unique artifact identifier corresponding to the factory.
-    fn artifact_id(&self) -> RustArtifactId;
+    fn artifact_id(&self) -> ArtifactId;
     /// Returns the Protobuf specification used by the instances of this service.
     fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec;
     /// Creates a new service instance.

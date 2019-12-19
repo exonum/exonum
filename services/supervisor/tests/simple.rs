@@ -22,7 +22,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
-        ArtifactId, DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -352,7 +352,7 @@ fn deploy_service() {
 
     let deadline_height = Height(5);
 
-    let artifact = ArtifactId::new(0_u32, "deployable-test-service:0.1.0").unwrap();
+    let artifact = DeployableService.artifact_id();
     let deploy_request = DeployRequest {
         artifact: artifact.clone(),
         spec: Vec::new(),

@@ -12,29 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+use exonum_build::ProtobufGenerator;
 
-package exonum.testkit;
-
-import "types.proto";
-import "runtime.proto";
-
-message CreateWallet {
-  string name = 1;
-}
-
-message Issue {
-  exonum.crypto.PublicKey to = 1;
-  uint64 amount = 2;
-}
-
-message Wallet {
-  string name = 1;
-  uint64 balance = 2;
-}
-
-message AnyCall {
-  exonum.runtime.AnyTx inner = 1;
-  string interface_name = 2;
-  bool fallthrough_auth = 3;
+fn main() {
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .with_input_dir("src/proto")
+        .with_crypto()
+        .with_exonum()
+        .generate();
 }

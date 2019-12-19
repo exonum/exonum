@@ -91,6 +91,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   in the state aggregation. (#1553)
 
 - Added support of unsized keys to `MapIndex`. (#1621)
+- Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
   key-value storage `additional_headers` which can contain binary data. (#1602)

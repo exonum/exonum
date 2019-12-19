@@ -12,29 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+//! Module of the rust-protobuf generated files.
 
-package exonum.testkit;
+#![allow(bare_trait_objects)]
 
-import "types.proto";
-import "runtime.proto";
+pub use self::service::*;
 
-message CreateWallet {
-  string name = 1;
-}
+use exonum::proto::schema::runtime;
 
-message Issue {
-  exonum.crypto.PublicKey to = 1;
-  uint64 amount = 2;
-}
-
-message Wallet {
-  string name = 1;
-  uint64 balance = 2;
-}
-
-message AnyCall {
-  exonum.runtime.AnyTx inner = 1;
-  string interface_name = 2;
-  bool fallthrough_auth = 3;
-}
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));

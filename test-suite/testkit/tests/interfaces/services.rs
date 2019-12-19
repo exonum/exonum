@@ -12,19 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Services set to test interservice calls.
+//! Services set to test calls between services.
 
 pub use crate::interface::Issue;
 
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
-        CallInfo, ExecutionError, InstanceId, SnapshotExt,
+        rust::{
+            CallContext, ChildAuthorization, DefaultInstance, GenericCallMut, MethodDescriptor,
+            Service,
+        },
+        AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{access::Access, Snapshot};
+use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -134,6 +137,11 @@ impl DepositInterface<CallContext<'_>> for DepositService {
     fn deposit(&self, mut ctx: CallContext<'_>, arg: TxIssue) -> Self::Output {
         use crate::interface::IssueReceiverMut;
 
+        // Check authorization of the call.
+        if ctx.caller().author() != Some(arg.to) {
+            return Err(Error::UnauthorizedIssuer.into());
+        }
+        // The child call is authorized by the service.
         ctx.issue(
             WalletService::ID,
             Issue {
@@ -153,35 +161,56 @@ impl DefaultInstance for DepositService {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::AnyCall")]
-pub struct TxAnyCall {
-    pub call_info: CallInfo,
+pub struct AnyCall {
+    pub inner: AnyTx,
     pub interface_name: String,
-    pub args: Vec<u8>,
+    pub fallthrough_auth: bool,
+}
+
+impl AnyCall {
+    pub fn new(call_info: CallInfo, arguments: impl BinaryValue) -> Self {
+        Self {
+            inner: AnyTx {
+                call_info,
+                arguments: arguments.into_bytes(),
+            },
+            fallthrough_auth: false,
+            interface_name: String::default(),
+        }
+    }
 }
 
 #[exonum_interface]
-pub trait AnyCall<Ctx> {
+pub trait CallAny<Ctx> {
     type Output;
-    fn call_any(&self, context: Ctx, arg: TxAnyCall) -> Self::Output;
+    fn call_any(&self, context: Ctx, arg: AnyCall) -> Self::Output;
     fn call_recursive(&self, context: Ctx, depth: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "any-call-service", proto_sources = "proto")]
-#[service_dispatcher(implements("AnyCall"))]
+#[service_dispatcher(implements("CallAny"))]
 pub struct AnyCallService;
 
 impl AnyCallService {
     pub const ID: InstanceId = 26;
 }
 
-impl AnyCall<CallContext<'_>> for AnyCallService {
+impl CallAny<CallContext<'_>> for AnyCallService {
     type Output = Result<(), ExecutionError>;
 
-    fn call_any(&self, mut ctx: CallContext<'_>, tx: TxAnyCall) -> Self::Output {
-        let method_descriptor =
-            MethodDescriptor::new(&tx.interface_name, "", tx.call_info.method_id);
-        ctx.generic_call_mut(tx.call_info.instance_id, method_descriptor, tx.args)
+    fn call_any(&self, mut ctx: CallContext<'_>, tx: AnyCall) -> Self::Output {
+        // FIXME!
+        let auth = if tx.fallthrough_auth {
+            ChildAuthorization::Fallthrough
+        } else {
+            ChildAuthorization::Service
+        };
+
+        let call_info = tx.inner.call_info;
+        let args = tx.inner.arguments;
+        let method_descriptor = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
+        ctx.generic_call_mut(call_info.instance_id, method_descriptor, args)
     }
 
     fn call_recursive(
