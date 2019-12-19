@@ -286,7 +286,8 @@ impl RustRuntime {
                 artifact,
                 self.artifacts_to_pretty_string()
             );
-            let error = ExecutionError::runtime(Error::UnableToDeploy as u8, description);
+            let error =
+                ExecutionError::runtime(RustRuntime::ID, Error::UnableToDeploy as u8, description);
             return Err(error);
         }
 

@@ -30,7 +30,7 @@ use std::{
     panic,
 };
 
-use super::{InstanceId, MethodId};
+use super::{InstanceId, MethodId, RuntimeIdentifier};
 use crate::{
     blockchain::FatalError,
     crypto::{self, Hash},
@@ -543,9 +543,12 @@ impl Display for ExecutionError {
         } else if let Some(runtime_id) = self.runtime_id {
             write!(
                 formatter,
-                "Execution error `{kind}` occurred in runtime {id}",
+                "Execution error with code `{kind}` occurred in {runtime}",
                 kind = self.kind,
-                id = runtime_id
+                runtime = match RuntimeIdentifier::try_from(runtime_id) {
+                    Ok(runtime) => format!("<{} runtime>", runtime),
+                    Err(_) => format!("<Non-default runtime with id {}>", runtime_id),
+                }
             )?;
         } else {
             write!(
