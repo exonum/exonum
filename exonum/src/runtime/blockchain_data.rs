@@ -14,10 +14,10 @@
 
 use exonum_merkledb::{
     access::{AsReadonly, Prefixed, RawAccess},
-    Snapshot, SystemSchema,
+    Fork, Snapshot, SystemSchema,
 };
 
-use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery};
+use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceStatus};
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
 /// Provides access to blockchain data for the executing service.
@@ -99,7 +99,12 @@ fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
 ) -> Option<Prefixed<'static, T>> {
-    let state = DispatcherSchema::new(access.clone()).get_instance(id)?;
+    let state = DispatcherSchema::new(access.clone())
+        .get_instance(id)
+        .filter(|state| match (state.status, state.pending_status) {
+            (Some(InstanceStatus::Active), _) | (None, Some(InstanceStatus::Active)) => true,
+            _ => false,
+        })?;
     Some(Prefixed::new(state.spec.name, access))
 }
 
@@ -130,5 +135,20 @@ impl SnapshotExt for dyn Snapshot {
         id: impl Into<InstanceQuery<'q>>,
     ) -> Option<Prefixed<'static, &dyn Snapshot>> {
         mount_point_for_service(self, id)
+    }
+}
+
+/// Extension trait for `Fork` allowing to writeable access blockchain data in a more structured way.
+///
+/// Be very careful with blockchain manipulations, they can destroy the data consistency!
+#[doc(hidden)]
+pub trait ForkExt {
+    /// Returns writeable core schema.
+    fn for_core_writeable(&self) -> CoreSchema<&'_ Fork>;
+}
+
+impl ForkExt for Fork {
+    fn for_core_writeable(&self) -> CoreSchema<&'_ Fork> {
+        CoreSchema::new(self)
     }
 }

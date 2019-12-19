@@ -14,11 +14,12 @@
 
 //! The current runtime is for running native services written in Rust.
 //!
-//! A set of artifacts available to deploy in the Rust runtime is static. The set is defined at the time
-//! of compilation. Once created, the set can be changed only by the node binary recompilation.
+//! In the Rust runtime a set of service artifacts that you may want to deploy is static. The set
+//! is defined at the time of compilation. Once the set is created, you can change it only by
+//! the node binary recompilation.
 //!
-//! Beware of removing the artifacts from the Rust runtime. An attempt to remove an artifact
-//! from an instance that is already running can cause blockchain to break. It is only safe
+//! Beware of removing artifacts from the Rust runtime. An attempt to remove an artifact
+//! from an instance that is already running can cause the blockchain to break. It is only safe
 //! to add new artifacts.
 //!
 //! The Rust runtime does not provide any level of service isolation from the operation system.
@@ -61,10 +62,8 @@
 //!     WalletAlreadyExists = 1,
 //! }
 //!
-//! // Define the transaction interface for your service by creating a trait with
+//! // Define a transaction interface for your service by creating a `Transactions` trait with
 //! // the following attribute and method signatures.
-//! // This attribute implements `Interface` trait for this trait and `Transaction`
-//! // trait for each argument.
 //! #[exonum_interface]
 //! pub trait Transactions {
 //!     // Each method of the trait should have a signature of the following format. The argument
@@ -179,16 +178,15 @@ use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
     helpers::Height,
-    runtime::WellKnownRuntime,
+    runtime::{
+        dispatcher::{self, Mailbox},
+        error::{catch_panic, ExecutionError, ExecutionFail},
+        ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
+        InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
+    },
 };
 
 use self::api::ServiceApiBuilder;
-use super::{
-    dispatcher::{self, Mailbox},
-    error::{catch_panic, ExecutionError, ExecutionFail},
-    ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-    InstanceSpec, Runtime, RuntimeIdentifier,
-};
 
 mod call_context;
 mod runtime_api;
@@ -207,7 +205,7 @@ pub struct RustRuntime {
     deployed_artifacts: HashSet<RustArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
-    new_services_since_last_block: bool,
+    changed_services_since_last_block: bool,
 }
 
 #[derive(Debug)]
@@ -249,7 +247,7 @@ impl RustRuntime {
             deployed_artifacts: Default::default(),
             started_services: Default::default(),
             started_services_by_name: Default::default(),
-            new_services_since_last_block: false,
+            changed_services_since_last_block: false,
         }
     }
 
@@ -273,6 +271,11 @@ impl RustRuntime {
         self.started_services_by_name
             .insert(instance.name.clone(), instance.id);
         self.started_services.insert(instance.id, instance);
+    }
+
+    fn remove_started_service(&mut self, instance: &InstanceSpec) {
+        self.started_services_by_name.remove(&instance.name);
+        self.started_services.remove(&instance.id);
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
@@ -327,7 +330,7 @@ impl RustRuntime {
     }
 
     fn push_api_changes(&mut self) {
-        if self.new_services_since_last_block {
+        if self.changed_services_since_last_block {
             let user_endpoints = self.api_endpoints();
             // FIXME: this should either be made async, or an unbounded channel should be used.
             if !self.api_notifier.is_closed() {
@@ -338,7 +341,7 @@ impl RustRuntime {
                     .ok();
             }
         }
-        self.new_services_since_last_block = false;
+        self.changed_services_since_last_block = false;
     }
 }
 
@@ -346,7 +349,7 @@ impl WellKnownRuntime for RustRuntime {
     const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
-/// The unique identifier of the Rust artifact, containing the name and version of the artifact.
+/// A unique identifier of the Rust artifact, containing the name and version of the artifact.
 ///
 /// As a string, the artifact name is represented as follows:
 ///
@@ -354,7 +357,7 @@ impl WellKnownRuntime for RustRuntime {
 /// and `artifact_version` is a semantic version identifier.
 ///
 /// * Artifact name can contain only the following characters: `a-zA-Z0-9` and one of `_-.`.
-/// * Artifact version identifier must conform to the semantic version scheme (major.minor.patch).
+/// * Artifact version identifier must conform to the semantic versioning scheme (major.minor.patch).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RustArtifactId {
     /// Artifact name.
@@ -377,7 +380,7 @@ impl RustArtifactId {
         }
     }
 
-    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    /// Converts into `InstanceInitParams` with the given ID, name and empty constructor.
     pub fn into_default_instance(
         self,
         id: InstanceId,
@@ -450,7 +453,7 @@ impl Runtime for RustRuntime {
         self.blockchain = Some(blockchain.clone());
     }
 
-    // We need to propagate changes in the services immediately after initialization.
+    // Propagates changes in the services immediately after initialization.
     fn on_resume(&mut self) {
         self.push_api_changes();
     }
@@ -476,7 +479,7 @@ impl Runtime for RustRuntime {
         }
     }
 
-    fn start_adding_service(
+    fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
         spec: &InstanceSpec,
@@ -489,14 +492,23 @@ impl Runtime for RustRuntime {
         catch_panic(|| service.initialize(context, parameters))
     }
 
-    fn commit_service(
+    fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(spec)?;
-        self.add_started_service(instance);
-        self.new_services_since_last_block = true;
+        match status {
+            InstanceStatus::Active => {
+                let instance = self.new_service(spec)?;
+                self.add_started_service(instance);
+            }
+
+            InstanceStatus::Stopped => {
+                self.remove_started_service(spec);
+            }
+        }
+        self.changed_services_since_last_block = true;
         Ok(())
     }
 
@@ -560,7 +572,7 @@ impl Runtime for RustRuntime {
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
         self.push_api_changes();
 
-        // By convention, services don't handle `after_commit()` on the genesis block.
+        // By convention, services do not handle `after_commit()` on the genesis block.
         let core_schema = CoreSchema::new(snapshot);
         if core_schema.height() == Height(0) {
             return;

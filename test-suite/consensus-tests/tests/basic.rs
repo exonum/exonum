@@ -16,23 +16,21 @@
 //! related to consensus protocol handling, such as ability of the node
 //! to add block after receiving correct consensus messages.
 
+use exonum::{
+    crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
+    helpers::{Height, Round, ValidatorId},
+    messages::{Precommit, Verified},
+    runtime::SnapshotExt,
+};
+use exonum_consensus_tests::{
+    sandbox_tests_helper::*,
+    timestamping::{TimestampingTxGenerator, DATA_SIZE},
+    timestamping_sandbox, timestamping_sandbox_builder,
+};
 use exonum_merkledb::ObjectHash;
 use rand::{thread_rng, Rng};
 
 use std::collections::BTreeMap;
-
-use crate::{
-    blockchain::Schema,
-    crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
-    helpers::{Height, Round, ValidatorId},
-    messages::{Precommit, Verified},
-    sandbox::{
-        self,
-        sandbox_tests_helper::*,
-        timestamping::{TimestampingTxGenerator, DATA_SIZE},
-        timestamping_sandbox, timestamping_sandbox_builder,
-    },
-};
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader
@@ -93,9 +91,7 @@ fn test_reach_one_height() {
 /// The idea of the test is to reach one height in the network with single validator.
 #[test]
 fn test_one_validator() {
-    let sandbox = sandbox::timestamping_sandbox_builder()
-        .with_validators(1)
-        .build();
+    let sandbox = timestamping_sandbox_builder().with_validators(1).build();
     let sandbox_state = SandboxState::new();
 
     add_one_height(&sandbox, &sandbox_state);
@@ -278,7 +274,7 @@ fn test_store_txs_positions() {
     sandbox.assert_state(committed_height.next(), Round(1));
 
     let snapshot = sandbox.blockchain().snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = snapshot.for_core();
     let locations = schema.transactions_locations();
     for (expected_idx, hash) in hashes.iter().enumerate() {
         let location = locations.get(hash).unwrap();

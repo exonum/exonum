@@ -15,15 +15,14 @@
 //! Tests in this module are designed to test ability of the node to recover
 //! state after restart/stop.
 
+use exonum::{
+    helpers::{user_agent, Height, Round, ValidatorId},
+    node,
+};
+use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
 use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
-
-use crate::{
-    helpers::{user_agent, Height, Round, ValidatorId},
-    node,
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder},
-};
 
 #[test]
 #[ignore = "TODO: Refine consensus enable/disable logic [ECR-3927]"]
