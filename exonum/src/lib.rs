@@ -57,9 +57,6 @@ extern crate serde_derive;
 extern crate serde_json;
 
 // Test dependencies.
-#[cfg(test)]
-#[macro_use]
-extern crate lazy_static;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
 

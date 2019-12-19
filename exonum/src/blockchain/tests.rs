@@ -14,7 +14,8 @@
 
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_merkledb::{
-    access::Access, BinaryValue, Error as FatalError, ListIndex, ObjectHash, Snapshot, TemporaryDB,
+    access::Access, BinaryValue, Error as FatalError, ObjectHash, ProofListIndex, Snapshot,
+    SystemSchema,
 };
 use futures::{Future, IntoFuture};
 
@@ -68,7 +69,7 @@ fn create_genesis_config() -> GenesisConfig {
 
 #[derive(Debug, FromAccess)]
 struct InspectorSchema<T: Access> {
-    values: ListIndex<T::Base, u64>,
+    values: ProofListIndex<T::Base, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,7 +111,6 @@ enum ExecuteAction {}
 
 #[derive(Debug, Clone)]
 enum AfterTransactionsAction {
-    Noop,
     AddValue(u64),
     Panic,
 }
@@ -118,8 +118,6 @@ enum AfterTransactionsAction {
 impl AfterTransactionsAction {
     fn execute(self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            AfterTransactionsAction::Noop => Ok(()),
-
             AfterTransactionsAction::AddValue(value) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(value);
@@ -393,7 +391,7 @@ fn after_transactions_invoked_on_genesis() {
     let blockchain = create_blockchain(
         RuntimeInspector::default()
             .with_after_transactions_action(AfterTransactionsAction::AddValue(1)),
-        vec![],
+        vec![InitAction::Noop.into_default_instance()],
     )
     .unwrap();
 
@@ -465,7 +463,7 @@ fn handling_tx_panic_error() {
 }
 
 #[test]
-#[should_panic(expected = "Box<Any>")]
+#[should_panic]
 fn handling_tx_fatal_error() {
     let (pk, sk) = exonum_crypto::gen_keypair();
 
@@ -475,7 +473,6 @@ fn handling_tx_fatal_error() {
     )
     .unwrap();
 
-    // Check that the transaction modifies inspector schema.
     execute_transaction(
         &mut blockchain,
         Transaction::FatalError.sign(TEST_SERVICE_ID, pk, &sk),
@@ -767,4 +764,34 @@ fn blockchain_height() {
     let schema = snapshot.for_core();
     assert_eq!(schema.height(), Height(1));
     assert_eq!(schema.next_height(), Height(2));
+}
+
+#[test]
+fn state_aggregation() {
+    let (pk, sk) = exonum_crypto::gen_keypair();
+
+    let mut blockchain = create_blockchain(
+        RuntimeInspector::default(),
+        vec![InitAction::Noop.into_default_instance()],
+    )
+    .unwrap();
+
+    execute_transaction(
+        &mut blockchain,
+        Transaction::AddValue(10).sign(TEST_SERVICE_ID, pk, &sk),
+    )
+    .expect("Transaction must success");
+
+    let snapshot = blockchain.snapshot();
+    let expected_indexes = vec![
+        "core.consensus_config",
+        "dispatcher_artifacts",
+        "dispatcher_instances",
+        "values",
+    ];
+    let actual_indexes: Vec<_> = SystemSchema::new(&snapshot)
+        .state_aggregator()
+        .keys()
+        .collect();
+    assert_eq!(actual_indexes, expected_indexes);
 }

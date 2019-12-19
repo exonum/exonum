@@ -35,10 +35,9 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
-        rust::{Error as RustRuntimeError, RustRuntime},
-        ArtifactId, BlockchainData, CallInfo, CallType, Caller, DispatcherError, DispatcherSchema,
-        ErrorKind, ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
-        InstanceSpec, InstanceStatus, MethodId, Runtime, RuntimeIdentifier,
+        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        InstanceStatus, MethodId, Runtime,
     },
 };
 
@@ -471,68 +470,6 @@ fn test_dispatcher_simple() {
         expected_new_services,
         changes_rx.iter().take(2).collect::<Vec<_>>()
     );
-}
-
-#[test]
-fn test_dispatcher_rust_runtime_no_service() {
-    const RUST_SERVICE_ID: InstanceId = 2;
-    const RUST_SERVICE_NAME: &str = "rust-service";
-    const RUST_METHOD_ID: MethodId = 0;
-
-    // Create dispatcher and test data.
-    let db = Arc::new(TemporaryDB::new());
-    let blockchain = Blockchain::new(
-        Arc::clone(&db) as Arc<dyn Database>,
-        gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
-    );
-
-    let mut dispatcher = DispatcherBuilder::default()
-        .with_runtime(
-            RuntimeIdentifier::Rust as u32,
-            RustRuntime::new(mpsc::channel(0).0),
-        )
-        .finalize(&blockchain);
-    let rust_artifact = ArtifactId::new(RuntimeIdentifier::Rust as u32, "foo:1.0.0").unwrap();
-
-    assert_eq!(
-        dispatcher
-            .deploy_artifact(rust_artifact.clone(), vec![])
-            .wait()
-            .unwrap_err(),
-        ErrorMatch::from_fail(&RustRuntimeError::UnableToDeploy)
-    );
-
-    let mut fork = db.fork();
-    let rust_service = InstanceSpec {
-        artifact: rust_artifact.clone(),
-        id: RUST_SERVICE_ID,
-        name: RUST_SERVICE_NAME.into(),
-    };
-
-    let err = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain)
-        .initiate_adding_service(rust_service, vec![])
-        .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ArtifactNotDeployed)
-            .for_service(RUST_SERVICE_ID)
-            .in_call(CallType::Constructor)
-    );
-
-    let patch = create_genesis_block(&mut dispatcher, fork);
-    db.merge(patch).unwrap();
-
-    let mut fork = db.fork();
-    let tx_payload = [0x00_u8; 1];
-    dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 15 },
-            &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
-            &tx_payload,
-        )
-        .expect_err("execute succeed");
 }
 
 #[derive(Debug, Clone)]
