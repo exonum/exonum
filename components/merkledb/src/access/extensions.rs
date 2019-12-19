@@ -141,7 +141,7 @@ pub trait AccessExt: Access {
     fn get_proof_map<I, K, V>(self, addr: I) -> ProofMapIndex<Self::Base, K, V>
     where
         I: Into<IndexAddress>,
-        K: BinaryKey + ObjectHash,
+        K: BinaryKey + ObjectHash + ?Sized,
         V: BinaryValue,
     {
         ProofMapIndex::from_access(self, addr.into())
@@ -156,7 +156,7 @@ pub trait AccessExt: Access {
     fn get_raw_proof_map<I, K, V>(self, addr: I) -> ProofMapIndex<Self::Base, K, V, Raw>
     where
         I: Into<IndexAddress>,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
         Raw: ToProofPath<K>,
     {
@@ -191,7 +191,7 @@ pub trait AccessExt: Access {
     ) -> ProofMapIndex<Self::Base, K, V, KeyMode>
     where
         I: Into<IndexAddress>,
-        K: BinaryKey,
+        K: BinaryKey + ?Sized,
         V: BinaryValue,
         KeyMode: ToProofPath<K>,
     {

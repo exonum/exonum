@@ -80,6 +80,7 @@ markdownlint
 memlimit
 memorydb
 mempool
+Merkelize
 Merkelized
 Merkle
 merkledb
@@ -188,6 +189,7 @@ threadpool
 timestamping
 timestamps
 tlsdate
+toctou
 todos
 toml
 toolchain

@@ -31,6 +31,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
 
+- `commit_service` has been renamed to the `update_service_status` and now takes
+  `InstanceStatus` as an additional argument.
+  `start_adding_service` has been renamed to `initiate_adding_service` to
+  better distinguish between starting and stopping a service. (#1605)
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
@@ -80,6 +84,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+- Service instances can now be stopped.
+
+  Active service instance can be stopped by the corresponding request to the
+  `Supervisor`. Stopped service no more participates in the business logic,
+  i.e. it does not execute transactions, process events, provide user APIs, etc.
+  Service data becomes unavailable to other services, but still exists. The name
+  and identifier remain reserved for the stopped service and cannot be used again
+  for adding new services. (#1605)
 - New `blockchain::Schema` method `next_height` was added as a non-panicking
   alternative to `height`. (#1619)
 - New method `in_genesis_block` was added to the `CallContext` to check if the service
@@ -100,6 +112,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   in the state aggregation. (#1553)
 
 - Added support of unsized keys to `MapIndex`. (#1621)
+- Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
   key-value storage `additional_headers` which can contain binary data. (#1602)
@@ -110,6 +123,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
+- `ConfigChange::StopService` has been added to make requests to stop the service
+  instance. (#1605)  
 
 ### Internal Improvements
 

@@ -16,14 +16,13 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly},
-    Fork, ListIndex, MapIndex, ProofMapIndex,
+    Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 
+use super::{ArtifactId, Error, InstanceSpec};
 use crate::runtime::{
     ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
 };
-
-use super::{ArtifactSpec, Error, InstanceSpec};
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
 const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
@@ -46,7 +45,7 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an artifacts registry indexed by the artifact name.
-    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, String, ArtifactState> {
+    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, ArtifactId, ArtifactState> {
         self.access.clone().get_proof_map(ARTIFACTS)
     }
 
@@ -62,14 +61,14 @@ impl<T: Access> Schema<T> {
 
     /// Returns a pending artifacts queue used to notify the runtime about artifacts
     /// to be deployed.
-    fn pending_artifacts(&self) -> ListIndex<T::Base, ArtifactSpec> {
-        self.access.clone().get_list(PENDING_ARTIFACTS)
+    fn pending_artifacts(&self) -> KeySetIndex<T::Base, ArtifactId> {
+        self.access.clone().get_key_set(PENDING_ARTIFACTS)
     }
 
     /// Returns a pending instances queue used to notify the runtime about service instances
-    /// to be committed.
-    fn pending_instances(&self) -> ListIndex<T::Base, InstanceSpec> {
-        self.access.clone().get_list(PENDING_INSTANCES)
+    /// to be updated.
+    fn modified_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
+        self.access.clone().get_map(PENDING_INSTANCES)
     }
 
     /// Returns the information about a service instance by its identifier.
@@ -87,7 +86,7 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns information about an artifact by its identifier.
-    pub fn get_artifact(&self, name: &str) -> Option<ArtifactState> {
+    pub fn get_artifact(&self, name: &ArtifactId) -> Option<ArtifactState> {
         self.artifacts().get(name)
     }
 }
@@ -102,43 +101,37 @@ impl<T: AsReadonly> Schema<T> {
 
 impl Schema<&Fork> {
     /// Adds artifact specification to the set of the pending artifacts.
-    pub(super) fn add_pending_artifact(&mut self, spec: ArtifactSpec) -> Result<(), Error> {
+    pub(super) fn add_pending_artifact(
+        &mut self,
+        artifact: ArtifactId,
+        deploy_spec: Vec<u8>,
+    ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts().contains(&spec.artifact.name) {
+        if self.artifacts().contains(&artifact) {
             return Err(Error::ArtifactAlreadyDeployed);
         }
-        // Add artifact to pending artifacts queue.
-        self.pending_artifacts().push(spec.clone());
         // Add artifact to registry with pending status.
-        let artifact_name = spec.artifact.name.clone();
         self.artifacts().put(
-            &artifact_name,
+            &artifact,
             ArtifactState {
-                spec,
+                deploy_spec,
                 status: ArtifactStatus::Pending,
             },
         );
+        // Add artifact to pending artifacts queue.
+        self.pending_artifacts().insert(artifact);
         Ok(())
     }
 
     /// Adds information about a pending service instance to the schema.
-    pub(crate) fn add_pending_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
-        let artifact_id = self
-            .artifacts()
-            .get(&spec.artifact.name)
-            .ok_or(Error::ArtifactNotDeployed)?
-            .spec
-            .artifact;
+    pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
+        self.artifacts()
+            .get(&spec.artifact)
+            .ok_or(Error::ArtifactNotDeployed)?;
 
         let mut instances = self.instances();
         let mut instance_ids = self.instance_ids();
 
-        // Checks that runtime identifier is proper in instance.
-        // TODO It seems that this error cannot be produced by the user code, thus we might
-        // replace error by assertion. [ECR-3743]
-        if artifact_id != spec.artifact {
-            return Err(Error::IncorrectRuntime);
-        }
         // Checks that instance name doesn't exist.
         if instances.contains(&spec.name) {
             return Err(Error::ServiceNameExists);
@@ -149,17 +142,58 @@ impl Schema<&Fork> {
             return Err(Error::ServiceIdExists);
         }
 
-        let id = spec.id;
-        let name = spec.name.clone();
+        let instance_id = spec.id;
+        let instance_name = spec.name.clone();
+        let pending_status = InstanceStatus::Active;
+
         instances.put(
-            &name,
+            &instance_name,
             InstanceState {
-                spec: spec.clone(),
-                status: InstanceStatus::Pending,
+                spec,
+                status: None,
+                pending_status: Some(pending_status),
             },
         );
-        instance_ids.put(&id, name);
-        self.pending_instances().push(spec);
+        self.modified_instances()
+            .put(&instance_name, pending_status);
+        instance_ids.put(&instance_id, instance_name);
+        Ok(())
+    }
+
+    /// Adds information about stopping service instance to the schema.
+    pub(crate) fn initiate_stopping_service(
+        &mut self,
+        instance_id: InstanceId,
+    ) -> Result<(), Error> {
+        let mut instances = self.instances();
+        let mut modified_instances = self.modified_instances();
+
+        let instance_name = self
+            .instance_ids()
+            .get(&instance_id)
+            .ok_or(Error::IncorrectInstanceId)?;
+
+        let mut state = instances
+            .get(&instance_name)
+            .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
+
+        match state.status {
+            Some(InstanceStatus::Active) => {}
+            _ => return Err(Error::ServiceNotActive),
+        }
+
+        if state.pending_status.is_some() {
+            return Err(Error::ServicePending);
+        }
+
+        // Modify instance status.
+        let pending_status = InstanceStatus::Stopped;
+        // Because we guarantee that the stopping service will process all transactions and other
+        // events in the block,  we cannot stop it immediately. But we must account these changes
+        // in the state hash, therefore we use pending status.
+        state.pending_status = Some(pending_status);
+        modified_instances.put(&instance_name, pending_status);
+        instances.put(&instance_name, state);
         Ok(())
     }
 
@@ -167,31 +201,65 @@ impl Schema<&Fork> {
     pub(super) fn activate_pending(&mut self) {
         // Activate pending artifacts.
         let mut artifacts = self.artifacts();
-        for spec in &self.pending_artifacts() {
-            let name = spec.artifact.name.clone();
-            artifacts.put(&name, ArtifactState::new(spec, ArtifactStatus::Active));
+        for artifact in &self.pending_artifacts() {
+            let mut state = artifacts
+                .get(&artifact)
+                .expect("Artifact marked as pending is not saved in `artifacts`");
+            state.status = ArtifactStatus::Active;
+            artifacts.put(&artifact, state);
         }
-        // Activate pending instances.
+        // Commit new statuses for pending instances.
         let mut instances = self.instances();
-        for spec in &self.pending_instances() {
-            let name = spec.name.clone();
-            instances.put(&name, InstanceState::new(spec, InstanceStatus::Active));
+        for (instance, status) in &self.modified_instances() {
+            let mut state = instances
+                .get(&instance)
+                .expect("BUG: Instance marked as modified is not saved in `instances`");
+            debug_assert_eq!(
+                Some(status),
+                state.pending_status,
+                "BUG: Instance status in `modified_instances` should be same as `pending_status` \
+                 in the instance state."
+            );
+
+            state.commit_pending_status();
+            instances.put(&instance, state);
         }
     }
 
     /// Takes pending artifacts from queue.
-    pub(super) fn take_pending_artifacts(&mut self) -> Vec<ArtifactSpec> {
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, Vec<u8>)> {
         let mut index = self.pending_artifacts();
-        let pending_artifacts = index.iter().collect::<Vec<_>>();
+        let artifacts = self.artifacts();
+        let pending_artifacts = index
+            .iter()
+            .map(|artifact| {
+                let deploy_spec = artifacts
+                    .get(&artifact)
+                    .expect("Artifact marked as pending is not saved in `artifacts`")
+                    .deploy_spec;
+                (artifact, deploy_spec)
+            })
+            .collect();
         index.clear();
         pending_artifacts
     }
 
-    /// Takes pending service instances from queue.
-    pub(super) fn take_pending_instances(&mut self) -> Vec<InstanceSpec> {
-        let mut index = self.pending_instances();
-        let pending_instances = index.iter().collect::<Vec<_>>();
-        index.clear();
-        pending_instances
+    /// Takes modified service instances from queue.
+    pub(super) fn take_modified_instances(&mut self) -> Vec<(InstanceSpec, InstanceStatus)> {
+        let mut modified_instances = self.modified_instances();
+        let instances = self.instances();
+
+        let output = modified_instances
+            .iter()
+            .map(|(instance_name, status)| {
+                let state = instances
+                    .get(&instance_name)
+                    .expect("BUG: Instance marked as modified is not saved in `instances`");
+                (state.spec, status)
+            })
+            .collect::<Vec<_>>();
+        modified_instances.clear();
+
+        output
     }
 }

@@ -70,7 +70,7 @@ fn incorrect_configuration() {
     let instance_spec = InstanceSpec {
         id: SUPERVISOR_INSTANCE_ID,
         name: Supervisor::NAME.into(),
-        artifact: Supervisor.artifact_id().into(),
+        artifact: Supervisor.artifact_id(),
     };
     let incorrect_instance = InstanceInitParams {
         instance_spec,

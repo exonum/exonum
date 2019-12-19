@@ -82,6 +82,13 @@
 //!   are independent and have separate blockchain storages. Users can distinguish services
 //!   by their IDs; both numeric and string IDs are unique within a blockchain.
 //!
+//! 4. Active service instances can be stopped by a corresponding request to [`Dispatcher`].
+//!   A stopped service no longer participates in business logic, i.e. it does not process
+//!   transactions, events, does not interact with the users in any way.
+//!   Service data becomes unavailable for the other services, but still exists. The service name
+//!   and identifier remain reserved for the stopped service and can't be used again for
+//!   adding new services.
+//!
 //! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
 //! # Transaction Lifecycle
@@ -109,7 +116,10 @@
 //!
 //! A supervisor service is a service that has additional privileges. This service
 //! allows deploying artifacts and instantiating new services after the blockchain is launched
-//! and running. Other than that, it looks like an ordinary service.
+//! and running. Moreover the Supervisor service allows update the configuration or stop the
+//! active service instances.
+//! Other than that, it looks like an ordinary service.
+//!
 //! To enable adding new artifacts / services to the blockchain after its start, the supervisor
 //! must be one of the builtin service instances.
 //!
@@ -203,11 +213,11 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// ```text
 /// LIFE ::= initialize (GENESIS | RESUME) BLOCK* shutdown
-/// GENESIS ::= (deploy_artifact | start_adding_service commit_service)* after_commit
-/// RESUME ::= (deploy_artifact | commit_service)* on_resume
+/// GENESIS ::= (deploy_artifact | initiate_adding_service update_service_status)* after_commit
+/// RESUME ::= (deploy_artifact | update_service_status)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= before_transactions* (execute | start_adding_service)* after_transactions*
-/// COMMIT ::= deploy_artifact* commit_service* after_commit
+/// PROPOSAL ::= before_transactions* (execute | initiate_adding_service)* after_transactions*
+/// COMMIT ::= deploy_artifact* update_service_status* after_commit
 /// ```
 ///
 /// The ordering for the "read-only" method `is_artifact_deployed` in relation
@@ -221,7 +231,7 @@ impl From<RuntimeIdentifier> for u32 {
 /// - `before_transactions`
 /// - `execute`
 /// - `after_transactions`
-/// - `start_adding_service`
+/// - `initiate_adding_service`
 ///
 /// All these methods should also produce the same changes to the storage via
 /// the provided `ExecutionContext`. Discrepancy in node behavior within these methods may lead
@@ -281,15 +291,15 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// initialized service instance. That is to say, the constructor is *not* called on a node
     /// restart.
     ///
-    /// At the same time, when `start_adding_service` is called,
+    /// At the same time, when `initiate_adding_service` is called,
     /// there is no guarantee that the service will eventually get to the blockchain via
-    /// `commit_service`. The consensus may accept an alternative block proposal, in which
+    /// `update_service_status`. The consensus may accept an alternative block proposal, in which
     /// the service is not instantiated or instantiated with different parameters.
     ///
-    /// The `commit_service` call always takes place
+    /// The `update_service_status` call always takes place
     /// in the closest committed block, i.e., before the nearest `Runtime::after_commit()`.
     /// The dispatcher routes transactions and `before_transactions` / `after_transactions`
-    /// events to the service only after `commit_service()` is called with the same instance
+    /// events to the service only after `update_service_status()` is called with the same instance
     /// specification.
     ///
     /// The runtime should discard the instantiated service instance after completing this method.
@@ -297,55 +307,66 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// instantiated in the runtime. There may be compelling reasons for the runtime to retain
     /// the instantiated service. For example, if creating an instance takes very long time.
     /// In this case, the "garbage" services may be removed from the runtime in `after_commit`
-    /// because of the time dependence between `commit_service` and `after_commit` described above.
+    /// because of the time dependence between `update_service_status` and `after_commit` described above.
     ///
     /// The runtime should commit long-term resources for the service only after the
-    /// `commit_service()` call. In other words, the runtime must be sure that the service
+    /// `update_service_status()` call. In other words, the runtime must be sure that the service
     /// has been committed to the blockchain.
     ///
     /// # Return Value
     ///
     /// Returning an error is a signal of `Runtime` that the
     /// service instantiation has failed. As a rule of a thumb, changes made by the
-    /// `start_adding_service` method will be rolled back after such a signal. The exact logic of
+    /// `initiate_adding_service` method will be rolled back after such a signal. The exact logic of
     /// the rollback is determined by the supervisor.
     ///
     /// An error is one of the expected / handled outcomes of the service instantiation procedure.
     /// Thus, verifying prerequisites
     /// for instantiation and reporting corresponding failures should be performed at this stage
-    /// rather than in `commit_service`.
-    fn start_adding_service(
+    /// rather than in `update_service_status`.
+    fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
-    /// Permanently adds a service to the runtime.
+    /// Notifies runtime about changes of the service instance state.
     ///
-    /// This method is called *once* for a specific service instance during the `Runtime` lifetime:
+    /// This method notifies runtime about a specific service instance state changes in the
+    /// dispatcher. Runtime should perform corresponding actions in according to changes in
+    /// the service instance state.
     ///
-    /// - For newly added instances, the method is called when the fork with the corresponding
-    ///   `start_adding_service()` call is committed.
-    /// - After a node restart, the method is called for all existing service instances.
+    /// Method is called for a specific service instance during the `Runtime` lifetime in the
+    /// following cases:
     ///
-    /// Invocation of this method guarantees that `start_adding_service()` has been called with
-    /// the same `spec` already and returned `Ok(())`. The results of the call (i.e., changes
-    /// to the blockchain state) will be persisted from the call.
+    /// - For newly added instances, or modified existing this method is called when the fork
+    ///   with the corresponding changes is committed.
+    /// - After a node restart, the method is called for all existing service instances regardless
+    ///   of their statuses.
+    ///
+    /// For newly added instances invocation of this method guarantees that
+    /// `initiate_adding_service()` has been called with the same `spec` already and returned
+    /// `Ok(())`. The results of the call (i.e., changes to the blockchain state) will be
+    /// persisted from the call.
     ///
     /// # Arguments
     ///
     /// `snapshot` is a storage snapshot at the latest height when the method is called:
     ///
     /// - Suppose the service is committed during the node operation. Then `snapshot` is taken at the
-    ///   moment the fork applies for which the corresponding `start_adding_service`
+    ///   moment the fork applies for which the corresponding `initiate_adding_service`
     ///   has been performed.
+    /// - Suppose the service is stopped during the node operation. `Then `snapshot` is taken at
+    ///   the moment the fork applies for which the corresponding request has been performed.
     /// - Suppose the service resumes after the node restart. Then `snapshot` is the storage state
     ///   at the node start.
     ///
     /// For the built-in services, on the first node start `snapshot` will not contain information
     /// on the genesis block. Thus, using some core APIs, like requesting the current
     /// blockchain height, will result in a panic.
+    ///
+    /// `status` is the resulting status of the service instance.
     ///
     /// # Return value
     ///
@@ -357,11 +378,12 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// This error / panic must not be common to all nodes in the network.
     /// The errors common for the whole network should be produced during the preceding
-    /// `start_adding_service` call.
-    fn commit_service(
+    /// `initiate_adding_service` call.
+    fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
+        status: InstanceStatus,
     ) -> Result<(), ExecutionError>;
 
     /// Dispatches payload to the method of a specific service instance.
@@ -434,7 +456,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Notifies the runtime about commit of a new block.
     ///
-    /// This method is called *after* all `commit_service` calls related
+    /// This method is called *after* all `update_service_status` calls related
     /// to the same block. The method is called exactly once for each block in the blockchain,
     /// including the genesis block.
     ///
@@ -587,13 +609,16 @@ impl<'a> ExecutionContext<'a> {
         }
     }
 
-    pub(crate) fn child_context(&mut self, caller_service_id: InstanceId) -> ExecutionContext<'_> {
+    pub(crate) fn child_context(
+        &mut self,
+        caller_service_id: Option<InstanceId>,
+    ) -> ExecutionContext<'_> {
         ExecutionContext {
+            caller: caller_service_id
+                .map(|instance_id| Caller::Service { instance_id })
+                .unwrap_or(self.caller),
             dispatcher: self.dispatcher,
             fork: self.fork,
-            caller: Caller::Service {
-                instance_id: caller_service_id,
-            },
             interface_name: "",
             call_stack_depth: self.call_stack_depth + 1,
         }
@@ -629,12 +654,12 @@ impl<'a> ExecutionContext<'a> {
             })
     }
 
-    /// Starts adding a new service instance to the blockchain. The created service is not active
+    /// Initiates adding a new service instance to the blockchain. The created service is not active
     /// (i.e., does not process transactions or the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     ///
     /// This method should be called for the exact context passed to the runtime.
-    pub(crate) fn start_adding_service(
+    pub(crate) fn initiate_adding_service(
         &mut self,
         spec: InstanceSpec,
         constructor: impl BinaryValue,
@@ -646,7 +671,7 @@ impl<'a> ExecutionContext<'a> {
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(DispatcherError::IncorrectRuntime)?;
         runtime
-            .start_adding_service(self.reborrow(), &spec, constructor.into_bytes())
+            .initiate_adding_service(self.reborrow(), &spec, constructor.into_bytes())
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite {
@@ -658,7 +683,7 @@ impl<'a> ExecutionContext<'a> {
 
         // Add a service instance to the dispatcher schema.
         DispatcherSchema::new(&*self.fork)
-            .add_pending_service(spec)
+            .initiate_adding_service(spec)
             .map_err(From::from)
     }
 
