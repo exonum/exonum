@@ -146,9 +146,8 @@ message ArtifactState {
 message InstanceState {
   // Status of a service instance.
   enum Status {
-    // The service instance has no status, i.e. this value corresponds to
-    // `Option::None` on the Rust code level and other corresponds to
-    // `Some(...)`.
+    // No value, e.g. there are no pending changes to the instance
+    // status.
     NONE = 0;
     // The service instance is active.
     ACTIVE = 1;
@@ -157,8 +156,8 @@ message InstanceState {
   }
   // Service instance specification.
   exonum.runtime.InstanceSpec spec = 1;
-  // Service instance activity status.
+  // Service instance status.
   Status status = 2;
-  // Pending status of instance if the value is not `NONE`.
+  // Pending status of the instance.
   Status pending_status = 3;
 }
