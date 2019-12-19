@@ -114,7 +114,7 @@ fn test_send_transaction() {
         response,
         json!({
             "result": "error",
-            "description": "Execution error `dispatcher:7` occurred: Suitable runtime \
+            "description": "Execution error with code `dispatcher:7` occurred: Suitable runtime \
              for the given service instance ID is not found."
         })
     );
