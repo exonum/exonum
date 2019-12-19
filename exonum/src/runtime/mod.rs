@@ -606,13 +606,16 @@ impl<'a> ExecutionContext<'a> {
         }
     }
 
-    pub(crate) fn child_context(&mut self, caller_service_id: InstanceId) -> ExecutionContext<'_> {
+    pub(crate) fn child_context(
+        &mut self,
+        caller_service_id: Option<InstanceId>,
+    ) -> ExecutionContext<'_> {
         ExecutionContext {
+            caller: caller_service_id
+                .map(|instance_id| Caller::Service { instance_id })
+                .unwrap_or(self.caller),
             dispatcher: self.dispatcher,
             fork: self.fork,
-            caller: Caller::Service {
-                instance_id: caller_service_id,
-            },
             interface_name: "",
             call_stack_depth: self.call_stack_depth + 1,
         }

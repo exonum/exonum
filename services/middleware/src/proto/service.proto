@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_derive::ExecutionFail;
+syntax = "proto3";
 
-/// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[derive(ExecutionFail)]
-pub enum Error {
-    /// Wallet not found.
-    WalletNotFound = 0,
-    /// Wallet already exists.
-    WalletAlreadyExists = 1,
-    /// Wrong interface caller.
-    WrongInterfaceCaller = 2,
-    /// Issuer is not authorized.
-    UnauthorizedIssuer = 3,
+package exonum.service.middleware;
+
+import "runtime.proto";
+
+message CheckedCall {
+  string artifact_name = 1;
+  string artifact_version = 2;
+  exonum.runtime.AnyTx inner = 3;
+}
+
+message Batch {
+  repeated exonum.runtime.AnyTx inner = 1;
 }

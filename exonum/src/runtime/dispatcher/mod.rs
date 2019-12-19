@@ -35,7 +35,7 @@ use crate::{
 
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
-    ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -134,14 +134,13 @@ impl Dispatcher {
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
-        for state in schema.artifacts().values() {
+        for (artifact, state) in schema.artifacts().iter() {
             debug_assert_eq!(
                 state.status,
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
-            self.deploy_artifact(state.spec.artifact, state.spec.payload)
-                .wait()?;
+            self.deploy_artifact(artifact, state.deploy_spec).wait()?;
         }
         // Restart active service instances.
         for state in schema.instances().values() {
@@ -228,15 +227,12 @@ impl Dispatcher {
     pub(crate) fn commit_artifact(
         fork: &Fork,
         artifact: ArtifactId,
-        payload: Vec<u8>,
+        deploy_spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork)
-            .add_pending_artifact(ArtifactSpec {
-                artifact: artifact.clone(),
-                payload: payload.clone(),
-            })
+            .add_pending_artifact(artifact, deploy_spec)
             .map_err(From::from)
     }
 
@@ -404,8 +400,8 @@ impl Dispatcher {
         let patch = fork.into_patch();
 
         // Block futures with pending deployments.
-        for spec in pending_artifacts {
-            self.block_until_deployed(spec.artifact, spec.payload);
+        for (artifact, deploy_spec) in pending_artifacts {
+            self.block_until_deployed(artifact, deploy_spec);
         }
         // Notify runtime about changes in service instances.
         for (spec, status) in modified_instances {
