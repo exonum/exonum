@@ -95,7 +95,7 @@ use exonum::{
     node::Node,
     runtime::{rust::ServiceFactory, RuntimeInstance, WellKnownRuntime},
 };
-use exonum_supervisor::{mode::Mode as SupervisorMode, Supervisor};
+use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
 
@@ -178,9 +178,7 @@ impl NodeBuilder {
     }
 
     fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {
-        match run_config.node_config.public_config.general.supervisor_mode {
-            SupervisorMode::Simple => Supervisor::simple(),
-            SupervisorMode::Decentralized => Supervisor::decentralized(),
-        }
+        let mode = run_config.node_config.public_config.general.supervisor_mode;
+        Supervisor::builtin_instance(SupervisorConfig { mode })
     }
 }
