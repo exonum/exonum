@@ -555,17 +555,17 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
     };
 
     let testnet_dir = tempfile::tempdir()?;
-    let pub_config_1_path = concat_path(testnet_dir.path(), "pub1.toml");
-    let pub_config_2_path = concat_path(testnet_dir.path(), "pub2.toml");
-    let sec_config_path = concat_path(testnet_dir.path(), "sec.toml");
+    let pub_config_1_path = testnet_dir.path().join("pub1.toml");
+    let pub_config_2_path = testnet_dir.path().join("pub2.toml");
+    let sec_config_path = testnet_dir.path().join("sec.toml");
 
     save_config_file(&pub_config_1, &pub_config_1_path)?;
     save_config_file(&pub_config_2, &pub_config_2_path)?;
     save_config_file(&sec_config, &sec_config_path)?;
 
     let finalize = Finalize {
-        secret_config_path: concat_path(testnet_dir.path(), "sec.toml"),
-        output_config_path: concat_path(testnet_dir.path(), "node.toml"),
+        secret_config_path: testnet_dir.path().join("sec.toml"),
+        output_config_path: testnet_dir.path().join("node.toml"),
         public_configs: vec![pub_config_1_path, pub_config_2_path],
         public_api_address: None,
         private_api_address: None,
@@ -597,7 +597,7 @@ fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
 fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failure::Error> {
     let testnet_dir = tempfile::tempdir()?;
 
-    let common_config_path = concat_path(testnet_dir.path(), "common.toml");
+    let common_config_path = testnet_dir.path().join("common.toml");
 
     let generate_template = GenerateTemplate {
         common_config: common_config_path.clone(),
@@ -624,7 +624,7 @@ fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failu
         _ => unreachable!("Invalid result of generate-config"),
     };
 
-    let node_config_path = concat_path(testnet_dir.path(), "node.toml");
+    let node_config_path = testnet_dir.path().join("node.toml");
 
     let finalize = Finalize {
         secret_config_path: secret_config,
@@ -655,11 +655,4 @@ fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failu
     }
 
     Ok(())
-}
-
-/// Concatenates PathBuf and string. Useful to make a `PathBuf` to a file in the specific directory.
-fn concat_path<P: AsRef<Path>>(first: P, second: &str) -> PathBuf {
-    let mut path = first.as_ref().to_owned();
-    path.push(second);
-    path
 }
