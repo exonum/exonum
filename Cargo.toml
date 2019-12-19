@@ -2,15 +2,20 @@
 members = [
     "cli",
     "exonum",
+
     "examples/cryptocurrency",
     "examples/cryptocurrency-advanced/backend",
     "examples/sample_runtime",
     "examples/timestamping/backend",
+
+    "services/middleware",
     "services/time",
     "services/supervisor",
+
     "test-suite/consensus-tests",
     "test-suite/testkit",
     "test-suite/testkit/server",
+
     "components/build",
     "components/crypto",
     "components/derive",
