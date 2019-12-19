@@ -231,6 +231,12 @@ impl ObjectHash for str {
     }
 }
 
+impl ObjectHash for [u8] {
+    fn object_hash(&self) -> Hash {
+        hash(self)
+    }
+}
+
 /// Errors that can occur while validating a `ListProof` or `MapProof` against
 /// a trusted collection hash.
 #[derive(Debug, Fail)]

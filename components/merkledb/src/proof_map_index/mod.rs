@@ -201,7 +201,7 @@ pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ToOwned + ?Sized,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {

@@ -1707,6 +1707,7 @@ fn unsized_key() {
 
     let proof = table.get_proof("key1".to_owned());
     assert_eq!(proof.proof_unchecked(), vec![]);
+    assert!(proof.check().is_ok());
 
     // Check missing key.
     let proof = table.get_multiproof(vec!["key2".to_owned(), "key3".to_owned()]);

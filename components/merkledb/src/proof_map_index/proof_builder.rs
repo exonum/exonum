@@ -179,7 +179,7 @@ pub trait BuildProof<K: ToOwned + ?Sized, V, KeyMode> {
 
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
-    K: BinaryKey + ToOwned + ?Sized,
+    K: BinaryKey + ?Sized,
     T: MerklePatriciaTree<K, V>,
     KeyMode: ToProofPath<K>,
 {
