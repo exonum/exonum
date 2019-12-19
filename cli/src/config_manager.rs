@@ -75,7 +75,7 @@ impl DefaultConfigManager {
 
 impl ConfigManager for DefaultConfigManager {
     /// Stores updated connect list at file system.
-    fn store_connect_list(&self, connect_list: ConnectListConfig) {
+    fn store_connect_list(&mut self, connect_list: ConnectListConfig) {
         self.tx
             .send(UpdateRequest(connect_list))
             .expect("Can't message to ConfigManager thread");

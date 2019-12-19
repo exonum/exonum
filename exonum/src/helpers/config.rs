@@ -20,5 +20,5 @@ use crate::node::ConnectListConfig;
 /// the fly.
 pub trait ConfigManager: Send {
     /// Update connect list in the node configuration.
-    fn store_connect_list(&self, connect_list: ConnectListConfig);
+    fn store_connect_list(&mut self, connect_list: ConnectListConfig);
 }
