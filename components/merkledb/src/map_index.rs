@@ -18,7 +18,7 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use std::{borrow::Borrow, fmt, marker::PhantomData};
+use std::{borrow::Borrow, marker::PhantomData};
 
 use super::{
     access::{Access, AccessError, FromAccess},
@@ -50,6 +50,7 @@ pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
 /// [`iter`]: struct.MapIndex.html#method.iter
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
 /// [`MapIndex`]: struct.MapIndex.html
+#[derive(Debug)]
 pub struct MapIndexIter<'a, K: ?Sized, V> {
     base_iter: ViewIter<'a, K, V>,
 }
@@ -62,6 +63,7 @@ pub struct MapIndexIter<'a, K: ?Sized, V> {
 /// [`keys`]: struct.MapIndex.html#method.keys
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
 /// [`MapIndex`]: struct.MapIndex.html
+#[derive(Debug)]
 pub struct MapIndexKeys<'a, K: ?Sized> {
     base_iter: ViewIter<'a, K, ()>,
 }
@@ -352,10 +354,10 @@ where
     }
 }
 
-impl<'a, T, K, V> std::iter::IntoIterator for &'a MapIndex<T, K, V>
+impl<'a, T, K, V> IntoIterator for &'a MapIndex<T, K, V>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
@@ -368,7 +370,7 @@ where
 
 impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
@@ -380,7 +382,7 @@ where
 
 impl<'a, K> Iterator for MapIndexKeys<'a, K>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     type Item = K::Owned;
 
@@ -397,25 +399,6 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(.., v)| v)
-    }
-}
-
-impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V>
-where
-    K: BinaryKey,
-    V: BinaryValue,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("MapIndexIter").finish()
-    }
-}
-
-impl<'a, K> fmt::Debug for MapIndexKeys<'a, K>
-where
-    K: BinaryKey,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("MapIndexKeys").finish()
     }
 }
 

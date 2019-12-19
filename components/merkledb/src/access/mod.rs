@@ -30,12 +30,12 @@ mod extensions;
 ///
 /// struct Schema<T: Access> {
 ///     list: ListIndex<T::Base, u64>,
-///     map: ProofMapIndex<T::Base, String, u64>,
+///     map: ProofMapIndex<T::Base, str, u64>,
 /// }
 ///
 /// impl<T: Access> Schema<T> {
 ///     fn get_some_data(&self) -> Option<u64> {
-///         Some(self.list.get(0)? + self.map.get(&"foo".to_owned())?)
+///         Some(self.list.get(0)? + self.map.get("foo")?)
 ///     }
 /// }
 /// ```

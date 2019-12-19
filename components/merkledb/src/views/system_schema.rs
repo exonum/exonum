@@ -9,7 +9,7 @@ const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
 pub fn get_state_aggregator<T: RawAccess>(
     access: T,
     namespace: &str,
-) -> ProofMapIndex<T, String, Hash> {
+) -> ProofMapIndex<T, str, Hash> {
     let view = ViewWithMetadata::get_or_create_unchecked(
         access,
         &(STATE_AGGREGATOR, namespace).into(),
@@ -79,7 +79,7 @@ impl<T: RawAccess + AsReadonly> SystemSchema<T> {
     /// See [state aggregation] for details how the database state is aggregated.
     ///
     /// [state aggregation]: index.html#state-aggregation
-    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
+    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, str, Hash> {
         get_state_aggregator(self.0.as_readonly(), "")
     }
 }
