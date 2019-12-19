@@ -95,14 +95,19 @@ impl StartService {
         let dispatcher_data = context.data().for_dispatcher();
 
         // Check that artifact is deployed.
-        dispatcher_data
-            .get_artifact(self.artifact.name.as_str())
-            .ok_or_else(|| {
-                Error::UnknownArtifact.with_description(format!(
-                    "Discarded start of service {} from the unknown artifact {}.",
-                    &self.name, &self.artifact.name,
-                ))
-            })?;
+        if dispatcher_data.get_artifact(&self.artifact).is_none() {
+            log::trace!(
+                "Discarded start of service {} from the unknown artifact {}.",
+                &self.name,
+                &self.artifact.name,
+            );
+
+            let err = Error::UnknownArtifact.with_description(format!(
+                "Discarded start of service {} from the unknown artifact {}.",
+                &self.name, &self.artifact.name,
+            ));
+            return Err(err);
+        }
 
         // Check that there is no instance with the same name.
         if dispatcher_data.get_instance(self.name.as_str()).is_some() {
@@ -280,7 +285,7 @@ impl SupervisorInterface for Supervisor {
         if context
             .data()
             .for_dispatcher()
-            .get_artifact(&deploy.artifact.name)
+            .get_artifact(&deploy.artifact)
             .is_some()
         {
             return Err(Error::AlreadyDeployed.into());

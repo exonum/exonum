@@ -12,18 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_derive::ExecutionFail;
+use exonum_build::ProtobufGenerator;
 
-/// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[derive(ExecutionFail)]
-pub enum Error {
-    /// Wallet not found.
-    WalletNotFound = 0,
-    /// Wallet already exists.
-    WalletAlreadyExists = 1,
-    /// Wrong interface caller.
-    WrongInterfaceCaller = 2,
-    /// Issuer is not authorized.
-    UnauthorizedIssuer = 3,
+fn main() {
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .with_input_dir("src/proto")
+        .with_crypto()
+        .with_exonum()
+        .generate();
 }

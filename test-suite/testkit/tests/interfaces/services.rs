@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Services set to test interservice calls.
+//! Services set to test calls between services.
 
 pub use crate::interface::Issue;
 
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, DefaultInstance, Service},
-        CallInfo, ExecutionError, InstanceId, SnapshotExt,
+        rust::{CallContext, ChildAuthorization, DefaultInstance, Service},
+        AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{access::Access, Snapshot};
+use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -135,6 +135,11 @@ impl Service for DepositService {}
 
 impl DepositInterface for DepositService {
     fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
+        // Check authorization of the call.
+        if context.caller().author() != Some(arg.to) {
+            return Err(Error::UnauthorizedIssuer.into());
+        }
+        // The child call is authorized by the service.
         context
             .interface::<IssueReceiverClient<'_>>(WalletService::ID)?
             .issue(Issue {
@@ -153,65 +158,87 @@ impl DefaultInstance for DepositService {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::AnyCall")]
-pub struct TxAnyCall {
-    pub call_info: CallInfo,
+pub struct AnyCall {
+    pub inner: AnyTx,
     pub interface_name: String,
-    pub args: Vec<u8>,
+    pub fallthrough_auth: bool,
+}
+
+impl AnyCall {
+    pub fn new(call_info: CallInfo, arguments: impl BinaryValue) -> Self {
+        Self {
+            inner: AnyTx {
+                call_info,
+                arguments: arguments.into_bytes(),
+            },
+            fallthrough_auth: false,
+            interface_name: String::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::RecursiveCall")]
-pub struct TxRecursiveCall {
+pub struct RecursiveCall {
     pub depth: u64,
 }
 
 #[exonum_interface]
-pub trait AnyCall {
-    fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
+pub trait CallAny {
+    fn call_any(&self, context: CallContext<'_>, arg: AnyCall) -> Result<(), ExecutionError>;
 
     fn call_recursive(
         &self,
         context: CallContext<'_>,
-        arg: TxRecursiveCall,
+        arg: RecursiveCall,
     ) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "any-call-service", proto_sources = "proto")]
-#[service_dispatcher(implements("AnyCall"))]
+#[service_dispatcher(implements("CallAny"))]
 pub struct AnyCallService;
 
 impl AnyCallService {
     pub const ID: InstanceId = 26;
 }
 
-impl AnyCall for AnyCallService {
-    fn call_any(&self, mut context: CallContext<'_>, tx: TxAnyCall) -> Result<(), ExecutionError> {
-        context.call_context(tx.call_info.instance_id)?.call(
-            tx.interface_name,
-            tx.call_info.method_id,
-            tx.args,
-        )
+impl CallAny for AnyCallService {
+    fn call_any(&self, mut context: CallContext<'_>, tx: AnyCall) -> Result<(), ExecutionError> {
+        let auth = if tx.fallthrough_auth {
+            ChildAuthorization::Fallthrough
+        } else {
+            ChildAuthorization::Service
+        };
+        context
+            .call_context(tx.inner.call_info.instance_id, auth)?
+            .call(
+                tx.interface_name,
+                tx.inner.call_info.method_id,
+                tx.inner.arguments,
+            )
     }
 
     fn call_recursive(
         &self,
         mut context: CallContext<'_>,
-        arg: TxRecursiveCall,
+        arg: RecursiveCall,
     ) -> Result<(), ExecutionError> {
         if arg.depth == 1 {
             return Ok(());
         }
 
-        context.call_context(context.instance().id)?.call(
-            "",
-            1,
-            TxRecursiveCall {
-                depth: arg.depth - 1,
-            },
-        )
+        context
+            .call_context(context.instance().id, ChildAuthorization::Fallthrough)?
+            .call(
+                "",
+                1,
+                RecursiveCall {
+                    depth: arg.depth - 1,
+                },
+            )
     }
 }
 

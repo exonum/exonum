@@ -18,6 +18,7 @@ use exonum_merkledb::{
     SystemSchema,
 };
 use futures::{Future, IntoFuture};
+use semver::Version;
 
 use std::{
     cell::RefCell,
@@ -231,7 +232,7 @@ impl RuntimeInspector {
     }
 
     fn default_artifact_id() -> ArtifactId {
-        ArtifactId::new(Self::ID, "runtime-inspector").unwrap()
+        ArtifactId::new(Self::ID, "runtime-inspector", Version::new(1, 0, 0)).unwrap()
     }
 }
 
@@ -493,7 +494,8 @@ fn initialize_service_ok() {
 fn deploy_available() {
     let (pk, sk) = exonum_crypto::gen_keypair();
 
-    let artifact_id = ArtifactId::new(RuntimeInspector::ID, "secondary").unwrap();
+    let artifact_id =
+        ArtifactId::new(RuntimeInspector::ID, "secondary", Version::new(1, 0, 0)).unwrap();
     let mut blockchain = create_blockchain(
         RuntimeInspector::default().with_available_artifact(artifact_id.clone()),
         vec![InitAction::Noop.into_default_instance()],
@@ -542,7 +544,8 @@ fn deploy_unavailable_artifact() {
     )
     .unwrap();
 
-    let artifact_id = ArtifactId::new(RuntimeInspector::ID, "secondary").unwrap();
+    let artifact_id =
+        ArtifactId::new(RuntimeInspector::ID, "secondary", Version::new(1, 0, 0)).unwrap();
     execute_transaction(
         &mut blockchain,
         Transaction::DeployArtifact(artifact_id).sign(TEST_SERVICE_ID, pk, &sk),

@@ -75,17 +75,10 @@ impl ServiceFactory {
         if let Some(ref artifact_version) = self.artifact_version {
             // Check that artifact version is semver compatible.
             Version::parse(artifact_version).expect("Unable to parse artifact version");
-
             quote! { #artifact_version }
         } else {
             quote! { env!("CARGO_PKG_VERSION") }
         }
-    }
-
-    fn artifact_id(&self) -> impl ToTokens {
-        let artifact_name = self.artifact_name();
-        let artifact_version = self.artifact_version();
-        quote! { concat!(#artifact_name, ":", #artifact_version) }
     }
 
     fn service_constructor(&self) -> impl ToTokens {
@@ -120,15 +113,20 @@ impl ToTokens for ServiceFactory {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = &self.ident;
         let cr = &self.cr;
-        let artifact_id = self.artifact_id();
+        let artifact_name = self.artifact_name();
+        let artifact_version = self.artifact_version();
         let artifact_protobuf_spec = self.artifact_protobuf_spec();
         let service_constructor = self.service_constructor();
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
         let expanded = quote! {
             impl #impl_generics #cr::runtime::rust::ServiceFactory for #name #ty_generics #where_clause {
-                fn artifact_id(&self) -> #cr::runtime::rust::RustArtifactId {
-                    #artifact_id.parse().unwrap()
+                fn artifact_id(&self) -> #cr::runtime::ArtifactId {
+                    #cr::runtime::ArtifactId {
+                        runtime_id: #cr::runtime::RuntimeIdentifier::Rust as _,
+                        name: #artifact_name.to_string(),
+                        version: #artifact_version.parse().expect("Cannot parse artifact version"),
+                    }
                 }
 
                 fn artifact_protobuf_spec(&self) -> #cr::runtime::rust::ArtifactProtobufSpec {

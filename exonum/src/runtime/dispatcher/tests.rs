@@ -16,6 +16,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
+use semver::Version;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -326,11 +327,13 @@ fn test_dispatcher_simple() {
 
     let rust_artifact = ArtifactId {
         runtime_id: SampleRuntimes::First as u32,
-        name: "first".into(),
+        name: "first".to_owned(),
+        version: "0.5.0".parse().unwrap(),
     };
     let java_artifact = ArtifactId {
         runtime_id: SampleRuntimes::Second as u32,
-        name: "second".into(),
+        name: "second".to_owned(),
+        version: "1.2.1".parse().unwrap(),
     };
 
     // Check if the services are ready for deploy.
@@ -600,6 +603,7 @@ impl DeploymentRuntime {
         let artifact = ArtifactId {
             runtime_id: 2,
             name: name.to_owned(),
+            version: Version::new(1, 0, 0),
         };
         self.mailbox_actions
             .lock()
@@ -803,7 +807,8 @@ fn failed_deployment_with_node_restart() {
 
     let snapshot = db.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    assert!(schema.get_artifact("recoverable_after_restart").is_none());
+    let artifact = "2:recoverable_after_restart:1.0.0".parse().unwrap();
+    assert!(schema.get_artifact(&artifact).is_none());
     // ^-- Since the node panicked before merging the block, the artifact is forgotten.
 
     // Emulate node restart. The node will obtain the same block with the `commit_artifact`
@@ -819,10 +824,6 @@ fn failed_deployment_with_node_restart() {
         .with_runtime(2, runtime)
         .finalize(&blockchain);
 
-    let artifact = ArtifactId {
-        runtime_id: 2,
-        name: "recoverable_after_restart".to_owned(),
-    };
     let mut spec = vec![0_u8; 8];
     LittleEndian::write_u64(&mut spec, 100);
 
@@ -835,7 +836,7 @@ fn failed_deployment_with_node_restart() {
 
     let snapshot = db.snapshot();
     let state = DispatcherSchema::new(&snapshot)
-        .get_artifact(&artifact.name)
+        .get_artifact(&artifact)
         .unwrap();
     assert_eq!(state.status, ArtifactStatus::Active);
 }
@@ -902,6 +903,7 @@ fn stopped_service_workflow() {
     let artifact = ArtifactId {
         runtime_id: SampleRuntimes::First as u32,
         name: "first".into(),
+        version: Version::new(0, 1, 0),
     };
     dispatcher
         .commit_artifact_sync(&fork, artifact.clone(), vec![])

@@ -152,7 +152,7 @@
 //! [ServiceFactory]: trait.ServiceFactory.html
 
 pub use self::{
-    call_context::CallContext,
+    call_context::{CallContext, ChildAuthorization},
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
     service::{
@@ -164,23 +164,18 @@ pub use self::{
 pub mod api;
 pub mod error;
 
-use exonum_merkledb::{validation::is_valid_identifier, Snapshot};
+use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
-use semver::Version;
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    fmt,
-    str::FromStr,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
+    blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
         dispatcher::{self, Mailbox},
-        error::{catch_panic, ExecutionError, ExecutionFail},
+        error::{catch_panic, ExecutionError},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
@@ -201,8 +196,8 @@ mod tests;
 pub struct RustRuntime {
     blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
-    available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
-    deployed_artifacts: HashSet<RustArtifactId>,
+    available_artifacts: HashMap<ArtifactId, Box<dyn ServiceFactory>>,
+    deployed_artifacts: HashSet<ArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
     changed_services_since_last_block: bool,
@@ -279,7 +274,6 @@ impl RustRuntime {
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        let artifact = RustArtifactId::parse(&artifact)?;
         if self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
@@ -288,13 +282,12 @@ impl RustRuntime {
         }
 
         trace!("Deployed artifact: {}", artifact);
-        self.deployed_artifacts.insert(artifact);
+        self.deployed_artifacts.insert(artifact.to_owned());
         Ok(())
     }
 
     fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
-        let artifact = RustArtifactId::parse(&spec.artifact)?;
-        if !self.deployed_artifacts.contains(&artifact) {
+        if !self.deployed_artifacts.contains(&spec.artifact) {
             return Err(dispatcher::Error::ArtifactNotDeployed.into());
         }
         if self.started_services.contains_key(&spec.id) {
@@ -304,7 +297,7 @@ impl RustRuntime {
             return Err(dispatcher::Error::ServiceNameExists.into());
         }
 
-        let service = self.available_artifacts[&artifact].create_instance();
+        let service = self.available_artifacts[&spec.artifact].create_instance();
         Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
@@ -349,105 +342,6 @@ impl WellKnownRuntime for RustRuntime {
     const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
-/// A unique identifier of the Rust artifact, containing the name and version of the artifact.
-///
-/// As a string, the artifact name is represented as follows:
-///
-/// `{artifact_name}:{artifact_version}`, where `artifact_name` is a unique name of the artifact,
-/// and `artifact_version` is a semantic version identifier.
-///
-/// * Artifact name can contain only the following characters: `a-zA-Z0-9` and one of `_-.`.
-/// * Artifact version identifier must conform to the semantic versioning scheme (major.minor.patch).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RustArtifactId {
-    /// Artifact name.
-    pub name: String,
-    /// Artifact version identifier conforming to the semantic versioning scheme.
-    pub version: Version,
-}
-
-impl RustArtifactId {
-    /// Creates a new Rust artifact ID from the provided name and version.
-    ///
-    /// # Panics
-    ///
-    /// If the `name` is empty or contains illegal character.
-    pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
-        Self::is_valid_name(name).expect("Invalid Rust artifact name.");
-        Self {
-            name: name.to_owned(),
-            version: Version::new(major, minor, patch),
-        }
-    }
-
-    /// Converts into `InstanceInitParams` with the given ID, name and empty constructor.
-    pub fn into_default_instance(
-        self,
-        id: InstanceId,
-        name: impl Into<String>,
-    ) -> InstanceInitParams {
-        InstanceInitParams::new(id, name, self.into(), ())
-    }
-
-    /// Checks that the Rust artifact name contains only allowed characters and is not empty.
-    fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
-        let name = name.as_ref();
-        ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
-        ensure!(
-            is_valid_identifier(name),
-            "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
-        );
-        Ok(())
-    }
-
-    fn parse(artifact: &ArtifactId) -> Result<Self, ExecutionError> {
-        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
-            return Err(Error::IncorrectArtifactId.into());
-        }
-        artifact
-            .name
-            .parse()
-            .map_err(|inner| Error::IncorrectArtifactId.with_description(inner))
-    }
-}
-
-impl From<RustArtifactId> for ArtifactId {
-    fn from(inner: RustArtifactId) -> Self {
-        Self {
-            runtime_id: RustRuntime::ID,
-            name: inner.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for RustArtifactId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.name, self.version)
-    }
-}
-
-impl FromStr for RustArtifactId {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split(':').take(2).collect::<Vec<_>>();
-        match &split[..] {
-            [name, version] => {
-                Self::is_valid_name(name)?;
-                let version = Version::parse(version)?;
-                Ok(Self {
-                    name: name.to_string(),
-                    version,
-                })
-            }
-            _ => Err(failure::format_err!(
-                "Wrong Rust artifact name format. The name should be arranged \
-                 as follows \"artifact_name:artifact_version\""
-            )),
-        }
-    }
-}
-
 impl Runtime for RustRuntime {
     fn initialize(&mut self, blockchain: &Blockchain) {
         self.blockchain = Some(blockchain.clone());
@@ -472,11 +366,7 @@ impl Runtime for RustRuntime {
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if let Ok(artifact) = RustArtifactId::parse(id) {
-            self.deployed_artifacts.contains(&artifact)
-        } else {
-            false
-        }
+        self.deployed_artifacts.contains(id)
     }
 
     fn initiate_adding_service(
@@ -590,40 +480,5 @@ impl Runtime for RustRuntime {
                 validator_id,
             ));
         }
-    }
-}
-
-#[test]
-fn parse_rust_artifact_id_correct() {
-    RustArtifactId::from_str("my-service:1.0.0").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-alpha").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-alpha.1").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-rc").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-rc.1").unwrap();
-}
-
-#[test]
-fn parse_rust_artifact_id_incorrect() {
-    let cases = vec![
-        ("my-service:1.1.1.1.1", "Extra junk after valid version"),
-        (":1.0", "Rust artifact name should not be empty"),
-        ("name:", "Error parsing major identifier"),
-        ("$name:1.0", "Rust artifact name contains illegal character"),
-        (
-            "aAa",
-            "Wrong Rust artifact name format. The name should be arranged as follows",
-        ),
-    ];
-
-    for (artifact_str, expected_err) in cases {
-        let actual_err = RustArtifactId::from_str(artifact_str)
-            .unwrap_err()
-            .to_string();
-        assert!(
-            actual_err.contains(expected_err),
-            "Actual error is: \"{}\", but expected \"{}\"",
-            actual_err,
-            expected_err
-        )
     }
 }

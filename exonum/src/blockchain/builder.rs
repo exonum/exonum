@@ -109,7 +109,7 @@ impl InstanceCollection {
         params: impl BinaryValue,
     ) -> Self {
         let spec = InstanceSpec {
-            artifact: self.factory.artifact_id().into(),
+            artifact: self.factory.artifact_id(),
             id,
             name: name.into(),
         };
