@@ -176,6 +176,8 @@ impl FromAccessAttrs {
 struct FromAccessFieldAttrs {
     #[darling(default)]
     rename: Option<String>,
+    #[darling(default)]
+    flatten: bool,
 }
 
 impl FromAccess {
@@ -258,7 +260,7 @@ impl FromDeriveInput for FromAccess {
                                 let e = "Duplicate field name";
                                 return Err(darling::Error::custom(e).with_span(&field.span));
                             }
-                        } else {
+                        } else if !field.flatten {
                             let msg = if this.fields.len() == 1 {
                                 "Unnamed fields necessitate #[from_access(rename = ...)]. \
                                  To use a wrapper, add #[from_access(transparent)] to the struct"
@@ -284,6 +286,7 @@ struct AccessField {
     span: Span,
     ident: Option<Ident>,
     name_suffix: Option<String>,
+    flatten: bool,
 }
 
 impl FromField for AccessField {
@@ -301,6 +304,7 @@ impl FromField for AccessField {
             ident,
             name_suffix,
             span: field.span(),
+            flatten: attrs.flatten,
         })
     }
 }
@@ -318,15 +322,23 @@ impl AccessField {
     fn constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(exonum_merkledb::access::FromAccess);
         let ident = self.ident(field_index);
-        let name = self.name_suffix.as_ref().unwrap();
-        quote!(#ident: #from_access::from_access(access.clone(), addr.clone().append_name(#name))?)
+        if self.flatten {
+            quote!(#ident: #from_access::from_access(access.clone(), addr.clone())?)
+        } else {
+            let name = self.name_suffix.as_ref().unwrap();
+            quote!(#ident: #from_access::from_access(access.clone(), addr.clone().append_name(#name))?)
+        }
     }
 
     fn root_constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(exonum_merkledb::access::FromAccess);
         let ident = self.ident(field_index);
-        let name = &self.name_suffix;
-        quote!(#ident: #from_access::from_access(access.clone(), #name.into())?)
+        if self.flatten {
+            quote!(#ident: #from_access::from_root(access.clone())?)
+        } else {
+            let name = &self.name_suffix;
+            quote!(#ident: #from_access::from_access(access.clone(), #name.into())?)
+        }
     }
 }
 

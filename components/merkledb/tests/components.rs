@@ -4,7 +4,8 @@ use exonum_derive::FromAccess;
 
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, RawAccessMut},
-    BinaryKey, Database, Entry, Group, Lazy, ListIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+    BinaryKey, Database, Entry, Group, Lazy, ListIndex, ObjectHash, ProofEntry, ProofMapIndex,
+    TemporaryDB,
 };
 
 #[derive(FromAccess)]
@@ -217,4 +218,103 @@ fn opt_out_from_schema() {
     fork.get_proof_map("map").put(&1_u64, 2_u64);
     let schema = NotSchema::new(&fork, "huh?");
     assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
+}
+
+#[test]
+fn schema_interface_pattern() {
+    #[derive(Debug, FromAccess)]
+    struct SchemaInterface<T: Access> {
+        pub wallets: ProofMapIndex<T::Base, str, u64>,
+        pub total_balance: ProofEntry<T::Base, u64>,
+    }
+
+    #[derive(Debug, FromAccess)]
+    struct FlattenedSchema<T: Access> {
+        /// Flattened components are useful to split schemas into a public interface
+        /// and implementation details.
+        #[from_access(flatten)]
+        public: SchemaInterface<T>,
+        private_entry: Entry<T::Base, String>,
+        private_list: ListIndex<T::Base, u64>,
+    }
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut schema: FlattenedSchema<_> = FlattenedSchema::new(&fork);
+        schema.public.wallets.put("Alice", 10);
+        schema.public.wallets.put("Bob", 20);
+        schema.public.total_balance.set(30);
+        schema.private_entry.set("XNM".to_owned());
+        schema.private_list.extend(vec![10, 20]);
+    }
+
+    let interface = SchemaInterface::from_root(fork.readonly()).unwrap();
+    assert_eq!(interface.wallets.values().sum::<u64>(), 30);
+    assert_eq!(interface.total_balance.get(), Some(30));
+}
+
+#[test]
+fn flattened_unnamed_fields() {
+    #[derive(FromAccess)]
+    struct Flattened<T: Access> {
+        entry: Entry<T::Base, String>,
+        other_entry: Entry<T::Base, u64>,
+    }
+
+    #[derive(FromAccess)]
+    struct Wrapper<T: Access>(
+        #[from_access(flatten)] Flattened<T>,
+        #[from_access(rename = "list")] ListIndex<T::Base, u8>,
+    );
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut wrapper = Wrapper::from_root(&fork).unwrap();
+        wrapper.0.entry.set("!!".to_owned());
+        wrapper.0.other_entry.set(42);
+        wrapper.1.extend(vec![1, 2, 3]);
+    }
+    assert_eq!(fork.get_entry::<_, String>("entry").get().unwrap(), "!!");
+    assert_eq!(fork.get_list::<_, u8>("list").get(1), Some(2));
+}
+
+#[test]
+fn multiple_flattened_fields() {
+    #[derive(FromAccess)]
+    struct Flattened<T: Access> {
+        entry: Entry<T::Base, String>,
+        other_entry: Entry<T::Base, u64>,
+    }
+
+    #[derive(FromAccess)]
+    struct OtherFlattened<T: Access> {
+        list: ListIndex<T::Base, Vec<u8>>,
+        maps: Group<T, u32, ProofMapIndex<T::Base, str, u64>>,
+    }
+
+    #[derive(FromAccess)]
+    struct Schema<T: Access> {
+        #[from_access(flatten)]
+        first: Flattened<T>,
+        #[from_access(flatten)]
+        second: OtherFlattened<T>,
+    }
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut schema = Schema::new(&fork);
+        schema.first.entry.set("Some".to_owned());
+        schema.first.other_entry.set(1);
+        schema.second.list.push(vec![2, 3, 4]);
+        schema.second.maps.get(&23).put("Alice", 1);
+    }
+    assert_eq!(fork.get_entry::<_, String>("entry").get().unwrap(), "Some");
+    assert_eq!(fork.get_list::<_, Vec<u8>>("list").len(), 1);
+    assert_eq!(
+        fork.get_proof_map(("maps", &23_u32)).get("Alice"),
+        Some(1_u64)
+    );
 }
