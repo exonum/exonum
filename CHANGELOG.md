@@ -10,32 +10,52 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
 - `before_transactions` and `after_transactions` hooks in Rust services
   now return a `Result`. The semantics is the same as for transactions;
   an error or panic in the hook will lead to the rollback of the blockchain
   state. (#1576)
+
 - Errors occurring while executing transactions and `before_transactions` /
   `after_transactions` hooks are now aggregated within each block, rather than
   globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+
 - The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
   Error fields were made private and information about a failing call
   was added. (#1585)
+
 - `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
   and a corresponding derive macro. (#1585)
+
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
+
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
+
 - The following public APIs were removed/made private: (#1629)
   - `helpers::path_relative_from` function;
   - `messages::BinaryValue` public re-export;
   - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
     `Blockchain::remove_peer_with_pubkey` methods;
   - `node::state` module (constants from `node::state` are now accessible in
-    `node::constants` module).
+    `node::constants` module);
+  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
+  - `blockchain::{error reexports}` (available from `runtime::`);
+  - `blockchain::FatalError` public re-export;
+  - `blockchain::InstanceCollection` structure;
+  - `helpers::ZeroizeOnDrop` trait;
+  - `helpers::Milliseconds` type;
+  - `helpers::generate_testnet_config` and `helpers::create_rust_runtime_and_genesis_config`
+    functions;
+  - `helpers::config` and `helpers::user_agent` modules;
+  - `proto` module;
+  - `runtime::error` module;
+  - `runtime::Mailbox` structure.
 
 #### exonum-merkledb
 
@@ -75,12 +95,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   for its contents. Hashed indexes which are not a part of a group participate
   in this aggregation. Consult crate docs for more details on how
   aggregation works. (#1553)
+
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
+
 - Added support of unsized keys to `MapIndex`. (#1621)
 
 - Added mechanism to extend block header. Block now contains
   key-value storage `additional_headers` which can contain binary data. (#1602)
+
+- `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
 #### exonum-supervisor
 
