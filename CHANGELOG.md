@@ -67,7 +67,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - API endpoints are now can be marked as deprecated. (#1607)
 
-
 #### exonum-merkledb
 
 - MerkleDB now performs automated state aggregation allowing to construct proofs
