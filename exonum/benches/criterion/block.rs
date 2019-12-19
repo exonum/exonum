@@ -103,7 +103,7 @@ fn create_blockchain(
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
     blockchain.create_patch(
-        ValidatorId::zero(),
+        ValidatorId::zero().into(),
         Height(height),
         txs,
         &mut BTreeMap::new(),

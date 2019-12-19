@@ -12,13 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::proto::schema::tests::TimestampTx;
+pub use crate::proto::TimestampTx;
 
-use exonum_merkledb::{access::AccessExt, BinaryValue};
-use exonum_proto::impl_binary_value_for_pb_message;
-use rand::{rngs::ThreadRng, thread_rng, RngCore};
-
-use crate::{
+use exonum::{
     blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
@@ -27,21 +23,24 @@ use crate::{
         AnyTx, InstanceId,
     },
 };
+use exonum_derive::*;
+use exonum_merkledb::{access::AccessExt, BinaryValue};
+use exonum_proto::impl_binary_value_for_pb_message;
+use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;
 
-#[exonum_interface(crate = "crate")]
+#[exonum_interface]
 pub trait TimestampingInterface {
     fn timestamp(&self, context: CallContext<'_>, arg: TimestampTx) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("TimestampingInterface"))]
+#[service_dispatcher(implements("TimestampingInterface"))]
 #[service_factory(
-    crate = "crate",
     artifact_name = "timestamping",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema"
+    proto_sources = "crate::proto"
 )]
 pub struct TimestampingService;
 
@@ -75,6 +74,7 @@ impl TimestampingService {
 
 impl_binary_value_for_pb_message! { TimestampTx }
 
+#[derive(Debug)]
 pub struct TimestampingTxGenerator {
     rand: ThreadRng,
     data_size: usize,

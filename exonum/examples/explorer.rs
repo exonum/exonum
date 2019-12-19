@@ -33,6 +33,7 @@ use std::{collections::BTreeMap, iter};
 use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
 };
+use exonum::blockchain::ProposerId;
 
 #[path = "../tests/explorer/blockchain/mod.rs"]
 mod blockchain;
@@ -259,7 +260,9 @@ fn main() {
     // Determine the number of blocks proposed by a specific validator
     let block_count = explorer
         .blocks(Height(1)..) // skip genesis block
-        .filter(|block| block.header().proposer_id == ValidatorId(0))
+        .filter(|block| {
+            block.header().get_header::<ProposerId>().unwrap().unwrap() == ValidatorId(0).into()
+        })
         .count();
     assert_eq!(block_count, 1);
 }

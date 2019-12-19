@@ -83,7 +83,7 @@ impl HashedEntry {
 ///
 /// # JSON serialization
 ///
-/// `ListProof` is serialized to JSON as an object with 2 array fields:
+/// `ListProof` is serialized to JSON as an object with the following fields:
 ///
 /// - `proof` is an array of `{ height: number, index: number, hash: Hash }` objects.
 /// - `entries` is an array with list elements and their indexes, that is,

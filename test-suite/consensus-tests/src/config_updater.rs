@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::proto::schema::tests::TxConfig;
+pub use crate::proto::TxConfig;
 
-use exonum_merkledb::BinaryValue;
-use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
-
-use crate::{
+use exonum::{
     blockchain::{ConsensusConfig, ExecutionError},
     crypto::{PublicKey, SecretKey},
     helpers::Height,
@@ -27,19 +24,21 @@ use crate::{
         InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_derive::*;
+use exonum_merkledb::BinaryValue;
+use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
-#[exonum_interface(crate = "crate")]
+#[exonum_interface]
 pub trait ConfigUpdaterInterface {
     fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(crate = "crate", implements("ConfigUpdaterInterface"))]
+#[service_dispatcher(implements("ConfigUpdaterInterface"))]
 #[service_factory(
-    crate = "crate",
     artifact_name = "config_updater",
     artifact_version = "0.1.0",
-    proto_sources = "crate::proto::schema"
+    proto_sources = "crate::proto"
 )]
 pub struct ConfigUpdaterService;
 
