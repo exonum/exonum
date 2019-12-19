@@ -92,7 +92,7 @@ pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
 /// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexIter<'a, K, V> {
+pub struct Iter<'a, K, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
     _k: PhantomData<K>,
 }
@@ -106,7 +106,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexKeys<'a, K> {
+pub struct Keys<'a, K> {
     base_iter: ViewIter<'a, Vec<u8>, ()>,
     _k: PhantomData<K>,
 }
@@ -120,7 +120,7 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// [`values_from`]: struct.ProofMapIndex.html#method.values_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexValues<'a, V> {
+pub struct Values<'a, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
 }
 
@@ -355,8 +355,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofMapIndexIter<'_, K, V> {
-        ProofMapIndexIter {
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        Iter {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
             _k: PhantomData,
         }
@@ -379,8 +379,8 @@ where
     ///     println!("{:?}", key);
     /// }
     /// ```
-    pub fn keys(&self) -> ProofMapIndexKeys<'_, K> {
-        ProofMapIndexKeys {
+    pub fn keys(&self) -> Keys<'_, K> {
+        Keys {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
             _k: PhantomData,
         }
@@ -403,8 +403,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> ProofMapIndexValues<'_, V> {
-        ProofMapIndexValues {
+    pub fn values(&self) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter(&VALUE_KEY_PREFIX),
         }
     }
@@ -427,8 +427,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<'_, K, V> {
-        ProofMapIndexIter {
+    pub fn iter_from(&self, from: &K) -> Iter<'_, K, V> {
+        Iter {
             base_iter: self
                 .base
                 .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
@@ -454,8 +454,8 @@ where
     ///     println!("{:?}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<'_, K> {
-        ProofMapIndexKeys {
+    pub fn keys_from(&self, from: &K) -> Keys<'_, K> {
+        Keys {
             base_iter: self
                 .base
                 .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
@@ -481,8 +481,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> ProofMapIndexValues<'_, V> {
-        ProofMapIndexValues {
+    pub fn values_from(&self, from: &K) -> Values<'_, V> {
+        Values {
             base_iter: self
                 .base
                 .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
@@ -894,14 +894,14 @@ where
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
-    type IntoIter = ProofMapIndexIter<'a, K, V>;
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
+impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
     K: BinaryKey,
     V: BinaryValue,
@@ -915,7 +915,7 @@ where
     }
 }
 
-impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
+impl<'a, K> Iterator for Keys<'a, K>
 where
     K: BinaryKey,
 {
@@ -926,7 +926,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for ProofMapIndexValues<'a, V>
+impl<'a, V> Iterator for Values<'a, V>
 where
     V: BinaryValue,
 {

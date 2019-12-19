@@ -168,7 +168,9 @@ pub use self::{
     error::Error,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     indexes::{
-        Entry, Group, KeySetIndex, ListIndex, MapIndex, ProofEntry, SparseListIndex, ValueSetIndex,
+        key_set_index::KeySetIndex, list_index::ListIndex, map_index::MapIndex,
+        sparse_list_index::SparseListIndex, value_set_index::ValueSetIndex, Entry, Group,
+        ProofEntry,
     },
     keys::BinaryKey,
     lazy::Lazy,
@@ -196,7 +198,6 @@ mod backends;
 mod db;
 mod error;
 mod hash;
-mod indexes;
 mod keys;
 mod lazy;
 mod options;
@@ -204,6 +205,7 @@ mod values;
 mod views;
 
 pub mod access;
+pub mod indexes;
 pub mod migration;
 pub mod validation;
 

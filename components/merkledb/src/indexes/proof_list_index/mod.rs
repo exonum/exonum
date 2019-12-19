@@ -70,7 +70,7 @@ pub struct ProofListIndex<T: RawAccess, V> {
 /// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
 /// [`ProofListIndex`]: struct.ProofListIndex.html
 #[derive(Debug)]
-pub struct ProofListIndexIter<'a, V> {
+pub struct Iter<'a, V> {
     base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
@@ -313,8 +313,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofListIndexIter<'_, V> {
-        ProofListIndexIter {
+    pub fn iter(&self) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter(&0_u8),
         }
     }
@@ -335,8 +335,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ProofListIndexIter<'_, V> {
-        ProofListIndexIter {
+    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
     }
@@ -729,14 +729,14 @@ where
     V: BinaryValue,
 {
     type Item = V;
-    type IntoIter = ProofListIndexIter<'a, V>;
+    type IntoIter = Iter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for ProofListIndexIter<'a, V>
+impl<'a, V> Iterator for Iter<'a, V>
 where
     V: BinaryValue,
 {

@@ -39,6 +39,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` structure isn't generic anymore. (#1587)
 
+#### exonum-merkledb
+
+- All indexes has been moved to separate module `indexes`. Indexes iterators
+name has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+
 ### New features
 
 #### exonum
@@ -83,14 +88,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `Configure` interface. (#1587)
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
-
-### Internal Improvements
-
-#### exonum-merkledb
-
-- All indexes has been moved to separate module `indexes`. All index modules has
-become private except for `ProofListIndex` and `ProofMapIndex` because they export
-some additional types such as `MapProof`, `ListProof` and others.
 
 ### Bug Fixes
 
