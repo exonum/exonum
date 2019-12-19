@@ -21,9 +21,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
-use super::{
-    system_schema::STATE_AGGREGATOR, IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View,
-};
+use super::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View};
 use crate::views::address::INDEX_NAME_SEPARATOR;
 use crate::{
     access::{AccessError, AccessErrorKind},
@@ -60,6 +58,8 @@ pub enum IndexType {
     /// Merkelized entry.
     ProofEntry = 9,
 
+    /// Tombstone indicating necessity to remove an index after migration is completed.
+    Tombstone = 254,
     /// Unknown index type.
     #[doc(hidden)]
     Unknown = 255,
@@ -67,7 +67,7 @@ pub enum IndexType {
 
 impl IndexType {
     /// Checks if the index of this type is Merkelized.
-    fn is_merkelized(self) -> bool {
+    pub fn is_merkelized(self) -> bool {
         match self {
             IndexType::ProofList | IndexType::ProofMap | IndexType::ProofEntry => true,
             _ => false,
@@ -296,10 +296,10 @@ where
 
 /// Persistent pool used to store indexes metadata in the database.
 /// Pool size is used as an identifier of newly created indexes.
-pub(super) struct IndexesPool<T: RawAccess>(View<T>);
+pub struct IndexesPool<T: RawAccess>(View<T>);
 
 impl<T: RawAccess> IndexesPool<T> {
-    pub(super) fn new(index_access: T) -> Self {
+    pub(crate) fn new(index_access: T) -> Self {
         let view = View::new(index_access, ResolvedAddress::system(INDEXES_POOL_NAME));
         Self(view)
     }
@@ -368,11 +368,92 @@ fn get_suffix<K: BinaryKey + Clone>(entry: (Vec<u8>, Vec<u8>)) -> K {
     key.borrow().clone()
 }
 
+impl<T: RawAccessMut> IndexesPool<T> {
+    /// Moves indexes with the specified prefix from the next version (i.e., `^prefix.*` form)
+    /// to the current version (`prefix.*` form). The existing old indexes are replaced, or
+    /// removed if the new index is a `Tombstone`. If there is no overriding index, an old
+    /// index is left in place.
+    ///
+    /// # Return value
+    ///
+    /// Returns resolved addresses of the removed indexes. For each address, we also return a flag
+    /// indicating whether the corresponding index was removed from aggregation (i.e., was
+    /// aggregated and was not replaced by an aggregated index).
+    pub(crate) fn flush_migration(&mut self, prefix: &str) -> Vec<(ResolvedAddress, bool)> {
+        let prefix = IndexAddress::qualify_migration_namespace(prefix);
+        // Minimum length of the name part for the original indexes, i.e., ones for which
+        // the name part of the address doesn't start with '^'. Since the '^' char is removed from
+        // the name, this length is one lesser than the length of the `prefix`.
+        let min_name_len = prefix.len() - 1;
+
+        let moved_indexes: Vec<_> = self.0.iter::<_, Vec<u8>, IndexMetadata>(&prefix).collect();
+        let mut removed_addrs = Vec::new();
+        for (key, metadata) in moved_indexes {
+            let migrated_key = IndexAddress::migrate_qualified_name(&key);
+            debug_assert!({
+                let migrated_prefix = IndexAddress::migrate_qualified_name(&prefix);
+                migrated_key.starts_with(migrated_prefix)
+            });
+
+            if let Some(old_metadata) = self.0.get::<_, IndexMetadata>(migrated_key) {
+                let (name, is_in_group) =
+                    IndexAddress::parse_fully_qualified_name(migrated_key, min_name_len);
+                let resolved = ResolvedAddress {
+                    name,
+                    id: NonZeroU64::new(old_metadata.identifier),
+                };
+                let is_removed_from_aggregation = !is_in_group
+                    && old_metadata.index_type.is_merkelized()
+                    && !metadata.index_type.is_merkelized();
+                removed_addrs.push((resolved, is_removed_from_aggregation));
+            }
+
+            if metadata.index_type == IndexType::Tombstone {
+                // Tombstones are removed without replacement.
+                self.0.remove(migrated_key);
+            } else {
+                self.0.put(migrated_key, metadata);
+            }
+            self.0.remove(&key);
+        }
+        removed_addrs
+    }
+
+    pub(crate) fn rollback_migration(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
+        let prefix = IndexAddress::qualify_migration_namespace(prefix);
+        let (removed_names, removed_addrs): (Vec<_>, Vec<_>) = self
+            .0
+            .iter::<_, Vec<u8>, IndexMetadata>(&prefix)
+            .map(|(key, metadata)| {
+                let (name, _) = IndexAddress::parse_fully_qualified_name(&key, prefix.len());
+                let resolved = ResolvedAddress {
+                    name,
+                    id: NonZeroU64::new(metadata.identifier),
+                };
+                (key, resolved)
+            })
+            .unzip();
+        for full_name in &removed_names {
+            self.0.remove(full_name);
+        }
+        removed_addrs
+    }
+}
+
 /// Obtains `object_hash` for an aggregated index.
-pub fn get_object_hash<T: RawAccess>(access: T, addr: ResolvedAddress) -> Hash {
+pub fn get_object_hash<T: RawAccess>(
+    access: T,
+    addr: ResolvedAddress,
+    is_in_migration: bool,
+) -> Hash {
     use crate::{ObjectHash, ProofListIndex, ProofMapIndex};
 
-    let index_full_name = addr.name.as_bytes().to_vec();
+    let mut original_addr = IndexAddress::from_root(&addr.name);
+    if is_in_migration {
+        original_addr.in_migration = true;
+    }
+    let index_full_name = original_addr.fully_qualified_name();
+
     let metadata = IndexesPool::new(access.clone())
         .index_metadata(&index_full_name)
         .unwrap_or_else(|| {
@@ -427,7 +508,10 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
-        check_index_valid_full_name(index_address)?;
+        check_index_valid_full_name(&index_address.name).map_err(|kind| AccessError {
+            addr: index_address.to_owned(),
+            kind,
+        })?;
         Self::get_or_create_unchecked(index_access, index_address, index_type)
     }
 
@@ -442,8 +526,15 @@ where
         index_address: &IndexAddress,
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
+        if index_type == IndexType::Tombstone && !index_address.in_migration {
+            return Err(AccessError {
+                kind: AccessErrorKind::InvalidTombstone,
+                addr: index_address.to_owned(),
+            });
+        }
+
         // Actual name.
-        let index_name = index_address.name.clone();
+        let index_name = index_address.name().to_owned();
         // Full name for internal usage.
         let index_full_name = index_address.fully_qualified_name();
 
@@ -460,13 +551,16 @@ where
             id: NonZeroU64::new(metadata.identifier),
         };
 
-        let is_aggregated = !is_phantom
-            && index_type.is_merkelized()
-            && index_address.id_in_group.is_none()
-            && index_address.name != STATE_AGGREGATOR;
+        let is_aggregated =
+            !is_phantom && real_index_type.is_merkelized() && index_address.id_in_group.is_none();
+        let namespace = if is_aggregated {
+            Some(index_address.namespace().to_owned())
+        } else {
+            None
+        };
 
         let mut view = View::new(index_access, addr);
-        view.set_or_forget_aggregation(is_aggregated);
+        view.set_or_forget_aggregation(namespace);
         let this = Self {
             view,
             metadata,
