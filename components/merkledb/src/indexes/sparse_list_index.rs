@@ -113,7 +113,7 @@ pub struct Keys<'a> {
 /// [`values`]: struct.SparseListIndex.html#method.values
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparseListIndexValues<'a, V> {
+pub struct Values<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
@@ -303,8 +303,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> SparseListIndexValues<'_, V> {
-        SparseListIndexValues {
+    pub fn values(&self) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
@@ -559,7 +559,7 @@ impl<'a> Iterator for Keys<'a> {
     }
 }
 
-impl<'a, V> Iterator for SparseListIndexValues<'a, V>
+impl<'a, V> Iterator for Values<'a, V>
 where
     V: BinaryValue,
 {

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! All available `MerkleDB` indexes.
+
 pub use self::{entry::Entry, group::Group, proof_entry::ProofEntry};
 
 mod entry;

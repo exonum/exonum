@@ -203,12 +203,12 @@ mod error;
 mod hash;
 mod keys;
 mod lazy;
+mod indexes;
 mod options;
 mod values;
 mod views;
 
 pub mod access;
-mod indexes;
 pub mod migration;
 pub mod validation;
 
