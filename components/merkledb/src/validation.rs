@@ -14,8 +14,7 @@
 
 //! Validation helpers for index names.
 
-use crate::access::{AccessError, AccessErrorKind};
-use crate::IndexAddress;
+use crate::access::AccessErrorKind;
 
 /// Validates that an index `name` consists of allowed chars. This method does not check
 /// if `name` is empty.
@@ -52,27 +51,19 @@ pub fn is_allowed_index_name_char(c: u8) -> bool {
 // Allow because it's looks more readable.
 #[allow(clippy::if_not_else)]
 fn check_valid_name<F>(
-    addr: &IndexAddress,
+    name: &str,
     predicate: F,
     allowed_chars: &'static str,
-) -> Result<(), AccessError>
+) -> Result<(), AccessErrorKind>
 where
     F: Fn(&str) -> bool,
 {
-    let name = addr.name();
-
     if name.is_empty() {
-        Err(AccessError {
-            kind: AccessErrorKind::EmptyName,
-            addr: addr.to_owned(),
-        })
+        Err(AccessErrorKind::EmptyName)
     } else if !predicate(name) {
-        Err(AccessError {
-            kind: AccessErrorKind::InvalidCharsInName {
-                name: name.to_owned(),
-                allowed_chars,
-            },
-            addr: addr.to_owned(),
+        Err(AccessErrorKind::InvalidCharsInName {
+            name: name.to_owned(),
+            allowed_chars,
         })
     } else {
         Ok(())
@@ -80,24 +71,15 @@ where
 }
 
 /// Checks that provided address is valid index full name.
-pub(crate) fn check_index_valid_full_name(addr: &IndexAddress) -> Result<(), AccessError> {
-    if addr.name().starts_with("__") && !addr.name().contains('.') {
-        return Err(AccessError {
-            addr: addr.to_owned(),
-            kind: AccessErrorKind::ReservedName,
-        });
-    };
-
-    check_valid_name(addr, is_valid_identifier, "a-zA-Z0-9 and _-.")
+pub(crate) fn check_index_valid_full_name(name: &str) -> Result<(), AccessErrorKind> {
+    if name.starts_with("__") && !name.contains('.') {
+        return Err(AccessErrorKind::ReservedName);
+    }
+    check_valid_name(name, is_valid_identifier, "a-zA-Z0-9 and _-.")
 }
 
 pub(crate) fn assert_valid_name_component(name: &str) {
-    check_valid_name(
-        &name.into(),
-        is_valid_index_name_component,
-        "a-zA-Z0-9 and _-",
-    )
-    .unwrap();
+    check_valid_name(name, is_valid_index_name_component, "a-zA-Z0-9 and _-").unwrap();
 }
 
 #[cfg(test)]
