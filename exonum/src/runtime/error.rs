@@ -536,7 +536,7 @@ impl Display for ExecutionError {
         if let Some(ref call_site) = self.call_site {
             write!(
                 formatter,
-                "Execution error `{kind}` occurred in {site}",
+                "Execution error with code `{kind}` occurred in {site}",
                 kind = self.kind,
                 site = call_site
             )?;
@@ -546,14 +546,14 @@ impl Display for ExecutionError {
                 "Execution error with code `{kind}` occurred in {runtime}",
                 kind = self.kind,
                 runtime = match RuntimeIdentifier::try_from(runtime_id) {
-                    Ok(runtime) => format!("<{} runtime>", runtime),
-                    Err(_) => format!("<Non-default runtime with id {}>", runtime_id),
+                    Ok(runtime) => format!("{} runtime", runtime),
+                    Err(_) => format!("Non-default runtime with id {}", runtime_id),
                 }
             )?;
         } else {
             write!(
                 formatter,
-                "Execution error `{kind}` occurred",
+                "Execution error with code `{kind}` occurred",
                 kind = self.kind
             )?;
         }
