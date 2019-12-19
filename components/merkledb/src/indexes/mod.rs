@@ -12,21 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::{
-    entry::Entry, group::Group, key_set_index::KeySetIndex, list_index::ListIndex,
-    map_index::MapIndex, proof_entry::ProofEntry, sparse_list_index::SparseListIndex,
-    value_set_index::ValueSetIndex,
-};
+pub use self::{entry::Entry, group::Group, proof_entry::ProofEntry};
 
 mod entry;
 mod group;
 mod proof_entry;
 
-mod key_set_index;
-mod list_index;
-mod map_index;
-mod sparse_list_index;
-mod value_set_index;
-
+pub mod key_set_index;
+pub mod list_index;
+pub mod map_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
+pub mod sparse_list_index;
+pub mod value_set_index;

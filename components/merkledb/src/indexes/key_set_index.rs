@@ -33,7 +33,7 @@ use crate::{
 /// `KeySetIndex` implements a set that stores the elements as keys with empty values.
 /// `KeySetIndex` requires that elements should implement the [`BinaryKey`] trait.
 ///
-/// [`BinaryKey`]: trait.BinaryKey.html
+/// [`BinaryKey`]: ../trait.BinaryKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T: RawAccess, K> {
     base: View<T>,
@@ -49,7 +49,7 @@ pub struct KeySetIndex<T: RawAccess, K> {
 /// [`iter_from`]: struct.KeySetIndex.html#method.iter_from
 /// [`KeySetIndex`]: struct.KeySetIndex.html
 #[derive(Debug)]
-pub struct KeySetIndexIter<'a, K> {
+pub struct Iter<'a, K> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
@@ -115,8 +115,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> KeySetIndexIter<'_, K> {
-        KeySetIndexIter {
+    pub fn iter(&self) -> Iter<'_, K> {
+        Iter {
             base_iter: self.base.iter(&()),
         }
     }
@@ -137,8 +137,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> KeySetIndexIter<'_, K> {
-        KeySetIndexIter {
+    pub fn iter_from(&self, from: &K) -> Iter<'_, K> {
+        Iter {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -226,14 +226,14 @@ where
     K: BinaryKey,
 {
     type Item = K::Owned;
-    type IntoIter = KeySetIndexIter<'a, K>;
+    type IntoIter = Iter<'a, K>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K> Iterator for KeySetIndexIter<'a, K>
+impl<'a, K> Iterator for Iter<'a, K>
 where
     K: BinaryKey,
 {

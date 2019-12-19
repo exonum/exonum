@@ -105,6 +105,11 @@ jobs:
     - touch target/doc/std/primitive.char.html
     - touch target/doc/exonum_merkledb/proof_map_index/trait.BinaryKey.html
     - touch target/doc/exonum_merkledb/proof_map_index/trait.BinaryValue.html
+    - touch target/doc/trait.BinaryKey.html
+    - touch target/doc/trait.BinaryValue.html
+    - touch target/doc/struct.ListIndex.html
+    - mkdir -p target/exonum_crypto
+    - touch target/exonum_crypto/struct.Hash.html
     - cargo deadlinks --dir target/doc
 
     # Run kcov.

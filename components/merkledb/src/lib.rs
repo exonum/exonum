@@ -167,9 +167,7 @@ pub use self::{
     db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
     error::Error,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
-    indexes::{
-        Entry, Group, KeySetIndex, ListIndex, MapIndex, ProofEntry, SparseListIndex, ValueSetIndex,
-    },
+    indexes::{Entry, Group, ProofEntry},
     keys::BinaryKey,
     lazy::Lazy,
     options::DbOptions,
@@ -182,6 +180,13 @@ pub use self::{
 pub use self::{
     indexes::proof_list_index::{ListProof, ProofListIndex},
     indexes::proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},
+    indexes::{
+        key_set_index::{self, KeySetIndex},
+        list_index::{self, ListIndex},
+        map_index::{self, MapIndex},
+        sparse_list_index::{self, SparseListIndex},
+        value_set_index::{self, ValueSetIndex},
+    },
 };
 
 #[macro_use]
@@ -196,7 +201,6 @@ mod backends;
 mod db;
 mod error;
 mod hash;
-mod indexes;
 mod keys;
 mod lazy;
 mod options;
@@ -204,6 +208,7 @@ mod values;
 mod views;
 
 pub mod access;
+mod indexes;
 pub mod migration;
 pub mod validation;
 
