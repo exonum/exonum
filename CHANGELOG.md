@@ -34,7 +34,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   hook will cause a panic for a builtin service. (#1619)
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
-
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
