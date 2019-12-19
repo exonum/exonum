@@ -19,10 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{
-            CallContext, ChildAuthorization, DefaultInstance, GenericCallMut, MethodDescriptor,
-            Service,
-        },
+        rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
         AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -200,17 +197,16 @@ impl CallAny<CallContext<'_>> for AnyCallService {
     type Output = Result<(), ExecutionError>;
 
     fn call_any(&self, mut ctx: CallContext<'_>, tx: AnyCall) -> Self::Output {
-        // FIXME!
-        let auth = if tx.fallthrough_auth {
-            ChildAuthorization::Fallthrough
-        } else {
-            ChildAuthorization::Service
-        };
-
         let call_info = tx.inner.call_info;
         let args = tx.inner.arguments;
-        let method_descriptor = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
-        ctx.generic_call_mut(call_info.instance_id, method_descriptor, args)
+        let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
+
+        if tx.fallthrough_auth {
+            ctx.with_fallthrough_auth()
+                .generic_call_mut(call_info.instance_id, method, args)
+        } else {
+            ctx.generic_call_mut(call_info.instance_id, method, args)
+        }
     }
 
     fn call_recursive(

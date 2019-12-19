@@ -23,16 +23,6 @@ pub struct CallContext<'a> {
     instance: InstanceDescriptor<'a>,
 }
 
-/// Authorization for a child call.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
-pub enum ChildAuthorization {
-    /// Fallthrough authorization: the child call retains `Caller` information of the parent call.
-    Fallthrough,
-    /// Authorization with the authority of the service executing the parent call.
-    Service,
-}
-
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
@@ -67,6 +57,15 @@ impl<'a> CallContext<'a> {
     pub fn in_genesis_block(&self) -> bool {
         let core_schema = self.data().for_core();
         core_schema.next_height() == Height(0)
+    }
+
+    /// Returns a stub which uses fallthrough auth to authorize calls.
+    #[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
+    pub fn with_fallthrough_auth(&mut self) -> FallthroughAuth<'_> {
+        FallthroughAuth(CallContext {
+            inner: self.inner.reborrow(),
+            instance: self.instance,
+        })
     }
 
     /// Provides writeable access to core schema.
@@ -140,6 +139,34 @@ impl<'a> CallContext<'a> {
 
         Dispatcher::initiate_stopping_service(self.inner.fork, instance_id)
     }
+
+    fn make_child_call<'q>(
+        &mut self,
+        called_id: impl Into<InstanceQuery<'q>>,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+        fallthrough_auth: bool,
+    ) -> Result<(), ExecutionError> {
+        let descriptor = self
+            .inner
+            .dispatcher
+            .get_service(called_id)
+            .ok_or(DispatcherError::IncorrectInstanceId)?;
+
+        let call_info = CallInfo {
+            instance_id: descriptor.id,
+            method_id: method.id,
+        };
+
+        let caller = if fallthrough_auth {
+            None
+        } else {
+            Some(self.instance.id)
+        };
+        self.inner
+            .child_context(caller)
+            .call(method.interface_name, &call_info, &args)
+    }
 }
 
 impl<'a, I> GenericCallMut<I> for CallContext<'a>
@@ -154,20 +181,25 @@ where
         method: MethodDescriptor<'_>,
         args: Vec<u8>,
     ) -> Self::Output {
-        let descriptor = self
-            .inner
-            .dispatcher
-            .get_service(called_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+        self.make_child_call(called_id, method, args, false)
+    }
+}
 
-        let call_info = CallInfo {
-            instance_id: descriptor.id,
-            method_id: method.id,
-        };
-        self.inner.child_context(Some(self.instance.id)).call(
-            method.interface_name,
-            &call_info,
-            &args,
-        )
+#[derive(Debug)]
+pub struct FallthroughAuth<'a>(CallContext<'a>);
+
+impl<'a, I> GenericCallMut<I> for FallthroughAuth<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_id: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        self.0.make_child_call(called_id, method, args, true)
     }
 }

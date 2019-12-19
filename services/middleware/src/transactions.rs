@@ -127,14 +127,20 @@ impl MiddlewareInterface<CallContext<'_>> for MiddlewareService {
 
         // TODO: use interface name from `call_info` once it's added there
         let method = MethodDescriptor::new("", "", arg.inner.call_info.method_id);
-        context.generic_call_mut(instance_id, method, arg.inner.arguments)
+        context
+            .with_fallthrough_auth()
+            .generic_call_mut(instance_id, method, arg.inner.arguments)
     }
 
     fn batch(&self, mut context: CallContext<'_>, arg: Batch) -> Self::Output {
         for call in arg.inner {
             // TODO: use interface name from `call_info` once it's added there
             let method = MethodDescriptor::new("", "", call.call_info.method_id);
-            context.generic_call_mut(call.call_info.instance_id, method, call.arguments)?;
+            context.with_fallthrough_auth().generic_call_mut(
+                call.call_info.instance_id,
+                method,
+                call.arguments,
+            )?;
         }
         Ok(())
     }
