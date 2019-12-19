@@ -18,7 +18,7 @@ use bit_vec::BitVec;
 use exonum::{
     blockchain::ProposerId,
     crypto::{gen_keypair, Hash},
-    helpers::{Height, Milliseconds, Round, ValidatorId},
+    helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Verified, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
     node::constants::TRANSACTIONS_REQUEST_TIMEOUT,
 };
@@ -26,7 +26,7 @@ use exonum_consensus_tests::{
     config_updater::TxConfig,
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
-    timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
+    timestamping_sandbox, timestamping_sandbox_builder, Milliseconds, Sandbox,
 };
 use exonum_merkledb::{BinaryValue, ObjectHash};
 

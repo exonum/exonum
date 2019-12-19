@@ -499,7 +499,7 @@ impl NodeHandler {
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
-                &user_agent::get(),
+                &user_agent(),
             ),
             config.keys.consensus_pk(),
             &config.keys.consensus_sk(),

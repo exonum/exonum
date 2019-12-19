@@ -24,7 +24,7 @@ use exonum::{
     helpers::Height,
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
-    runtime::{error::ErrorKind, rust::Transaction, SnapshotExt},
+    runtime::{rust::Transaction, ErrorKind, SnapshotExt},
 };
 use serde_json::json;
 

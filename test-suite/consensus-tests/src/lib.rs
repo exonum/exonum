@@ -25,18 +25,16 @@ use bit_vec::BitVec;
 use exonum::{
     api::node::SharedNodeState,
     blockchain::{
+        config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         contains_transaction, Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut,
-        ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
+        ConsensusConfig, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
         network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
-    helpers::{
-        create_rust_runtime_and_genesis_config, user_agent, Height, Milliseconds, Round,
-        ValidatorId,
-    },
+    helpers::{user_agent, Height, Round, ValidatorId},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -46,7 +44,10 @@ use exonum::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         ListenerConfig, NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
     },
-    runtime::SnapshotExt,
+    runtime::{
+        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        ArtifactId, SnapshotExt,
+    },
 };
 use exonum_keys::Keys;
 use exonum_merkledb::{
@@ -74,6 +75,7 @@ use crate::{
 };
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
+pub type Milliseconds = u64;
 
 const INITIAL_TIME_IN_SECS: u64 = 1_486_720_340;
 
@@ -193,7 +195,7 @@ impl Sandbox {
             &self.public_key(ValidatorId(0)),
             self.address(ValidatorId(0)),
             connect_message_time.into(),
-            &user_agent::get(),
+            &user_agent(),
             self.secret_key(ValidatorId(0)),
         );
 
@@ -203,7 +205,7 @@ impl Sandbox {
                 &self.public_key(validator),
                 self.address(validator),
                 self.time().into(),
-                &user_agent::get(),
+                &user_agent(),
                 self.secret_key(validator),
             ));
             self.send(self.public_key(validator), &connect);
@@ -959,9 +961,12 @@ impl Sandbox {
 #[derive(Debug)]
 pub struct SandboxBuilder {
     initialize: bool,
-    services: Vec<InstanceCollection>,
+    services: Vec<InstanceInitParams>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
+    rust_runtime: RustRuntime,
+    instances: Vec<InstanceInitParams>,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
 }
 
 impl Default for SandboxBuilder {
@@ -981,6 +986,9 @@ impl Default for SandboxBuilder {
                 propose_timeout_threshold: std::u32::MAX,
                 validator_keys: Vec::default(),
             },
+            rust_runtime: RustRuntime::new(mpsc::channel(1).0),
+            instances: Vec::new(),
+            artifacts: HashMap::new(),
         }
     }
 }
@@ -995,7 +1003,7 @@ impl SandboxBuilder {
         self
     }
 
-    pub fn with_services(mut self, services: Vec<InstanceCollection>) -> Self {
+    pub fn with_services(mut self, services: Vec<InstanceInitParams>) -> Self {
         self.services = services;
         self
     }
@@ -1010,9 +1018,53 @@ impl SandboxBuilder {
         self
     }
 
+    /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
+    /// artifact and default instance are added implicitly.
+    pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
+        self.with_artifact(service.artifact_id())
+            .with_instance(service.default_instance())
+            .with_rust_service(service)
+    }
+
+    /// Adds instances descriptions to the testkit that will be used for specification of builtin
+    /// services of testing blockchain.
+    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
+        self.instances.push(instance.into());
+        self
+    }
+
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
+    /// already added.
+    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
+        self.with_parametric_artifact(artifact, ())
+    }
+
+    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
+    /// given id is already added.
+    pub fn with_parametric_artifact(
+        mut self,
+        artifact: impl Into<ArtifactId>,
+        payload: impl BinaryValue,
+    ) -> Self {
+        let artifact = artifact.into();
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| payload.into_bytes());
+        self
+    }
+
+    /// Adds a Rust service to the testkit.
+    pub fn with_rust_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
+        let service = service.into();
+        self.rust_runtime = self.rust_runtime.with_factory(service);
+        self
+    }
+
     pub fn build(self) -> Sandbox {
         let mut sandbox = sandbox_with_services_uninitialized(
-            self.services,
+            self.rust_runtime,
+            self.artifacts,
+            self.instances,
             self.consensus_config,
             self.validators_count,
         );
@@ -1045,9 +1097,32 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
+/// Creates and initializes RustRuntime and GenesisConfig with information from collection of InstanceCollection.
+fn create_genesis_config(
+    consensus_config: ConsensusConfig,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    instances: Vec<InstanceInitParams>,
+) -> GenesisConfig {
+    let genesis_config_builder = instances.into_iter().fold(
+        GenesisConfigBuilder::with_consensus_config(consensus_config),
+        |builder, instance| builder.with_instance(instance),
+    );
+
+    let genesis_config = artifacts
+        .into_iter()
+        .fold(genesis_config_builder, |builder, (artifact, payload)| {
+            builder.with_parametric_artifact(artifact, payload)
+        })
+        .build();
+
+    genesis_config
+}
+
 /// Constructs an uninitialized instance of a `Sandbox`.
 fn sandbox_with_services_uninitialized(
-    services: Vec<InstanceCollection>,
+    rust_runtime: RustRuntime,
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    instances: Vec<InstanceInitParams>,
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
@@ -1107,8 +1182,7 @@ fn sandbox_with_services_uninitialized(
         ApiSender(api_channel.0.clone()),
     );
 
-    let (rust_runtime, genesis_config) =
-        create_rust_runtime_and_genesis_config(mpsc::channel(1).0, genesis, services);
+    let genesis_config = create_genesis_config(genesis, artifacts, instances);
 
     let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
@@ -1187,18 +1261,10 @@ pub fn timestamping_sandbox() -> Sandbox {
 }
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
-    SandboxBuilder::new().with_services(vec![
-        InstanceCollection::new(TimestampingService).with_instance(
-            TimestampingService::ID,
-            "timestamping",
-            (),
-        ),
-        InstanceCollection::new(ConfigUpdaterService).with_instance(
-            ConfigUpdaterService::ID,
-            "config-updater",
-            (),
-        ),
-    ])
+    SandboxBuilder::new()
+        .with_rust_service(TimestampingService)
+        .with_default_rust_service(TimestampingService)
+        .with_default_rust_service(ConfigUpdaterService)
 }
 
 #[cfg(test)]
@@ -1261,7 +1327,7 @@ mod tests {
             &consensus.0,
             new_peer_addr.to_string(),
             s.time().into(),
-            &user_agent::get(),
+            &user_agent(),
             &consensus.1,
         ));
         s.send(
@@ -1270,7 +1336,7 @@ mod tests {
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
                 s.time().into(),
-                &user_agent::get(),
+                &user_agent(),
                 s.secret_key(ValidatorId(0)),
             ),
         );
@@ -1296,7 +1362,7 @@ mod tests {
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
                 s.time().into(),
-                &user_agent::get(),
+                &user_agent(),
                 s.secret_key(ValidatorId(0)),
             ),
         );
@@ -1318,7 +1384,7 @@ mod tests {
             &public,
             s.address(ValidatorId(2)),
             s.time().into(),
-            &user_agent::get(),
+            &user_agent(),
             &secret,
         ));
         s.send(
@@ -1327,7 +1393,7 @@ mod tests {
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
                 s.time().into(),
-                &user_agent::get(),
+                &user_agent(),
                 s.secret_key(ValidatorId(0)),
             ),
         );
@@ -1349,7 +1415,7 @@ mod tests {
             &public,
             s.address(ValidatorId(2)),
             s.time().into(),
-            &user_agent::get(),
+            &user_agent(),
             &secret,
         ));
     }
@@ -1370,14 +1436,14 @@ mod tests {
             &public,
             s.address(ValidatorId(2)),
             s.time().into(),
-            &user_agent::get(),
+            &user_agent(),
             &secret,
         ));
         s.recv(&s.create_connect(
             &public,
             s.address(ValidatorId(3)),
             s.time().into(),
-            &user_agent::get(),
+            &user_agent(),
             &secret,
         ));
         panic!("Oops! We don't catch unexpected message");
@@ -1399,7 +1465,7 @@ mod tests {
             &public,
             s.address(ValidatorId(2)),
             s.time().into(),
-            &user_agent::get(),
+            &user_agent(),
             &secret,
         ));
         s.add_time(Duration::from_millis(1000));

@@ -19,11 +19,10 @@ extern crate exonum_derive;
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::ExecutionError,
     crypto::gen_keypair,
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        SnapshotExt,
+        ExecutionError, SnapshotExt,
     },
 };
 use exonum_merkledb::ObjectHash;

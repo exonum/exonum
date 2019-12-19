@@ -18,13 +18,13 @@ use exonum::{
         node::public::explorer::{TransactionQuery, TransactionResponse},
         Error as ApiError,
     },
-    blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind, ValidatorKeys},
+    blockchain::{CallInBlock, ValidatorKeys},
     crypto::{self, Hash},
     explorer::BlockchainExplorer,
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, SnapshotExt},
+    runtime::{rust::Transaction, ErrorKind, ExecutionError, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
@@ -776,7 +776,7 @@ fn test_explorer_transaction_statuses() {
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.kind() == ExecutionErrorKind::Unexpected
+            Err(ref err) if err.kind() == ErrorKind::Unexpected
                 && err.description() == "attempt to add with overflow"
         );
     }
@@ -798,7 +798,7 @@ fn test_explorer_transaction_statuses() {
     );
     assert_eq!(
         errors[&CallInBlock::transaction(2)].kind(),
-        ExecutionErrorKind::Unexpected
+        ErrorKind::Unexpected
     );
 
     // Check status proofs for transactions.
@@ -820,7 +820,7 @@ fn test_explorer_transaction_statuses() {
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
         proof.entries().next().unwrap().1.kind(),
-        ExecutionErrorKind::Unexpected
+        ErrorKind::Unexpected
     );
 
     // Now, the same statuses retrieved via explorer web API.

@@ -174,12 +174,14 @@ impl Handler<RollBack> for TestKitActor {
 mod tests {
     use exonum::{
         api,
-        blockchain::ExecutionError,
         crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::rust::{CallContext, Service, ServiceFactory, Transaction},
+        runtime::{
+            rust::{CallContext, Service, ServiceFactory, Transaction},
+            ExecutionError,
+        },
     };
     use exonum_merkledb::ObjectHash;
     use exonum_proto::ProtobufConvert;

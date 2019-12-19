@@ -16,14 +16,13 @@
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::ExecutionError,
     crypto::{gen_keypair, PublicKey, SecretKey},
     helpers::Height,
     merkledb::{access::Access, ProofMapIndex},
     messages::Verified,
     runtime::{
         rust::{CallContext, Service, ServiceFactory, Transaction},
-        AnyTx, InstanceId, SnapshotExt,
+        AnyTx, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;

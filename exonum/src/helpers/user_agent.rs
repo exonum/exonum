@@ -23,10 +23,11 @@ static USER_AGENT: &str = include_str!(concat!(env!("OUT_DIR"), "/user_agent"));
 /// ```
 /// use exonum::helpers::user_agent;
 ///
-/// let user_agent = user_agent::get();
+/// let user_agent = user_agent();
 /// println!("{}", user_agent);
 /// ```
-pub fn get() -> String {
+#[doc(hidden)]
+pub fn user_agent() -> String {
     let os = os_info::get();
     format!("{}/{}", USER_AGENT, os)
 }
@@ -38,7 +39,7 @@ mod tests {
     // Checks that user agent string contains three nonempty components.
     #[test]
     fn components() {
-        let user_agent = get();
+        let user_agent = user_agent();
         let components: Vec<_> = user_agent.split('/').collect();
         assert_eq!(components.len(), 3);
 

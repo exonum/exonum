@@ -18,8 +18,11 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, Transaction, CallContext, Service}},
-//!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
+//!     runtime::{
+//!         rust::{ServiceFactory, Transaction, CallContext, Service},
+//!         BlockchainData, SnapshotExt, ExecutionError,
+//!     },
+//!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
 //!     helpers::Height,
@@ -139,7 +142,7 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
-    builder::{InstanceCollection, TestKitBuilder},
+    builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
@@ -351,9 +354,8 @@ impl TestKit {
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{
-    /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{BlockchainData, rust::{CallContext, Service, ServiceFactory, Transaction}},
+    /// #     runtime::{BlockchainData, ExecutionError, rust::{CallContext, Service, ServiceFactory, Transaction}},
     /// # };
     /// #
     /// # const SERVICE_ID: u32 = 1;

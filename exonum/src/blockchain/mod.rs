@@ -14,21 +14,16 @@
 
 //! The module containing building blocks for creating blockchains powered by the Exonum framework.
 
-pub use exonum_merkledb::Error as FatalError;
-
-pub use crate::runtime::{
-    error::{ErrorKind as ExecutionErrorKind, ExecutionStatus},
-    ExecutionError,
-};
-
 pub use self::{
     block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
-    builder::{BlockchainBuilder, InstanceCollection},
+    builder::BlockchainBuilder,
     config::{ConsensusConfig, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
 };
 
 pub mod config;
+
+pub(crate) use crate::runtime::{ExecutionError, ExecutionStatus};
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
