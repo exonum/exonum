@@ -178,7 +178,7 @@ pub use self::{
 // does not exist!'
 #[doc(inline)]
 pub use self::{
-    indexes::proof_list_index::{ListProof, ProofListIndex},
+    indexes::proof_list_index::{self, ListProof, ProofListIndex},
     indexes::proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},
     indexes::{
         key_set_index::{self, KeySetIndex},
