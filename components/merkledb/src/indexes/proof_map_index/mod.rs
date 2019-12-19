@@ -49,7 +49,7 @@ mod tests;
 impl<T, K, V, KeyMode> MerklePatriciaTree<K, V> for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ToOwned + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -75,7 +75,7 @@ where
 ///
 /// [`BinaryKey`]: trait.BinaryKey.html
 /// [`BinaryValue`]: trait.BinaryValue.html
-pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
+pub struct ProofMapIndex<T: RawAccess, K: ?Sized, V, KeyMode: ToProofPath<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, ProofPath>,
     _k: PhantomData<K>,
@@ -92,7 +92,7 @@ pub struct ProofMapIndex<T: RawAccess, K, V, KeyMode: ToProofPath<K> = Hashed> {
 /// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexIter<'a, K, V> {
+pub struct ProofMapIndexIter<'a, K: ?Sized, V> {
     base_iter: ViewIter<'a, Vec<u8>, V>,
     _k: PhantomData<K>,
 }
@@ -106,7 +106,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexKeys<'a, K> {
+pub struct ProofMapIndexKeys<'a, K: ?Sized> {
     base_iter: ViewIter<'a, Vec<u8>, ()>,
     _k: PhantomData<K>,
 }
@@ -181,7 +181,7 @@ impl BinaryAttribute for ProofPath {
 impl<T, K, V, KeyMode> FromAccess<T> for ProofMapIndex<T::Base, K, V, KeyMode>
 where
     T: Access,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -201,7 +201,7 @@ pub type RawProofMapIndex<T, K, V> = ProofMapIndex<T, K, V, Raw>;
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -314,7 +314,7 @@ where
     ///
     /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
+    pub fn get_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
         self.create_proof(key)
     }
 
@@ -331,9 +331,9 @@ where
     ///
     /// let proof = index.get_multiproof(vec!["foo".to_owned(), "bar".to_owned()]);
     /// ```
-    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V, KeyMode>
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K::Owned, V, KeyMode>
     where
-        KI: IntoIterator<Item = K>,
+        KI: IntoIterator<Item = K::Owned>,
     {
         self.create_multiproof(keys)
     }
@@ -493,7 +493,7 @@ where
 impl<T, K, V, KeyMode> ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccessMut,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {
@@ -878,7 +878,7 @@ where
 impl<T, K, V, KeyMode> ObjectHash for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {

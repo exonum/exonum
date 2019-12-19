@@ -450,7 +450,6 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
 
 impl<K, V, KeyMode> MapProof<K, V, KeyMode>
 where
-    K: ObjectHash,
     V: BinaryValue,
     KeyMode: ToProofPath<K>,
 {

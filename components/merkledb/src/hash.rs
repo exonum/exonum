@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use byteorder::{ByteOrder, LittleEndian};
-use exonum_crypto::{Hash, HashStream};
+use exonum_crypto::{hash, Hash, HashStream};
 use failure::Fail;
 use hex::FromHex;
 
@@ -222,6 +222,18 @@ pub trait ObjectHash {
 impl ObjectHash for Hash {
     fn object_hash(&self) -> Hash {
         *self
+    }
+}
+
+impl ObjectHash for str {
+    fn object_hash(&self) -> Hash {
+        hash(self.as_bytes())
+    }
+}
+
+impl ObjectHash for [u8] {
+    fn object_hash(&self) -> Hash {
+        hash(self)
     }
 }
 
