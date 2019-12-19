@@ -177,16 +177,14 @@ pub use self::{
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'
 #[doc(inline)]
-pub use self::{
-    indexes::proof_list_index::{self, ListProof, ProofListIndex},
-    indexes::proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},
-    indexes::{
-        key_set_index::{self, KeySetIndex},
-        list_index::{self, ListIndex},
-        map_index::{self, MapIndex},
-        sparse_list_index::{self, SparseListIndex},
-        value_set_index::{self, ValueSetIndex},
-    },
+pub use self::indexes::{
+    key_set_index::{self, KeySetIndex},
+    list_index::{self, ListIndex},
+    map_index::{self, MapIndex},
+    proof_list_index::{self, ListProof, ProofListIndex},
+    proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},
+    sparse_list_index::{self, SparseListIndex},
+    value_set_index::{self, ValueSetIndex},
 };
 
 #[macro_use]
@@ -201,9 +199,9 @@ mod backends;
 mod db;
 mod error;
 mod hash;
+mod indexes;
 mod keys;
 mod lazy;
-mod indexes;
 mod options;
 mod values;
 mod views;
