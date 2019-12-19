@@ -25,6 +25,8 @@ use exonum::{
 use exonum_derive::*;
 use semver::Version;
 
+use exonum_middleware_service::ArtifactReq;
+
 #[derive(Debug, FromAccess)]
 pub struct IncSchema<T: Access> {
     pub counts: MapIndex<T::Base, PublicKey, u64>,
@@ -67,6 +69,15 @@ impl IncFactory {
 
     pub fn new(version: Version) -> Self {
         Self { version }
+    }
+
+    pub fn req(version_req: &str) -> ArtifactReq {
+        ArtifactReq {
+            name: Self::ARTIFACT_NAME.to_owned(),
+            version: version_req
+                .parse()
+                .expect("Cannot parse version requirement"),
+        }
     }
 }
 

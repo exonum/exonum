@@ -15,15 +15,15 @@
 //! Transaction logic for `MiddlewareService`.
 
 use exonum::runtime::{
-    rust::{CallContext, GenericCallMut, MethodDescriptor},
-    AnyTx, DispatcherError, ExecutionError,
+    rust::{CallContext, GenericCall, GenericCallMut, MethodDescriptor, TxStub},
+    AnyTx, DispatcherError, ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
 use semver::VersionReq;
 use serde_derive::*;
 
-use crate::{proto, MiddlewareService};
+use crate::{proto, ArtifactReq, MiddlewareService};
 
 /// Errors of the `MiddlewareService`.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
@@ -60,7 +60,61 @@ mod pb_version_req {
     }
 }
 
+impl GenericCall<InstanceId> for ArtifactReq {
+    type Output = CheckedCall;
+
+    fn generic_call(
+        &self,
+        instance_id: InstanceId,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        CheckedCall {
+            artifact_name: self.name.clone(),
+            artifact_version: self.version.clone(),
+            inner: TxStub.generic_call(instance_id, method, args),
+        }
+    }
+}
+
 /// Transactions executed in a batch.
+///
+/// # Examples
+///
+/// `Batch` is a mutable stub, which adds corresponding transactions on call:
+///
+/// ```
+/// // Suppose we have this interface defined.
+/// mod token {
+/// #   use exonum_derive::*;
+///     #[exonum_interface]
+///     pub trait Token<Ctx> {
+///         type Output;
+///         fn create_wallet(&self, ctx: Ctx, owner: String) -> Self::Output;
+///         fn burn(&self, ctx: Ctx, amount: u64) -> Self::Output;
+///         // Other methods...
+///     }
+/// }
+///
+/// # use exonum::runtime::{rust::DefaultInstance, InstanceId};
+/// use exonum_middleware_service::{
+///     ArtifactReq, Batch, MiddlewareInterfaceMut, MiddlewareService,
+/// };
+/// use token::{Token, TokenMut};
+///
+/// const TOKEN_ID: InstanceId = 100;
+///
+/// let mut batch = Batch::new();
+/// batch.create_wallet(TOKEN_ID, "Alice".into());
+/// batch.burn(TOKEN_ID, 50);
+/// // Batch can include calls to multiple services. Let's add
+/// // a checked call to the token service, which will be routed
+/// // through a default middleware service instance.
+/// let req: ArtifactReq = "exonum.Token@1".parse().unwrap();
+/// let checked_call = req.burn(TOKEN_ID, 20);
+/// batch.checked_call(MiddlewareService::INSTANCE_ID, checked_call);
+/// assert_eq!(batch.inner.len(), 3);
+/// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "proto::Batch")]
@@ -79,6 +133,20 @@ impl Batch {
     pub fn with_call(mut self, call: AnyTx) -> Self {
         self.inner.push(call);
         self
+    }
+}
+
+impl GenericCallMut<InstanceId> for Batch {
+    type Output = ();
+
+    fn generic_call_mut(
+        &mut self,
+        instance_id: InstanceId,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        self.inner
+            .push(TxStub.generic_call(instance_id, method, args));
     }
 }
 
