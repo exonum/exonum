@@ -1,6 +1,8 @@
 //! Building `MapProof`s. See README.md in the module directory for high-level explanation
 //! how the proofs are built.
 
+use std::borrow::Borrow;
+
 use exonum_crypto::Hash;
 
 use super::{
@@ -8,6 +10,7 @@ use super::{
     node::{BranchNode, Node},
     MapProof, ToProofPath,
 };
+use crate::BinaryKey;
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -15,13 +18,16 @@ const DEFAULT_PROOF_CAPACITY: usize = 8;
 impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     /// Includes a proof of existence / absence of a single key when a proof of multiple
     /// keys is requested.
-    fn process_key(
+    fn process_key<Q: ?Sized>(
         mut self,
-        tree: &impl MerklePatriciaTree<K, V>,
+        tree: &impl MerklePatriciaTree<Q, V>,
         contour: &mut Vec<ContourNode>,
         proof_path: &ProofPath,
         key: K,
-    ) -> Self {
+    ) -> Self
+    where
+        K: Borrow<Q>,
+    {
         // `unwrap()` is safe: there is at least 1 element in the contour by design
         let common_prefix = proof_path.common_prefix_len(&contour.last().unwrap().key);
 
@@ -67,7 +73,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
                 }
                 Node::Leaf(_) => {
                     // We have reached the leaf node and haven't diverged!
-                    let value = tree.value(&key);
+                    let value = tree.value(key.borrow());
                     break self.add_entry(key, value);
                 }
             }
@@ -77,7 +83,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
 
 /// Encapsulation of a Merkle Patricia tree allowing to access its terminal and intermediate
 /// nodes.
-pub trait MerklePatriciaTree<K, V> {
+pub trait MerklePatriciaTree<K: ?Sized, V> {
     /// Gets the root node of the tree.
     fn root_node(&self) -> Option<(ProofPath, Node)>;
 
@@ -160,21 +166,25 @@ impl ContourNode {
 /// implement `BuildProof` as well.
 ///
 /// [`MerklePatriciaTree`]: trait.MerklePatriciaTree.html
-pub trait BuildProof<K, V, KeyMode> {
+pub trait BuildProof<K: ToOwned + ?Sized, V, KeyMode> {
     /// Creates a proof of existence / absence for a single key.
-    fn create_proof(&self, key: K) -> MapProof<K, V, KeyMode>;
+    fn create_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode>;
 
     /// Creates a proof of existence / absence for multiple keys.
-    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V, KeyMode>;
+    fn create_multiproof(
+        &self,
+        keys: impl IntoIterator<Item = K::Owned>,
+    ) -> MapProof<K::Owned, V, KeyMode>;
 }
 
 impl<K, V, T, KeyMode> BuildProof<K, V, KeyMode> for T
 where
+    K: BinaryKey + ?Sized,
     T: MerklePatriciaTree<K, V>,
     KeyMode: ToProofPath<K>,
 {
-    fn create_proof(&self, key: K) -> MapProof<K, V, KeyMode> {
-        let searched_path = KeyMode::transform_key(&key);
+    fn create_proof(&self, key: K::Owned) -> MapProof<K::Owned, V, KeyMode> {
+        let searched_path = KeyMode::transform_key(key.borrow());
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
                 let mut left_hashes = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
@@ -207,7 +217,7 @@ where
                                 // We have reached the leaf node and haven't diverged!
                                 // The key is there, we've just gotten the value, so we just
                                 // need to return it.
-                                let value = self.value(&key);
+                                let value = self.value(key.borrow());
                                 break MapProof::new()
                                     .add_entry(key, value)
                                     .add_proof_entries(combine_hashes(left_hashes, right_hashes));
@@ -230,7 +240,7 @@ where
 
             Some((root_path, Node::Leaf(hash))) => {
                 if root_path == searched_path {
-                    let value = self.value(&key);
+                    let value = self.value(key.borrow());
                     MapProof::new().add_entry(key, value)
                 } else {
                     MapProof::new()
@@ -243,15 +253,18 @@ where
         }
     }
 
-    fn create_multiproof(&self, keys: impl IntoIterator<Item = K>) -> MapProof<K, V, KeyMode> {
+    fn create_multiproof(
+        &self,
+        keys: impl IntoIterator<Item = K::Owned>,
+    ) -> MapProof<K::Owned, V, KeyMode> {
         match self.root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
-                let mut proof = MapProof::new();
+                let mut proof: MapProof<K::Owned, V, KeyMode> = MapProof::new();
 
                 let searched_paths = {
                     let mut keys: Vec<_> = keys
                         .into_iter()
-                        .map(|k| (KeyMode::transform_key(&k), k))
+                        .map(|k| (KeyMode::transform_key(k.borrow()), k))
                         .collect();
 
                     keys.sort_unstable_by(|x, y| {
@@ -280,14 +293,13 @@ where
                 }
                 proof
             }
-
             Some((root_path, Node::Leaf(root_hash))) => {
                 let mut proof = MapProof::new();
                 // (One of) keys corresponding to the existing table entry.
-                let mut found_key: Option<K> = None;
+                let mut found_key: Option<K::Owned> = None;
 
                 for key in keys {
-                    let searched_path = KeyMode::transform_key(&key);
+                    let searched_path = KeyMode::transform_key(key.borrow());
                     if root_path == searched_path {
                         found_key = Some(key);
                     } else {
@@ -296,7 +308,7 @@ where
                 }
 
                 if let Some(key) = found_key {
-                    let value = self.value(&key);
+                    let value = self.value(key.borrow());
                     proof.add_entry(key, value)
                 } else {
                     proof.add_proof_entry(root_path, root_hash)
