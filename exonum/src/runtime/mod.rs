@@ -196,8 +196,8 @@ impl std::convert::TryFrom<u32> for RuntimeIdentifier {
 
     fn try_from(id: u32) -> Result<Self, Self::Error> {
         match id {
-            0 => Ok(Self::Rust),
-            1 => Ok(Self::Java),
+            0 => Ok(RuntimeIdentifier::Rust),
+            1 => Ok(RuntimeIdentifier::Java),
             _ => Err(()),
         }
     }
@@ -206,8 +206,8 @@ impl std::convert::TryFrom<u32> for RuntimeIdentifier {
 impl std::fmt::Display for RuntimeIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Rust => write!(f, "Rust"),
-            Self::Java => write!(f, "Java"),
+            RuntimeIdentifier::Rust => write!(f, "Rust"),
+            RuntimeIdentifier::Java => write!(f, "Java"),
         }
     }
 }
