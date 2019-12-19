@@ -529,12 +529,12 @@ fn test_clear_cache() {
 
 #[test]
 fn run_node_with_simple_supervisor() {
-    run_node_with_supervisor(SupervisorMode::Simple).unwrap();
+    run_node_with_supervisor(&SupervisorMode::Simple).unwrap();
 }
 
 #[test]
 fn run_node_with_decentralized_supervisor() {
-    run_node_with_supervisor(SupervisorMode::Decentralized).unwrap();
+    run_node_with_supervisor(&SupervisorMode::Decentralized).unwrap();
 }
 
 #[test]
@@ -594,7 +594,7 @@ fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
     }
 }
 
-fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failure::Error> {
+fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), failure::Error> {
     let testnet_dir = tempfile::tempdir()?;
 
     let common_config_path = testnet_dir.path().join("common.toml");
@@ -602,7 +602,7 @@ fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failu
     let generate_template = GenerateTemplate {
         common_config: common_config_path.clone(),
         validators_count: 1,
-        supervisor_mode,
+        supervisor_mode: supervisor_mode.clone(),
     };
     generate_template.execute()?;
 
@@ -647,7 +647,7 @@ fn run_node_with_supervisor(supervisor_mode: SupervisorMode) -> Result<(), failu
 
     if let StandardResult::Run(config) = run.execute()? {
         assert_eq!(
-            config.node_config.public_config.general.supervisor_mode,
+            &config.node_config.public_config.general.supervisor_mode,
             supervisor_mode
         );
     } else {

@@ -178,7 +178,12 @@ impl NodeBuilder {
     }
 
     fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {
-        let mode = run_config.node_config.public_config.general.supervisor_mode;
+        let mode = run_config
+            .node_config
+            .public_config
+            .general
+            .supervisor_mode
+            .clone();
         Supervisor::builtin_instance(SupervisorConfig { mode })
     }
 }
