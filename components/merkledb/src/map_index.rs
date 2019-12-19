@@ -530,4 +530,43 @@ mod tests {
             vec![(2, 2), (3, 3)]
         );
     }
+
+    #[test]
+    fn index_as_iterator() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut map_index = fork.get_map(IDX_NAME);
+
+        map_index.put(&1_u8, 1_u8);
+        map_index.put(&2_u8, 2_u8);
+        map_index.put(&3_u8, 3_u8);
+
+        for (key, value) in &map_index {
+            assert!(key == value);
+        }
+        assert_eq!((&map_index).into_iter().count(), 3);
+        assert_eq!(map_index.keys().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            map_index.iter().collect::<Vec<_>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+
+        let mut map_index = fork.get_map((IDX_NAME, &0_u8));
+        map_index.put("1", 1_u8);
+        map_index.put("2", 2_u8);
+        map_index.put("3", 3_u8);
+        for (key, value) in &map_index {
+            assert_eq!(key, value.to_string());
+        }
+        assert_eq!((&map_index).into_iter().count(), 3);
+        assert_eq!(map_index.keys().collect::<Vec<_>>(), vec!["1", "2", "3"]);
+        assert_eq!(
+            map_index.iter().collect::<Vec<_>>(),
+            vec![
+                ("1".to_owned(), 1),
+                ("2".to_owned(), 2),
+                ("3".to_owned(), 3)
+            ]
+        );
+    }
 }
