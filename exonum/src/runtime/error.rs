@@ -456,6 +456,16 @@ impl ExecutionError {
         Self::new(ErrorKind::Service { code }, description)
     }
 
+    /// Creates a runtime error for use in runtime code.
+    pub fn runtime(runtime_id: u32, code: u8, description: impl Into<String>) -> Self {
+        Self {
+            kind: ErrorKind::Runtime { code },
+            description: description.into(),
+            runtime_id: Some(runtime_id),
+            call_site: None,
+        }
+    }
+
     /// Creates an execution error from the panic description.
     fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
         let any = any.as_ref();
