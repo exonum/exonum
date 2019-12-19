@@ -181,6 +181,27 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
+impl std::convert::TryFrom<u32> for RuntimeIdentifier {
+    type Error = ();
+
+    fn try_from(id: u32) -> Result<Self, Self::Error> {
+        match id {
+            0 => Ok(Self::Rust),
+            1 => Ok(Self::Java),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for RuntimeIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Rust => write!(f, "Rust"),
+            Self::Java => write!(f, "Java"),
+        }
+    }
+}
+
 /// Runtime environment for the Exonum services.
 ///
 /// You can read more about the life cycle of services and transactions
