@@ -50,12 +50,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `blockchain::InstanceCollection` structure;
   - `helpers::ZeroizeOnDrop` trait;
   - `helpers::Milliseconds` type;
-  - `helpers::generate_testnet_config` and `helpers::create_rust_runtime_and_genesis_config`
-    functions;
+  - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
+    and `helpers::clear_consensus_messages_cache` functions;
   - `helpers::config` and `helpers::user_agent` modules;
   - `proto` module;
-  - `runtime::error` module;
-  - `runtime::Mailbox` structure.
+  - `runtime::error` module (`catch_panic` was added to the list of public
+    re-exports from `runtime::error`).
 
 #### exonum-merkledb
 

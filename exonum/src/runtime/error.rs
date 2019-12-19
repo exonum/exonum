@@ -87,7 +87,7 @@ use crate::{
 /// to the node termination.
 ///
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
-/// [`DispatcherError`]: ../enum.DispatcherError.html
+/// [`DispatcherError`]: enum.DispatcherError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
@@ -102,7 +102,7 @@ pub enum ErrorKind {
     Dispatcher {
         /// Error code. Available values can be found in the [description] of dispatcher errors.
         ///
-        /// [description]: ../enum.DispatcherError.html
+        /// [description]: enum.DispatcherError.html
         code: u8,
     },
 

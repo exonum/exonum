@@ -132,9 +132,10 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{Dispatcher, Error as DispatcherError, Schema as DispatcherSchema},
+    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{
-        CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail, ExecutionStatus,
+        catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
+        ExecutionStatus,
     },
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
@@ -151,7 +152,6 @@ use std::fmt;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
-use self::dispatcher::Mailbox;
 use crate::{
     blockchain::Blockchain,
     crypto::{Hash, PublicKey},
@@ -233,7 +233,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// Panics in the `Runtime` methods are **not** caught. A panic in the runtime method will cause
 /// the node termination. To catch panics in the Rust code and convert them to unchecked execution
-/// errors, use the [`catch_panic`](error/fn.catch_panic.html) method.
+/// errors, use the [`catch_panic`](fn.catch_panic.html) method.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.

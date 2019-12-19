@@ -104,6 +104,7 @@ pub trait ValidateInput: Sized {
 /// Clears consensus messages cache.
 ///
 /// Used in `exonum-cli` to implement `clear-cache` maintenance action.
+#[doc(hidden)]
 pub fn clear_consensus_messages_cache(fork: &Fork) {
     Schema::new(fork).consensus_messages_cache().clear();
 }
