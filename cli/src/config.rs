@@ -111,10 +111,10 @@ impl Into<CoreNodeConfig> for NodeConfig {
 impl NodeConfig {
     /// Read validator keys from the encrypted file.
     pub fn read_secret_keys(
-        self,
+        &mut self,
         config_file_path: impl AsRef<Path>,
         master_key_passphrase: &[u8],
-    ) -> NodeConfig {
+    ) {
         let config_folder = config_file_path.as_ref().parent().unwrap();
         let master_key_path = self.private_config.master_key_path.clone();
         let master_key_path = if master_key_path.is_absolute() {
@@ -126,12 +126,9 @@ impl NodeConfig {
         let keys = read_keys_from_file(&master_key_path, master_key_passphrase)
             .expect("Could not read master_key_path from file");
 
-        NodeConfig {
-            private_config: NodePrivateConfig {
-                keys,
-                ..self.private_config
-            },
-            ..self
-        }
+        self.private_config = NodePrivateConfig {
+            keys,
+            ..self.private_config.clone()
+        };
     }
 }

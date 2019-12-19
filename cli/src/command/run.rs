@@ -89,7 +89,7 @@ impl ExonumCommand for Run {
             .unwrap_or_default()
             .get_passphrase(PassphraseUsage::Using)?;
 
-        let config = config.read_secret_keys(&config_path, master_passphrase.as_bytes());
+        config.read_secret_keys(&config_path, master_passphrase.as_bytes());
 
         let run_config = NodeRunConfig {
             node_config: config,
