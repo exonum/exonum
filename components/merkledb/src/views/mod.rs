@@ -14,8 +14,10 @@
 
 pub use self::{
     address::{IndexAddress, ResolvedAddress},
-    metadata::{get_object_hash, BinaryAttribute, IndexState, IndexType, ViewWithMetadata},
-    system_schema::SystemSchema,
+    metadata::{
+        get_object_hash, BinaryAttribute, IndexState, IndexType, IndexesPool, ViewWithMetadata,
+    },
+    system_schema::{get_state_aggregator, SystemSchema},
 };
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
@@ -67,7 +69,7 @@ impl ChangeSet for () {
     }
 }
 
-impl ChangeSet for ChangesRef {
+impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
         Some(&*self)
     }
@@ -307,9 +309,9 @@ impl<T: RawAccess> View<T> {
     /// (in which case, the flag is forgotten).
     ///
     /// The aggregation flag is used by `Fork::into_patch()` to update the state aggregator.
-    pub(crate) fn set_or_forget_aggregation(&mut self, is_aggregated: bool) {
+    pub(crate) fn set_or_forget_aggregation(&mut self, namespace: Option<String>) {
         if let Some(changes) = self.changes.as_mut() {
-            changes.set_aggregation(is_aggregated);
+            changes.set_aggregation(namespace);
         }
     }
 }

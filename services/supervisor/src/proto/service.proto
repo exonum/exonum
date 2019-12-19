@@ -38,7 +38,7 @@ message DeployConfirmation {
   exonum.runtime.ArtifactId artifact = 1;
 }
 
-// Request for the start service instance
+// Request for the start service instance.
 message StartService {
   // Artifact identifier.
   exonum.runtime.ArtifactId artifact = 1;
@@ -46,6 +46,12 @@ message StartService {
   string name = 2;
   // Instance configuration.
   bytes config = 3;
+}
+
+// Request for the stop existing service instance.
+message StopService {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
 }
 
 // Configuration parameters of the certain service instance.
@@ -65,19 +71,23 @@ message ConfigChange {
     ServiceConfig service = 2;
     // New service instance start request.
     StartService start_service = 3;
+    // Existing service instance stop request.
+    StopService stop_service = 4;
   }
 }
 
 // Request for the configuration change
 message ConfigPropose {
-  // The height until which the update configuration procedure should be completed.
+  // The height until which the update configuration procedure should be
+  // completed.
   uint64 actual_from = 1;
   // New configuration proposition.
   repeated ConfigChange changes = 2;
   // Configuration proposal number to avoid conflicting proposals.
   // For every proposal, this field should be equal to the amount of
   // valid processed proposals (no matter accepted or not).
-  // Appropriate value for this field can be obtained via "configuration-number" API endpoint.
+  // Appropriate value for this field can be obtained via "configuration-number"
+  // API endpoint.
   uint64 configuration_number = 3;
 }
 
@@ -87,15 +97,14 @@ message ConfigVote {
   exonum.crypto.Hash propose_hash = 1;
 }
 
-
 // Supervisor operating mode.
 enum SupervisorMode {
   SIMPLE = 0;
   DECENTRALIZED = 1;
 }
 
-// Supervisor service configuration (not to be confused with `ConfigPropose`, which
-// contains core/service configuration change proposal).
+// Supervisor service configuration (not to be confused with `ConfigPropose`,
+// which contains core/service configuration change proposal).
 message Config {
   // Supervisor operating mode.
   SupervisorMode mode = 1;

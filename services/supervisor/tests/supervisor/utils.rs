@@ -208,3 +208,9 @@ pub fn check_second_service_actual_param(testkit: &TestKit, param: Option<String
         None => assert!(!actual_params.exists()),
     }
 }
+
+pub fn latest_assigned_instance_id(testkit: &TestKit) -> Option<InstanceId> {
+    let snapshot = testkit.snapshot();
+    let schema = Schema::new(snapshot.for_service(Supervisor::NAME).unwrap());
+    schema.vacant_instance_id.get().map(|x| x - 1)
+}
