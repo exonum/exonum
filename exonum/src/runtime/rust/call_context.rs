@@ -23,6 +23,16 @@ pub struct CallContext<'a> {
     instance: InstanceDescriptor<'a>,
 }
 
+/// Authorization for a child call.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
+pub enum ChildAuthorization {
+    /// Fallthrough authorization: the child call retains `Caller` information of the parent call.
+    Fallthrough,
+    /// Authorization with the authority of the service executing the parent call.
+    Service,
+}
+
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
@@ -76,10 +86,22 @@ impl<'a> CallContext<'a> {
     }
 
     // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
+    /// Creates a client to call interface methods of the specified service instance.
+    #[doc(hidden)]
+    pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
+    where
+        T: From<CallContext<'s>>,
+    {
+        self.call_context(called, ChildAuthorization::Service)
+            .map(Into::into)
+    }
+
+    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
     #[doc(hidden)]
     pub fn call_context<'s>(
         &'s mut self,
         called_id: impl Into<InstanceQuery<'s>>,
+        auth: ChildAuthorization,
     ) -> Result<CallContext<'s>, ExecutionError> {
         let descriptor = self
             .inner
@@ -87,19 +109,12 @@ impl<'a> CallContext<'a> {
             .get_service(called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
         Ok(CallContext {
-            inner: self.inner.child_context(self.instance.id),
+            inner: self.inner.child_context(match auth {
+                ChildAuthorization::Fallthrough => None,
+                ChildAuthorization::Service => Some(self.instance.id),
+            }),
             instance: descriptor,
         })
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
-    /// Creates a client to call interface methods of the specified service instance.
-    #[doc(hidden)]
-    pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
-    where
-        T: From<CallContext<'s>>,
-    {
-        self.call_context(called).map(Into::into)
     }
 
     /// Provides writeable access to core schema.
@@ -153,7 +168,7 @@ impl<'a> CallContext<'a> {
         }
 
         self.inner
-            .child_context(self.instance.id)
+            .child_context(Some(self.instance.id))
             .initiate_adding_service(instance_spec, constructor)
     }
 

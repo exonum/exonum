@@ -12,18 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_derive::ExecutionFail;
+//! Module of the rust-protobuf generated files.
 
-/// Common errors emitted by transactions during execution.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[derive(ExecutionFail)]
-pub enum Error {
-    /// Wallet not found.
-    WalletNotFound = 0,
-    /// Wallet already exists.
-    WalletAlreadyExists = 1,
-    /// Wrong interface caller.
-    WrongInterfaceCaller = 2,
-    /// Issuer is not authorized.
-    UnauthorizedIssuer = 3,
-}
+#![allow(bare_trait_objects)]
+
+pub use self::service::*;
+
+use exonum::proto::schema::runtime;
+
+include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));

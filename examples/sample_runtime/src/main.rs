@@ -310,7 +310,7 @@ fn main() {
         api_sender
             .broadcast_transaction(
                 DeployRequest {
-                    artifact: "255:sample_artifact".parse().unwrap(),
+                    artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
                     deadline_height: deploy_height,
                     spec: Vec::default(),
                 }
@@ -331,7 +331,7 @@ fn main() {
             .broadcast_transaction(
                 ConfigPropose::immediate(0)
                     .start_service(
-                        "255:sample_artifact".parse().unwrap(),
+                        "255:sample_artifact:0.1.0".parse().unwrap(),
                         instance_name,
                         10_u64,
                     )
