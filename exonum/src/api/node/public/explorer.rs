@@ -17,10 +17,9 @@
 use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{MapProof, ObjectHash, Snapshot};
+use exonum_merkledb::{ObjectHash, Snapshot};
 use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
-use serde::de::{self, Deserialize};
 
 use std::{
     ops::{Bound, Range},
@@ -36,7 +35,7 @@ use crate::{
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         ApiBackend, ApiScope, Error as ApiError, FutureResult,
     },
-    blockchain::{Block, Blockchain, CallInBlock, ExecutionError, ExecutionStatus},
+    blockchain::{Block, Blockchain, CallInBlock, ExecutionStatus},
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
@@ -177,73 +176,16 @@ impl AsRef<[u8]> for TransactionHex {
 pub struct CallStatusResponse {
     /// Call status
     pub status: ExecutionStatus,
-    /// Call execution proof
-    pub call_proof: MapProof<CallInBlock, ExecutionError>,
 }
 
 /// Call status query parameters.
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum CallStatusQuery {
-    /// To check a transaction status
-    TransactionHash {
-        /// Transaction hash
-        tx_hash: Hash,
-    },
-    /// To check `before_transactions` or `after_transactions` call
-    CallWithHeight {
-        /// Height of a block
-        #[serde(deserialize_with = "from_str")]
-        height: u64,
-        /// Location of an call within a block.
-        #[serde(flatten)]
-        call: CallKind,
-    },
-}
-
-/// The kind of requested call
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum CallKind {
-    /// Call of a transaction within the block.
-    Transaction {
-        /// Zero-based transaction index.
-        #[serde(deserialize_with = "from_str")]
-        index: u64,
-    },
-    /// Call kind of `before_transactions` hook
-    BeforeTransactions {
-        /// Numerical service identifier.
-        #[serde(deserialize_with = "from_str")]
-        id: u32,
-    },
-    /// Call kind of `after_transactions` hook
-    AfterTransactions {
-        /// Numerical service identifier.
-        #[serde(deserialize_with = "from_str")]
-        id: u32,
-    },
-}
-
-impl From<CallKind> for CallInBlock {
-    fn from(call: CallKind) -> Self {
-        match call {
-            CallKind::Transaction { index } => CallInBlock::transaction(index),
-            CallKind::BeforeTransactions { id } => CallInBlock::before_transactions(id),
-            CallKind::AfterTransactions { id } => CallInBlock::after_transactions(id),
-        }
-    }
-}
-
-fn from_str<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-where
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
-    D: de::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    T::from_str(&s).map_err(de::Error::custom)
+/// To check `before_transactions` or `after_transactions` call
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CallStatusQuery {
+    /// Height of a block
+    pub height: Height,
+    /// Numerical service identifier.
+    pub id: u32,
 }
 
 /// Exonum blockchain explorer API.
@@ -352,41 +294,51 @@ impl ExplorerApi {
     }
 
     /// Return call status of committed transaction.
-    pub fn call_status(
+    pub fn transaction_status(
+        snapshot: &dyn Snapshot,
+        query: TransactionQuery,
+    ) -> Result<CallStatusResponse, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+
+        let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
+            ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
+        })?;
+        let tx_info = match tx_info {
+            TransactionInfo::Committed(info) => Ok(info),
+            TransactionInfo::InPool { .. } => Err(ApiError::NotFound(format!(
+                "Requested transaction ({}) is not executed yet",
+                query.hash
+            ))),
+        }?;
+        let call_in_block = CallInBlock::transaction(tx_info.location().position_in_block());
+        let block_height = tx_info.location().block_height();
+
+        let status = ExecutionStatus(explorer.call_status(block_height, call_in_block));
+        Ok(CallStatusResponse { status })
+    }
+
+    /// Return call status of `before_transactions` hook.
+    pub fn before_transactions_status(
         snapshot: &dyn Snapshot,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
+        let call_in_block = CallInBlock::before_transactions(query.id);
 
-        let (call_in_block, height) = match query {
-            CallStatusQuery::CallWithHeight { height, call } => (call.into(), Height(height)),
-            CallStatusQuery::TransactionHash { tx_hash } => {
-                let tx_info = explorer.transaction(&tx_hash).ok_or_else(|| {
-                    ApiError::NotFound(format!("Unknown transaction hash ({})", tx_hash))
-                })?;
-                let tx_info = match tx_info {
-                    TransactionInfo::Committed(info) => Ok(info),
-                    TransactionInfo::InPool { .. } => Err(ApiError::NotFound(format!(
-                        "Requested transaction ({}) is not executed yet",
-                        tx_hash
-                    ))),
-                }?;
-                let call_in_block =
-                    CallInBlock::transaction(tx_info.location().position_in_block());
+        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
+        Ok(CallStatusResponse { status })
+    }
 
-                let block_height = tx_info.location().block_height();
-                (call_in_block, block_height)
-            }
-        };
+    /// Return call status of `after_transactions` hook.
+    pub fn after_transactions_status(
+        snapshot: &dyn Snapshot,
+        query: CallStatusQuery,
+    ) -> Result<CallStatusResponse, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+        let call_in_block = CallInBlock::after_transactions(query.id);
 
-        let block_info = explorer.block(height).ok_or_else(|| {
-            ApiError::InternalError(format_err!("Unable to get block info of height {}", height))
-        })?;
-
-        let status = ExecutionStatus(explorer.call_status(height, call_in_block));
-        let call_proof = block_info.error_proof(call_in_block);
-
-        Ok(CallStatusResponse { status, call_proof })
+        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
+        Ok(CallStatusResponse { status })
     }
 
     /// Adds transaction into the pool of unconfirmed transactions if it's valid
@@ -513,9 +465,17 @@ impl ExplorerApi {
                 let blockchain = self.blockchain.clone();
                 move |query| Self::block(blockchain.snapshot().as_ref(), query)
             })
-            .endpoint("v1/call_status", {
+            .endpoint("v1/call_status/transaction", {
                 let blockchain = self.blockchain.clone();
-                move |query| Self::call_status(blockchain.snapshot().as_ref(), query)
+                move |query| Self::transaction_status(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/call_status/after_transactions", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::after_transactions_status(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/call_status/before_transactions", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::before_transactions_status(blockchain.snapshot().as_ref(), query)
             })
             .endpoint("v1/transactions", {
                 let blockchain = self.blockchain.clone();

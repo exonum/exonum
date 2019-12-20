@@ -48,7 +48,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
 
-- `explorer/v1/call_status` endpoint was introduced. (#1612)
+- Set of endpoints to check call statuses were introduced.
+  `v1/call_status/transaction` - to get status of commited transaction
+  `v1/call_status/before_transactions` - status of `before_transactions` hook
+  `v1/call_status/after_transactions` - status of `after_transactions` hook
+  (#1612)
 
 - Service instances can now be stopped.
 

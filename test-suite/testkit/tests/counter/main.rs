@@ -16,7 +16,7 @@ use assert_matches::assert_matches;
 use exonum::{
     api::{
         node::public::explorer::{
-            CallKind, CallStatusQuery, CallStatusResponse, TransactionQuery, TransactionResponse,
+            CallStatusQuery, CallStatusResponse, TransactionQuery, TransactionResponse,
         },
         Error as ApiError,
     },
@@ -1113,32 +1113,28 @@ fn test_explorer_api_with_before_transactions_error() {
     let tx = Increment::new(13).sign(SERVICE_ID, pubkey, &key);
 
     // This tx lead to error in before_transaction on the next transaction
-    let block = testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx.clone());
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::BeforeTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
-    let proof = response.call_proof;
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 0);
-
     let tx = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
     // So perform one more tx to check the error
-    let block = testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx.clone());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 2,
-            call: CallKind::BeforeTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(2),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_err());
     assert!(response
@@ -1148,26 +1144,22 @@ fn test_explorer_api_with_before_transactions_error() {
         .description()
         .contains("Number 13"));
 
-    let proof = response.call_proof;
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::TransactionHash {
-            tx_hash: tx.object_hash(),
+        .query(&TransactionQuery {
+            hash: tx.object_hash(),
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed 3");
     assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::AfterTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed 4");
     assert!(response.status.0.is_ok());
 }
@@ -1178,14 +1170,14 @@ fn test_explorer_api_with_transaction_error() {
     let (pubkey, key) = crypto::gen_keypair();
     let tx = Increment::new(0).sign(SERVICE_ID, pubkey, &key);
 
-    let block = testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx.clone());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::TransactionHash {
-            tx_hash: tx.object_hash(),
+        .query(&TransactionQuery {
+            hash: tx.object_hash(),
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_err());
     assert!(response
@@ -1195,27 +1187,23 @@ fn test_explorer_api_with_transaction_error() {
         .description()
         .contains("Adding zero does nothing!"));
 
-    let proof = response.call_proof;
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::BeforeTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::AfterTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }
@@ -1226,15 +1214,15 @@ fn test_explorer_api_with_after_transactions_error() {
     let (pubkey, key) = crypto::gen_keypair();
     let tx = Increment::new(42).sign(SERVICE_ID, pubkey, &key);
 
-    let block = testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx.clone());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::AfterTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_err());
     assert!(response
@@ -1244,26 +1232,22 @@ fn test_explorer_api_with_after_transactions_error() {
         .description()
         .contains("What's the question?"));
 
-    let proof = response.call_proof;
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::BeforeTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::TransactionHash {
-            tx_hash: tx.object_hash(),
+        .query(&TransactionQuery {
+            hash: tx.object_hash(),
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }
@@ -1274,38 +1258,34 @@ fn test_explorer_api_without_error() {
     let (pubkey, key) = crypto::gen_keypair();
     let tx = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
 
-    let block = testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx.clone());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::BeforeTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::TransactionHash {
-            tx_hash: tx.object_hash(),
+        .query(&TransactionQuery {
+            hash: tx.object_hash(),
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
     let response = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery::CallWithHeight {
-            height: 1,
-            call: CallKind::AfterTransactions { id: SERVICE_ID },
+        .query(&CallStatusQuery {
+            height: Height(1),
+            id: SERVICE_ID,
         })
-        .get::<CallStatusResponse>("v1/call_status")
+        .get::<CallStatusResponse>("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
-
-    let proof = response.call_proof;
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 0);
 }
