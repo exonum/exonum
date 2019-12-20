@@ -116,6 +116,7 @@ use exonum_crypto::Hash;
 
 use std::{fmt, mem, sync::Arc};
 
+use crate::views::IndexMetadata;
 use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
     validation::assert_valid_name_component,
@@ -177,13 +178,17 @@ impl<T: RawAccess + AsReadonly> Migration<'_, T> {
     /// let aggregator = migration_view.state_aggregator();
     /// assert!(aggregator.contains("migration.entry")); // Not `entry`!
     /// ```
-    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
+    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, str, Hash> {
         get_state_aggregator(self.access.as_readonly(), self.namespace)
     }
 }
 
 impl<T: RawAccessMut> Migration<'_, T> {
     /// Marks an index with the specified address as removed during migration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an index already exists at the specified address.
     pub fn create_tombstone<I>(self, addr: I)
     where
         I: Into<IndexAddress>,
@@ -195,6 +200,12 @@ impl<T: RawAccessMut> Migration<'_, T> {
 
 impl<T: RawAccess> Access for Migration<'_, T> {
     type Base = T;
+
+    fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
+        let mut prefixed_addr = addr.prepend_name(self.namespace.as_ref());
+        prefixed_addr.set_in_migration();
+        self.access.get_index_metadata(prefixed_addr)
+    }
 
     fn get_or_create_view(
         self,
