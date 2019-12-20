@@ -65,17 +65,19 @@ pub use exonum_keys as keys;
 pub use exonum_merkledb as merkledb;
 
 #[macro_use]
-pub mod proto;
-#[macro_use]
 pub mod messages;
 #[macro_use]
 pub mod helpers;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
-#[doc(hidden)]
-pub mod events;
 pub mod explorer;
 pub mod node;
 #[macro_use]
 pub mod runtime;
+
+#[macro_use]
+#[doc(hidden)]
+pub mod proto;
+#[doc(hidden)]
+pub mod events;

@@ -60,7 +60,7 @@ fn user_agent_info() {
     let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
     let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
-    let expected = user_agent::get();
+    let expected = user_agent();
     assert_eq!(info, expected);
 }
 

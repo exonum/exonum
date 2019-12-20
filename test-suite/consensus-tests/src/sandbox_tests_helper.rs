@@ -17,7 +17,7 @@
 use bit_vec::BitVec;
 use exonum::{
     blockchain::{AdditionalHeaders, Block, ProposerId},
-    helpers::{Height, Milliseconds, Round, ValidatorId},
+    helpers::{Height, Round, ValidatorId},
     messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Verified},
 };
 use exonum_crypto::Hash;
@@ -34,6 +34,8 @@ use super::{
 pub type TimestampingSandbox = Sandbox;
 
 pub const NOT_LOCKED: Round = Round(0);
+
+type Milliseconds = u64;
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
 /// Idea of ProposeBuilder is to implement Builder pattern in order to get Block with

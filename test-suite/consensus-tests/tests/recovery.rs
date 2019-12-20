@@ -418,14 +418,14 @@ fn should_restore_peers_after_restart() {
         &public_key0,
         address0,
         time.into(),
-        &user_agent::get(),
+        &user_agent(),
         &secret_key0,
     );
     let connect_from_1 = sandbox.create_connect(
         &public_key1,
         address1,
         time.into(),
-        &user_agent::get(),
+        &user_agent(),
         &secret_key1,
     );
     let peers_request = sandbox.create_peers_request(public_key1, public_key0, &secret_key1);
