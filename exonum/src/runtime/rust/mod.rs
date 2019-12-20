@@ -284,8 +284,7 @@ impl RustRuntime {
                 artifact,
                 self.artifacts_to_pretty_string()
             );
-            let err = Error::UnableToDeploy.with_description(description).into();
-            return Err(err);
+            return Err(Error::UnableToDeploy.with_description(description));
         }
 
         trace!("Deployed artifact: {}", artifact);
