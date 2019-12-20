@@ -119,7 +119,7 @@ impl Default for InitAction {
     }
 }
 
-/// Actions that performs at the `after_transactions` stage.
+/// Actions to be performed at the `after_transactions` stage.
 #[derive(Debug, Clone)]
 enum AfterTransactionsAction {
     /// Add some value to the inspector schema index.
