@@ -1,6 +1,6 @@
 //! Extension traits to simplify index instantiation.
 
-use super::{Access, AccessError, FromAccess};
+use super::{Access, FromAccess};
 use crate::{
     indexes::proof_map_index::{Raw, ToProofPath},
     views::IndexType,
@@ -241,17 +241,86 @@ pub trait AccessExt: Access {
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
-    /// Touches an index at the specified address, asserting that it has a specific type.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the index has in invalid type.
-    fn touch_index<I>(self, addr: I, index_type: IndexType) -> Result<(), AccessError>
+    /// Gets index type at the specified address, or `None` if there is no index.
+    fn index_type<I>(self, addr: I) -> Option<IndexType>
     where
         I: Into<IndexAddress>,
     {
-        self.get_or_create_view(addr.into(), index_type).map(drop)
+        self.get_index_metadata(addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
+            .map(|metadata| metadata.index_type())
     }
 }
 
 impl<T: Access> AccessExt for T {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{access::Prefixed, migration::Migration, Database, TemporaryDB};
+
+    #[test]
+    fn index_type_works() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_list("list").extend(vec![1, 2, 3]);
+        assert_eq!(fork.index_type("list"), Some(IndexType::List));
+        fork.get_proof_map(("fam", &0_u8)).put(&1_u8, 2_u8);
+        assert_eq!(fork.index_type(("fam", &0_u8)), Some(IndexType::ProofMap));
+        assert_eq!(fork.index_type(("fam", &1_u8)), None);
+
+        let patch = fork.into_patch();
+        assert_eq!(patch.index_type("list"), Some(IndexType::List));
+        assert_eq!(patch.index_type(("fam", &0_u8)), Some(IndexType::ProofMap));
+        assert_eq!(patch.index_type(("fam", &1_u8)), None);
+
+        db.merge(patch).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.index_type("list"), Some(IndexType::List));
+        assert_eq!(
+            snapshot.index_type(("fam", &0_u8)),
+            Some(IndexType::ProofMap)
+        );
+        assert_eq!(snapshot.index_type(("fam", &1_u8)), None);
+    }
+
+    #[test]
+    fn index_type_in_migration() {
+        let db = TemporaryDB::new();
+        let mut fork = db.fork();
+        fork.get_list("some.list").extend(vec![1, 2, 3]);
+        fork.get_entry(("some.entry", &0_u8)).set("!".to_owned());
+        fork.get_entry(("some.entry", &1_u8)).set("!!".to_owned());
+
+        {
+            let migration = Migration::new("some", &fork);
+            migration.get_proof_list("list").extend(vec![4, 5, 6]);
+            migration.create_tombstone(("entry", &0_u8));
+            assert_eq!(migration.index_type("list"), Some(IndexType::ProofList));
+            assert_eq!(
+                migration.index_type(("entry", &0_u8)),
+                Some(IndexType::Tombstone)
+            );
+            assert_eq!(migration.index_type(("entry", &1_u8)), None);
+        }
+        fork.flush_migration("some");
+
+        let patch = fork.into_patch();
+        let ns = Prefixed::new("some", &patch);
+        assert_eq!(ns.clone().index_type("list"), Some(IndexType::ProofList));
+        assert_eq!(ns.clone().index_type(("entry", &0_u8)), None);
+        assert_eq!(
+            ns.clone().index_type(("entry", &1_u8)),
+            Some(IndexType::Entry)
+        );
+
+        db.merge(patch).unwrap();
+        let snapshot = db.snapshot();
+        assert_eq!(snapshot.index_type("some.list"), Some(IndexType::ProofList));
+        assert_eq!(snapshot.index_type(("some.entry", &0_u8)), None);
+        assert_eq!(
+            snapshot.index_type(("some.entry", &1_u8)),
+            Some(IndexType::Entry)
+        );
+    }
+}
