@@ -348,30 +348,6 @@ impl<T: RawAccessMut> View<T> {
     }
 }
 
-//TODO: Wrapper to prevent abstraction leak. Maybe there is better way.
-pub(crate) struct IndexesPoolWrapper<T: RawAccess> {
-    inner: IndexesPool<T>,
-}
-
-impl<T: RawAccess> IndexesPoolWrapper<T> {
-    pub(crate) fn new(index_access: T) -> Self {
-        IndexesPoolWrapper {
-            inner: IndexesPool::new(index_access),
-        }
-    }
-
-    pub(crate) fn suffixes<K: BinaryKey + Clone>(
-        &self,
-        prefix: &IndexAddress,
-    ) -> Result<Vec<K>, failure::Error> {
-        ensure!(
-            prefix.id_in_group().is_none(),
-            "This method works only for group addresses"
-        );
-        Ok(self.inner.suffixes(prefix.name()))
-    }
-}
-
 pub(crate) struct ChangesIter<'a, T: Iterator + 'a> {
     inner: Peekable<T>,
     _lifetime: PhantomData<&'a ()>,

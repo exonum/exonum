@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use crate::views::{IndexesPoolWrapper, RawAccess};
+use crate::views::{IndexesPool, RawAccess};
 use crate::{
     access::{Access, AccessError, FromAccess},
     views::IndexAddress,
-    BinaryKey, BinaryValue,
+    BinaryKey,
 };
 
 // cspell:ignore foob
@@ -110,18 +110,16 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: RawAccess,
-    K: BinaryKey + Clone,
+    K: BinaryKey + ?Sized,
     I: FromAccess<T>,
 {
     /// Return all the keys from this group.
     ///
     /// Note: use this method carefully, because storing all keys in memory may
     /// consume a large amount of RAM.
-    pub fn keys<V: BinaryValue>(&self) -> Vec<K> {
-        let indexes_pool = IndexesPoolWrapper::new(self.access.clone());
-        indexes_pool
-            .suffixes(&self.prefix.clone())
-            .unwrap_or_else(|e| panic!("Invalid group prefix: {}", e))
+    pub fn keys(&self) -> Vec<K::Owned> {
+        let indexes_pool = IndexesPool::new(self.access.clone());
+        indexes_pool.suffixes::<K>(self.prefix.name())
     }
 }
 
@@ -170,18 +168,18 @@ mod tests {
         let fork = db.fork();
 
         {
-            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group(GROUP_NAME);
-            let mut list = group.get(&"g1".to_owned());
+            let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group(GROUP_NAME);
+            let mut list = group.get("g1");
             list.push("foo".to_owned());
-            group.get(&"g2".to_owned()).push("bar".to_owned());
-            group.get(&"g3".to_owned()).push("baz".to_owned());
+            group.get("g2").push("bar".to_owned());
+            group.get("g3").push("baz".to_owned());
         }
 
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
-        let keys = group.keys::<String>();
+        let group: Group<_, str, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
+        let keys = group.keys();
 
         let results = keys
             .iter()
@@ -200,19 +198,18 @@ mod tests {
         let fork = db.fork();
 
         {
-            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group("before_group");
-            let mut list = group.get(&"b1".to_owned());
+            let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group("before_group");
+            let mut list = group.get("b1");
             list.push("value".to_owned());
 
-            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group(GROUP_NAME);
-            let mut list = group.get(&"g1".to_owned());
+            let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group(GROUP_NAME);
+            let mut list = group.get("g1");
             list.push("foo".to_owned());
             group.get(&"g2".to_owned()).push("bar".to_owned());
             group.get(&"".to_owned()).push("baz".to_owned());
 
-            let group: Group<_, String, ProofListIndex<_, String>> =
-                fork.get_group("unrelated_group");
-            let mut list = group.get(&"u1".to_owned());
+            let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group("unrelated_group");
+            let mut list = group.get("u1");
             list.push("value".to_owned());
         }
 
@@ -220,7 +217,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
-        let keys = group.keys::<String>();
+        let keys = group.keys();
 
         // Keys should not contain keys from the indexes, that was written before or
         // after the `GROUP_NAME`.

@@ -28,7 +28,6 @@ use crate::{
     validation::check_index_valid_full_name,
     BinaryKey, BinaryValue,
 };
-use std::borrow::Borrow;
 
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
@@ -340,14 +339,14 @@ impl<T: RawAccess> IndexesPool<T> {
         (metadata, is_phantom)
     }
 
-    pub(super) fn suffixes<K: BinaryKey + Clone>(&self, prefix: &str) -> Vec<K> {
+    pub(crate) fn suffixes<K: BinaryKey + ?Sized>(&self, prefix: &str) -> Vec<K::Owned> {
         let prefix = concat_keys!(prefix, INDEX_NAME_SEPARATOR);
         let mut keys = Vec::new();
 
-        for entry in self.0.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
-            let split = entry.0.split_at(prefix.len());
-            let key = K::read(&split.1).borrow().clone();
-            keys.push(key);
+        for (key, _) in self.0.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
+            let split = key.split_at(prefix.len());
+            let suffix = K::read(&split.1);
+            keys.push(suffix);
         }
 
         keys
