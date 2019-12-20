@@ -50,7 +50,7 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns a service instances registry indexed by the instance name.
-    pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, String, InstanceState> {
+    pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, str, InstanceState> {
         self.access.clone().get_proof_map(INSTANCES)
     }
 
@@ -67,7 +67,7 @@ impl<T: Access> Schema<T> {
 
     /// Returns a pending instances queue used to notify the runtime about service instances
     /// to be updated.
-    fn modified_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
+    fn modified_instances(&self) -> MapIndex<T::Base, str, InstanceStatus> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
