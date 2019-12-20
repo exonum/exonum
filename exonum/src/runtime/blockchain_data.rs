@@ -119,6 +119,7 @@ pub trait SnapshotExt {
     /// may happen indefinitely after the service has been initialized. Thus, `unwrap`ping the
     /// returned value may unexpectedly lead to a panic unless the index is initialized early
     /// (e.g., during service initialization).
+    #[doc(hidden)]
     fn proof_for_index(&self, index_name: &str) -> Option<IndexProof>;
 }
 
