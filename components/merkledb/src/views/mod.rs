@@ -18,6 +18,7 @@ pub use self::{
         get_object_hash, BinaryAttribute, IndexMetadata, IndexState, IndexType, IndexesPool,
         ViewWithMetadata,
     },
+    owning_iter::OwningIter,
     system_schema::{get_state_aggregator, SystemSchema},
 };
 
@@ -31,6 +32,7 @@ use super::{
 
 mod address;
 mod metadata;
+mod owning_iter;
 mod system_schema;
 #[cfg(test)]
 mod tests;
