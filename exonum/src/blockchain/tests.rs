@@ -14,7 +14,7 @@
 
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_merkledb::{
-    access::Access, BinaryValue, Error as FatalError, ObjectHash, ProofListIndex, Snapshot,
+    access::Access, BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot,
     SystemSchema,
 };
 use futures::{Future, IntoFuture};
@@ -34,10 +34,9 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     runtime::{
-        error::catch_panic, AnyTx, ArtifactId, CallInfo, Dispatcher, DispatcherError,
-        DispatcherSchema, ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId,
-        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
-        SUPERVISOR_INSTANCE_ID,
+        catch_panic, AnyTx, ArtifactId, CallInfo, Dispatcher, DispatcherError, DispatcherSchema,
+        ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -73,14 +72,25 @@ struct InspectorSchema<T: Access> {
     values: ProofListIndex<T::Base, u64>,
 }
 
+/// Actions that performs at the `initiate_adding_service` stage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum InitAction {
+    /// Nothing happens.
     Noop,
+    /// Emit panic.
     Panic,
-    Error,
+    /// Emit execution error with the corresponding code and description.
+    Error(u8, String),
+}
+
+/// Describes action execution logic.
+trait Execute {
+    /// Executes the corresponding action.
+    fn execute(self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError>;
 }
 
 impl InitAction {
+    /// Creates a default instance init params.
     fn into_default_instance(self) -> InstanceInitParams {
         InstanceInitParams::new(
             TEST_SERVICE_ID,
@@ -89,14 +99,16 @@ impl InitAction {
             self,
         )
     }
+}
 
+impl Execute for InitAction {
     fn execute(self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
             InitAction::Noop => Ok(()),
 
             InitAction::Panic => panic!(PANIC_STR),
 
-            InitAction::Error => Err(ExecutionError::service(0, "Not a great answer")),
+            InitAction::Error(code, description) => Err(ExecutionError::service(code, description)),
         }
     }
 }
@@ -107,16 +119,16 @@ impl Default for InitAction {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum ExecuteAction {}
-
+/// Actions that performs at the `after_transactions` stage.
 #[derive(Debug, Clone)]
 enum AfterTransactionsAction {
+    /// Add some value to the inspector schema index.
     AddValue(u64),
+    /// Emit panic.
     Panic,
 }
 
-impl AfterTransactionsAction {
+impl Execute for AfterTransactionsAction {
     fn execute(self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
             AfterTransactionsAction::AddValue(value) => {
@@ -130,14 +142,22 @@ impl AfterTransactionsAction {
     }
 }
 
+/// Runtime inspector transaction set.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum Transaction {
+    /// Add some value to the inspector schema index.
     AddValue(u64),
+    /// Emit panic.
     Panic,
-    FatalError,
+    /// Emit MerkleDb error.
+    MerkledbError,
+    /// Emit execution error with the corresponding code and description.
     ExecutionError(u8, String),
+    /// Deploy artifact with the specified ID.
     DeployArtifact(ArtifactId),
-    AddService(InstanceSpec, Vec<u8>),
+    /// Add service with the specified spec and init action.
+    AddService(InstanceSpec, InitAction),
+    /// Stop service with the specified ID.
     StopService(InstanceId),
 }
 
@@ -154,7 +174,9 @@ impl Transaction {
         };
         Verified::from_value(tx, public_key, secret_key)
     }
+}
 
+impl Execute for Transaction {
     fn execute(self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
             Transaction::AddValue(value) => {
@@ -169,7 +191,7 @@ impl Transaction {
                 panic!(PANIC_STR);
             }
 
-            Transaction::FatalError => panic!(FatalError::new(PANIC_STR)),
+            Transaction::MerkledbError => panic!(MerkledbError::new(PANIC_STR)),
 
             Transaction::ExecutionError(code, description) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
@@ -335,7 +357,7 @@ fn execute_transaction(
         .merge({
             let fork = blockchain.fork();
             let mut schema = Schema::new(&fork);
-            schema.add_transaction_into_pool(tx.clone());
+            schema.add_transaction_into_pool(tx);
             fork.into_patch()
         })
         .unwrap();
@@ -465,7 +487,7 @@ fn handling_tx_panic_error() {
 
 #[test]
 #[should_panic]
-fn handling_tx_fatal_error() {
+fn handling_tx_merkledb_error() {
     let (pk, sk) = exonum_crypto::gen_keypair();
 
     let mut blockchain = create_blockchain(
@@ -476,7 +498,7 @@ fn handling_tx_fatal_error() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::FatalError.sign(TEST_SERVICE_ID, pk, &sk),
+        Transaction::MerkledbError.sign(TEST_SERVICE_ID, pk, &sk),
     )
     .unwrap();
 }
@@ -504,7 +526,7 @@ fn deploy_available() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::DeployArtifact(artifact_id.clone()).sign(TEST_SERVICE_ID, pk, &sk),
+        Transaction::DeployArtifact(artifact_id).sign(TEST_SERVICE_ID, pk, &sk),
     )
     .unwrap();
 }
@@ -578,7 +600,7 @@ fn start_stop_service_instance() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::AddService(instance_spec.clone(), InitAction::Noop.into_bytes()).sign(
+        Transaction::AddService(instance_spec.clone(), InitAction::Noop).sign(
             TEST_SERVICE_ID,
             pk,
             &sk,

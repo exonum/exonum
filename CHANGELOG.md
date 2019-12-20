@@ -131,6 +131,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
+- Some of test was moved to the `test-suite/node-tests`. (#1633)
 
 ### Bug Fixes
 
