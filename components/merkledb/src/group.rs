@@ -111,63 +111,19 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: RawAccess,
-    K: BinaryKey + Clone, //TODO: This clone definitely should be removed.
+    K: BinaryKey + Clone,
     I: FromAccess<T>,
 {
-    ///TODO: add doc
-    pub fn iter<V: BinaryValue>(&self) -> GroupIter<K, T, I> {
+    /// Return all the keys from this group.
+    ///
+    /// Note: use this method carefully, because storing all keys in memory may
+    /// consume a large amount of RAM.
+    pub fn keys<V: BinaryValue>(&self) -> Vec<K> {
         let prefix = IndexAddress::from(self.prefix.clone());
         let indexes_pool = IndexesPoolWrapper::new(self.access.clone());
-        let keys = indexes_pool.suffixes(&prefix);
-
-        GroupIter::new(self.prefix.clone(), keys, self.access.clone())
-    }
-}
-
-///TODO: add doc
-#[derive(Debug)]
-pub struct GroupIter<K, T, I> {
-    base: IndexAddress,
-    keys: Vec<K>,
-    access: T,
-    _index: PhantomData<I>,
-}
-
-impl<K, T, I> GroupIter<K, T, I>
-where
-    T: Access,
-    K: BinaryKey,
-    I: FromAccess<T>,
-{
-    fn new(base: IndexAddress, keys: Vec<K>, access: T) -> Self {
-        Self {
-            base,
-            keys,
-            access,
-            _index: PhantomData,
-        }
-    }
-}
-
-impl<K, T, I> Iterator for GroupIter<K, T, I>
-where
-    T: Access,
-    K: BinaryKey,
-    I: FromAccess<T>,
-{
-    type Item = I;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.keys.is_empty() {
-            return None;
-        }
-
-        let key = self.keys.remove(0);
-        let addr = self.base.clone().append_key(&key);
-        let index = I::from_access(self.access.clone(), addr)
-            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e));
-
-        Some(index)
+        indexes_pool
+            .suffixes(&prefix)
+            .unwrap_or_else(|e| panic!("Invalid group prefix: {}", e))
     }
 }
 
@@ -175,6 +131,8 @@ where
 mod tests {
     use super::*;
     use crate::{access::AccessExt, Database, ProofListIndex, TemporaryDB};
+
+    const GROUP_NAME: &'static str = "group_group";
 
     #[test]
     fn group() {
@@ -209,9 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn group_iter() {
-        const GROUP_NAME: &'static str = "group_group";
-
+    fn group_iter_value() {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
@@ -223,19 +179,57 @@ mod tests {
             group.get(&"g3".to_owned()).push("baz".to_owned());
         }
 
-        db.merge(fork.into_patch());
+        db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
         let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
-        let indexes = group.iter::<String>();
+        let keys = group.keys::<String>();
 
-        let mut results = indexes
-            .map(|index| index.get(0).unwrap())
+        let results = keys
+            .iter()
+            .map(|key| group.get(key).get(0).unwrap())
             .collect::<Vec<_>>();
 
         assert_eq!(
             results,
             vec!["foo".to_owned(), "bar".to_owned(), "baz".to_owned()]
         )
+    }
+
+    #[test]
+    fn group_iter_keys() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        {
+            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group("before_group");
+            let mut list = group.get(&"b1".to_owned());
+            list.push("value".to_owned());
+
+            let group: Group<_, String, ProofListIndex<_, String>> = fork.get_group(GROUP_NAME);
+            let mut list = group.get(&"g1".to_owned());
+            list.push("foo".to_owned());
+            group.get(&"g2".to_owned()).push("bar".to_owned());
+            group.get(&"".to_owned()).push("baz".to_owned());
+
+            let group: Group<_, String, ProofListIndex<_, String>> =
+                fork.get_group("unrelated_group");
+            let mut list = group.get(&"u1".to_owned());
+            list.push("value".to_owned());
+        }
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
+        let keys = group.keys::<String>();
+
+        // Keys should not contain keys from the indexes, that was written before or
+        // after the `GROUP_NAME`.
+        assert!(!keys.contains(&"u1".to_owned()));
+        assert!(!keys.contains(&"b1".to_owned()));
+
+        // Keys also shouldn't start with `GROUP_NAME`.
+        assert!(!keys.iter().any(|key| { key.starts_with(GROUP_NAME) }));
     }
 }

@@ -360,8 +360,15 @@ impl<T: RawAccess> IndexesPoolWrapper<T> {
         }
     }
 
-    pub(crate) fn suffixes<K: BinaryKey + Clone>(&self, prefix: &IndexAddress) -> Vec<K> {
-        self.inner.suffixes(prefix)
+    pub(crate) fn suffixes<K: BinaryKey + Clone>(
+        &self,
+        prefix: &IndexAddress,
+    ) -> Result<Vec<K>, failure::Error> {
+        ensure!(
+            prefix.id_in_group().is_none(),
+            "This method works only for group addresses"
+        );
+        Ok(self.inner.suffixes(prefix.name()))
     }
 }
 

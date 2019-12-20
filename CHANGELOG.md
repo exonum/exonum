@@ -76,6 +76,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added mechanism to extend block header. Block now contains
   key-value storage `additional_headers` which can contain binary data. (#1602)
+  
+- Added method `keys` to `Group` index which return all the keys from the group.
+(#1614)
 
 #### exonum-supervisor
 

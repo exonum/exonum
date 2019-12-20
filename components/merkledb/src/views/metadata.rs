@@ -340,32 +340,18 @@ impl<T: RawAccess> IndexesPool<T> {
         (metadata, is_phantom)
     }
 
-    pub(super) fn suffixes<K: BinaryKey + Clone>(&self, prefix: &IndexAddress) -> Vec<K> {
-        let prefix = prefix.fully_qualified_name();
+    pub(super) fn suffixes<K: BinaryKey + Clone>(&self, prefix: &str) -> Vec<K> {
+        let prefix = concat_keys!(prefix, INDEX_NAME_SEPARATOR);
         let mut keys = Vec::new();
 
         for entry in self.0.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
-            let key = get_suffix(entry);
+            let split = entry.0.split_at(prefix.len());
+            let key = K::read(&split.1).borrow().clone();
             keys.push(key);
         }
 
         keys
     }
-}
-
-fn get_suffix<K: BinaryKey + Clone>(entry: (Vec<u8>, Vec<u8>)) -> K {
-    // TODO: simplify this
-    let key = entry
-        .0
-        .split(|b| &[*b] == INDEX_NAME_SEPARATOR)
-        .skip(1)
-        .flatten()
-        .cloned()
-        .collect::<Vec<_>>();
-
-    // TODO: change BinaryKey::read signature to avoid panic (ECR-174)
-    let key = K::read(&key);
-    key.borrow().clone()
 }
 
 impl<T: RawAccessMut> IndexesPool<T> {
