@@ -175,7 +175,7 @@ use crate::{
     helpers::Height,
     runtime::{
         dispatcher::{self, Mailbox},
-        error::{catch_panic, ExecutionError},
+        error::{catch_panic, ExecutionError, ExecutionFail},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
@@ -284,9 +284,8 @@ impl RustRuntime {
                 artifact,
                 self.artifacts_to_pretty_string()
             );
-            let error =
-                ExecutionError::runtime(RustRuntime::ID, Error::UnableToDeploy as u8, description);
-            return Err(error);
+            let err = Error::UnableToDeploy.with_description(description).into();
+            return Err(err);
         }
 
         trace!("Deployed artifact: {}", artifact);
