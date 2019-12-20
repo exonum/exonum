@@ -23,6 +23,7 @@ extern crate proc_macro;
 mod db_traits;
 mod execution_fail;
 mod exonum_interface;
+mod require_artifact;
 mod service_dispatcher;
 mod service_factory;
 
@@ -236,6 +237,12 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(ExecutionFail, attributes(execution_fail))]
 pub fn execution_fail(input: TokenStream) -> TokenStream {
     execution_fail::impl_execution_fail(input)
+}
+
+/// FIXME
+#[proc_macro_derive(RequireArtifact, attributes(require_artifact))]
+pub fn require_artifact(input: TokenStream) -> TokenStream {
+    require_artifact::impl_require_artifact(input)
 }
 
 pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMeta> {

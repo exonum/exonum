@@ -14,7 +14,6 @@
 
 //! Cryptocurrency database schema.
 
-use exonum::runtime::{Version, VersionReq, Versioned};
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,
@@ -31,25 +30,16 @@ use crate::{wallet::Wallet, INITIAL_BALANCE};
 pub(crate) struct Schema<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
-    pub(crate) public: SchemaInterface<T>,
+    pub public: SchemaInterface<T>,
     /// History for specific wallets.
-    pub(crate) wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
+    pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
 
 /// Public part of the cryptocurrency schema.
-#[derive(Debug, FromAccess)]
+#[derive(Debug, FromAccess, RequireArtifact)]
 pub struct SchemaInterface<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
-}
-
-impl<T: Access> Versioned for SchemaInterface<T> {
-    const NAME: &'static str = env!("CARGO_PKG_NAME");
-
-    fn is_compatible(version: &Version) -> bool {
-        let version_req: VersionReq = env!("CARGO_PKG_VERSION").parse().unwrap();
-        version_req.matches(version)
-    }
 }
 
 impl<T> Schema<T>

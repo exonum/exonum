@@ -112,7 +112,8 @@
 //! }
 //!
 //! /// Public part of the schema.
-//! #[derive(Debug, FromAccess)]
+//! #[derive(Debug, FromAccess, RequireArtifact)]
+//! #[require_artifact(name = "some.Token", version = "^1")]
 //! pub struct SchemaInterface<T: Access> {
 //!     /// Public index. Note that changing key or value type will be a breaking change.
 //!     /// To extend interface longevity, it makes sense to make key / value types

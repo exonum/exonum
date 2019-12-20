@@ -14,9 +14,9 @@
 
 use exonum::{
     crypto::Hash,
-    runtime::{ArtifactId, InstanceId, Version, VersionReq, Versioned},
+    runtime::{ArtifactId, InstanceId},
 };
-use exonum_derive::FromAccess;
+use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, Prefixed},
     Entry, Fork, ProofEntry, ProofMapIndex,
@@ -49,21 +49,12 @@ pub(crate) struct Schema<T: Access> {
 }
 
 /// Public part of the supervisor service.
-#[derive(Debug, FromAccess)]
+#[derive(Debug, FromAccess, RequireArtifact)]
 pub struct SchemaInterface<T: Access> {
     /// Supervisor configuration.
     pub configuration: ProofEntry<T::Base, SupervisorConfig>,
     /// Current pending configuration proposal.
     pub pending_proposal: ProofEntry<T::Base, ConfigProposalWithHash>,
-}
-
-impl<T: Access> Versioned for SchemaInterface<T> {
-    const NAME: &'static str = env!("CARGO_PKG_NAME");
-
-    fn is_compatible(version: &Version) -> bool {
-        let version_req: VersionReq = env!("CARGO_PKG_VERSION").parse().unwrap();
-        version_req.matches(version)
-    }
 }
 
 impl<T: Access> Schema<T> {
