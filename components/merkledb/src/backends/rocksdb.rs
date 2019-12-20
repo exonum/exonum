@@ -97,6 +97,10 @@ impl RocksDB {
         Ok(db)
     }
 
+    pub(super) fn rocksdb(&self) -> &rocksdb::DB {
+        self.db.as_ref()
+    }
+
     /// Creates checkpoint of this database in the given directory. See [RocksDB docs] for
     /// details.
     ///

@@ -17,10 +17,11 @@ use std::mem;
 use crate::{
     blockchain::{get_transaction, Schema},
     crypto::{Hash, PublicKey},
+    merkledb::BinaryValue,
     messages::{
-        BinaryValue, BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest,
-        ProposeRequest, Requests, TransactionsRequest, TransactionsResponse, Verified,
-        TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD,
+        BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest, ProposeRequest,
+        Requests, TransactionsRequest, TransactionsResponse, Verified, TX_RES_EMPTY_SIZE,
+        TX_RES_PB_OVERHEAD_PAYLOAD,
     },
 };
 
@@ -31,7 +32,7 @@ use super::NodeHandler;
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_request(&mut self, msg: &Requests) {
+    pub(crate) fn handle_request(&mut self, msg: &Requests) {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!("Received message addressed to other peer = {:?}.", msg.to());
@@ -57,7 +58,7 @@ impl NodeHandler {
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: &Verified<ProposeRequest>) {
+    pub(crate) fn handle_request_propose(&mut self, msg: &Verified<ProposeRequest>) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.payload().height() != self.state.height() {
             return;
@@ -77,13 +78,13 @@ impl NodeHandler {
     }
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: &Verified<TransactionsRequest>) {
+    pub(crate) fn handle_request_txs(&mut self, msg: &Verified<TransactionsRequest>) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         self.send_transactions_by_hash(msg.author(), &msg.payload().txs);
     }
 
     /// Handles `PoolTransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_pool_txs(&mut self, msg: &Verified<PoolTransactionsRequest>) {
+    pub(crate) fn handle_request_pool_txs(&mut self, msg: &Verified<PoolTransactionsRequest>) {
         trace!("HANDLE POOL TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -127,7 +128,7 @@ impl NodeHandler {
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: &Verified<PrevotesRequest>) {
+    pub(crate) fn handle_request_prevotes(&mut self, msg: &Verified<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.payload().height() != self.state.height() {
             return;
@@ -148,7 +149,7 @@ impl NodeHandler {
     }
 
     /// Handles `BlockRequest` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: &Verified<BlockRequest>) {
+    pub(crate) fn handle_request_block(&mut self, msg: &Verified<BlockRequest>) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.payload().height(),

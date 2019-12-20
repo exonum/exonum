@@ -16,14 +16,13 @@
 
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly},
-    Fork, ListIndex, MapIndex, ProofMapIndex,
+    Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 
+use super::{ArtifactId, Error, InstanceSpec};
 use crate::runtime::{
     ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
 };
-
-use super::{ArtifactSpec, Error, InstanceSpec};
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
 const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
@@ -46,12 +45,12 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an artifacts registry indexed by the artifact name.
-    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, String, ArtifactState> {
+    pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, ArtifactId, ArtifactState> {
         self.access.clone().get_proof_map(ARTIFACTS)
     }
 
     /// Returns a service instances registry indexed by the instance name.
-    pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, String, InstanceState> {
+    pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, str, InstanceState> {
         self.access.clone().get_proof_map(INSTANCES)
     }
 
@@ -62,13 +61,13 @@ impl<T: Access> Schema<T> {
 
     /// Returns a pending artifacts queue used to notify the runtime about artifacts
     /// to be deployed.
-    fn pending_artifacts(&self) -> ListIndex<T::Base, ArtifactSpec> {
-        self.access.clone().get_list(PENDING_ARTIFACTS)
+    fn pending_artifacts(&self) -> KeySetIndex<T::Base, ArtifactId> {
+        self.access.clone().get_key_set(PENDING_ARTIFACTS)
     }
 
     /// Returns a pending instances queue used to notify the runtime about service instances
     /// to be updated.
-    fn modified_instances(&self) -> MapIndex<T::Base, String, InstanceStatus> {
+    fn modified_instances(&self) -> MapIndex<T::Base, str, InstanceStatus> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
@@ -87,7 +86,7 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns information about an artifact by its identifier.
-    pub fn get_artifact(&self, name: &str) -> Option<ArtifactState> {
+    pub fn get_artifact(&self, name: &ArtifactId) -> Option<ArtifactState> {
         self.artifacts().get(name)
     }
 }
@@ -102,43 +101,37 @@ impl<T: AsReadonly> Schema<T> {
 
 impl Schema<&Fork> {
     /// Adds artifact specification to the set of the pending artifacts.
-    pub(super) fn add_pending_artifact(&mut self, spec: ArtifactSpec) -> Result<(), Error> {
+    pub(super) fn add_pending_artifact(
+        &mut self,
+        artifact: ArtifactId,
+        deploy_spec: Vec<u8>,
+    ) -> Result<(), Error> {
         // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts().contains(&spec.artifact.name) {
+        if self.artifacts().contains(&artifact) {
             return Err(Error::ArtifactAlreadyDeployed);
         }
-        // Add artifact to pending artifacts queue.
-        self.pending_artifacts().push(spec.clone());
         // Add artifact to registry with pending status.
-        let artifact_name = spec.artifact.name.clone();
         self.artifacts().put(
-            &artifact_name,
+            &artifact,
             ArtifactState {
-                spec,
+                deploy_spec,
                 status: ArtifactStatus::Pending,
             },
         );
+        // Add artifact to pending artifacts queue.
+        self.pending_artifacts().insert(artifact);
         Ok(())
     }
 
     /// Adds information about a pending service instance to the schema.
     pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
-        let artifact_id = self
-            .artifacts()
-            .get(&spec.artifact.name)
-            .ok_or(Error::ArtifactNotDeployed)?
-            .spec
-            .artifact;
+        self.artifacts()
+            .get(&spec.artifact)
+            .ok_or(Error::ArtifactNotDeployed)?;
 
         let mut instances = self.instances();
         let mut instance_ids = self.instance_ids();
 
-        // Checks that runtime identifier is proper in instance.
-        // TODO It seems that this error cannot be produced by the user code, thus we might
-        // replace error by assertion. [ECR-3743]
-        if artifact_id != spec.artifact {
-            return Err(Error::IncorrectRuntime);
-        }
         // Checks that instance name doesn't exist.
         if instances.contains(&spec.name) {
             return Err(Error::ServiceNameExists);
@@ -208,9 +201,12 @@ impl Schema<&Fork> {
     pub(super) fn activate_pending(&mut self) {
         // Activate pending artifacts.
         let mut artifacts = self.artifacts();
-        for spec in &self.pending_artifacts() {
-            let name = spec.artifact.name.clone();
-            artifacts.put(&name, ArtifactState::new(spec, ArtifactStatus::Active));
+        for artifact in &self.pending_artifacts() {
+            let mut state = artifacts
+                .get(&artifact)
+                .expect("Artifact marked as pending is not saved in `artifacts`");
+            state.status = ArtifactStatus::Active;
+            artifacts.put(&artifact, state);
         }
         // Commit new statuses for pending instances.
         let mut instances = self.instances();
@@ -231,9 +227,19 @@ impl Schema<&Fork> {
     }
 
     /// Takes pending artifacts from queue.
-    pub(super) fn take_pending_artifacts(&mut self) -> Vec<ArtifactSpec> {
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, Vec<u8>)> {
         let mut index = self.pending_artifacts();
-        let pending_artifacts = index.iter().collect::<Vec<_>>();
+        let artifacts = self.artifacts();
+        let pending_artifacts = index
+            .iter()
+            .map(|artifact| {
+                let deploy_spec = artifacts
+                    .get(&artifact)
+                    .expect("Artifact marked as pending is not saved in `artifacts`")
+                    .deploy_spec;
+                (artifact, deploy_spec)
+            })
+            .collect();
         index.clear();
         pending_artifacts
     }

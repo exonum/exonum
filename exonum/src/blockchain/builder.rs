@@ -15,12 +15,8 @@
 //! The module responsible for the correct Exonum blockchain creation.
 
 use crate::{
-    blockchain::{
-        config::{GenesisConfig, InstanceInitParams},
-        Blockchain, BlockchainMut, Schema,
-    },
-    merkledb::BinaryValue,
-    runtime::{rust::ServiceFactory, Dispatcher, InstanceId, InstanceSpec, RuntimeInstance},
+    blockchain::{config::GenesisConfig, Blockchain, BlockchainMut, Schema},
+    runtime::{Dispatcher, RuntimeInstance},
 };
 
 /// The object responsible for the correct Exonum blockchain creation from the components.
@@ -83,45 +79,6 @@ impl BlockchainBuilder {
     }
 }
 
-/// Rust runtime artifact with the list of instances.
-#[derive(Debug)]
-pub struct InstanceCollection {
-    /// Rust services factory as a special case of an artifact.
-    pub factory: Box<dyn ServiceFactory>,
-    /// List of service instances with the initial configuration parameters.
-    pub instances: Vec<InstanceInitParams>,
-}
-
-impl InstanceCollection {
-    /// Creates a new blank collection of instances for the specified service factory.
-    pub fn new(factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        Self {
-            factory: factory.into(),
-            instances: Vec::new(),
-        }
-    }
-
-    /// Add a new service instance to the collection.
-    pub fn with_instance(
-        mut self,
-        id: InstanceId,
-        name: impl Into<String>,
-        params: impl BinaryValue,
-    ) -> Self {
-        let spec = InstanceSpec {
-            artifact: self.factory.artifact_id().into(),
-            id,
-            name: name.into(),
-        };
-        let instance_config = InstanceInitParams {
-            instance_spec: spec,
-            constructor: params.into_bytes(),
-        };
-        self.instances.push(instance_config);
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use futures::sync::mpsc;
@@ -129,10 +86,12 @@ mod tests {
     use super::*;
     use crate::{
         blockchain::{
-            config::GenesisConfigBuilder, tests::ServiceGoodImpl as SampleService, ConsensusConfig,
+            config::{GenesisConfigBuilder, InstanceInitParams},
+            tests::ServiceGoodImpl as SampleService,
+            ConsensusConfig,
         },
         helpers::{generate_testnet_config, Height},
-        runtime::rust::RustRuntime,
+        runtime::rust::{RustRuntime, ServiceFactory},
     };
 
     #[test]

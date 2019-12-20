@@ -29,7 +29,7 @@ use std::{sync::Arc, sync::RwLock};
 struct RuntimeState {
     deployed_artifact: ArtifactId,
     deploy_spec: Vec<u8>,
-    config_params: Vec<u8>,
+    constructor_params: Vec<u8>,
 }
 
 // Main purpose is to track and make some assertions on state of runtime.
@@ -45,9 +45,9 @@ impl RuntimeTester {
         state.deploy_spec = deploy_spec;
     }
 
-    fn configure_service(&self, config_params: Vec<u8>) {
+    fn construct_service(&self, constructor_params: Vec<u8>) {
         let mut state = self.state.write().unwrap();
-        state.config_params = config_params;
+        state.constructor_params = constructor_params;
     }
 
     fn is_artifact_deployed(&self, artifact_id: &ArtifactId) -> bool {
@@ -61,9 +61,9 @@ impl RuntimeTester {
         assert_eq!(state.deploy_spec, deploy_spec);
     }
 
-    fn assert_config_params_passed(&self, config_params: Vec<u8>) {
+    fn assert_constructor_params_passed(&self, constructor_params: Vec<u8>) {
         let state = self.state.read().unwrap();
-        assert_eq!(state.config_params, config_params)
+        assert_eq!(state.constructor_params, constructor_params)
     }
 }
 
@@ -71,12 +71,14 @@ impl Default for RuntimeTester {
     fn default() -> Self {
         let state = RuntimeState {
             deployed_artifact: ArtifactId {
-                runtime_id: Default::default(),
-                name: Default::default(),
+                runtime_id: 10,
+                name: "test-artifact".to_owned(),
+                version: "1.0.0".parse().unwrap(),
             },
-            deploy_spec: Default::default(),
-            config_params: Default::default(),
+            deploy_spec: vec![],
+            constructor_params: vec![],
         };
+
         Self {
             state: RwLock::new(state),
         }
@@ -114,7 +116,7 @@ impl Runtime for TestRuntime {
         _spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        self.tester.configure_service(parameters);
+        self.tester.construct_service(parameters);
         Ok(())
     }
 
@@ -159,10 +161,11 @@ impl WellKnownRuntime for TestRuntime {
     const ID: u32 = 42;
 }
 
-// We assert that:
-//  1) TestRuntime was passed to the testing blockchain
-//  2) Artifact was deployed with correct deploy specification
-//  3) Service was instantiated with correct initialization parameters
+/// We assert that:
+///
+/// 1. TestRuntime was passed to the testing blockchain
+/// 2. Artifact was deployed with correct deploy specification
+/// 3. Service was instantiated with correct initialization parameters
 #[test]
 fn test_runtime_factory() {
     let tester = Arc::new(RuntimeTester::default());
@@ -172,7 +175,7 @@ fn test_runtime_factory() {
     let instance_spec = InstanceSpec::new(
         1,
         "test_instance",
-        &format!("{}:{}", TestRuntime::ID, "artifact_name"),
+        &format!("{}:{}:1.0.0", TestRuntime::ID, "artifact_name"),
     )
     .unwrap();
 
@@ -190,5 +193,5 @@ fn test_runtime_factory() {
         .create();
 
     tester.assert_artifact_deployed(artifact, deploy_args);
-    tester.assert_config_params_passed(constructor);
+    tester.assert_constructor_params_passed(constructor);
 }

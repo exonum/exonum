@@ -61,7 +61,7 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
         testkit,
         ConfigPropose::immediate(0)
             .start_service(
-                IncService.artifact_id().into(),
+                IncService.artifact_id(),
                 IncService::INSTANCE_NAME,
                 Vec::default(),
             )

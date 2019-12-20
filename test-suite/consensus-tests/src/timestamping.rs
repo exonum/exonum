@@ -15,12 +15,11 @@
 pub use crate::proto::TimestampTx;
 
 use exonum::{
-    blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
     runtime::{
-        rust::{CallContext, Service, Transaction},
-        AnyTx, InstanceId,
+        rust::{CallContext, DefaultInstance, Service, Transaction},
+        AnyTx, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -122,4 +121,9 @@ impl Iterator for TimestampingTxGenerator {
         tx.set_data(data);
         Some(tx.sign(self.instance_id, self.public_key, &self.secret_key))
     }
+}
+
+impl DefaultInstance for TimestampingService {
+    const INSTANCE_ID: InstanceId = TimestampingService::ID;
+    const INSTANCE_NAME: &'static str = "timestamping";
 }

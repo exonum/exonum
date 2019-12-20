@@ -39,7 +39,7 @@ use crate::{
     },
     helpers::Milliseconds,
     messages::{Connect, Message, Service, SignedMessage, Verified},
-    node::state::SharedConnectList,
+    node::SharedConnectList,
 };
 use exonum_crypto::x25519::into_x25519_public_key;
 

@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Creates a `Vec<Box<Transaction>>` from the given transactions, or other objects
-/// implementing the `Into<Box<Transaction>>` trait.
-#[macro_export]
-macro_rules! txvec {
-    ($($x:expr),*) => (
-        vec![$($x.into()),*]
-    );
-    ($($x:expr,)*) => (
-        vec![$($x.into()),*]
-    )
+use exonum_build::ProtobufGenerator;
+
+fn main() {
+    ProtobufGenerator::with_mod_name("protobuf_mod.rs")
+        .with_input_dir("src/proto")
+        .with_crypto()
+        .with_exonum()
+        .generate();
 }
