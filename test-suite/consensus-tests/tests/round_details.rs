@@ -1919,11 +1919,14 @@ fn handle_recieve_multiple_proposals_same_round() {
     // in this test we check, that if the first propose was properly processed, the second
     // propose won't break anything (at the moment of this test being added, processing of the
     // second propose results in a panic).
-    let (propose_hash, block_hash) = if propose_1.object_hash() < propose_2.object_hash() {
-        (propose_1.object_hash(), block_1.object_hash())
-    } else {
-        (propose_2.object_hash(), block_2.object_hash())
-    };
+    let (propose_hash, block_hash, txs_in_pool) =
+        if propose_1.object_hash() < propose_2.object_hash() {
+            // `tx_2` will be left in pool.
+            (propose_1.object_hash(), block_1.object_hash(), 1)
+        } else {
+            // No txs will be left in pool.
+            (propose_2.object_hash(), block_2.object_hash(), 0)
+        };
 
     // Receive prevotes.
     for i in 1..sandbox.validators().len() as u16 {
@@ -1976,7 +1979,14 @@ fn handle_recieve_multiple_proposals_same_round() {
         sandbox.secret_key(ValidatorId(0)),
     ));
 
-    sandbox.check_broadcast_status(Height(2), block_hash);
+    // Block should be applied.
+    sandbox.broadcast(&sandbox.create_status(
+        sandbox.public_key(ValidatorId(0)),
+        Height(2),
+        block_hash,
+        txs_in_pool,
+        &sandbox.secret_key(ValidatorId(0)),
+    ));
 }
 
 #[test]
