@@ -118,10 +118,9 @@ where
     /// Note: use this method carefully, because storing all keys in memory may
     /// consume a large amount of RAM.
     pub fn keys<V: BinaryValue>(&self) -> Vec<K> {
-        let prefix = IndexAddress::from(self.prefix.clone());
         let indexes_pool = IndexesPoolWrapper::new(self.access.clone());
         indexes_pool
-            .suffixes(&prefix)
+            .suffixes(&self.prefix.clone())
             .unwrap_or_else(|e| panic!("Invalid group prefix: {}", e))
     }
 }
@@ -131,7 +130,7 @@ mod tests {
     use super::*;
     use crate::{access::AccessExt, Database, ProofListIndex, TemporaryDB};
 
-    const GROUP_NAME: &'static str = "group_group";
+    const GROUP_NAME: &str = "group_group";
 
     #[test]
     fn group() {
