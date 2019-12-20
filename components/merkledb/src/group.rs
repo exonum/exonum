@@ -6,7 +6,6 @@ use crate::{
     views::IndexAddress,
     BinaryKey, BinaryValue,
 };
-use std::fmt;
 
 // cspell:ignore foob
 
@@ -93,7 +92,7 @@ where
 impl<T, K, I> Group<T, K, I>
 where
     T: Access,
-    K: BinaryKey + ?Sized + fmt::Debug,
+    K: BinaryKey + ?Sized,
     I: FromAccess<T>,
 {
     /// Gets an index corresponding to the specified key.
