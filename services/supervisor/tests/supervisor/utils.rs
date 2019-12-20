@@ -27,8 +27,8 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{
-    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
-    SupervisorInterface,
+    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, SchemaInterface, ServiceConfig,
+    Supervisor, SupervisorInterface,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
@@ -38,8 +38,8 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
-    let snapshot = snapshot.for_service(supervisor_name()).unwrap();
-    Schema::new(snapshot)
+    let schema: SchemaInterface<_> = snapshot.service_schema(supervisor_name()).unwrap();
+    schema
         .pending_proposal
         .get()
         .map(|entry| entry.config_propose)
@@ -206,10 +206,4 @@ pub fn check_second_service_actual_param(testkit: &TestKit, param: Option<String
         Some(param) => assert_eq!(actual_params.get().unwrap(), param),
         None => assert!(!actual_params.exists()),
     }
-}
-
-pub fn latest_assigned_instance_id(testkit: &TestKit) -> Option<InstanceId> {
-    let snapshot = testkit.snapshot();
-    let schema = Schema::new(snapshot.for_service(Supervisor::NAME).unwrap());
-    schema.vacant_instance_id.get().map(|x| x - 1)
 }

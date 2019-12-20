@@ -110,7 +110,10 @@ impl PublicApi for ApiImpl<'_> {
     }
 
     fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
-        Ok(Schema::new(self.0.service_data()).pending_proposal.get())
+        Ok(Schema::new(self.0.service_data())
+            .public
+            .pending_proposal
+            .get())
     }
 }
 

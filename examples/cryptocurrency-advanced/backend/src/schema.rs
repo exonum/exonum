@@ -43,7 +43,7 @@ pub struct SchemaInterface<T: Access> {
     pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
 }
 
-impl<T: Access> Versioned<T> for SchemaInterface<T> {
+impl<T: Access> Versioned for SchemaInterface<T> {
     const NAME: &'static str = env!("CARGO_PKG_NAME");
 
     fn is_compatible(version: &Version) -> bool {

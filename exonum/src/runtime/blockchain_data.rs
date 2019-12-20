@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    access::{Access, AsReadonly, FromAccess, Prefixed, RawAccess},
+    access::{AsReadonly, FromAccess, Prefixed, RawAccess},
     Snapshot, SystemSchema,
 };
 use semver::Version;
@@ -77,7 +77,7 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// [`SchemaError`]: enum.SchemaError.html
     pub fn service_schema<'q, S, I>(&self, service_id: I) -> Result<S, SchemaError>
     where
-        S: Versioned<Prefixed<'static, T::Readonly>>,
+        S: Versioned + FromAccess<Prefixed<'static, T::Readonly>>,
         I: Into<InstanceQuery<'q>>,
     {
         schema_for_service(self.access.as_readonly(), service_id)
@@ -137,7 +137,7 @@ fn schema_for_service<'q, T, S>(
 ) -> Result<S, SchemaError>
 where
     T: RawAccess,
-    S: Versioned<Prefixed<'static, T>>,
+    S: Versioned + FromAccess<Prefixed<'static, T>>,
 {
     let (access, spec) =
         mount_point_for_service(access, service_id).ok_or(SchemaError::NoService)?;
@@ -182,7 +182,7 @@ pub trait SnapshotExt {
     /// [`SchemaError`]: enum.SchemaError.html
     fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, SchemaError>
     where
-        S: Versioned<Prefixed<'static, &'s dyn Snapshot>>,
+        S: Versioned + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
         I: Into<InstanceQuery<'q>>;
 }
 
@@ -204,16 +204,16 @@ impl SnapshotExt for dyn Snapshot {
 
     fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, SchemaError>
     where
-        S: Versioned<Prefixed<'static, &'s dyn Snapshot>>,
+        S: Versioned + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
         I: Into<InstanceQuery<'q>>,
     {
         schema_for_service(self, service_id)
     }
 }
 
-/// Version service schema.
+/// Versioned object that checks compatibility with the artifact of a service.
 // TODO: Reuse `ArtifactReq` here once #1606 is merged?
-pub trait Versioned<T: Access>: FromAccess<T> {
+pub trait Versioned {
     /// Name of the artifact corresponding to the service.
     const NAME: &'static str;
     /// Is the schema compatible with the given artifact version?
@@ -244,7 +244,7 @@ mod tests {
     use assert_matches::assert_matches;
     use exonum_crypto::PublicKey;
     use exonum_derive::*;
-    use exonum_merkledb::{Entry, ProofMapIndex};
+    use exonum_merkledb::{access::Access, Entry, ProofMapIndex};
     use futures::sync::mpsc;
 
     use super::*;
@@ -267,7 +267,7 @@ mod tests {
         private: Entry<T::Base, String>,
     }
 
-    impl<T: Access> Versioned<T> for SchemaInterface<T> {
+    impl<T: Access> Versioned for SchemaInterface<T> {
         const NAME: &'static str = "exonum.Token";
 
         fn is_compatible(version: &Version) -> bool {

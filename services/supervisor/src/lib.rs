@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! Supervisor is an [Exonum][exonum] service capable of the following activities:
+//!
 //! - Service artifact deployment;
 //! - Service instances creation;
 //! - Changing consensus configuration;
@@ -73,7 +74,7 @@ pub use self::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
         DeployRequest, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
-    schema::Schema,
+    schema::SchemaInterface,
     transactions::SupervisorInterface,
 };
 
@@ -90,7 +91,7 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 
-use crate::{configure::ConfigureMut, mode::Mode};
+use crate::{configure::ConfigureMut, mode::Mode, schema::Schema};
 
 pub mod mode;
 
@@ -280,7 +281,7 @@ impl Service for Supervisor {
             SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
 
         let mut schema = Schema::new(context.service_data());
-        schema.configuration.set(config);
+        schema.public.configuration.set(config);
 
         Ok(())
     }
@@ -303,12 +304,12 @@ impl Service for Supervisor {
             log::trace!("Removed outdated deployment request {:?}", request);
         }
 
-        let entry = schema.pending_proposal.get();
+        let entry = schema.public.pending_proposal.get();
         if let Some(entry) = entry {
             if entry.config_propose.actual_from <= height {
                 // Remove pending config proposal for which deadline was exceeded.
                 log::trace!("Removed outdated config proposal");
-                schema.pending_proposal.remove();
+                schema.public.pending_proposal.remove();
             }
         }
         Ok(())
@@ -322,7 +323,7 @@ impl Service for Supervisor {
         let validator_count = core_schema.consensus_config().validator_keys.len();
 
         // Check if we should apply a new config.
-        let entry = schema.pending_proposal.get();
+        let entry = schema.public.pending_proposal.get();
         if let Some(entry) = entry {
             if entry.config_propose.actual_from == next_height {
                 // Config should be applied at the next height.
@@ -340,7 +341,7 @@ impl Service for Supervisor {
                     // If the config update will fail, this entry will be restored due to rollback.
                     // However, it won't be actual anymore and will be removed at the beginning
                     // of the next height (within `before_transactions` hook).
-                    schema.pending_proposal.remove();
+                    schema.public.pending_proposal.remove();
                     drop(schema);
 
                     // Perform the application of configs.
@@ -416,9 +417,7 @@ impl Configure for Supervisor {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.service_data());
-
-        schema.configuration.set(params);
-
+        schema.public.configuration.set(params);
         Ok(())
     }
 }

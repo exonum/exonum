@@ -163,14 +163,14 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let mut schema = Schema::new(context.service_data());
 
         // Verifies that there are no pending config changes.
-        if let Some(proposal) = schema.pending_proposal.get() {
+        if let Some(proposal) = schema.public.pending_proposal.get() {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
                 return Err(Error::ConfigProposeExists.into());
             } else {
                 // Proposal is outdated but was not removed (e.g. because of the panic
                 // during config applying), clean it.
-                schema.pending_proposal.remove();
+                schema.public.pending_proposal.remove();
             }
         }
         drop(schema);
@@ -192,7 +192,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             config_propose: propose,
             propose_hash,
         };
-        schema.pending_proposal.set(config_entry);
+        schema.public.pending_proposal.set(config_entry);
 
         Ok(())
     }
@@ -211,6 +211,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
         let mut schema = Schema::new(context.service_data());
         let entry = schema
+            .public
             .pending_proposal
             .get()
             .ok_or(Error::ConfigProposeNotRegistered)?;

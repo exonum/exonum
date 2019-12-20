@@ -24,7 +24,7 @@ use exonum_merkledb::BinaryValue;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigChange, ConfigPropose, Schema, ServiceConfig, Supervisor,
+    supervisor_name, ConfigChange, ConfigPropose, SchemaInterface, ServiceConfig, Supervisor,
     SupervisorConfig,
 };
 
@@ -33,10 +33,8 @@ use crate::{config_api::create_proposal, utils::CFG_CHANGE_HEIGHT};
 /// Asserts that current supervisor configuration equals to the provided one.
 fn assert_supervisor_config(testkit: &TestKit, config: SupervisorConfig) {
     let snapshot = testkit.snapshot();
-    let current_config = Schema::new(snapshot.for_service(supervisor_name()).unwrap())
-        .configuration
-        .get()
-        .unwrap();
+    let schema: SchemaInterface<_> = snapshot.service_schema(supervisor_name()).unwrap();
+    let current_config = schema.configuration.get().unwrap();
     assert_eq!(current_config, config);
 }
 

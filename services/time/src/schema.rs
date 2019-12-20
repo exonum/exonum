@@ -14,19 +14,32 @@
 
 use chrono::{DateTime, Utc};
 
-use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
+use exonum::{
+    blockchain::ValidatorKeys,
+    crypto::PublicKey,
+    runtime::{Version, VersionReq, Versioned},
+};
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     ProofEntry, ProofMapIndex,
 };
 
-/// `Exonum-time` service database schema.
+/// Database schema of the time service. The schema is fully public.
 #[derive(Debug, FromAccess)]
 pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
     /// Consolidated time.
     pub time: ProofEntry<T::Base, DateTime<Utc>>,
+}
+
+impl<T: Access> Versioned for TimeSchema<T> {
+    const NAME: &'static str = env!("CARGO_PKG_NAME");
+
+    fn is_compatible(version: &Version) -> bool {
+        let version_req: VersionReq = env!("CARGO_PKG_VERSION").parse().unwrap();
+        version_req.matches(version)
+    }
 }
 
 impl<T: Access> TimeSchema<T>
