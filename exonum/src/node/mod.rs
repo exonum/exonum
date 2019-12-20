@@ -23,7 +23,15 @@ pub use self::{
 };
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
-pub mod state;
+/// Node timeout constants.
+pub mod constants {
+    pub use super::state::{
+        BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+        TRANSACTIONS_REQUEST_TIMEOUT,
+    };
+}
+
+pub(crate) use self::state::SharedConnectList;
 
 use exonum_keys::{read_keys_from_file, Keys};
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
@@ -69,7 +77,6 @@ use crate::{
         config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
-    node::state::SharedConnectList,
     runtime::{
         rust::{RustRuntime, ServiceFactory},
         RuntimeInstance,
@@ -81,6 +88,7 @@ mod connect_list;
 mod consensus;
 mod events;
 mod requests;
+mod state;
 
 /// External messages.
 #[derive(Debug)]
@@ -491,7 +499,7 @@ impl NodeHandler {
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
-                &user_agent::get(),
+                &user_agent(),
             ),
             config.keys.consensus_pk(),
             &config.keys.consensus_sk(),
@@ -1099,6 +1107,7 @@ impl Node {
         let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
             .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
+
         network_thread.join().unwrap()
     }
 

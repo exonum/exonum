@@ -91,9 +91,8 @@
 //!
 
 pub use self::{signed::Verified, types::*};
-pub use exonum_merkledb::BinaryValue;
 
-use exonum_merkledb::ObjectHash;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 
 use std::borrow::Cow;
 
@@ -102,8 +101,6 @@ use crate::{
     helpers::{Height, Round, ValidatorId},
 };
 
-#[macro_use]
-mod macros;
 mod signed;
 #[cfg(test)]
 mod tests;

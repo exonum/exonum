@@ -39,7 +39,7 @@ use crate::{
         },
         tests::raw_message,
     },
-    messages::BinaryValue,
+    merkledb::BinaryValue,
 };
 
 #[test]

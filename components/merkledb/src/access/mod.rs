@@ -40,7 +40,7 @@ mod extensions;
 /// }
 /// ```
 pub trait Access: Clone {
-    /// Raw access serving as the basis for created indices.
+    /// Raw access serving as the basis for created indexes.
     type Base: RawAccess;
 
     /// Gets or creates a generic view with the specified address.
