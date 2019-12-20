@@ -12,12 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
-pub use self::tests_transactions::{CreateWallet, Transfer};
+fn main() {
+    let protobuf_gen_data = [(
+        "src/proto",
+        vec![
+            "src/proto".into(),
+            ProtoSources::Exonum,
+            ProtoSources::Crypto,
+        ],
+        "protobuf_mod.rs",
+    )];
 
-include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
-
-use exonum::crypto::proto::*;
+    for (input_dir, includes, mod_file_name) in protobuf_gen_data.into_iter() {
+        ProtobufGenerator::with_mod_name(mod_file_name)
+            .with_input_dir(input_dir)
+            .with_includes(includes)
+            .generate();
+    }
+}

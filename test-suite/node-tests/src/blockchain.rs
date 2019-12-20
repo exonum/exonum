@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Simplified blockchain emulation for the `BlockchainExplorer`.
+//! Simplified blockchain emulation for the Exonum node tests.
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
@@ -33,23 +33,21 @@ use serde_derive::*;
 
 use std::collections::BTreeMap;
 
-pub const SERVICE_ID: InstanceId = 4;
-
-mod proto;
+pub const SERVICE_ID: InstanceId = 118;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::CreateWallet")]
+#[protobuf_convert(source = "crate::proto::CreateWallet")]
 pub struct CreateWallet {
     pub pubkey: PublicKey,
     pub name: String,
 }
 
 impl CreateWallet {
-    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
+    pub fn new(pubkey: PublicKey, name: &str) -> Self {
         Self {
-            pubkey: *pubkey,
+            pubkey,
             name: name.to_owned(),
         }
     }
@@ -58,7 +56,7 @@ impl CreateWallet {
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Transfer")]
+#[protobuf_convert(source = "crate::proto::Transfer")]
 pub struct Transfer {
     pub from: PublicKey,
     pub to: PublicKey,
@@ -66,12 +64,8 @@ pub struct Transfer {
 }
 
 impl Transfer {
-    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
-        Self {
-            from: *from,
-            to: *to,
-            amount,
-        }
+    pub fn new(from: PublicKey, to: PublicKey, amount: u64) -> Self {
+        Self { from, to, amount }
     }
 }
 
@@ -96,10 +90,10 @@ pub trait ExplorerTransactions {
 #[service_factory(
     artifact_name = "my-service",
     artifact_version = "1.0.1",
-    proto_sources = "proto"
+    proto_sources = "crate::proto"
 )]
 #[service_dispatcher(implements("ExplorerTransactions"))]
-struct MyService;
+pub struct MyService;
 
 impl ExplorerTransactions for MyService {
     fn create_wallet(

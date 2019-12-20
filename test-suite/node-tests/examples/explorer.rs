@@ -14,11 +14,8 @@
 
 //! Examples of usage of a blockchain explorer.
 
-#[macro_use]
-extern crate serde_derive;
-
 use exonum::{
-    blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind},
+    blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind, ProposerId},
     crypto,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -26,24 +23,18 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::rust::Transaction as _,
 };
-use serde_json::json;
-
-use std::{collections::BTreeMap, iter};
-
-use crate::blockchain::{
+use exonum_node_tests::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
 };
-use exonum::blockchain::ProposerId;
-
-#[path = "../tests/explorer/blockchain/mod.rs"]
-mod blockchain;
+use serde_json::json;
+use std::{collections::BTreeMap, iter};
 
 /// Creates a transaction for the mempool.
 pub fn mempool_transaction() -> Verified<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
-    CreateWallet::new(&pk_alex, "Alex").sign(SERVICE_ID, pk_alex, &key_alex)
+    CreateWallet::new(pk_alex, "Alex").sign(SERVICE_ID, pk_alex, &key_alex)
 }
 
 /// Creates a sample blockchain for the example.
@@ -60,9 +51,9 @@ pub fn sample_blockchain() -> BlockchainMut {
     let (pk_alice, key_alice) = crypto::gen_keypair();
     let (pk_bob, key_bob) = crypto::gen_keypair();
 
-    let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
-    let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
-    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_alice = CreateWallet::new(pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_bob = CreateWallet::new(pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
+    let tx_transfer = Transfer::new(pk_alice, pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));
