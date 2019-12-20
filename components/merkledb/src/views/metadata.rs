@@ -232,6 +232,13 @@ where
     }
 }
 
+impl<V> IndexMetadata<V> {
+    /// Returns the index type.
+    pub fn index_type(&self) -> IndexType {
+        self.index_type
+    }
+}
+
 impl IndexMetadata {
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;
@@ -486,6 +493,21 @@ where
         Self::get_or_create_unchecked(index_access, index_address, index_type)
     }
 
+    /// Gets index metadata. Unlike `get_or_create`, this method will not create an index
+    /// if it does not exist.
+    pub(crate) fn get_metadata(
+        index_access: T,
+        index_address: &IndexAddress,
+    ) -> Result<Option<IndexMetadata>, AccessError> {
+        check_index_valid_full_name(index_address.name()).map_err(|kind| AccessError {
+            addr: index_address.to_owned(),
+            kind,
+        })?;
+        let index_full_name = index_address.fully_qualified_name();
+        let pool = IndexesPool::new(index_access);
+        Ok(pool.index_metadata(&index_full_name))
+    }
+
     /// Gets an index with the specified address and type. Unlike `get_or_create`, this method
     /// does not check if the name of the index is reserved.
     ///
@@ -641,5 +663,18 @@ mod tests {
                 .unwrap()
                 .view;
         assert!(!view.changes.is_aggregated());
+    }
+
+    #[test]
+    fn index_type_does_not_create_indexes() {
+        use crate::access::AccessExt;
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let index_count = IndexesPool::new(&fork).len();
+        assert!(fork.index_type("foo").is_none());
+        let pool = IndexesPool::new(&fork);
+        assert!(pool.index_metadata(b"foo").is_none());
+        assert_eq!(pool.len(), index_count);
     }
 }
