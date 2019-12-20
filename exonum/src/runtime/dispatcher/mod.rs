@@ -384,7 +384,7 @@ impl Dispatcher {
     /// Calls `after_transactions` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
-    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
+    /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, CallType::AfterTransactions);

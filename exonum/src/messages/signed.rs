@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},

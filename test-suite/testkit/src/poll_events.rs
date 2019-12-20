@@ -66,7 +66,7 @@ where
 }
 
 /// Polls ready events from a stream of events. The stream is not closed.
-pub fn poll_events<S: Stream<Item = (), Error = ()>>(stream: &mut S) {
+pub(crate) fn poll_events<S: Stream<Item = (), Error = ()>>(stream: &mut S) {
     TakeWhileReady::new(stream.by_ref())
         .for_each(|_| Ok(()))
         .wait()
@@ -74,7 +74,7 @@ pub fn poll_events<S: Stream<Item = (), Error = ()>>(stream: &mut S) {
 }
 
 /// Polls ready items from the stream, returning the latest one.
-pub fn poll_latest<S: Stream>(stream: &mut S) -> Option<Result<S::Item, S::Error>> {
+pub(crate) fn poll_latest<S: Stream>(stream: &mut S) -> Option<Result<S::Item, S::Error>> {
     TakeWhileReady::new(stream).wait().last()
 }
 

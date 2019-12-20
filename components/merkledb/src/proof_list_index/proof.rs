@@ -348,7 +348,7 @@ impl<V: BinaryValue> ListProof<V> {
             return Err(ListProofError::Unordered);
         }
 
-        // Check that hashes on each height have indices in the allowed range.
+        // Check that hashes on each height have indexes in the allowed range.
         for &HashedEntry { key, .. } in &self.proof {
             let height = key.height();
             if height == 0 {
@@ -422,7 +422,7 @@ impl<V: BinaryValue> ListProof<V> {
         self.length
     }
 
-    /// Returns indices and references to elements in the proof without verifying it.
+    /// Returns indexes and references to elements in the proof without verifying it.
     pub fn entries_unchecked(&self) -> &[(u64, V)] {
         &self.entries
     }
@@ -564,7 +564,7 @@ pub struct CheckedListProof<'a, V> {
 }
 
 impl<'a, V> CheckedListProof<'a, V> {
-    /// Returns indices and references to elements in the proof.
+    /// Returns indexes and references to elements in the proof.
     pub fn entries(&self) -> &'a [(u64, V)] {
         self.entries
     }
@@ -748,7 +748,7 @@ mod tests {
         //       |
         //       x   Values
 
-        // Proof for indices 1..=2 in a 3-element tree.
+        // Proof for indexes 1..=2 in a 3-element tree.
         let mut proof = ListProof::new(vec![(1, 1_u32), (2, 2)], 3);
         proof.push_hash(1, 0, Hash::zero());
         assert_eq!(proof.hash_ops().unwrap(), 5);
