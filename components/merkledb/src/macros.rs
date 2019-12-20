@@ -102,13 +102,13 @@ macro_rules! impl_serde_hex_for_binary_value {
             fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
                 use exonum_merkledb::BinaryValue;
 
-                self.to_bytes().encode_hex()
+                BinaryValue::to_bytes(self).encode_hex()
             }
 
             fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
                 use exonum_merkledb::BinaryValue;
 
-                self.to_bytes().encode_hex_upper()
+                BinaryValue::to_bytes(self).encode_hex_upper()
             }
         }
 
@@ -119,7 +119,7 @@ macro_rules! impl_serde_hex_for_binary_value {
                 use exonum_merkledb::BinaryValue;
 
                 let bytes = Vec::<u8>::from_hex(v)?;
-                Self::from_bytes(bytes.into()).map_err(From::from)
+                <Self as BinaryValue>::from_bytes(bytes.into()).map_err(From::from)
             }
         }
 
@@ -127,7 +127,7 @@ macro_rules! impl_serde_hex_for_binary_value {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 use hex::ToHex;
 
-                write!(f, "{}", self.encode_hex::<String>())
+                write!(f, "{}", <Self as ToHex>::encode_hex::<String>(self))
             }
         }
 
@@ -137,7 +137,7 @@ macro_rules! impl_serde_hex_for_binary_value {
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 use hex::FromHex;
 
-                Self::from_hex(s)
+                <Self as FromHex>::from_hex(s)
             }
         }
 

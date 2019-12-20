@@ -540,7 +540,7 @@ mod foreign_interface_call {
 
     impl Service for Timestamping {}
 
-    fn default_instance(id: InstanceId, name: &'static str) -> InstanceInitParams {
+    fn default_instance(id: InstanceId, name: &str) -> InstanceInitParams {
         Timestamping.artifact_id().into_default_instance(id, name)
     }
 
