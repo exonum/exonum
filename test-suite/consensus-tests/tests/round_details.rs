@@ -22,7 +22,7 @@ use exonum::{
     blockchain::ProposerId,
     helpers::{Height, Round, ValidatorId},
     messages::{PrevotesRequest, TransactionsRequest, Verified},
-    node::state::{
+    node::constants::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
 };

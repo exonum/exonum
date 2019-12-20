@@ -36,11 +36,10 @@ pub mod schema;
 pub mod transactions;
 
 use exonum::{
-    blockchain::ExecutionError,
     merkledb::BinaryValue,
     runtime::{
         rust::{api::ServiceApiBuilder, CallContext, Service},
-        DispatcherError,
+        DispatcherError, ExecutionError,
     },
 };
 

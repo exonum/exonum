@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{
     access::{AsReadonly, Prefixed, RawAccess},
-    Fork, Snapshot, SystemSchema,
+    Snapshot, SystemSchema,
 };
 
 use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceStatus};
@@ -150,20 +150,5 @@ impl SnapshotExt for dyn Snapshot {
             block_proof,
             index_proof,
         })
-    }
-}
-
-/// Extension trait for `Fork` allowing to writeable access blockchain data in a more structured way.
-///
-/// Be very careful with blockchain manipulations, they can destroy the data consistency!
-#[doc(hidden)]
-pub trait ForkExt {
-    /// Returns writeable core schema.
-    fn for_core_writeable(&self) -> CoreSchema<&'_ Fork>;
-}
-
-impl ForkExt for Fork {
-    fn for_core_writeable(&self) -> CoreSchema<&'_ Fork> {
-        CoreSchema::new(self)
     }
 }

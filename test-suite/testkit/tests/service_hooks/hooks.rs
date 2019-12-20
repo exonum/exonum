@@ -15,11 +15,10 @@
 //! A special service which generates transactions on `after_commit` events.
 use super::proto;
 use exonum::{
-    blockchain::ExecutionError,
     helpers::Height,
     runtime::{
         rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
-        InstanceId,
+        ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;

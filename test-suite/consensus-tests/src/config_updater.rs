@@ -15,13 +15,13 @@
 pub use crate::proto::TxConfig;
 
 use exonum::{
-    blockchain::{ConsensusConfig, ExecutionError},
+    blockchain::ConsensusConfig,
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, Service, Transaction},
-        InstanceId, SUPERVISOR_INSTANCE_ID,
+        rust::{CallContext, DefaultInstance, Service, Transaction},
+        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -56,6 +56,11 @@ impl Service for ConfigUpdaterService {}
 
 impl ConfigUpdaterService {
     pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;
+}
+
+impl DefaultInstance for ConfigUpdaterService {
+    const INSTANCE_ID: InstanceId = ConfigUpdaterService::ID;
+    const INSTANCE_NAME: &'static str = "config-updater";
 }
 
 impl TxConfig {

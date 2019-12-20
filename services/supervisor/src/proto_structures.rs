@@ -19,13 +19,14 @@ use exonum::{
     crypto::Hash,
     exonum_merkledb::ObjectHash,
     helpers::Height,
-    impl_serde_hex_for_binary_value,
     messages::{AnyTx, Verified},
     runtime::{rust::Transaction, ArtifactId, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
-use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
+use exonum_merkledb::{
+    impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue,
+};
 use exonum_proto::ProtobufConvert;
 
 use super::{mode::Mode, proto, transactions::SupervisorInterface};

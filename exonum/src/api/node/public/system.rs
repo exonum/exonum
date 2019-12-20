@@ -114,7 +114,7 @@ impl SystemApi {
     }
 
     fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint(name, move |_query: ()| Ok(user_agent::get()));
+        api_scope.endpoint(name, move |_query: ()| Ok(user_agent()));
         self
     }
 

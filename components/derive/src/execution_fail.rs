@@ -204,12 +204,12 @@ impl ExecutionFail {
         let match_arms = self.variants.iter().map(|variant| {
             let ident = &variant.ident;
             let id = &variant.id;
-            quote!(#name::#ident => #cr::runtime::error::ErrorKind::#kind { code: #id },)
+            quote!(#name::#ident => #cr::runtime::ErrorKind::#kind { code: #id },)
         });
 
         quote! {
-            impl #cr::runtime::error::ExecutionFail for #name {
-                fn kind(&self) -> #cr::runtime::error::ErrorKind {
+            impl #cr::runtime::ExecutionFail for #name {
+                fn kind(&self) -> #cr::runtime::ErrorKind {
                     match self {
                         #( #match_arms )*
                     }
@@ -225,7 +225,7 @@ impl ExecutionFail {
     fn implement_into_execution_error(&self) -> impl ToTokens {
         let name = &self.name;
         let cr = &self.attrs.cr;
-        let module = quote!(#cr::runtime::error);
+        let module = quote!(#cr::runtime);
         quote! {
             impl From<#name> for #module::ExecutionError {
                 fn from(inner: #name) -> Self {
