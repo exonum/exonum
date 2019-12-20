@@ -140,10 +140,8 @@
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
 
-pub use semver::{Version, VersionReq};
-
 pub use self::{
-    blockchain_data::{BlockchainData, SnapshotExt, Versioned},
+    blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
@@ -157,6 +155,7 @@ pub use self::{
 
 #[macro_use]
 pub mod rust;
+pub mod versioning;
 
 use futures::Future;
 

@@ -16,11 +16,10 @@ use exonum_merkledb::{
     access::{AsReadonly, FromAccess, Prefixed, RawAccess},
     Snapshot, SystemSchema,
 };
-use semver::Version;
 
 use super::{
-    DispatcherError, DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor,
-    InstanceQuery, InstanceSpec, InstanceStatus,
+    versioning::{ArtifactReqError, RequireArtifact},
+    DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceSpec, InstanceStatus,
 };
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
@@ -68,16 +67,16 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     ///
     /// # Errors
     ///
-    /// Returns an error in the following situations (see [`SchemaError`] for more details):
+    /// Returns an error in the following situations (see [`ArtifactReqError`] for more details):
     ///
     /// - Service with the given ID does not exist
     /// - Service has an unexpected artifact name
     /// - Service has an incompatible artifact version
     ///
-    /// [`SchemaError`]: enum.SchemaError.html
-    pub fn service_schema<'q, S, I>(&self, service_id: I) -> Result<S, SchemaError>
+    /// [`ArtifactReqError`]: versioning/enum.ArtifactReqError.html
+    pub fn service_schema<'q, S, I>(&self, service_id: I) -> Result<S, ArtifactReqError>
     where
-        S: Versioned + FromAccess<Prefixed<'static, T::Readonly>>,
+        S: RequireArtifact + FromAccess<Prefixed<'static, T::Readonly>>,
         I: Into<InstanceQuery<'q>>,
     {
         schema_for_service(self.access.as_readonly(), service_id)
@@ -134,26 +133,16 @@ fn mount_point_for_service<'q, T: RawAccess>(
 fn schema_for_service<'q, T, S>(
     access: T,
     service_id: impl Into<InstanceQuery<'q>>,
-) -> Result<S, SchemaError>
+) -> Result<S, ArtifactReqError>
 where
     T: RawAccess,
-    S: Versioned + FromAccess<Prefixed<'static, T>>,
+    S: RequireArtifact + FromAccess<Prefixed<'static, T>>,
 {
     let (access, spec) =
-        mount_point_for_service(access, service_id).ok_or(SchemaError::NoService)?;
+        mount_point_for_service(access, service_id).ok_or(ArtifactReqError::NoService)?;
 
-    if spec.artifact.name != S::NAME {
-        return Err(SchemaError::UnexpectedName {
-            expected: S::NAME.to_owned(),
-            actual: spec.artifact.name,
-        });
-    }
-    if !S::is_compatible(&spec.artifact.version) {
-        return Err(SchemaError::IncompatibleVersion {
-            actual: spec.artifact.version,
-        });
-    }
-
+    let artifact_req = S::required_artifact();
+    artifact_req.try_match(&spec.artifact)?;
     Ok(S::from_root(access).unwrap())
 }
 
@@ -173,16 +162,16 @@ pub trait SnapshotExt {
     ///
     /// # Errors
     ///
-    /// Returns an error in the following situations (see [`SchemaError`] for more details):
+    /// Returns an error in the following situations (see [`ArtifactReqError`] for more details):
     ///
     /// - Service with the given ID does not exist
     /// - Service has an unexpected artifact name
     /// - Service has an incompatible artifact version
     ///
-    /// [`SchemaError`]: enum.SchemaError.html
-    fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, SchemaError>
+    /// [`ArtifactReqError`]: versioning/enum.ArtifactReqError.html
+    fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>
     where
-        S: Versioned + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
+        S: RequireArtifact + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
         I: Into<InstanceQuery<'q>>;
 }
 
@@ -202,40 +191,12 @@ impl SnapshotExt for dyn Snapshot {
         mount_point_for_service(self, id).map(|(access, _)| access)
     }
 
-    fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, SchemaError>
+    fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>
     where
-        S: Versioned + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
+        S: RequireArtifact + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
         I: Into<InstanceQuery<'q>>,
     {
         schema_for_service(self, service_id)
-    }
-}
-
-/// Versioned object that checks compatibility with the artifact of a service.
-// TODO: Reuse `ArtifactReq` here once #1606 is merged?
-pub trait Versioned {
-    /// Name of the artifact corresponding to the service.
-    const NAME: &'static str;
-    /// Is the schema compatible with the given artifact version?
-    fn is_compatible(version: &Version) -> bool;
-}
-
-#[derive(Debug, Fail)]
-pub enum SchemaError {
-    #[fail(display = "No service with the specified identifier exists")]
-    NoService,
-    #[fail(
-        display = "Unexpected artifact name ({}), was expecting `{}`",
-        expected, actual
-    )]
-    UnexpectedName { expected: String, actual: String },
-    #[fail(display = "Incompatible artifact version ({})", actual)]
-    IncompatibleVersion { actual: Version },
-}
-
-impl From<SchemaError> for ExecutionError {
-    fn from(err: SchemaError) -> Self {
-        DispatcherError::IncorrectInstanceId.with_description(err.to_string())
     }
 }
 
@@ -248,6 +209,7 @@ mod tests {
     use futures::sync::mpsc;
 
     use super::*;
+    use crate::runtime::versioning::ArtifactReq;
     use crate::{
         blockchain::config::GenesisConfigBuilder,
         blockchain::{Blockchain, BlockchainMut},
@@ -267,11 +229,9 @@ mod tests {
         private: Entry<T::Base, String>,
     }
 
-    impl<T: Access> Versioned for SchemaInterface<T> {
-        const NAME: &'static str = "exonum.Token";
-
-        fn is_compatible(version: &Version) -> bool {
-            *version >= Version::new(1, 3, 0) && *version < Version::new(2, 0, 0)
+    impl<T: Access> RequireArtifact for SchemaInterface<T> {
+        fn required_artifact() -> ArtifactReq {
+            "exonum.Token@^1.3.0".parse().unwrap()
         }
     }
 
@@ -367,17 +327,17 @@ mod tests {
         let err = data
             .service_schema::<SchemaInterface<_>, _>("what")
             .expect_err("Retrieving schema for non-existing service should fail");
-        assert_matches!(err, SchemaError::NoService);
+        assert_matches!(err, ArtifactReqError::NoService);
         let err = data
             .service_schema::<SchemaInterface<_>, _>("old-token")
             .expect_err("Retrieving schema for old service should fail");
-        assert_matches!(err, SchemaError::IncompatibleVersion { .. });
+        assert_matches!(err, ArtifactReqError::IncompatibleVersion { .. });
         let err = data
             .service_schema::<SchemaInterface<_>, _>("other")
             .expect_err("Retrieving schema for unrelated service should fail");
         assert_matches!(
             err,
-            SchemaError::UnexpectedName { ref actual, .. } if actual == "exonum.OtherService"
+            ArtifactReqError::UnexpectedName { ref actual, .. } if actual == "exonum.OtherService"
         );
 
         blockchain.merge(fork.into_patch()).unwrap();
