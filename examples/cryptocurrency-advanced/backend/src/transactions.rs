@@ -124,8 +124,16 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             return Err(Error::SenderSameAsReceiver.into());
         }
 
-        let sender = schema.wallets.get(&from).ok_or(Error::SenderNotFound)?;
-        let receiver = schema.wallets.get(&to).ok_or(Error::ReceiverNotFound)?;
+        let sender = schema
+            .public
+            .wallets
+            .get(&from)
+            .ok_or(Error::SenderNotFound)?;
+        let receiver = schema
+            .public
+            .wallets
+            .get(&to)
+            .ok_or(Error::ReceiverNotFound)?;
         if sender.balance < amount {
             Err(Error::InsufficientCurrencyAmount.into())
         } else {
@@ -142,7 +150,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
-        if let Some(wallet) = schema.wallets.get(&from) {
+        if let Some(wallet) = schema.public.wallets.get(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
@@ -158,7 +166,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
-        if schema.wallets.get(&from).is_none() {
+        if schema.public.wallets.get(&from).is_none() {
             let name = &arg.name;
             schema.create_wallet(&from, name, tx_hash);
             Ok(())

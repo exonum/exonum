@@ -14,6 +14,7 @@
 
 //! Cryptocurrency database schema.
 
+use exonum::runtime::{Version, VersionReq, Versioned};
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,
@@ -24,12 +25,31 @@ use exonum::crypto::{Hash, PublicKey};
 use crate::{wallet::Wallet, INITIAL_BALANCE};
 
 /// Database schema for the cryptocurrency.
+///
+/// Note that the schema is crate-private, but it has a public part.
 #[derive(Debug, FromAccess)]
-pub struct Schema<T: Access> {
+pub(crate) struct Schema<T: Access> {
+    /// Public part of the schema.
+    #[from_access(flatten)]
+    pub(crate) public: SchemaInterface<T>,
+    /// History for specific wallets.
+    pub(crate) wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
+}
+
+/// Public part of the cryptocurrency schema.
+#[derive(Debug, FromAccess)]
+pub struct SchemaInterface<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
-    /// History for specific wallets.
-    pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
+}
+
+impl<T: Access> Versioned<T> for SchemaInterface<T> {
+    const NAME: &'static str = env!("CARGO_PKG_NAME");
+
+    fn is_compatible(version: &Version) -> bool {
+        let version_req: VersionReq = env!("CARGO_PKG_VERSION").parse().unwrap();
+        version_req.matches(version)
+    }
 }
 
 impl<T> Schema<T>
@@ -52,7 +72,7 @@ where
         let balance = wallet.balance;
         let wallet = wallet.set_balance(balance + amount, &history_hash);
         let wallet_key = wallet.pub_key;
-        self.wallets.put(&wallet_key, wallet);
+        self.public.wallets.put(&wallet_key, wallet);
     }
 
     /// Decrease balance of the wallet and append new record to its history.
@@ -70,7 +90,7 @@ where
         let balance = wallet.balance;
         let wallet = wallet.set_balance(balance - amount, &history_hash);
         let wallet_key = wallet.pub_key;
-        self.wallets.put(&wallet_key, wallet);
+        self.public.wallets.put(&wallet_key, wallet);
     }
 
     /// Create new wallet and append first record to its history.
@@ -79,6 +99,6 @@ where
         history.push(transaction);
         let history_hash = history.object_hash();
         let wallet = Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash);
-        self.wallets.put(key, wallet);
+        self.public.wallets.put(key, wallet);
     }
 }

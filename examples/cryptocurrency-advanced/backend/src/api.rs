@@ -23,7 +23,7 @@ use exonum::{
     runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 };
 
-use crate::{wallet::Wallet, Schema};
+use crate::{schema::Schema, wallet::Wallet};
 
 /// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -78,12 +78,12 @@ impl PublicApi {
         } = state.data().proof_for_service_index("wallets").unwrap();
 
         let currency_schema = Schema::new(state.service_data());
-        let to_wallet = currency_schema.wallets.get_proof(pub_key);
+        let to_wallet = currency_schema.public.wallets.get_proof(pub_key);
         let wallet_proof = WalletProof {
             to_table: index_proof,
             to_wallet,
         };
-        let wallet = currency_schema.wallets.get(&pub_key);
+        let wallet = currency_schema.public.wallets.get(&pub_key);
 
         let wallet_history = wallet.map(|_| {
             // `history` is always present for existing wallets.

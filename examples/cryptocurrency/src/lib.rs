@@ -37,6 +37,9 @@ extern crate serde_derive;
 
 pub mod proto;
 
+#[cfg(test)]
+mod tx_tests;
+
 /// Persistent data.
 pub mod schema {
     use exonum::crypto::PublicKey;
@@ -89,10 +92,12 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
+    ///
+    /// Note that the schema is fully private; it is exposed to the clients via service HTTP API.
     #[derive(Debug, FromAccess)]
-    pub struct CurrencySchema<T: Access> {
-        /// Correspondence of public keys of users to account information.
-        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+    pub(crate) struct CurrencySchema<T: Access> {
+        /// Correspondence of public keys of users to the account information.
+        pub(crate) wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 }
 
