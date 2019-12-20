@@ -113,13 +113,15 @@ where
     K: BinaryKey + ?Sized,
     I: FromAccess<T>,
 {
-    /// Return all the keys from this group.
+    /// Return iterator over the keys from this group.
     ///
-    /// Note: use this method carefully, because storing all keys in memory may
+    /// **Note:** use this method carefully, because storing all keys in memory may
     /// consume a large amount of RAM.
-    pub fn keys(&self) -> Vec<K::Owned> {
+    ///
+    /// **Note:** creating any new indexes while this iterator is in scope may lead to panic.
+    pub fn keys_unchecked(&self) -> impl Iterator<Item = K::Owned> {
         let indexes_pool = IndexesPool::new(self.access.clone());
-        indexes_pool.suffixes::<K>(self.prefix.name())
+        indexes_pool.suffixes::<K>(self.prefix.name()).into_iter()
     }
 }
 
@@ -179,11 +181,10 @@ mod tests {
 
         let snapshot = db.snapshot();
         let group: Group<_, str, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
-        let keys = group.keys();
 
-        let results = keys
-            .iter()
-            .map(|key| group.get(key).get(0).unwrap())
+        let results = group
+            .keys_unchecked()
+            .map(|key| group.get(&key).get(0).unwrap())
             .collect::<Vec<_>>();
 
         assert_eq!(
@@ -217,7 +218,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
-        let keys = group.keys();
+        let keys = group.keys_unchecked().collect::<Vec<String>>();
 
         // Keys should not contain keys from the indexes, that was written before or
         // after the `GROUP_NAME`.
