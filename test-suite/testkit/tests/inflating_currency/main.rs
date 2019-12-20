@@ -23,11 +23,11 @@ use exonum::{
     api::node::public::explorer::TransactionResponse,
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Verified},
+    messages::{AnyTx, Verified},
     runtime::rust::Transaction,
 };
-use exonum_merkledb::ObjectHash;
-use exonum_testkit::{txvec, ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 use serde_json::json;
 
@@ -111,9 +111,9 @@ fn test_transfer_scenarios() {
 
     // Put transactions from A to B in separate blocks, allowing them both to succeed.
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
-    testkit.create_block_with_transactions(txvec![]); // A: 4 + 2, B: 14 + 2
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
+    testkit.create_block_with_transactions(vec![]); // A: 4 + 2, B: 14 + 2
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
     assert_eq!(get_balance(&api, &tx_alice.author()), 1); // 0 + 1
     assert_eq!(get_balance(&api, &tx_bob.author()), 23); // 20 + 3
     testkit.rollback();
@@ -121,29 +121,29 @@ fn test_transfer_scenarios() {
     // If there is no block separating transactions, Alice's balance is insufficient
     // to complete the second transaction.
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // fails
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // fails
     assert_eq!(get_balance(&api, &tx_alice.author()), 6); // 4 + 2
     assert_eq!(get_balance(&api, &tx_bob.author()), 16); // 14 + 2
     testkit.rollback();
 
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // fails
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // fails
     assert_eq!(get_balance(&api, &tx_alice.author()), 5); // 3 + 2
     assert_eq!(get_balance(&api, &tx_bob.author()), 17); // 15 + 2
     testkit.rollback();
 
     // If the transactions are put in the same block, only the first transaction should succeed
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
     assert_eq!(get_balance(&api, &tx_alice.author()), 5); // 4 + 1
     assert_eq!(get_balance(&api, &tx_bob.author()), 15); // 14 + 1
     testkit.rollback();
 
     // Same here
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
     assert_eq!(get_balance(&api, &tx_alice.author()), 4); // 3 + 1
     assert_eq!(get_balance(&api, &tx_bob.author()), 16); // 15 + 1
     testkit.rollback();
