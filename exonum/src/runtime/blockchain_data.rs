@@ -80,18 +80,8 @@ impl BlockchainData<'_, &dyn Snapshot> {
     /// returned value may unexpectedly lead to a panic unless the index is initialized early
     /// (e.g., during service initialization).
     pub fn proof_for_service_index(&self, index_name: &str) -> Option<IndexProof> {
-        let core_schema = self.for_core();
-        let height = core_schema.height();
-        let block_proof = core_schema.block_and_precommits(height).unwrap();
-
         let full_index_name = [self.service_instance.name, ".", index_name].concat();
-        let aggregator = SystemSchema::new(self.access).state_aggregator();
-        aggregator.get(&full_index_name)?;
-        let index_proof = aggregator.get_proof(full_index_name);
-        Some(IndexProof {
-            block_proof,
-            index_proof,
-        })
+        self.access.proof_for_index(&full_index_name)
     }
 }
 
@@ -119,6 +109,17 @@ pub trait SnapshotExt {
         &self,
         id: impl Into<InstanceQuery<'q>>,
     ) -> Option<Prefixed<'static, &dyn Snapshot>>;
+
+    /// Returns a proof for a Merkelized index with the specified name.
+    ///
+    /// # Return value
+    ///
+    /// If the index does not exist or is not Merkelized, returns `None`. Note that this may
+    /// occur before the index is accessed the first time, which, depending on the service logic,
+    /// may happen indefinitely after the service has been initialized. Thus, `unwrap`ping the
+    /// returned value may unexpectedly lead to a panic unless the index is initialized early
+    /// (e.g., during service initialization).
+    fn proof_for_index(&self, index_name: &str) -> Option<IndexProof>;
 }
 
 impl SnapshotExt for dyn Snapshot {
@@ -135,6 +136,20 @@ impl SnapshotExt for dyn Snapshot {
         id: impl Into<InstanceQuery<'q>>,
     ) -> Option<Prefixed<'static, &dyn Snapshot>> {
         mount_point_for_service(self, id)
+    }
+
+    fn proof_for_index(&self, index_name: &str) -> Option<IndexProof> {
+        let core_schema = self.for_core();
+        let height = core_schema.height();
+        let block_proof = core_schema.block_and_precommits(height).unwrap();
+
+        let aggregator = SystemSchema::new(self).state_aggregator();
+        aggregator.get(index_name)?;
+        let index_proof = aggregator.get_proof(index_name.to_string());
+        Some(IndexProof {
+            block_proof,
+            index_proof,
+        })
     }
 }
 
