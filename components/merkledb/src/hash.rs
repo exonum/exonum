@@ -16,7 +16,7 @@ use exonum_crypto::{hash, Hash, HashStream};
 use failure::Fail;
 use hex::FromHex;
 
-use crate::{proof_map_index::ProofPath, BinaryValue};
+use crate::{proof_map::ProofPath, BinaryValue};
 
 const EMPTY_LIST_HASH: &str = "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9";
 const EMPTY_MAP_HASH: &str = "7324b5c72b51bb5d4c180f1109cfd347b60473882145841c39f3e584576296f9";
@@ -44,14 +44,14 @@ pub enum HashTag {
     /// [`BinaryValue`]: trait.BinaryValue.html
     Blob = 0,
     /// Hash prefix of a branch node in a Merkle tree built for
-    /// a [Merkelized list](struct.ProofListIndex.html).
+    /// a [Merkelized list](indexes/proof_list/struct.ProofListIndex.html).
     ListBranchNode = 1,
-    /// Hash prefix of a [Merkelized list](struct.ProofListIndex.html).
+    /// Hash prefix of a [Merkelized list](indexes/proof_list/struct.ProofListIndex.html).
     ListNode = 2,
-    /// Hash prefix of a [Merkelized map](struct.ProofMapIndex.html).
+    /// Hash prefix of a [Merkelized map](indexes/proof_map/struct.ProofMapIndex.html).
     MapNode = 3,
     /// Hash prefix of a branch node in a Merkle Patricia tree built for
-    /// a [Merkelized map](struct.ProofMapIndex.html).
+    /// a [Merkelized map](indexes/proof_map/struct.ProofMapIndex.html).
     MapBranchNode = 4,
 }
 
@@ -136,7 +136,7 @@ impl HashTag {
     ///
     /// See [`ProofMapIndex`] for details how branch nodes are serialized.
     ///
-    /// [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html#impl-ObjectHash
+    /// [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html#impl-ObjectHash
     pub fn hash_map_branch(branch_node: &[u8]) -> Hash {
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])

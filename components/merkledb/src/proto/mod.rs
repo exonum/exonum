@@ -21,7 +21,7 @@ use failure::Error;
 use protobuf::{well_known_types::Empty, RepeatedField};
 use std::borrow::Cow;
 
-use crate::{proof_map_index::ProofPath, BinaryKey, BinaryValue};
+use crate::{proof_map::ProofPath, BinaryKey, BinaryValue};
 use exonum_crypto::proto::*;
 use exonum_proto::ProtobufConvert;
 
@@ -125,7 +125,7 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        access::AccessExt, indexes::proof_map_index::ToProofPath, proto, BinaryKey, BinaryValue,
+        access::AccessExt, indexes::proof_map::ToProofPath, proto, BinaryKey, BinaryValue,
         Database, ListProof, MapProof, ObjectHash, TemporaryDB,
     };
     use protobuf::RepeatedField;

@@ -118,15 +118,15 @@
 //! [`merge`]: trait.Database.html#tymethod.merge
 //! [`BinaryKey`]: trait.BinaryKey.html
 //! [`BinaryValue`]: trait.BinaryValue.html
-//! [`Entry`]: struct.Entry.html
-//! [`ProofEntry`]: struct.ProofEntry.html
-//! [`ListIndex`]: struct.ListIndex.html
-//! [`SparseListIndex`]: struct.SparseListIndex.html
-//! [`MapIndex`]: struct.MapIndex.html
-//! [`ProofListIndex`]: struct.ProofListIndex.html
-//! [`ProofMapIndex`]: struct.ProofMapIndex.html
-//! [`KeySetIndex`]: struct.KeySetIndex.html
-//! [`ValueSetIndex`]: struct.ValueSetIndex.html
+//! [`Entry`]: indexes/entry/struct.Entry.html
+//! [`ProofEntry`]: indexes/proof_entry/struct.ProofEntry.html
+//! [`ListIndex`]: indexes/list/struct.ListIndex.html
+//! [`SparseListIndex`]: indexes/sparse_list/struct.SparseListIndex.html
+//! [`MapIndex`]: indexes/map/struct.MapIndex.html
+//! [`ProofListIndex`]: indexes/proof_list/struct.ProofListIndex.html
+//! [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html
+//! [`KeySetIndex`]: indexes/key_set/struct.KeySetIndex.html
+//! [`ValueSetIndex`]: indexes/value_set/struct.ValueSetIndex.html
 //! [`ObjectHash`]: trait.ObjectHash.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
@@ -136,7 +136,7 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 //! [`state_aggregator`]: struct.SystemSchema.html#method.state_aggregator
-//! [`Group`]: struct.Group.html
+//! [`Group`]: indexes/group/struct.Group.html
 //! [`IndexAddress`]: struct.IndexAddress.html
 //! [Exonum]: https://exonum.com/
 
@@ -167,7 +167,6 @@ pub use self::{
     db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
     error::Error,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
-    indexes::{Entry, Group, ProofEntry},
     keys::BinaryKey,
     lazy::Lazy,
     options::DbOptions,
@@ -176,15 +175,16 @@ pub use self::{
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'
-#[doc(inline)]
+#[doc(no_inline)]
 pub use self::indexes::{
-    key_set_index::{self, KeySetIndex},
-    list_index::{self, ListIndex},
-    map_index::{self, MapIndex},
-    proof_list_index::{self, ListProof, ProofListIndex},
-    proof_map_index::{self, MapProof, ProofMapIndex, RawProofMapIndex},
-    sparse_list_index::{self, SparseListIndex},
-    value_set_index::{self, ValueSetIndex},
+    key_set::{self, KeySetIndex},
+    list::{self, ListIndex},
+    map::{self, MapIndex},
+    proof_list::{self, ListProof, ProofListIndex},
+    proof_map::{self, MapProof, ProofMapIndex, RawProofMapIndex},
+    sparse_list::{self, SparseListIndex},
+    value_set::{self, ValueSetIndex},
+    Entry, Group, ProofEntry,
 };
 
 #[macro_use]
@@ -199,7 +199,6 @@ mod backends;
 mod db;
 mod error;
 mod hash;
-mod indexes;
 mod keys;
 mod lazy;
 mod options;
@@ -207,6 +206,7 @@ mod values;
 mod views;
 
 pub mod access;
+pub mod indexes;
 pub mod migration;
 pub mod validation;
 

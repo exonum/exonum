@@ -136,7 +136,7 @@ mod tests {
     use exonum_crypto;
 
     use super::*;
-    use crate::{proof_map_index::key::BitsRange, BinaryValue, ObjectHash};
+    use crate::{proof_map::key::BitsRange, BinaryValue, ObjectHash};
 
     #[test]
     fn test_branch_node_layout() {

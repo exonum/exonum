@@ -27,7 +27,7 @@ use super::{
 };
 use crate::{BinaryValue, HashTag, ObjectHash};
 
-use crate::indexes::proof_map_index::key::{Hashed, ToProofPath};
+use crate::indexes::proof_map::key::{Hashed, ToProofPath};
 
 impl serde::Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -233,7 +233,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
 /// #    access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, HashTag,
-/// #    proof_map_index::{Hashed, ToProofPath},
+/// #    proof_map::{Hashed, ToProofPath},
 /// # };
 /// # use exonum_crypto::hash;
 /// # fn main() {

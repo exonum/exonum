@@ -33,7 +33,7 @@ use crate::{
 /// `KeySetIndex` implements a set that stores the elements as keys with empty values.
 /// `KeySetIndex` requires that elements should implement the [`BinaryKey`] trait.
 ///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
+/// [`BinaryKey`]: ../../trait.BinaryKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T: RawAccess, K> {
     base: View<T>,

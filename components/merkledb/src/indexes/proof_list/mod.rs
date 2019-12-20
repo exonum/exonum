@@ -53,7 +53,7 @@ fn tree_height_by_length(len: u64) -> u8 {
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that elements implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
@@ -755,7 +755,7 @@ mod proto {
     use std::borrow::Cow;
 
     use super::{HashedEntry, ListProof, ProofListKey};
-    use crate::{indexes::proof_list_index::MAX_INDEX, BinaryValue};
+    use crate::{indexes::proof_list::MAX_INDEX, BinaryValue};
     use exonum_proto::ProtobufConvert;
 
     impl ProtobufConvert for ProofListKey {

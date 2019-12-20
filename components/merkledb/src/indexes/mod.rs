@@ -20,10 +20,10 @@ mod entry;
 mod group;
 mod proof_entry;
 
-pub mod key_set_index;
-pub mod list_index;
-pub mod map_index;
-pub mod proof_list_index;
-pub mod proof_map_index;
-pub mod sparse_list_index;
-pub mod value_set_index;
+pub mod key_set;
+pub mod list;
+pub mod map;
+pub mod proof_list;
+pub mod proof_map;
+pub mod sparse_list;
+pub mod value_set;

@@ -73,8 +73,8 @@ where
 /// `ProofMapIndex` requires that keys implement the [`BinaryKey`] trait and
 /// values implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryKey`]: ../../trait.BinaryKey.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 pub struct ProofMapIndex<T: RawAccess, K: ?Sized, V, KeyMode: ToProofPath<K> = Hashed> {
     base: View<T>,
     state: IndexState<T, ProofPath>,

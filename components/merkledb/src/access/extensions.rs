@@ -2,7 +2,7 @@
 
 use super::{Access, FromAccess};
 use crate::{
-    indexes::proof_map_index::{Raw, ToProofPath},
+    indexes::proof_map::{Raw, ToProofPath},
     views::IndexType,
     BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex, MapIndex,
     ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex, SparseListIndex, ValueSetIndex,

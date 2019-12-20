@@ -74,8 +74,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-merkledb
 
-- All indexes has been moved to separate module `indexes`. Indexes iterators
-name has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+- The crate has been restructured, indexes are now located in separate module.
+Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
 
 ### exonum-testkit
 

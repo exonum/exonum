@@ -27,7 +27,7 @@ use crate::{
 /// You can add an element to this index and check whether it exists. A value
 /// should implement [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: trait.BinaryValue.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct Entry<T: RawAccess, V> {
     base: View<T>,

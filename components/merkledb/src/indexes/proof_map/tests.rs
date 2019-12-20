@@ -33,7 +33,7 @@ use super::{
 };
 use crate::{
     access::AccessExt,
-    proof_map_index::{Hashed, ProofMapIndex, Raw, ToProofPath},
+    proof_map::{Hashed, ProofMapIndex, Raw, ToProofPath},
     BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };
 

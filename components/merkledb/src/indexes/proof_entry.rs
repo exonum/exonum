@@ -30,8 +30,8 @@ use crate::{
 /// should implement [`BinaryValue`] and [`ObjectHash`] traits. Unlike [`Entry`],
 /// hashed entries are eagerly hashed and may participate in [state aggregation].
 ///
-/// [`BinaryValue`]: trait.BinaryValue.html
-/// [`ObjectHash`]: trait.ObjectHash.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`ObjectHash`]: ../trait.ObjectHash.html
 /// [`Entry`]: struct.Entry.html
 /// [state aggregation]: index.html#state-aggregation
 #[derive(Debug)]
