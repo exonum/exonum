@@ -140,8 +140,10 @@
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
 
+pub use semver::{Version, VersionReq};
+
 pub use self::{
-    blockchain_data::{BlockchainData, SnapshotExt},
+    blockchain_data::{BlockchainData, SnapshotExt, Versioned},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,

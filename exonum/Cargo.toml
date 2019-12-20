@@ -63,6 +63,7 @@ exonum-merkledb = { version = "0.13.0-rc.2", path = "../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../components/proto" }
 
 [dev-dependencies]
+assert_matches = "1.3.0"
 criterion = "0.3.0"
 lazy_static = "1.0.1"
 modifier = "0.1.0"
