@@ -878,7 +878,7 @@ impl State {
                 // Rounds are equal, compare by hash.
                 a.0.cmp(&b.0)
             } else {
-                // Round differ, use the comparison result.
+                // Rounds are different, use the comparison result.
                 cmp_result
             }
         });

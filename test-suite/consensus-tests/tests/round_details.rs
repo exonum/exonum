@@ -1881,7 +1881,7 @@ fn handle_precommit_remove_propose_request() {
 /// The idea of the test:
 /// - node receives one transaction (tx2);
 /// - node receives all the precommits and prevotes for one proposal;
-/// - node recieves multiple proposals within one round:
+/// - node receives multiple proposals within one round:
 ///   - first proposal contains one transaction (tx1),
 ///     second one contains two transactions (tx1, tx2);
 ///   - both proposals are incomplete yet (tx1 is missing).
@@ -1890,9 +1890,9 @@ fn handle_precommit_remove_propose_request() {
 ///
 /// Motivation:
 /// consensus code contained a bug when during processing of full proposals
-/// the second proposal was processed even though node locked on the first one.
+/// the second proposal was processed even though node already bumped the height.
 #[test]
-fn handle_recieve_multiple_proposals_same_round() {
+fn handle_receive_multiple_proposals_same_round() {
     let sandbox = timestamping_sandbox_builder().build();
 
     let tx_1 = gen_timestamping_tx();
