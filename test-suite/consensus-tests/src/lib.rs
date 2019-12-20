@@ -548,33 +548,35 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
+    pub fn broadcast<T>(&self, msg: &Verified<T>)
+    where
+        T: TryFrom<SignedMessage> + std::fmt::Debug,
+    {
         self.broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1));
     }
 
-    pub fn try_broadcast<T: TryFrom<SignedMessage>>(
-        &self,
-        msg: &Verified<T>,
-    ) -> Result<(), String> {
+    pub fn try_broadcast<T>(&self, msg: &Verified<T>) -> Result<(), String>
+    where
+        T: TryFrom<SignedMessage> + std::fmt::Debug,
+    {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1))
     }
 
-    pub fn broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
-        &self,
-        msg: &Verified<T>,
-        addresses: I,
-    ) where
+    pub fn broadcast_to_addrs<'a, T, I>(&self, msg: &Verified<T>, addresses: I)
+    where
+        T: TryFrom<SignedMessage> + std::fmt::Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    pub fn try_broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
+    pub fn try_broadcast_to_addrs<'a, T, I>(
         &self,
         msg: &Verified<T>,
         addresses: I,
     ) -> Result<(), String>
     where
+        T: TryFrom<SignedMessage> + std::fmt::Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
         let expected_msg = msg.as_raw();
@@ -585,11 +587,13 @@ impl Sandbox {
 
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-                assert_eq!(
-                    expected_msg,
-                    real_msg.as_raw(),
-                    "Expected to broadcast other message"
-                );
+                if expected_msg != real_msg.as_raw() {
+                    // Use full messages instead of raw for reporting an assertion failure.
+                    panic!(
+                        "Expected to broadcast other message: expected {:?}, but got {:?}",
+                        &msg, &real_msg
+                    );
+                }
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
@@ -1124,7 +1128,7 @@ fn sandbox_with_services_uninitialized(
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
-    let keys: (Vec<_>) = (0..validators_count)
+    let keys: Vec<_> = (0..validators_count)
         .map(|i| {
             (
                 gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),

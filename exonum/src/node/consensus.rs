@@ -42,6 +42,15 @@ fn into_verified<T: TryFrom<SignedMessage>>(
     Ok(items)
 }
 
+/// Result of an action within a round.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum RoundAction {
+    /// New height was achieved.
+    NewHeight,
+    /// No actions happened.
+    None,
+}
+
 // TODO Reduce view invocations. (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
@@ -247,7 +256,15 @@ impl NodeHandler {
     /// Returns `true` if majority of prevotes is achieved, and returns `false` otherwise.
     fn check_propose_and_broadcast_prevote(&mut self, round: Round, propose_hash: Hash) -> bool {
         // Do not send a prevote if propose contains incorrect transactions.
-        let propose_state = self.state.propose(&propose_hash).unwrap();
+        let propose_state = self.state.propose(&propose_hash).unwrap_or_else(|| {
+            panic!(
+                "BUG: We're attempting to send a prevote, but don't have a propose; \
+                 this should never occur. Round: {:?}, propose hash: {:?}, height: {:?}",
+                round,
+                propose_hash,
+                self.state.height()
+            )
+        });
         if propose_state.has_invalid_txs() {
             warn!("Denying sending a prevote for a propose which contains incorrect transactions");
             self.state.has_majority_prevotes(round, propose_hash)
@@ -266,7 +283,15 @@ impl NodeHandler {
         block_hash: Hash,
     ) {
         // Do not send a precommit if propose contains incorrect transactions.
-        let propose_state = self.state.propose(&propose_hash).unwrap();
+        let propose_state = self.state.propose(&propose_hash).unwrap_or_else(|| {
+            panic!(
+                "BUG: We're attempting to send a precommit, but don't have a propose; \
+                 this should never occur. Round: {:?}, propose hash: {:?}, height: {:?}",
+                round,
+                propose_hash,
+                self.state.height()
+            )
+        });
         if propose_state.has_invalid_txs() {
             warn!(
                 "Denying sending a precommit for a propose which contains incorrect transactions"
@@ -282,7 +307,7 @@ impl NodeHandler {
     /// # Panics
     ///
     /// This function panics if the hash from precommit doesn't match the calculated one.
-    fn handle_full_propose(&mut self, hash: Hash, propose_round: Round) {
+    fn handle_full_propose(&mut self, hash: Hash, propose_round: Round) -> RoundAction {
         // Send prevote
         if self.state.locked_round() == Round::zero() {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
@@ -297,7 +322,10 @@ impl NodeHandler {
         let start_round = std::cmp::max(self.state.locked_round().next(), propose_round);
         for round in start_round.iter_to(self.state.round().next()) {
             if self.state.has_majority_prevotes(round, hash) {
-                self.handle_majority_prevotes(round, hash);
+                let action = self.handle_majority_prevotes(round, hash);
+                if action == RoundAction::NewHeight {
+                    return action;
+                }
             }
         }
 
@@ -309,13 +337,19 @@ impl NodeHandler {
             if our_block_hash != block_hash {
                 panic!(
                     "Full propose: wrong state hash. Either a node's implementation is \
-                     incorrect or validators majority works incorrectly"
+                     incorrect or validators majority works incorrectly. Calculated hash \
+                     is {:?}, but hash in the propose is {:?}",
+                    our_block_hash, block_hash,
                 );
             }
 
             let precommits = self.state.precommits(round, our_block_hash).to_vec();
             self.commit(our_block_hash, precommits.into_iter(), Some(propose_round));
+
+            return RoundAction::NewHeight;
         }
+
+        RoundAction::None
     }
 
     /// Executes and commits block. This function is called when node has full block information.
@@ -393,7 +427,11 @@ impl NodeHandler {
 
     /// Locks to the propose by calling `lock`. This function is called when node receives
     /// +2/3 pre-votes.
-    fn handle_majority_prevotes(&mut self, prevote_round: Round, propose_hash: Hash) {
+    fn handle_majority_prevotes(
+        &mut self,
+        prevote_round: Round,
+        propose_hash: Hash,
+    ) -> RoundAction {
         // Remove request info
         self.remove_request(&RequestData::Prevotes(prevote_round, propose_hash));
         // Lock to propose
@@ -409,8 +447,9 @@ impl NodeHandler {
                 );
             }
 
-            self.lock(prevote_round, propose_hash);
+            return self.lock(prevote_round, propose_hash);
         }
+        RoundAction::None
     }
 
     /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
@@ -420,12 +459,17 @@ impl NodeHandler {
     /// This method panics if:
     /// - Accepted propose contains transaction(s) for which `BlockchainMut::check_tx` failed.
     /// - Calculated hash of the block doesn't match the hash from precommits.
-    fn handle_majority_precommits(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
+    fn handle_majority_precommits(
+        &mut self,
+        round: Round,
+        propose_hash: &Hash,
+        block_hash: &Hash,
+    ) -> RoundAction {
         // Check if propose is known.
         if self.state.propose(propose_hash).is_none() {
             self.state
                 .add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
-            return;
+            return RoundAction::None;
         }
 
         // Request transactions if needed.
@@ -443,7 +487,7 @@ impl NodeHandler {
         };
         if let Some(proposer) = proposer {
             self.request(RequestData::ProposeTransactions(*propose_hash), proposer);
-            return;
+            return RoundAction::None;
         }
 
         // Check that propose is valid and should be executed.
@@ -466,10 +510,12 @@ impl NodeHandler {
         // Commit.
         let precommits = self.state.precommits(round, our_block_hash).to_vec();
         self.commit(our_block_hash, precommits.into_iter(), Some(round));
+
+        RoundAction::NewHeight
     }
 
     /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
-    fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
+    fn lock(&mut self, prevote_round: Round, propose_hash: Hash) -> RoundAction {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
         for round in prevote_round.iter_to(self.state.round().next()) {
             // Send prevotes
@@ -496,14 +542,15 @@ impl NodeHandler {
                     self.check_propose_and_broadcast_precommit(round, propose_hash, block_hash);
                     // Commit if has consensus
                     if self.state.has_majority_precommits(round, block_hash) {
-                        self.handle_majority_precommits(round, &propose_hash, &block_hash);
-                        return;
+                        return self.handle_majority_precommits(round, &propose_hash, &block_hash);
                     }
                 }
                 // Remove request info
                 self.remove_request(&RequestData::Prevotes(round, propose_hash));
             }
         }
+
+        RoundAction::None
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
@@ -660,9 +707,14 @@ impl NodeHandler {
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction.
+        let mut height_bumped = false;
         for (hash, round) in full_proposes {
             self.remove_request(&RequestData::ProposeTransactions(hash));
-            self.handle_full_propose(hash, round);
+            // If a new height was achieved, no more proposals for this height
+            // should be processed. However, we still have to remove requests.
+            if !height_bumped {
+                height_bumped = self.handle_full_propose(hash, round) == RoundAction::NewHeight;
+            }
         }
 
         let full_block = self.state.remove_unknown_transaction(hash);

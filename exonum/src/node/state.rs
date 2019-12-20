@@ -870,6 +870,19 @@ impl State {
             }
         }
 
+        // Sort proposes, so the order of processing is predictable.
+        full_proposes.sort_unstable_by(|a, b| {
+            // Compare rounds first.
+            let cmp_result = a.1.cmp(&b.1);
+            if let std::cmp::Ordering::Equal = cmp_result {
+                // Rounds are equal, compare by hash.
+                a.0.cmp(&b.0)
+            } else {
+                // Round differ, use the comparison result.
+                cmp_result
+            }
+        });
+
         full_proposes
     }
 
