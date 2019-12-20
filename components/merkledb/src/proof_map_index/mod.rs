@@ -20,7 +20,7 @@ pub use self::{
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
-use std::{borrow::Borrow, fmt, io, marker::PhantomData};
+use std::{fmt, io, marker::PhantomData};
 
 use exonum_crypto::Hash;
 
@@ -266,11 +266,7 @@ where
     /// index.put(&hash, 2);
     /// assert_eq!(Some(2), index.get(&hash));
     /// ```
-    pub fn get<Q>(&self, key: &Q) -> Option<V>
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(&key.to_value_path())
     }
 
@@ -292,11 +288,7 @@ where
     /// index.put(&hash, 2);
     /// assert!(index.contains(&hash));
     /// ```
-    pub fn contains<Q>(&self, key: &Q) -> bool
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn contains(&self, key: &K) -> bool {
         self.base.contains(&key.to_value_path())
     }
 
@@ -505,11 +497,7 @@ where
         hash
     }
 
-    fn remove_leaf<Q>(&mut self, proof_path: &ProofPath, key: &Q)
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    fn remove_leaf(&mut self, proof_path: &ProofPath, key: &K) {
         self.base.remove(proof_path);
         self.base.remove(&key.to_value_path());
     }
@@ -582,16 +570,12 @@ where
         }
     }
 
-    fn remove_node<Q>(
+    fn remove_node(
         &mut self,
         parent: &BranchNode,
         proof_path: &ProofPath,
-        key: &Q,
-    ) -> RemoveAction
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+        key: &K,
+    ) -> RemoveAction {
         let child_path = parent
             .child_path(proof_path.bit(0))
             .start_from(proof_path.start());
@@ -729,12 +713,7 @@ where
     /// index.remove(&hash);
     /// assert!(!index.contains(&hash));
     /// ```
-    pub fn remove<Q>(&mut self, key: &Q)
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-        KeyMode: ToProofPath<Q>,
-    {
+    pub fn remove(&mut self, key: &K) {
         let proof_path = KeyMode::transform_key(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
@@ -887,11 +866,12 @@ where
     }
 }
 
-impl<'a, T, K, V> std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
+impl<'a, T, K, V, KeyMode> IntoIterator for &'a ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey + ObjectHash,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
     type Item = (K::Owned, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
@@ -903,7 +883,7 @@ where
 
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
@@ -917,7 +897,7 @@ where
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     type Item = K::Owned;
 
@@ -940,12 +920,12 @@ where
 impl<T, K, V, KeyMode> fmt::Debug for ProofMapIndex<T, K, V, KeyMode>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue + fmt::Debug,
     KeyMode: ToProofPath<K>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct Entry<'a, T: RawAccess, K, V: BinaryValue, KeyMode: ToProofPath<K>> {
+        struct Entry<'a, T: RawAccess, K: ?Sized, V: BinaryValue, KeyMode: ToProofPath<K>> {
             index: &'a ProofMapIndex<T, K, V, KeyMode>,
             path: ProofPath,
             hash: Hash,
@@ -955,7 +935,7 @@ where
         impl<'a, T, K, V, KeyMode> Entry<'a, T, K, V, KeyMode>
         where
             T: RawAccess,
-            K: BinaryKey,
+            K: BinaryKey + ?Sized,
             V: BinaryValue,
             KeyMode: ToProofPath<K>,
         {
@@ -984,7 +964,7 @@ where
         impl<T, K, V, KeyMode> fmt::Debug for Entry<'_, T, K, V, KeyMode>
         where
             T: RawAccess,
-            K: BinaryKey,
+            K: BinaryKey + ?Sized,
             V: BinaryValue + fmt::Debug,
             KeyMode: ToProofPath<K>,
         {
