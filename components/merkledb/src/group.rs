@@ -115,8 +115,9 @@ where
 {
     /// Returns an iterator over the keys from this group.
     ///
-    /// **Note:** use this method carefully, because storing all keys in memory may
-    /// consume a large amount of RAM.
+    /// **Note:** use this method carefully, because it obtains all available keys for this
+    /// group in `suffixes` method and stores them in `Vec`. This operation can consume a large
+    /// amount of RAM.
     ///
     /// **Note:** creating any new indexes while this iterator is in scope may lead to panic.
     pub fn keys_unchecked(&self) -> impl Iterator<Item = K::Owned> {

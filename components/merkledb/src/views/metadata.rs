@@ -350,7 +350,7 @@ impl<T: RawAccess> IndexesPool<T> {
         let prefix = concat_keys!(prefix, INDEX_NAME_SEPARATOR);
         let mut keys = Vec::new();
 
-        for (key, _) in self.0.iter::<Vec<u8>, Vec<u8>, Vec<u8>>(&prefix) {
+        for (key, _) in self.0.iter::<_, Vec<u8>, Vec<u8>>(&prefix) {
             let split = key.split_at(prefix.len());
             let suffix = K::read(&split.1);
             keys.push(suffix);

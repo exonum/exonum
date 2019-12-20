@@ -17,7 +17,7 @@ use std::{borrow::Cow, num::NonZeroU64};
 use crate::BinaryKey;
 
 /// Separator between the name and the additional bytes in family indexes.
-pub const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
+pub(super) const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
 
 pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)
