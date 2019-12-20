@@ -545,8 +545,8 @@ impl Display for ExecutionError {
                 formatter,
                 "Execution error with code `{kind}` occurred in {runtime}",
                 kind = self.kind,
-                runtime = match RuntimeIdentifier::try_from(runtime_id) {
-                    Ok(runtime) => format!("{} runtime", runtime),
+                runtime = match RuntimeIdentifier::transform(runtime_id) {
+                    Ok(runtime) => runtime.to_string(),
                     Err(_) => format!("Non-default runtime with id {}", runtime_id),
                 }
             )?;
