@@ -350,7 +350,7 @@ impl TestKit {
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::rust::{CallContext, Service, ServiceFactory},
+    /// #     runtime::{rust::{CallContext, Service, ServiceFactory}, ExecutionError},
     /// # };
     /// #
     /// // Suppose we test this service interface:
