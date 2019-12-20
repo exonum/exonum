@@ -35,6 +35,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `InstanceStatus` as an additional argument.
   `start_adding_service` has been renamed to `initiate_adding_service` to
   better distinguish between starting and stopping a service. (#1605)
+
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
@@ -65,6 +66,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
 
+- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
@@ -84,6 +87,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
 - Service instances can now be stopped.
 
   Active service instance can be stopped by the corresponding request to the
@@ -92,8 +96,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Service data becomes unavailable to other services, but still exists. The name
   and identifier remain reserved for the stopped service and cannot be used again
   for adding new services. (#1605)
+
 - New `blockchain::Schema` method `next_height` was added as a non-panicking
   alternative to `height`. (#1619)
+
 - New method `in_genesis_block` was added to the `CallContext` to check if the service
   hook is being executed for the genesis block. (#1619)
 
@@ -111,7 +117,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
 
-- Added support of unsized keys to `MapIndex`. (#1621)
 - Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
@@ -119,6 +124,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   
 - Added method `keys` to `Group` index which return all the keys from the group.
 (#1614)
+
+- `TemporaryDB` can now be cleared. This will remove contents of all indexes
+  and erase index metadata. (#1630)
 
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 

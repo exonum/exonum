@@ -15,7 +15,8 @@
 pub use self::{
     address::{IndexAddress, ResolvedAddress},
     metadata::{
-        get_object_hash, BinaryAttribute, IndexState, IndexType, IndexesPool, ViewWithMetadata,
+        get_object_hash, BinaryAttribute, IndexMetadata, IndexState, IndexType, IndexesPool,
+        ViewWithMetadata,
     },
     system_schema::{get_state_aggregator, SystemSchema},
 };
@@ -419,15 +420,15 @@ pub struct Iter<'a, K: ?Sized, V> {
     _v: PhantomData<V>,
 }
 
-impl<'a, K, V> fmt::Debug for Iter<'a, K, V> {
+impl<'a, K: ?Sized, V> fmt::Debug for Iter<'a, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Iter(..)")
+        f.write_str("Iter(..)")
     }
 }
 
 impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
