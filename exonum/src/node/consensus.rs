@@ -205,7 +205,6 @@ impl NodeHandler {
     }
 
     /// Handles the `Block` message. For details see the message documentation.
-    // TODO: Write helper function which returns Result. (ECR-123)
     pub(crate) fn handle_block(
         &mut self,
         msg: &Verified<BlockResponse>,
