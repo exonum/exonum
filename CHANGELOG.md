@@ -131,6 +131,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
+  
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
 
