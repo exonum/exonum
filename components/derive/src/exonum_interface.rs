@@ -191,7 +191,7 @@ impl ExonumService {
                     ctx: #cr::runtime::rust::CallContext<'_>,
                     method: #cr::runtime::MethodId,
                     payload: &[u8],
-                ) -> Result<(), #cr::runtime::error::ExecutionError> {
+                ) -> Result<(), #cr::runtime::ExecutionError> {
                     match method {
                         #( #match_arms )*
                         _ => Err(#cr::runtime::DispatcherError::NoSuchMethod.into()),

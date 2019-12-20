@@ -26,7 +26,8 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
-    messages::{BinaryValue, SIGNED_MESSAGE_MIN_SIZE},
+    merkledb::BinaryValue,
+    messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::{blockchain, runtime},
     runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };
@@ -209,8 +210,7 @@ impl ConsensusConfig {
     ///
     /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
     /// method, but some values can decrease consensus performance.
-    #[doc(hidden)]
-    pub fn warn_if_nonoptimal(&self) {
+    fn warn_if_nonoptimal(&self) {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 

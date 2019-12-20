@@ -31,7 +31,7 @@ use crate::{
         noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
     },
     messages::{Connect, Verified},
-    node::state::SharedConnectList,
+    node::SharedConnectList,
 };
 
 /// Params needed to establish secured connection using Noise Protocol.

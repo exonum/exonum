@@ -10,21 +10,27 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
 - `before_transactions` and `after_transactions` hooks in Rust services
   now return a `Result`. The semantics is the same as for transactions;
   an error or panic in the hook will lead to the rollback of the blockchain
   state. (#1576)
+
 - Errors occurring while executing transactions and `before_transactions` /
   `after_transactions` hooks are now aggregated within each block, rather than
   globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+
 - The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
   Error fields were made private and information about a failing call
   was added. (#1585)
+
 - `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
   and a corresponding derive macro. (#1585)
+
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+
 - `commit_service` has been renamed to the `update_service_status` and now takes
   `InstanceStatus` as an additional argument.
   `start_adding_service` has been renamed to `initiate_adding_service` to
@@ -35,9 +41,40 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
+- The following public APIs were removed/made private: (#1629)
+  - `blockchain::{error reexports}` (available from `runtime::`);
+  - `blockchain::FatalError` public re-export;
+  - `blockchain::InstanceCollection` structure;
+  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
+    `Blockchain::remove_peer_with_pubkey` methods;
+  - `helpers::path_relative_from` function;
+  - `helpers::ZeroizeOnDrop` trait;
+  - `helpers::Milliseconds` type;
+  - `helpers::config` and `helpers::user_agent` modules;
+  - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
+    and `helpers::clear_consensus_messages_cache` functions;
+  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
+  - `messages::BinaryValue` public re-export;
+  - `node::state` module (constants from `node::state` are now accessible in
+    `node::constants` module);
+  - `proto` module;
+  - `runtime::error` module (`catch_panic` was added to the list of public
+    re-exports from `runtime::error`).
+
+#### exonum-merkledb
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
+
+### exonum-testkit
+
+- The following public APIs were removed/made private: (#1629)
+  - `compare` module;
+  - `txvec` macro;
+  - `TestKit::probe_all` and `TestKit::probe` methods.
 
 ### New features
 
@@ -70,8 +107,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   for its contents. Hashed indexes which are not a part of a group participate
   in this aggregation. Consult crate docs for more details on how
   aggregation works. (#1553)
+
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
+
+- Added support of unsized keys to `MapIndex`. (#1621)
 - Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
@@ -80,12 +120,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added method `keys` to `Group` index which return all the keys from the group.
 (#1614)
 
+- `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
+
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
+
+### Internal Improvements
+
+#### exonum
+
+- `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
 
 ### Bug Fixes
 

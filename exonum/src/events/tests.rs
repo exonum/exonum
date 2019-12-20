@@ -35,8 +35,9 @@ use crate::{
         NetworkEvent, NetworkRequest,
     },
     helpers::user_agent,
-    messages::{BinaryValue, Connect, SignedMessage, Verified},
-    node::{state::SharedConnectList, ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel},
+    merkledb::BinaryValue,
+    messages::{Connect, SignedMessage, Verified},
+    node::{ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel, SharedConnectList},
 };
 
 #[derive(Debug)]
@@ -203,7 +204,7 @@ pub fn connect_message(
 ) -> Verified<Connect> {
     let time = time::UNIX_EPOCH;
     Verified::from_value(
-        Connect::new(&addr.to_string(), time.into(), &user_agent::get()),
+        Connect::new(&addr.to_string(), time.into(), &user_agent()),
         public_key,
         secret_key,
     )
@@ -234,7 +235,7 @@ impl HandshakeParams {
         let address = "127.0.0.1:8000";
 
         let connect = Verified::from_value(
-            Connect::new(address, SystemTime::now().into(), &user_agent::get()),
+            Connect::new(address, SystemTime::now().into(), &user_agent()),
             public_key,
             &secret_key,
         );

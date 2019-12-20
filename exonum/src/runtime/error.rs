@@ -20,6 +20,7 @@ mod execution_result;
 mod tests;
 
 use exonum_derive::*;
+use exonum_merkledb::Error as MerkledbError;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
@@ -32,7 +33,6 @@ use std::{
 
 use super::{InstanceId, MethodId};
 use crate::{
-    blockchain::FatalError,
     crypto::{self, Hash},
     proto::schema::runtime as runtime_proto,
 };
@@ -87,7 +87,7 @@ use crate::{
 /// to the node termination.
 ///
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
-/// [`DispatcherError`]: ../enum.DispatcherError.html
+/// [`DispatcherError`]: enum.DispatcherError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
@@ -102,7 +102,7 @@ pub enum ErrorKind {
     Dispatcher {
         /// Error code. Available values can be found in the [description] of dispatcher errors.
         ///
-        /// [description]: ../enum.DispatcherError.html
+        /// [description]: enum.DispatcherError.html
         code: u8,
     },
 
@@ -388,7 +388,7 @@ impl StringMatch {
 /// If the closure panics, it returns an `Unexpected` error with the description derived
 /// from the panic object.
 ///
-/// `FatalError`s are not caught by this method.
+/// `merkledb`s are not caught by this method.
 pub fn catch_panic<F, T>(maybe_panic: F) -> Result<T, ExecutionError>
 where
     F: FnOnce() -> Result<T, ExecutionError>,
@@ -399,8 +399,8 @@ where
         Ok(Err(e)) => Err(e),
         // Panic.
         Err(panic) => {
-            if panic.is::<FatalError>() {
-                // Continue panic unwinding if the reason is FatalError.
+            if panic.is::<MerkledbError>() {
+                // Continue panic unwinding if the reason is MerkledbError.
                 panic::resume_unwind(panic);
             }
             Err(ExecutionError::from_panic(panic))
