@@ -40,7 +40,7 @@ mod extensions;
 /// }
 /// ```
 pub trait Access: Clone {
-    /// Raw access serving as the basis for created indices.
+    /// Raw access serving as the basis for created indexes.
     type Base: RawAccess;
 
     /// Gets index metadata at the specified address, or `None` if there is no index.

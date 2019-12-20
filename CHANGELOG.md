@@ -42,13 +42,42 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
+- The following public APIs were removed/made private: (#1629)
+  - `blockchain::{error reexports}` (available from `runtime::`);
+  - `blockchain::FatalError` public re-export;
+  - `blockchain::InstanceCollection` structure;
+  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
+    `Blockchain::remove_peer_with_pubkey` methods;
+  - `helpers::path_relative_from` function;
+  - `helpers::ZeroizeOnDrop` trait;
+  - `helpers::Milliseconds` type;
+  - `helpers::config` and `helpers::user_agent` modules;
+  - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
+    and `helpers::clear_consensus_messages_cache` functions;
+  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
+  - `messages::BinaryValue` public re-export;
+  - `node::state` module (constants from `node::state` are now accessible in
+    `node::constants` module);
+  - `proto` module;
+  - `runtime::error` module (`catch_panic` was added to the list of public
+    re-exports from `runtime::error`).
+
 #### exonum-merkledb
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
 
 - `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
 
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
+
+### exonum-testkit
+
+- The following public APIs were removed/made private: (#1629)
+  - `compare` module;
+  - `txvec` macro;
+  - `TestKit::probe_all` and `TestKit::probe` methods.
 
 ### New features
 
@@ -96,12 +125,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `TemporaryDB` can now be cleared. This will remove contents of all indexes
   and erase index metadata. (#1630)
 
+- `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
+
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
+
+### Internal Improvements
+
+#### exonum
+
+- `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
 
 ### Bug Fixes
 

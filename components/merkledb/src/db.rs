@@ -789,7 +789,7 @@ impl Fork {
         self.patch
     }
 
-    /// Returns a readonly wrapper around the fork. Indices created based on the readonly
+    /// Returns a readonly wrapper around the fork. Indexes created based on the readonly
     /// version cannot be modified; on the other hand, it is possible to have multiple
     /// copies of an index at the same time.
     pub fn readonly(&self) -> ReadonlyFork<'_> {
@@ -802,7 +802,7 @@ impl From<Patch> for Fork {
     ///
     /// Note: using created fork to modify data already present in `patch` may lead
     /// to an inconsistent database state. Hence, this method is useful only if you
-    /// are sure that the fork and `patch` interacted with different indices.
+    /// are sure that the fork and `patch` interacted with different indexes.
     fn from(patch: Patch) -> Self {
         Self {
             patch,

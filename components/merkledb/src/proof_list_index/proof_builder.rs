@@ -73,7 +73,7 @@ where
     }
 }
 
-/// Creates a `ListProof` for a contiguous half-open range of indices `[from, to)`.
+/// Creates a `ListProof` for a contiguous half-open range of indexes `[from, to)`.
 ///
 /// The caller must ensure that `to > from`.
 fn create_proof<V: BinaryValue>(tree: &impl MerkleTree<V>, from: u64, to: u64) -> ListProof<V> {
@@ -86,7 +86,7 @@ fn create_proof<V: BinaryValue>(tree: &impl MerkleTree<V>, from: u64, to: u64) -
     let items = (from..to).zip(tree.values(from));
     let mut proof = ListProof::new(items, tree_len);
 
-    // `left` and `right` track the indices of elements for which we build the proof,
+    // `left` and `right` track the indexes of elements for which we build the proof,
     // on the particular `height` of the tree. Both these values are inclusive; i.e., the range
     // is `[left, right]`.
     let (mut left, mut right) = (from, to - 1);
