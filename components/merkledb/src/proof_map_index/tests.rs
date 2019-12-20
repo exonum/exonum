@@ -1168,7 +1168,7 @@ fn index_as_iterator() {
     map.put(&2_u8, 2_u8);
     map.put(&3_u8, 3_u8);
     for (key, value) in &map {
-        assert!(key == value);
+        assert_eq!(key, value);
     }
     assert_eq!((&map).into_iter().count(), 3);
     assert_eq!(map.keys().collect::<Vec<_>>(), vec![1, 2, 3]);
