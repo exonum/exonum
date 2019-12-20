@@ -177,7 +177,7 @@ impl<T: RawAccess + AsReadonly> Migration<'_, T> {
     /// let aggregator = migration_view.state_aggregator();
     /// assert!(aggregator.contains("migration.entry")); // Not `entry`!
     /// ```
-    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, String, Hash> {
+    pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, str, Hash> {
         get_state_aggregator(self.access.as_readonly(), self.namespace)
     }
 }
