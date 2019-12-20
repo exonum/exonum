@@ -303,13 +303,18 @@ impl ExplorerApi {
         let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
             ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
         })?;
+
         let tx_info = match tx_info {
-            TransactionInfo::Committed(info) => Ok(info),
-            TransactionInfo::InPool { .. } => Err(ApiError::NotFound(format!(
-                "Requested transaction ({}) is not executed yet",
-                query.hash
-            ))),
-        }?;
+            TransactionInfo::Committed(info) => info,
+            TransactionInfo::InPool { .. } => {
+                let err = ApiError::NotFound(format!(
+                    "Requested transaction ({}) is not executed yet",
+                    query.hash
+                ));
+                return Err(err);
+            }
+        };
+
         let call_in_block = CallInBlock::transaction(tx_info.location().position_in_block());
         let block_height = tx_info.location().block_height();
 
