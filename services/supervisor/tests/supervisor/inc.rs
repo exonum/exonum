@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    blockchain::ExecutionError,
-    runtime::{
-        rust::{
-            api::{self, ServiceApiBuilder},
-            CallContext, DefaultInstance, Service,
-        },
-        DispatcherError, InstanceId,
+use exonum::runtime::{
+    rust::{
+        api::{self, ServiceApiBuilder},
+        CallContext, DefaultInstance, Service,
     },
+    DispatcherError, ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 use exonum_merkledb::{

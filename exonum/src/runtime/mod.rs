@@ -135,15 +135,18 @@
 //! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
 //! [`Runtime`]: trait.Runtime.html
 //! [execution]: trait.Runtime.html#execute
-//! [execution status]: error/struct.ExecutionStatus.html
+//! [execution status]: struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
 
 pub use self::{
-    blockchain_data::{BlockchainData, ForkExt, SnapshotExt},
+    blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
-    error::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail},
+    error::{
+        catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
+        ExecutionStatus,
+    },
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
         InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
@@ -152,7 +155,6 @@ pub use self::{
 
 #[macro_use]
 pub mod rust;
-pub mod error;
 
 use futures::Future;
 
@@ -168,6 +170,7 @@ use crate::{
 
 mod blockchain_data;
 mod dispatcher;
+pub(crate) mod error;
 mod types;
 
 /// Persistent identifier of a supervisor service instance.
@@ -240,7 +243,7 @@ impl From<RuntimeIdentifier> for u32 {
 ///
 /// Panics in the `Runtime` methods are **not** caught. A panic in the runtime method will cause
 /// the node termination. To catch panics in the Rust code and convert them to unchecked execution
-/// errors, use the [`catch_panic`](error/fn.catch_panic.html) method.
+/// errors, use the [`catch_panic`](fn.catch_panic.html) method.
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.

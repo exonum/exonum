@@ -23,7 +23,7 @@ use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Status
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, msg: Message) {
+    pub(crate) fn handle_message(&mut self, msg: Message) {
         match msg {
             Message::Consensus(msg) => self.handle_consensus(msg),
             Message::Requests(ref msg) => self.handle_request(msg),
@@ -43,7 +43,11 @@ impl NodeHandler {
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, address: &ConnectedPeerAddr, connect: Verified<Connect>) {
+    pub(crate) fn handle_connected(
+        &mut self,
+        address: &ConnectedPeerAddr,
+        connect: Verified<Connect>,
+    ) {
         info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
         self.state.add_connection(connect.author(), address.clone());
@@ -52,14 +56,14 @@ impl NodeHandler {
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
     /// in the validators list.
-    pub fn handle_disconnected(&mut self, key: PublicKey) {
+    pub(crate) fn handle_disconnected(&mut self, key: PublicKey) {
         info!("Disconnected from: {}", key);
         self.remove_peer_with_addr(key);
     }
 
     /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
     /// if it was in the validators list.
-    pub fn handle_unable_to_connect(&mut self, key: PublicKey) {
+    pub(crate) fn handle_unable_to_connect(&mut self, key: PublicKey) {
         info!("Could not connect to: {}", key);
         self.remove_peer_with_addr(key);
     }
@@ -77,7 +81,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: Verified<Connect>) {
+    pub(crate) fn handle_connect(&mut self, message: Verified<Connect>) {
         // TODO Add spam protection (ECR-170)
         // TODO: drop connection if checks have failed. (ECR-1837)
         let address = message.payload().host.clone();
@@ -141,7 +145,7 @@ impl NodeHandler {
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: &Verified<Status>) {
+    pub(crate) fn handle_status(&mut self, msg: &Verified<Status>) {
         let height = self.state.height();
         trace!(
             "HANDLE STATUS: current height = {}, msg height = {}",
@@ -179,7 +183,7 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: &Verified<PeersRequest>) {
+    pub(crate) fn handle_request_peers(&mut self, msg: &Verified<PeersRequest>) {
         let peers = self.state.peers().values().cloned().collect::<Vec<_>>();
 
         trace!(
@@ -195,14 +199,14 @@ impl NodeHandler {
 
     /// Handles `NodeTimeout::Status`, broadcasts the `Status` message if it isn't outdated as
     /// result.
-    pub fn handle_status_timeout(&mut self, height: Height) {
+    pub(crate) fn handle_status_timeout(&mut self, height: Height) {
         if self.state.height() == height {
             self.broadcast_status();
             self.add_status_timeout();
         }
     }
     /// Handles `NodeTimeout::PeerExchange`. Node sends the `PeersRequest` to a random peer.
-    pub fn handle_peer_exchange_timeout(&mut self) {
+    pub(crate) fn handle_peer_exchange_timeout(&mut self) {
         if !self.state.peers().is_empty() {
             let to = self.state.peers().len();
             let gen_peer_id = || -> usize {
@@ -229,7 +233,7 @@ impl NodeHandler {
     }
     /// Handles `NodeTimeout::UpdateApiState`.
     /// Node update internal `ApiState` and `NodeRole`.
-    pub fn handle_update_api_state_timeout(&mut self) {
+    pub(crate) fn handle_update_api_state_timeout(&mut self) {
         self.api_state.update_node_state(&self.state);
         // FIXME Add special event to update state [ECR-3222]
         self.node_role = NodeRole::new(self.state.validator_id());
@@ -237,7 +241,7 @@ impl NodeHandler {
     }
 
     /// Broadcasts the `Status` message to all peers.
-    pub fn broadcast_status(&mut self) {
+    pub(crate) fn broadcast_status(&mut self) {
         let status = Status {
             height: self.state.height(),
             last_hash: self.blockchain.as_ref().last_hash(),

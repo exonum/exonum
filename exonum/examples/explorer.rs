@@ -18,12 +18,13 @@
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind},
+    blockchain::{BlockchainMut, CallInBlock},
     crypto::gen_keypair,
     explorer::*,
     helpers::{Height, ValidatorId},
     merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
+    runtime::ErrorKind as ExecutionErrorKind,
 };
 use serde_json::json;
 

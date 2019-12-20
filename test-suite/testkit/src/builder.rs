@@ -14,8 +14,6 @@
 
 //! Testkit builder.
 
-pub use exonum::blockchain::InstanceCollection;
-
 use exonum::{
     blockchain::config::{GenesisConfigBuilder, InstanceInitParams},
     crypto,
@@ -88,7 +86,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # use exonum_merkledb::Snapshot;
 /// # use exonum_testkit::TestKitBuilder;
 /// # use exonum::{
-/// #     blockchain::InstanceCollection,
 /// #     crypto::Hash,
 /// #     runtime::{BlockchainData, rust::{Service, ServiceFactory}},
 /// # };

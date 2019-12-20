@@ -18,8 +18,11 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, CallContext, Service}},
-//!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
+//!     runtime::{
+//!         rust::{ServiceFactory, CallContext, Service},
+//!         BlockchainData, SnapshotExt, ExecutionError,
+//!     },
+//!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
 //!     helpers::Height,
@@ -135,12 +138,10 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
-    builder::{InstanceCollection, TestKitBuilder},
-    compare::ComparableSnapshot,
+    builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
-pub mod compare;
 
 use exonum::{
     api::{
@@ -174,14 +175,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::server::TestKitActor;
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
+    server::TestKitActor,
 };
 
-#[macro_use]
-mod macros;
 mod api;
 mod builder;
 mod checkpoint_db;
@@ -347,10 +346,9 @@ impl TestKit {
     /// # use serde_derive::{Serialize, Deserialize};
     /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_proto::ProtobufConvert;
-    /// # use exonum_testkit::{txvec, TestKit, TestKitBuilder};
+    /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{
-    /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
     /// #     runtime::rust::{CallContext, Service, ServiceFactory},
     /// # };
@@ -412,50 +410,6 @@ impl TestKit {
     /// ```
     pub fn rollback(&mut self) {
         self.db_handler.rollback()
-    }
-
-    /// Executes a list of transactions given the current state of the blockchain, but does not
-    /// commit execution results to the blockchain. The execution result is the same
-    /// as if transactions were included into a new block; for example,
-    /// transactions included into one of previous blocks do not lead to any state changes.
-    ///
-    /// # Panics
-    /// - Panics if any of the transactions is incorrect.
-    pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
-    where
-        I: IntoIterator<Item = Verified<AnyTx>>,
-    {
-        self.poll_events();
-        // Filter out already committed transactions; otherwise,
-        // `create_block_with_transactions()` will panic.
-        let snapshot = self.snapshot();
-        let schema = snapshot.for_core();
-        let uncommitted_txs: Vec<_> = transactions
-            .into_iter()
-            .filter(|tx| {
-                self.check_tx(&tx);
-
-                !schema.transactions().contains(&tx.object_hash())
-                    || schema.transactions_pool().contains(&tx.object_hash())
-            })
-            .collect();
-
-        self.checkpoint();
-        self.create_block_with_transactions(uncommitted_txs);
-        let snapshot = self.snapshot();
-        self.rollback();
-        snapshot
-    }
-
-    /// Executes a transaction given the current state of the blockchain but does not
-    /// commit execution results to the blockchain. The execution result is the same
-    /// as if a transaction was included into a new block; for example,
-    /// a transaction included into one of previous blocks does not lead to any state changes.
-    ///
-    /// # Panics
-    /// - Panics if any of the transactions is incorrect.
-    pub fn probe(&mut self, transaction: Verified<AnyTx>) -> Box<dyn Snapshot> {
-        self.probe_all(vec![transaction])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
@@ -560,7 +514,7 @@ impl TestKit {
     /// - Panics if given transaction has been already committed to the blockchain.
     /// - Panics if any of the transactions is incorrect.
     pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
-        self.create_block_with_transactions(txvec![tx])
+        self.create_block_with_transactions(vec![tx])
     }
 
     /// Creates block with the specified transactions. The transactions must be previously

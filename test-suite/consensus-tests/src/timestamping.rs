@@ -13,12 +13,11 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::ExecutionError,
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
     runtime::{
-        rust::{CallContext, Service},
-        AnyTx, InstanceId,
+        rust::{CallContext, DefaultInstance, Service},
+        AnyTx, ExecutionError, InstanceId,
     },
 };
 use exonum_derive::*;
@@ -113,4 +112,9 @@ impl Iterator for TimestampingTxGenerator {
         self.rand.fill_bytes(&mut data);
         Some(self.keypair.timestamp(self.instance_id, data))
     }
+}
+
+impl DefaultInstance for TimestampingService {
+    const INSTANCE_ID: InstanceId = TimestampingService::ID;
+    const INSTANCE_NAME: &'static str = "timestamping";
 }

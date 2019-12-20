@@ -18,23 +18,22 @@ use exonum::{
         node::public::explorer::{TransactionQuery, TransactionResponse},
         Error as ApiError,
     },
-    blockchain::{CallInBlock, ExecutionError, ExecutionErrorKind, ValidatorKeys},
-    crypto::{self, gen_keypair, Hash, PublicKey},
+    blockchain::{CallInBlock, ValidatorKeys},
+    crypto::{self, gen_keypair, Hash},
     explorer::BlockchainExplorer,
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::SnapshotExt,
+    runtime::{ErrorKind, ExecutionError, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder, TestNode};
-use hex::FromHex;
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, CounterServiceInterface, CounterWithProof, ADMIN_KEY,
-    SERVICE_ID, SERVICE_NAME,
+    CounterSchema, CounterService, CounterServiceInterface, CounterWithProof, SERVICE_ID,
+    SERVICE_NAME,
 };
 use exonum::blockchain::{AdditionalHeaders, ProposerId};
 use exonum::helpers::ValidatorId;
@@ -288,42 +287,6 @@ fn counter_proof_with_mauled_value() {
 }
 
 #[test]
-fn test_probe() {
-    let (mut testkit, api) = init_testkit();
-    let us = testkit.us().service_keypair();
-    let tx = us.increment(SERVICE_ID, 5);
-
-    let snapshot = testkit.probe(tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(5));
-    // Verify that the patch has not been applied to the blockchain
-    let counter: u64 = api
-        .public(ApiKind::Service("counter"))
-        .get("count")
-        .unwrap();
-    assert_eq!(counter, 0);
-
-    let other_tx = us.increment(SERVICE_ID, 3);
-    let snapshot = testkit.probe_all(vec![tx.clone(), other_tx.clone()]);
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(8));
-
-    // Posting a transaction is not enough to change the blockchain!
-    let _: TransactionResponse = api
-        .public(ApiKind::Service("counter"))
-        .query(&5)
-        .post("count")
-        .unwrap();
-    let snapshot = testkit.probe(other_tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(3));
-    testkit.create_block();
-    let snapshot = testkit.probe(other_tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(8));
-}
-
-#[test]
 fn test_duplicate_tx() {
     let (mut testkit, api) = init_testkit();
 
@@ -337,161 +300,6 @@ fn test_duplicate_tx() {
         .get("count")
         .unwrap();
     assert_eq!(counter, 5);
-}
-
-#[test]
-fn test_probe_advanced() {
-    let (mut testkit, api) = init_testkit();
-
-    let keypair = gen_keypair();
-    let tx = keypair.increment(SERVICE_ID, 6);
-    let other_tx = keypair.increment(SERVICE_ID, 10);
-    let admin = crypto::gen_keypair_from_seed(
-        &crypto::Seed::from_slice(&crypto::hash(b"correct horse battery staple")[..]).unwrap(),
-    );
-    assert_eq!(admin.0, PublicKey::from_hex(ADMIN_KEY).unwrap());
-    let admin_tx = admin.reset(SERVICE_ID, ());
-
-    let snapshot = testkit.probe(tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(6));
-    // Check that data is not persisted
-    let snapshot = testkit.snapshot();
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), None);
-
-    // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(vec![tx.clone(), admin_tx.clone()]);
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(0));
-    let snapshot = testkit.probe_all(vec![admin_tx.clone(), tx.clone()]);
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(6));
-    // Check that data is (still) not persisted
-    let snapshot = testkit.snapshot();
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), None);
-
-    api.send(other_tx);
-    testkit.create_block();
-    let snapshot = testkit.snapshot();
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(10));
-
-    let snapshot = testkit.probe(tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(16));
-    // Check that data is not persisted
-    let snapshot = testkit.snapshot();
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(10));
-
-    // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(vec![tx.clone(), admin_tx.clone()]);
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(0));
-    let snapshot = testkit.probe_all(vec![admin_tx.clone(), tx.clone()]);
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(6));
-    // Check that data is (still) not persisted
-    let snapshot = testkit.snapshot();
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(10));
-}
-
-#[test]
-fn test_probe_duplicate_tx() {
-    //! Checks that committed transactions do not change the blockchain state when probed.
-
-    let (mut testkit, api) = init_testkit();
-    inc_count(&api, 5);
-    let us = testkit.us().service_keypair();
-    let tx = us.increment(SERVICE_ID, 5);
-
-    let snapshot = testkit.probe(tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(5));
-
-    testkit.create_block();
-    let snapshot = testkit.probe(tx.clone());
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(5));
-
-    // Check the mixed case when some probed transactions are committed and some are not
-    inc_count(&api, 7);
-    let other_tx = us.increment(SERVICE_ID, 7);
-    let snapshot = testkit.probe_all(vec![tx, other_tx]);
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(12));
-}
-
-#[test]
-#[should_panic(expected = "Attempt to add invalid tx in the pool")]
-fn test_probe_incorrect_transaction() {
-    let (mut testkit, _) = init_testkit();
-    let incorrect_tx = gen_inc_incorrect_tx(5);
-    testkit.probe(incorrect_tx);
-}
-
-#[test]
-fn test_snapshot_comparison() {
-    let (mut testkit, api) = init_testkit();
-
-    let keypair = gen_keypair();
-    let tx = keypair.increment(SERVICE_ID, 5);
-    testkit
-        .probe(tx.clone())
-        .compare(testkit.snapshot())
-        .map(|snapshot| get_schema(snapshot))
-        .map(|schema| schema.counter.get())
-        .assert_before("Counter does not exist", Option::is_none)
-        .assert_after("Counter has been set", |&c| c == Some(5));
-
-    api.send(tx);
-    testkit.create_block();
-
-    let keypair = gen_keypair();
-    let other_tx = keypair.increment(SERVICE_ID, 3);
-    testkit
-        .probe(other_tx.clone())
-        .compare(testkit.snapshot())
-        .map(|snapshot| get_schema(snapshot))
-        .map(|schema| schema.counter.get())
-        .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| new == old + 3);
-}
-
-#[test]
-#[should_panic(expected = "Counter has increased")]
-fn test_snapshot_comparison_panic() {
-    let (mut testkit, api) = init_testkit();
-    let increment_by = 5;
-    let keypair = gen_keypair();
-    let tx = keypair.increment(SERVICE_ID, increment_by);
-
-    api.send(tx.clone());
-    testkit.create_block();
-
-    // The assertion fails because the transaction is already committed by now.
-    testkit
-        .probe(tx.clone())
-        .compare(testkit.snapshot())
-        .map(|snapshot| get_schema(snapshot))
-        .map(|schema| schema.counter.get())
-        .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| {
-            new == old + increment_by
-        });
-}
-
-fn create_sample_block(testkit: &mut TestKit) {
-    let height = testkit.height().next().0;
-    if height == 2 || height == 5 {
-        let keypair = gen_keypair();
-        let tx = keypair.increment(SERVICE_ID, height as u64);
-        testkit.api().send(tx.clone());
-    }
-    testkit.create_block();
 }
 
 #[test]
@@ -624,6 +432,15 @@ fn test_explorer_api_block_request() {
         response,
         ApiError::NotFound(ref body) if body == "Requested block height (10) exceeds the blockchain height (1)"
     );
+}
+
+fn create_sample_block(testkit: &mut TestKit) {
+    let height = testkit.height().next().0;
+    if height == 2 || height == 5 {
+        let tx = gen_keypair().increment(SERVICE_ID, height);
+        testkit.api().send(tx.clone());
+    }
+    testkit.create_block();
 }
 
 #[test]
@@ -950,7 +767,7 @@ fn test_explorer_transaction_statuses() {
         );
         assert_matches!(
             statuses[2],
-            Err(ref err) if err.kind() == ExecutionErrorKind::Unexpected
+            Err(ref err) if err.kind() == ErrorKind::Unexpected
                 && err.description() == "attempt to add with overflow"
         );
     }
@@ -972,7 +789,7 @@ fn test_explorer_transaction_statuses() {
     );
     assert_eq!(
         errors[&CallInBlock::transaction(2)].kind(),
-        ExecutionErrorKind::Unexpected
+        ErrorKind::Unexpected
     );
 
     // Check status proofs for transactions.
@@ -994,7 +811,7 @@ fn test_explorer_transaction_statuses() {
     assert_eq!(proof.entries().count(), 1);
     assert_eq!(
         proof.entries().next().unwrap().1.kind(),
-        ExecutionErrorKind::Unexpected
+        ErrorKind::Unexpected
     );
 
     // Now, the same statuses retrieved via explorer web API.

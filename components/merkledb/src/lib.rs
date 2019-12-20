@@ -36,7 +36,7 @@
 //! of the `Database` instance. Snapshots provide read isolation, so you are guaranteed to work
 //! with consistent values even if the data in the database changes between reads. `Snapshot`
 //! provides all the necessary methods for reading data from the database, so `&Snapshot`
-//! is used as a storage view for creating a read-only representation of the [indices](#indices).
+//! is used as a storage view for creating a read-only representation of the [indexes](#indexes).
 //!
 //! If you need to make changes to the database, you need to create a [`Fork`] using
 //! the [`fork`][2] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
@@ -50,18 +50,18 @@
 //! the [`BinaryKey`] or [`BinaryValue`] traits respectively. These traits have already been
 //! implemented for most standard types.
 //!
-//! # Indices
+//! # Indexes
 //!
-//! Indices are structures representing data collections stored in the database.
+//! Indexes are structures representing data collections stored in the database.
 //! This concept is similar to tables in relational databases. The interfaces
-//! of the indices are similar to ordinary collections (like arrays, maps and sets).
+//! of the indexes are similar to ordinary collections (like arrays, maps and sets).
 //!
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
-//! On the other hand, multiple indices can be stored in the same column family, provided
+//! On the other hand, multiple indexes can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
 //! of [`Group`]s or keyed [`IndexAddress`]es.
 //!
-//! Merkelized indices can generate cryptographic proofs about inclusion
+//! Merkelized indexes can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
 //! was authorized by the blockchain validators, without having to replicate
 //! the entire blockchain contents.
@@ -72,7 +72,7 @@
 //!   configuration. Similar to a combination of [`Box`] and [`Option`].
 //! - [`ListIndex`] is a list of items stored in a sequential order. Similar to [`Vec`].
 //! - [`SparseListIndex`] is a list of items stored in a sequential order. Similar to `ListIndex`,
-//!   but may contain indices without elements.
+//!   but may contain indexes without elements.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`].
 //! - [`ProofEntry`] is a Merkelized version of `Entry`.
 //! - [`ProofListIndex`] is a Merkelized version of `ListIndex` that supports cryptographic

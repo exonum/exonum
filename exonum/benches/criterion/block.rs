@@ -47,14 +47,17 @@ use std::{collections::BTreeMap, iter, sync::Arc};
 
 use exonum::{
     blockchain::{
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, InstanceCollection,
-        ValidatorKeys,
+        config::{GenesisConfig, GenesisConfigBuilder},
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
-    helpers::{create_rust_runtime_and_genesis_config, Height, ValidatorId},
+    helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::SnapshotExt,
+    runtime::{
+        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        SnapshotExt,
+    },
 };
 
 /// Number of transactions added to the blockchain before the bench begins.
@@ -79,8 +82,34 @@ fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
 
 fn create_blockchain(
     db: impl Into<Arc<dyn Database>>,
-    services: Vec<InstanceCollection>,
+    service: impl DefaultInstance + Clone,
 ) -> BlockchainMut {
+    let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
+
+    let factory: Box<dyn ServiceFactory> = service.clone().into();
+    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+        .with_artifact(service.artifact_id())
+        .with_instance(service.default_instance())
+        .build();
+
+    create_blockchain_from_parts(blockchain_base, genesis_config, rust_runtime)
+}
+
+fn create_blockchain_from_parts(
+    blockchain_base: Blockchain,
+    genesis_config: GenesisConfig,
+    rust_runtime: RustRuntime,
+) -> BlockchainMut {
+    BlockchainBuilder::new(blockchain_base, genesis_config)
+        .with_runtime(rust_runtime)
+        .build()
+        .unwrap()
+}
+
+fn create_consensus_config_and_blockchain_base(
+    db: impl Into<Arc<dyn Database>>,
+) -> (ConsensusConfig, Blockchain) {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
     let consensus_config = ConsensusConfig {
@@ -93,12 +122,8 @@ fn create_blockchain(
 
     let api_sender = ApiSender::new(mpsc::channel(0).0);
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
-    let (rust_runtime, genesis_config) =
-        create_rust_runtime_and_genesis_config(mpsc::channel(1).0, consensus_config, services);
-    BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_runtime(rust_runtime)
-        .build()
-        .unwrap()
+
+    (consensus_config, blockchain_base)
 }
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
@@ -112,12 +137,11 @@ fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash
 
 mod timestamping {
     use exonum::{
-        blockchain::{ExecutionError, InstanceCollection},
         crypto::Hash,
         messages::Verified,
         runtime::{
-            rust::{CallContext, Service},
-            AnyTx, InstanceId,
+            rust::{CallContext, DefaultInstance, Service},
+            AnyTx, ExecutionError, InstanceId,
         },
     };
     use exonum_merkledb::ObjectHash;
@@ -134,7 +158,7 @@ mod timestamping {
         fn timestamp_panic(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
-    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher, Clone)]
     #[service_dispatcher(implements("TimestampingInterface"))]
     #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
@@ -153,10 +177,9 @@ mod timestamping {
 
     impl Service for Timestamping {}
 
-    impl From<Timestamping> for InstanceCollection {
-        fn from(t: Timestamping) -> Self {
-            Self::new(t).with_instance(TIMESTAMPING_SERVICE_ID, "timestamping", ())
-        }
+    impl DefaultInstance for Timestamping {
+        const INSTANCE_ID: InstanceId = TIMESTAMPING_SERVICE_ID;
+        const INSTANCE_NAME: &'static str = "timestamping";
     }
 
     pub fn transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
@@ -174,12 +197,11 @@ mod timestamping {
 
 mod cryptocurrency {
     use exonum::{
-        blockchain::{ExecutionError, InstanceCollection},
         crypto::PublicKey,
         messages::Verified,
         runtime::{
-            rust::{CallContext, Service},
-            AnyTx, ErrorKind, InstanceId,
+            rust::{CallContext, DefaultInstance, Service},
+            AnyTx, ErrorKind, ExecutionError, InstanceId,
         },
     };
     use exonum_merkledb::access::AccessExt;
@@ -208,7 +230,7 @@ mod cryptocurrency {
         fn transfer_error_sometimes(&self, ctx: Ctx, arg: Tx) -> Self::Output;
     }
 
-    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher, Clone)]
     #[service_dispatcher(implements("CryptocurrencyInterface"))]
     #[service_factory(artifact_name = "cryptocurrency", proto_sources = "crate::proto")]
     pub struct Cryptocurrency;
@@ -262,10 +284,9 @@ mod cryptocurrency {
 
     impl Service for Cryptocurrency {}
 
-    impl From<Cryptocurrency> for InstanceCollection {
-        fn from(t: Cryptocurrency) -> Self {
-            Self::new(t).with_instance(CRYPTOCURRENCY_SERVICE_ID, "cryptocurrency", ())
-        }
+    impl DefaultInstance for Cryptocurrency {
+        const INSTANCE_ID: InstanceId = CRYPTOCURRENCY_SERVICE_ID;
+        const INSTANCE_NAME: &'static str = "cryptocurrency";
     }
 
     /// Transfers one unit of currency from `from` to `to`.
@@ -327,18 +348,26 @@ mod cryptocurrency {
 
 mod foreign_interface_call {
     use exonum::{
-        blockchain::{ExecutionError, InstanceCollection},
+        blockchain::{
+            config::{GenesisConfigBuilder, InstanceInitParams},
+            BlockchainMut,
+        },
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
         runtime::{
-            rust::{CallContext, Service},
-            AnyTx, InstanceId,
+            rust::{CallContext, RustRuntime, Service, ServiceFactory as _},
+            AnyTx, ExecutionError, InstanceId,
         },
     };
+    use futures::sync::mpsc;
     use rand::rngs::StdRng;
+    use tempdir::TempDir;
 
-    use super::gen_keypair_from_rng;
+    use super::{
+        create_blockchain_from_parts, create_consensus_config_and_blockchain_base, create_rocksdb,
+        gen_keypair_from_rng,
+    };
 
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
@@ -371,7 +400,7 @@ mod foreign_interface_call {
         type Output;
     }
 
-    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[derive(Debug, ServiceFactory, ServiceDispatcher, Clone)]
     #[service_dispatcher(implements(
         "SelfInterface",
         "ForeignInterface",
@@ -420,16 +449,27 @@ mod foreign_interface_call {
 
     impl Service for Timestamping {}
 
-    impl From<Timestamping> for InstanceCollection {
-        fn from(t: Timestamping) -> Self {
-            Self::new(t)
-                .with_instance(SELF_INTERFACE_SERVICE_ID, "timestamping", Vec::default())
-                .with_instance(
-                    FOREIGN_INTERFACE_SERVICE_ID,
-                    "timestamping-foreign",
-                    Vec::default(),
-                )
-        }
+    fn default_instance(id: InstanceId, name: &str) -> InstanceInitParams {
+        Timestamping.artifact_id().into_default_instance(id, name)
+    }
+
+    pub fn build_blockchain() -> BlockchainMut {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
+
+        let factory: Box<_> = Timestamping.into();
+        let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
+            .with_artifact(Timestamping.artifact_id())
+            .with_instance(default_instance(SELF_INTERFACE_SERVICE_ID, "timestamping"))
+            .with_instance(default_instance(
+                FOREIGN_INTERFACE_SERVICE_ID,
+                "timestamping-foreign",
+            ))
+            .build();
+
+        create_blockchain_from_parts(blockchain_base, genesis_config, rust_runtime)
     }
 
     pub fn self_transactions(mut rng: StdRng) -> impl Iterator<Item = Verified<AnyTx>> {
@@ -495,13 +535,22 @@ fn prepare_blockchain(
 fn execute_block_rocksdb(
     criterion: &mut Criterion,
     bench_name: &'static str,
-    service: impl Into<InstanceCollection>,
-    mut tx_generator: impl Iterator<Item = Verified<AnyTx>>,
+    service: impl DefaultInstance + Clone,
+    tx_generator: impl Iterator<Item = Verified<AnyTx>>,
 ) {
     let tempdir = TempDir::new("exonum").unwrap();
     let db = create_rocksdb(&tempdir);
-    let mut blockchain = create_blockchain(db, vec![service.into()]);
+    let blockchain = create_blockchain(db, service);
 
+    execute_block_rocksdb_with_blockchain(criterion, bench_name, blockchain, tx_generator);
+}
+
+fn execute_block_rocksdb_with_blockchain(
+    criterion: &mut Criterion,
+    bench_name: &'static str,
+    mut blockchain: BlockchainMut,
+    mut tx_generator: impl Iterator<Item = Verified<AnyTx>>,
+) {
     // We don't particularly care how transactions are distributed in the blockchain
     // in the preparation phase.
     prepare_blockchain(
@@ -585,17 +634,17 @@ pub fn bench_block(criterion: &mut Criterion) {
         cryptocurrency::rollback_transactions(SeedableRng::from_seed([4; 32])),
     );
 
-    execute_block_rocksdb(
+    execute_block_rocksdb_with_blockchain(
         criterion,
         "block/foreign_interface_call/self_tx",
-        foreign_interface_call::Timestamping,
+        foreign_interface_call::build_blockchain(),
         foreign_interface_call::self_transactions(SeedableRng::from_seed([2; 32])),
     );
 
-    execute_block_rocksdb(
+    execute_block_rocksdb_with_blockchain(
         criterion,
         "block/foreign_interface_call/foreign_tx",
-        foreign_interface_call::Timestamping,
+        foreign_interface_call::build_blockchain(),
         foreign_interface_call::foreign_transactions(SeedableRng::from_seed([2; 32])),
     );
 }

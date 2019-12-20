@@ -13,12 +13,9 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-use exonum::{
-    blockchain::ExecutionError,
-    runtime::{
-        rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
-        InstanceId,
-    },
+use exonum::runtime::{
+    rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
+    ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 

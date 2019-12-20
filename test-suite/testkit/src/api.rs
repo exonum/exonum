@@ -34,11 +34,10 @@ use exonum::{
         node::public::{explorer::TransactionQuery, system::DispatcherInfo},
         ApiAggregator,
     },
-    blockchain::ExecutionStatus,
     crypto::Hash,
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::error::ErrorMatch,
+    runtime::{ErrorMatch, ExecutionStatus},
 };
 
 use crate::TestKit;

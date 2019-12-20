@@ -18,9 +18,6 @@
 //! Note how business logic tests use `TestKit::create_block*` methods to send transactions,
 //! the service schema to make assertions about the storage state.
 
-#[macro_use]
-extern crate exonum_testkit;
-
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     runtime::SnapshotExt,
@@ -133,7 +130,7 @@ fn test_transfer_overcharge() {
     let mut testkit = init_testkit();
     let alice = gen_keypair();
     let bob = gen_keypair();
-    testkit.create_block_with_transactions(txvec![
+    testkit.create_block_with_transactions(vec![
         alice.create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME)),
         bob.create_wallet(INSTANCE_ID, CreateWallet::new(BOB_NAME)),
         alice.transfer(
@@ -142,7 +139,7 @@ fn test_transfer_overcharge() {
                 amount: 150,
                 seed: 0,
                 to: bob.0,
-            }
+            },
         ),
     ]);
 
@@ -181,16 +178,7 @@ fn test_transfers_in_single_block() {
         },
     );
 
-    {
-        // See what happens if transactions are applied in an "incorrect" order.
-        // We use `TestKit::probe_all()` method for this.
-        let snapshot = testkit.probe_all(vec![tx_b_to_a.clone(), tx_a_to_b.clone()]);
-        let schema = get_schema(&snapshot);
-        assert_eq!(schema.wallets.get(&alice.0).map(|w| w.balance), Some(10));
-        assert_eq!(schema.wallets.get(&bob.0).map(|w| w.balance), Some(190));
-    }
-
-    testkit.create_block_with_transactions(txvec![tx_a_to_b, tx_b_to_a]);
+    testkit.create_block_with_transactions(vec![tx_a_to_b, tx_b_to_a]);
 
     let alice_wallet = get_wallet(&testkit, &alice.0);
     assert_eq!(alice_wallet.balance, 130);
