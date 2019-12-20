@@ -12,34 +12,27 @@ use exonum_crypto::Hash;
 use proptest::{
     bool,
     collection::vec,
-    option, prop_assert_eq, prop_oneof, proptest, sample, strategy,
+    prop_assert_eq, prop_oneof, proptest, sample, strategy,
     strategy::Strategy,
     test_runner::{Config, TestCaseResult},
 };
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    iter::FromIterator,
-};
+use std::collections::{HashMap, HashSet};
 
 use exonum_merkledb::{
-    access::{Access, AccessErrorKind, AccessExt, RawAccessMut},
+    access::{Access, AccessExt},
     migration::Migration,
     Database, HashTag, IndexAddress, IndexType, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
 };
+
+mod work;
+use self::work::*;
 
 const ACTIONS_MAX_LEN: usize = 25;
 
 const NAMESPACES: Strings = &["test", "other", "tes"];
 
 const UNRELATED_NAMESPACES: Strings = &["other_", "unrelated"];
-
-const INDEX_NAMES: Strings = &[
-    "foo",
-    "bar",
-    "b",
-    "overly_long_prefix_still_should_work_though",
-];
 
 type Strings = &'static [&'static str];
 type NewIndexes = HashMap<(&'static str, IndexAddress), IndexData>;
@@ -70,112 +63,6 @@ enum MigrationAction {
     FlushFork,
     /// Merge the fork into the DB.
     MergeFork,
-}
-
-impl MigrationAction {
-    fn work<T>(
-        fork: T,
-        addr: IndexAddress,
-        mut index_type: IndexType,
-        value: Option<Vec<u8>>,
-    ) -> IndexType
-    where
-        T: Access + Copy,
-        T::Base: RawAccessMut,
-    {
-        if let Err(e) = fork.touch_index(addr.clone(), index_type) {
-            if let AccessErrorKind::WrongIndexType { actual, .. } = e.kind {
-                index_type = actual;
-            }
-        }
-
-        match index_type {
-            IndexType::Entry => {
-                let mut entry = fork.get_entry(addr);
-                if let Some(val) = value {
-                    entry.set(val);
-                } else {
-                    entry.remove();
-                }
-            }
-            IndexType::ProofEntry => {
-                let mut entry = fork.get_proof_entry(addr);
-                if let Some(val) = value {
-                    entry.set(val);
-                } else {
-                    entry.remove();
-                }
-            }
-
-            IndexType::List => {
-                let mut list = fork.get_list(addr);
-                if let Some(val) = value {
-                    list.push(val);
-                } else {
-                    list.clear();
-                }
-            }
-            IndexType::ProofList => {
-                let mut list = fork.get_proof_list(addr);
-                if let Some(val) = value {
-                    list.push(val);
-                } else {
-                    list.clear();
-                }
-            }
-
-            IndexType::Map => {
-                let mut map = fork.get_map(addr);
-                if let Some(val) = value {
-                    let key = val[0];
-                    map.put(&key, val);
-                } else {
-                    map.clear();
-                }
-            }
-            IndexType::ProofMap => {
-                let mut map = fork.get_proof_map(addr);
-                if let Some(val) = value {
-                    let key = val[0];
-                    map.put(&key, val);
-                } else {
-                    map.clear();
-                }
-            }
-
-            _ => {}
-        }
-
-        index_type
-    }
-}
-
-/// Generates an `IndexAddress` optionally placed in a group.
-fn generate_address() -> impl Strategy<Value = IndexAddress> {
-    let index_name = sample::select(INDEX_NAMES).prop_map(IndexAddress::from_root);
-    prop_oneof![
-        // Non-prefixed addresses
-        index_name.clone(),
-        // Prefixed addresses
-        (index_name, 1_u8..8).prop_map(|(addr, prefix)| addr.append_key(&prefix)),
-    ]
-}
-
-fn generate_index_type() -> impl Strategy<Value = IndexType> {
-    prop_oneof![
-        strategy::Just(IndexType::Entry),
-        strategy::Just(IndexType::ProofEntry),
-        strategy::Just(IndexType::List),
-        strategy::Just(IndexType::ProofList),
-        strategy::Just(IndexType::Map),
-        strategy::Just(IndexType::ProofMap),
-    ]
-}
-
-/// Generates a value to place in the index. if `None` is generated, the index will be cleared
-/// instead.
-fn generate_value() -> impl Strategy<Value = Option<Vec<u8>>> {
-    option::weighted(0.8, vec(0_u8..4, 1..=1))
 }
 
 /// Generates an atomic migration action.
@@ -252,62 +139,6 @@ where
         IndexType::ProofList => snapshot.get_proof_list::<_, ()>(name).object_hash(),
         IndexType::ProofMap => snapshot.get_proof_map::<_, (), ()>(name).object_hash(),
         _ => unreachable!(),
-    }
-}
-
-#[derive(Debug)]
-struct IndexData {
-    ty: IndexType,
-    values: Vec<Vec<u8>>,
-}
-
-impl IndexData {
-    fn check<S>(&self, snapshot: S, addr: IndexAddress) -> TestCaseResult
-    where
-        S: Access,
-    {
-        match self.ty {
-            IndexType::Entry => {
-                let val = snapshot.get_entry::<_, Vec<u8>>(addr).get();
-                prop_assert_eq!(val.as_ref(), self.values.last());
-            }
-            IndexType::ProofEntry => {
-                let val = snapshot.get_proof_entry::<_, Vec<u8>>(addr).get();
-                prop_assert_eq!(val.as_ref(), self.values.last());
-            }
-
-            IndexType::List => {
-                let list = snapshot.get_list::<_, Vec<u8>>(addr);
-                prop_assert_eq!(list.len(), self.values.len() as u64);
-                let values = list.iter().collect::<Vec<_>>();
-                prop_assert_eq!(&values, &self.values);
-            }
-            IndexType::ProofList => {
-                let list = snapshot.get_proof_list::<_, Vec<u8>>(addr);
-                prop_assert_eq!(list.len(), self.values.len() as u64);
-                let values = list.iter().collect::<Vec<_>>();
-                prop_assert_eq!(&values, &self.values);
-            }
-
-            IndexType::Map => {
-                let map = snapshot.get_map::<_, u8, Vec<u8>>(addr);
-                let expected_map =
-                    BTreeMap::from_iter(self.values.iter().map(|val| (val[0], val.clone())));
-                // Using `Vec<_>` allows to test for duplicate entries during iteration etc.
-                let expected_map: Vec<_> = expected_map.into_iter().collect();
-                prop_assert_eq!(map.iter().collect::<Vec<_>>(), expected_map);
-            }
-            IndexType::ProofMap => {
-                let map = snapshot.get_proof_map::<_, u8, Vec<u8>>(addr);
-                let expected_map =
-                    BTreeMap::from_iter(self.values.iter().map(|val| (val[0], val.clone())));
-                let expected_map: Vec<_> = expected_map.into_iter().collect();
-                prop_assert_eq!(map.iter().collect::<Vec<_>>(), expected_map);
-            }
-
-            _ => {}
-        }
-        Ok(())
     }
 }
 
@@ -416,7 +247,7 @@ fn check_final_consistency(
 
     for (name, ty) in aggregated_indexes {
         if *ty == IndexType::Tombstone {
-            // The index should be fully removed, thus creating a `ProofMapIndex` on its place
+            // The index should be fully removed; thus, creating a `ProofMapIndex` on its place
             // should succeed and it should have a default `object_hash`.
             prop_assert_eq!(
                 get_object_hash(snapshot, name, IndexType::ProofMap),
@@ -428,32 +259,13 @@ fn check_final_consistency(
     Ok(())
 }
 
-/// Gets the single indexes and their types from the `snapshot`. This uses the fact that only
-/// a limited amount of indexes may be generated by `MigrationAction`s.
-fn get_single_indexes(snapshot: &dyn Snapshot, namespaces: Strings) -> HashMap<String, IndexType> {
-    let mut indexes = HashMap::new();
-
-    for &namespace in namespaces.iter().chain(UNRELATED_NAMESPACES) {
-        for &index_name in INDEX_NAMES {
-            let addr = IndexAddress::from_root(namespace).append_name(index_name);
-            let full_name = addr.name().to_owned();
-            if let Err(e) = snapshot.touch_index(addr, IndexType::Unknown) {
-                if let AccessErrorKind::WrongIndexType { actual, .. } = e.kind {
-                    indexes.insert(full_name, actual);
-                }
-            }
-        }
-    }
-    indexes
-}
-
 fn apply_actions(
     db: &TemporaryDB,
     actions: Vec<MigrationAction>,
     namespaces: Strings,
 ) -> TestCaseResult {
     // Original single indexes together with their type.
-    let mut original_indexes = get_single_indexes(&db.snapshot(), namespaces);
+    let mut original_indexes = HashMap::new();
     // All indexes in the migration together with type and expected contents.
     let mut new_indexes: NewIndexes = HashMap::new();
 
@@ -468,10 +280,10 @@ fn apply_actions(
             } => {
                 let is_in_group = addr.id_in_group().is_some();
                 let real_type = if namespace.is_empty() {
-                    MigrationAction::work(&fork, addr.clone(), index_type, value.clone())
+                    work_on_index(&fork, addr.clone(), index_type, value.clone())
                 } else {
                     let migration = Migration::new(namespace, &fork);
-                    MigrationAction::work(migration, addr.clone(), index_type, value.clone())
+                    work_on_index(migration, addr.clone(), index_type, value.clone())
                 };
 
                 if !namespace.is_empty() {
@@ -494,10 +306,8 @@ fn apply_actions(
 
             MigrationAction::CreateTombstone { namespace, addr } => {
                 let migration = Migration::new(namespace, &fork);
-                if migration
-                    .touch_index(addr.clone(), IndexType::Tombstone)
-                    .is_ok()
-                {
+                if migration.index_type(addr.clone()).is_none() {
+                    migration.create_tombstone(addr.clone());
                     new_indexes.insert(
                         (namespace, addr),
                         IndexData {
@@ -580,6 +390,7 @@ fn single_migration() {
     let db = TemporaryDB::new();
     proptest!(|(actions in vec(generate_action(SINGLE_NAMESPACE), 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, SINGLE_NAMESPACE)?;
+        db.clear().unwrap();
     });
 }
 
@@ -590,6 +401,7 @@ fn single_migration_with_rollbacks() {
     let action = generate_action_with_rollbacks(SINGLE_NAMESPACE);
     proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, SINGLE_NAMESPACE)?;
+        db.clear().unwrap();
     });
 }
 
@@ -598,6 +410,7 @@ fn multiple_migrations_with_synced_end() {
     let db = TemporaryDB::new();
     proptest!(|(actions in vec(generate_action(NAMESPACES), 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, NAMESPACES)?;
+        db.clear().unwrap();
     });
 }
 
@@ -607,5 +420,6 @@ fn multiple_migrations_with_synced_end_and_rollbacks() {
     let action = generate_action_with_rollbacks(NAMESPACES);
     proptest!(|(actions in vec(action, 1..ACTIONS_MAX_LEN))| {
         apply_actions(&db, actions, NAMESPACES)?;
+        db.clear().unwrap();
     });
 }
