@@ -113,7 +113,7 @@ where
     K: BinaryKey + ?Sized,
     I: FromAccess<T>,
 {
-    /// Return iterator over the keys from this group.
+    /// Returns an iterator over the keys from this group.
     ///
     /// **Note:** use this method carefully, because storing all keys in memory may
     /// consume a large amount of RAM.
