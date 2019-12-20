@@ -42,21 +42,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
 - The following public APIs were removed/made private: (#1629)
-  - `helpers::path_relative_from` function;
-  - `messages::BinaryValue` public re-export;
-  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
-    `Blockchain::remove_peer_with_pubkey` methods;
-  - `node::state` module (constants from `node::state` are now accessible in
-    `node::constants` module);
-  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
   - `blockchain::{error reexports}` (available from `runtime::`);
   - `blockchain::FatalError` public re-export;
   - `blockchain::InstanceCollection` structure;
+  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
+    `Blockchain::remove_peer_with_pubkey` methods;
+  - `helpers::path_relative_from` function;
   - `helpers::ZeroizeOnDrop` trait;
   - `helpers::Milliseconds` type;
+  - `helpers::config` and `helpers::user_agent` modules;
   - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
     and `helpers::clear_consensus_messages_cache` functions;
-  - `helpers::config` and `helpers::user_agent` modules;
+  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
+  - `messages::BinaryValue` public re-export;
+  - `node::state` module (constants from `node::state` are now accessible in
+    `node::constants` module);
   - `proto` module;
   - `runtime::error` module (`catch_panic` was added to the list of public
     re-exports from `runtime::error`).
