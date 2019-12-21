@@ -65,40 +65,6 @@ use crate::{
 /// group.get("bar").push(42);
 /// # assert_eq!(fork.readonly().get_list::<_, u64>(("unsized_group", "bar")).len(), 1);
 /// ```
-///
-/// This example shows incorrect use of the [`keys`] iterator:
-///
-/// ```should_panic
-/// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
-/// let db = TemporaryDB::new();
-/// let fork = db.fork();
-/// let group: Group<_, str, ListIndex<_, String>> = fork.get_group("group");
-/// group.get("foo").push("foo".to_owned());
-/// group.get("bar").push("bar".to_owned());
-///
-/// for key in group.keys() {
-///     fork.get_list("list").push(key); // << will panic
-/// }
-/// ```
-///
-/// In this case, the fix is easy: move the index creation outside the `for` cycle.
-///
-/// ```
-/// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
-/// # let db = TemporaryDB::new();
-/// # let fork = db.fork();
-/// # let group: Group<_, str, ListIndex<_, String>> = fork.get_group("group");
-/// # group.get("foo").push("foo".to_owned());
-/// # group.get("bar").push("bar".to_owned());
-/// let mut list = fork.get_list("list");
-/// for key in group.keys() {
-///     list.push(key);
-/// }
-/// // ...or, more idiomatically:
-/// list.extend(group.keys());
-/// ```
-///
-/// [`keys`]: #method.keys
 #[derive(Debug)]
 pub struct Group<T, K: ?Sized, I> {
     access: T,
@@ -160,7 +126,40 @@ where
     /// [`Fork`]: struct.Fork.html
     /// [`ReadonlyFork`]: struct.ReadonlyFork.html
     /// [`buffered_keys`]: #method.buffered_keys
-    #[doc(hidden)] // Has clunky user experience, error-prone
+    ///
+    /// # Examples
+    ///
+    /// This example shows incorrect use of the iterator:
+    ///
+    /// ```should_panic
+    /// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let group: Group<_, str, ListIndex<_, String>> = fork.get_group("group");
+    /// group.get("foo").push("foo".to_owned());
+    /// group.get("bar").push("bar".to_owned());
+    ///
+    /// for key in group.keys() {
+    ///     fork.get_list("list").push(key); // << will panic
+    /// }
+    /// ```
+    ///
+    /// In this case, the fix is easy: move the index creation outside the `for` cycle.
+    ///
+    /// ```
+    /// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
+    /// # let db = TemporaryDB::new();
+    /// # let fork = db.fork();
+    /// # let group: Group<_, str, ListIndex<_, String>> = fork.get_group("group");
+    /// # group.get("foo").push("foo".to_owned());
+    /// # group.get("bar").push("bar".to_owned());
+    /// let mut list = fork.get_list("list");
+    /// for key in group.keys() {
+    ///     list.push(key);
+    /// }
+    /// // ...or, more idiomatically:
+    /// list.extend(group.keys());
+    /// ```
     pub fn keys(&self) -> Keys<T::Base, K> {
         let inner = self.access.clone().group_keys(self.prefix.clone());
         Keys {
