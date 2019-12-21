@@ -81,7 +81,7 @@ use crate::{
 /// }
 /// ```
 ///
-/// In this case, the fix is easy: just move the index creation outside the `for` cycle.
+/// In this case, the fix is easy: move the index creation outside the `for` cycle.
 ///
 /// ```
 /// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
@@ -95,7 +95,7 @@ use crate::{
 ///     list.push(key);
 /// }
 /// // ...or, more idiomatically:
-/// //list.extend(group.keys());
+/// list.extend(group.keys());
 /// ```
 ///
 /// [`keys`]: #method.keys
@@ -150,13 +150,17 @@ where
     ///
     /// # Panics
     ///
-    /// If the group is built on top a [`Fork`], an attempt to create an index from the fork
-    /// while iterating over keys will result in a panic. This is because such an operation
-    /// may invalidate the iterator. As a workaround, consider using the [`buffered_keys`]
-    /// method or otherwise delay the DB modification after the iterator is dropped.
+    /// If the group is built on top a [`Fork`] (including via [`ReadonlyFork`]), an attempt
+    /// to get a mutable index from the fork or drop a mutable index
+    /// while iterating over keys will result in a panic. This is because
+    /// such an operation may invalidate the iterator. As a workaround, consider using
+    /// the [`buffered_keys`] method or otherwise delay the DB modification until after
+    /// the iterator is dropped.
     ///
     /// [`Fork`]: struct.Fork.html
+    /// [`ReadonlyFork`]: struct.ReadonlyFork.html
     /// [`buffered_keys`]: #method.buffered_keys
+    #[doc(hidden)] // Has clunky user experience, error-prone
     pub fn keys(&self) -> Keys<T::Base, K> {
         let inner = self.access.clone().group_keys(self.prefix.clone());
         Keys {
@@ -168,6 +172,7 @@ where
 
 /// Iterator over keys in a group.
 #[derive(Debug)]
+#[doc(hidden)] // Used only by the unstable `Group::keys` method
 pub struct Keys<T: RawAccess, K: ?Sized> {
     inner: GroupKeys<T>,
     _key: PhantomData<K>,
@@ -231,20 +236,17 @@ mod tests {
         A: Access,
         A::Base: RawAccessMut,
     {
-        {
-            let group: Group<_, str, ProofListIndex<_, String>> = fork.clone().get_group("group");
-            group.get("foo").push("foo".to_owned());
-            group.get("bar").push("bar".to_owned());
-            group.get("baz").push("baz".to_owned());
-        }
-        {
-            let group: Group<_, u32, ProofListIndex<_, String>> =
-                Group::from_access(fork.clone(), ("prefixed", &0_u8).into()).unwrap();
-            group.get(&1).push("foo".to_owned());
-            group.get(&2).push("bar".to_owned());
-            group.get(&5).push("baz".to_owned());
-            group.get(&100_000).push("?".to_owned());
-        }
+        let group: Group<_, str, ProofListIndex<_, String>> = fork.clone().get_group("group");
+        group.get("foo").push("foo".to_owned());
+        group.get("bar").push("bar".to_owned());
+        group.get("baz").push("baz".to_owned());
+
+        let group: Group<_, u32, ProofListIndex<_, String>> =
+            Group::from_access(fork.clone(), ("prefixed", &0_u8).into()).unwrap();
+        group.get(&1).push("foo".to_owned());
+        group.get(&2).push("bar".to_owned());
+        group.get(&5).push("baz".to_owned());
+        group.get(&100_000).push("?".to_owned());
 
         // Add some unrelated stuff to the DB.
         fork.clone().get_entry("gr").set(42);
@@ -320,5 +322,45 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         test_key_iter(Migration::new("namespace", &fork));
+    }
+
+    fn check_multiple_iterators<A: Access + Copy>(access: A) {
+        let group: Group<_, str, ProofListIndex<_, String>> = access.get_group("group");
+        let other_group: Group<_, u32, ProofListIndex<_, String>> = access.get_group("other");
+        let key_pairs: Vec<_> = group.keys().zip(other_group.keys()).collect();
+        assert_eq!(
+            key_pairs,
+            vec![
+                ("bar".to_owned(), 2),
+                ("baz".to_owned(), 3),
+                ("foo".to_owned(), 5),
+            ]
+        );
+    }
+
+    /// Multiple iterators over `ReadonlyFork`, `Snapshot` and `Patch` should be supported.
+    #[test]
+    fn multiple_iterators() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        {
+            let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group("group");
+            group.get("foo").push("foo".to_owned());
+            group.get("bar").push("bar".to_owned());
+            group.get("baz").push("baz".to_owned());
+
+            let other_group: Group<_, u32, ProofListIndex<_, String>> = fork.get_group("other");
+            other_group.get(&2).push("foo".to_owned());
+            other_group.get(&3).push("bar".to_owned());
+            other_group.get(&5).push("baz".to_owned());
+            other_group.get(&8).push("?".to_owned());
+        }
+
+        check_multiple_iterators(fork.readonly());
+        let patch = fork.into_patch();
+        check_multiple_iterators(&patch);
+        db.merge(patch).unwrap();
+        check_multiple_iterators(&db.snapshot());
     }
 }
