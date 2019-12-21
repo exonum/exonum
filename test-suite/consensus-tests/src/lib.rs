@@ -742,9 +742,8 @@ impl Sandbox {
 
     pub fn get_proof_to_index(&self, index_name: &str) -> MapProof<String, Hash> {
         let snapshot = self.blockchain().snapshot();
-        SystemSchema::new(&snapshot)
-            .state_aggregator()
-            .get_proof(index_name.to_owned())
+        let aggregator = SystemSchema::new(&snapshot).state_aggregator();
+        aggregator.get_proof(index_name.to_owned())
     }
 
     pub fn get_configs_merkle_root(&self) -> Hash {

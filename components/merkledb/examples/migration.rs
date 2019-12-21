@@ -255,18 +255,20 @@ fn main() {
     fork.flush_migration("test");
     let patch = fork.into_patch();
 
-    // Now, the new indexes have replaced the old ones.
-    let new_schema = v2::Schema::new(Prefixed::new("test", &patch));
-    assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
-    assert!(!patch.get_entry::<_, u8>("test.divisibility").exists());
+    {
+        // Now, the new indexes have replaced the old ones.
+        let new_schema = v2::Schema::new(Prefixed::new("test", &patch));
+        assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
+        assert!(!patch.get_entry::<_, u8>("test.divisibility").exists());
 
-    // The indexes are now aggregated in the default namespace.
-    let system_schema = SystemSchema::new(&patch);
-    let state = system_schema.state_aggregator();
-    assert_eq!(
-        state.keys().collect::<Vec<_>>(),
-        vec!["test.config", "test.wallets", "unrelated.list"]
-    );
+        // The indexes are now aggregated in the default namespace.
+        let system_schema = SystemSchema::new(&patch);
+        let state = system_schema.state_aggregator();
+        assert_eq!(
+            state.keys().collect::<Vec<_>>(),
+            vec!["test.config", "test.wallets", "unrelated.list"]
+        );
+    }
 
     // When the patch is merged, the situation remains the same.
     db.merge(patch).unwrap();

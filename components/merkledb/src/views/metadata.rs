@@ -259,10 +259,23 @@ impl IndexMetadata {
 }
 
 #[derive(Debug)]
-pub struct IndexState<T, V> {
+pub struct IndexState<T: RawAccess, V: BinaryAttribute> {
     metadata: IndexMetadata<V>,
     index_access: T,
     index_full_name: Vec<u8>,
+    is_dirty: bool, // Does metadata need to be updated on drop?
+}
+
+impl<T: RawAccess, V: BinaryAttribute> Drop for IndexState<T, V> {
+    fn drop(&mut self) {
+        if self.is_dirty {
+            View::new(
+                self.index_access.clone(),
+                ResolvedAddress::system(INDEXES_POOL_NAME),
+            )
+            .put_or_forget(&self.index_full_name, self.metadata.to_bytes());
+        }
+    }
 }
 
 impl<T, V> IndexState<T, V>
@@ -282,20 +295,12 @@ where
 {
     pub fn set(&mut self, state: V) {
         self.metadata.state = Some(state);
-        View::new(
-            self.index_access.clone(),
-            ResolvedAddress::system(INDEXES_POOL_NAME),
-        )
-        .put(&self.index_full_name, self.metadata.to_bytes());
+        self.is_dirty = true;
     }
 
     pub fn unset(&mut self) {
         self.metadata.state = None;
-        View::new(
-            self.index_access.clone(),
-            ResolvedAddress::system(INDEXES_POOL_NAME),
-        )
-        .put(&self.index_full_name, self.metadata.to_bytes());
+        self.is_dirty = true;
     }
 }
 
@@ -628,6 +633,7 @@ where
             metadata: self.metadata.convert(),
             index_access: self.view.index_access.clone(),
             index_full_name: self.index_full_name,
+            is_dirty: false,
         };
         (self.view, state)
     }

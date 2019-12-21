@@ -41,7 +41,8 @@ pub const SECOND_SERVICE_NAME: &str = "change-service";
 pub fn config_propose_entry(testkit: &TestKit) -> Option<ConfigPropose> {
     let snapshot = testkit.snapshot();
     let snapshot = snapshot.for_service(supervisor_name()).unwrap();
-    Schema::new(snapshot)
+    let schema = Schema::new(snapshot);
+    schema
         .pending_proposal
         .get()
         .map(|entry| entry.config_propose)

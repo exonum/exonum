@@ -187,24 +187,26 @@ mod tests {
         further_changes(&fork);
 
         let patch = fork.into_patch();
-        let system_schema = SystemSchema::new(&patch);
-        let aggregator = system_schema.state_aggregator();
         let expected_index_names = vec![
             "another_map".to_owned(),
             "entry".to_owned(),
             "list".to_owned(),
             "map".to_owned(),
         ];
-        assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
-        assert_eq!(
-            aggregator.get(&"list".to_owned()).unwrap(),
-            patch.get_proof_list::<_, u32>("list").object_hash()
-        );
-        assert_eq!(
-            aggregator.get(&"map".to_owned()).unwrap(),
-            patch.get_proof_map::<_, i32, String>("map").object_hash()
-        );
-        assert_eq!(aggregator.object_hash(), system_schema.state_hash());
+        {
+            let system_schema = SystemSchema::new(&patch);
+            let aggregator = system_schema.state_aggregator();
+            assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
+            assert_eq!(
+                aggregator.get(&"list".to_owned()).unwrap(),
+                patch.get_proof_list::<_, u32>("list").object_hash()
+            );
+            assert_eq!(
+                aggregator.get(&"map".to_owned()).unwrap(),
+                patch.get_proof_map::<_, i32, String>("map").object_hash()
+            );
+            assert_eq!(aggregator.object_hash(), system_schema.state_hash());
+        }
         db.merge_sync(patch).unwrap();
 
         let snapshot = db.snapshot();
