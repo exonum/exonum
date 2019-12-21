@@ -21,7 +21,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
-use super::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View};
+use super::{IndexAddress, OwningIter, RawAccess, RawAccessMut, ResolvedAddress, View};
 use crate::{
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
@@ -344,6 +344,16 @@ impl<T: RawAccess> IndexesPool<T> {
         self.set_len(len + 1);
         (metadata, is_phantom)
     }
+
+    /// Iterates over indexes with addresses in which the name part is as specified.
+    pub(crate) fn group_keys(self, base_addr: &IndexAddress) -> GroupKeys<T> {
+        let prefix = base_addr.qualified_prefix();
+        GroupKeys {
+            inner: OwningIter::new(self.0, &prefix),
+            prefix,
+            ended: false,
+        }
+    }
 }
 
 impl<T: RawAccessMut> IndexesPool<T> {
@@ -415,6 +425,34 @@ impl<T: RawAccessMut> IndexesPool<T> {
             self.0.remove(full_name);
         }
         removed_addrs
+    }
+}
+
+/// Low-level iterator over keys in a group.
+#[derive(Debug)]
+pub struct GroupKeys<T: RawAccess> {
+    inner: OwningIter<T>,
+    prefix: Vec<u8>,
+    ended: bool,
+}
+
+impl<T: RawAccess> GroupKeys<T> {
+    /// Returns the next key within the group, or `None` if the iterator has ended.
+    pub fn next(&mut self) -> Option<&[u8]> {
+        use crate::db::Iterator as _;
+
+        if self.ended {
+            return None;
+        }
+
+        if let Some((next_key, _)) = self.inner.next() {
+            if next_key.starts_with(&self.prefix) {
+                return Some(&next_key[self.prefix.len()..]);
+            }
+        }
+
+        self.ended = true;
+        None
     }
 }
 

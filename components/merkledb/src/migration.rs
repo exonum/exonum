@@ -121,7 +121,8 @@ use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
     validation::assert_valid_name_component,
     views::{
-        get_state_aggregator, AsReadonly, IndexAddress, IndexType, RawAccessMut, ViewWithMetadata,
+        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexType, IndexesPool,
+        RawAccessMut, ViewWithMetadata,
     },
     Database, Fork, ObjectHash, ProofMapIndex, ReadonlyFork,
 };
@@ -215,6 +216,12 @@ impl<T: RawAccess> Access for Migration<'_, T> {
         let mut prefixed_addr = addr.prepend_name(self.namespace.as_ref());
         prefixed_addr.set_in_migration();
         self.access.get_or_create_view(prefixed_addr, index_type)
+    }
+
+    fn group_keys(self, base_addr: IndexAddress) -> GroupKeys<Self::Base> {
+        let mut prefixed_addr = base_addr.prepend_name(self.namespace.as_ref());
+        prefixed_addr.set_in_migration();
+        IndexesPool::new(self.access).group_keys(&prefixed_addr)
     }
 }
 

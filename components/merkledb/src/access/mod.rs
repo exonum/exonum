@@ -8,14 +8,16 @@ pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
 use crate::validation::assert_valid_name_component;
-use crate::views::{IndexAddress, IndexMetadata, IndexType, ViewWithMetadata};
+use crate::views::{
+    GroupKeys, IndexAddress, IndexMetadata, IndexType, IndexesPool, ViewWithMetadata,
+};
 
 mod extensions;
 
 /// High-level access to database data.
 ///
 /// This trait is not intended to be implemented by the types outside the crate; indeed,
-/// it instantiates `ViewWithMetadata`, which is crate-private. Correspondingly, `Access` methods
+/// it instantiates several crate-private types. Correspondingly, `Access` methods
 /// rarely need to be used directly; use [its extension trait][`AccessExt`] instead.
 ///
 /// [`AccessExt`]: trait.AccessExt.html
@@ -52,6 +54,15 @@ pub trait Access: Clone {
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError>;
+
+    /// Returns an iterator over keys in a group with the specified address.
+    ///
+    /// # Panics
+    ///
+    /// If the access is built on top a `Fork`, an attempt to create an index from the fork
+    /// while iterating over keys will result in a panic. This is because such an operation
+    /// may invalidate the iterator.
+    fn group_keys(self, base_addr: IndexAddress) -> GroupKeys<Self::Base>;
 }
 
 impl<T: RawAccess> Access for T {
@@ -67,6 +78,10 @@ impl<T: RawAccess> Access for T {
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
         ViewWithMetadata::get_or_create(self, &addr, index_type)
+    }
+
+    fn group_keys(self, base_addr: IndexAddress) -> GroupKeys<Self::Base> {
+        IndexesPool::new(self).group_keys(&base_addr)
     }
 }
 
@@ -110,8 +125,8 @@ impl<'a, T: Access> Prefixed<'a, T> {
     }
 }
 
-impl<T: Access> Access for Prefixed<'_, T> {
-    type Base = T::Base;
+impl<T: RawAccess> Access for Prefixed<'_, T> {
+    type Base = T;
 
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
         let prefixed_addr = addr.prepend_name(self.prefix.as_ref());
@@ -125,6 +140,11 @@ impl<T: Access> Access for Prefixed<'_, T> {
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
         let prefixed_addr = addr.prepend_name(self.prefix.as_ref());
         self.access.get_or_create_view(prefixed_addr, index_type)
+    }
+
+    fn group_keys(self, base_addr: IndexAddress) -> GroupKeys<Self::Base> {
+        let prefixed_addr = base_addr.prepend_name(self.prefix.as_ref());
+        IndexesPool::new(self.access).group_keys(&prefixed_addr)
     }
 }
 
