@@ -166,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn group_iter_value() {
+    fn group_iter_values() {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
@@ -227,6 +227,7 @@ mod tests {
         assert!(!keys.contains(&"b1".to_owned()));
 
         // Keys also shouldn't start with `GROUP_NAME`.
-        assert!(!keys.iter().any(|key| { key.starts_with(GROUP_NAME) }));
+        let starts_with_group_name = |key: &String| key.starts_with(GROUP_NAME);
+        assert!(!keys.iter().any(starts_with_group_name));
     }
 }
