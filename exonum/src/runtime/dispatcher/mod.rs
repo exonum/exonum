@@ -74,23 +74,20 @@ impl CommittedServices {
         })
     }
 
-    fn get_instance<'s>(
-        &'s self,
-        id: impl Into<InstanceQuery<'s>>,
-    ) -> Option<(InstanceDescriptor<'s>, InstanceStatus)> {
-        match id.into() {
-            InstanceQuery::Id(id) => {
-                let info = self.instances.get(&id)?;
-                let name = info.name.as_str();
-                Some((InstanceDescriptor { id, name }, info.status))
-            }
+    fn get_instance<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<(InstanceDescriptor<'_>, InstanceStatus)> {
+        let (id, info) = match id.into() {
+            InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
             InstanceQuery::Name(name) => {
                 let id = *self.instance_names.get(name)?;
-                let status = self.instances.get(&id)?.status;
-                Some((InstanceDescriptor { id, name }, status))
+                (id, self.instances.get(&id)?)
             }
-        }
+        };
+        let name = info.name.as_str();
+        Some((InstanceDescriptor { id, name }, info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -384,7 +381,7 @@ impl Dispatcher {
     /// Calls `after_transactions` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
-    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
+    /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
@@ -467,10 +464,10 @@ impl Dispatcher {
     }
 
     /// Returns the service matching the specified query.
-    pub(crate) fn get_service<'s>(
-        &'s self,
-        id: impl Into<InstanceQuery<'s>>,
-    ) -> Option<InstanceDescriptor<'s>> {
+    pub(crate) fn get_service<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<InstanceDescriptor<'_>> {
         let (descriptor, status) = self.service_infos.get_instance(id)?;
         if status.is_active() {
             Some(descriptor)

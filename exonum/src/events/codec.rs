@@ -19,7 +19,8 @@ use tokio_io::codec::{Decoder, Encoder};
 
 use crate::{
     events::noise::{TransportWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH},
-    messages::{BinaryValue, SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
+    merkledb::BinaryValue,
+    messages::{SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
 };
 #[derive(Debug)]
 pub struct MessagesCodec {

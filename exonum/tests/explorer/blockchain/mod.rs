@@ -42,16 +42,12 @@ mod proto;
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
-    pub pubkey: PublicKey,
     pub name: String,
 }
 
 impl CreateWallet {
-    pub fn new(pubkey: &PublicKey, name: &str) -> Self {
-        Self {
-            pubkey: *pubkey,
-            name: name.to_owned(),
-        }
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
     }
 }
 
@@ -60,18 +56,13 @@ impl CreateWallet {
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer")]
 pub struct Transfer {
-    pub from: PublicKey,
     pub to: PublicKey,
     pub amount: u64,
 }
 
 impl Transfer {
-    pub fn new(from: &PublicKey, to: &PublicKey, amount: u64) -> Self {
-        Self {
-            from: *from,
-            to: *to,
-            amount,
-        }
+    pub fn new(to: &PublicKey, amount: u64) -> Self {
+        Self { to: *to, amount }
     }
 }
 
@@ -82,14 +73,11 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait ExplorerTransactions {
-    fn create_wallet(
-        &self,
-        context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError>;
+pub trait ExplorerTransactions<Ctx> {
+    type Output;
 
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -101,12 +89,10 @@ pub trait ExplorerTransactions {
 #[service_dispatcher(implements("ExplorerTransactions"))]
 struct MyService;
 
-impl ExplorerTransactions for MyService {
-    fn create_wallet(
-        &self,
-        _context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError> {
+impl ExplorerTransactions<CallContext<'_>> for MyService {
+    type Output = Result<(), ExecutionError>;
+
+    fn create_wallet(&self, _ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -114,7 +100,7 @@ impl ExplorerTransactions for MyService {
         }
     }
 
-    fn transfer(&self, _context: CallContext<'_>, _arg: Transfer) -> Result<(), ExecutionError> {
+    fn transfer(&self, _ctx: CallContext<'_>, _arg: Transfer) -> Self::Output {
         panic!("oops");
     }
 }

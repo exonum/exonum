@@ -31,12 +31,12 @@ use crate::{
 /// A list of items where elements are added to the end of the list and are
 /// removed starting from the end of the list.
 ///
-/// Access to the elements is obtained using the indices of the list items.
+/// Access to the elements is obtained using the indexes of the list items.
 /// `ListIndex` implements an array list, storing the elements as values and
 /// using `u64` as an index. `ListIndex` requires that elements implement the
 /// [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ListIndex<T: RawAccess, V> {
     base: View<T>,
@@ -53,7 +53,7 @@ pub struct ListIndex<T: RawAccess, V> {
 /// [`iter_from`]: struct.ListIndex.html#method.iter_from
 /// [`ListIndex`]: struct.ListIndex.html
 #[derive(Debug)]
-pub struct ListIndexIter<'a, V> {
+pub struct Iter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
@@ -182,8 +182,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ListIndexIter<'_, V> {
-        ListIndexIter {
+    pub fn iter(&self) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
@@ -206,8 +206,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ListIndexIter<'_, V> {
-        ListIndexIter {
+    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), &from),
         }
     }
@@ -393,14 +393,14 @@ where
     V: BinaryValue,
 {
     type Item = V;
-    type IntoIter = ListIndexIter<'a, V>;
+    type IntoIter = Iter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for ListIndexIter<'a, V>
+impl<'a, V> Iterator for Iter<'a, V>
 where
     V: BinaryValue,
 {

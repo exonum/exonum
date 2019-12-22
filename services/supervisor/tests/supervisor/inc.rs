@@ -12,24 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_derive::{Deserialize, Serialize};
-
-use exonum::{
-    blockchain::ExecutionError,
-    runtime::{
-        rust::{
-            api::{self, ServiceApiBuilder},
-            CallContext, DefaultInstance, Service,
-        },
-        DispatcherError, InstanceId,
+use exonum::runtime::{
+    rust::{
+        api::{self, ServiceApiBuilder},
+        CallContext, DefaultInstance, Service,
     },
+    DispatcherError, ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     Entry,
 };
-use exonum_proto::ProtobufConvert;
 
 use crate::proto;
 use exonum_supervisor::Configure;
@@ -65,23 +59,16 @@ where
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxInc")]
-pub struct Inc {
-    pub seed: u64,
-}
-
 #[exonum_interface]
-pub trait IncInterface {
-    fn inc(&self, context: CallContext<'_>, arg: Inc) -> Result<(), ExecutionError>;
+pub trait IncInterface<Ctx> {
+    type Output;
+    fn inc(&self, context: Ctx, seed: u64) -> Self::Output;
 }
 
 /// Very simple test service that has one tx and one endpoint.
 /// Basically, it just counts how many time the tx was received.
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(implements("IncInterface", "Configure<Params = String>"))]
+#[service_dispatcher(implements("IncInterface", raw = "Configure<Params = String>"))]
 #[service_factory(
     artifact_name = "inc",
     artifact_version = "1.0.0",
@@ -89,8 +76,10 @@ pub trait IncInterface {
 )]
 pub struct IncService;
 
-impl IncInterface for IncService {
-    fn inc(&self, context: CallContext<'_>, _arg: Inc) -> Result<(), ExecutionError> {
+impl IncInterface<CallContext<'_>> for IncService {
+    type Output = Result<(), ExecutionError>;
+
+    fn inc(&self, context: CallContext<'_>, _seed: u64) -> Self::Output {
         Schema::new(context.service_data()).inc();
         Ok(())
     }

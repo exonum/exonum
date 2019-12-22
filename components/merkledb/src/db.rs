@@ -518,8 +518,46 @@ pub trait Database: Send + Sync + 'static {
 
 /// Extension trait for `Database`.
 pub trait DatabaseExt: Database {
-    /// Merges a patch into the database and creates a rollback patch that reverses all the merged
+    /// Merges a patch into the database and creates a backup patch that reverses all the merged
     /// changes.
+    ///
+    /// # Safety
+    ///
+    /// It is logically unsound to merge other patches to the database between the `merge_with_backup`
+    /// call and merging the backup patch. This may lead to merge artifacts and an inconsistent
+    /// database state.
+    ///
+    /// An exception to this rule is creating backups for several merged patches
+    /// and then applying backups in the reverse order:
+    ///
+    /// ```
+    /// # use exonum_merkledb::{access::{Access, AccessExt}, Database, DatabaseExt, TemporaryDB};
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// fork.get_list("list").push(1_u32);
+    /// let backup1 = db.merge_with_backup(fork.into_patch()).unwrap();
+    /// let fork = db.fork();
+    /// fork.get_list("list").push(2_u32);
+    /// let backup2 = db.merge_with_backup(fork.into_patch()).unwrap();
+    /// let fork = db.fork();
+    /// fork.get_list("list").extend(vec![3_u32, 4]);
+    /// let backup3 = db.merge_with_backup(fork.into_patch()).unwrap();
+    ///
+    /// fn enumerate_list<A: Access>(view: A) -> Vec<u32> {
+    ///     view.get_list("list").iter().collect()
+    /// }
+    ///
+    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1, 2, 3, 4]);
+    /// // Rollback the most recent merge.
+    /// db.merge(backup3).unwrap();
+    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1, 2]);
+    /// // ...Then the penultimate merge.
+    /// db.merge(backup2).unwrap();
+    /// assert_eq!(enumerate_list(&db.snapshot()), vec![1]);
+    /// // ...Then the oldest one.
+    /// db.merge(backup1).unwrap();
+    /// assert!(enumerate_list(&db.snapshot()).is_empty());
+    /// ```
     ///
     /// # Performance notes
     ///
@@ -751,7 +789,7 @@ impl Fork {
         self.patch
     }
 
-    /// Returns a readonly wrapper around the fork. Indices created based on the readonly
+    /// Returns a readonly wrapper around the fork. Indexes created based on the readonly
     /// version cannot be modified; on the other hand, it is possible to have multiple
     /// copies of an index at the same time.
     pub fn readonly(&self) -> ReadonlyFork<'_> {
@@ -764,7 +802,7 @@ impl From<Patch> for Fork {
     ///
     /// Note: using created fork to modify data already present in `patch` may lead
     /// to an inconsistent database state. Hence, this method is useful only if you
-    /// are sure that the fork and `patch` interacted with different indices.
+    /// are sure that the fork and `patch` interacted with different indexes.
     fn from(patch: Patch) -> Self {
         Self {
             patch,
@@ -1239,6 +1277,19 @@ mod tests {
         assert_eq!(snapshot.get(&"foo".into(), &[]), Some(vec![1]));
         assert_eq!(snapshot.get(&"foo".into(), &[1]), Some(vec![2]));
         assert_eq!(snapshot.get(&"foo".into(), &[2]), None);
+    }
+
+    #[test]
+    fn backup_reverting_index_creation() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_entry("foo").set(1_u32);
+        db.merge(fork.into_patch()).unwrap();
+        let fork = db.fork();
+        fork.get_entry(("foo", &1_u8)).set(2_u32);
+        let backup = db.merge_with_backup(fork.into_patch()).unwrap();
+        assert!(backup.index_type(("foo", &1_u8)).is_none());
+        assert!(backup.get_list::<_, u32>(("foo", &1_u8)).is_empty());
     }
 
     #[test]

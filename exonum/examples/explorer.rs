@@ -18,20 +18,21 @@
 extern crate serde_derive;
 
 use exonum::{
-    blockchain::{BlockchainMut, CallInBlock, ExecutionErrorKind},
-    crypto,
+    blockchain::{BlockchainMut, CallInBlock},
+    crypto::gen_keypair,
     explorer::*,
     helpers::{Height, ValidatorId},
     merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
-    runtime::rust::Transaction as _,
+    runtime::ErrorKind as ExecutionErrorKind,
 };
 use serde_json::json;
 
 use std::{collections::BTreeMap, iter};
 
 use crate::blockchain::{
-    consensus_keys, create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID,
+    consensus_keys, create_block, create_blockchain, CreateWallet, ExplorerTransactions as _,
+    Transfer, SERVICE_ID,
 };
 use exonum::blockchain::ProposerId;
 
@@ -42,8 +43,7 @@ mod blockchain;
 pub fn mempool_transaction() -> Verified<AnyTx> {
     // Must be deterministic, so we are using consensus keys, which are generated from
     // a passphrase.
-    let (pk_alex, key_alex) = consensus_keys();
-    CreateWallet::new(&pk_alex, "Alex").sign(SERVICE_ID, pk_alex, &key_alex)
+    consensus_keys().create_wallet(SERVICE_ID, CreateWallet::new("Alex"))
 }
 
 /// Creates a sample blockchain for the example.
@@ -57,12 +57,12 @@ pub fn mempool_transaction() -> Verified<AnyTx> {
 /// Additionally, a single transaction is placed into the pool.
 pub fn sample_blockchain() -> BlockchainMut {
     let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let alice = gen_keypair();
+    let bob = gen_keypair();
 
-    let tx_alice = CreateWallet::new(&pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
-    let tx_bob = CreateWallet::new(&pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
-    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100).sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(&bob.0, 100));
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));

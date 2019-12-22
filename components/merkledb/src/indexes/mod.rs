@@ -12,8 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+//! All available `MerkleDB` indexes.
 
-package exonum.testkit;
+pub use self::{entry::Entry, group::Group, proof_entry::ProofEntry};
 
-message TxAfterCommit { uint64 height = 1; }
+mod entry;
+mod group;
+mod proof_entry;
+
+pub mod key_set;
+pub mod list;
+pub mod map;
+pub mod proof_list;
+pub mod proof_map;
+pub mod sparse_list;
+pub mod value_set;

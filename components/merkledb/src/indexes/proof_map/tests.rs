@@ -31,9 +31,10 @@ use super::{
     node::BranchNode,
     MapProof, MapProofError, ProofPath,
 };
-use crate::proof_map_index::{Hashed, ProofMapIndex, Raw, ToProofPath};
 use crate::{
-    access::AccessExt, BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
+    access::AccessExt,
+    proof_map::{Hashed, ProofMapIndex, Raw, ToProofPath},
+    BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };
 
 const IDX_NAME: &str = "idx_name";
@@ -1157,6 +1158,57 @@ fn test_iter_raw() {
 #[test]
 fn test_iter_hashed() {
     ProofMapTester::<Hashed>::test_iter()
+}
+
+#[test]
+fn index_as_iterator() {
+    let db = TemporaryDB::default();
+    let fork = db.fork();
+    let mut map = fork.get_proof_map(IDX_NAME);
+    map.put(&1_u8, 1_u8);
+    map.put(&2_u8, 2_u8);
+    map.put(&3_u8, 3_u8);
+    for (key, value) in &map {
+        assert_eq!(key, value);
+    }
+    assert_eq!((&map).into_iter().count(), 3);
+    assert_eq!(map.keys().collect::<Vec<_>>(), vec![1, 2, 3]);
+    assert_eq!(map.iter().collect::<Vec<_>>(), vec![(1, 1), (2, 2), (3, 3)]);
+
+    let mut map = fork.get_proof_map((IDX_NAME, &0_u8));
+    map.put("1", 1_u8);
+    map.put("2", 2_u8);
+    map.put("3", 3_u8);
+    for (key, value) in &map {
+        assert_eq!(key, value.to_string());
+    }
+    assert_eq!((&map).into_iter().count(), 3);
+    assert_eq!(map.keys().collect::<Vec<_>>(), vec!["1", "2", "3"]);
+    assert_eq!(
+        map.iter().collect::<Vec<_>>(),
+        vec![
+            ("1".to_owned(), 1),
+            ("2".to_owned(), 2),
+            ("3".to_owned(), 3)
+        ]
+    );
+
+    let mut map = fork.get_raw_proof_map((IDX_NAME, &1_u8));
+    map.put(&[1; 32], 1_u8);
+    map.put(&[2; 32], 2_u8);
+    map.put(&[3; 32], 3_u8);
+    for (key, value) in &map {
+        assert_eq!(key[0], value);
+    }
+    assert_eq!((&map).into_iter().count(), 3);
+    assert_eq!(
+        map.keys().collect::<Vec<_>>(),
+        vec![[1; 32], [2; 32], [3; 32]]
+    );
+    assert_eq!(
+        map.iter().collect::<Vec<_>>(),
+        vec![([1; 32], 1), ([2; 32], 2), ([3; 32], 3)]
+    );
 }
 
 #[test]

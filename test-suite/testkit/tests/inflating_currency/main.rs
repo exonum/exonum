@@ -23,15 +23,16 @@ use exonum::{
     api::node::public::explorer::TransactionResponse,
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
-    messages::{AnyTx, BinaryValue, Verified},
-    runtime::rust::Transaction,
+    messages::{AnyTx, Verified},
 };
-use exonum_merkledb::ObjectHash;
-use exonum_testkit::{txvec, ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 use serde_json::json;
 
-use crate::inflating_cryptocurrency::{CreateWallet, CurrencyService, Transfer, SERVICE_ID};
+use crate::inflating_cryptocurrency::{
+    CreateWallet, CurrencyInterface, CurrencyService, Transfer, SERVICE_ID,
+};
 
 mod inflating_cryptocurrency;
 mod proto;
@@ -43,13 +44,10 @@ fn init_testkit() -> TestKit {
         .create()
 }
 
-fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, SecretKey) {
-    let (pubkey, key) = crypto::gen_keypair();
+fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, (PublicKey, SecretKey)) {
+    let keypair = crypto::gen_keypair();
     // Create a pre-signed transaction
-    let tx = CreateWallet {
-        name: name.to_owned(),
-    }
-    .sign(SERVICE_ID, pubkey, &key);
+    let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new(name));
 
     let data = hex::encode(tx.to_bytes());
     let tx_info: TransactionResponse = api
@@ -59,7 +57,7 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (Verified<AnyTx>, SecretKey) {
         .unwrap();
     assert_eq!(tx_info.tx_hash, tx.object_hash());
 
-    (tx, key)
+    (tx, keypair)
 }
 
 fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
@@ -86,7 +84,7 @@ fn test_transfer_scenarios() {
     let api = testkit.api();
 
     // Create 2 wallets
-    let (tx_alice, key_alice) = create_wallet(&api, "Alice");
+    let (tx_alice, alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
     testkit.create_blocks_until(Height(9));
 
@@ -95,25 +93,29 @@ fn test_transfer_scenarios() {
     assert_eq!(get_balance(&api, &tx_bob.author()), 9);
 
     // Transfer funds
-    let tx_a_to_b = Transfer {
-        to: tx_bob.author(),
-        amount: 5,
-        seed: 0,
-    }
-    .sign(SERVICE_ID, tx_alice.author(), &key_alice);
+    let tx_a_to_b = alice.transfer(
+        SERVICE_ID,
+        Transfer {
+            to: tx_bob.author(),
+            amount: 5,
+            seed: 0,
+        },
+    );
 
-    let next_tx_a_to_b = Transfer {
-        to: tx_bob.author(),
-        amount: 6,
-        seed: 1,
-    }
-    .sign(SERVICE_ID, tx_alice.author(), &key_alice);
+    let next_tx_a_to_b = alice.transfer(
+        SERVICE_ID,
+        Transfer {
+            to: tx_bob.author(),
+            amount: 6,
+            seed: 1,
+        },
+    );
 
     // Put transactions from A to B in separate blocks, allowing them both to succeed.
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
-    testkit.create_block_with_transactions(txvec![]); // A: 4 + 2, B: 14 + 2
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
+    testkit.create_block_with_transactions(vec![]); // A: 4 + 2, B: 14 + 2
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
     assert_eq!(get_balance(&api, &tx_alice.author()), 1); // 0 + 1
     assert_eq!(get_balance(&api, &tx_bob.author()), 23); // 20 + 3
     testkit.rollback();
@@ -121,29 +123,29 @@ fn test_transfer_scenarios() {
     // If there is no block separating transactions, Alice's balance is insufficient
     // to complete the second transaction.
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // fails
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // fails
     assert_eq!(get_balance(&api, &tx_alice.author()), 6); // 4 + 2
     assert_eq!(get_balance(&api, &tx_bob.author()), 16); // 14 + 2
     testkit.rollback();
 
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // fails
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // fails
     assert_eq!(get_balance(&api, &tx_alice.author()), 5); // 3 + 2
     assert_eq!(get_balance(&api, &tx_bob.author()), 17); // 15 + 2
     testkit.rollback();
 
     // If the transactions are put in the same block, only the first transaction should succeed
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
+    testkit.create_block_with_transactions(vec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
     assert_eq!(get_balance(&api, &tx_alice.author()), 5); // 4 + 1
     assert_eq!(get_balance(&api, &tx_bob.author()), 15); // 14 + 1
     testkit.rollback();
 
     // Same here
     testkit.checkpoint();
-    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
     assert_eq!(get_balance(&api, &tx_alice.author()), 4); // 3 + 1
     assert_eq!(get_balance(&api, &tx_bob.author()), 16); // 15 + 1
     testkit.rollback();
@@ -161,20 +163,14 @@ fn test_fuzz_transfers() {
     // First, create users
     let keys_and_txs: Vec<_> = (0..USERS)
         .map(|i| {
-            let (pubkey, key) = crypto::gen_keypair();
-            let tx = CreateWallet {
-                name: format!("User #{}", i),
-            }
-            .sign(SERVICE_ID, pubkey, &key);
-            (key, tx)
+            let keypair = crypto::gen_keypair();
+            let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new(format!("User #{}", i)));
+            (keypair, tx)
         })
         .collect();
-    let pubkeys: Vec<_> = keys_and_txs
-        .iter()
-        .map(|&(_, ref tx)| tx.author())
-        .collect();
+    let pubkeys: Vec<_> = keys_and_txs.iter().map(|(_, tx)| tx.author()).collect();
 
-    testkit.create_block_with_transactions(keys_and_txs.iter().map(|&(_, ref tx)| tx.clone()));
+    testkit.create_block_with_transactions(keys_and_txs.iter().map(|(_, tx)| tx.clone()));
 
     for _ in 0..64 {
         let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&api, &key)).sum();
@@ -184,17 +180,18 @@ fn test_fuzz_transfers() {
         let height = testkit.height().0;
         let txs = (0..tx_count).map(|_| {
             let sender_idx = rng.gen_range(0, USERS);
-            let sender = &pubkeys[sender_idx];
-            let sender_key = &keys_and_txs[sender_idx].0;
+            let (sender, _) = &keys_and_txs[sender_idx];
             let receiver = &pubkeys[rng.gen_range(0, USERS)];
             let amount = rng.gen_range(1, 2 * height);
 
-            Transfer {
-                to: *receiver,
-                amount,
-                seed: rng.gen::<u64>(),
-            }
-            .sign(SERVICE_ID, *sender, sender_key)
+            sender.transfer(
+                SERVICE_ID,
+                Transfer {
+                    to: *receiver,
+                    amount,
+                    seed: rng.gen::<u64>(),
+                },
+            )
         });
         testkit.create_block_with_transactions(txs);
     }

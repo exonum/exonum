@@ -16,7 +16,7 @@
 
 use exonum::{
     helpers::{Height, Round, ValidatorId},
-    node::state::PROPOSE_REQUEST_TIMEOUT,
+    node::constants::PROPOSE_REQUEST_TIMEOUT,
 };
 use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
 use exonum_crypto::Hash;

@@ -1,13 +1,13 @@
 use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
+use super::{GenericCallMut, MethodDescriptor};
 use crate::{
     blockchain::Schema as CoreSchema,
     helpers::Height,
     runtime::{
         dispatcher::{Dispatcher, Error as DispatcherError},
         ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, MethodId,
-        SUPERVISOR_INSTANCE_ID,
+        InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -21,16 +21,6 @@ pub struct CallContext<'a> {
     inner: ExecutionContext<'a>,
     /// ID of the executing service.
     instance: InstanceDescriptor<'a>,
-}
-
-/// Authorization for a child call.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
-pub enum ChildAuthorization {
-    /// Fallthrough authorization: the child call retains `Caller` information of the parent call.
-    Fallthrough,
-    /// Authorization with the authority of the service executing the parent call.
-    Service,
 }
 
 impl<'a> CallContext<'a> {
@@ -69,51 +59,12 @@ impl<'a> CallContext<'a> {
         core_schema.next_height() == Height(0)
     }
 
-    /// Invokes an arbitrary method in the context.
-    #[doc(hidden)]
-    pub fn call(
-        &mut self,
-        interface_name: impl AsRef<str>,
-        method_id: MethodId,
-        arguments: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        let call_info = CallInfo {
-            instance_id: self.instance.id,
-            method_id,
-        };
-        self.inner
-            .call(interface_name.as_ref(), &call_info, &arguments.into_bytes())
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
-    /// Creates a client to call interface methods of the specified service instance.
-    #[doc(hidden)]
-    pub fn interface<'s, T>(&'s mut self, called: InstanceId) -> Result<T, ExecutionError>
-    where
-        T: From<CallContext<'s>>,
-    {
-        self.call_context(called, ChildAuthorization::Service)
-            .map(Into::into)
-    }
-
-    // TODO This method is hidden until it is fully tested in next releases. [ECR-3494]
-    #[doc(hidden)]
-    pub fn call_context<'s>(
-        &'s mut self,
-        called_id: impl Into<InstanceQuery<'s>>,
-        auth: ChildAuthorization,
-    ) -> Result<CallContext<'s>, ExecutionError> {
-        let descriptor = self
-            .inner
-            .dispatcher
-            .get_service(called_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
-        Ok(CallContext {
-            inner: self.inner.child_context(match auth {
-                ChildAuthorization::Fallthrough => None,
-                ChildAuthorization::Service => Some(self.instance.id),
-            }),
-            instance: descriptor,
+    /// Returns a stub which uses fallthrough auth to authorize calls.
+    #[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
+    pub fn with_fallthrough_auth(&mut self) -> FallthroughAuth<'_> {
+        FallthroughAuth(CallContext {
+            inner: self.inner.reborrow(),
+            instance: self.instance,
         })
     }
 
@@ -187,5 +138,68 @@ impl<'a> CallContext<'a> {
         }
 
         Dispatcher::initiate_stopping_service(self.inner.fork, instance_id)
+    }
+
+    fn make_child_call<'q>(
+        &mut self,
+        called_id: impl Into<InstanceQuery<'q>>,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+        fallthrough_auth: bool,
+    ) -> Result<(), ExecutionError> {
+        let descriptor = self
+            .inner
+            .dispatcher
+            .get_service(called_id)
+            .ok_or(DispatcherError::IncorrectInstanceId)?;
+
+        let call_info = CallInfo {
+            instance_id: descriptor.id,
+            method_id: method.id,
+        };
+
+        let caller = if fallthrough_auth {
+            None
+        } else {
+            Some(self.instance.id)
+        };
+        self.inner
+            .child_context(caller)
+            .call(method.interface_name, &call_info, &args)
+    }
+}
+
+impl<'a, I> GenericCallMut<I> for CallContext<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_id: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        self.make_child_call(called_id, method, args, false)
+    }
+}
+
+#[derive(Debug)]
+pub struct FallthroughAuth<'a>(CallContext<'a>);
+
+impl<'a, I> GenericCallMut<I> for FallthroughAuth<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_id: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        self.0.make_child_call(called_id, method, args, true)
     }
 }

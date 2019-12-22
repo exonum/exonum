@@ -36,7 +36,7 @@
 //! of the `Database` instance. Snapshots provide read isolation, so you are guaranteed to work
 //! with consistent values even if the data in the database changes between reads. `Snapshot`
 //! provides all the necessary methods for reading data from the database, so `&Snapshot`
-//! is used as a storage view for creating a read-only representation of the [indices](#indices).
+//! is used as a storage view for creating a read-only representation of the [indexes](#indexes).
 //!
 //! If you need to make changes to the database, you need to create a [`Fork`] using
 //! the [`fork`][2] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
@@ -50,18 +50,18 @@
 //! the [`BinaryKey`] or [`BinaryValue`] traits respectively. These traits have already been
 //! implemented for most standard types.
 //!
-//! # Indices
+//! # Indexes
 //!
-//! Indices are structures representing data collections stored in the database.
+//! Indexes are structures representing data collections stored in the database.
 //! This concept is similar to tables in relational databases. The interfaces
-//! of the indices are similar to ordinary collections (like arrays, maps and sets).
+//! of the indexes are similar to ordinary collections (like arrays, maps and sets).
 //!
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
-//! On the other hand, multiple indices can be stored in the same column family, provided
+//! On the other hand, multiple indexes can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
 //! of [`Group`]s or keyed [`IndexAddress`]es.
 //!
-//! Merkelized indices can generate cryptographic proofs about inclusion
+//! Merkelized indexes can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
 //! was authorized by the blockchain validators, without having to replicate
 //! the entire blockchain contents.
@@ -72,7 +72,7 @@
 //!   configuration. Similar to a combination of [`Box`] and [`Option`].
 //! - [`ListIndex`] is a list of items stored in a sequential order. Similar to [`Vec`].
 //! - [`SparseListIndex`] is a list of items stored in a sequential order. Similar to `ListIndex`,
-//!   but may contain indices without elements.
+//!   but may contain indexes without elements.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`].
 //! - [`ProofEntry`] is a Merkelized version of `Entry`.
 //! - [`ProofListIndex`] is a Merkelized version of `ListIndex` that supports cryptographic
@@ -118,15 +118,15 @@
 //! [`merge`]: trait.Database.html#tymethod.merge
 //! [`BinaryKey`]: trait.BinaryKey.html
 //! [`BinaryValue`]: trait.BinaryValue.html
-//! [`Entry`]: struct.Entry.html
-//! [`ProofEntry`]: struct.ProofEntry.html
-//! [`ListIndex`]: list_index/struct.ListIndex.html
-//! [`SparseListIndex`]: sparse_list_index/struct.SparseListIndex.html
-//! [`MapIndex`]: map_index/struct.MapIndex.html
-//! [`ProofListIndex`]: proof_list_index/struct.ProofListIndex.html
-//! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
-//! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
-//! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
+//! [`Entry`]: indexes/entry/struct.Entry.html
+//! [`ProofEntry`]: indexes/proof_entry/struct.ProofEntry.html
+//! [`ListIndex`]: indexes/list/struct.ListIndex.html
+//! [`SparseListIndex`]: indexes/sparse_list/struct.SparseListIndex.html
+//! [`MapIndex`]: indexes/map/struct.MapIndex.html
+//! [`ProofListIndex`]: indexes/proof_list/struct.ProofListIndex.html
+//! [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html
+//! [`KeySetIndex`]: indexes/key_set/struct.KeySetIndex.html
+//! [`ValueSetIndex`]: indexes/value_set/struct.ValueSetIndex.html
 //! [`ObjectHash`]: trait.ObjectHash.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
@@ -136,7 +136,7 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 //! [`state_aggregator`]: struct.SystemSchema.html#method.state_aggregator
-//! [`Group`]: struct.Group.html
+//! [`Group`]: indexes/group/struct.Group.html
 //! [`IndexAddress`]: struct.IndexAddress.html
 //! [Exonum]: https://exonum.com/
 
@@ -165,28 +165,26 @@
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
     db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
-    entry::Entry,
     error::Error,
-    group::Group,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
-    key_set_index::KeySetIndex,
     keys::BinaryKey,
     lazy::Lazy,
-    list_index::ListIndex,
-    map_index::MapIndex,
     options::DbOptions,
-    proof_entry::ProofEntry,
-    sparse_list_index::SparseListIndex,
-    value_set_index::ValueSetIndex,
     values::BinaryValue,
     views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress, SystemSchema},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
 // does not exist!'
 #[doc(no_inline)]
-pub use self::{
-    proof_list_index::{ListProof, ProofListIndex},
-    proof_map_index::{MapProof, ProofMapIndex, RawProofMapIndex},
+pub use self::indexes::{
+    key_set::{self, KeySetIndex},
+    list::{self, ListIndex},
+    map::{self, MapIndex},
+    proof_list::{self, ListProof, ProofListIndex},
+    proof_map::{self, MapProof, ProofMapIndex, RawProofMapIndex},
+    sparse_list::{self, SparseListIndex},
+    value_set::{self, ValueSetIndex},
+    Entry, Group, ProofEntry,
 };
 
 #[macro_use]
@@ -199,27 +197,18 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod macros;
 mod backends;
 mod db;
-mod entry;
 mod error;
-mod group;
 mod hash;
 mod keys;
 mod lazy;
 mod options;
-mod proof_entry;
 mod values;
 mod views;
 
 pub mod access;
-pub mod key_set_index;
-pub mod list_index;
-pub mod map_index;
+pub mod indexes;
 pub mod migration;
-pub mod proof_list_index;
-pub mod proof_map_index;
-pub mod sparse_list_index;
 pub mod validation;
-pub mod value_set_index;
 
 #[cfg(feature = "with-protobuf")]
 pub mod proto;

@@ -14,13 +14,7 @@
 
 //! Definition of the interfaces for tests of interservice calls.
 
-use exonum::{
-    crypto::PublicKey,
-    runtime::{
-        rust::{CallContext, Interface},
-        ExecutionError,
-    },
-};
+use exonum::crypto::PublicKey;
 use exonum_derive::{exonum_interface, BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
@@ -37,20 +31,7 @@ pub struct Issue {
 }
 
 #[exonum_interface(interface = "IssueReceiver")]
-pub trait IssueReceiver {
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
-}
-
-pub struct IssueReceiverClient<'a>(CallContext<'a>);
-
-impl<'a> IssueReceiverClient<'a> {
-    pub fn issue(&mut self, arg: Issue) -> Result<(), ExecutionError> {
-        self.0.call(IssueReceiver::INTERFACE_NAME, 0, arg)
-    }
-}
-
-impl<'a> From<CallContext<'a>> for IssueReceiverClient<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
-    }
+pub trait IssueReceiver<Ctx> {
+    type Output;
+    fn issue(&self, ctx: Ctx, arg: Issue) -> Self::Output;
 }

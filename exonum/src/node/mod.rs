@@ -23,7 +23,15 @@ pub use self::{
 };
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
-pub mod state;
+/// Node timeout constants.
+pub mod constants {
+    pub use super::state::{
+        BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+        TRANSACTIONS_REQUEST_TIMEOUT,
+    };
+}
+
+pub(crate) use self::state::SharedConnectList;
 
 use exonum_keys::Keys;
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
@@ -69,7 +77,6 @@ use crate::{
         config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
-    node::state::SharedConnectList,
     runtime::{
         rust::{RustRuntime, ServiceFactory},
         RuntimeInstance,
@@ -81,6 +88,7 @@ mod connect_list;
 mod consensus;
 mod events;
 mod requests;
+mod state;
 
 /// External messages.
 #[derive(Debug)]
@@ -459,7 +467,7 @@ impl NodeHandler {
             Connect::new(
                 external_address,
                 system_state.current_time().into(),
-                &user_agent::get(),
+                &user_agent(),
             ),
             config.keys.consensus_pk(),
             &config.keys.consensus_sk(),
@@ -1059,6 +1067,7 @@ impl Node {
         let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
             .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
+
         network_thread.join().unwrap()
     }
 
@@ -1141,143 +1150,12 @@ impl Node {
     }
 }
 
-// TODO implement transaction verification logic [ECR-3253]
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::{BinaryValue, TemporaryDB};
-    use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
-
-    use crate::{
-        blockchain::{config::GenesisConfigBuilder, Schema},
-        crypto::gen_keypair,
-        events::EventHandler,
-        helpers,
-        messages::AnyTx,
-        proto::schema::tests::TxSimple,
-        runtime::{
-            rust::{CallContext, Service, Transaction},
-            ExecutionError, InstanceId, RuntimeInstance,
-        },
-    };
+    use exonum_merkledb::TemporaryDB;
 
     use super::*;
-
-    const SERVICE_ID: InstanceId = 15;
-
-    impl_binary_value_for_pb_message! { TxSimple }
-
-    #[exonum_interface(crate = "crate")]
-    pub trait TestInterface {
-        fn simple(&self, context: CallContext<'_>, arg: TxSimple) -> Result<(), ExecutionError>;
-    }
-
-    #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-    #[service_dispatcher(crate = "crate", implements("TestInterface"))]
-    #[service_factory(
-        crate = "crate",
-        artifact_name = "test-service",
-        artifact_version = "0.1.0",
-        proto_sources = "crate::proto::schema"
-    )]
-    struct TestService;
-
-    impl TestInterface for TestService {
-        fn simple(&self, _context: CallContext<'_>, _arg: TxSimple) -> Result<(), ExecutionError> {
-            Ok(())
-        }
-    }
-
-    impl Service for TestService {}
-
-    fn create_simple_tx(p_key: PublicKey, s_key: &SecretKey) -> Verified<AnyTx> {
-        let mut msg = TxSimple::new();
-        msg.set_public_key(p_key.to_pb());
-        msg.set_msg("Hello, World!".to_owned());
-        msg.sign(SERVICE_ID, p_key, s_key)
-    }
-
-    #[test]
-    #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
-    fn test_duplicated_transaction() {
-        let (p_key, s_key) = gen_keypair();
-
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
-
-        let service = TestService;
-        let artifact = service.artifact_id();
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-                .with_artifact(artifact.clone())
-                .with_instance(artifact.into_default_instance(SERVICE_ID, "test-service"))
-                .build();
-        let services = vec![service.into()];
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
-
-        let mut node = Node::new(
-            db,
-            external_runtimes,
-            services,
-            node_cfg,
-            genesis_config,
-            None,
-        );
-
-        let tx = create_simple_tx(p_key, &s_key);
-
-        // Create original transaction.
-        let tx_orig = tx.clone();
-        let event = ExternalMessage::Transaction(tx_orig);
-        node.handler.handle_event(event.into());
-
-        // Initial transaction should be added to the pool.
-        let snapshot = node.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        assert_eq!(schema.transactions_pool_len(), 1);
-
-        // Create duplicated transaction.
-        let tx_copy = tx.clone();
-        let event = ExternalMessage::Transaction(tx_copy);
-        node.handler.handle_event(event.into());
-
-        // Duplicated transaction shouldn't be added to the pool.
-        let snapshot = node.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        assert_eq!(schema.transactions_pool_len(), 1);
-    }
-
-    #[test]
-    #[ignore = "TODO: We have to implement transactions verifier [ECR-3253]"]
-    fn test_transaction_without_service() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![];
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
-        let (p_key, s_key) = gen_keypair();
-
-        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-
-        let mut node = Node::new(
-            db,
-            external_runtimes,
-            services,
-            node_cfg,
-            genesis_config,
-            None,
-        );
-
-        let tx = create_simple_tx(p_key, &s_key);
-
-        // Send transaction to node.
-        let event = ExternalMessage::Transaction(tx);
-        node.handler.handle_event(event.into());
-
-        // Service not found for transaction.
-        let snapshot = node.blockchain().snapshot();
-        let schema = Schema::new(&snapshot);
-        assert_eq!(schema.transactions_pool_len(), 0);
-    }
+    use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
 
     #[test]
     fn test_good_internal_events_config() {

@@ -18,9 +18,9 @@
 //! the [`BinaryValue`] trait. The given section contains methods related to
 //! `MapIndex` and iterators over the items of this map.
 
-use std::{borrow::Borrow, fmt, marker::PhantomData};
+use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{
+use crate::{
     access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
@@ -33,8 +33,8 @@ use super::{
 /// `MapIndex` requires that keys implement the [`BinaryKey`] trait and values implement
 /// the [`BinaryValue`] trait.
 ///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryKey`]: ../../trait.BinaryKey.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,
@@ -50,7 +50,8 @@ pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
 /// [`iter`]: struct.MapIndex.html#method.iter
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
 /// [`MapIndex`]: struct.MapIndex.html
-pub struct MapIndexIter<'a, K: ?Sized, V> {
+#[derive(Debug)]
+pub struct Iter<'a, K: ?Sized, V> {
     base_iter: ViewIter<'a, K, V>,
 }
 
@@ -62,7 +63,8 @@ pub struct MapIndexIter<'a, K: ?Sized, V> {
 /// [`keys`]: struct.MapIndex.html#method.keys
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
 /// [`MapIndex`]: struct.MapIndex.html
-pub struct MapIndexKeys<'a, K: ?Sized> {
+#[derive(Debug)]
+pub struct Keys<'a, K: ?Sized> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
@@ -75,7 +77,7 @@ pub struct MapIndexKeys<'a, K: ?Sized> {
 /// [`values_from`]: struct.MapIndex.html#method.values_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexValues<'a, V> {
+pub struct Values<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
@@ -160,8 +162,8 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter(&self) -> MapIndexIter<'_, K, V> {
-        MapIndexIter {
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        Iter {
             base_iter: self.base.iter(&()),
         }
     }
@@ -182,8 +184,8 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys(&self) -> MapIndexKeys<'_, K> {
-        MapIndexKeys {
+    pub fn keys(&self) -> Keys<'_, K> {
+        Keys {
             base_iter: self.base.iter(&()),
         }
     }
@@ -204,8 +206,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> MapIndexValues<'_, V> {
-        MapIndexValues {
+    pub fn values(&self) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter(&()),
         }
     }
@@ -226,8 +228,8 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> MapIndexIter<'_, K, V> {
-        MapIndexIter {
+    pub fn iter_from(&self, from: &K) -> Iter<'_, K, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -248,8 +250,8 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> MapIndexKeys<'_, K> {
-        MapIndexKeys {
+    pub fn keys_from(&self, from: &K) -> Keys<'_, K> {
+        Keys {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -269,8 +271,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> MapIndexValues<'_, V> {
-        MapIndexValues {
+    pub fn values_from(&self, from: &K) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -352,23 +354,23 @@ where
     }
 }
 
-impl<'a, T, K, V> std::iter::IntoIterator for &'a MapIndex<T, K, V>
+impl<'a, T, K, V> IntoIterator for &'a MapIndex<T, K, V>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
-    type IntoIter = MapIndexIter<'a, K, V>;
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
+impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
@@ -378,9 +380,9 @@ where
     }
 }
 
-impl<'a, K> Iterator for MapIndexKeys<'a, K>
+impl<'a, K> Iterator for Keys<'a, K>
 where
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     type Item = K::Owned;
 
@@ -389,7 +391,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for MapIndexValues<'a, V>
+impl<'a, V> Iterator for Values<'a, V>
 where
     V: BinaryValue,
 {
@@ -397,25 +399,6 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(.., v)| v)
-    }
-}
-
-impl<'a, K, V> fmt::Debug for MapIndexIter<'a, K, V>
-where
-    K: BinaryKey,
-    V: BinaryValue,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("MapIndexIter").finish()
-    }
-}
-
-impl<'a, K> fmt::Debug for MapIndexKeys<'a, K>
-where
-    K: BinaryKey,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("MapIndexKeys").finish()
     }
 }
 
@@ -545,6 +528,45 @@ mod tests {
         assert_eq!(
             map_index.iter_from(&1_u8).collect::<Vec<(u8, u8)>>(),
             vec![(2, 2), (3, 3)]
+        );
+    }
+
+    #[test]
+    fn index_as_iterator() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut map_index = fork.get_map(IDX_NAME);
+
+        map_index.put(&1_u8, 1_u8);
+        map_index.put(&2_u8, 2_u8);
+        map_index.put(&3_u8, 3_u8);
+
+        for (key, value) in &map_index {
+            assert!(key == value);
+        }
+        assert_eq!((&map_index).into_iter().count(), 3);
+        assert_eq!(map_index.keys().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            map_index.iter().collect::<Vec<_>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+
+        let mut map_index = fork.get_map((IDX_NAME, &0_u8));
+        map_index.put("1", 1_u8);
+        map_index.put("2", 2_u8);
+        map_index.put("3", 3_u8);
+        for (key, value) in &map_index {
+            assert_eq!(key, value.to_string());
+        }
+        assert_eq!((&map_index).into_iter().count(), 3);
+        assert_eq!(map_index.keys().collect::<Vec<_>>(), vec!["1", "2", "3"]);
+        assert_eq!(
+            map_index.iter().collect::<Vec<_>>(),
+            vec![
+                ("1".to_owned(), 1),
+                ("2".to_owned(), 2),
+                ("3".to_owned(), 3)
+            ]
         );
     }
 }

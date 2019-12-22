@@ -18,7 +18,7 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
-pub use self::interfaces::{AnyCall, CreateWallet, Issue, RecursiveCall, Wallet};
+pub use self::interfaces::*;
 
 include!(concat!(env!("OUT_DIR"), "/interfaces_protobuf_mod.rs"));
 

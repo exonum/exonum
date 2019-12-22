@@ -10,29 +10,61 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
 - `before_transactions` and `after_transactions` hooks in Rust services
   now return a `Result`. The semantics is the same as for transactions;
   an error or panic in the hook will lead to the rollback of the blockchain
   state. (#1576)
+
 - Errors occurring while executing transactions and `before_transactions` /
   `after_transactions` hooks are now aggregated within each block, rather than
   globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+
 - The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
   Error fields were made private and information about a failing call
   was added. (#1585)
+
 - `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
   and a corresponding derive macro. (#1585)
+
 - State hash aggregation is now performed automatically by MerkleDB.
   The relevant methods in `Runtime` and `Service` in Rust runtime
   have been removed. (#1553)
+
 - `commit_service` has been renamed to the `update_service_status` and now takes
   `InstanceStatus` as an additional argument.
   `start_adding_service` has been renamed to `initiate_adding_service` to
   better distinguish between starting and stopping a service. (#1605)
+
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
+
+- Interaction with services from the Rust runtime has been changed. Instead of
+  using the `Transaction` trait, it is now possible to use service interfaces
+  directly as Rust traits. These interface traits can be applied to a keypair
+  (to generate signed transactions), to `CallContext` (to call another service)
+  and some other types. See Rust runtime docs for more details. (#1606)
+- The following public APIs were removed/made private: (#1629)
+  - `blockchain::{error reexports}` (available from `runtime::`);
+  - `blockchain::FatalError` public re-export;
+  - `blockchain::InstanceCollection` structure;
+  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
+    `Blockchain::remove_peer_with_pubkey` methods;
+  - `helpers::path_relative_from` function;
+  - `helpers::ZeroizeOnDrop` trait;
+  - `helpers::Milliseconds` type;
+  - `helpers::config` and `helpers::user_agent` modules;
+  - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
+    and `helpers::clear_consensus_messages_cache` functions;
+  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
+  - `messages::BinaryValue` public re-export;
+  - `node::state` module (constants from `node::state` are now accessible in
+    `node::constants` module);
+  - `proto` module;
+  - `runtime::error` module (`catch_panic` was added to the list of public
+    re-exports from `runtime::error`).
 
 #### exonum-cli
 
@@ -43,6 +75,22 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` structure isn't generic anymore. (#1587)
 
+#### exonum-merkledb
+
+- The crate has been restructured, indexes are now located in separate module.
+Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
+
+- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
+
+### exonum-testkit
+
+- The following public APIs were removed/made private: (#1629)
+  - `compare` module;
+  - `txvec` macro;
+  - `TestKit::probe_all` and `TestKit::probe` methods.
+
 ### New features
 
 #### exonum
@@ -51,6 +99,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
 - Service instances can now be stopped.
 
   Active service instance can be stopped by the corresponding request to the
@@ -59,8 +108,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Service data becomes unavailable to other services, but still exists. The name
   and identifier remain reserved for the stopped service and cannot be used again
   for adding new services. (#1605)
+
 - New `blockchain::Schema` method `next_height` was added as a non-panicking
   alternative to `height`. (#1619)
+
 - New method `in_genesis_block` was added to the `CallContext` to check if the service
   hook is being executed for the genesis block. (#1619)
 
@@ -74,19 +125,33 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   for its contents. Hashed indexes which are not a part of a group participate
   in this aggregation. Consult crate docs for more details on how
   aggregation works. (#1553)
+
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
+
 - Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
   key-value storage `additional_headers` which can contain binary data. (#1602)
 
+- `TemporaryDB` can now be cleared. This will remove contents of all indexes
+  and erase index metadata. (#1630)
+
+- `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
+
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
+
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
+
+### Internal Improvements
+
+#### exonum
+
+- `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
 
 ### Bug Fixes
 
