@@ -16,11 +16,6 @@ use exonum::runtime::rust::{api::ServiceApiBuilder, DefaultInstance, Service};
 
 use exonum_derive::*;
 
-#[exonum_interface]
-pub trait TestServiceInterface {}
-
-impl TestServiceInterface for TestRuntimeApiService {}
-
 /// Define the service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(
@@ -28,10 +23,8 @@ impl TestServiceInterface for TestRuntimeApiService {}
     artifact_version = "0.0.1",
     proto_sources = "crate::proto"
 )]
-#[service_dispatcher(implements("TestServiceInterface"))]
 pub struct TestRuntimeApiService;
 
-/// Implement a `Service` trait for the service.
 impl Service for TestRuntimeApiService {
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
 }

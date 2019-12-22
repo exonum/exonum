@@ -19,10 +19,7 @@ use exonum::{
     blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{
-        rust::{ServiceFactory, Transaction},
-        ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{rust::ServiceFactory, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
@@ -156,11 +153,13 @@ fn test_discard_config_with_not_enough_confirms() {
         .expect("Transaction with change propose discarded.");
 
     // Sign confirmation transaction by second validator
-    let keys = testkit.network().validators()[1].service_keypair();
-    let signed_confirm = ConfigVote {
-        propose_hash: proposal_hash,
-    }
-    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let keypair = testkit.network().validators()[1].service_keypair();
+    let signed_confirm = keypair.confirm_config_change(
+        SUPERVISOR_INSTANCE_ID,
+        ConfigVote {
+            propose_hash: proposal_hash,
+        },
+    );
     testkit
         .create_block_with_transaction(signed_confirm)
         .transactions[0]
@@ -199,21 +198,15 @@ fn test_apply_config_by_min_required_majority() {
     };
     // Sign and send confirmation transaction by second validator
     let keys = testkit.network().validators()[1].service_keypair();
-    testkit
-        .create_block_with_transaction(confirm.clone().sign(
-            SUPERVISOR_INSTANCE_ID,
-            keys.0,
-            &keys.1,
-        ))
-        .transactions[0]
+    let tx = keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, confirm.clone());
+    testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .expect("Transaction with confirmations discarded.");
 
     // Sign confirmation transaction by third validator
     let keys = testkit.network().validators()[2].service_keypair();
-    testkit
-        .create_block_with_transaction(confirm.sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1))
-        .transactions[0]
+    let tx = keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, confirm);
+    testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .expect("Transaction with confirmation discarded.");
 
@@ -244,10 +237,12 @@ fn test_send_confirmation_by_initiator() {
 
     // Try to send confirmation transaction by the initiator
     let keys = testkit.network().us().service_keypair();
-    let signed_confirm = ConfigVote {
-        propose_hash: proposal_hash,
-    }
-    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let signed_confirm = keys.confirm_config_change(
+        SUPERVISOR_INSTANCE_ID,
+        ConfigVote {
+            propose_hash: proposal_hash,
+        },
+    );
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();
@@ -299,10 +294,12 @@ fn test_confirm_config_by_incorrect_validator() {
         .expect("Transaction with change propose discarded.");
 
     let keys = crypto::gen_keypair();
-    let signed_confirm = ConfigVote {
-        propose_hash: proposal_hash,
-    }
-    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let signed_confirm = keys.confirm_config_change(
+        SUPERVISOR_INSTANCE_ID,
+        ConfigVote {
+            propose_hash: proposal_hash,
+        },
+    );
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();
@@ -511,12 +508,7 @@ fn test_service_config_discard_fake_supervisor() {
         .extend_service_config_propose(params)
         .build();
 
-    let tx = Transaction::<dyn SupervisorInterface>::sign(
-        propose,
-        FAKE_SUPERVISOR_ID,
-        keypair.0,
-        &keypair.1,
-    );
+    let tx = keypair.propose_config_change(FAKE_SUPERVISOR_ID, propose);
     let block = testkit.create_block_with_transaction(tx);
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(

@@ -23,5 +23,3 @@ message TxConfig {
   bytes config = 2;
   uint64 actual_from = 3;
 }
-
-message TimestampTx { bytes data = 1; }

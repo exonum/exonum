@@ -16,14 +16,10 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use exonum::blockchain::ConsensusConfig;
-use exonum::{
-    crypto::Hash,
-    helpers::ValidatorId,
-    runtime::{rust::Transaction, SUPERVISOR_INSTANCE_ID},
-};
+use exonum::{crypto::Hash, helpers::ValidatorId, runtime::SUPERVISOR_INSTANCE_ID};
 
 use crate::utils::*;
-use exonum_supervisor::{ConfigProposalWithHash, ConfigPropose, ConfigVote};
+use exonum_supervisor::{ConfigProposalWithHash, ConfigPropose, ConfigVote, SupervisorInterface};
 
 fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
     api.public(ApiKind::Service("supervisor"))
@@ -136,11 +132,13 @@ fn test_send_proposal_with_api() {
     assert_eq!(config_proposal, pending_config.config_propose);
 
     // Sign confirmation transaction by second validator
-    let keys = testkit.network().validators()[1].service_keypair();
-    let signed_confirm = ConfigVote {
-        propose_hash: pending_config.propose_hash,
-    }
-    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let keypair = testkit.network().validators()[1].service_keypair();
+    let signed_confirm = keypair.confirm_config_change(
+        SUPERVISOR_INSTANCE_ID,
+        ConfigVote {
+            propose_hash: pending_config.propose_hash,
+        },
+    );
     // Confirm proposal
     testkit
         .create_block_with_transaction(signed_confirm)
@@ -170,11 +168,13 @@ fn apply_config(testkit: &mut TestKit) {
         current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
 
     // Sign confirmation transaction by second validator.
-    let keys = testkit.network().validators()[1].service_keypair();
-    let signed_confirm = ConfigVote {
-        propose_hash: pending_config.propose_hash,
-    }
-    .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1);
+    let keypair = testkit.network().validators()[1].service_keypair();
+    let signed_confirm = keypair.confirm_config_change(
+        SUPERVISOR_INSTANCE_ID,
+        ConfigVote {
+            propose_hash: pending_config.propose_hash,
+        },
+    );
 
     // Confirm proposal.
     testkit
