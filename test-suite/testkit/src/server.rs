@@ -30,7 +30,7 @@ use super::TestKit;
 pub struct TestKitActor(TestKit);
 
 impl TestKitActor {
-    pub fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
+    pub(crate) fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
         let mut api_aggregator = testkit.update_aggregator();
 
         // Spawn the testkit actor on the new `actix` system.
@@ -174,62 +174,44 @@ impl Handler<RollBack> for TestKitActor {
 mod tests {
     use exonum::{
         api,
-        blockchain::ExecutionError,
         crypto::{gen_keypair, Hash},
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::rust::{CallContext, Service, ServiceFactory, Transaction},
+        runtime::{
+            rust::{CallContext, Service, ServiceFactory},
+            ExecutionError,
+        },
     };
     use exonum_merkledb::ObjectHash;
-    use exonum_proto::ProtobufConvert;
 
     use std::time::Duration;
 
     use super::*;
-    use crate::{proto, TestKitApi, TestKitBuilder};
+    use crate::{TestKitApi, TestKitBuilder};
 
     const TIMESTAMP_SERVICE_ID: u32 = 2;
     const TIMESTAMP_SERVICE_NAME: &str = "sample";
 
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::examples::TxTimestamp")]
-    struct TxTimestamp {
-        message: String,
-    }
-
-    impl TxTimestamp {
-        fn for_str(s: &str) -> Verified<AnyTx> {
-            let (pubkey, key) = gen_keypair();
-            Self {
-                message: s.to_owned(),
-            }
-            .sign(TIMESTAMP_SERVICE_ID, pubkey, &key)
-        }
+    fn timestamp(s: &str) -> Verified<AnyTx> {
+        gen_keypair().timestamp(TIMESTAMP_SERVICE_ID, s.to_owned())
     }
 
     #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-    #[service_factory(artifact_name = "sample-service", proto_sources = "crate::proto")]
-    #[service_dispatcher(implements("SampleServiceInterface"))]
+    #[service_factory(artifact_name = "sample-service")]
+    #[service_dispatcher(implements("SampleInterface"))]
     struct SampleService;
 
     #[exonum_interface]
-    trait SampleServiceInterface {
-        fn timestamp(
-            &self,
-            context: CallContext<'_>,
-            arg: TxTimestamp,
-        ) -> Result<(), ExecutionError>;
+    trait SampleInterface<Ctx> {
+        type Output;
+        fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
     }
 
-    impl SampleServiceInterface for SampleService {
-        fn timestamp(
-            &self,
-            _context: CallContext<'_>,
-            _arg: TxTimestamp,
-        ) -> Result<(), ExecutionError> {
+    impl SampleInterface<CallContext<'_>> for SampleService {
+        type Output = Result<(), ExecutionError>;
+
+        fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
             Ok(())
         }
     }
@@ -265,7 +247,7 @@ mod tests {
     #[test]
     fn test_create_block_with_empty_body() {
         let api = init_handler(Height(0));
-        let tx = TxTimestamp::for_str("foo");
+        let tx = timestamp("foo");
         api.send(tx.clone());
         sleep();
 
@@ -302,8 +284,8 @@ mod tests {
     #[test]
     fn test_create_block_with_specified_transactions() {
         let api = init_handler(Height(0));
-        let tx_foo = TxTimestamp::for_str("foo");
-        let tx_bar = TxTimestamp::for_str("bar");
+        let tx_foo = timestamp("foo");
+        let tx_bar = timestamp("bar");
         api.send(tx_foo.clone());
         api.send(tx_bar.clone());
         sleep();

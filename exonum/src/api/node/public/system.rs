@@ -69,11 +69,7 @@ impl DispatcherInfo {
     /// Loads dispatcher information from database.
     pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
         Self {
-            artifacts: schema
-                .artifacts()
-                .values()
-                .map(|state| state.spec.artifact)
-                .collect(),
+            artifacts: schema.artifacts().keys().collect(),
             services: schema.instances().values().collect(),
         }
     }
@@ -118,7 +114,7 @@ impl SystemApi {
     }
 
     fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint(name, move |_query: ()| Ok(user_agent::get()));
+        api_scope.endpoint(name, move |_query: ()| Ok(user_agent()));
         self
     }
 

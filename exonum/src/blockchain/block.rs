@@ -126,6 +126,7 @@ pub struct Block {
 
 impl Block {
     /// Inserts new additional header to the block.
+    #[doc(hidden)]
     pub fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
         self.additional_headers.insert::<K>(value);
     }
@@ -139,7 +140,7 @@ impl Block {
     /// # use exonum::crypto::Hash;
     /// # use exonum::blockchain::{Block, BlockHeaderKey, AdditionalHeaders};
     /// # use exonum::helpers::Height;
-    /// # use exonum::messages::BinaryValue;
+    /// # use exonum::merkledb::BinaryValue;
     /// # use failure::Error;
     /// # use std::borrow::Cow;
     ///

@@ -15,13 +15,13 @@
 pub use crate::proto::TxConfig;
 
 use exonum::{
-    blockchain::{ConsensusConfig, ExecutionError},
+    blockchain::ConsensusConfig,
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, Service, Transaction},
-        InstanceId, SUPERVISOR_INSTANCE_ID,
+        rust::{CallContext, DefaultInstance, Service, TxStub},
+        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -29,12 +29,13 @@ use exonum_merkledb::BinaryValue;
 use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
 
 #[exonum_interface]
-pub trait ConfigUpdaterInterface {
-    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError>;
+pub trait ConfigUpdater<Ctx> {
+    type Output;
+    fn update_config(&self, ctx: Ctx, arg: TxConfig) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("ConfigUpdaterInterface"))]
+#[service_dispatcher(implements("ConfigUpdater"))]
 #[service_factory(
     artifact_name = "config_updater",
     artifact_version = "0.1.0",
@@ -42,10 +43,11 @@ pub trait ConfigUpdaterInterface {
 )]
 pub struct ConfigUpdaterService;
 
-impl ConfigUpdaterInterface for ConfigUpdaterService {
-    fn update_config(&self, context: CallContext<'_>, arg: TxConfig) -> Result<(), ExecutionError> {
-        context
-            .writeable_core_schema()
+impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
+    type Output = Result<(), ExecutionError>;
+
+    fn update_config(&self, ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
+        ctx.writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
@@ -56,6 +58,11 @@ impl Service for ConfigUpdaterService {}
 
 impl ConfigUpdaterService {
     pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;
+}
+
+impl DefaultInstance for ConfigUpdaterService {
+    const INSTANCE_ID: InstanceId = ConfigUpdaterService::ID;
+    const INSTANCE_NAME: &'static str = "config-updater";
 }
 
 impl TxConfig {
@@ -69,7 +76,9 @@ impl TxConfig {
         msg.set_from(from.to_pb());
         msg.set_config(config.to_vec());
         msg.set_actual_from(actual_from.0);
-        msg.sign(ConfigUpdaterService::ID, from, signer)
+        TxStub
+            .update_config(ConfigUpdaterService::ID, msg)
+            .sign(from, signer)
     }
 }
 

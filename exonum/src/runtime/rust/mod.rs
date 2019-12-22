@@ -26,12 +26,14 @@
 //! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
 //!
 //! The artifact interface in the Rust runtime is represented by the
-//! [`ServiceFactory`][ServiceFactory] trait. The trait creates service instances and provides
+//! [`ServiceFactory`] trait. The trait creates service instances and provides
 //! information about the artifact.
+//!
+//! [`ServiceFactory`]: trait.ServiceFactory.html
 //!
 //! # Examples
 //!
-//! ## Minimal complete example of an Exonum service definition.
+//! ## Minimal complete example
 //!
 //! ```
 //! use exonum::{
@@ -65,38 +67,39 @@
 //! // Define a transaction interface for your service by creating a `Transactions` trait with
 //! // the following attribute and method signatures.
 //! #[exonum_interface]
-//! pub trait Transactions {
-//!     // Each method of the trait should have a signature of the following format. The argument
-//!     // should implement the `BinaryValue` trait.
-//!     fn create_wallet(
-//!         &self,
-//!         context: CallContext<'_>,
-//!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>;
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!     // Each method of the trait should have a signature of the following format.
+//!     // The argument should implement the `BinaryValue` trait.
+//!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
 //! }
 //!
 //! // In order a service could process transactions, you have to implement the
 //! // `ServiceDispatcher` trait, which can be derived using the corresponding macro.
-//! // To explain to the runtime how to create instances of this service, you have to implement
-//! // the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
+//! // To explain to the runtime how to create instances of this service, you have
+//! // to implement the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-//! // Declare that the service implements the `Transactions` interface that was presented above.
+//! // Declare that the service implements the `Transactions` interface
+//! // that was presented above.
 //! #[service_dispatcher(implements("Transactions"))]
-//! // By default the macro uses the crate name and version to provide an artifact ID for this
-//! // service factory. You should only provide a path to the generated Protobuf schema.
+//! // By default the macro uses the crate name and version to provide an artifact ID
+//! // for this service factory. You should only provide a path to the generated
+//! // Protobuf schema.
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
 //! pub struct PointService;
 //!
-//! // Do not forget to implement the `Transactions` and `Service` traits for the service.
+//! // Do not forget to implement the `Transactions` and `Service` traits
+//! // for the service.
+//! impl Transactions<CallContext<'_>> for PointService {
+//!     type Output = Result<(), ExecutionError>;
 //!
-//! impl Transactions for PointService {
 //!     fn create_wallet(
 //!         &self,
 //!         _context: CallContext<'_>,
 //!         _arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
-//!         Ok(())
+//! #       Ok(())
 //!     }
 //! }
 //!
@@ -109,13 +112,15 @@
 //! prototyping.
 //!
 //! ```
-//! use exonum::runtime::{rust::Service, BlockchainData};
-//! use exonum_crypto::Hash;
-//! use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-//! use exonum_merkledb::Snapshot;
-//!
-//! #  #[exonum_interface]
-//! #  pub trait Transactions {}
+//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
+//! # use exonum_crypto::Hash;
+//! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+//! # use exonum_merkledb::Snapshot;
+//! #[exonum_interface]
+//! pub trait Transactions<Ctx> {
+//! #   type Output;
+//!     // service methods...
+//! }
 //!
 //! // If your service has a state, for example, for debugging purposes, then you can
 //! // use a separate structure for the service.
@@ -144,43 +149,131 @@
 //!     }
 //! }
 //!
-//! # impl Transactions for StatefulService {}
+//! # impl Transactions<CallContext<'_>> for StatefulService {
+//! #     type Output = Result<(), ExecutionError>;
+//! # }
 //! #
 //! # impl Service for StatefulService {}
 //! ```
 //!
-//! [ServiceFactory]: trait.ServiceFactory.html
+//! # Interfaces
+//!
+//! By bringing an interface trait into scope, you can use its methods with any stub type.
+//! Stub here means a type that can process calls from *any* interface. (What exactly
+//! is meant by processing depends on the stub and on the provided context argument.)
+//! For example, the following stubs are defined in this crate:
+//!
+//! | Stub | Behavior |
+//! |------|----------|
+//! | [`TxStub`] | Generates unsigned transactions |
+//! | `(PublicKey, SecretKey)` | Generates signed transactions |
+//! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
+//! | [`CallContext`] | Calls methods of another service during transaction execution **(1)** |
+//!
+//! 1. Beware that this is experimental functionality which is subject to change in next releases.
+//!
+//! More stub types can be defined in other crates. To define a stub type, you need to implement
+//! one of [`GenericCall`] or [`GenericCallMut`] traits.
+//!
+//! ## Mutable interfaces
+//!
+//! `#[exonum_interface]` macro produces a mutable version of the interface trait,
+//! which differs from the original trait in the following ways:
+//!
+//! - Name is the original trait name appended with `Mut` (e.g., `TransactionsMut`)
+//! - All methods consume `&mut self` instead of `&self`
+//!
+//! Otherwise, the mutable trait is a carbon copy of the original trait.
+//!
+//! The mutable trait is necessary for some stub types (e.g., `CallContext`) because they need
+//! to mutate their state when processing the calls. Hence, the mutable trait should be
+//! exported from the crate along with the original "immutable" trait.
+//!
+//! [`TxStub`]: struct.TxStub.html
+//! [`Broadcaster`]: struct.Broadcaster.html
+//! [`CallContext`]: struct.CallContext.html
+//! [`GenericCall`]: trait.GenericCall.html
+//! [`GenericCallMut`]: trait.GenericCallMut.html
+//!
+//! ## Interface usage
+//!
+//! ```
+//! # use exonum::runtime::{rust::CallContext, ExecutionError};
+//! # use exonum_crypto::gen_keypair;
+//! # use exonum_derive::exonum_interface;
+//! # type CreateWallet = String;
+//! # type Transfer = String;
+//! #[exonum_interface]
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
+//!     fn transfer(&self, context: Ctx, arg: Transfer) -> Self::Output;
+//! }
+//!
+//! // Create a signed transaction.
+//! let keypair = gen_keypair();
+//! let create_wallet: CreateWallet = // ...
+//! #    "create_wallet".to_owned();
+//! // The context in this case is the numerical instance ID.
+//! let instance_id = 100;
+//! let tx = keypair.create_wallet(instance_id, create_wallet);
+//! let transfer: Transfer = // ...
+//! #    "transfer".to_owned();
+//! let other_tx = keypair.transfer(instance_id, transfer);
+//! // The same call with the explicit method attribution:
+//! # let transfer = "transfer".to_owned();
+//! let other_tx = Transactions::transfer(&keypair, instance_id, transfer);
+//!
+//! // Using the trait within another service implementation:
+//! # struct Service;
+//! # type SomeArg = String;
+//! # impl Service {
+//! fn batch_transfers(
+//!     &self,
+//!     mut ctx: CallContext<'_>,
+//!     wallet_count: u64,
+//! ) -> Result<(), ExecutionError> {
+//!     let receiver_service = "token";
+//!     // ^-- `CallContext` allows to use any of service IDs as the context.
+//!     for _ in 0..wallet_count {
+//!         let transfer: Transfer = // ...
+//! #           "transfer".to_owned();
+//!         ctx.transfer(receiver_service, transfer)?;
+//!         // The same call with the explicit attribution:
+//! #       let transfer = "transfer".to_owned();
+//!         TransactionsMut::transfer(&mut ctx, receiver_service, transfer)?;
+//!     }
+//!     Ok(())
+//! }
+//! # }
+//! ```
 
 pub use self::{
     call_context::CallContext,
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
     service::{
-        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
-        ServiceFactory, Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
+        ServiceFactory,
     },
+    stubs::{GenericCall, GenericCallMut, Interface, MethodDescriptor, TxStub},
 };
 
 pub mod api;
 pub mod error;
 
-use exonum_merkledb::{validation::is_valid_identifier, Snapshot};
+use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
-use semver::Version;
 
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    fmt,
-    str::FromStr,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{config::InstanceInitParams, Blockchain, Schema as CoreSchema},
+    blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
         dispatcher::{self, Mailbox},
-        error::{catch_panic, ExecutionError, ExecutionFail},
+        error::{catch_panic, ExecutionError},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
@@ -191,6 +284,7 @@ use self::api::ServiceApiBuilder;
 mod call_context;
 mod runtime_api;
 mod service;
+mod stubs;
 #[cfg(test)]
 mod tests;
 
@@ -201,8 +295,8 @@ mod tests;
 pub struct RustRuntime {
     blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
-    available_artifacts: HashMap<RustArtifactId, Box<dyn ServiceFactory>>,
-    deployed_artifacts: HashSet<RustArtifactId>,
+    available_artifacts: HashMap<ArtifactId, Box<dyn ServiceFactory>>,
+    deployed_artifacts: HashSet<ArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
     changed_services_since_last_block: bool,
@@ -279,7 +373,6 @@ impl RustRuntime {
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        let artifact = RustArtifactId::parse(&artifact)?;
         if self.deployed_artifacts.contains(&artifact) {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
@@ -288,13 +381,12 @@ impl RustRuntime {
         }
 
         trace!("Deployed artifact: {}", artifact);
-        self.deployed_artifacts.insert(artifact);
+        self.deployed_artifacts.insert(artifact.to_owned());
         Ok(())
     }
 
     fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
-        let artifact = RustArtifactId::parse(&spec.artifact)?;
-        if !self.deployed_artifacts.contains(&artifact) {
+        if !self.deployed_artifacts.contains(&spec.artifact) {
             return Err(dispatcher::Error::ArtifactNotDeployed.into());
         }
         if self.started_services.contains_key(&spec.id) {
@@ -304,7 +396,7 @@ impl RustRuntime {
             return Err(dispatcher::Error::ServiceNameExists.into());
         }
 
-        let service = self.available_artifacts[&artifact].create_instance();
+        let service = self.available_artifacts[&spec.artifact].create_instance();
         Ok(Instance::new(spec.id, spec.name.clone(), service))
     }
 
@@ -349,105 +441,6 @@ impl WellKnownRuntime for RustRuntime {
     const ID: u32 = RuntimeIdentifier::Rust as u32;
 }
 
-/// A unique identifier of the Rust artifact, containing the name and version of the artifact.
-///
-/// As a string, the artifact name is represented as follows:
-///
-/// `{artifact_name}:{artifact_version}`, where `artifact_name` is a unique name of the artifact,
-/// and `artifact_version` is a semantic version identifier.
-///
-/// * Artifact name can contain only the following characters: `a-zA-Z0-9` and one of `_-.`.
-/// * Artifact version identifier must conform to the semantic versioning scheme (major.minor.patch).
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RustArtifactId {
-    /// Artifact name.
-    pub name: String,
-    /// Artifact version identifier conforming to the semantic versioning scheme.
-    pub version: Version,
-}
-
-impl RustArtifactId {
-    /// Creates a new Rust artifact ID from the provided name and version.
-    ///
-    /// # Panics
-    ///
-    /// If the `name` is empty or contains illegal character.
-    pub fn new(name: &str, major: u64, minor: u64, patch: u64) -> Self {
-        Self::is_valid_name(name).expect("Invalid Rust artifact name.");
-        Self {
-            name: name.to_owned(),
-            version: Version::new(major, minor, patch),
-        }
-    }
-
-    /// Converts into `InstanceInitParams` with the given ID, name and empty constructor.
-    pub fn into_default_instance(
-        self,
-        id: InstanceId,
-        name: impl Into<String>,
-    ) -> InstanceInitParams {
-        InstanceInitParams::new(id, name, self.into(), ())
-    }
-
-    /// Checks that the Rust artifact name contains only allowed characters and is not empty.
-    fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
-        let name = name.as_ref();
-        ensure!(!name.is_empty(), "Rust artifact name should not be empty.");
-        ensure!(
-            is_valid_identifier(name),
-            "Rust artifact name contains illegal character, use only: a-zA-Z0-9 and one of _-."
-        );
-        Ok(())
-    }
-
-    fn parse(artifact: &ArtifactId) -> Result<Self, ExecutionError> {
-        if artifact.runtime_id != RuntimeIdentifier::Rust as u32 {
-            return Err(Error::IncorrectArtifactId.into());
-        }
-        artifact
-            .name
-            .parse()
-            .map_err(|inner| Error::IncorrectArtifactId.with_description(inner))
-    }
-}
-
-impl From<RustArtifactId> for ArtifactId {
-    fn from(inner: RustArtifactId) -> Self {
-        Self {
-            runtime_id: RustRuntime::ID,
-            name: inner.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for RustArtifactId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.name, self.version)
-    }
-}
-
-impl FromStr for RustArtifactId {
-    type Err = failure::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let split = s.split(':').take(2).collect::<Vec<_>>();
-        match &split[..] {
-            [name, version] => {
-                Self::is_valid_name(name)?;
-                let version = Version::parse(version)?;
-                Ok(Self {
-                    name: name.to_string(),
-                    version,
-                })
-            }
-            _ => Err(failure::format_err!(
-                "Wrong Rust artifact name format. The name should be arranged \
-                 as follows \"artifact_name:artifact_version\""
-            )),
-        }
-    }
-}
-
 impl Runtime for RustRuntime {
     fn initialize(&mut self, blockchain: &Blockchain) {
         self.blockchain = Some(blockchain.clone());
@@ -472,11 +465,7 @@ impl Runtime for RustRuntime {
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if let Ok(artifact) = RustArtifactId::parse(id) {
-            self.deployed_artifacts.contains(&artifact)
-        } else {
-            false
-        }
+        self.deployed_artifacts.contains(id)
     }
 
     fn initiate_adding_service(
@@ -590,40 +579,5 @@ impl Runtime for RustRuntime {
                 validator_id,
             ));
         }
-    }
-}
-
-#[test]
-fn parse_rust_artifact_id_correct() {
-    RustArtifactId::from_str("my-service:1.0.0").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-alpha").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-alpha.1").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-rc").unwrap();
-    RustArtifactId::from_str("my-service:1.0.0-rc.1").unwrap();
-}
-
-#[test]
-fn parse_rust_artifact_id_incorrect() {
-    let cases = vec![
-        ("my-service:1.1.1.1.1", "Extra junk after valid version"),
-        (":1.0", "Rust artifact name should not be empty"),
-        ("name:", "Error parsing major identifier"),
-        ("$name:1.0", "Rust artifact name contains illegal character"),
-        (
-            "aAa",
-            "Wrong Rust artifact name format. The name should be arranged as follows",
-        ),
-    ];
-
-    for (artifact_str, expected_err) in cases {
-        let actual_err = RustArtifactId::from_str(artifact_str)
-            .unwrap_err()
-            .to_string();
-        assert!(
-            actual_err.contains(expected_err),
-            "Actual error is: \"{}\", but expected \"{}\"",
-            actual_err,
-            expected_err
-        )
     }
 }

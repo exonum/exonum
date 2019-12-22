@@ -34,11 +34,7 @@ message Wallet {
 }
 
 message AnyCall {
-  exonum.runtime.CallInfo call_info = 1;
+  exonum.runtime.AnyTx inner = 1;
   string interface_name = 2;
-  bytes args = 3;
-}
-
-message RecursiveCall {
-  uint64 depth = 1;
+  bool fallthrough_auth = 3;
 }

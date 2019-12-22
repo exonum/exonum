@@ -14,17 +14,16 @@
 
 use exonum::{
     crypto,
-    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, CallInfo, DispatcherError, ErrorMatch, ExecutionError},
+    runtime::{CallInfo, DispatcherError, ErrorMatch, ExecutionError},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::{
     error::Error,
     services::{
-        AnyCallService, DepositService, TxAnyCall, TxCreateWallet, TxIssue, TxRecursiveCall,
-        WalletService,
+        AnyCall, AnyCallService, CallAny, DepositInterface, DepositService, TxIssue,
+        WalletInterface, WalletService,
     },
 };
 
@@ -56,12 +55,40 @@ fn test_create_wallet_ok() {
 
     execute_transaction(
         &mut testkit,
-        TxCreateWallet {
-            name: "Alice".into(),
-        }
-        .sign(WalletService::ID, keypair.0, &keypair.1),
+        keypair.create_wallet(WalletService::ID, "Alice".into()),
     )
     .expect("Unable to create wallet");
+}
+
+#[test]
+fn test_create_wallet_fallthrough_auth() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    // Without fallthrough auth, the call should fail: `create_wallet` expects the caller
+    // to be external, and it is a service.
+    let mut call = AnyCall::new(CallInfo::new(WalletService::ID, 0), "Alice".to_owned());
+    let err = execute_transaction(
+        &mut testkit,
+        keypair.call_any(AnyCallService::ID, call.clone()),
+    )
+    .unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&Error::WrongInterfaceCaller));
+
+    // With fallthrough auth, the call should succeed.
+    call.fallthrough_auth = true;
+    execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call))
+        .expect("Cannot create wallet");
+
+    let snapshot = testkit.snapshot();
+    assert_eq!(
+        WalletService::get_schema(&snapshot)
+            .wallets
+            .get(&keypair.0)
+            .unwrap()
+            .balance,
+        0
+    );
 }
 
 #[test]
@@ -71,20 +98,19 @@ fn test_deposit_ok() {
 
     execute_transaction(
         &mut testkit,
-        TxCreateWallet {
-            name: "Alice".into(),
-        }
-        .sign(WalletService::ID, keypair.0, &keypair.1),
+        keypair.create_wallet(WalletService::ID, "Alice".into()),
     )
     .expect("Unable to create wallet");
 
     execute_transaction(
         &mut testkit,
-        TxIssue {
-            to: keypair.0,
-            amount: 10_000,
-        }
-        .sign(DepositService::ID, keypair.0, &keypair.1),
+        keypair.deposit(
+            DepositService::ID,
+            TxIssue {
+                to: keypair.0,
+                amount: 10_000,
+            },
+        ),
     )
     .expect("Unable to deposit wallet");
 
@@ -97,6 +123,95 @@ fn test_deposit_ok() {
             .balance,
         10_000
     );
+
+    // Use indirection via `AnyCallService` to deposit some more funds.
+    // Since inner transactions are not checked for uniqueness, depositing the same amount again
+    // should work fine.
+    let mut call = AnyCall::new(
+        CallInfo::new(DepositService::ID, 0),
+        TxIssue {
+            to: keypair.0,
+            amount: 10_000,
+        },
+    );
+    call.fallthrough_auth = true;
+    execute_transaction(
+        &mut testkit,
+        keypair.call_any(AnyCallService::ID, call.clone()),
+    )
+    .expect("Unable to deposit more funds");
+
+    let snapshot = testkit.snapshot();
+    assert_eq!(
+        WalletService::get_schema(&snapshot)
+            .wallets
+            .get(&keypair.0)
+            .unwrap()
+            .balance,
+        20_000
+    );
+
+    // Add some more indirection layers.
+    let mut call = call;
+    for _ in 0..10 {
+        call = AnyCall::new(CallInfo::new(AnyCallService::ID, 0), call);
+        call.fallthrough_auth = true; // Must be set to `true` in all calls!
+    }
+    execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call))
+        .expect("Unable to deposit funds with high indirection");
+
+    let snapshot = testkit.snapshot();
+    assert_eq!(
+        WalletService::get_schema(&snapshot)
+            .wallets
+            .get(&keypair.0)
+            .unwrap()
+            .balance,
+        30_000
+    );
+}
+
+#[test]
+fn test_deposit_invalid_auth() {
+    let mut testkit = testkit_with_interfaces();
+    let keypair = crypto::gen_keypair();
+
+    execute_transaction(
+        &mut testkit,
+        keypair.create_wallet(WalletService::ID, "Alice".into()),
+    )
+    .expect("Unable to create wallet");
+
+    let mut call = AnyCall::new(
+        CallInfo::new(DepositService::ID, 0),
+        TxIssue {
+            to: keypair.0,
+            amount: 10_000,
+        },
+    );
+    // Do not set fallthrough auth, as in the previous example.
+    let err = execute_transaction(
+        &mut testkit,
+        keypair.call_any(AnyCallService::ID, call.clone()),
+    )
+    .unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
+
+    call.fallthrough_auth = true;
+    for i in 0..10 {
+        call = AnyCall::new(CallInfo::new(AnyCallService::ID, 0), call);
+        if i != 5 {
+            call.fallthrough_auth = true;
+        }
+    }
+    // Since there is no uninterrupted chain of fallthrough auth, the authorization should fail
+    // for the deposit service.
+    let err = execute_transaction(
+        &mut testkit,
+        keypair.call_any(AnyCallService::ID, call.clone()),
+    )
+    .unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
 }
 
 #[test]
@@ -106,11 +221,13 @@ fn test_deposit_err_issue_without_wallet() {
 
     let err = execute_transaction(
         &mut testkit,
-        TxIssue {
-            to: keypair.0,
-            amount: 10_000,
-        }
-        .sign(DepositService::ID, keypair.0, &keypair.1),
+        keypair.deposit(
+            DepositService::ID,
+            TxIssue {
+                to: keypair.0,
+                amount: 10_000,
+            },
+        ),
     )
     .unwrap_err();
 
@@ -127,30 +244,20 @@ fn test_any_call_ok_deposit() {
 
     execute_transaction(
         &mut testkit,
-        TxCreateWallet {
-            name: "Alice".into(),
-        }
-        .sign(WalletService::ID, keypair.0, &keypair.1),
+        keypair.create_wallet(WalletService::ID, "Alice".into()),
     )
     .expect("Unable to create wallet");
 
-    execute_transaction(
-        &mut testkit,
-        TxAnyCall {
-            call_info: CallInfo {
-                instance_id: DepositService::ID,
-                method_id: 0,
-            },
-            interface_name: String::default(),
-            args: TxIssue {
-                to: keypair.0,
-                amount: 10_000,
-            }
-            .into_bytes(),
-        }
-        .sign(AnyCallService::ID, keypair.0, &keypair.1),
-    )
-    .expect("Unable to deposit wallet");
+    let mut call = AnyCall::new(
+        CallInfo::new(DepositService::ID, 0),
+        TxIssue {
+            to: keypair.0,
+            amount: 10_000,
+        },
+    );
+    call.fallthrough_auth = true;
+    execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call))
+        .expect("Unable to deposit wallet");
 
     let snapshot = testkit.snapshot();
     assert_eq!(
@@ -170,30 +277,20 @@ fn test_any_call_err_deposit_unauthorized() {
 
     execute_transaction(
         &mut testkit,
-        TxCreateWallet {
-            name: "Alice".into(),
-        }
-        .sign(WalletService::ID, keypair.0, &keypair.1),
+        keypair.create_wallet(WalletService::ID, "Alice".into()),
     )
     .expect("Unable to create wallet");
 
-    let err = execute_transaction(
-        &mut testkit,
-        TxAnyCall {
-            call_info: CallInfo {
-                instance_id: WalletService::ID,
-                method_id: 0,
-            },
-            interface_name: "IssueReceiver".to_owned(),
-            args: TxIssue {
-                to: keypair.0,
-                amount: 10_000,
-            }
-            .into_bytes(),
-        }
-        .sign(AnyCallService::ID, keypair.0, &keypair.1),
-    )
-    .unwrap_err();
+    let mut call = AnyCall::new(
+        CallInfo::new(WalletService::ID, 0),
+        TxIssue {
+            to: keypair.0,
+            amount: 10_000,
+        },
+    );
+    call.interface_name = "IssueReceiver".to_owned();
+    let err =
+        execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
     assert_eq!(
         err,
@@ -205,17 +302,9 @@ fn test_any_call_err_deposit_unauthorized() {
 fn test_any_call_err_unknown_instance() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
-
-    let err = execute_transaction(
-        &mut testkit,
-        TxAnyCall {
-            call_info: CallInfo::new(10_000, 0),
-            interface_name: String::new(),
-            args: vec![],
-        }
-        .sign(AnyCallService::ID, keypair.0, &keypair.1),
-    )
-    .unwrap_err();
+    let call = AnyCall::new(CallInfo::new(10_000, 0), ());
+    let err =
+        execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
     assert_eq!(
         err,
@@ -228,19 +317,10 @@ fn test_any_call_err_unknown_interface() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
-    let err = execute_transaction(
-        &mut testkit,
-        TxAnyCall {
-            call_info: CallInfo {
-                instance_id: WalletService::ID,
-                method_id: 0,
-            },
-            interface_name: "FooFace".to_owned(),
-            args: vec![],
-        }
-        .sign(AnyCallService::ID, keypair.0, &keypair.1),
-    )
-    .unwrap_err();
+    let mut call = AnyCall::new(CallInfo::new(WalletService::ID, 0), ());
+    call.interface_name = "FooFace".to_owned();
+    let err =
+        execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
     assert_eq!(
         err,
@@ -253,23 +333,16 @@ fn test_any_call_err_unknown_method() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
-    let err = execute_transaction(
-        &mut testkit,
-        TxAnyCall {
-            call_info: CallInfo {
-                instance_id: WalletService::ID,
-                method_id: 1,
-            },
-            interface_name: "IssueReceiver".to_owned(),
-            args: TxIssue {
-                to: keypair.0,
-                amount: 10_000,
-            }
-            .into_bytes(),
-        }
-        .sign(AnyCallService::ID, keypair.0, &keypair.1),
-    )
-    .unwrap_err();
+    let mut call = AnyCall::new(
+        CallInfo::new(WalletService::ID, 1),
+        TxIssue {
+            to: keypair.0,
+            amount: 10_000,
+        },
+    );
+    call.interface_name = "IssueReceiver".to_owned();
+    let err =
+        execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
     assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
 }
@@ -279,29 +352,18 @@ fn test_any_call_err_wrong_arg() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
+    let inner_call = AnyCall::new(CallInfo::new(10_000, 0), ());
+    let outer_call = AnyCall::new(CallInfo::new(WalletService::ID, 0), inner_call);
     let err = execute_transaction(
         &mut testkit,
-        TxAnyCall {
-            call_info: CallInfo {
-                instance_id: WalletService::ID,
-                method_id: 0,
-            },
-            interface_name: String::default(),
-            args: TxAnyCall {
-                interface_name: String::default(),
-                call_info: CallInfo::new(10_000, 0),
-                args: vec![],
-            }
-            .into_bytes(),
-        }
-        .sign(AnyCallService::ID, keypair.0, &keypair.1),
+        keypair.call_any(AnyCallService::ID, outer_call),
     )
     .unwrap_err();
 
     assert_eq!(
         err,
         ErrorMatch::from_fail(&DispatcherError::MalformedArguments)
-            .with_description_containing("Utf8Error")
+            .with_description_containing("invalid utf-8 sequence")
     );
 }
 
@@ -312,13 +374,13 @@ fn test_any_call_panic_recursion_limit() {
 
     execute_transaction(
         &mut testkit,
-        TxRecursiveCall { depth: 256 }.sign(AnyCallService::ID, keypair.0, &keypair.1),
+        keypair.call_recursive(AnyCallService::ID, 256),
     )
     .expect("Call stack depth is enough");
 
     let err = execute_transaction(
         &mut testkit,
-        TxRecursiveCall { depth: 300 }.sign(AnyCallService::ID, keypair.0, &keypair.1),
+        keypair.call_recursive(AnyCallService::ID, 300),
     )
     .unwrap_err();
 

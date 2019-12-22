@@ -30,11 +30,11 @@ use crate::{
         Blockchain, BlockchainMut, Schema as CoreSchema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
-    proto::schema::tests::{TestServiceInit, TestServiceTx},
+    proto::schema::tests::TestServiceInit,
     runtime::{
-        error::ExecutionError, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema,
-        ExecutionContext, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        WellKnownRuntime,
+        CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema, ErrorMatch,
+        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
+        Runtime, WellKnownRuntime,
     },
 };
 
@@ -229,7 +229,7 @@ impl WellKnownRuntime for Inspected<RustRuntime> {
     const ID: u32 = RustRuntime::ID;
 }
 
-#[derive(Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "TestServiceInit")]
 pub struct Init {
     msg: String,
@@ -243,26 +243,15 @@ impl Default for Init {
     }
 }
 
-#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct TxA {
-    value: u64,
-}
-
-#[derive(Debug, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "TestServiceTx")]
-struct TxB {
-    value: u64,
-}
-
 #[exonum_interface(crate = "crate")]
-trait TestService {
-    fn method_a(&self, context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError>;
-    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError>;
+trait Test<Ctx> {
+    type Output;
+    fn method_a(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    fn method_b(&self, ctx: Ctx, arg: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(crate = "crate", implements("TestService"))]
+#[service_dispatcher(crate = "crate", implements("Test"))]
 #[service_factory(
     crate = "crate",
     artifact_name = "test_service",
@@ -271,47 +260,28 @@ trait TestService {
 )]
 pub struct TestServiceImpl;
 
-#[derive(Debug)]
-struct TestServiceClient<'a>(CallContext<'a>);
+impl Test<CallContext<'_>> for TestServiceImpl {
+    type Output = Result<(), ExecutionError>;
 
-impl<'a> From<CallContext<'a>> for TestServiceClient<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
-    }
-}
-
-impl<'a> TestServiceClient<'a> {
-    fn method_b(&mut self, arg: TxB) -> Result<(), ExecutionError> {
-        self.0.call("", 1, arg)
-    }
-}
-
-impl TestService for TestServiceImpl {
-    fn method_a(&self, mut context: CallContext<'_>, arg: TxA) -> Result<(), ExecutionError> {
-        context
-            .service_data()
+    fn method_a(&self, mut ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
+        ctx.service_data()
             .get_proof_entry("method_a_entry")
-            .set(arg.value);
+            .set(arg);
         // Test calling one service from another.
-        context
-            .interface::<TestServiceClient<'_>>(SERVICE_INSTANCE_ID)?
-            .method_b(TxB { value: arg.value })
-            .expect("Failed to dispatch call");
-        Ok(())
+        ctx.method_b(SERVICE_INSTANCE_ID, arg)
     }
 
-    fn method_b(&self, context: CallContext<'_>, arg: TxB) -> Result<(), ExecutionError> {
-        context
-            .service_data()
+    fn method_b(&self, ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
+        ctx.service_data()
             .get_proof_entry("method_b_entry")
-            .set(arg.value);
+            .set(arg);
         Ok(())
     }
 }
 
 impl TestServiceImpl {
     fn genesis_config() -> GenesisConfig {
-        let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+        let artifact = TestServiceImpl.artifact_id();
         let config = generate_testnet_config(1, 0)[0].clone();
         GenesisConfigBuilder::with_consensus_config(config.consensus)
             .with_artifact(artifact)
@@ -342,6 +312,34 @@ impl DefaultInstance for TestServiceImpl {
     }
 }
 
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_dispatcher(crate = "crate", implements("Test"))]
+#[service_factory(
+    crate = "crate",
+    artifact_name = "test_service",
+    artifact_version = "0.2.0",
+    proto_sources = "crate::proto::schema"
+)]
+pub struct TestServiceImplV2;
+
+impl Test<CallContext<'_>> for TestServiceImplV2 {
+    type Output = Result<(), ExecutionError>;
+
+    fn method_a(&self, _context: CallContext<'_>, _arg: u64) -> Self::Output {
+        Err(DispatcherError::NoSuchMethod.into())
+    }
+
+    fn method_b(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
+        context
+            .service_data()
+            .get_proof_entry("method_b_entry")
+            .set(arg + 42);
+        Ok(())
+    }
+}
+
+impl Service for TestServiceImplV2 {}
+
 /// In this test, we manually instruct the dispatcher to deploy artifacts / create / stop services
 /// instead of using transactions. We still need to create patches using a `BlockchainMut`
 /// in order to properly emulate the blockchain workflow.
@@ -349,7 +347,7 @@ impl DefaultInstance for TestServiceImpl {
 fn basic_rust_runtime() {
     // Create a runtime and a service artifact.
     let (runtime, event_handle) = create_runtime();
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact = TestServiceImpl.artifact_id();
     // Create dummy dispatcher.
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
@@ -420,7 +418,7 @@ fn basic_rust_runtime() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 0,
     };
-    let payload = TxA { value: ARG_A_VALUE }.into_bytes();
+    let payload = ARG_A_VALUE.into_bytes();
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
@@ -455,7 +453,7 @@ fn basic_rust_runtime() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 1,
     };
-    let payload = TxB { value: ARG_B_VALUE }.into_bytes();
+    let payload = ARG_B_VALUE.into_bytes();
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
@@ -502,7 +500,7 @@ fn basic_rust_runtime() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 1,
     };
-    let payload = TxB { value: ARG_B_VALUE }.into_bytes();
+    let payload = ARG_B_VALUE.into_bytes();
     let caller = Caller::Service {
         instance_id: SERVICE_INSTANCE_ID,
     };
@@ -524,7 +522,7 @@ fn rust_runtime_with_builtin_services() {
         .expect("Can't create a blockchain instance");
 
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact = TestServiceImpl.artifact_id();
     let instance_spec = TestServiceImpl.default_instance().instance_spec;
     assert_eq!(
         events,
@@ -616,9 +614,129 @@ fn state_aggregation() {
 }
 
 #[test]
+fn multiple_service_versions() {
+    const NEW_INSTANCE_ID: InstanceId = SERVICE_INSTANCE_ID + 1;
+
+    let runtime = RustRuntime::new(mpsc::channel(1).0)
+        .with_factory(TestServiceImpl)
+        .with_factory(TestServiceImplV2);
+    let config = generate_testnet_config(1, 0)[0].clone();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+    let mut blockchain = Blockchain::build_for_tests()
+        .into_mut(genesis_config)
+        .with_runtime(runtime)
+        .build()
+        .unwrap();
+
+    let fork = create_block(&blockchain);
+    let artifact = TestServiceImpl.artifact_id();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    let mut fork = create_block(&blockchain);
+    let spec = InstanceSpec {
+        artifact: artifact.clone(),
+        id: SERVICE_INSTANCE_ID,
+        name: SERVICE_INSTANCE_NAME.to_owned(),
+    };
+    let constructor = Init { msg: String::new() };
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
+        .initiate_adding_service(spec, constructor)
+        .unwrap();
+
+    commit_block(&mut blockchain, fork);
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.get_artifact(&artifact).is_some());
+    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact));
+
+    // Add a newer artifact version.
+    let fork = blockchain.fork();
+    let new_artifact = TestServiceImplV2.artifact_id();
+    assert_ne!(new_artifact, artifact);
+    assert!(schema.get_artifact(&new_artifact).is_none());
+    Dispatcher::commit_artifact(&fork, new_artifact.clone(), vec![]).unwrap();
+    commit_block(&mut blockchain, fork);
+
+    // ...and a service based on the new artifact.
+    let mut fork = blockchain.fork();
+    let spec = InstanceSpec {
+        artifact: new_artifact.clone(),
+        id: NEW_INSTANCE_ID,
+        name: "new_service".to_owned(),
+    };
+    ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
+        .initiate_adding_service(spec, ())
+        .unwrap();
+
+    // Check that both artifact versions are present in the dispatcher schema.
+    commit_block(&mut blockchain, fork);
+    let snapshot = blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.get_artifact(&artifact).is_some());
+    assert!(blockchain.dispatcher().is_artifact_deployed(&artifact));
+    assert!(schema.get_artifact(&new_artifact).is_some());
+    assert!(blockchain.dispatcher().is_artifact_deployed(&new_artifact));
+    assert!(schema.get_instance(SERVICE_INSTANCE_ID).is_some());
+    assert!(schema.get_instance("new_service").is_some());
+
+    // Check that both services are active by calling transactions for them.
+    let mut call_info = CallInfo {
+        instance_id: SERVICE_INSTANCE_ID,
+        method_id: 0,
+    };
+    let payload = 11_u64.into_bytes();
+    let caller = Caller::Service {
+        instance_id: SERVICE_INSTANCE_ID,
+    };
+
+    let mut fork = create_block(&blockchain);
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+    call_info.instance_id = NEW_INSTANCE_ID;
+    let err = blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap_err();
+    // `method_a` is removed from the newer service version.
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
+
+    {
+        let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_proof_entry(idx_name.as_str());
+        assert_eq!(entry.get(), Some(11));
+        let entry = fork.get_proof_entry::<_, u64>("new_service.method_a_entry");
+        assert!(!entry.exists());
+    }
+
+    call_info.method_id = 1;
+    call_info.instance_id = SERVICE_INSTANCE_ID;
+    let payload = 12_u64.into_bytes();
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+    call_info.instance_id = NEW_INSTANCE_ID;
+    blockchain
+        .dispatcher()
+        .call(&mut fork, caller, &call_info, &payload)
+        .unwrap();
+
+    {
+        let idx_name = format!("{}.method_b_entry", SERVICE_INSTANCE_NAME);
+        let entry = fork.get_proof_entry(idx_name.as_str());
+        assert_eq!(entry.get(), Some(12));
+        let entry = fork.get_proof_entry("new_service.method_b_entry");
+        assert_eq!(entry.get(), Some(54)); // 12 + 42
+    }
+}
+
+#[test]
 fn conflicting_service_instances() {
     let (runtime, event_handle) = create_runtime();
-    let artifact: ArtifactId = TestServiceImpl.artifact_id().into();
+    let artifact = TestServiceImpl.artifact_id();
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
@@ -675,7 +793,7 @@ fn conflicting_service_instances() {
         instance_id: SERVICE_INSTANCE_ID,
         method_id: 0,
     };
-    let payload = TxA { value: 10 }.into_bytes();
+    let payload = 10_u64.into_bytes();
     let caller = Caller::Transaction {
         hash: Hash::zero(),
         author: PublicKey::new([0; PUBLIC_KEY_LENGTH]),

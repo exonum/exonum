@@ -67,7 +67,8 @@ impl Service for TimeService {
     /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         if let Some(broadcast) = context.broadcaster() {
-            broadcast.send(TxTime::new(self.time.current_time())).ok();
+            let time = TxTime::new(self.time.current_time());
+            broadcast.report_time((), time).ok();
         }
     }
 

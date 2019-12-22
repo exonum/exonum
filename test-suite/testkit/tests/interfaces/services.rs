@@ -12,40 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Services set to test interservice calls.
+//! Services set to test calls between services.
 
 pub use crate::interface::Issue;
 
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, DefaultInstance, Service},
-        CallInfo, ExecutionError, InstanceId, SnapshotExt,
+        rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
+        AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{access::Access, Snapshot};
+use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
-    interface::{IssueReceiver, IssueReceiverClient},
+    interface::IssueReceiver,
     proto,
     schema::{Wallet, WalletSchema},
 };
 
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::CreateWallet")]
-pub struct TxCreateWallet {
-    pub name: String,
-}
-
 #[exonum_interface]
-pub trait WalletInterface {
-    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
+pub trait WalletInterface<Ctx> {
+    type Output;
+    fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -63,13 +56,12 @@ impl WalletService {
 
 impl Service for WalletService {}
 
-impl WalletInterface for WalletService {
-    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
-        let owner = context
-            .caller()
-            .author()
-            .ok_or(Error::WrongInterfaceCaller)?;
-        let mut schema = WalletSchema::new(context.service_data());
+impl WalletInterface<CallContext<'_>> for WalletService {
+    type Output = Result<(), ExecutionError>;
+
+    fn create_wallet(&self, ctx: CallContext<'_>, username: String) -> Self::Output {
+        let owner = ctx.caller().author().ok_or(Error::WrongInterfaceCaller)?;
+        let mut schema = WalletSchema::new(ctx.service_data());
 
         if schema.wallets.contains(&owner) {
             return Err(Error::WalletAlreadyExists.into());
@@ -77,7 +69,7 @@ impl WalletInterface for WalletService {
         schema.wallets.put(
             &owner,
             Wallet {
-                name: arg.name,
+                name: username,
                 balance: 0,
             },
         );
@@ -85,9 +77,11 @@ impl WalletInterface for WalletService {
     }
 }
 
-impl IssueReceiver for WalletService {
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
-        let instance_id = context
+impl IssueReceiver<CallContext<'_>> for WalletService {
+    type Output = Result<(), ExecutionError>;
+
+    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Self::Output {
+        let instance_id = ctx
             .caller()
             .as_service()
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -95,7 +89,7 @@ impl IssueReceiver for WalletService {
             return Err(Error::UnauthorizedIssuer.into());
         }
 
-        let mut schema = WalletSchema::new(context.service_data());
+        let mut schema = WalletSchema::new(ctx.service_data());
         let mut wallet = schema.wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
         wallet.balance += arg.amount;
         schema.wallets.put(&arg.to, wallet);
@@ -118,8 +112,9 @@ pub struct TxIssue {
 }
 
 #[exonum_interface]
-pub trait DepositInterface {
-    fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
+pub trait DepositInterface<Ctx> {
+    type Output;
+    fn deposit(&self, context: Ctx, arg: TxIssue) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -133,14 +128,24 @@ impl DepositService {
 
 impl Service for DepositService {}
 
-impl DepositInterface for DepositService {
-    fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
-        context
-            .interface::<IssueReceiverClient<'_>>(WalletService::ID)?
-            .issue(Issue {
+impl DepositInterface<CallContext<'_>> for DepositService {
+    type Output = Result<(), ExecutionError>;
+
+    fn deposit(&self, mut ctx: CallContext<'_>, arg: TxIssue) -> Self::Output {
+        use crate::interface::IssueReceiverMut;
+
+        // Check authorization of the call.
+        if ctx.caller().author() != Some(arg.to) {
+            return Err(Error::UnauthorizedIssuer.into());
+        }
+        // The child call is authorized by the service.
+        ctx.issue(
+            WalletService::ID,
+            Issue {
                 to: arg.to,
                 amount: arg.amount,
-            })
+            },
+        )
     }
 }
 
@@ -153,65 +158,66 @@ impl DefaultInstance for DepositService {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::AnyCall")]
-pub struct TxAnyCall {
-    pub call_info: CallInfo,
+pub struct AnyCall {
+    pub inner: AnyTx,
     pub interface_name: String,
-    pub args: Vec<u8>,
+    pub fallthrough_auth: bool,
 }
 
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::RecursiveCall")]
-pub struct TxRecursiveCall {
-    pub depth: u64,
+impl AnyCall {
+    pub fn new(call_info: CallInfo, arguments: impl BinaryValue) -> Self {
+        Self {
+            inner: AnyTx {
+                call_info,
+                arguments: arguments.into_bytes(),
+            },
+            fallthrough_auth: false,
+            interface_name: String::default(),
+        }
+    }
 }
 
 #[exonum_interface]
-pub trait AnyCall {
-    fn call_any(&self, context: CallContext<'_>, arg: TxAnyCall) -> Result<(), ExecutionError>;
-
-    fn call_recursive(
-        &self,
-        context: CallContext<'_>,
-        arg: TxRecursiveCall,
-    ) -> Result<(), ExecutionError>;
+pub trait CallAny<Ctx> {
+    type Output;
+    fn call_any(&self, context: Ctx, arg: AnyCall) -> Self::Output;
+    fn call_recursive(&self, context: Ctx, depth: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "any-call-service", proto_sources = "proto")]
-#[service_dispatcher(implements("AnyCall"))]
+#[service_dispatcher(implements("CallAny"))]
 pub struct AnyCallService;
 
 impl AnyCallService {
     pub const ID: InstanceId = 26;
 }
 
-impl AnyCall for AnyCallService {
-    fn call_any(&self, mut context: CallContext<'_>, tx: TxAnyCall) -> Result<(), ExecutionError> {
-        context.call_context(tx.call_info.instance_id)?.call(
-            tx.interface_name,
-            tx.call_info.method_id,
-            tx.args,
-        )
+impl CallAny<CallContext<'_>> for AnyCallService {
+    type Output = Result<(), ExecutionError>;
+
+    fn call_any(&self, mut ctx: CallContext<'_>, tx: AnyCall) -> Self::Output {
+        let call_info = tx.inner.call_info;
+        let args = tx.inner.arguments;
+        let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
+
+        if tx.fallthrough_auth {
+            ctx.with_fallthrough_auth()
+                .generic_call_mut(call_info.instance_id, method, args)
+        } else {
+            ctx.generic_call_mut(call_info.instance_id, method, args)
+        }
     }
 
     fn call_recursive(
         &self,
         mut context: CallContext<'_>,
-        arg: TxRecursiveCall,
+        depth: u64,
     ) -> Result<(), ExecutionError> {
-        if arg.depth == 1 {
+        if depth == 1 {
             return Ok(());
         }
-
-        context.call_context(context.instance().id)?.call(
-            "",
-            1,
-            TxRecursiveCall {
-                depth: arg.depth - 1,
-            },
-        )
+        context.call_recursive(context.instance().id, depth - 1)
     }
 }
 

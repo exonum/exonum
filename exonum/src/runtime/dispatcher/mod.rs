@@ -35,7 +35,7 @@ use crate::{
 
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
-    ArtifactId, ArtifactSpec, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
 mod error;
@@ -74,23 +74,20 @@ impl CommittedServices {
         })
     }
 
-    fn get_instance<'s>(
-        &'s self,
-        id: impl Into<InstanceQuery<'s>>,
-    ) -> Option<(InstanceDescriptor<'s>, InstanceStatus)> {
-        match id.into() {
-            InstanceQuery::Id(id) => {
-                let info = self.instances.get(&id)?;
-                let name = info.name.as_str();
-                Some((InstanceDescriptor { id, name }, info.status))
-            }
+    fn get_instance<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<(InstanceDescriptor<'_>, InstanceStatus)> {
+        let (id, info) = match id.into() {
+            InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
             InstanceQuery::Name(name) => {
                 let id = *self.instance_names.get(name)?;
-                let status = self.instances.get(&id)?.status;
-                Some((InstanceDescriptor { id, name }, status))
+                (id, self.instances.get(&id)?)
             }
-        }
+        };
+        let name = info.name.as_str();
+        Some((InstanceDescriptor { id, name }, info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -134,14 +131,13 @@ impl Dispatcher {
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
-        for state in schema.artifacts().values() {
+        for (artifact, state) in schema.artifacts().iter() {
             debug_assert_eq!(
                 state.status,
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
-            self.deploy_artifact(state.spec.artifact, state.spec.payload)
-                .wait()?;
+            self.deploy_artifact(artifact, state.deploy_spec).wait()?;
         }
         // Restart active service instances.
         for state in schema.instances().values() {
@@ -228,15 +224,12 @@ impl Dispatcher {
     pub(crate) fn commit_artifact(
         fork: &Fork,
         artifact: ArtifactId,
-        payload: Vec<u8>,
+        deploy_spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork)
-            .add_pending_artifact(ArtifactSpec {
-                artifact: artifact.clone(),
-                payload: payload.clone(),
-            })
+            .add_pending_artifact(artifact, deploy_spec)
             .map_err(From::from)
     }
 
@@ -388,7 +381,7 @@ impl Dispatcher {
     /// Calls `after_transactions` for all currently active services, isolating each call.
     ///
     /// Changes the status of pending artifacts and services to active in the merkelized
-    /// indices of the dispatcher information scheme. Thus, these statuses will be equally
+    /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
@@ -404,8 +397,8 @@ impl Dispatcher {
         let patch = fork.into_patch();
 
         // Block futures with pending deployments.
-        for spec in pending_artifacts {
-            self.block_until_deployed(spec.artifact, spec.payload);
+        for (artifact, deploy_spec) in pending_artifacts {
+            self.block_until_deployed(artifact, deploy_spec);
         }
         // Notify runtime about changes in service instances.
         for (spec, status) in modified_instances {
@@ -471,10 +464,10 @@ impl Dispatcher {
     }
 
     /// Returns the service matching the specified query.
-    pub(crate) fn get_service<'s>(
-        &'s self,
-        id: impl Into<InstanceQuery<'s>>,
-    ) -> Option<InstanceDescriptor<'s>> {
+    pub(crate) fn get_service<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<InstanceDescriptor<'_>> {
         let (descriptor, status) = self.service_infos.get_instance(id)?;
         if status.is_active() {
             Some(descriptor)

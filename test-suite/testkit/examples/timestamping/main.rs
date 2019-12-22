@@ -12,66 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate exonum_derive;
+//! Simple timestamping service implementation.
 
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
-    blockchain::ExecutionError,
     crypto::gen_keypair,
     runtime::{
-        rust::{CallContext, Service, ServiceFactory, Transaction},
-        SnapshotExt,
+        rust::{CallContext, Service, ServiceFactory},
+        ExecutionError, SnapshotExt,
     },
 };
+use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
-use exonum_proto::ProtobufConvert;
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
-mod proto;
-
-// Simple service implementation.
-
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxTimestamp")]
-struct TxTimestamp {
-    message: String,
-}
-
-impl TxTimestamp {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-        }
-    }
-}
-
 #[exonum_interface]
-trait TimestampingInterface {
-    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+trait TimestampingInterface<Ctx> {
+    type Output;
+    fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "timestamping",
-    artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "timestamping", artifact_version = "1.0.0")]
 #[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
-impl TimestampingInterface for TimestampingService {
-    fn timestamp(
-        &self,
-        _context: CallContext<'_>,
-        _arg: TxTimestamp,
-    ) -> Result<(), ExecutionError> {
+impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+    type Output = Result<(), ExecutionError>;
+
+    fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
         Ok(())
     }
 }
@@ -91,13 +60,12 @@ fn main() {
         .create();
     // Create few transactions.
     let keypair = gen_keypair();
-    let tx1 = TxTimestamp::new("Down To Earth").sign(instance_id, keypair.0, &keypair.1);
-    let tx2 = TxTimestamp::new("Cry Over Spilt Milk").sign(instance_id, keypair.0, &keypair.1);
-    let tx3 = TxTimestamp::new("Dropping Like Flies").sign(instance_id, keypair.0, &keypair.1);
+    let tx1 = keypair.timestamp(instance_id, "Down To Earth".to_owned());
+    let tx2 = keypair.timestamp(instance_id, "Cry Over Spilt Milk".to_owned());
+    let tx3 = keypair.timestamp(instance_id, "Dropping Like Flies".to_owned());
 
     // Commit them into blockchain.
-    let block =
-        testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone(),]);
+    let block = testkit.create_block_with_transactions(vec![tx1.clone(), tx2.clone(), tx3.clone()]);
     assert_eq!(block.len(), 3);
     assert!(block.iter().all(|transaction| transaction.status().is_ok()));
 

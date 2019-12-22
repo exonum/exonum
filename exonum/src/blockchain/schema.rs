@@ -93,9 +93,9 @@ impl TxLocation {
     }
 }
 
-/// Information schema for indices maintained by the Exonum core logic.
+/// Information schema for indexes maintained by the Exonum core logic.
 ///
-/// Indices defined by this schema are present in the blockchain regardless of
+/// Indexes defined by this schema are present in the blockchain regardless of
 /// the deployed services and store general-purpose information, such as
 /// committed transactions.
 #[derive(Debug, Clone, Copy)]
@@ -108,7 +108,8 @@ pub struct Schema<T> {
 
 impl<T: Access> Schema<T> {
     /// Constructs information schema based on the given `access`.
-    pub(crate) fn new(access: T) -> Self {
+    #[doc(hidden)]
+    pub fn new(access: T) -> Self {
         Self { access }
     }
 

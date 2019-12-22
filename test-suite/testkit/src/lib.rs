@@ -18,47 +18,46 @@
 //! # Example
 //! ```
 //! use exonum::{
-//!     runtime::{BlockchainData, SnapshotExt, rust::{ServiceFactory, Transaction, CallContext, Service}},
-//!     blockchain::{Block, Schema, ExecutionError, InstanceCollection},
+//!     runtime::{
+//!         rust::{ServiceFactory, CallContext, Service},
+//!         BlockchainData, SnapshotExt, ExecutionError,
+//!     },
+//!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
 //!     explorer::TransactionInfo,
 //!     helpers::Height,
 //!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
-//! use serde_derive::{Serialize, Deserialize};
-//! use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
+//! use serde_derive::*;
+//! use exonum_derive::*;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
-//! use exonum_testkit::{txvec, ApiKind, TestKitBuilder};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! // Simple service implementation.
 //!
 //! const SERVICE_ID: u32 = 1;
-//!
-//! #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
-//! #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
-//! pub struct TxTimestamp {
-//!     message: String,
-//! }
 //!
 //! #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
 //! #[service_dispatcher(implements("TimestampingInterface"))]
 //! #[service_factory(
 //!     artifact_name = "timestamping",
 //!     artifact_version = "1.0.0",
-//!     proto_sources = "exonum_testkit::proto",
 //! )]
 //! struct TimestampingService;
 //!
 //! impl Service for TimestampingService {}
 //!
 //! #[exonum_interface]
-//! pub trait TimestampingInterface {
-//!     fn timestamp(&self, _: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError>;
+//! pub trait TimestampingInterface<Ctx> {
+//!     type Output;
+//!     fn timestamp(&self, _: Ctx, arg: String) -> Self::Output;
 //! }
 //!
-//! impl TimestampingInterface for TimestampingService {
-//!     fn timestamp(&self, _: CallContext<'_>, arg: TxTimestamp) -> Result<(), ExecutionError> {
+//! impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+//!     type Output = Result<(), ExecutionError>;
+//!
+//!     fn timestamp(&self, _: CallContext<'_>, arg: String) -> Self::Output {
 //!         Ok(())
 //!     }
 //! }
@@ -78,16 +77,16 @@
 //!     // Create few transactions.
 //!     let keys = gen_keypair();
 //!     let id = SERVICE_ID;
-//!     let tx1 = TxTimestamp { message: "Down To Earth".into() }.sign(id, keys.0, &keys.1);
-//!     let tx2 = TxTimestamp { message: "Cry Over Spilt Milk".into() }.sign(id, keys.0, &keys.1);
-//!     let tx3 = TxTimestamp { message: "Dropping Like Flies".into() }.sign(id, keys.0, &keys.1);
+//!     let tx1 = keys.timestamp(id, "Down To Earth".into());
+//!     let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
+//!     let tx3 = keys.timestamp(id, "Dropping Like Flies".into());
 //!     // Commit them into blockchain.
-//!     testkit.create_block_with_transactions(txvec![
+//!     testkit.create_block_with_transactions(vec![
 //!         tx1.clone(), tx2.clone(), tx3.clone()
 //!     ]);
 //!
 //!     // Add a single transaction.
-//!     let tx4 = TxTimestamp { message: "Barking up the wrong tree".into() }.sign(id, keys.0, &keys.1);
+//!     let tx4 = keys.timestamp(id, "Barking up the wrong tree".into());
 //!     testkit.create_block_with_transaction(tx4.clone());
 //!
 //!     // Check results with schema.
@@ -139,13 +138,10 @@ extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
-    builder::{InstanceCollection, TestKitBuilder},
-    compare::ComparableSnapshot,
+    builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
-pub mod compare;
-pub mod proto;
 
 use exonum::{
     api::{
@@ -179,14 +175,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::server::TestKitActor;
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
+    server::TestKitActor,
 };
 
-#[macro_use]
-mod macros;
 mod api;
 mod builder;
 mod checkpoint_db;
@@ -352,47 +346,44 @@ impl TestKit {
     /// # use serde_derive::{Serialize, Deserialize};
     /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_proto::ProtobufConvert;
-    /// # use exonum_testkit::{txvec, TestKit, TestKitBuilder};
+    /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{
-    /// #     blockchain::{ExecutionError, InstanceCollection},
     /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{BlockchainData, rust::{CallContext, Service, ServiceFactory, Transaction}},
+    /// #     runtime::{rust::{CallContext, Service, ServiceFactory}, ExecutionError},
     /// # };
     /// #
-    /// # const SERVICE_ID: u32 = 1;
-    /// #
+    /// // Suppose we test this service interface:
+    /// #[exonum_interface]
+    /// pub trait ExampleInterface<Ctx> {
+    ///     type Output;
+    ///     fn example_tx(&self, ctx: Ctx, arg: String) -> Self::Output;
+    /// }
+    ///
+    /// // ...implemented by this service:
     /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-    /// # #[service_dispatcher(implements("ExampleInterface"))]
     /// # #[service_factory(
     /// #     artifact_name = "example",
     /// #     artifact_version = "1.0.0",
-    /// #     proto_sources = "exonum_testkit::proto",
     /// # )]
-    /// # pub struct ExampleService;
-    /// # impl Service for ExampleService {}
+    /// #[service_dispatcher(implements("ExampleInterface"))]
+    /// pub struct ExampleService;
+    /// impl Service for ExampleService {}
     /// #
-    /// # #[exonum_interface]
-    /// # pub trait ExampleInterface {
-    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError>;
-    /// # }
-    /// #
-    /// # impl ExampleInterface for ExampleService {
-    /// #     fn example_tx(&self, _: CallContext, arg: ExampleTx) -> Result<(), ExecutionError> {
+    /// # impl ExampleInterface<CallContext<'_>> for ExampleService {
+    /// #     type Output = Result<(), ExecutionError>;
+    /// #     fn example_tx(&self, _: CallContext<'_>, _: String) -> Self::Output {
     /// #         Ok(())
     /// #     }
-    /// # }
-    /// #
-    /// # #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert, BinaryValue)]
-    /// # #[protobuf_convert(source = "exonum_testkit::proto::examples::TxTimestamp")]
-    /// # pub struct ExampleTx {
-    /// #     message: String,
     /// # }
     /// #
     /// # fn expensive_setup(_: &mut TestKit) {}
     /// # fn assert_something_about(_: &TestKit) {}
     /// #
     /// # fn main() {
+    /// // ...with this ID:
+    /// const SERVICE_ID: u32 = 1;
+    ///
     /// let service = ExampleService;
     /// let artifact = service.artifact_id();
     /// let mut testkit = TestKitBuilder::validator()
@@ -401,68 +392,24 @@ impl TestKit {
     ///     .with_rust_service(ExampleService)
     ///     .create();
     /// expensive_setup(&mut testkit);
-    /// let (pubkey, key) = exonum::crypto::gen_keypair();
-    /// let tx_a = ExampleTx { message: "foo".into() }.sign(SERVICE_ID, pubkey, &key);
-    /// let tx_b = ExampleTx { message: "bar".into() }.sign(SERVICE_ID, pubkey, &key);
+    /// let keys = exonum::crypto::gen_keypair();
+    /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
+    /// let tx_b = keys.example_tx(SERVICE_ID, "bar".into());
     ///
     /// testkit.checkpoint();
-    /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
+    /// testkit.create_block_with_transactions(vec![tx_a.clone(), tx_b.clone()]);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
     ///
     /// testkit.checkpoint();
-    /// testkit.create_block_with_transactions(txvec![tx_a.clone()]);
-    /// testkit.create_block_with_transactions(txvec![tx_b.clone()]);
+    /// testkit.create_block_with_transaction(tx_a);
+    /// testkit.create_block_with_transaction(tx_b);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
     /// # }
     /// ```
     pub fn rollback(&mut self) {
         self.db_handler.rollback()
-    }
-
-    /// Executes a list of transactions given the current state of the blockchain, but does not
-    /// commit execution results to the blockchain. The execution result is the same
-    /// as if transactions were included into a new block; for example,
-    /// transactions included into one of previous blocks do not lead to any state changes.
-    ///
-    /// # Panics
-    /// - Panics if any of the transactions is incorrect.
-    pub fn probe_all<I>(&mut self, transactions: I) -> Box<dyn Snapshot>
-    where
-        I: IntoIterator<Item = Verified<AnyTx>>,
-    {
-        self.poll_events();
-        // Filter out already committed transactions; otherwise,
-        // `create_block_with_transactions()` will panic.
-        let snapshot = self.snapshot();
-        let schema = snapshot.for_core();
-        let uncommitted_txs: Vec<_> = transactions
-            .into_iter()
-            .filter(|tx| {
-                self.check_tx(&tx);
-
-                !schema.transactions().contains(&tx.object_hash())
-                    || schema.transactions_pool().contains(&tx.object_hash())
-            })
-            .collect();
-
-        self.checkpoint();
-        self.create_block_with_transactions(uncommitted_txs);
-        let snapshot = self.snapshot();
-        self.rollback();
-        snapshot
-    }
-
-    /// Executes a transaction given the current state of the blockchain but does not
-    /// commit execution results to the blockchain. The execution result is the same
-    /// as if a transaction was included into a new block; for example,
-    /// a transaction included into one of previous blocks does not lead to any state changes.
-    ///
-    /// # Panics
-    /// - Panics if any of the transactions is incorrect.
-    pub fn probe(&mut self, transaction: Verified<AnyTx>) -> Box<dyn Snapshot> {
-        self.probe_all(vec![transaction])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
@@ -567,7 +514,7 @@ impl TestKit {
     /// - Panics if given transaction has been already committed to the blockchain.
     /// - Panics if any of the transactions is incorrect.
     pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
-        self.create_block_with_transactions(txvec![tx])
+        self.create_block_with_transactions(vec![tx])
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
@@ -786,11 +733,9 @@ impl TestKit {
 /// # const SERVICE_ID: u32 = 1;
 /// // Service with internal state modified by a custom `after_commit` hook.
 /// # #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
-/// # #[service_dispatcher(implements("AfterCommitInterface"))]
 /// # #[service_factory(
 /// #     artifact_name = "after_commit",
 /// #     artifact_version = "1.0.0",
-/// #     proto_sources = "exonum_testkit::proto",
 /// #     service_constructor = "Self::new_instance",
 /// # )]
 /// struct AfterCommitService {
@@ -811,11 +756,6 @@ impl TestKit {
 ///     }
 /// }
 ///
-/// # #[exonum_interface]
-/// # trait AfterCommitInterface {}
-/// #
-/// # impl AfterCommitInterface for AfterCommitService {}
-/// #
 /// impl Service for AfterCommitService {
 ///     fn after_commit(&self, _: AfterCommitContext) {
 ///         self.counter.fetch_add(1, Ordering::SeqCst);

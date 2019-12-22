@@ -26,7 +26,8 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
-    messages::{BinaryValue, SIGNED_MESSAGE_MIN_SIZE},
+    merkledb::BinaryValue,
+    messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::{blockchain, runtime},
     runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };
@@ -209,8 +210,7 @@ impl ConsensusConfig {
     ///
     /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
     /// method, but some values can decrease consensus performance.
-    #[doc(hidden)]
-    pub fn warn_if_nonoptimal(&self) {
+    fn warn_if_nonoptimal(&self) {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 
@@ -558,8 +558,10 @@ mod tests {
     #[test]
     fn genesis_config_creation() {
         let consensus = gen_consensus_config();
-        let artifact1 = ArtifactId::new(42_u32, "test_artifact1").unwrap();
-        let artifact2 = ArtifactId::new(42_u32, "test_artifact2").unwrap();
+        let version = "1.0.0".parse().unwrap();
+        let artifact1 = ArtifactId::new(42_u32, "test_artifact1", version).unwrap();
+        let version = "0.2.8".parse().unwrap();
+        let artifact2 = ArtifactId::new(42_u32, "test_artifact2", version).unwrap();
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
             .with_artifact(artifact1.clone())
@@ -582,7 +584,8 @@ mod tests {
     #[test]
     fn genesis_config_check_artifacts_duplication() {
         let consensus = gen_consensus_config();
-        let artifact = ArtifactId::new(42_u32, "test_artifact").unwrap();
+        let version = "1.1.5-rc.3".parse().unwrap();
+        let artifact = ArtifactId::new(42_u32, "test_artifact", version).unwrap();
         let correct_payload = vec![1_u8, 2, 3];
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus)

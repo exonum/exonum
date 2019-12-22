@@ -14,31 +14,24 @@
 
 //! Different assorted utilities.
 
-pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
+pub use self::types::{Height, Round, ValidatorId};
 
+// Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden under `doc(hidden)`.
+pub use self::user_agent::user_agent;
+
+// `Milliseconds` is just `u64`, but more readable within context.
+pub(crate) use self::types::Milliseconds;
+
+#[doc(hidden)]
 pub mod config;
-pub mod user_agent;
 
 use env_logger::Builder;
 use log::SetLoggerError;
 
-use std::path::{Component, Path, PathBuf};
-
-use crate::{
-    api::manager::UpdateEndpoints,
-    blockchain::{
-        config::{GenesisConfig, GenesisConfigBuilder},
-        ConsensusConfig, InstanceCollection, Schema, ValidatorKeys,
-    },
-    crypto::gen_keypair,
-    exonum_merkledb::Fork,
-    node::{ConnectListConfig, NodeConfig},
-    runtime::rust::RustRuntime,
-};
-use exonum_keys::Keys;
-use futures::sync::mpsc;
+use crate::{blockchain::Schema, exonum_merkledb::Fork};
 
 mod types;
+mod user_agent;
 
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
@@ -47,8 +40,16 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
         .try_init()
 }
 
-/// Generates testnet configuration.
-pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
+/// Generates testnet configuration. This function needs to be public to be used in `tests`.
+#[doc(hidden)]
+pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<crate::node::NodeConfig> {
+    use crate::{
+        blockchain::{ConsensusConfig, ValidatorKeys},
+        crypto::gen_keypair,
+        node::{ConnectListConfig, NodeConfig},
+    };
+    use exonum_keys::Keys;
+
     let keys: (Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
@@ -100,56 +101,10 @@ pub trait ValidateInput: Sized {
     }
 }
 
-/// This routine is adapted from the *old* Path's `path_relative_from`
-/// function, which works differently from the new `relative_from` function.
-/// In particular, this handles the case on unix where both paths are
-/// absolute but with only the root as the common directory.
-///
-/// @see https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
-pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Option<PathBuf> {
-    let path = path.as_ref();
-    let base = base.as_ref();
-
-    if path.is_absolute() != base.is_absolute() {
-        if path.is_absolute() {
-            Some(PathBuf::from(path))
-        } else {
-            None
-        }
-    } else {
-        let mut ita = path.components();
-        let mut itb = base.components();
-        let mut comps: Vec<Component<'_>> = vec![];
-        loop {
-            match (ita.next(), itb.next()) {
-                (None, None) => break,
-                (Some(a), None) => {
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
-                }
-                (None, _) => comps.push(Component::ParentDir),
-                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
-                (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
-                (Some(_), Some(b)) if b == Component::ParentDir => return None,
-                (Some(a), Some(_)) => {
-                    comps.push(Component::ParentDir);
-                    for _ in itb {
-                        comps.push(Component::ParentDir);
-                    }
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
-                }
-            }
-        }
-        Some(comps.iter().map(|c| c.as_os_str()).collect())
-    }
-}
-
 /// Clears consensus messages cache.
 ///
 /// Used in `exonum-cli` to implement `clear-cache` maintenance action.
+#[doc(hidden)]
 pub fn clear_consensus_messages_cache(fork: &Fork) {
     Schema::new(fork).consensus_messages_cache().clear();
 }
@@ -157,43 +112,4 @@ pub fn clear_consensus_messages_cache(fork: &Fork) {
 /// Returns sufficient number of votes for the given validators number.
 pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
-}
-
-// TODO: Separate creation of RustRuntime and GenesisConfig. [ECR-3913]
-/// Creates and initializes RustRuntime and GenesisConfig with information from collection of InstanceCollection.
-pub fn create_rust_runtime_and_genesis_config(
-    api_notifier: mpsc::Sender<UpdateEndpoints>,
-    consensus_config: ConsensusConfig,
-    instances: impl IntoIterator<Item = InstanceCollection>,
-) -> (RustRuntime, GenesisConfig) {
-    let mut rust_runtime = RustRuntime::new(api_notifier);
-    let mut config_builder = GenesisConfigBuilder::with_consensus_config(consensus_config);
-
-    for InstanceCollection { factory, instances } in instances {
-        rust_runtime = rust_runtime.with_factory(factory);
-        config_builder = instances
-            .into_iter()
-            .fold(config_builder, |builder, instance| {
-                builder
-                    .with_artifact(instance.instance_spec.artifact.clone())
-                    .with_instance(instance)
-            });
-    }
-
-    (rust_runtime, config_builder.build())
-}
-
-#[test]
-fn test_path_relative_from() {
-    let cases = vec![
-        ("/b", "/c", Some("../b".into())),
-        ("/a/b", "/a/c", Some("../b".into())),
-        ("/a", "/a/c", Some("../".into())),
-        ("/a/b/c", "/a/b", Some("c".into())),
-        ("/a/b/c", "/a/b/d", Some("../c".into())),
-        ("./a/b", "./a/c", Some("../b".into())),
-    ];
-    for c in cases {
-        assert_eq!(path_relative_from(c.0, c.1), c.2);
-    }
 }

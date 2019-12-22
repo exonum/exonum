@@ -38,10 +38,13 @@ message AnyTx {
 message ArtifactId {
   uint32 runtime_id = 1;
   string name = 2;
+  string version = 3;
 }
 
 message ArtifactSpec {
+  // Information uniquely identifying the artifact.
   ArtifactId artifact = 1;
+  // Runtime-specific artifact payload.
   bytes payload = 2;
 }
 
@@ -129,15 +132,16 @@ message ExecutionStatus {
 message ArtifactState {
   // Status of an artifact deployment.
   enum Status {
-    // Reserved for the further usage. 
+    // Reserved for the further usage.
     NONE = 0;
     // The artifact is pending deployment.
     PENDING = 1;
     // The artifact has been successfully deployed.
     ACTIVE = 2;
   }
-  // Artifact specification.
-  exonum.runtime.ArtifactSpec spec = 1;
+
+  // Runtime-specific artifact specification.
+  bytes deploy_spec = 1;
   // Artifact deployment status.
   Status status = 2;
 }

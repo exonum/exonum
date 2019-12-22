@@ -969,7 +969,7 @@ fn test_valid_tombstone() {
     let migration = Migration::new("foo", &fork);
 
     // Valid tombstone in a fork.
-    migration.touch_index("bar", IndexType::Tombstone).unwrap();
+    migration.create_tombstone("bar");
     // Check that index cannot be reinterpreted with another type.
     let err = ListIndex::<_, u64>::from_access(migration, "bar".into()).unwrap_err();
     assert_matches!(
@@ -990,13 +990,13 @@ fn test_valid_tombstone() {
 
 #[test]
 fn test_invalid_tombstone() {
-    use crate::access::AccessErrorKind;
+    use crate::access::{Access, AccessErrorKind};
 
     let db = TemporaryDB::new();
     let fork = db.fork();
     // A tombstone cannot be created outside the migration!
     let err = fork
-        .touch_index("foo.bar", IndexType::Tombstone)
+        .get_or_create_view("foo.bar".into(), IndexType::Tombstone)
         .unwrap_err();
     assert_matches!(err.kind, AccessErrorKind::InvalidTombstone);
 }
