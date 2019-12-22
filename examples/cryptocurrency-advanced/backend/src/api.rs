@@ -14,7 +14,7 @@
 
 //! Cryptocurrency API.
 
-use exonum_merkledb::{proof_map_index::Raw, ListProof, MapProof};
+use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
 
 use exonum::{
     blockchain::{BlockProof, IndexProof},

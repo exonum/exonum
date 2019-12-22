@@ -77,6 +77,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` structure isn't generic anymore. (#1587)
 
+#### exonum-merkledb
+
+- The crate has been restructured, indexes are now located in separate module.
+Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+
 ### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)

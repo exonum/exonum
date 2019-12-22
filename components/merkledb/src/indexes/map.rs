@@ -20,7 +20,7 @@
 
 use std::{borrow::Borrow, marker::PhantomData};
 
-use super::{
+use crate::{
     access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
@@ -33,8 +33,8 @@ use super::{
 /// `MapIndex` requires that keys implement the [`BinaryKey`] trait and values implement
 /// the [`BinaryValue`] trait.
 ///
-/// [`BinaryKey`]: ../trait.BinaryKey.html
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryKey`]: ../../trait.BinaryKey.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,
@@ -51,7 +51,7 @@ pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexIter<'a, K: ?Sized, V> {
+pub struct Iter<'a, K: ?Sized, V> {
     base_iter: ViewIter<'a, K, V>,
 }
 
@@ -64,7 +64,7 @@ pub struct MapIndexIter<'a, K: ?Sized, V> {
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexKeys<'a, K: ?Sized> {
+pub struct Keys<'a, K: ?Sized> {
     base_iter: ViewIter<'a, K, ()>,
 }
 
@@ -77,7 +77,7 @@ pub struct MapIndexKeys<'a, K: ?Sized> {
 /// [`values_from`]: struct.MapIndex.html#method.values_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexValues<'a, V> {
+pub struct Values<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
@@ -162,8 +162,8 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter(&self) -> MapIndexIter<'_, K, V> {
-        MapIndexIter {
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        Iter {
             base_iter: self.base.iter(&()),
         }
     }
@@ -184,8 +184,8 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys(&self) -> MapIndexKeys<'_, K> {
-        MapIndexKeys {
+    pub fn keys(&self) -> Keys<'_, K> {
+        Keys {
             base_iter: self.base.iter(&()),
         }
     }
@@ -206,8 +206,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> MapIndexValues<'_, V> {
-        MapIndexValues {
+    pub fn values(&self) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter(&()),
         }
     }
@@ -228,8 +228,8 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> MapIndexIter<'_, K, V> {
-        MapIndexIter {
+    pub fn iter_from(&self, from: &K) -> Iter<'_, K, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -250,8 +250,8 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> MapIndexKeys<'_, K> {
-        MapIndexKeys {
+    pub fn keys_from(&self, from: &K) -> Keys<'_, K> {
+        Keys {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -271,8 +271,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> MapIndexValues<'_, V> {
-        MapIndexValues {
+    pub fn values_from(&self, from: &K) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -361,14 +361,14 @@ where
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
-    type IntoIter = MapIndexIter<'a, K, V>;
+    type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
+impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
     K: BinaryKey + ?Sized,
     V: BinaryValue,
@@ -380,7 +380,7 @@ where
     }
 }
 
-impl<'a, K> Iterator for MapIndexKeys<'a, K>
+impl<'a, K> Iterator for Keys<'a, K>
 where
     K: BinaryKey + ?Sized,
 {
@@ -391,7 +391,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for MapIndexValues<'a, V>
+impl<'a, V> Iterator for Values<'a, V>
 where
     V: BinaryValue,
 {
