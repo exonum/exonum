@@ -12,12 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+syntax = "proto3";
 
-pub use self::tests_transactions::{CreateWallet, Transfer};
+package exonum.tests.node;
 
-use exonum::crypto::proto::*;
+import "types.proto";
 
-include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
+message CreateWallet {
+  exonum.crypto.PublicKey pubkey = 1;
+  string name = 2;
+}
+
+message Transfer {
+  exonum.crypto.PublicKey from = 1;
+  exonum.crypto.PublicKey to = 2;
+  uint64 amount = 3;
+}
+
+message Issue {
+  exonum.crypto.PublicKey to = 2;
+  uint64 amount = 3;
+}

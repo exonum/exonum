@@ -127,7 +127,6 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
 
-- Added support of unsized keys to `MapIndex`. (#1621)
 - Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
@@ -142,7 +141,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
-
+  
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
 
@@ -151,6 +150,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 #### exonum
 
 - `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
+
+- Some of general-purpose tests were moved to the `test-suite/node-tests`. (#1633)
 
 ### Bug Fixes
 
