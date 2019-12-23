@@ -91,7 +91,7 @@ pub struct Raw;
 ///
 /// [`Hashed`]: struct.Hashed.html
 /// [`Raw`]: struct.Raw.html
-/// [`BinaryKey`]: ../trait.BinaryKey.html
+/// [`BinaryKey`]: ../../trait.BinaryKey.html
 pub trait ToProofPath<K: ?Sized> {
     /// Transforms the provided key.
     fn transform_key(key: &K) -> ProofPath;

@@ -17,10 +17,7 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{ServiceFactory, Transaction},
-        InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{rust::ServiceFactory, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -31,6 +28,7 @@ use crate::{
 };
 use exonum_supervisor::{
     supervisor_name, ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
+    SupervisorInterface,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(2);
@@ -67,11 +65,12 @@ pub fn build_confirmation_transactions(
         .iter()
         .filter(|validator| validator.validator_id() != Some(initiator_id))
         .map(|validator| {
-            let keys = validator.service_keypair();
-            ConfigVote {
-                propose_hash: proposal_hash,
-            }
-            .sign(SUPERVISOR_INSTANCE_ID, keys.0, &keys.1)
+            validator.service_keypair().confirm_config_change(
+                SUPERVISOR_INSTANCE_ID,
+                ConfigVote {
+                    propose_hash: proposal_hash,
+                },
+            )
         })
         .collect()
 }

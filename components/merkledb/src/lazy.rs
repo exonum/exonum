@@ -35,7 +35,7 @@ use crate::{
 /// ```
 ///
 /// [`get()`]: #method.get
-/// [`Group`]: struct.Group.html
+/// [`Group`]: indexes/group/struct.Group.html
 #[derive(Debug)]
 pub struct Lazy<T, I> {
     access: T,
