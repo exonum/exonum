@@ -41,14 +41,6 @@ fn main() {
         .with_common()
         .generate();
 
-    // Exonum external tests.
-    ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
-        .with_input_dir("tests/explorer/blockchain/proto")
-        .add_path("src/proto/schema/exonum")
-        .with_crypto()
-        .with_common()
-        .generate();
-
     // Exonum benchmarks.
     ProtobufGenerator::with_mod_name("exonum_benches_proto_mod.rs")
         .with_input_dir("benches/criterion/proto")

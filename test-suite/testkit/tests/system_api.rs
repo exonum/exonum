@@ -76,10 +76,7 @@ fn network() {
 fn shutdown() {
     let mut testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    assert_eq!(
-        api.private(ApiKind::System)
-            .post::<()>("v1/shutdown")
-            .unwrap(),
-        ()
-    );
+    api.private(ApiKind::System)
+        .post::<()>("v1/shutdown")
+        .unwrap();
 }
