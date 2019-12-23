@@ -53,9 +53,14 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// Returns a mount point for another service. If the service with `id` does not exist,
     /// returns `None`.
     ///
-    /// Note that this method does not check the service type; the caller is responsible
+    /// # Safety
+    ///
+    /// This method does not check the service type; the caller is responsible
     /// for constructing a schema of a correct type around the returned access. Constructing
-    /// an incorrect schema can lead to a panic or unexpected behavior.
+    /// an incorrect schema can lead to a panic or unexpected behavior. Use [`service_schema`]
+    /// as a safer alternative, which performs all necessary checks.
+    ///
+    /// [`service_schema`]: #method.service_schema
     pub fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
@@ -152,7 +157,17 @@ pub trait SnapshotExt {
     fn for_core(&self) -> CoreSchema<&'_ dyn Snapshot>;
     /// Returns dispatcher schema.
     fn for_dispatcher(&self) -> DispatcherSchema<&'_ dyn Snapshot>;
+
     /// Returns a mount point for a service. If the service does not exist, returns `None`.
+    ///
+    /// # Safety
+    ///
+    /// This method does not check the service type; the caller is responsible
+    /// for constructing a schema of a correct type around the returned access. Constructing
+    /// an incorrect schema can lead to a panic or unexpected behavior. Use [`service_schema`]
+    /// as a safer alternative, which performs all necessary checks.
+    ///
+    /// [`service_schema`]: #tymethod.service_schema
     fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
