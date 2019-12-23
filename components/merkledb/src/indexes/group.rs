@@ -119,10 +119,18 @@ where
     /// group in `suffixes` method and stores them in `Vec`. This operation can consume a large
     /// amount of RAM.
     ///
-    /// **Note:** creating any new indexes while this iterator is in scope may lead to panic.
-    pub fn keys_unchecked(&self) -> impl Iterator<Item = K::Owned> {
+    /// # Panics
+    ///
+    /// Panics if group prefix contains `id_in_group` component. Such group can be created via
+    /// `FromAccess` trait.
+    pub fn buffered_keys(&self) -> Vec<K::Owned> {
         let indexes_pool = IndexesPool::new(self.access.clone());
-        indexes_pool.suffixes::<K>(self.prefix.name()).into_iter()
+        let prefix = &self.prefix;
+        assert!(
+            prefix.id_in_group().is_none(),
+            "This method works only for group addresses"
+        );
+        indexes_pool.suffixes::<K>(prefix)
     }
 }
 
@@ -184,7 +192,8 @@ mod tests {
         let group: Group<_, str, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
 
         let results = group
-            .keys_unchecked()
+            .buffered_keys()
+            .iter()
             .map(|key| group.get(&key).get(0).unwrap())
             .collect::<Vec<_>>();
 
@@ -219,7 +228,7 @@ mod tests {
 
         let snapshot = db.snapshot();
         let group: Group<_, String, ProofListIndex<_, String>> = snapshot.get_group(GROUP_NAME);
-        let keys = group.keys_unchecked().collect::<Vec<String>>();
+        let keys = group.buffered_keys();
 
         // Keys should not contain keys from the indexes, that was written before or
         // after the `GROUP_NAME`.

@@ -22,7 +22,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
 
 use super::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View};
-use crate::views::address::INDEX_NAME_SEPARATOR;
 use crate::{
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
@@ -346,13 +345,13 @@ impl<T: RawAccess> IndexesPool<T> {
         (metadata, is_phantom)
     }
 
-    pub(crate) fn suffixes<K: BinaryKey + ?Sized>(&self, prefix: &str) -> Vec<K::Owned> {
-        let prefix = concat_keys!(prefix, INDEX_NAME_SEPARATOR);
+    pub(crate) fn suffixes<K: BinaryKey + ?Sized>(&self, prefix: &IndexAddress) -> Vec<K::Owned> {
+        let prefix = prefix.qualified_prefix();
         let mut keys = Vec::new();
+        let mut bytes_iter = self.0.iter_bytes(&prefix);
 
-        for (key, _) in self.0.iter::<_, Vec<u8>, Vec<u8>>(&prefix) {
-            let split = key.split_at(prefix.len());
-            let suffix = K::read(&split.1);
+        while let Some(key) = bytes_iter.next() {
+            let suffix = K::read(&key.0[prefix.len()..]);
             keys.push(suffix);
         }
 

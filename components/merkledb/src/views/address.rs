@@ -17,7 +17,7 @@ use std::{borrow::Cow, num::NonZeroU64};
 use crate::BinaryKey;
 
 /// Separator between the name and the additional bytes in family indexes.
-pub(super) const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
+const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
 
 pub fn key_bytes<K: BinaryKey + ?Sized>(key: &K) -> Vec<u8> {
     concat_keys!(key)
@@ -179,6 +179,15 @@ impl IndexAddress {
             (true, None) => concat_keys!(MIGRATION_PREFIX, self.name()),
             (false, None) => self.name.as_bytes().to_vec(),
         }
+    }
+
+    /// Returns common prefix of fully qualified names for the child indexes.
+    pub(super) fn qualified_prefix(&self) -> Vec<u8> {
+        let mut prefix = self.fully_qualified_name();
+        if self.id_in_group.is_none() {
+            prefix.push(SEPARATOR_CHAR);
+        }
+        prefix
     }
 
     /// Infers the name part of the fully qualified name that was obtained with
