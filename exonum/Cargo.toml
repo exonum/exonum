@@ -64,16 +64,14 @@ exonum-proto = { version = "0.13.0-rc.2", path = "../components/proto" }
 
 [dev-dependencies]
 assert_matches = "1.3.0"
+bincode = "1.2.0"
 criterion = "0.3.0"
-lazy_static = "1.0.1"
 modifier = "0.1.0"
 num = "0.2.0"
 pretty_assertions = "0.6.1"
 proptest = "0.9.1"
 tempdir = "0.3.7"
 tempfile = "3"
-websocket = "0.24"
-reqwest = "0.9"
 
 [[bench]]
 name = "criterion"
