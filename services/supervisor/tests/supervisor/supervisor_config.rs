@@ -18,9 +18,10 @@
 
 use exonum::{
     blockchain::config::InstanceInitParams,
-    runtime::{rust::ServiceFactory, InstanceSpec, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{InstanceSpec, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::BinaryValue;
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{

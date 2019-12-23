@@ -15,7 +15,8 @@
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;
 
-use exonum::{helpers::ValidatorId, runtime::rust::ServiceFactory};
+use exonum::helpers::ValidatorId;
+use exonum_rust_runtime::ServiceFactory;
 
 use crate::utils::*;
 use exonum_supervisor::Supervisor;

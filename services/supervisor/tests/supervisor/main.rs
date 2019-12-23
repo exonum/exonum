@@ -16,12 +16,10 @@ use exonum::{
     api, crypto,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -254,7 +252,9 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
 }
 
 fn add_available_services(runtime: RustRuntime) -> RustRuntime {
-    runtime.with_factory(IncService).with_factory(Supervisor)
+    runtime
+        .with_available_service(IncService)
+        .with_available_service(Supervisor)
 }
 
 /// Just test that the Inc service works as intended.

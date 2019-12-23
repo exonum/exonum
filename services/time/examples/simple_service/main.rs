@@ -19,13 +19,11 @@ use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
     merkledb::{access::Access, ProofMapIndex},
-    runtime::{
-        rust::{CallContext, Service, ServiceFactory},
-        ExecutionError, InstanceId, SnapshotExt,
-    },
+    runtime::{ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 use serde_derive::*;
 

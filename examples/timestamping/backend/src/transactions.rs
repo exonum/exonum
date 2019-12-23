@@ -14,8 +14,9 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::{rust::CallContext, DispatcherError, ExecutionError};
+use exonum::runtime::{DispatcherError, ExecutionError};
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::CallContext;
 use exonum_time::schema::TimeSchema;
 
 use crate::{

@@ -945,7 +945,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
+        with_runtimes: impl FnOnce(mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance>,
         node_cfg: NodeConfig,
         genesis_config: GenesisConfig,
         config_file_path: Option<String>,
@@ -961,7 +961,7 @@ impl Node {
         );
 
         let mut blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
-        for runtime in runtimes {
+        for runtime in with_runtimes(channel.endpoints.0.clone()) {
             blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
         let blockchain = blockchain_builder
@@ -1185,21 +1185,23 @@ mod tests {
     use super::*;
     use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
 
+    fn with_runtimes(_: mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance> {
+        Vec::new()
+    }
+
     #[test]
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let runtimes: Vec<RuntimeInstance> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, runtimes, node_cfg, genesis_config, None);
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1207,14 +1209,13 @@ mod tests {
             .internal_events_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, runtimes, node_cfg, genesis_config, None);
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1222,7 +1223,7 @@ mod tests {
             .network_requests_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, runtimes, node_cfg, genesis_config, None);
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
@@ -1231,8 +1232,6 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let runtimes: Vec<RuntimeInstance> = vec![];
-
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1240,7 +1239,7 @@ mod tests {
             .internal_events_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, runtimes, node_cfg, genesis_config, None);
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
@@ -1249,8 +1248,6 @@ mod tests {
         let accidental_large_value = 0_usize.overflowing_sub(1).0;
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let runtimes: Vec<RuntimeInstance> = vec![];
-
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1258,6 +1255,6 @@ mod tests {
             .network_requests_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, runtimes, node_cfg, genesis_config, None);
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 }

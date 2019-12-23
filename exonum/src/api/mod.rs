@@ -16,6 +16,7 @@
 
 pub use self::{
     error::Error,
+    manager::UpdateEndpoints,
     with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 

@@ -165,7 +165,7 @@ impl TestKitBuilder {
     /// Adds a Rust service to the testkit.
     pub fn with_rust_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
         let service = service.into();
-        self.rust_runtime = self.rust_runtime.with_factory(service);
+        self.rust_runtime = self.rust_runtime.with_available_service(service);
         self
     }
 

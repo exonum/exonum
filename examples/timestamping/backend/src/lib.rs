@@ -37,11 +37,9 @@ pub mod transactions;
 
 use exonum::{
     merkledb::BinaryValue,
-    runtime::{
-        rust::{api::ServiceApiBuilder, CallContext, Service},
-        DispatcherError, ExecutionError,
-    },
+    runtime::{DispatcherError, ExecutionError},
 };
+use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
 
 use crate::{
     api::PublicApi as TimestampingApi,

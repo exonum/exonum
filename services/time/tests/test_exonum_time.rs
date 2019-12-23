@@ -16,9 +16,10 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
-    runtime::{rust::ServiceFactory, ErrorMatch, InstanceId, SnapshotExt},
+    runtime::{ErrorMatch, InstanceId, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, Snapshot};
+use exonum_rust_runtime::ServiceFactory;
 use exonum_supervisor::{ConfigPropose, Supervisor};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use pretty_assertions::assert_eq;

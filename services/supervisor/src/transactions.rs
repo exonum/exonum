@@ -341,9 +341,12 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
             // Removes artifact from pending deployments.
             schema.pending_deployments.remove(&confirmation.artifact);
+            drop(schema);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+            context
+                .supervisor_extensions()
+                .start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
         }
 
         Ok(())

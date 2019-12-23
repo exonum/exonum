@@ -17,9 +17,10 @@ use exonum::{
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
     messages::Verified,
-    runtime::{rust::ServiceFactory, AnyTx, InstanceId},
+    runtime::{AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use serde_json::json;

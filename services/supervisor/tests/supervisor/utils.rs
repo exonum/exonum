@@ -17,9 +17,10 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::ServiceFactory, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::access::AccessExt;
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use crate::{

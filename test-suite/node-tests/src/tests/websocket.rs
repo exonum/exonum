@@ -19,10 +19,10 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
     node::{ExternalMessage, Node},
-    runtime::{rust::ServiceFactory, RuntimeInstance},
 };
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{ObjectHash, TemporaryDB};
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use reqwest;
 use serde_json::json;
 use websocket::{
@@ -49,19 +49,22 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let external_runtimes: Vec<RuntimeInstance> = vec![];
     let service = MyService;
     let artifact = service.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();
-    let services = vec![service.into()];
+
+    let with_runtimes = |notifier| {
+        vec![RustRuntime::new(notifier)
+            .with_available_service(service)
+            .into()]
+    };
 
     let node = Node::new(
         TemporaryDB::new(),
-        external_runtimes,
-        services,
+        with_runtimes,
         node_cfg,
         genesis_config,
         None,

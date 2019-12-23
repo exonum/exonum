@@ -21,13 +21,13 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
         DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
         SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
 use exonum_merkledb::{access::AccessExt, ObjectHash};
+use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory as _};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{

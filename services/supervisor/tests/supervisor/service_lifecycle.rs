@@ -16,11 +16,9 @@
 
 use exonum::{
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{DefaultInstance, ServiceFactory},
-        ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
+use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{ConfigPropose, Error, Supervisor};

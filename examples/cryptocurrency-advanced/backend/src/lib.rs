@@ -30,10 +30,8 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::runtime::{
-    rust::{api::ServiceApiBuilder, CallContext, Service},
-    ExecutionError,
-};
+use exonum::runtime::ExecutionError;
+use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
 
 use crate::api::PublicApi as CryptocurrencyApi;
 
