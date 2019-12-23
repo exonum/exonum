@@ -26,12 +26,14 @@
 //! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
 //!
 //! The artifact interface in the Rust runtime is represented by the
-//! [`ServiceFactory`][ServiceFactory] trait. The trait creates service instances and provides
+//! [`ServiceFactory`] trait. The trait creates service instances and provides
 //! information about the artifact.
+//!
+//! [`ServiceFactory`]: trait.ServiceFactory.html
 //!
 //! # Examples
 //!
-//! ## Minimal complete example of an Exonum service definition.
+//! ## Minimal complete example
 //!
 //! ```
 //! use exonum::{
@@ -65,38 +67,39 @@
 //! // Define a transaction interface for your service by creating a `Transactions` trait with
 //! // the following attribute and method signatures.
 //! #[exonum_interface]
-//! pub trait Transactions {
-//!     // Each method of the trait should have a signature of the following format. The argument
-//!     // should implement the `BinaryValue` trait.
-//!     fn create_wallet(
-//!         &self,
-//!         context: CallContext<'_>,
-//!         arg: CreateWallet,
-//!     ) -> Result<(), ExecutionError>;
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!     // Each method of the trait should have a signature of the following format.
+//!     // The argument should implement the `BinaryValue` trait.
+//!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
 //! }
 //!
 //! // In order a service could process transactions, you have to implement the
 //! // `ServiceDispatcher` trait, which can be derived using the corresponding macro.
-//! // To explain to the runtime how to create instances of this service, you have to implement
-//! // the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
+//! // To explain to the runtime how to create instances of this service, you have
+//! // to implement the `ServiceFactory` trait by using the `ServiceFactory` derive macro.
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-//! // Declare that the service implements the `Transactions` interface that was presented above.
+//! // Declare that the service implements the `Transactions` interface
+//! // that was presented above.
 //! #[service_dispatcher(implements("Transactions"))]
-//! // By default the macro uses the crate name and version to provide an artifact ID for this
-//! // service factory. You should only provide a path to the generated Protobuf schema.
+//! // By default the macro uses the crate name and version to provide an artifact ID
+//! // for this service factory. You should only provide a path to the generated
+//! // Protobuf schema.
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
 //! pub struct PointService;
 //!
-//! // Do not forget to implement the `Transactions` and `Service` traits for the service.
+//! // Do not forget to implement the `Transactions` and `Service` traits
+//! // for the service.
+//! impl Transactions<CallContext<'_>> for PointService {
+//!     type Output = Result<(), ExecutionError>;
 //!
-//! impl Transactions for PointService {
 //!     fn create_wallet(
 //!         &self,
 //!         _context: CallContext<'_>,
 //!         _arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
-//!         Ok(())
+//! #       Ok(())
 //!     }
 //! }
 //!
@@ -109,13 +112,15 @@
 //! prototyping.
 //!
 //! ```
-//! use exonum::runtime::{rust::Service, BlockchainData};
-//! use exonum_crypto::Hash;
-//! use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-//! use exonum_merkledb::Snapshot;
-//!
-//! #  #[exonum_interface]
-//! #  pub trait Transactions {}
+//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
+//! # use exonum_crypto::Hash;
+//! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+//! # use exonum_merkledb::Snapshot;
+//! #[exonum_interface]
+//! pub trait Transactions<Ctx> {
+//! #   type Output;
+//!     // service methods...
+//! }
 //!
 //! // If your service has a state, for example, for debugging purposes, then you can
 //! // use a separate structure for the service.
@@ -144,21 +149,114 @@
 //!     }
 //! }
 //!
-//! # impl Transactions for StatefulService {}
+//! # impl Transactions<CallContext<'_>> for StatefulService {
+//! #     type Output = Result<(), ExecutionError>;
+//! # }
 //! #
 //! # impl Service for StatefulService {}
 //! ```
 //!
-//! [ServiceFactory]: trait.ServiceFactory.html
+//! # Interfaces
+//!
+//! By bringing an interface trait into scope, you can use its methods with any stub type.
+//! Stub here means a type that can process calls from *any* interface. (What exactly
+//! is meant by processing depends on the stub and on the provided context argument.)
+//! For example, the following stubs are defined in this crate:
+//!
+//! | Stub | Behavior |
+//! |------|----------|
+//! | [`TxStub`] | Generates unsigned transactions |
+//! | `(PublicKey, SecretKey)` | Generates signed transactions |
+//! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
+//! | [`CallContext`] | Calls methods of another service during transaction execution **(1)** |
+//!
+//! 1. Beware that this is experimental functionality which is subject to change in next releases.
+//!
+//! More stub types can be defined in other crates. To define a stub type, you need to implement
+//! one of [`GenericCall`] or [`GenericCallMut`] traits.
+//!
+//! ## Mutable interfaces
+//!
+//! `#[exonum_interface]` macro produces a mutable version of the interface trait,
+//! which differs from the original trait in the following ways:
+//!
+//! - Name is the original trait name appended with `Mut` (e.g., `TransactionsMut`)
+//! - All methods consume `&mut self` instead of `&self`
+//!
+//! Otherwise, the mutable trait is a carbon copy of the original trait.
+//!
+//! The mutable trait is necessary for some stub types (e.g., `CallContext`) because they need
+//! to mutate their state when processing the calls. Hence, the mutable trait should be
+//! exported from the crate along with the original "immutable" trait.
+//!
+//! [`TxStub`]: struct.TxStub.html
+//! [`Broadcaster`]: struct.Broadcaster.html
+//! [`CallContext`]: struct.CallContext.html
+//! [`GenericCall`]: trait.GenericCall.html
+//! [`GenericCallMut`]: trait.GenericCallMut.html
+//!
+//! ## Interface usage
+//!
+//! ```
+//! # use exonum::runtime::{rust::CallContext, ExecutionError};
+//! # use exonum_crypto::gen_keypair;
+//! # use exonum_derive::exonum_interface;
+//! # type CreateWallet = String;
+//! # type Transfer = String;
+//! #[exonum_interface]
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
+//!     fn transfer(&self, context: Ctx, arg: Transfer) -> Self::Output;
+//! }
+//!
+//! // Create a signed transaction.
+//! let keypair = gen_keypair();
+//! let create_wallet: CreateWallet = // ...
+//! #    "create_wallet".to_owned();
+//! // The context in this case is the numerical instance ID.
+//! let instance_id = 100;
+//! let tx = keypair.create_wallet(instance_id, create_wallet);
+//! let transfer: Transfer = // ...
+//! #    "transfer".to_owned();
+//! let other_tx = keypair.transfer(instance_id, transfer);
+//! // The same call with the explicit method attribution:
+//! # let transfer = "transfer".to_owned();
+//! let other_tx = Transactions::transfer(&keypair, instance_id, transfer);
+//!
+//! // Using the trait within another service implementation:
+//! # struct Service;
+//! # type SomeArg = String;
+//! # impl Service {
+//! fn batch_transfers(
+//!     &self,
+//!     mut ctx: CallContext<'_>,
+//!     wallet_count: u64,
+//! ) -> Result<(), ExecutionError> {
+//!     let receiver_service = "token";
+//!     // ^-- `CallContext` allows to use any of service IDs as the context.
+//!     for _ in 0..wallet_count {
+//!         let transfer: Transfer = // ...
+//! #           "transfer".to_owned();
+//!         ctx.transfer(receiver_service, transfer)?;
+//!         // The same call with the explicit attribution:
+//! #       let transfer = "transfer".to_owned();
+//!         TransactionsMut::transfer(&mut ctx, receiver_service, transfer)?;
+//!     }
+//!     Ok(())
+//! }
+//! # }
+//! ```
 
 pub use self::{
-    call_context::{CallContext, ChildAuthorization},
+    call_context::CallContext,
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
     service::{
-        AfterCommitContext, Broadcaster, DefaultInstance, Interface, Service, ServiceDispatcher,
-        ServiceFactory, Transaction,
+        AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
+        ServiceFactory,
     },
+    stubs::{GenericCall, GenericCallMut, Interface, MethodDescriptor, TxStub},
 };
 
 pub mod api;
@@ -186,6 +284,7 @@ use self::api::ServiceApiBuilder;
 mod call_context;
 mod runtime_api;
 mod service;
+mod stubs;
 #[cfg(test)]
 mod tests;
 

@@ -86,19 +86,31 @@ pub struct CreateWallet {
     pub name: String,
 }
 
-/// Cryptocurrency service transactions.
-#[exonum_interface]
-pub trait CryptocurrencyInterface {
-    /// Transfers `amount` of the currency from one wallet to another.
-    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError>;
-    /// Issues `amount` of the currency to the `wallet`.
-    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError>;
-    /// Creates wallet with the given `name`.
-    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Result<(), ExecutionError>;
+impl CreateWallet {
+    /// Creates wallet info based on the given `name`.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
+    }
 }
 
-impl CryptocurrencyInterface for CryptocurrencyService {
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Result<(), ExecutionError> {
+/// Cryptocurrency service transactions.
+#[exonum_interface]
+pub trait CryptocurrencyInterface<Ctx> {
+    /// Output returned by the interface methods.
+    type Output;
+
+    /// Transfers `amount` of the currency from one wallet to another.
+    fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
+    /// Issues `amount` of the currency to the `wallet`.
+    fn issue(&self, ctx: Ctx, arg: Issue) -> Self::Output;
+    /// Creates wallet with the given `name`.
+    fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+}
+
+impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
+    type Output = Result<(), ExecutionError>;
+
+    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Self::Output {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
@@ -123,7 +135,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
+    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Self::Output {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
@@ -139,11 +151,7 @@ impl CryptocurrencyInterface for CryptocurrencyService {
         }
     }
 
-    fn create_wallet(
-        &self,
-        context: CallContext<'_>,
-        arg: CreateWallet,
-    ) -> Result<(), ExecutionError> {
+    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Self::Output {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()

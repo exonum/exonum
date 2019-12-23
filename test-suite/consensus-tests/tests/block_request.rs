@@ -193,7 +193,7 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.recv(&sandbox.create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        vec![tx.clone()],
+        vec![tx],
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -256,7 +256,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
     sandbox.recv(&sandbox.create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        block.clone(),
+        block,
         precommits,
         vec![incorrect_tx.object_hash()],
         sandbox.secret_key(ValidatorId(3)),
@@ -278,7 +278,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
         sandbox.recv(&sandbox.create_transactions_response(
             sandbox.public_key(ValidatorId(3)),
             sandbox.public_key(ValidatorId(0)),
-            vec![incorrect_tx.clone()],
+            vec![incorrect_tx],
             sandbox.secret_key(ValidatorId(3)),
         ));
     }
@@ -381,7 +381,7 @@ fn handle_block_response_with_invalid_txs_order() {
     sandbox.recv(&sandbox.create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        block.clone(),
+        block,
         vec![precommit_1, precommit_2, precommit_3],
         vec![tx2.object_hash(), tx1.object_hash()],
         sandbox.secret_key(ValidatorId(3)),
@@ -458,7 +458,7 @@ fn handle_block_response_with_invalid_precommits() {
     sandbox.recv(&sandbox.create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        block1.clone(),
+        block1,
         vec![precommit_1, precommit_2, precommit_for_other_block],
         vec![tx.object_hash()],
         sandbox.secret_key(ValidatorId(3)),
@@ -557,7 +557,7 @@ fn handle_block_response_with_known_transaction() {
     sandbox.recv(&sandbox.create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        vec![tx2.clone()],
+        vec![tx2],
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -761,7 +761,7 @@ fn received_block_while_there_is_full_propose() {
     sandbox.recv(&sandbox.create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        vec![tx.clone()],
+        vec![tx],
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -877,7 +877,7 @@ fn received_block_while_there_is_pending_block() {
     sandbox.recv(&sandbox.create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
-        vec![tx.clone()],
+        vec![tx],
         sandbox.secret_key(ValidatorId(3)),
     ));
 
@@ -1004,7 +1004,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.recv(&sandbox.create_transactions_response(
         sandbox.public_key(ValidatorId(2)),
         sandbox.public_key(ValidatorId(0)),
-        vec![tx.clone()],
+        vec![tx],
         sandbox.secret_key(ValidatorId(2)),
     ));
 

@@ -27,7 +27,6 @@ use exonum::{
     api::{self, node::public::explorer::TransactionQuery},
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
-    runtime::rust::Transaction,
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
@@ -35,7 +34,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
     api::WalletQuery,
-    contracts::CryptocurrencyService,
+    contracts::{CryptocurrencyInterface, CryptocurrencyService},
     schema::Wallet,
     transactions::{Config, CreateWallet, TxTransfer},
 };
@@ -66,7 +65,7 @@ fn test_create_wallet() {
 fn test_transfer() {
     // Create 2 wallets.
     let (mut testkit, api) = create_testkit();
-    let (tx_alice, key_alice) = api.create_wallet(ALICE_NAME);
+    let (tx_alice, alice) = api.create_wallet(ALICE_NAME);
     let (tx_bob, _) = api.create_wallet(BOB_NAME);
     testkit.create_block();
     api.assert_tx_status(tx_alice.object_hash(), &json!({ "type": "success" }));
@@ -79,12 +78,14 @@ fn test_transfer() {
     assert_eq!(wallet.balance, 100);
 
     // Transfer funds by invoking the corresponding API method.
-    let tx = TxTransfer {
-        to: tx_bob.author(),
-        amount: 10,
-        seed: 0,
-    }
-    .sign(INSTANCE_ID, tx_alice.author(), &key_alice);
+    let tx = alice.transfer(
+        INSTANCE_ID,
+        TxTransfer {
+            to: tx_bob.author(),
+            amount: 10,
+            seed: 0,
+        },
+    );
 
     api.transfer(&tx);
     testkit.create_block();
@@ -103,7 +104,7 @@ fn test_transfer() {
 fn test_transfer_from_nonexisting_wallet() {
     let (mut testkit, api) = create_testkit();
 
-    let (tx_alice, key_alice) = api.create_wallet(ALICE_NAME);
+    let (tx_alice, alice) = api.create_wallet(ALICE_NAME);
     let (tx_bob, _) = api.create_wallet(BOB_NAME);
     // Do not commit Alice's transaction, so Alice's wallet does not exist
     // when a transfer occurs.
@@ -113,12 +114,14 @@ fn test_transfer_from_nonexisting_wallet() {
     let wallet = api.get_wallet(tx_bob.author());
     assert_eq!(wallet.balance, 100);
 
-    let tx = TxTransfer {
-        to: tx_bob.author(),
-        amount: 10,
-        seed: 0,
-    }
-    .sign(INSTANCE_ID, tx_alice.author(), &key_alice);
+    let tx = alice.transfer(
+        INSTANCE_ID,
+        TxTransfer {
+            to: tx_bob.author(),
+            amount: 10,
+            seed: 0,
+        },
+    );
 
     api.transfer(&tx);
     testkit.create_block_with_tx_hashes(&[tx.object_hash()]);
@@ -147,7 +150,7 @@ fn test_transfer_from_nonexisting_wallet() {
 fn test_transfer_to_nonexisting_wallet() {
     let (mut testkit, api) = create_testkit();
 
-    let (tx_alice, key_alice) = api.create_wallet(ALICE_NAME);
+    let (tx_alice, alice) = api.create_wallet(ALICE_NAME);
     let (tx_bob, _) = api.create_wallet(BOB_NAME);
     // Do not commit Bob's transaction, so Bob's wallet does not exist
     // when a transfer occurs.
@@ -157,12 +160,14 @@ fn test_transfer_to_nonexisting_wallet() {
     assert_eq!(wallet.balance, 100);
     api.assert_no_wallet(tx_bob.author());
 
-    let tx = TxTransfer {
-        to: tx_bob.author(),
-        amount: 10,
-        seed: 0,
-    }
-    .sign(INSTANCE_ID, tx_alice.author(), &key_alice);
+    let tx = alice.transfer(
+        INSTANCE_ID,
+        TxTransfer {
+            to: tx_bob.author(),
+            amount: 10,
+            seed: 0,
+        },
+    );
 
     api.transfer(&tx);
     testkit.create_block_with_tx_hashes(&[tx.object_hash()]);
@@ -191,17 +196,19 @@ fn test_transfer_to_nonexisting_wallet() {
 fn test_transfer_overcharge() {
     let (mut testkit, api) = create_testkit();
 
-    let (tx_alice, key_alice) = api.create_wallet(ALICE_NAME);
+    let (tx_alice, alice) = api.create_wallet(ALICE_NAME);
     let (tx_bob, _) = api.create_wallet(BOB_NAME);
     testkit.create_block();
 
     // Transfer funds. The transfer amount (110) is more than Alice has (100).
-    let tx = TxTransfer {
-        to: tx_bob.author(),
-        amount: 110,
-        seed: 0,
-    }
-    .sign(INSTANCE_ID, tx_alice.author(), &key_alice);
+    let tx = alice.transfer(
+        INSTANCE_ID,
+        TxTransfer {
+            to: tx_bob.author(),
+            amount: 110,
+            seed: 0,
+        },
+    );
 
     api.transfer(&tx);
     testkit.create_block();
@@ -260,13 +267,10 @@ impl CryptocurrencyApi {
     /// within the response).
     /// Note that the transaction is not immediately added to the blockchain, but rather is put
     /// to the pool of unconfirmed transactions.
-    fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, SecretKey) {
-        let (pubkey, key) = crypto::gen_keypair();
+    fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, (PublicKey, SecretKey)) {
+        let keypair = crypto::gen_keypair();
         // Create a pre-signed transaction
-        let tx = CreateWallet {
-            name: name.to_owned(),
-        }
-        .sign(INSTANCE_ID, pubkey, &key);
+        let tx = keypair.create_wallet(INSTANCE_ID, CreateWallet::new(name));
         let tx_info: serde_json::Value = self
             .inner
             .public(ApiKind::Explorer)
@@ -274,7 +278,7 @@ impl CryptocurrencyApi {
             .post("v1/transactions")
             .unwrap();
         assert_eq!(tx_info, json!({ "tx_hash": tx.object_hash() }));
-        (tx, key)
+        (tx, keypair)
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
