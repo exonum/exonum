@@ -53,7 +53,7 @@ fn tree_height_by_length(len: u64) -> u8 {
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that elements implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
@@ -70,7 +70,7 @@ pub struct ProofListIndex<T: RawAccess, V> {
 /// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
 /// [`ProofListIndex`]: struct.ProofListIndex.html
 #[derive(Debug)]
-pub struct ProofListIndexIter<'a, V> {
+pub struct Iter<'a, V> {
     base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
@@ -313,8 +313,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ProofListIndexIter<'_, V> {
-        ProofListIndexIter {
+    pub fn iter(&self) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter(&0_u8),
         }
     }
@@ -335,8 +335,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> ProofListIndexIter<'_, V> {
-        ProofListIndexIter {
+    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
         }
     }
@@ -729,14 +729,14 @@ where
     V: BinaryValue,
 {
     type Item = V;
-    type IntoIter = ProofListIndexIter<'a, V>;
+    type IntoIter = Iter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for ProofListIndexIter<'a, V>
+impl<'a, V> Iterator for Iter<'a, V>
 where
     V: BinaryValue,
 {
@@ -755,7 +755,7 @@ mod proto {
     use std::borrow::Cow;
 
     use super::{HashedEntry, ListProof, ProofListKey};
-    use crate::{proof_list_index::MAX_INDEX, BinaryValue};
+    use crate::{indexes::proof_list::MAX_INDEX, BinaryValue};
     use exonum_proto::ProtobufConvert;
 
     impl ProtobufConvert for ProofListKey {
