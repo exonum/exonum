@@ -81,3 +81,61 @@ impl ConfigManager for DefaultConfigManager {
             .expect("Can't message to ConfigManager thread");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use exonum::{
+        crypto::gen_keypair,
+        node::{ConnectInfo, ConnectListConfig},
+    };
+    use exonum_supervisor::mode::Mode;
+    use tempfile::tempdir;
+
+    use super::DefaultConfigManager;
+    use crate::config::{GeneralConfig, NodeConfig, NodePrivateConfig, NodePublicConfig};
+    use crate::io::{load_config_file, save_config_file};
+
+    #[test]
+    fn test_update_config() {
+        let config = NodeConfig {
+            private_config: NodePrivateConfig {
+                listen_address: "127.0.0.1:5400".parse().unwrap(),
+                external_address: "127.0.0.1:5400".to_string(),
+                master_key_path: Default::default(),
+                api: Default::default(),
+                network: Default::default(),
+                mempool: Default::default(),
+                database: Default::default(),
+                thread_pool_size: None,
+                connect_list: Default::default(),
+                keys: Default::default(),
+            },
+            public_config: NodePublicConfig {
+                consensus: Default::default(),
+                general: GeneralConfig {
+                    validators_count: 1,
+                    supervisor_mode: Mode::Simple,
+                },
+                validator_keys: None,
+            },
+        };
+        let tmp_dir = tempdir().unwrap();
+        let config_path = tmp_dir.path().join("node.toml");
+        save_config_file(&config, &config_path).unwrap();
+
+        // Test config update.
+        let peer = ConnectInfo {
+            address: "0.0.0.1:8080".to_owned(),
+            public_key: gen_keypair().0,
+        };
+
+        let connect_list = ConnectListConfig { peers: vec![peer] };
+
+        DefaultConfigManager::update_connect_list(connect_list.clone(), &config_path)
+            .expect("Unable to update connect list");
+        let config: NodeConfig = load_config_file(&config_path).unwrap();
+
+        let new_connect_list = config.private_config.connect_list;
+        assert_eq!(new_connect_list.peers, connect_list.peers);
+    }
+}

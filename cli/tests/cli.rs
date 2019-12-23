@@ -17,19 +17,13 @@
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{
-    api::backends::actix::AllowOrigin,
-    blockchain::ValidatorKeys,
-    crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH},
-    node::{ConnectInfo, ConnectListConfig},
-};
+use exonum::{api::backends::actix::AllowOrigin, blockchain::ValidatorKeys, crypto::gen_keypair};
 use exonum_cli::{
     command::{
         finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
         run::Run, Command, ExonumCommand, StandardResult,
     },
-    config::{GeneralConfig, NodeConfig, NodePrivateConfig, NodePublicConfig},
-    config_manager::DefaultConfigManager,
+    config::{GeneralConfig, NodePrivateConfig, NodePublicConfig},
     io::{load_config_file, save_config_file},
     password::DEFAULT_MASTER_PASS_ENV_VAR,
 };
@@ -494,29 +488,6 @@ fn test_run_dev() {
 }
 
 #[test]
-fn test_update_config() {
-    let env = ConfigSpec::new_without_pass();
-    let config_path = env.output_dir().join("node.toml");
-    fs::create_dir(&config_path.parent().unwrap()).unwrap();
-    fs::copy(&env.expected_node_config_file(0), &config_path).unwrap();
-
-    // Test config update.
-    let peer = ConnectInfo {
-        address: "0.0.0.1:8080".to_owned(),
-        public_key: PublicKey::new([1; PUBLIC_KEY_LENGTH]),
-    };
-
-    let connect_list = ConnectListConfig { peers: vec![peer] };
-
-    DefaultConfigManager::update_connect_list(connect_list.clone(), &config_path)
-        .expect("Unable to update connect list");
-    let config: NodeConfig = load_config_file(&config_path).unwrap();
-
-    let new_connect_list = config.private_config.connect_list;
-    assert_eq!(new_connect_list.peers, connect_list.peers);
-}
-
-#[test]
 fn test_clear_cache() {
     let env = ConfigSpec::new_without_pass();
     let db_path = env.output_dir().join("db0");
@@ -566,7 +537,7 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
     save_config_file(&sec_config, &sec_config_path)?;
 
     let finalize = Finalize {
-        secret_config_path: testnet_dir.path().join("sec.toml"),
+        private_config_path: testnet_dir.path().join("sec.toml"),
         output_config_path: testnet_dir.path().join("node.toml"),
         public_configs: vec![pub_config_1_path, pub_config_2_path],
         public_api_address: None,
@@ -629,7 +600,7 @@ fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), fail
     let node_config_path = testnet_dir.path().join("node.toml");
 
     let finalize = Finalize {
-        secret_config_path: secret_config,
+        private_config_path: secret_config,
         output_config_path: node_config_path.clone(),
         public_configs: vec![public_config],
         public_api_address: None,
