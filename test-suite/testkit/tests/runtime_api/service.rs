@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::rust::{api::ServiceApiBuilder, DefaultInstance, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
 use exonum_derive::*;
 

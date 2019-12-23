@@ -17,9 +17,10 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
-    runtime::{rust::ServiceFactory, RuntimeInstance},
+    runtime::RuntimeInstance,
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
+use exonum_rust_runtime::ServiceFactory;
 
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();

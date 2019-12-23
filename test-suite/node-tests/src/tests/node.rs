@@ -18,13 +18,11 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
     node::{ExternalMessage, Node, NodeConfig},
-    runtime::{
-        rust::{AfterCommitContext, Service, ServiceFactory},
-        RuntimeInstance,
-    },
+    runtime::RuntimeInstance,
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{Database, TemporaryDB};
+use exonum_rust_runtime::{AfterCommitContext, Service, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;

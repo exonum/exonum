@@ -22,18 +22,16 @@ use exonum::{
         ApiBackend,
     },
     blockchain::{IndexProof, ValidatorKeys},
-    runtime::{
-        rust::{
-            api::{ServiceApiBuilder, ServiceApiState},
-            CallContext, DefaultInstance, Service,
-        },
-        ExecutionError, InstanceId,
-    },
+    runtime::{ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     ObjectHash, ProofEntry,
+};
+use exonum_rust_runtime::{
+    api::{ServiceApiBuilder, ServiceApiState},
+    CallContext, DefaultInstance, Service,
 };
 use futures::{Future, IntoFuture};
 use log::trace;

@@ -16,11 +16,9 @@
 
 use exonum::{
     crypto::gen_keypair,
-    runtime::{
-        rust::{DefaultInstance, ServiceFactory, TxStub},
-        DispatcherError, ErrorMatch, InstanceId, SnapshotExt,
-    },
+    runtime::{DispatcherError, ErrorMatch, InstanceId, SnapshotExt},
 };
+use exonum_rust_runtime::{DefaultInstance, ServiceFactory, TxStub};
 use exonum_testkit::{TestKit, TestKitBuilder};
 use semver::Version;
 

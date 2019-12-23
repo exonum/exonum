@@ -156,9 +156,6 @@ pub use self::{
     },
 };
 
-#[macro_use]
-pub mod rust;
-
 use futures::Future;
 
 use std::fmt;

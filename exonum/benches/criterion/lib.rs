@@ -19,19 +19,11 @@ extern crate exonum_derive;
 #[macro_use]
 extern crate serde_derive;
 
-use crate::block::bench_block;
 use crate::crypto::bench_crypto;
 use crate::transactions::bench_verify_transactions;
 
-mod block;
 mod crypto;
-mod proto;
 mod transactions;
 
-criterion_group!(
-    benches,
-    bench_crypto,
-    bench_block,
-    bench_verify_transactions
-);
+criterion_group!(benches, bench_crypto, bench_verify_transactions);
 criterion_main!(benches);

@@ -17,18 +17,17 @@
 use exonum::{
     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     crypto::gen_keypair,
-    runtime::{
-        rust::{CallContext, Service, ServiceFactory},
-        ExecutionError, SnapshotExt,
-    },
+    runtime::{ExecutionError, SnapshotExt},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[exonum_interface]
 trait TimestampingInterface<Ctx> {
     type Output;
+
     fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
 }
 

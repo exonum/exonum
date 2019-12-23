@@ -47,11 +47,9 @@ pub use self::transactions::{
 pub mod proto;
 mod transactions;
 
-use exonum::runtime::{
-    rust::{DefaultInstance, Service},
-    InstanceId,
-};
+use exonum::runtime::InstanceId;
 use exonum_derive::*;
+use exonum_rust_runtime::{DefaultInstance, Service};
 use failure::format_err;
 use semver::VersionReq;
 

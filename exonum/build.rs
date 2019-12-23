@@ -40,13 +40,6 @@ fn main() {
         .with_crypto()
         .with_common()
         .generate();
-
-    // Exonum benchmarks.
-    ProtobufGenerator::with_mod_name("exonum_benches_proto_mod.rs")
-        .with_input_dir("benches/criterion/proto")
-        .with_crypto()
-        .with_common()
-        .generate();
 }
 
 fn rust_version() -> Option<String> {

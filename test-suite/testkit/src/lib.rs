@@ -160,11 +160,9 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        InstanceId, RuntimeInstance, SnapshotExt,
-    },
+    runtime::{InstanceId, RuntimeInstance, SnapshotExt},
 };
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 

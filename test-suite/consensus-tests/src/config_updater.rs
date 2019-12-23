@@ -19,14 +19,12 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{CallContext, DefaultInstance, Service, TxStub},
-        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
+use exonum_rust_runtime::{CallContext, DefaultInstance, Service, TxStub};
 
 #[exonum_interface]
 pub trait ConfigUpdater<Ctx> {

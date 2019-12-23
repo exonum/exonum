@@ -20,14 +20,12 @@ use exonum::{
     helpers::generate_testnet_config,
     messages::Verified,
     node::ApiSender,
-    runtime::{
-        rust::{CallContext, RustRuntime, Service, ServiceFactory},
-        AnyTx, ExecutionError, InstanceId,
-    },
+    runtime::{AnyTx, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::{ObjectHash, TemporaryDB};
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory};
 use futures::sync::mpsc;
 use serde_derive::*;
 

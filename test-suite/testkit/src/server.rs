@@ -178,12 +178,10 @@ mod tests {
         explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::{
-            rust::{CallContext, Service, ServiceFactory},
-            ExecutionError,
-        },
+        runtime::ExecutionError,
     };
     use exonum_merkledb::ObjectHash;
+    use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 
     use std::time::Duration;
 

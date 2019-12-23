@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    blockchain::ConsensusConfig,
-    crypto::Hash,
-    runtime::rust::{
-        api::{self, ServiceApiBuilder, ServiceApiState},
-        Broadcaster,
-    },
+use exonum::{blockchain::ConsensusConfig, crypto::Hash};
+use exonum_rust_runtime::{
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    Broadcaster,
 };
 use failure::Fail;
 

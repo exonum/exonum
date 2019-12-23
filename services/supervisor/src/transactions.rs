@@ -14,13 +14,11 @@
 
 use exonum::{
     helpers::{Height, ValidateInput},
-    runtime::{
-        rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec,
-        InstanceStatus,
-    },
+    runtime::{DispatcherError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::CallContext;
 
 use std::collections::HashSet;
 
@@ -302,7 +300,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        context: CallContext<'_>,
+        mut context: CallContext<'_>,
         confirmation: DeployConfirmation,
     ) -> Self::Output {
         confirmation

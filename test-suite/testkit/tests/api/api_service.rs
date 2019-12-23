@@ -18,17 +18,12 @@
 use chrono::{TimeZone, Utc};
 use serde_derive::{Deserialize, Serialize};
 
-use exonum::{
-    api,
-    runtime::{
-        rust::{
-            api::{Deprecated, ServiceApiBuilder, ServiceApiState},
-            DefaultInstance, Service,
-        },
-        InstanceId,
-    },
-};
+use exonum::{api, runtime::InstanceId};
 use exonum_derive::*;
+use exonum_rust_runtime::{
+    api::{Deprecated, ServiceApiBuilder, ServiceApiState},
+    DefaultInstance, Service,
+};
 
 pub const SERVICE_NAME: &str = "api-service";
 pub const SERVICE_ID: InstanceId = 3;

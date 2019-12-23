@@ -20,11 +20,9 @@ use exonum::{
     helpers::ValidatorId,
     keys::Keys,
     merkledb::{BinaryValue, TemporaryDB},
-    runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        ArtifactId, RuntimeInstance, WellKnownRuntime,
-    },
+    runtime::{ArtifactId, RuntimeInstance, WellKnownRuntime},
 };
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
 use futures::sync::mpsc;
 
 use std::{collections::HashMap, net::SocketAddr};

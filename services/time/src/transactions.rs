@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::runtime::{rust::CallContext, ExecutionError};
+use exonum::runtime::ExecutionError;
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::CallContext;
 
 use crate::{proto, schema::TimeSchema, TimeService};
 

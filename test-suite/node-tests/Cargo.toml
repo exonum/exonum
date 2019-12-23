@@ -14,6 +14,7 @@ exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-keys = { version = "0.13.0-rc.2", path = "../../components/keys" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 failure = "0.1.5"
 futures = "0.1.25"
 lazy_static = "1.4.0"

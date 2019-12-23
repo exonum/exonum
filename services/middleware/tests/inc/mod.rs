@@ -17,12 +17,10 @@
 use exonum::{
     crypto::PublicKey,
     merkledb::{access::Access, MapIndex},
-    runtime::{
-        rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
-        ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
-    },
+    runtime::{ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier},
 };
 use exonum_derive::*;
+use exonum_rust_runtime::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory};
 use semver::Version;
 
 use exonum_middleware_service::ArtifactReq;

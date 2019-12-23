@@ -13,11 +13,9 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-use exonum::runtime::{
-    rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
-    ExecutionError, InstanceId,
-};
+use exonum::runtime::{ExecutionError, InstanceId};
 use exonum_derive::*;
+use exonum_rust_runtime::{AfterCommitContext, CallContext, DefaultInstance, Service};
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

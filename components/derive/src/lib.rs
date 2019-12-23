@@ -248,15 +248,31 @@ pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMe
 
 #[derive(Debug, FromMeta, PartialEq, Eq)]
 #[darling(default)]
-struct CratePath(syn::Path);
+struct ExonumCratePath(syn::Path);
 
-impl Default for CratePath {
+impl Default for ExonumCratePath {
     fn default() -> Self {
         Self(syn::parse_str("exonum").unwrap())
     }
 }
 
-impl ToTokens for CratePath {
+impl ToTokens for ExonumCratePath {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.0.to_tokens(tokens)
+    }
+}
+
+#[derive(Debug, FromMeta, PartialEq, Eq)]
+#[darling(default)]
+struct ExonumRustRuntimeCratePath(syn::Path);
+
+impl Default for ExonumRustRuntimeCratePath {
+    fn default() -> Self {
+        Self(syn::parse_str("exonum_rust_runtime").unwrap())
+    }
+}
+
+impl ToTokens for ExonumRustRuntimeCratePath {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         self.0.to_tokens(tokens)
     }

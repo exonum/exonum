@@ -18,11 +18,12 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-keys = { version = "0.13.0-rc.2", path = "../../components/keys" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 failure = "0.1.5"
 serde = "1.0"
 serde_derive = "1.0"
