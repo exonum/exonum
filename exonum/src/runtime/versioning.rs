@@ -47,8 +47,9 @@
 //! incompatible with any other version."
 //!
 //! Correct versioning is the responsibility of the service developers; the framework does not
-//! (and cannot) check versioning automatically. The general guidelines to maximize service
-//! longevity are:
+//! (and cannot) check versioning automatically.
+//!
+//! The general guidelines to maximize service longevity are:
 //!
 //! - Versioning concerns *all* public interfaces of the service. As of Exonum 1.0, these interfaces
 //!   are transactions and the (public part of) service schema.
@@ -242,6 +243,57 @@ impl fmt::Display for ArtifactReq {
 }
 
 /// Versioned object that checks compatibility with the artifact of a service.
+///
+/// # Examples
+///
+/// This trait is usually implemented via the derive macro from the `exonum_derive` crate:
+///
+/// ```
+/// use exonum_derive::*;
+/// # use exonum_merkledb::{access::Access, Fork, ProofMapIndex};
+/// # use exonum::runtime::versioning::RequireArtifact;
+///
+/// #[derive(Debug, FromAccess, RequireArtifact)]
+/// #[require_artifact(name = "some.Service", version = "1")]
+/// pub struct SchemaInterface<T: Access> {
+///     pub wallets: ProofMapIndex<T::Base, str, u64>,
+/// }
+///
+/// assert_eq!(
+///     SchemaInterface::<&'static Fork>::required_artifact(),
+///     "some.Service@^1".parse().unwrap()
+/// );
+/// ```
+///
+/// Both `name` and `version` fields of the `require_artifact` are have default values:
+///
+/// - `name` needs to agree with the artifact name as defined in the service factory
+///   for the corresponding service. By default, it is set to the crate name.
+/// - `version` is a semantic version requirement. By default, it is set to be semver-compatible
+///   with the current version of the crate. For stability, it may make sense to set `version`
+///   when the interface is created and not change it since. For example, a service may set
+///   `version = "1"` in the v1.0.0 release and keep this requirement in the following
+///   semver-compatible versions.
+///
+/// If the interface needs to be extended, you may define the extension as a new type
+/// with the corresponding bump in `version`.
+///
+/// ```
+/// # use exonum_derive::*;
+/// # use exonum_merkledb::{access::Access, Fork, ProofEntry, ProofMapIndex};
+/// # use exonum::runtime::versioning::RequireArtifact;
+/// #[derive(Debug, FromAccess, RequireArtifact)]
+/// #[require_artifact(name = "some.Service", version = "1.3.0")]
+/// pub struct ExtendedSchemaInterface<T: Access> {
+///     pub wallets: ProofMapIndex<T::Base, str, u64>,
+///     /// Added in version 1.3.0.
+///     pub total_token_amount: ProofEntry<T::Base, u64>,
+/// }
+/// # assert_eq!(
+/// #     ExtendedSchemaInterface::<&'static Fork>::required_artifact(),
+/// #     "some.Service@^1.3.0".parse().unwrap()
+/// # );
+/// ```
 pub trait RequireArtifact {
     /// Returns the artifact requirement.
     fn required_artifact() -> ArtifactReq;
