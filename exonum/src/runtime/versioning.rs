@@ -146,13 +146,49 @@ use std::{fmt, str::FromStr};
 
 use crate::runtime::{ArtifactId, DispatcherError, ExecutionError, ExecutionFail};
 
-/// Requirement on an artifact.
+/// Requirement on an artifact. Can be matched against artifact identifiers.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::runtime::{versioning::ArtifactReq, ArtifactId, RuntimeIdentifier};
+/// // Requirements can be parsed from a string.
+/// let req: ArtifactReq = "some.Service@^1.3.0".parse().unwrap();
+///
+/// let valid_artifact = ArtifactId {
+///     runtime_id: RuntimeIdentifier::Rust as _,
+///     name: "some.Service".to_owned(),
+///     version: "1.5.7".parse().unwrap(),
+/// };
+/// req.try_match(&valid_artifact).unwrap();
+///
+/// // This artifact is outdated.
+/// let outdated_artifact = ArtifactId {
+///     version: "1.2.0".parse().unwrap(),
+///     ..valid_artifact.clone()
+/// };
+/// assert!(req.try_match(&outdated_artifact).is_err());
+///
+/// // This artifact is too new.
+/// let novel_artifact = ArtifactId {
+///     version: "2.0.0".parse().unwrap(),
+///     ..valid_artifact.clone()
+/// };
+/// assert!(req.try_match(&novel_artifact).is_err());
+///
+/// // This artifact has wrong name.
+/// let other_artifact = ArtifactId {
+///     name: "other.Service".to_owned(),
+///     ..valid_artifact
+/// };
+/// assert!(req.try_match(&novel_artifact).is_err());
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArtifactReq {
     /// Artifact name.
-    name: String,
+    pub name: String,
     /// Allowed artifact versions.
-    version: VersionReq,
+    pub version: VersionReq,
 }
 
 impl ArtifactReq {

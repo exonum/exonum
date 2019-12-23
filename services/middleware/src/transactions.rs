@@ -70,8 +70,8 @@ impl GenericCall<InstanceId> for ArtifactReq {
         args: Vec<u8>,
     ) -> Self::Output {
         CheckedCall {
-            artifact_name: self.name.clone(),
-            artifact_version: self.version.clone(),
+            artifact_name: self.0.name.clone(),
+            artifact_version: self.0.version.clone(),
             inner: TxStub.generic_call(instance_id, method, args),
         }
     }

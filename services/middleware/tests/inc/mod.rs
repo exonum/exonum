@@ -19,6 +19,7 @@ use exonum::{
     merkledb::{access::Access, MapIndex},
     runtime::{
         rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
+        versioning::ArtifactReq as CoreReq,
         ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
     },
 };
@@ -72,12 +73,7 @@ impl IncFactory {
     }
 
     pub fn req(version_req: &str) -> ArtifactReq {
-        ArtifactReq {
-            name: Self::ARTIFACT_NAME.to_owned(),
-            version: version_req
-                .parse()
-                .expect("Cannot parse version requirement"),
-        }
+        CoreReq::new(Self::ARTIFACT_NAME, version_req.parse().unwrap()).into()
     }
 }
 
