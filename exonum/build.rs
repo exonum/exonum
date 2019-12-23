@@ -39,6 +39,7 @@ fn main() {
         .with_input_dir("src/proto/schema/exonum")
         .with_crypto()
         .with_common()
+        .with_merkledb()
         .generate();
 
     // Exonum external tests.
@@ -47,6 +48,7 @@ fn main() {
         .add_path("src/proto/schema/exonum")
         .with_crypto()
         .with_common()
+        .with_merkledb()
         .generate();
 
     // Exonum benchmarks.
@@ -54,6 +56,7 @@ fn main() {
         .with_input_dir("benches/criterion/proto")
         .with_crypto()
         .with_common()
+        .with_merkledb()
         .generate();
 }
 

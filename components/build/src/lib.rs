@@ -59,6 +59,8 @@ pub enum ProtoSources<'a> {
     Crypto,
     /// Path to common protobuf files.
     Common,
+    /// Path to merkledb protobuf files.
+    Merkledb,
     /// Path to manually specified protobuf sources.
     Path(&'a str),
 }
@@ -70,6 +72,7 @@ impl<'a> ProtoSources<'a> {
             ProtoSources::Exonum => get_exonum_protobuf_files_path(),
             ProtoSources::Common => get_exonum_protobuf_common_files_path(),
             ProtoSources::Crypto => get_exonum_protobuf_crypto_files_path(),
+            ProtoSources::Merkledb => get_exonum_protobuf_merkledb_files_path(),
             ProtoSources::Path(path) => path.to_string(),
         }
     }
@@ -199,6 +202,7 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 ///   .with_input_dir("src/proto")
 ///   .with_crypto()
 ///   .with_common()
+///   .with_merkledb()
 ///   .generate();
 /// ```
 /// After successful run `$OUT_DIR` will contain \*.rs for each \*.proto file in
@@ -275,6 +279,12 @@ impl<'a> ProtobufGenerator<'a> {
     /// Proto files from `exonum-crypto` crate (`Hash`, `PublicKey`, etc..).
     pub fn with_crypto(mut self) -> Self {
         self.includes.push(ProtoSources::Crypto);
+        self
+    }
+
+    /// Proto files from `exonum-merkledb` crate (`MapProof`, `ListProof`).
+    pub fn with_merkledb(mut self) -> Self {
+        self.includes.push(ProtoSources::Merkledb);
         self
     }
 
@@ -375,4 +385,10 @@ fn get_exonum_protobuf_crypto_files_path() -> String {
 fn get_exonum_protobuf_common_files_path() -> String {
     env::var("DEP_EXONUM_PROTOBUF_COMMON_PROTOS")
         .expect("Failed to get exonum common protobuf path")
+}
+
+/// Get path to the folder containing `exonum-merkledb` protobuf files.
+fn get_exonum_protobuf_merkledb_files_path() -> String {
+    env::var("DEP_EXONUM_PROTOBUF_MERKLEDB_PROTOS")
+        .expect("Failed to get exonum merkledb protobuf path")
 }
