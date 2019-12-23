@@ -19,10 +19,7 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
     node::{ExternalMessage, Node},
-    runtime::{
-        rust::{ServiceFactory, Transaction},
-        RuntimeInstance,
-    },
+    runtime::{rust::ServiceFactory, RuntimeInstance},
 };
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{ObjectHash, TemporaryDB};
@@ -40,7 +37,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::{CreateWallet, MyService, Transfer, SERVICE_ID},
+    blockchain::{CreateWallet, ExplorerTransactions, MyService, Transfer, SERVICE_ID},
     RunHandle,
 };
 
@@ -123,8 +120,8 @@ fn test_send_transaction() {
     assert!(client.recv_message().is_err());
 
     // Send transaction.
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Alice").sign(SERVICE_ID, pk, &sk);
+    let keypair = gen_keypair();
+    let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_hash = tx.object_hash();
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
     let tx_json = serde_json::to_string(&tx_body).unwrap();
@@ -142,8 +139,8 @@ fn test_send_transaction() {
     );
 
     // Send invalid transaction.
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID + 1, pk, &sk);
+    let keypair = gen_keypair();
+    let tx = keypair.create_wallet(SERVICE_ID + 1, CreateWallet::new("Bob"));
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
     let tx_json = serde_json::to_string(&tx_body).unwrap();
     client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
@@ -211,8 +208,8 @@ fn test_transactions_subscribe() {
         .unwrap();
 
     // Send transaction.
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Alice").sign(SERVICE_ID, pk, &sk);
+    let keypair = gen_keypair();
+    let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -257,8 +254,8 @@ fn test_transactions_subscribe_with_filter() {
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID, pk, &sk);
+    let alice = gen_keypair();
+    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -280,9 +277,8 @@ fn test_transactions_subscribe_with_filter() {
         ),
     };
 
-    let (pk, sk) = gen_keypair();
     let (to, _) = gen_keypair();
-    let tx = Transfer::new(pk, to, 10).sign(SERVICE_ID, pk, &sk);
+    let tx = alice.transfer(SERVICE_ID, Transfer::new(to, 10));
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8082/api/explorer/v1/transactions")
@@ -317,8 +313,8 @@ fn test_transactions_subscribe_with_partial_filter() {
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID, pk, &sk);
+    let alice = gen_keypair();
+    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -340,9 +336,8 @@ fn test_transactions_subscribe_with_partial_filter() {
         ),
     };
 
-    let (pk, sk) = gen_keypair();
     let (to, _) = gen_keypair();
-    let tx = Transfer::new(pk, to, 10).sign(SERVICE_ID, pk, &sk);
+    let tx = alice.transfer(SERVICE_ID, Transfer::new(to, 10));
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8083/api/explorer/v1/transactions")
@@ -384,8 +379,7 @@ fn test_transactions_subscribe_with_bad_filter() {
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Bob").sign(SERVICE_ID, pk, &sk);
+    let tx = gen_keypair().create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -524,8 +518,8 @@ fn test_blocks_and_tx_both_subscribe() {
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
 
-    let (pk, sk) = gen_keypair();
-    let tx = CreateWallet::new(pk, "Alice").sign(SERVICE_ID, pk, &sk);
+    let alice = gen_keypair();
+    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client

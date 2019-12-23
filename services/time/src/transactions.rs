@@ -46,13 +46,17 @@ impl TxTime {
 
 /// Time oracle service transaction.
 #[exonum_interface]
-pub trait TimeOracleInterface {
+pub trait TimeOracleInterface<Ctx> {
+    /// Output of the methods in this interface.
+    type Output;
     /// Receives a new time from one of validators.
-    fn time(&self, ctx: CallContext<'_>, arg: TxTime) -> Result<(), ExecutionError>;
+    fn report_time(&self, ctx: Ctx, arg: TxTime) -> Self::Output;
 }
 
-impl TimeOracleInterface for TimeService {
-    fn time(&self, context: CallContext<'_>, arg: TxTime) -> Result<(), ExecutionError> {
+impl TimeOracleInterface<CallContext<'_>> for TimeService {
+    type Output = Result<(), ExecutionError>;
+
+    fn report_time(&self, context: CallContext<'_>, arg: TxTime) -> Self::Output {
         let author = context.caller().author().ok_or(Error::UnknownSender)?;
         // Check that the transaction is signed by a validator.
         let core_schema = context.data().for_core();

@@ -208,7 +208,7 @@ pub enum AccessErrorKind {
 /// be used to compose storage objects from simpler ones.
 ///
 /// [`Lazy`]: ../struct.Lazy.html
-/// [`Group`]: ../struct.Group.html
+/// [`Group`]: ../indexes/group/struct.Group.html
 ///
 /// # Examples
 ///

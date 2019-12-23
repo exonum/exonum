@@ -14,9 +14,10 @@
 
 //! Configuration interface used by the supervisor to change service configuration.
 
+use exonum::runtime::rust::MethodDescriptor;
 use exonum::runtime::{
-    rust::{CallContext, Interface},
-    DispatcherError, ExecutionError, MethodId,
+    rust::{CallContext, GenericCallMut, Interface},
+    DispatcherError, ExecutionError, InstanceId, MethodId,
 };
 use exonum_merkledb::BinaryValue;
 
@@ -80,12 +81,12 @@ pub trait Configure {
     ) -> Result<(), ExecutionError>;
 }
 
-impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
+impl<'a, T: BinaryValue> Interface<'a> for dyn Configure<Params = T> {
     const INTERFACE_NAME: &'static str = CONFIGURE_INTERFACE_NAME;
 
     fn dispatch(
         &self,
-        context: CallContext<'_>,
+        context: CallContext<'a>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -107,30 +108,27 @@ impl<T: BinaryValue> Interface for dyn Configure<Params = T> {
     }
 }
 
-/// A helper struct for invoking the [`Configure`] interface methods on the specified service instance.
-///
-/// [`Configure`]: trait.Configure.html
-#[derive(Debug)]
-pub struct ConfigureCall<'a>(CallContext<'a>);
+// Makeshift replacement for generic stubbing, which is made difficult by the existence
+// of the type param.
+pub(crate) trait ConfigureMut<Ctx> {
+    type Output;
 
-impl<'a> From<CallContext<'a>> for ConfigureCall<'a> {
-    fn from(context: CallContext<'a>) -> Self {
-        Self(context)
-    }
+    fn verify_config(&mut self, context: Ctx, params: Vec<u8>) -> Self::Output;
+    fn apply_config(&mut self, context: Ctx, params: Vec<u8>) -> Self::Output;
 }
 
-impl<'a> ConfigureCall<'a> {
-    /// Invoke the corresponding [method](trait.Configure.html#tymethod.verify_config)
-    /// of the interface.
-    pub fn verify_config(&mut self, params: impl BinaryValue) -> Result<(), ExecutionError> {
-        self.0
-            .call(CONFIGURE_INTERFACE_NAME, VERIFY_CONFIG_METHOD_ID, params)
+impl ConfigureMut<InstanceId> for CallContext<'_> {
+    type Output = Result<(), ExecutionError>;
+
+    fn verify_config(&mut self, instance_id: InstanceId, params: Vec<u8>) -> Self::Output {
+        const METHOD_DESCRIPTOR: MethodDescriptor<'static> =
+            MethodDescriptor::new(CONFIGURE_INTERFACE_NAME, "verify_config", 0);
+        self.generic_call_mut(instance_id, METHOD_DESCRIPTOR, params)
     }
 
-    /// Invoke the corresponding [method](trait.Configure.html#tymethod.apply_config)
-    /// of the interface.
-    pub fn apply_config(&mut self, params: impl BinaryValue) -> Result<(), ExecutionError> {
-        self.0
-            .call(CONFIGURE_INTERFACE_NAME, APPLY_CONFIG_METHOD_ID, params)
+    fn apply_config(&mut self, instance_id: InstanceId, params: Vec<u8>) -> Self::Output {
+        const METHOD_DESCRIPTOR: MethodDescriptor<'static> =
+            MethodDescriptor::new(CONFIGURE_INTERFACE_NAME, "apply_config", 1);
+        self.generic_call_mut(instance_id, METHOD_DESCRIPTOR, params)
     }
 }

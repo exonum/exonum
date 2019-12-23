@@ -53,7 +53,13 @@ pub fn sign_config_propose_transaction_by_us(
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("Configure<Params=String>"))]
+#[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
+pub struct DeployableService;
+
+impl Service for DeployableService {}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements(raw = "Configure<Params = String>"))]
 #[service_factory(artifact_name = "config-change-test-service")]
 pub struct ConfigChangeService;
 
@@ -62,17 +68,6 @@ impl DefaultInstance for ConfigChangeService {
     const INSTANCE_NAME: &'static str = "config-change";
 }
 
-#[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("DeployableServiceInterface"))]
-#[service_factory(artifact_name = "deployable-test-service", artifact_version = "0.1.0")]
-pub struct DeployableService;
-
-impl Service for DeployableService {}
-
-#[exonum_interface]
-pub trait DeployableServiceInterface {}
-
-impl DeployableServiceInterface for DeployableService {}
 impl Service for ConfigChangeService {}
 
 impl Configure for ConfigChangeService {

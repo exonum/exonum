@@ -74,23 +74,20 @@ impl CommittedServices {
         })
     }
 
-    fn get_instance<'s>(
-        &'s self,
-        id: impl Into<InstanceQuery<'s>>,
-    ) -> Option<(InstanceDescriptor<'s>, InstanceStatus)> {
-        match id.into() {
-            InstanceQuery::Id(id) => {
-                let info = self.instances.get(&id)?;
-                let name = info.name.as_str();
-                Some((InstanceDescriptor { id, name }, info.status))
-            }
+    fn get_instance<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<(InstanceDescriptor<'_>, InstanceStatus)> {
+        let (id, info) = match id.into() {
+            InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
             InstanceQuery::Name(name) => {
                 let id = *self.instance_names.get(name)?;
-                let status = self.instances.get(&id)?.status;
-                Some((InstanceDescriptor { id, name }, status))
+                (id, self.instances.get(&id)?)
             }
-        }
+        };
+        let name = info.name.as_str();
+        Some((InstanceDescriptor { id, name }, info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -467,10 +464,10 @@ impl Dispatcher {
     }
 
     /// Returns the service matching the specified query.
-    pub(crate) fn get_service<'s>(
-        &'s self,
-        id: impl Into<InstanceQuery<'s>>,
-    ) -> Option<InstanceDescriptor<'s>> {
+    pub(crate) fn get_service<'q>(
+        &self,
+        id: impl Into<InstanceQuery<'q>>,
+    ) -> Option<InstanceDescriptor<'_>> {
         let (descriptor, status) = self.service_infos.get_instance(id)?;
         if status.is_active() {
             Some(descriptor)

@@ -42,6 +42,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
+- Interaction with services from the Rust runtime has been changed. Instead of
+  using the `Transaction` trait, it is now possible to use service interfaces
+  directly as Rust traits. These interface traits can be applied to a keypair
+  (to generate signed transactions), to `CallContext` (to call another service)
+  and some other types. See Rust runtime docs for more details. (#1606)
 - The following public APIs were removed/made private: (#1629)
   - `blockchain::{error reexports}` (available from `runtime::`);
   - `blockchain::FatalError` public re-export;
@@ -71,6 +76,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
+
+#### exonum-merkledb
+
+- The crate has been restructured, indexes are now located in separate module.
+Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
 
 ### exonum-testkit
 
@@ -117,6 +127,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added hashed version of `Entry` called `ProofEntry`, which participates
   in the state aggregation. (#1553)
 
+- Added support of unsized keys to `MapIndex`. (#1621)
 - Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
 
 - Added mechanism to extend block header. Block now contains
@@ -132,6 +143,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
   
+
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
 

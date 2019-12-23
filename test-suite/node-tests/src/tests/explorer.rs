@@ -16,32 +16,31 @@
 
 use exonum::{
     blockchain::TxLocation,
-    crypto::{self, Hash},
+    crypto::{gen_keypair, Hash},
     explorer::*,
     helpers::Height,
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, ErrorKind, SnapshotExt},
+    runtime::{ErrorKind, SnapshotExt},
 };
 use serde_json::json;
 
 use std::iter;
 
-use crate::blockchain::{create_block, create_blockchain, CreateWallet, Transfer, SERVICE_ID};
+use crate::blockchain::{
+    create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
+};
 
 #[test]
 #[allow(clippy::cognitive_complexity)]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let alice = gen_keypair();
+    let bob = gen_keypair();
 
-    let payload_alice = CreateWallet::new(pk_alice, "Alice");
-    let tx_alice = payload_alice.sign(SERVICE_ID, pk_alice, &key_alice);
-    let payload_bob = CreateWallet::new(pk_bob, "Bob");
-    let tx_bob = payload_bob.sign(SERVICE_ID, pk_bob, &key_bob);
-    let payload_transfer = Transfer::new(pk_alice, pk_bob, 2);
-    let tx_transfer = payload_transfer.sign(SERVICE_ID, pk_alice, &key_alice);
+    let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.0, 2));
 
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
@@ -163,9 +162,8 @@ fn test_explorer_basics() {
 #[test]
 fn test_explorer_errors_in_block() {
     let mut blockchain = create_blockchain();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
-    let payload_bob = CreateWallet::new(pk_bob, "Bob");
-    let tx_bob = payload_bob.sign(SERVICE_ID, pk_bob, &key_bob);
+    let bob = gen_keypair();
+    let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
 
     create_block(&mut blockchain, vec![tx_bob]);
     let snapshot = blockchain.snapshot();
@@ -213,8 +211,8 @@ fn test_explorer_errors_in_block() {
 #[test]
 fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let tx_alice = CreateWallet::new(pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
+    let alice = gen_keypair();
+    let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_hash = tx_alice.object_hash();
 
     let snapshot = blockchain.snapshot();
@@ -231,17 +229,16 @@ fn test_explorer_pool_transaction() {
     assert_eq!(tx_info.content(), &tx_alice);
 }
 
-fn tx_generator() -> Box<dyn Iterator<Item = Verified<AnyTx>>> {
-    Box::new((0..).map(|i| {
-        let (pk, key) = crypto::gen_keypair();
-        CreateWallet::new(pk, &format!("Alice #{}", i)).sign(SERVICE_ID, pk, &key)
-    }))
+fn tx_generator() -> impl Iterator<Item = Verified<AnyTx>> {
+    (0..).map(|i| {
+        gen_keypair().create_wallet(SERVICE_ID, CreateWallet::new(format!("Alice #{}", i)))
+    })
 }
 
 // TODO Implement method id getter in CreateWallet. [ECR-3254]
 fn is_create_wallet(tx: &CommittedTransaction) -> bool {
     let raw_tx = tx.content().payload();
-    if raw_tx.call_info.method_id == CreateWallet::METHOD_ID {
+    if raw_tx.call_info.method_id == 0 {
         raw_tx
             .parse::<CreateWallet>()
             .expect("Unable to parse transaction");
@@ -387,11 +384,11 @@ fn test_transaction_iterator() {
     }
 
     // Test filtering and other nice stuff.
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = CreateWallet::new(pk_alice, "Alice").sign(SERVICE_ID, pk_alice, &key_alice);
-    let tx_bob = CreateWallet::new(pk_bob, "Bob").sign(SERVICE_ID, pk_bob, &key_bob);
-    let tx_transfer = Transfer::new(pk_alice, pk_bob, 2).sign(SERVICE_ID, pk_alice, &key_alice);
+    let alice = gen_keypair();
+    let bob = gen_keypair();
+    let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.0, 2));
 
     create_block(
         &mut blockchain,
@@ -482,10 +479,7 @@ fn test_transaction_info_roundtrip() {
 #[test]
 fn test_block_with_transactions_roundtrip() {
     let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let payload = CreateWallet::new(pk_alice, "Alice");
-    let tx = payload.sign(SERVICE_ID, pk_alice, &key_alice);
-
+    let tx = gen_keypair().create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     create_block(&mut blockchain, vec![tx]);
 
     let snapshot = blockchain.snapshot();
