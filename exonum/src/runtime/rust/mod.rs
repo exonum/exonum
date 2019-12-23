@@ -449,7 +449,7 @@ impl RustRuntime {
 
         self.available_artifacts
             .keys()
-            .map(|id| id.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<String>>()
             .join(", ")
     }
