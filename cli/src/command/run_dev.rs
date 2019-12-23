@@ -82,7 +82,7 @@ impl ExonumCommand for RunDev {
         let node_config_file_name = "node.toml";
 
         let finalize = Finalize {
-            secret_config_path: self.artifact_path(SEC_CONFIG_FILE_NAME),
+            private_config_path: self.artifact_path(SEC_CONFIG_FILE_NAME),
             output_config_path: self.artifact_path(node_config_file_name),
             public_configs: vec![self.artifact_path(PUB_CONFIG_FILE_NAME)],
             public_api_address: Some("127.0.0.1:8080".parse().unwrap()),

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Standard Exonum CLI command used to combine a secret and all the public parts of the
+//! Standard Exonum CLI command used to combine a private and all the public parts of the
 //! node configuration in a single file.
 
 use exonum::{
@@ -36,8 +36,8 @@ use crate::{
 /// of other nodes in the network.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub struct Finalize {
-    /// Path to a secret part of a node configuration.
-    pub secret_config_path: PathBuf,
+    /// Path to a private part of a node configuration.
+    pub private_config_path: PathBuf,
     /// Path to a node configuration file which will be created after
     /// running this command.
     pub output_config_path: PathBuf,
@@ -119,16 +119,16 @@ impl Finalize {
 
     fn create_connect_list_config(
         public_configs: &[NodePublicConfig],
-        secret_config: &NodePrivateConfig,
+        private_config: &NodePrivateConfig,
     ) -> ConnectListConfig {
         let peers = public_configs
             .iter()
             .filter(|config| {
-                Self::get_consensus_key(config).unwrap() != secret_config.keys.consensus_pk()
+                Self::get_consensus_key(config).unwrap() != private_config.keys.consensus_pk()
             })
             .map(|config| ConnectInfo {
                 public_key: Self::get_consensus_key(config).unwrap(),
-                address: secret_config.external_address.clone(),
+                address: private_config.external_address.clone(),
             })
             .collect();
 
@@ -138,7 +138,7 @@ impl Finalize {
 
 impl ExonumCommand for Finalize {
     fn execute(self) -> Result<StandardResult, Error> {
-        let secret_config: NodePrivateConfig = load_config_file(&self.secret_config_path)?;
+        let private_config: NodePrivateConfig = load_config_file(&self.private_config_path)?;
         let public_configs: Vec<NodePublicConfig> = self
             .public_configs
             .into_iter()
@@ -170,25 +170,25 @@ impl ExonumCommand for Finalize {
             ..common.consensus
         };
 
-        let connect_list = Self::create_connect_list_config(&public_configs, &secret_config);
+        let connect_list = Self::create_connect_list_config(&public_configs, &private_config);
 
         let private_config = NodePrivateConfig {
-            listen_address: secret_config.listen_address,
-            external_address: secret_config.external_address,
-            master_key_path: secret_config.master_key_path,
+            listen_address: private_config.listen_address,
+            external_address: private_config.external_address,
+            master_key_path: private_config.master_key_path,
             api: NodeApiConfig {
                 public_api_address: self.public_api_address,
                 private_api_address: self.private_api_address,
                 public_allow_origin,
                 private_allow_origin,
-                ..secret_config.api
+                ..private_config.api
             },
-            network: secret_config.network,
-            mempool: secret_config.mempool,
-            database: secret_config.database,
-            thread_pool_size: secret_config.thread_pool_size,
+            network: private_config.network,
+            mempool: private_config.mempool,
+            database: private_config.database,
+            thread_pool_size: private_config.thread_pool_size,
             connect_list,
-            keys: secret_config.keys,
+            keys: private_config.keys,
         };
         let public_config = NodePublicConfig {
             consensus,
