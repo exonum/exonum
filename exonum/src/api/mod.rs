@@ -153,8 +153,10 @@ impl ApiScope {
 /// Exonum API builder, which is used to add endpoints to the node API.
 #[derive(Debug, Clone, Default)]
 pub struct ApiBuilder {
-    pub(crate) public_scope: ApiScope,
-    pub(crate) private_scope: ApiScope,
+    /// Public API scope.
+    pub public_scope: ApiScope,
+    /// Private API scope.
+    pub private_scope: ApiScope,
 }
 
 impl ApiBuilder {

@@ -1,16 +1,29 @@
-use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
+// Copyright 2019 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-use super::{GenericCallMut, MethodDescriptor};
-use crate::{
+use exonum::{
     blockchain::Schema as CoreSchema,
     helpers::Height,
     runtime::{
-        dispatcher::{Dispatcher, Error as DispatcherError},
-        ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionContextUnstable,
-        ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec,
-        SUPERVISOR_INSTANCE_ID,
+        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, ExecutionContext,
+        ExecutionContextUnstable, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
+        InstanceSpec, SupervisorExtensions, SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
+
+use super::{GenericCallMut, MethodDescriptor};
 
 /// Context for the executed call.
 ///
@@ -69,6 +82,18 @@ impl<'a> CallContext<'a> {
         })
     }
 
+    /// Returns extensions required for the Supervisor service implementation.
+    ///
+    /// This method can only be called by the supervisor; the call will panic otherwise.
+    #[doc(hidden)]
+    pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`supervisor_extensions` called within a non-supervisor service");
+        }
+
+        self.inner.supervisor_extensions()
+    }
+
     /// Provides writeable access to core schema.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
@@ -89,16 +114,14 @@ impl<'a> CallContext<'a> {
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
+    #[deprecated]
     pub fn start_artifact_registration(
-        &self,
+        &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_artifact_registration` called within a non-supervisor service");
-        }
-
-        Dispatcher::commit_artifact(self.inner.fork, artifact, spec)
+        self.supervisor_extensions()
+            .start_artifact_registration(artifact, spec)
     }
 
     /// Initiates adding a service instance to the blockchain.
@@ -110,17 +133,13 @@ impl<'a> CallContext<'a> {
     ///
     /// - This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
+    #[deprecated]
     pub fn initiate_adding_service(
         &mut self,
         instance_spec: InstanceSpec,
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`initiate_adding_service` called within a non-supervisor service");
-        }
-
-        self.inner
-            .child_context(Some(self.instance.id))
+        self.supervisor_extensions()
             .initiate_adding_service(instance_spec, constructor)
     }
 
@@ -133,12 +152,13 @@ impl<'a> CallContext<'a> {
     ///
     /// - This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`initiate_stopping_service` called within a non-supervisor service");
-        }
-
-        Dispatcher::initiate_stopping_service(self.inner.fork, instance_id)
+    #[deprecated]
+    pub fn initiate_stopping_service(
+        &mut self,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        self.supervisor_extensions()
+            .initiate_stopping_service(instance_id)
     }
 
     fn make_child_call<'q>(
@@ -150,7 +170,6 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         let descriptor = self
             .inner
-            .dispatcher
             .get_service(called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
 
@@ -164,9 +183,9 @@ impl<'a> CallContext<'a> {
         } else {
             Some(self.instance.id)
         };
+
         self.inner
-            .child_context(caller)
-            .call(method.interface_name, &call_info, &args)
+            .make_child_call(caller, method.interface_name, &call_info, &args)
     }
 }
 
