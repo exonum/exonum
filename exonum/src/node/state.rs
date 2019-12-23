@@ -880,8 +880,8 @@ impl State {
 
     #[cfg(debug_assertions)]
     fn reorder_proposes_if_needed(full_proposes: &mut Vec<(Hash, Round)>) {
-        // For tests we want don't care about DoS attacks,
-        // so (unlike the release version) we *always* sort by both round *and hash*.
+        // For tests we don't care about DoS attacks, so (unlike the release
+        // version) we *always* sort by both round *and hash*.
         // This is useful for tests to have proposes in a predictable order.
         full_proposes.sort_unstable_by(|(hash1, round1), (hash2, round2)| {
             // Compare rounds first.
