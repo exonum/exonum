@@ -104,9 +104,10 @@ use crate::config_manager::DefaultConfigManager;
 
 pub mod command;
 pub mod config;
-pub mod config_manager;
 pub mod io;
 pub mod password;
+
+mod config_manager;
 
 /// Rust-specific node builder used for constructing a node with a list
 /// of provided services.
