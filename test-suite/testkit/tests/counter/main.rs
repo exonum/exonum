@@ -940,13 +940,8 @@ fn test_explorer_api_with_before_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_err());
-    assert!(response
-        .status
-        .0
-        .unwrap_err()
-        .description()
-        .contains("Number 13"));
+    let execution_error = response.status.0.unwrap_err();
+    assert!(execution_error.description().contains("Number 13"));
 
     let response = api
         .public(ApiKind::Explorer)
@@ -982,11 +977,8 @@ fn test_explorer_api_with_transaction_error() {
         })
         .get::<CallStatusResponse>("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_err());
-    assert!(response
-        .status
-        .0
-        .unwrap_err()
+    let execution_error = response.status.0.unwrap_err();
+    assert!(execution_error
         .description()
         .contains("Adding zero does nothing!"));
 
@@ -1026,11 +1018,8 @@ fn test_explorer_api_with_after_transactions_error() {
         })
         .get::<CallStatusResponse>("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_err());
-    assert!(response
-        .status
-        .0
-        .unwrap_err()
+    let execution_error = response.status.0.unwrap_err();
+    assert!(execution_error
         .description()
         .contains("What's the question?"));
 
