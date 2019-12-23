@@ -1126,7 +1126,7 @@ fn sandbox_with_services_uninitialized(
     consensus: ConsensusConfig,
     validators_count: u8,
 ) -> Sandbox {
-    let keys: Vec<_> = (0..validators_count)
+    let keys = (0..validators_count)
         .map(|i| {
             (
                 gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
@@ -1134,7 +1134,7 @@ fn sandbox_with_services_uninitialized(
             )
         })
         .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
-        .collect();
+        .collect::<Vec<_>>();
 
     let validators = keys
         .iter()
@@ -1226,7 +1226,7 @@ fn sandbox_with_services_uninitialized(
         &str_addresses[0],
         node_sender,
         Box::new(system_state),
-        config.clone(),
+        config,
         api_state,
         None,
     );
@@ -1244,7 +1244,7 @@ fn sandbox_with_services_uninitialized(
     };
     let sandbox = Sandbox {
         inner: RefCell::new(inner),
-        validators_map: HashMap::from_iter(validators.clone()),
+        validators_map: HashMap::from_iter(validators),
         services_map: HashMap::from_iter(service_keys),
         addresses: connect_infos,
         connect: None,

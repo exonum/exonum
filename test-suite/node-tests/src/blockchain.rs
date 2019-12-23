@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Simplified blockchain emulation for the `BlockchainExplorer`.
+//! Simplified blockchain emulation for the Exonum node tests.
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
@@ -33,14 +33,12 @@ use serde_derive::*;
 
 use std::collections::BTreeMap;
 
-pub const SERVICE_ID: InstanceId = 4;
-
-mod proto;
+pub const SERVICE_ID: InstanceId = 118;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::CreateWallet")]
+#[protobuf_convert(source = "crate::proto::CreateWallet")]
 pub struct CreateWallet {
     pub name: String,
 }
@@ -54,15 +52,15 @@ impl CreateWallet {
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Transfer")]
+#[protobuf_convert(source = "crate::proto::Transfer")]
 pub struct Transfer {
     pub to: PublicKey,
     pub amount: u64,
 }
 
 impl Transfer {
-    pub fn new(to: &PublicKey, amount: u64) -> Self {
-        Self { to: *to, amount }
+    pub fn new(to: PublicKey, amount: u64) -> Self {
+        Self { to, amount }
     }
 }
 
@@ -84,10 +82,10 @@ pub trait ExplorerTransactions<Ctx> {
 #[service_factory(
     artifact_name = "my-service",
     artifact_version = "1.0.1",
-    proto_sources = "proto"
+    proto_sources = "crate::proto"
 )]
 #[service_dispatcher(implements("ExplorerTransactions"))]
-struct MyService;
+pub struct MyService;
 
 impl ExplorerTransactions<CallContext<'_>> for MyService {
     type Output = Result<(), ExecutionError>;

@@ -17,7 +17,7 @@
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
-    node::{ApiSender, ExternalMessage, Node, NodeConfig},
+    node::{ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service, ServiceFactory},
         RuntimeInstance,
@@ -31,9 +31,11 @@ use tokio_core::reactor::Core;
 
 use std::{
     sync::{Arc, Mutex},
-    thread::{self, JoinHandle},
+    thread::{self},
     time::Duration,
 };
+
+use crate::RunHandle;
 
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
 #[service_factory(
@@ -75,11 +77,6 @@ impl StartCheckerServiceFactory {
         *self.0.lock().unwrap() += 1;
         Box::new(StartCheckerService)
     }
-}
-
-struct RunHandle {
-    node_thread: JoinHandle<()>,
-    api_tx: ApiSender,
 }
 
 fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
