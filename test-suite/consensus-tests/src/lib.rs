@@ -579,7 +579,8 @@ impl Sandbox {
         T: TryFrom<SignedMessage> + Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
-        let expected_msg = msg.as_raw();
+        let expected_msg = Message::from_signed(msg.as_raw().clone())
+            .expect("Can't obtain `Message` from `Verified`");
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -587,13 +588,10 @@ impl Sandbox {
 
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
-                if expected_msg != real_msg.as_raw() {
-                    // Use full messages instead of raw for reporting an assertion failure.
-                    panic!(
-                        "Expected to broadcast other message: expected {:?}, but got {:?}",
-                        msg, real_msg
-                    );
-                }
+                assert_eq!(
+                    expected_msg, real_msg,
+                    "Expected to broadcast other message",
+                );
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
