@@ -36,6 +36,10 @@ message SignedMessage {
   exonum.crypto.Signature signature = 3;
 }
 
+message Verified {
+  SignedMessage raw = 1;
+}
+
 // List of consensus messages
 
 message Connect {
