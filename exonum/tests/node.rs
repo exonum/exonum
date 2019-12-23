@@ -23,7 +23,7 @@ use exonum::{
         RuntimeInstance,
     },
 };
-use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
@@ -35,11 +35,7 @@ use std::{
     time::Duration,
 };
 
-#[exonum_interface]
-trait CommitWatcherInterface {}
-
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("CommitWatcherInterface"))]
 #[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
@@ -54,22 +50,14 @@ impl CommitWatcherService {
     }
 }
 
-impl CommitWatcherInterface for CommitWatcherService {}
-
 impl Service for CommitWatcherService {
     fn after_commit(&self, _context: AfterCommitContext<'_>) {
         self.0.unbounded_send(()).ok();
     }
 }
 
-#[exonum_interface]
-trait StartCheckerInterface {}
-
 #[derive(Debug, ServiceDispatcher)]
-#[service_dispatcher(implements("StartCheckerInterface"))]
 struct StartCheckerService;
-
-impl StartCheckerInterface for StartCheckerService {}
 
 impl Service for StartCheckerService {}
 

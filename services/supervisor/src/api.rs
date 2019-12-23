@@ -17,7 +17,7 @@ use exonum::{
     crypto::Hash,
     runtime::rust::{
         api::{self, ServiceApiBuilder, ServiceApiState},
-        Transaction,
+        Broadcaster,
     },
 };
 use failure::Fail;
@@ -62,17 +62,11 @@ pub trait PublicApi {
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 
-impl<'a> ApiImpl<'a> {
-    fn broadcast_transaction(
-        &self,
-        transaction: impl Transaction<dyn SupervisorInterface>,
-    ) -> Result<Hash, api::Error> {
-        let tx_sender = self
-            .0
+impl ApiImpl<'_> {
+    fn broadcaster(&self) -> Result<Broadcaster<'_>, api::Error> {
+        self.0
             .broadcaster()
-            .ok_or_else(|| api::Error::BadRequest("Node is not a validator".to_owned()))?;
-        let tx_hash = tx_sender.send(transaction)?;
-        Ok(tx_hash)
+            .ok_or_else(|| api::Error::BadRequest("Node is not a validator".to_owned()))
     }
 }
 
@@ -80,26 +74,30 @@ impl PrivateApi for ApiImpl<'_> {
     type Error = api::Error;
 
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
-        self.broadcast_transaction(artifact).map_err(From::from)
+        self.broadcaster()?
+            .request_artifact_deploy((), artifact)
+            .map_err(From::from)
     }
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
-        self.broadcast_transaction(proposal).map_err(From::from)
+        self.broadcaster()?
+            .propose_config_change((), proposal)
+            .map_err(From::from)
     }
 
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
-        self.broadcast_transaction(vote).map_err(From::from)
+        self.broadcaster()?
+            .confirm_config_change((), vote)
+            .map_err(From::from)
     }
 
     fn configuration_number(&self) -> Result<u64, Self::Error> {
         let configuration_number = Schema::new(self.0.service_data()).get_configuration_number();
-
         Ok(configuration_number)
     }
 
     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
         let config = Schema::new(self.0.service_data()).supervisor_config();
-
         Ok(config)
     }
 }

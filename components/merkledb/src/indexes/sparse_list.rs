@@ -72,8 +72,8 @@ impl BinaryAttribute for SparseListSize {
 /// as an index.
 /// `SparseListIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
-/// [`ListIndex`]: <../list_index/struct.ListIndex.html>
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`ListIndex`]: ../../indexes/list/struct.ListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndex<T: RawAccess, V> {
     base: View<T>,
@@ -89,7 +89,7 @@ pub struct SparseListIndex<T: RawAccess, V> {
 /// [`iter`]: struct.SparseListIndex.html#method.iter
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparseListIndexIter<'a, V> {
+pub struct Iter<'a, V> {
     base_iter: ViewIter<'a, u64, V>,
 }
 
@@ -101,7 +101,7 @@ pub struct SparseListIndexIter<'a, V> {
 /// [`indexes`]: struct.SparseListIndex.html#method.indexes
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparseListIndexKeys<'a> {
+pub struct Keys<'a> {
     base_iter: ViewIter<'a, u64, ()>,
 }
 
@@ -113,7 +113,7 @@ pub struct SparseListIndexKeys<'a> {
 /// [`values`]: struct.SparseListIndex.html#method.values
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparseListIndexValues<'a, V> {
+pub struct Values<'a, V> {
     base_iter: ViewIter<'a, (), V>,
 }
 
@@ -256,8 +256,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> SparseListIndexIter<'_, V> {
-        SparseListIndexIter {
+    pub fn iter(&self) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
@@ -279,8 +279,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn indexes(&self) -> SparseListIndexKeys<'_> {
-        SparseListIndexKeys {
+    pub fn indexes(&self) -> Keys<'_> {
+        Keys {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
@@ -303,8 +303,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> SparseListIndexValues<'_, V> {
-        SparseListIndexValues {
+    pub fn values(&self) -> Values<'_, V> {
+        Values {
             base_iter: self.base.iter_from(&(), &0_u64),
         }
     }
@@ -328,8 +328,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> SparseListIndexIter<'_, V> {
-        SparseListIndexIter {
+    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), &from),
         }
     }
@@ -533,14 +533,14 @@ where
     V: BinaryValue,
 {
     type Item = (u64, V);
-    type IntoIter = SparseListIndexIter<'a, V>;
+    type IntoIter = Iter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for SparseListIndexIter<'a, V>
+impl<'a, V> Iterator for Iter<'a, V>
 where
     V: BinaryValue,
 {
@@ -551,7 +551,7 @@ where
     }
 }
 
-impl<'a> Iterator for SparseListIndexKeys<'a> {
+impl<'a> Iterator for Keys<'a> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -559,7 +559,7 @@ impl<'a> Iterator for SparseListIndexKeys<'a> {
     }
 }
 
-impl<'a, V> Iterator for SparseListIndexValues<'a, V>
+impl<'a, V> Iterator for Values<'a, V>
 where
     V: BinaryValue,
 {

@@ -24,7 +24,7 @@
 
 use exonum_merkledb::{
     access::{AccessExt, RawAccess},
-    proof_map_index::{Hashed, ToProofPath},
+    proof_map::{Hashed, ToProofPath},
     BinaryKey, BinaryValue, Database, MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
 };
 use proptest::{

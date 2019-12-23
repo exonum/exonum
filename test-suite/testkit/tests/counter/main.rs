@@ -19,12 +19,12 @@ use exonum::{
         Error as ApiError,
     },
     blockchain::{CallInBlock, ValidatorKeys},
-    crypto::{self, Hash},
+    crypto::{self, gen_keypair, Hash},
     explorer::BlockchainExplorer,
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{rust::Transaction, ErrorKind, ExecutionError, SnapshotExt},
+    runtime::{ErrorKind, ExecutionError, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
@@ -32,13 +32,13 @@ use pretty_assertions::assert_eq;
 use serde_json::{json, Value};
 
 use crate::counter::{
-    CounterSchema, CounterService, CounterWithProof, Increment, Reset, SERVICE_ID, SERVICE_NAME,
+    CounterSchema, CounterService, CounterServiceInterface, CounterWithProof, SERVICE_ID,
+    SERVICE_NAME,
 };
 use exonum::blockchain::{AdditionalHeaders, ProposerId};
 use exonum::helpers::ValidatorId;
 
 mod counter;
-mod proto;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKit::for_rust_service(CounterService, SERVICE_NAME, SERVICE_ID, ());
@@ -69,13 +69,11 @@ fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a>
 }
 
 fn gen_inc_tx(by: u64) -> Verified<AnyTx> {
-    let (pubkey, key) = crypto::gen_keypair();
-    Increment::new(by).sign(SERVICE_ID, pubkey, &key)
+    gen_keypair().increment(SERVICE_ID, by)
 }
 
 fn gen_inc_incorrect_tx(by: u64) -> Verified<AnyTx> {
-    let (pubkey, key) = crypto::gen_keypair();
-    Increment::new(by).sign(SERVICE_ID + 1, pubkey, &key)
+    gen_keypair().increment(SERVICE_ID + 1, by)
 }
 
 #[test]
@@ -97,10 +95,10 @@ fn test_inc_add_tx_incorrect_transaction() {
 #[test]
 fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
+    let keypair = gen_keypair();
 
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api
@@ -117,8 +115,8 @@ fn test_inc_count_create_block() {
     assert_eq!(counter_with_proof.verify(&validator_keys), Some(5));
 
     testkit.create_block_with_transactions(vec![
-        Increment::new(4).sign(SERVICE_ID, pubkey, &key),
-        Increment::new(1).sign(SERVICE_ID, pubkey, &key),
+        keypair.increment(SERVICE_ID, 4),
+        keypair.increment(SERVICE_ID, 1),
     ]);
 
     let counter: u64 = api
@@ -137,11 +135,11 @@ fn test_inc_count_create_block() {
 #[test]
 fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
+    let keypair = gen_keypair();
     // Create a pre-signed transaction
-    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
     // Create another block with the same transaction
-    testkit.create_block_with_transaction(Increment::new(5).sign(SERVICE_ID, pubkey, &key));
+    testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
 }
 
 #[test]
@@ -242,8 +240,7 @@ fn test_private_api() {
         .unwrap();
     assert_eq!(counter, 8);
 
-    let (pubkey, key) = testkit.us().service_keypair();
-    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    let tx = testkit.us().service_keypair().reset(SERVICE_ID, ());
     let tx_info: TransactionResponse = api
         .private(ApiKind::Service("counter"))
         .query(&())
@@ -440,8 +437,7 @@ fn test_explorer_api_block_request() {
 fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
-        let (pubkey, key) = crypto::gen_keypair();
-        let tx = Increment::new(height as u64).sign(SERVICE_ID, pubkey, &key);
+        let tx = gen_keypair().increment(SERVICE_ID, height);
         testkit.api().send(tx.clone());
     }
     testkit.create_block();
@@ -649,8 +645,7 @@ fn test_explorer_single_block() {
         assert_eq!(&*block.transaction_hashes(), &[]);
     }
 
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 5);
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
@@ -688,8 +683,7 @@ fn test_explorer_transaction_info() {
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 5);
 
     let info = api
         .public(ApiKind::Explorer)
@@ -755,12 +749,9 @@ fn test_explorer_transaction_statuses() {
     use exonum::explorer::TransactionInfo;
 
     let (mut testkit, api) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(5).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair();
-    let error_tx = Increment::new(0).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair();
-    let panicking_tx = Increment::new(u64::max_value() - 3).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 5);
+    let error_tx = gen_keypair().increment(SERVICE_ID, 0);
+    let panicking_tx = gen_keypair().increment(SERVICE_ID, u64::max_value() - 3);
 
     let block = testkit.create_block_with_transactions(vec![
         tx.clone(),
@@ -845,10 +836,9 @@ fn test_explorer_transaction_statuses() {
 #[test]
 fn test_explorer_with_after_transactions_error() {
     let (mut testkit, _) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx1 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx2 = Increment::new(21).sign(SERVICE_ID, pubkey, &key);
+    let tx1 = gen_keypair().increment(SERVICE_ID, 21);
+    let keypair = gen_keypair();
+    let tx2 = keypair.increment(SERVICE_ID, 21);
 
     let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
     let errors = block.error_map();
@@ -858,7 +848,7 @@ fn test_explorer_with_after_transactions_error() {
         .contains("What's the question?"));
     assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
 
-    let tx3 = Increment::new(1).sign(SERVICE_ID, pubkey, &key);
+    let tx3 = keypair.increment(SERVICE_ID, 1);
     let block = testkit.create_block_with_transaction(tx3);
     assert!(block.errors.is_empty());
     assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
@@ -867,8 +857,7 @@ fn test_explorer_with_after_transactions_error() {
 #[test]
 fn test_explorer_with_before_transactions_error() {
     let (mut testkit, _) = init_testkit();
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Increment::new(13).sign(SERVICE_ID, pubkey, &key);
+    let tx = gen_keypair().increment(SERVICE_ID, 13);
 
     let block = testkit.create_block_with_transaction(tx);
     let errors = block.error_map();
@@ -888,12 +877,12 @@ fn test_explorer_with_before_transactions_error() {
 
 /// Checks that `ExplorerApi` accepts valid transactions and discards transactions with incorrect instance ID.
 #[test]
-fn test_explorer_add_transaction_with_invalid_transaction() {
+fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
 
     // Send valid transaction.
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Reset.sign(SERVICE_ID, pubkey, &key);
+    let keypair = gen_keypair();
+    let tx = keypair.reset(SERVICE_ID, ());
     let data = hex::encode(tx.to_bytes());
     let response = api
         .public(ApiKind::Explorer)
@@ -903,8 +892,7 @@ fn test_explorer_add_transaction_with_invalid_transaction() {
     assert_eq!(response.tx_hash, tx.object_hash());
 
     // Send invalid transaction.
-    let (pubkey, key) = crypto::gen_keypair();
-    let tx = Reset.sign(SERVICE_ID + 1, pubkey, &key);
+    let tx = keypair.reset(SERVICE_ID + 1, ());
     let data = hex::encode(tx.to_bytes());
     let response = api
         .public(ApiKind::Explorer)

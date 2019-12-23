@@ -40,7 +40,9 @@
     missing_debug_implementations
 )]
 
-pub use self::transactions::{Batch, CheckedCall, Error, MiddlewareInterface};
+pub use self::transactions::{
+    Batch, CheckedCall, Error, MiddlewareInterface, MiddlewareInterfaceMut,
+};
 
 pub mod proto;
 mod transactions;
@@ -50,6 +52,10 @@ use exonum::runtime::{
     InstanceId,
 };
 use exonum_derive::*;
+use failure::format_err;
+use semver::VersionReq;
+
+use std::{fmt, str::FromStr};
 
 /// Middleware service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -62,4 +68,70 @@ impl Service for MiddlewareService {}
 impl DefaultInstance for MiddlewareService {
     const INSTANCE_ID: InstanceId = 1;
     const INSTANCE_NAME: &'static str = "middleware";
+}
+
+/// Requirement on an artifact.
+///
+/// # Examples
+///
+/// Requirements can be used as a stub, generating a [`CheckedCall`].
+///
+/// [`CheckedCall`]: struct.CheckedCall.html
+///
+/// ```
+/// # use exonum::runtime::InstanceId;
+/// # use exonum_derive::*;
+/// # use exonum_middleware_service::{ArtifactReq, CheckedCall};
+/// // Requirements can be parsed from a string.
+/// let req: ArtifactReq = "some.Service@^1.3.0".parse().unwrap();
+///
+/// // Suppose the interface for `some.Service` is defined as follows:
+/// #[exonum_interface]
+/// trait SomeService<Ctx> {
+///     type Output;
+///     fn do_something(&self, ctx: Ctx, arg: String) -> Self::Output;
+/// }
+///
+/// // Then, requirements can be used to perform a checked call to the service.
+/// const SERVICE_ID: InstanceId = 100;
+/// let checked_call: CheckedCall = req.do_something(SERVICE_ID, "Arg".into());
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArtifactReq {
+    /// Artifact name.
+    pub name: String,
+    /// Allowed artifact versions.
+    pub version: VersionReq,
+}
+
+impl FromStr for ArtifactReq {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<_> = s.splitn(2, '@').collect();
+        match &parts[..] {
+            [name, version] => Ok(Self {
+                name: name.to_string(),
+                version: version.parse()?,
+            }),
+            _ => Err(format_err!(
+                "Invalid artifact requirement. Use `name@version` format, \
+                 e.g., `exonum.Token@^1.3.0`"
+            )),
+        }
+    }
+}
+
+impl fmt::Display for ArtifactReq {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}@{}", self.name, self.version)
+    }
+}
+
+#[test]
+fn artifact_req_parsing() {
+    let req: ArtifactReq = "exonum.Token@^1.0.5".parse().unwrap();
+    assert_eq!(req.name, "exonum.Token");
+    assert_eq!(req.version, "^1.0.5".parse().unwrap());
+    assert_eq!(req.to_string(), "exonum.Token@^1.0.5");
 }

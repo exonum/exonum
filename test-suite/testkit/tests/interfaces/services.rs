@@ -19,7 +19,7 @@ pub use crate::interface::Issue;
 use exonum::{
     crypto::PublicKey,
     runtime::{
-        rust::{CallContext, ChildAuthorization, DefaultInstance, Service},
+        rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
         AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
     },
 };
@@ -30,22 +30,15 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{
     error::Error,
-    interface::{IssueReceiver, IssueReceiverClient},
+    interface::IssueReceiver,
     proto,
     schema::{Wallet, WalletSchema},
 };
 
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::CreateWallet")]
-pub struct TxCreateWallet {
-    pub name: String,
-}
-
 #[exonum_interface]
-pub trait WalletInterface {
-    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError>;
+pub trait WalletInterface<Ctx> {
+    type Output;
+    fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -63,13 +56,12 @@ impl WalletService {
 
 impl Service for WalletService {}
 
-impl WalletInterface for WalletService {
-    fn create(&self, context: CallContext<'_>, arg: TxCreateWallet) -> Result<(), ExecutionError> {
-        let owner = context
-            .caller()
-            .author()
-            .ok_or(Error::WrongInterfaceCaller)?;
-        let mut schema = WalletSchema::new(context.service_data());
+impl WalletInterface<CallContext<'_>> for WalletService {
+    type Output = Result<(), ExecutionError>;
+
+    fn create_wallet(&self, ctx: CallContext<'_>, username: String) -> Self::Output {
+        let owner = ctx.caller().author().ok_or(Error::WrongInterfaceCaller)?;
+        let mut schema = WalletSchema::new(ctx.service_data());
 
         if schema.wallets.contains(&owner) {
             return Err(Error::WalletAlreadyExists.into());
@@ -77,7 +69,7 @@ impl WalletInterface for WalletService {
         schema.wallets.put(
             &owner,
             Wallet {
-                name: arg.name,
+                name: username,
                 balance: 0,
             },
         );
@@ -85,9 +77,11 @@ impl WalletInterface for WalletService {
     }
 }
 
-impl IssueReceiver for WalletService {
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Result<(), ExecutionError> {
-        let instance_id = context
+impl IssueReceiver<CallContext<'_>> for WalletService {
+    type Output = Result<(), ExecutionError>;
+
+    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Self::Output {
+        let instance_id = ctx
             .caller()
             .as_service()
             .ok_or(Error::WrongInterfaceCaller)?;
@@ -95,7 +89,7 @@ impl IssueReceiver for WalletService {
             return Err(Error::UnauthorizedIssuer.into());
         }
 
-        let mut schema = WalletSchema::new(context.service_data());
+        let mut schema = WalletSchema::new(ctx.service_data());
         let mut wallet = schema.wallets.get(&arg.to).ok_or(Error::WalletNotFound)?;
         wallet.balance += arg.amount;
         schema.wallets.put(&arg.to, wallet);
@@ -118,8 +112,9 @@ pub struct TxIssue {
 }
 
 #[exonum_interface]
-pub trait DepositInterface {
-    fn issue(&self, context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError>;
+pub trait DepositInterface<Ctx> {
+    type Output;
+    fn deposit(&self, context: Ctx, arg: TxIssue) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -133,19 +128,24 @@ impl DepositService {
 
 impl Service for DepositService {}
 
-impl DepositInterface for DepositService {
-    fn issue(&self, mut context: CallContext<'_>, arg: TxIssue) -> Result<(), ExecutionError> {
+impl DepositInterface<CallContext<'_>> for DepositService {
+    type Output = Result<(), ExecutionError>;
+
+    fn deposit(&self, mut ctx: CallContext<'_>, arg: TxIssue) -> Self::Output {
+        use crate::interface::IssueReceiverMut;
+
         // Check authorization of the call.
-        if context.caller().author() != Some(arg.to) {
+        if ctx.caller().author() != Some(arg.to) {
             return Err(Error::UnauthorizedIssuer.into());
         }
         // The child call is authorized by the service.
-        context
-            .interface::<IssueReceiverClient<'_>>(WalletService::ID)?
-            .issue(Issue {
+        ctx.issue(
+            WalletService::ID,
+            Issue {
                 to: arg.to,
                 amount: arg.amount,
-            })
+            },
+        )
     }
 }
 
@@ -177,23 +177,11 @@ impl AnyCall {
     }
 }
 
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::RecursiveCall")]
-pub struct RecursiveCall {
-    pub depth: u64,
-}
-
 #[exonum_interface]
-pub trait CallAny {
-    fn call_any(&self, context: CallContext<'_>, arg: AnyCall) -> Result<(), ExecutionError>;
-
-    fn call_recursive(
-        &self,
-        context: CallContext<'_>,
-        arg: RecursiveCall,
-    ) -> Result<(), ExecutionError>;
+pub trait CallAny<Ctx> {
+    type Output;
+    fn call_any(&self, context: Ctx, arg: AnyCall) -> Self::Output;
+    fn call_recursive(&self, context: Ctx, depth: u64) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -205,40 +193,31 @@ impl AnyCallService {
     pub const ID: InstanceId = 26;
 }
 
-impl CallAny for AnyCallService {
-    fn call_any(&self, mut context: CallContext<'_>, tx: AnyCall) -> Result<(), ExecutionError> {
-        let auth = if tx.fallthrough_auth {
-            ChildAuthorization::Fallthrough
+impl CallAny<CallContext<'_>> for AnyCallService {
+    type Output = Result<(), ExecutionError>;
+
+    fn call_any(&self, mut ctx: CallContext<'_>, tx: AnyCall) -> Self::Output {
+        let call_info = tx.inner.call_info;
+        let args = tx.inner.arguments;
+        let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
+
+        if tx.fallthrough_auth {
+            ctx.with_fallthrough_auth()
+                .generic_call_mut(call_info.instance_id, method, args)
         } else {
-            ChildAuthorization::Service
-        };
-        context
-            .call_context(tx.inner.call_info.instance_id, auth)?
-            .call(
-                tx.interface_name,
-                tx.inner.call_info.method_id,
-                tx.inner.arguments,
-            )
+            ctx.generic_call_mut(call_info.instance_id, method, args)
+        }
     }
 
     fn call_recursive(
         &self,
         mut context: CallContext<'_>,
-        arg: RecursiveCall,
+        depth: u64,
     ) -> Result<(), ExecutionError> {
-        if arg.depth == 1 {
+        if depth == 1 {
             return Ok(());
         }
-
-        context
-            .call_context(context.instance().id, ChildAuthorization::Fallthrough)?
-            .call(
-                "",
-                1,
-                RecursiveCall {
-                    depth: arg.depth - 1,
-                },
-            )
+        context.call_recursive(context.instance().id, depth - 1)
     }
 }
 
