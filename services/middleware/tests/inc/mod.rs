@@ -28,7 +28,10 @@ use semver::Version;
 
 use exonum_middleware_service::ArtifactReq;
 
-#[derive(Debug, FromAccess)]
+#[derive(Debug, FromAccess, RequireArtifact)]
+#[require_artifact(name = "exonum.services.test.Inc", version = "*")]
+// ^-- Since the schema does not change across versions, we use a wildcard `version` requirement.
+// This is a bad idea for real services.
 pub struct IncSchema<T: Access> {
     pub counts: MapIndex<T::Base, PublicKey, u64>,
 }

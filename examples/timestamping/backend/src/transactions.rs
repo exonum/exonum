@@ -72,13 +72,8 @@ impl TimestampingInterface<CallContext<'_>> for TimestampingService {
         let config = schema.config.get().expect("Can't read service config");
 
         let data = context.data();
-        let time_service_data = data
-            .for_service(config.time_service_name.as_str())
-            .ok_or(Error::TimeServiceNotFound)?;
-        let time = TimeSchema::new(time_service_data)
-            .time
-            .get()
-            .ok_or(Error::TimeServiceNotFound)?;
+        let time_schema: TimeSchema<_> = data.service_schema(config.time_service_name.as_str())?;
+        let time = time_schema.time.get().ok_or(Error::TimeServiceNotFound)?;
 
         let hash = &arg.content.content_hash;
         if schema.timestamps.get(hash).is_some() {
