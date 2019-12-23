@@ -13,16 +13,11 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-use super::proto;
-use exonum::{
-    helpers::Height,
-    runtime::{
-        rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
-        ExecutionError, InstanceId,
-    },
+use exonum::runtime::{
+    rust::{AfterCommitContext, CallContext, DefaultInstance, Service},
+    ExecutionError, InstanceId,
 };
 use exonum_derive::*;
-use exonum_proto::ProtobufConvert;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -32,34 +27,16 @@ use std::sync::{
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
-#[derive(Clone, Debug, PartialEq)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxAfterCommit")]
-pub struct TxAfterCommit {
-    pub height: Height,
-}
-
 #[exonum_interface]
-pub trait AfterCommitInterface {
-    fn handle_after_commit(
-        &self,
-        context: CallContext<'_>,
-        arg: TxAfterCommit,
-    ) -> Result<(), ExecutionError>;
-}
-
-impl TxAfterCommit {
-    pub fn new(height: Height) -> Self {
-        Self { height }
-    }
+pub trait AfterCommitInterface<Ctx> {
+    type Output;
+    fn after_commit(&self, ctx: Ctx, height: u64) -> Self::Output;
 }
 
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
-    proto_sources = "crate::proto",
     service_constructor = "Self::new_instance"
 )]
 #[service_dispatcher(implements("AfterCommitInterface"))]
@@ -67,12 +44,10 @@ pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
 
-impl AfterCommitInterface for AfterCommitService {
-    fn handle_after_commit(
-        &self,
-        _context: CallContext<'_>,
-        _arg: TxAfterCommit,
-    ) -> Result<(), ExecutionError> {
+impl AfterCommitInterface<CallContext<'_>> for AfterCommitService {
+    type Output = Result<(), ExecutionError>;
+
+    fn after_commit(&self, _ctx: CallContext<'_>, _height: u64) -> Self::Output {
         Ok(())
     }
 }
@@ -100,13 +75,15 @@ impl Service for AfterCommitService {
         let counter = self.counter.fetch_add(1, Ordering::SeqCst);
 
         // Test both validator-specific and generic sending.
-        let tx = TxAfterCommit::new(context.height());
         if counter < 10_000 {
             if let Some(broadcast) = context.broadcaster() {
-                broadcast.send(tx).ok();
+                broadcast.after_commit((), context.height().0).ok();
             }
         } else {
-            context.generic_broadcaster().send(tx).ok();
+            context
+                .generic_broadcaster()
+                .after_commit((), context.height().0)
+                .ok();
         }
     }
 }

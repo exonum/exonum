@@ -33,11 +33,6 @@ use exonum_derive::*;
 pub const SERVICE_NAME: &str = "api-service";
 pub const SERVICE_ID: InstanceId = 3;
 
-#[exonum_interface]
-pub trait ApiServiceInterface {}
-
-impl ApiServiceInterface for ApiService {}
-
 /// Sample query supported by API.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[derive(Serialize, Deserialize)]
@@ -104,7 +99,6 @@ impl Api {
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "api-service", artifact_version = "1.0.0")]
-#[service_dispatcher(implements("ApiServiceInterface"))]
 pub struct ApiService;
 
 impl DefaultInstance for ApiService {

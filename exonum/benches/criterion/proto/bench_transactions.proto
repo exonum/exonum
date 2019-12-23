@@ -18,8 +18,6 @@ import "types.proto";
 
 package exonum.benchmarks;
 
-message TimestampTx { exonum.crypto.Hash data = 1; }
-
 message CurrencyTx {
   exonum.crypto.PublicKey to = 1;
   uint32 seed = 2;

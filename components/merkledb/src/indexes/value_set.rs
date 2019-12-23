@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 
 use exonum_crypto::Hash;
 
-use super::{
+use crate::{
     access::{Access, AccessError, FromAccess},
     views::{
         IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
@@ -35,7 +35,7 @@ use super::{
 /// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
 /// `ValueSetIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../trait.BinaryValue.html
+/// [`BinaryValue`]: ../../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T: RawAccess, V> {
     base: View<T>,
@@ -51,7 +51,7 @@ pub struct ValueSetIndex<T: RawAccess, V> {
 /// [`iter_from`]: struct.ValueSetIndex.html#method.iter_from
 /// [`ValueSetIndex`]: struct.ValueSetIndex.html
 #[derive(Debug)]
-pub struct ValueSetIndexIter<'a, V> {
+pub struct Iter<'a, V> {
     base_iter: ViewIter<'a, Hash, V>,
 }
 
@@ -64,7 +64,7 @@ pub struct ValueSetIndexIter<'a, V> {
 /// [`hashes_from`]: struct.ValueSetIndex.html#method.iter_from
 /// [`ValueSetIndex`]: struct.ValueSetIndex.html
 #[derive(Debug)]
-pub struct ValueSetIndexHashes<'a> {
+pub struct Hashes<'a> {
     base_iter: ViewIter<'a, Hash, ()>,
 }
 
@@ -149,8 +149,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> ValueSetIndexIter<'_, V> {
-        ValueSetIndexIter {
+    pub fn iter(&self) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter(&()),
         }
     }
@@ -174,14 +174,14 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<'_, V> {
-        ValueSetIndexIter {
+    pub fn iter_from(&self, from: &Hash) -> Iter<'_, V> {
+        Iter {
             base_iter: self.base.iter_from(&(), from),
         }
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order. The iterator element type
-    /// is [Hash](../../exonum_crypto/struct.Hash.html).
+    /// is [Hash](../../../exonum_crypto/struct.Hash.html).
     ///
     /// # Examples
     ///
@@ -196,14 +196,14 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn hashes(&self) -> ValueSetIndexHashes<'_> {
-        ValueSetIndexHashes {
+    pub fn hashes(&self) -> Hashes<'_> {
+        Hashes {
             base_iter: self.base.iter(&()),
         }
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order starting from the specified
-    /// hash. The iterator element type is [Hash](../../exonum_crypto/struct.Hash.html).
+    /// hash. The iterator element type is [Hash](../../../exonum_crypto/struct.Hash.html).
     ///
     /// # Examples
     ///
@@ -221,8 +221,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes<'_> {
-        ValueSetIndexHashes {
+    pub fn hashes_from(&self, from: &Hash) -> Hashes<'_> {
+        Hashes {
             base_iter: self.base.iter_from(&(), from),
         }
     }
@@ -329,14 +329,14 @@ where
     V: BinaryValue + ObjectHash,
 {
     type Item = (Hash, V);
-    type IntoIter = ValueSetIndexIter<'a, V>;
+    type IntoIter = Iter<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
+impl<'a, V> Iterator for Iter<'a, V>
 where
     V: BinaryValue + ObjectHash,
 {
@@ -347,7 +347,7 @@ where
     }
 }
 
-impl<'a> Iterator for ValueSetIndexHashes<'a> {
+impl<'a> Iterator for Hashes<'a> {
     type Item = Hash;
 
     fn next(&mut self) -> Option<Self::Item> {

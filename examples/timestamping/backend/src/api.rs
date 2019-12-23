@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! REST API.
-use exonum_merkledb::{proof_map_index::Raw, MapProof};
+use exonum_merkledb::{proof_map::Raw, MapProof};
 
 use exonum::{
     blockchain::{BlockProof, IndexProof},

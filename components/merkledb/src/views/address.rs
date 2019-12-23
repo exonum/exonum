@@ -21,7 +21,7 @@ const MIGRATION_CHAR: u8 = b'^';
 /// In contrast with [`ResolvedAddress`], `IndexAddress` is a high-level logical construct;
 /// it does not directly map to key-value storage abstractions (column families and their keys).
 ///
-/// [`Group`]: struct.Group.html
+/// [`Group`]: indexes/group/struct.Group.html
 /// [`ResolvedAddress`]: struct.ResolvedAddress.html
 ///
 /// # Examples

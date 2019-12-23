@@ -16,39 +16,16 @@
 
 use exonum::{
     crypto::PublicKey,
-    merkledb::{access::Access, BinaryValue, MapIndex},
+    merkledb::{access::Access, MapIndex},
     runtime::{
         rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
         ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
     },
 };
 use exonum_derive::*;
-use failure::ensure;
 use semver::Version;
 
-use std::borrow::Cow;
-
-#[derive(Debug, Clone, Copy, ObjectHash)]
-pub struct Inc {
-    seed: u8,
-}
-
-impl Inc {
-    pub fn new(seed: u8) -> Self {
-        Self { seed }
-    }
-}
-
-impl BinaryValue for Inc {
-    fn to_bytes(&self) -> Vec<u8> {
-        vec![self.seed]
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == 1, "Invalid `Inc` size");
-        Ok(Self { seed: bytes[0] })
-    }
-}
+use exonum_middleware_service::ArtifactReq;
 
 #[derive(Debug, FromAccess)]
 pub struct IncSchema<T: Access> {
@@ -56,8 +33,9 @@ pub struct IncSchema<T: Access> {
 }
 
 #[exonum_interface]
-pub trait IncInterface {
-    fn increment(&self, context: CallContext<'_>, arg: Inc) -> Result<(), ExecutionError>;
+pub trait IncInterface<Ctx> {
+    type Output;
+    fn increment(&self, context: Ctx, seed: u8) -> Self::Output;
 }
 
 #[derive(Clone, Default, Debug, ServiceDispatcher)]
@@ -66,8 +44,10 @@ pub struct IncService;
 
 impl Service for IncService {}
 
-impl IncInterface for IncService {
-    fn increment(&self, context: CallContext<'_>, _arg: Inc) -> Result<(), ExecutionError> {
+impl IncInterface<CallContext<'_>> for IncService {
+    type Output = Result<(), ExecutionError>;
+
+    fn increment(&self, context: CallContext<'_>, _seed: u8) -> Self::Output {
         let author = context
             .caller()
             .author()
@@ -89,6 +69,15 @@ impl IncFactory {
 
     pub fn new(version: Version) -> Self {
         Self { version }
+    }
+
+    pub fn req(version_req: &str) -> ArtifactReq {
+        ArtifactReq {
+            name: Self::ARTIFACT_NAME.to_owned(),
+            version: version_req
+                .parse()
+                .expect("Cannot parse version requirement"),
+        }
     }
 }
 
