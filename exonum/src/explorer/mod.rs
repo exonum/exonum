@@ -554,7 +554,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Return status of call in block
-    pub fn call_status(
+    pub(crate) fn call_status(
         &self,
         block_height: Height,
         call_location: CallInBlock,

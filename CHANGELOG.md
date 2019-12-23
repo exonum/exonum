@@ -99,9 +99,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
 
 - The set of endpoints were introduced.
-  `v1/call_status/transaction` - to get status of committed transaction
-  `v1/call_status/before_transactions` - status of `before_transactions` hook
-  `v1/call_status/after_transactions` - status of `after_transactions` hook
+  `v1/call_status/transaction` - to get status of committed transaction,
+  `v1/call_status/before_transactions` - status of `before_transactions` hook,
+  `v1/call_status/after_transactions` - status of `after_transactions` hook.
   (#1612)
 
 - Service instances can now be stopped.

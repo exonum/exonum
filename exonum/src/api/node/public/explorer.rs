@@ -41,7 +41,7 @@ use crate::{
     helpers::Height,
     messages::{Precommit, SignedMessage, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::CallInfo,
+    runtime::{CallInfo, InstanceId},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -171,7 +171,7 @@ impl AsRef<[u8]> for TransactionHex {
     }
 }
 
-/// Status of a call.
+/// Call status response.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CallStatusResponse {
     /// Call status
@@ -185,7 +185,7 @@ pub struct CallStatusQuery {
     /// Height of a block
     pub height: Height,
     /// Numerical service identifier.
-    pub id: u32,
+    pub service_id: InstanceId,
 }
 
 /// Exonum blockchain explorer API.
@@ -195,12 +195,12 @@ pub struct ExplorerApi {
 }
 
 impl ExplorerApi {
-    /// Create a new `ExplorerApi` instance.
+    /// Creates a new `ExplorerApi` instance.
     pub fn new(blockchain: Blockchain) -> Self {
         Self { blockchain }
     }
 
-    /// Return the explored range and the corresponding headers. The range specifies the smallest
+    /// Returns the explored range and the corresponding headers. The range specifies the smallest
     /// and largest heights traversed to collect the number of blocks specified in
     /// the [`BlocksQuery`] struct.
     ///
@@ -268,7 +268,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Return the content for a block at a specific height.
+    /// Returns the content for a block at a specific height.
     pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
@@ -280,7 +280,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Search for a transaction, either committed or uncommitted, by the hash.
+    /// Searches for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
         snapshot: &dyn Snapshot,
         query: TransactionQuery,
@@ -293,7 +293,7 @@ impl ExplorerApi {
             })
     }
 
-    /// Return call status of committed transaction.
+    /// Returns call status of committed transaction.
     pub fn transaction_status(
         snapshot: &dyn Snapshot,
         query: TransactionQuery,
@@ -322,25 +322,25 @@ impl ExplorerApi {
         Ok(CallStatusResponse { status })
     }
 
-    /// Return call status of `before_transactions` hook.
+    /// Returns call status of `before_transactions` hook.
     pub fn before_transactions_status(
         snapshot: &dyn Snapshot,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
-        let call_in_block = CallInBlock::before_transactions(query.id);
+        let call_in_block = CallInBlock::before_transactions(query.service_id);
 
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
         Ok(CallStatusResponse { status })
     }
 
-    /// Return call status of `after_transactions` hook.
+    /// Returns call status of `after_transactions` hook.
     pub fn after_transactions_status(
         snapshot: &dyn Snapshot,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
-        let call_in_block = CallInBlock::after_transactions(query.id);
+        let call_in_block = CallInBlock::after_transactions(query.service_id);
 
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
         Ok(CallStatusResponse { status })
@@ -419,7 +419,7 @@ impl ExplorerApi {
         });
     }
 
-    /// Add explorer API endpoints to the corresponding scope.
+    /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(
         self,
         api_scope: &mut ApiScope,

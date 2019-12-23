@@ -89,7 +89,6 @@ use crate::{
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
 /// [`DispatcherError`]: enum.DispatcherError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[derive(Serialize, Deserialize)]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
     ///
@@ -430,7 +429,6 @@ where
 /// [`ErrorKind`]: enum.ErrorKind.html
 /// [`CallSite`]: struct.CallSite.html
 #[derive(Clone, Debug, Fail, BinaryValue)]
-#[derive(Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 // ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
 // by the caller. It is useful for roundtrip tests, though.
