@@ -21,6 +21,9 @@ use serde::{
 use std::{borrow::Cow, convert::TryFrom};
 
 use crate::crypto::{self, Hash, PublicKey, SecretKey};
+use crate::proto::schema::consensus::Verified as pb_verified;
+use exonum_proto::ProtobufConvert;
+use failure::Error;
 
 use super::types::{ExonumMessage, SignedMessage};
 
@@ -195,6 +198,24 @@ impl<T> AsRef<T> for Verified<T> {
 impl<T> From<Verified<T>> for SignedMessage {
     fn from(msg: Verified<T>) -> Self {
         msg.into_raw()
+    }
+}
+
+impl<T> ProtobufConvert for Verified<T>
+where
+    T: TryFrom<SignedMessage>,
+{
+    type ProtoStruct = pb_verified;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut verified = pb_verified::new();
+        verified.set_raw(self.as_raw().to_pb());
+        verified
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let raw = SignedMessage::from_pb(pb.get_raw().clone()).unwrap();
+        Ok(raw.into_verified().unwrap())
     }
 }
 
