@@ -550,21 +550,21 @@ impl Sandbox {
 
     pub fn broadcast<T>(&self, msg: &Verified<T>)
     where
-        T: TryFrom<SignedMessage> + std::fmt::Debug,
+        T: TryFrom<SignedMessage> + Debug,
     {
         self.broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1));
     }
 
     pub fn try_broadcast<T>(&self, msg: &Verified<T>) -> Result<(), String>
     where
-        T: TryFrom<SignedMessage> + std::fmt::Debug,
+        T: TryFrom<SignedMessage> + Debug,
     {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1))
     }
 
     pub fn broadcast_to_addrs<'a, T, I>(&self, msg: &Verified<T>, addresses: I)
     where
-        T: TryFrom<SignedMessage> + std::fmt::Debug,
+        T: TryFrom<SignedMessage> + Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
@@ -576,7 +576,7 @@ impl Sandbox {
         addresses: I,
     ) -> Result<(), String>
     where
-        T: TryFrom<SignedMessage> + std::fmt::Debug,
+        T: TryFrom<SignedMessage> + Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
         let expected_msg = msg.as_raw();
@@ -591,13 +591,13 @@ impl Sandbox {
                     // Use full messages instead of raw for reporting an assertion failure.
                     panic!(
                         "Expected to broadcast other message: expected {:?}, but got {:?}",
-                        &msg, &real_msg
+                        msg, real_msg
                     );
                 }
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
-                        expected_msg, real_addr
+                        msg, real_addr
                     )
                 } else {
                     expected_set.remove(&real_addr);
@@ -606,7 +606,7 @@ impl Sandbox {
                 panic!(
                     "Expected to broadcast the message {:?} but someone don't receive \
                      messages: {:?}",
-                    expected_msg, expected_set
+                    msg, expected_set
                 );
             }
         }

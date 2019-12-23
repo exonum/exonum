@@ -78,7 +78,7 @@ pub struct State {
     queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
-    unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
+    precommits_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
 
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
@@ -486,7 +486,7 @@ impl State {
             queued: Vec::new(),
 
             unknown_txs: HashMap::new(),
-            unknown_proposes_with_precommits: HashMap::new(),
+            precommits_confirmed_by_majority: HashMap::new(),
 
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
@@ -824,7 +824,7 @@ impl State {
         // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
-        self.unknown_proposes_with_precommits.clear();
+        self.precommits_confirmed_by_majority.clear();
         self.prevotes.clear();
         self.precommits.clear();
         self.validators_rounds.clear();
@@ -1089,13 +1089,11 @@ impl State {
                     .our_prevotes
                     .insert(msg.payload().round, msg.clone())
                 {
-                    if other != msg {
-                        panic!(
-                            "Trying to send different prevotes for the same round: \
-                             old = {:?}, new = {:?}",
-                            other, msg
-                        );
-                    }
+                    // Our node should not ever send two different prevotes within one round.
+                    assert_eq!(
+                        other, msg,
+                        "Trying to send different prevotes for the same round"
+                    )
                 }
             }
         }
@@ -1168,27 +1166,27 @@ impl State {
         votes.count() >= majority_count
     }
 
-    /// Adds unknown (for this node) propose.
-    pub fn add_unknown_propose_with_precommits(
+    /// Adds a propose that was confirmed by a majority of
+    /// validator nodes without our participation.
+    pub fn add_propose_confirmed_by_majority(
         &mut self,
         round: Round,
         propose_hash: Hash,
         block_hash: Hash,
     ) {
-        self.unknown_proposes_with_precommits
-            .entry(propose_hash)
-            .or_insert_with(Vec::new)
-            .push((round, block_hash));
+        let old_value = self
+            .precommits_confirmed_by_majority
+            .insert(propose_hash, (round, block_hash));
+
+        debug_assert!(
+            old_value.is_none(),
+            "Attempt to add propose confirmed by majority twice"
+        );
     }
 
-    /// Removes propose from the list of unknown proposes and returns its round and hash.
-    pub fn take_unknown_propose_with_precommits(
-        &mut self,
-        propose_hash: &Hash,
-    ) -> Vec<(Round, Hash)> {
-        self.unknown_proposes_with_precommits
-            .remove(propose_hash)
-            .unwrap_or_default()
+    /// Removes a propose from the list of unknown proposes and returns its round and hash.
+    pub fn take_confirmed_propose(&mut self, propose_hash: &Hash) -> Option<(Round, Hash)> {
+        self.precommits_confirmed_by_majority.remove(propose_hash)
     }
 
     /// Returns true if the node has +2/3 pre-commits for the specified round and block hash.

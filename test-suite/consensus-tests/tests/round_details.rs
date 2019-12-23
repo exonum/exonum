@@ -554,7 +554,7 @@ fn lock_remove_request_prevotes() {
 /// scenario: // HANDLE PRECOMMIT positive scenario
 ///         - Our `block_hash` is different from the precommits one.
 #[test]
-#[should_panic(expected = "Our block_hash different from precommits one.")]
+#[should_panic(expected = "handle_majority_precommits: wrong block hash.")]
 fn handle_precommit_different_block_hash() {
     let sandbox = timestamping_sandbox();
 
@@ -1274,7 +1274,7 @@ fn commit_using_unknown_propose_with_precommits() {
 ///         `handle_precommit_positive_scenario_commit` propose and tx are received after second
 ///         precommit and here propose and tx are received after third precommit
 #[test]
-#[should_panic(expected = "Full propose: wrong state hash")]
+#[should_panic(expected = "handle_full_propose: wrong block hash")]
 fn handle_full_propose_wrong_state_hash() {
     let sandbox = timestamping_sandbox();
 
