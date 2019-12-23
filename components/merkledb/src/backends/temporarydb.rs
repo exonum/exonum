@@ -63,7 +63,7 @@ impl TemporaryDB {
                     let message = format!("Cannot access column family {}", name);
                     crate::Error::new(message)
                 })?;
-                let mut iter = db_reader.raw_iterator_cf(cf_handle.clone())?;
+                let mut iter = db_reader.raw_iterator_cf(cf_handle)?;
                 iter.seek_to_last();
                 if iter.valid() {
                     if let Some(key) = iter.key() {
@@ -75,7 +75,7 @@ impl TemporaryDB {
                         if key.len() < LARGER_KEY.len() {
                             batch.delete_range_cf::<&[u8]>(cf_handle, &[], LARGER_KEY)?;
                         } else {
-                            batch.delete_range_cf::<&[u8]>(cf_handle.clone(), &[], &key)?;
+                            batch.delete_range_cf::<&[u8]>(cf_handle, &[], &key)?;
                             batch.delete_cf(cf_handle, &key)?;
                         }
                     }
