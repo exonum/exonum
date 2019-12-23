@@ -14,11 +14,8 @@
 
 //! Examples of usage of a blockchain explorer.
 
-#[macro_use]
-extern crate serde_derive;
-
 use exonum::{
-    blockchain::{BlockchainMut, CallInBlock},
+    blockchain::{BlockchainMut, CallInBlock, ProposerId},
     crypto::gen_keypair,
     explorer::*,
     helpers::{Height, ValidatorId},
@@ -26,18 +23,12 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::ErrorKind as ExecutionErrorKind,
 };
-use serde_json::json;
-
-use std::{collections::BTreeMap, iter};
-
-use crate::blockchain::{
+use exonum_node_tests::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, ExplorerTransactions as _,
     Transfer, SERVICE_ID,
 };
-use exonum::blockchain::ProposerId;
-
-#[path = "../tests/explorer/blockchain/mod.rs"]
-mod blockchain;
+use serde_json::json;
+use std::{collections::BTreeMap, iter};
 
 /// Creates a transaction for the mempool.
 pub fn mempool_transaction() -> Verified<AnyTx> {
@@ -62,7 +53,7 @@ pub fn sample_blockchain() -> BlockchainMut {
 
     let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
-    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(&bob.0, 100));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.0, 100));
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));
