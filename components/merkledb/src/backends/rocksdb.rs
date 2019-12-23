@@ -132,9 +132,7 @@ impl RocksDB {
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
         for (resolved, changes) in patch.into_changes() {
-            let cf_exists = self.cf_exists(&resolved.name);
-
-            if !cf_exists {
+            if !self.cf_exists(&resolved.name) {
                 self.create_cf(&resolved.name)?;
             }
 
