@@ -16,12 +16,17 @@ use failure::Error;
 
 use exonum_merkledb::MapProof;
 use exonum_proto::ProtobufConvert;
+use protobuf::RepeatedField;
 
 use crate::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{Precommit, Verified},
-    proto::{self, OrderedMap},
+    proto::{
+        self,
+        schema::{consensus::Verified as pb_verified, proofs},
+        OrderedMap,
+    },
 };
 use exonum_merkledb::BinaryValue;
 use std::{borrow::Cow, fmt};
@@ -202,8 +207,35 @@ pub struct BlockProof {
     pub precommits: Vec<Verified<Precommit>>,
 }
 
+impl ProtobufConvert for BlockProof {
+    type ProtoStruct = proofs::BlockProof;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut block_proof = Self::ProtoStruct::new();
+
+        block_proof.set_block(self.block.to_pb());
+
+        let precommits: Vec<pb_verified> = self.precommits.iter().map(|v| v.to_pb()).collect();
+        block_proof.set_precommits(RepeatedField::from_vec(precommits));
+
+        block_proof
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let block = Block::from_pb(pb.get_block().clone()).unwrap();
+        let precommits = pb
+            .get_precommits()
+            .iter()
+            .map(|p| Verified::from_pb(p.clone()).unwrap())
+            .collect();
+
+        Ok(BlockProof { block, precommits })
+    }
+}
+
 /// Proof of authenticity for a single index within the database.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+#[protobuf_convert(source = "proofs::IndexProof")]
 pub struct IndexProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]
