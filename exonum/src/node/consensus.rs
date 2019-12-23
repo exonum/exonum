@@ -726,7 +726,7 @@ impl NodeHandler {
             }
         }
 
-        // Scenario 2&3: We're processing an already committed block.
+        // Scenario 2 and 3: We're processing an already committed block.
         // Note that this scenario should be mutually exclusive with the scenario 1:
         // if our height is not the height of the blockchain, validator nodes do not
         // process the consensus messages.

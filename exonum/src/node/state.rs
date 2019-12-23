@@ -880,15 +880,17 @@ impl State {
 
     #[cfg(debug_assertions)]
     fn reorder_proposes_if_needed(full_proposes: &mut Vec<(Hash, Round)>) {
-        // For tests we want the order of proposes to be predictable,
-        // so (unlike the release version) we *always* sort by both round and hash.
-        full_proposes.sort_unstable_by(|a, b| {
+        // For tests we want don't care about DoS attacks,
+        // so (unlike the release version) we *always* sort by both round *and hash*.
+        // This is useful for tests to have proposes in a predictable order.
+        full_proposes.sort_unstable_by(|(hash1, round1), (hash2, round2)| {
             // Compare rounds first.
-            // Note that we call `cmp` on `b` to obtain descending order.
-            let cmp_result = b.1.cmp(&a.1);
+            // Note that we call `cmp` on `round2` to obtain descending order.
+            let cmp_result = round2.cmp(&round1);
             if let std::cmp::Ordering::Equal = cmp_result {
-                // Rounds are equal, compare by hash.
-                a.0.cmp(&b.0)
+                // Rounds are equal, compare by hash (in direct order,
+                // since it doesn't affect anything).
+                hash1.cmp(&hash2)
             } else {
                 // Rounds are different, use the comparison result.
                 cmp_result
@@ -898,21 +900,24 @@ impl State {
 
     #[cfg(not(debug_assertions))]
     fn reorder_proposes_if_needed(full_proposes: &mut Vec<(Hash, Round)>) {
-        // If we have a lot of proposes, we should sort it by the round in
-        // descending order, since it's more likely to commit a propose with
-        // greater round, and we don't want to process a lot of proposes from
-        // lower rounds.
-        // However, if the amount of proposes isn't big, overhead from sorting
-        // is not desired.
+        // Since it's more likely to commit a propose with greater round,
+        // it makes sense to process proposes ordered descendingly by the
+        // round number.
+        // However, if we have a lot of proposes, the overhead of sorting
+        // can become significant, and we don't want to create a space for
+        // DoS attack. Thus the maximim amount of proposes for which
+        // sorting is applied is limited.
+        // Despite that, the limit is big enough to won't be achieved within
+        // normal blockchain functioning.
 
         // TODO: Clarify the value for this constant (ECR-4050).
-        const MIN_PROPOSES_AMOUNT_FOR_SORTING: usize = 10;
+        const MAX_PROPOSES_AMOUNT_FOR_SORTING: usize = 10;
 
-        if full_proposes.len() >= MIN_PROPOSES_AMOUNT_FOR_SORTING {
-            full_proposes.sort_unstable_by(|a, b| {
-                // Note that we call `cmp` on `b` to obtain descending order.
+        if full_proposes.len() <= MAX_PROPOSES_AMOUNT_FOR_SORTING {
+            full_proposes.sort_unstable_by(|(_, round1), (_, round2)| {
+                // Note that we call `cmp` on `round2` to obtain descending order.
                 // Unlike debug version, we don't sort by hash.
-                b.1.cmp(&a.1)
+                round2.cmp(&round1)
             });
         }
     }
