@@ -12,24 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
-
-import "types.proto";
-
-package exonum.tests.explorer;
-
-message CreateWallet {
-  exonum.crypto.PublicKey pubkey = 1;
-  string name = 2;
-}
-
-message Transfer {
-  exonum.crypto.PublicKey from = 1;
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
-
-message Issue {
-  exonum.crypto.PublicKey to = 2;
-  uint64 amount = 3;
-}
+mod explorer;
+mod node;
+mod websocket;
