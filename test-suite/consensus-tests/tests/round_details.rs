@@ -554,7 +554,7 @@ fn lock_remove_request_prevotes() {
 /// scenario: // HANDLE PRECOMMIT positive scenario
 ///         - Our `block_hash` is different from the precommits one.
 #[test]
-#[should_panic(expected = "Our block_hash different from precommits one.")]
+#[should_panic(expected = "handle_majority_precommits: wrong block hash.")]
 fn handle_precommit_different_block_hash() {
     let sandbox = timestamping_sandbox();
 
@@ -1274,7 +1274,7 @@ fn commit_using_unknown_propose_with_precommits() {
 ///         `handle_precommit_positive_scenario_commit` propose and tx are received after second
 ///         precommit and here propose and tx are received after third precommit
 #[test]
-#[should_panic(expected = "Full propose: wrong state hash")]
+#[should_panic(expected = "handle_full_propose: wrong block hash")]
 fn handle_full_propose_wrong_state_hash() {
     let sandbox = timestamping_sandbox();
 
@@ -1876,6 +1876,117 @@ fn handle_precommit_remove_propose_request() {
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
+}
+
+/// The idea of the test:
+/// - node receives one transaction (tx2);
+/// - node receives all the precommits and prevotes for one proposal;
+/// - node receives multiple proposals within one round:
+///   - first proposal contains one transaction (tx1),
+///     second one contains two transactions (tx1, tx2);
+///   - both proposals are incomplete yet (tx1 is missing).
+/// - node receives transaction (tx1);
+/// - both proposals are now complete, node should send prevote and precommit.
+///
+/// Motivation:
+/// consensus code contained a bug when during processing of full proposals
+/// the second proposal was processed even though node already bumped the height.
+#[test]
+fn handle_receive_multiple_proposals_same_round() {
+    let sandbox = timestamping_sandbox_builder().build();
+
+    let tx_1 = gen_timestamping_tx();
+    let tx_2 = gen_timestamping_tx();
+
+    let propose_1 = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx_1.object_hash()])
+        .build();
+    let propose_2 = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx_1.object_hash(), tx_2.object_hash()])
+        .build();
+
+    let block_1 = BlockBuilder::new(&sandbox)
+        .with_txs_hashes(&[tx_1.object_hash()])
+        .build();
+    let block_2 = BlockBuilder::new(&sandbox)
+        .with_txs_hashes(&[tx_1.object_hash(), tx_2.object_hash()])
+        .build();
+
+    sandbox.recv(&tx_2);
+
+    // Since multiple proposes for the same value will be sorted by the propose hash,
+    // we want to send precommits/prevotes for the propose that will be processed **first**:
+    // in this test we check, that if the first propose was properly processed, the second
+    // propose won't break anything (at the moment of this test being added, processing of the
+    // second propose results in a panic).
+    let (propose_hash, block_hash, txs_in_pool) =
+        if propose_1.object_hash() < propose_2.object_hash() {
+            // `tx_2` will be left in pool.
+            (propose_1.object_hash(), block_1.object_hash(), 1)
+        } else {
+            // No txs will be left in pool.
+            (propose_2.object_hash(), block_2.object_hash(), 0)
+        };
+
+    // Receive prevotes.
+    for i in 1..sandbox.validators().len() as u16 {
+        sandbox.recv(&sandbox.create_prevote(
+            ValidatorId(i),
+            Height(1),
+            Round(1),
+            propose_hash,
+            NOT_LOCKED,
+            sandbox.secret_key(ValidatorId(i)),
+        ));
+    }
+
+    // Receive precommits.
+    for i in 1..sandbox.validators().len() as u16 {
+        sandbox.recv(&sandbox.create_precommit(
+            ValidatorId(i),
+            Height(1),
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(ValidatorId(i)),
+        ))
+    }
+
+    sandbox.recv(&propose_1);
+    sandbox.recv(&propose_2);
+
+    sandbox.recv(&tx_1);
+    // ^-- here both proposes become complete, no panic should occur.
+
+    // We should send a prevote/precommit for the first (ordered by hash) proposal.
+    sandbox.broadcast(&sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose_hash,
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+
+    sandbox.broadcast(&sandbox.create_precommit(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose_hash,
+        block_hash,
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+
+    // Block should be applied.
+    sandbox.broadcast(&sandbox.create_status(
+        sandbox.public_key(ValidatorId(0)),
+        Height(2),
+        block_hash,
+        txs_in_pool,
+        &sandbox.secret_key(ValidatorId(0)),
+    ));
 }
 
 #[test]

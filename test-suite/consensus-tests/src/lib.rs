@@ -548,36 +548,39 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: TryFrom<SignedMessage>>(&self, msg: &Verified<T>) {
+    pub fn broadcast<T>(&self, msg: &Verified<T>)
+    where
+        T: TryFrom<SignedMessage> + Debug,
+    {
         self.broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1));
     }
 
-    pub fn try_broadcast<T: TryFrom<SignedMessage>>(
-        &self,
-        msg: &Verified<T>,
-    ) -> Result<(), String> {
+    pub fn try_broadcast<T>(&self, msg: &Verified<T>) -> Result<(), String>
+    where
+        T: TryFrom<SignedMessage> + Debug,
+    {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().map(|i| &i.public_key).skip(1))
     }
 
-    pub fn broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
-        &self,
-        msg: &Verified<T>,
-        addresses: I,
-    ) where
+    pub fn broadcast_to_addrs<'a, T, I>(&self, msg: &Verified<T>, addresses: I)
+    where
+        T: TryFrom<SignedMessage> + Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    pub fn try_broadcast_to_addrs<'a, T: TryFrom<SignedMessage>, I>(
+    pub fn try_broadcast_to_addrs<'a, T, I>(
         &self,
         msg: &Verified<T>,
         addresses: I,
     ) -> Result<(), String>
     where
+        T: TryFrom<SignedMessage> + Debug,
         I: IntoIterator<Item = &'a PublicKey>,
     {
-        let expected_msg = msg.as_raw();
+        let expected_msg = Message::from_signed(msg.as_raw().clone())
+            .expect("Can't obtain `Message` from `Verified`");
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -586,14 +589,13 @@ impl Sandbox {
         for _ in 0..expected_set.len() {
             if let Some((real_addr, real_msg)) = self.pop_sent_message() {
                 assert_eq!(
-                    expected_msg,
-                    real_msg.as_raw(),
-                    "Expected to broadcast other message"
+                    expected_msg, real_msg,
+                    "Expected to broadcast other message",
                 );
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
-                        expected_msg, real_addr
+                        msg, real_addr
                     )
                 } else {
                     expected_set.remove(&real_addr);
@@ -602,7 +604,7 @@ impl Sandbox {
                 panic!(
                     "Expected to broadcast the message {:?} but someone don't receive \
                      messages: {:?}",
-                    expected_msg, expected_set
+                    msg, expected_set
                 );
             }
         }
