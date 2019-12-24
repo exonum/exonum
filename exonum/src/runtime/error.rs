@@ -31,7 +31,7 @@ use std::{
     panic,
 };
 
-use super::{InstanceId, MethodId};
+use super::{InstanceId, MethodId, RuntimeIdentifier};
 use crate::{
     crypto::{self, Hash},
     proto::schema::runtime as runtime_proto,
@@ -526,21 +526,24 @@ impl Display for ExecutionError {
         if let Some(ref call_site) = self.call_site {
             write!(
                 formatter,
-                "Execution error `{kind}` occurred in {site}",
+                "Execution error with code `{kind}` occurred in {site}",
                 kind = self.kind,
                 site = call_site
             )?;
         } else if let Some(runtime_id) = self.runtime_id {
             write!(
                 formatter,
-                "Execution error `{kind}` occurred in runtime {id}",
+                "Execution error with code `{kind}` occurred in {runtime}",
                 kind = self.kind,
-                id = runtime_id
+                runtime = match RuntimeIdentifier::transform(runtime_id) {
+                    Ok(runtime) => runtime.to_string(),
+                    Err(_) => format!("Non-default runtime with id {}", runtime_id),
+                }
             )?;
         } else {
             write!(
                 formatter,
-                "Execution error `{kind}` occurred",
+                "Execution error with code `{kind}` occurred",
                 kind = self.kind
             )?;
         }
