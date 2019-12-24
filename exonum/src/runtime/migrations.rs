@@ -21,10 +21,11 @@ use exonum_merkledb::migration::MigrationHelper;
 
 use std::{collections::BTreeMap, fmt};
 
-use crate::runtime::{ArtifactId, InstanceSpec};
+use crate::runtime::InstanceSpec;
 
 /// Atomic migration script.
 pub struct MigrationScript {
+    end_version: Version,
     name: String,
     logic: Box<dyn FnOnce(&mut MigrationContext) + Send>,
 }
@@ -33,19 +34,21 @@ impl fmt::Debug for MigrationScript {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("MigrationScript")
+            .field("end_version", &self.end_version)
             .field("name", &self.name)
             .finish()
     }
 }
 
 impl MigrationScript {
-    /// Creates a new migration script with the specified name and implementation.
-    pub fn new<F>(name: impl Into<String>, logic: F) -> Self
+    /// Creates a new migration script with the specified end version and implementation.
+    pub fn new<F>(logic: F, end_version: Version) -> Self
     where
         F: FnOnce(&mut MigrationContext) + Send + 'static,
     {
         Self {
-            name: name.into(),
+            name: format!("Migration to {}", end_version),
+            end_version,
             logic: Box::new(logic),
         }
     }
@@ -53,6 +56,11 @@ impl MigrationScript {
     /// Returns the name of the script.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Return the version of the data after this script is applied.
+    pub fn end_version(&self) -> &Version {
+        &self.end_version
     }
 
     /// Executes the script.
@@ -92,50 +100,82 @@ pub trait MigrateData {
 /// Errors that can occur during data migrations.
 #[derive(Debug)]
 pub enum DataMigrationError {
-    /// Start version is too far in the past.
-    UnsupportedStartVersion {
+    /// The start version is too far in the past.
+    OldStartVersion {
         /// Minimum supported version.
         min_supported_version: Version,
     },
-    /// Start version is in the future.
+    /// The start version is in the future.
     FutureStartVersion {
         /// Maximum supported version.
         max_supported_version: Version,
     },
+    /// The start version falls in the supported lower / upper bounds on versions,
+    /// but is not supported itself. This can be the case, e.g., for pre-releases.
+    UnsupportedStart,
     // TODO: probably need custom errors.
 }
 
 /// Linearly ordered migrations.
+///
+/// # Limitations
+///
+/// Special care must be taken to support pre-release versions (i.e., versions like `0.2.0-pre.2` or
+/// `1.2.34-rc.5`). As per the semver specification:
+///
+/// - Any pre-release version is lesser than a corresponding version without a pre-release suffix
+/// - Pre-release versions with the same base triple are ordered alphabetically by their suffixes
+///
+/// The support of prerelease versions needs to be explicitly enabled by using the
+/// [`with_prereleases`](#method.with_prereleases) constructor. Otherwise, a prerelease mentioned
+/// in the builder stage will lead to a panic, and [`select`](#method.select) will return an error
+/// if a prerelease is specified as a `start_version`.
+#[derive(Debug)]
 pub struct LinearMigrations {
     min_start_version: Option<Version>,
     latest_version: Version,
     scripts: BTreeMap<Version, MigrationScript>,
-}
-
-impl fmt::Debug for LinearMigrations {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("LinearMigrations")
-            .field("min_start_version", &self.min_start_version)
-            .field("latest_version", &self.latest_version)
-            .field("scripts", &self.scripts.keys().collect::<Vec<_>>())
-            .finish()
-    }
+    support_prereleases: bool,
 }
 
 impl LinearMigrations {
-    /// Creates a new set of migrations with the latest supported version taken
-    /// from the supplied artifact.
-    pub fn new(latest_artifact: ArtifactId) -> Self {
+    /// Creates a new set of migrations with the specified latest supported version.
+    pub fn new(latest_version: Version) -> Self {
+        assert!(
+            !latest_version.is_prerelease(),
+            "Prerelease versions require using `with_prereleases` constructor"
+        );
+        Self {
+            support_prereleases: false,
+            ..Self::with_prereleases(latest_version)
+        }
+    }
+
+    /// Creates a new set of migrations with the specified latest supported version.
+    ///
+    /// Unlike the `new` constructor, this one indicates that prerelease versions are allowed
+    /// in the list of migrations and as the start version.
+    pub fn with_prereleases(latest_version: Version) -> Self {
         Self {
             min_start_version: None,
-            latest_version: latest_artifact.version,
+            latest_version,
             scripts: BTreeMap::new(),
+            support_prereleases: true,
+        }
+    }
+
+    fn check_prerelease(&self, version: &Version) {
+        if !self.support_prereleases {
+            assert!(
+                !version.is_prerelease(),
+                "Prerelease versions require using `with_prereleases` constructor"
+            );
         }
     }
 
     /// Signals to return an error if the starting version is less than the specified version.
     pub fn forget_before(mut self, version: Version) -> Self {
+        self.check_prerelease(&version);
         self.min_start_version = Some(version);
         self
     }
@@ -145,8 +185,14 @@ impl LinearMigrations {
     where
         F: FnOnce(&mut MigrationContext) + Send + 'static,
     {
-        let script_name = format!("Migration to version {}", version);
-        let script = MigrationScript::new(script_name, script);
+        self.check_prerelease(&version);
+        assert!(
+            version <= self.latest_version,
+            "Cannot add a script for a future version {} (the latest version is {})",
+            version,
+            self.latest_version
+        );
+        let script = MigrationScript::new(script, version.clone());
         self.scripts.insert(version, script);
         self
     }
@@ -156,6 +202,9 @@ impl LinearMigrations {
         self,
         start_version: &Version,
     ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        if !self.support_prereleases && start_version.is_prerelease() {
+            return Err(DataMigrationError::UnsupportedStart);
+        }
         if *start_version > self.latest_version {
             return Err(DataMigrationError::FutureStartVersion {
                 max_supported_version: self.latest_version,
@@ -163,7 +212,7 @@ impl LinearMigrations {
         }
         if let Some(min_supported_version) = self.min_start_version {
             if *start_version < min_supported_version {
-                return Err(DataMigrationError::UnsupportedStartVersion {
+                return Err(DataMigrationError::OldStartVersion {
                     min_supported_version,
                 });
             }
@@ -186,6 +235,247 @@ impl LinearMigrations {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime::{ArtifactId, RuntimeIdentifier};
 
-    // FIXME: tests for linear migrations
+    use assert_matches::assert_matches;
+    use exonum_crypto::Hash;
+    use exonum_merkledb::{access::AccessExt, Database, Snapshot, TemporaryDB};
+
+    use std::{collections::HashSet, sync::Arc};
+
+    const ARTIFACT_NAME: &str = "service.test.Migration";
+
+    fn migration_02(context: &mut MigrationContext) {
+        assert_eq!(context.instance_spec.name, "test");
+        assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
+        assert!(context.instance_spec.artifact.version < Version::new(0, 2, 0));
+
+        let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
+        assert!(!old_entry.exists());
+        let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
+        new_entry.set(1);
+    }
+
+    fn migration_05(context: &mut MigrationContext) {
+        assert_eq!(context.instance_spec.name, "test");
+        assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
+        assert!(context.instance_spec.artifact.version >= Version::new(0, 2, 0));
+        assert!(context.instance_spec.artifact.version < Version::new(0, 5, 0));
+
+        let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
+        assert_eq!(old_entry.get(), Some(1));
+        let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
+        new_entry.set(2);
+    }
+
+    fn migration_06(context: &mut MigrationContext) {
+        assert_eq!(context.instance_spec.name, "test");
+        assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
+        assert!(context.instance_spec.artifact.version >= Version::new(0, 5, 0));
+        assert!(context.instance_spec.artifact.version < Version::new(0, 6, 0));
+
+        let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
+        assert_eq!(old_entry.get(), Some(2));
+        let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
+        new_entry.set(3);
+    }
+
+    fn create_linear_migrations() -> LinearMigrations {
+        LinearMigrations::new(Version::new(0, 6, 3))
+            .migrate(Version::new(0, 2, 0), migration_02)
+            .migrate(Version::new(0, 5, 0), migration_05)
+            .migrate(Version::new(0, 6, 0), migration_06)
+    }
+
+    fn execute_scripts(
+        db: TemporaryDB,
+        start_version: Version,
+        scripts: Vec<MigrationScript>,
+    ) -> Box<dyn Snapshot> {
+        let db = Arc::new(db);
+        let mut version = start_version;
+        let mut migration_hashes = HashSet::new();
+
+        for script in scripts {
+            let mut context = MigrationContext {
+                helper: MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test"),
+                instance_spec: InstanceSpec {
+                    id: 100,
+                    name: "test".to_string(),
+                    artifact: ArtifactId {
+                        runtime_id: RuntimeIdentifier::Rust as _,
+                        name: ARTIFACT_NAME.to_owned(),
+                        version: version.clone(),
+                    },
+                },
+            };
+
+            let next_version = script.end_version().to_owned();
+            assert!(
+                version < next_version,
+                "current version = {}, next version = {}",
+                version,
+                next_version
+            );
+            version = next_version;
+
+            script.execute(&mut context);
+            let migration_hash = context.helper.finish().unwrap();
+            // Since the migration contains `ProofEntry`, its hash should be non-trivial.
+            assert_ne!(migration_hash, Hash::zero());
+            // Since the value in `ProofEntry` changes with each migration, all `migration_hash`es
+            // should be different.
+            assert!(migration_hashes.insert(migration_hash));
+
+            let mut fork = db.fork();
+            fork.flush_migration("test");
+            db.merge(fork.into_patch()).unwrap();
+        }
+        db.snapshot()
+    }
+
+    #[test]
+    fn linear_migration_all_scripts() {
+        let migrations = create_linear_migrations();
+        assert_eq!(migrations.latest_version, Version::new(0, 6, 3));
+        assert_eq!(migrations.min_start_version, None);
+        assert_eq!(migrations.scripts.len(), 3);
+
+        let start_version = Version::new(0, 1, 0);
+        let scripts = migrations.select(&start_version).unwrap();
+        // All 3 scripts should be selected.
+        assert_eq!(scripts.len(), 3);
+        let snapshot = execute_scripts(TemporaryDB::new(), start_version, scripts);
+        let entry = snapshot.get_proof_entry::<_, u32>("test.entry");
+        assert_eq!(entry.get(), Some(3));
+    }
+
+    #[test]
+    fn linear_migration_part_of_scripts() {
+        let migrations = create_linear_migrations();
+        let start_version = Version::new(0, 2, 0);
+        let scripts = migrations.select(&start_version).unwrap();
+        // 2 latest scripts should be selected.
+        assert_eq!(scripts.len(), 2);
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_entry::<_, u32>("test.entry").set(1);
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = execute_scripts(db, start_version, scripts);
+        let entry = snapshot.get_proof_entry::<_, u32>("test.entry");
+        assert_eq!(entry.get(), Some(3));
+    }
+
+    #[test]
+    fn prereleases_are_not_supported_by_default() {
+        let migrations = create_linear_migrations();
+        let start_version: Version = "0.2.0-pre.2".parse().unwrap();
+        let err = migrations.select(&start_version).unwrap_err();
+        assert_matches!(err, DataMigrationError::UnsupportedStart);
+    }
+
+    #[test]
+    #[should_panic(expected = "Prerelease versions require using `with_prereleases`")]
+    fn prerelease_in_constructor_leads_to_panic() {
+        LinearMigrations::new("0.3.0-pre.0".parse().unwrap());
+    }
+
+    #[test]
+    #[should_panic(expected = "Prerelease versions require using `with_prereleases`")]
+    fn prerelease_in_migration_spec_leads_to_panic() {
+        LinearMigrations::new(Version::new(0, 3, 1))
+            .migrate("0.2.0-pre.1".parse().unwrap(), migration_02);
+    }
+
+    #[test]
+    fn linear_migration_out_of_bounds_version() {
+        let migrations = create_linear_migrations();
+        let start_version = Version::new(1, 0, 0);
+        let err = migrations.select(&start_version).unwrap_err();
+        assert_matches!(
+            err,
+            DataMigrationError::FutureStartVersion { ref max_supported_version }
+                if *max_supported_version == Version::new(0, 6, 3)
+        );
+
+        let start_version = Version::new(0, 1, 0);
+        let migrations = LinearMigrations::new(Version::new(0, 5, 7))
+            .forget_before(Version::new(0, 4, 0))
+            .migrate(Version::new(0, 5, 0), migration_05);
+        let err = migrations.select(&start_version).unwrap_err();
+        assert_matches!(
+            err,
+            DataMigrationError::OldStartVersion { ref min_supported_version }
+                if *min_supported_version == Version::new(0, 4, 0)
+        );
+    }
+
+    fn create_migrations_with_prerelease() -> LinearMigrations {
+        let pre_version: Version = "0.2.0-alpha.0".parse().unwrap();
+        let pre_version_ = pre_version.clone();
+
+        LinearMigrations::with_prereleases(Version::new(0, 3, 2))
+            .migrate(pre_version.clone(), move |ctx| {
+                let start_version = &ctx.instance_spec.artifact.version;
+                assert!(*start_version < pre_version_);
+                ctx.helper.new_data().get_proof_entry("v02pre").set(1_u8);
+            })
+            .migrate(Version::new(0, 2, 0), move |ctx| {
+                let start_version = &ctx.instance_spec.artifact.version;
+                assert!(*start_version >= pre_version);
+                assert!(*start_version < Version::new(0, 2, 0));
+                ctx.helper.new_data().get_proof_entry("v02").set(2_u8);
+            })
+            .migrate(Version::new(0, 3, 0), |ctx| {
+                let start_version = &ctx.instance_spec.artifact.version;
+                assert!(*start_version >= Version::new(0, 2, 0));
+                assert!(*start_version < Version::new(0, 3, 0));
+                ctx.helper.new_data().get_proof_entry("v03").set(3_u8);
+            })
+    }
+
+    #[test]
+    fn linear_migration_from_prerelease_with_explicit_allowance() {
+        // All scripts should be selected.
+        let start_version = Version::new(0, 1, 7);
+        let scripts = create_migrations_with_prerelease()
+            .select(&start_version)
+            .unwrap();
+        assert_eq!(scripts.len(), 3);
+        execute_scripts(TemporaryDB::new(), start_version, scripts);
+
+        // 2nd and 3rd scripts should be selected (`0.2.0 > 0.2.0-alpha.2 > 0.2.0-alpha.0`).
+        let start_version = "0.2.0-alpha.0".parse().unwrap();
+        let scripts = create_migrations_with_prerelease()
+            .select(&start_version)
+            .unwrap();
+        assert_eq!(scripts.len(), 2);
+        execute_scripts(TemporaryDB::new(), start_version, scripts);
+
+        // ...Still 2nd and 3rd scripts.
+        let start_version = "0.2.0-alpha.0".parse().unwrap();
+        let scripts = create_migrations_with_prerelease()
+            .select(&start_version)
+            .unwrap();
+        assert_eq!(scripts.len(), 2);
+        execute_scripts(TemporaryDB::new(), start_version, scripts);
+
+        // ...Only 3rd script should be selected.
+        let start_version = "0.3.0-alpha.0".parse().unwrap();
+        let scripts = create_migrations_with_prerelease()
+            .select(&start_version)
+            .unwrap();
+        assert_eq!(scripts.len(), 1);
+        execute_scripts(TemporaryDB::new(), start_version, scripts);
+
+        // No scripts at all.
+        let start_version = "0.3.0".parse().unwrap();
+        let scripts = create_migrations_with_prerelease()
+            .select(&start_version)
+            .unwrap();
+        assert!(scripts.is_empty());
+        execute_scripts(TemporaryDB::new(), start_version, scripts);
+    }
 }
