@@ -445,9 +445,10 @@ impl NodeHandler {
                 );
             }
 
-            return self.lock(prevote_round, propose_hash);
+            self.lock(prevote_round, propose_hash)
+        } else {
+            RoundAction::None
         }
-        RoundAction::None
     }
 
     /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
