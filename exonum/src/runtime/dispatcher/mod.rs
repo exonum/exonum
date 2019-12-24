@@ -210,7 +210,14 @@ impl Dispatcher {
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
-            Either::A(runtime.deploy_artifact(artifact, payload))
+            let runtime_id = artifact.runtime_id;
+            let future = runtime
+                .deploy_artifact(artifact, payload)
+                .map_err(move |mut err| {
+                    err.set_runtime_id(runtime_id);
+                    err
+                });
+            Either::A(future)
         } else {
             Either::B(future::err(Error::IncorrectRuntime.into()))
         }
