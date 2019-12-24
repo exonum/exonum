@@ -137,6 +137,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
+#### exonum-rust-runtime
+
+- Rust runtime module was moved from the `exonum` crate into the separate
+  `exonum-rust-runtime` crate. (#1641)
+
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements

@@ -96,15 +96,14 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// If you aren't interested in the processing of for the genesis block, you can use
     /// [`CallContext::in_genesis_block`] method and exit early if `true` is returned.
     ///
-    /// Also note that invocation of [`blockchain::Schema::height`] will **panic** if invoked within
-    /// `after_transactions` of the genesis block. If you are going to process the genesis
-    /// block and need to know current height, use [`blockchain::Schema::next_height`] to infer the
-    /// current blockchain height.
+    /// Also note that invocation of `exonum::blockchain::Schema::height` will **panic**
+    /// if invoked within `after_transactions` of the genesis block. If you are going
+    /// to process the genesis block and need to know current height, use
+    /// `exonum::blockchain::Schema::next_height` to infer the current blockchain height.
     ///
-    /// Services should not rely on a particular ordering of `Service::after_transactions` invocations.
+    /// Services should not rely on a particular ordering of `Service::after_transactions`
+    /// invocations.
     ///
-    /// [`blockchain::Schema::height`]: ../../blockchain/schema/struct.Schema.html#method.height
-    /// [`blockchain::Schema::height`]: ../../blockchain/schema/struct.Schema.html#method.next_height
     /// [`CallContext::in_genesis_block`]: struct.CallContext.html#method.in_genesis_block
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
@@ -279,14 +278,12 @@ impl CowInstanceDescriptor<'_> {
 /// Transaction broadcast allows a service to create transactions in the `after_commit`
 /// handler or the HTTP API handlers and broadcast them to the connected Exonum nodes.
 /// The transactions are addressed to the executing service instance and are signed
-/// by the [service keypair] of the node.
+/// by the service keypair of the node.
 ///
 /// Broadcasting functionality is primarily useful for services that receive information
 /// from outside the blockchain and need to translate it to transactions. As an example,
 /// a time oracle service may broadcast local node time and build the blockchain-wide time
 /// by processing corresponding transactions.
-///
-/// [service keypair]: ../../blockchain/config/struct.ValidatorKeys.html#structfield.service_key
 #[derive(Debug, Clone)]
 pub struct Broadcaster<'a> {
     instance: CowInstanceDescriptor<'a>,

@@ -139,7 +139,6 @@ impl ServiceApiScope {
     /// Adds a readonly endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `GET` requests.
-    /// [Read more.](../../../api/struct.ApiScope.html#endpoint)
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -162,7 +161,6 @@ impl ServiceApiScope {
     /// Adds an endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `POST` requests.
-    /// [Read more.](../../../api/struct.ApiScope.html#endpoint_mut)
     pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
