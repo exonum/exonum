@@ -69,7 +69,6 @@ modifier = "0.1.0"
 num = "0.2.0"
 pretty_assertions = "0.6.1"
 proptest = "0.9.1"
-tempdir = "0.3.7"
 tempfile = "3"
 
 [[bench]]
