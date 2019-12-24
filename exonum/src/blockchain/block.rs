@@ -16,17 +16,12 @@ use failure::Error;
 
 use exonum_merkledb::MapProof;
 use exonum_proto::ProtobufConvert;
-use protobuf::RepeatedField;
 
 use crate::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{Precommit, Verified},
-    proto::{
-        self,
-        schema::{consensus::Verified as pb_verified, proofs},
-        OrderedMap,
-    },
+    proto::{self, schema::proofs, OrderedMap},
 };
 use exonum_merkledb::BinaryValue;
 use std::{borrow::Cow, fmt};
@@ -197,7 +192,8 @@ impl Block {
 /// This structure contains enough information to prove the correctness of
 /// a block. It consists of the block itself and the `Precommit`
 /// messages related to this block.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[protobuf_convert(source = "proofs::BlockProof")]
 pub struct BlockProof {
     /// Block header containing such information as the ID of the node which
     /// proposed the block, the height of the block, the number of transactions
@@ -205,32 +201,6 @@ pub struct BlockProof {
     pub block: Block,
     /// List of `Precommit` messages for the block.
     pub precommits: Vec<Verified<Precommit>>,
-}
-
-impl ProtobufConvert for BlockProof {
-    type ProtoStruct = proofs::BlockProof;
-
-    fn to_pb(&self) -> Self::ProtoStruct {
-        let mut block_proof = Self::ProtoStruct::new();
-
-        block_proof.set_block(self.block.to_pb());
-
-        let precommits: Vec<pb_verified> = self.precommits.iter().map(|v| v.to_pb()).collect();
-        block_proof.set_precommits(RepeatedField::from_vec(precommits));
-
-        block_proof
-    }
-
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let block = Block::from_pb(pb.get_block().clone()).unwrap();
-        let precommits = pb
-            .get_precommits()
-            .iter()
-            .map(|p| Verified::from_pb(p.clone()).unwrap())
-            .collect();
-
-        Ok(BlockProof { block, precommits })
-    }
 }
 
 /// Proof of authenticity for a single index within the database.
