@@ -68,9 +68,8 @@ class CryptoAdvancedTest(unittest.TestCase):
                 )
                 # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                 time.sleep(2)
-                alice_balance = crypto_client.get_wallet_info(alice_keys).json()[
-                    "wallet_proof"
-                ]["to_wallet"]["entries"][0]["value"]["balance"]
+                alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
+                alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
                 self.assertEqual(alice_balance, 100)
 
     def test_token_issue(self):
