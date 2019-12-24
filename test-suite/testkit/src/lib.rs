@@ -126,6 +126,7 @@
 pub use crate::{
     api::{ApiKind, TestKitApi},
     builder::TestKitBuilder,
+    migrations::MigrationTest,
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
@@ -171,6 +172,7 @@ use crate::{
 mod api;
 mod builder;
 mod checkpoint_db;
+mod migrations;
 mod network;
 mod poll_events;
 mod server;
