@@ -905,7 +905,7 @@ impl State {
         // round number.
         // However, if we have a lot of proposes, the overhead of sorting
         // can become significant, and we don't want to create a space for
-        // DoS attack. Thus the maximim amount of proposes for which
+        // DoS attack. Thus the maximum amount of proposes for which
         // sorting is applied is limited.
         // Despite that, the limit is big enough to won't be achieved within
         // normal blockchain functioning.
