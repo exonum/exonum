@@ -12,12 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+#![warn(missing_debug_implementations, unsafe_code, bare_trait_objects)]
 
-pub use self::tests_transactions::{CreateWallet, Transfer};
+//! A collection of tests of the Exonum node.
 
-include!(concat!(env!("OUT_DIR"), "/exonum_tests_proto_mod.rs"));
+pub mod blockchain;
+pub mod proto;
 
-use exonum::crypto::proto::*;
+use exonum::node::ApiSender;
+
+use std::thread::JoinHandle;
+
+#[cfg(test)]
+mod tests;
+
+#[derive(Debug)]
+pub struct RunHandle {
+    pub node_thread: JoinHandle<()>,
+    pub api_tx: ApiSender,
+}

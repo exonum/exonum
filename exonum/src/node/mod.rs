@@ -936,9 +936,12 @@ impl Node {
         for runtime in external_runtimes {
             blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
-        let blockchain = blockchain_builder
-            .build()
-            .expect("Cannot create dispatcher");
+        let blockchain = blockchain_builder.build().unwrap_or_else(|err| {
+            panic!(
+                "Blockchain initialization failed with the following error: {}",
+                err
+            )
+        });
 
         Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }

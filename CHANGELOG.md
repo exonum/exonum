@@ -143,7 +143,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `Supervisor` service now can have initial configuration and implements
   `Configure` interface. (#1587)
-
+  
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
 
@@ -152,6 +152,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 #### exonum
 
 - `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
+
+- Some of general-purpose tests were moved to the `test-suite/node-tests`. (#1633)
 
 ### Bug Fixes
 

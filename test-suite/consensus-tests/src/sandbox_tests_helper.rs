@@ -277,7 +277,7 @@ pub fn gen_incorrect_tx() -> Verified<AnyTx> {
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
     // Generate some transaction.
     let tx = gen_timestamping_tx();
-    add_one_height_with_transactions(sandbox, sandbox_state, &[tx.clone()]);
+    add_one_height_with_transactions(sandbox, sandbox_state, &[tx]);
 }
 
 pub fn add_one_height_with_transactions<'a, I>(
@@ -297,7 +297,7 @@ pub fn try_add_one_height(
 ) -> Result<(), String> {
     // gen some tx
     let tx = gen_timestamping_tx();
-    let result = try_add_one_height_with_transactions(sandbox, sandbox_state, &[tx.clone()]);
+    let result = try_add_one_height_with_transactions(sandbox, sandbox_state, &[tx]);
     match result {
         Ok(_) => Ok(()),
         Err(msg) => Err(msg),
@@ -315,7 +315,7 @@ where
     // sort transaction in order accordingly their hashes
     let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.object_hash(), tx.clone())));
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.object_hash(), tx)));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
     let txs: &[Verified<AnyTx>] = raw_txs.as_ref();
 
@@ -598,7 +598,7 @@ fn try_check_and_broadcast_propose_and_prevote(
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
-    Ok(Some(propose.clone()))
+    Ok(Some(propose))
 }
 
 /// Idea of method is sandbox to receive correct propose from certain validator
@@ -616,7 +616,7 @@ pub fn receive_valid_propose_with_transactions(
         sandbox.secret_key(sandbox.current_leader()),
     );
     sandbox.recv(&propose);
-    propose.clone()
+    propose
 }
 
 pub fn make_request_propose_from_precommit(

@@ -12,31 +12,72 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for the blockchain explorer functionality.
+//! Simplified node emulation for testing websockets.
 
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-
-use exonum::{api::websocket::*, crypto::gen_keypair, merkledb::ObjectHash, node::ExternalMessage};
-use std::{
-    thread::sleep,
-    time::{Duration, Instant},
+use exonum::{
+    api::websocket::Notification,
+    blockchain::config::GenesisConfigBuilder,
+    helpers,
+    node::{ExternalMessage, Node},
+    runtime::{rust::ServiceFactory, RuntimeInstance},
 };
+use exonum_crypto::gen_keypair;
+use exonum_merkledb::{ObjectHash, TemporaryDB};
+use reqwest;
+use serde_json::json;
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
     OwnedMessage, WebSocketResult,
 };
 
-mod blockchain;
+use std::{
+    net::SocketAddr,
+    thread::{self, sleep},
+    time::{Duration, Instant},
+};
 
-use blockchain::*;
+use crate::{
+    blockchain::{CreateWallet, ExplorerTransactions, MyService, Transfer, SERVICE_ID},
+    RunHandle,
+};
+
+fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
+    let mut node_cfg = helpers::generate_testnet_config(1, listen_port).remove(0);
+    node_cfg.api.public_api_address = Some(
+        format!("127.0.0.1:{}", pub_api_port)
+            .parse::<SocketAddr>()
+            .unwrap(),
+    );
+
+    let external_runtimes: Vec<RuntimeInstance> = vec![];
+    let service = MyService;
+    let artifact = service.artifact_id();
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
+        .build();
+    let services = vec![service.into()];
+
+    let node = Node::new(
+        TemporaryDB::new(),
+        external_runtimes,
+        services,
+        node_cfg,
+        genesis_config,
+        None,
+    );
+
+    let api_tx = node.channel();
+    let handle = RunHandle {
+        node_thread: thread::spawn(move || {
+            node.run().unwrap();
+        }),
+        api_tx,
+    };
+    // Wait until the node has fully started.
+    thread::sleep(Duration::from_secs(1));
+    handle
+}
 
 fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
     let mut last_err = None;
@@ -111,7 +152,7 @@ fn test_send_transaction() {
         response,
         json!({
             "result": "error",
-            "description": "Execution error `dispatcher:7` occurred: Suitable runtime \
+            "description": "Execution error with code `dispatcher:7` occurred: Suitable runtime \
              for the given service instance ID is not found."
         })
     );
@@ -204,9 +245,10 @@ fn test_transactions_subscribe_with_filter() {
     let node_handler = run_node(6333, 8082);
 
     // Create client with filter
-    let mut client = create_ws_client(
-        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id=118&message_id=0",
-    )
+    let mut client = create_ws_client(&format!(
+        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id={}&message_id=0",
+        SERVICE_ID
+    ))
     .expect("Cannot connect to node");
     client
         .stream_ref()
@@ -262,9 +304,10 @@ fn test_transactions_subscribe_with_partial_filter() {
     let node_handler = run_node(6334, 8083);
 
     // Create client with filter
-    let mut client = create_ws_client(
-        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id=118",
-    )
+    let mut client = create_ws_client(&format!(
+        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id={}",
+        SERVICE_ID
+    ))
     .expect("Cannot connect to node");
     client
         .stream_ref()
