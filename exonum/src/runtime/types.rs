@@ -159,7 +159,6 @@ impl AnyTx {
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
-    /// Semantic version of the artifact.
     /// Artifact name.
     pub name: String,
     /// Semantic version of the artifact.
