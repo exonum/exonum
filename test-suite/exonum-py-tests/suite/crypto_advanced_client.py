@@ -9,17 +9,34 @@ class ExonumCryptoAdvancedClient:
 
     def __init__(self, client: ExonumClient):
         self.client = client
-        cryptocurrency_service_name = 'exonum-cryptocurrency-advanced:0.13.0-rc.2'
+        cryptocurrency_service_name = "exonum-cryptocurrency-advanced"
+        cryptocurrency_service_version = "0.13.0-rc.2"
         self.loader = client.protobuf_loader()
         self.loader.initialize()
         self.loader.load_main_proto_files()
-        self.loader.load_service_proto_files(runtime_id=0, service_name='exonum-supervisor:0.13.0-rc.2')
-        self.loader.load_service_proto_files(runtime_id=0, service_name=cryptocurrency_service_name)
+        self.loader.load_service_proto_files(
+            runtime_id=0,
+            artifact_name="exonum-supervisor",
+            artifact_version="0.13.0-rc.2",
+        )
+        self.loader.load_service_proto_files(
+            runtime_id=0,
+            artifact_name=cryptocurrency_service_name,
+            artifact_version=cryptocurrency_service_version,
+        )
 
-        self.cryptocurrency_module = ModuleManager.import_service_module(cryptocurrency_service_name, 'service')
-        self.types_module = ModuleManager.import_service_module(cryptocurrency_service_name, 'types')
+        self.cryptocurrency_module = ModuleManager.import_service_module(
+            cryptocurrency_service_name, cryptocurrency_service_version, "service"
+        )
+        self.types_module = ModuleManager.import_service_module(
+            cryptocurrency_service_name, cryptocurrency_service_version, "types"
+        )
         instance_id = client.get_instance_id_by_name("crypto")
-        self.msg_generator = MessageGenerator(instance_id=instance_id, artifact_name=cryptocurrency_service_name)
+        self.msg_generator = MessageGenerator(
+            instance_id=instance_id,
+            artifact_name=cryptocurrency_service_name,
+            artifact_version=cryptocurrency_service_version
+        )
 
     def __enter__(self):
         return self
@@ -46,7 +63,9 @@ class ExonumCryptoAdvancedClient:
 
     def get_wallet_info(self, keys):
         """Wrapper for get wallet info operation."""
-        return self.client.get_service("crypto/v1", "wallets/info?pub_key=" + keys.public_key.hex())
+        return self.client.get_service(
+            "crypto/v1", "wallets/info?pub_key=" + keys.public_key.hex()
+        )
 
     def transfer(self, amount, from_wallet, to_wallet):
         """Wrapper for transfer operation."""
