@@ -553,6 +553,18 @@ impl<'a> BlockchainExplorer<'a> {
         Some(TransactionInfo::Committed(tx))
     }
 
+    /// Return status of call in block
+    pub(crate) fn call_status(
+        &self,
+        block_height: Height,
+        call_location: CallInBlock,
+    ) -> Result<(), ExecutionError> {
+        match self.schema.call_errors(block_height).get(&call_location) {
+            None => Ok(()),
+            Some(e) => Err(e),
+        }
+    }
+
     /// Return transaction message without proof.
     pub fn transaction_without_proof(&self, tx_hash: &Hash) -> Option<Verified<AnyTx>> {
         self.schema.transactions().get(tx_hash)
