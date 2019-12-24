@@ -24,6 +24,7 @@ pub use self::schema::{
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
         TransactionsResponse,
     },
+    proofs::{BlockProof, IndexProof},
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 

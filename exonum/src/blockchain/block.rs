@@ -21,7 +21,7 @@ use crate::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{Precommit, Verified},
-    proto::{self, schema::proofs, OrderedMap},
+    proto::{self, OrderedMap},
 };
 use exonum_merkledb::BinaryValue;
 use std::{borrow::Cow, fmt};
@@ -193,7 +193,7 @@ impl Block {
 /// a block. It consists of the block itself and the `Precommit`
 /// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert(source = "proofs::BlockProof")]
+#[protobuf_convert(source = "proto::BlockProof")]
 pub struct BlockProof {
     /// Block header containing such information as the ID of the node which
     /// proposed the block, the height of the block, the number of transactions
@@ -205,7 +205,7 @@ pub struct BlockProof {
 
 /// Proof of authenticity for a single index within the database.
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert(source = "proofs::IndexProof")]
+#[protobuf_convert(source = "proto::IndexProof")]
 pub struct IndexProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]
