@@ -273,7 +273,7 @@ use crate::{
     helpers::Height,
     runtime::{
         dispatcher::{self, Mailbox},
-        error::{catch_panic, ExecutionError},
+        error::{catch_panic, ExecutionError, ExecutionFail},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
@@ -377,7 +377,13 @@ impl RustRuntime {
             return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
         }
         if !self.available_artifacts.contains_key(&artifact) {
-            return Err(Error::UnableToDeploy.into());
+            let description = format!(
+                "Runtime failed to deploy artifact with id {}, \
+                 it is not listed among available artifacts. Available artifacts: {}",
+                artifact,
+                self.artifacts_to_pretty_string()
+            );
+            return Err(Error::UnableToDeploy.with_description(description));
         }
 
         trace!("Deployed artifact: {}", artifact);
@@ -434,6 +440,18 @@ impl RustRuntime {
             }
         }
         self.changed_services_since_last_block = false;
+    }
+
+    fn artifacts_to_pretty_string(&self) -> String {
+        if self.available_artifacts.is_empty() {
+            return "None".to_string();
+        }
+
+        self.available_artifacts
+            .keys()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", ")
     }
 }
 
