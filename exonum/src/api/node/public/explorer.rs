@@ -35,13 +35,13 @@ use crate::{
         websocket::{Server, Session, SubscriptionType, TransactionFilter},
         ApiBackend, ApiScope, Error as ApiError, FutureResult,
     },
-    blockchain::{Block, Blockchain},
+    blockchain::{Block, Blockchain, CallInBlock, ExecutionStatus},
     crypto::Hash,
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
     messages::{Precommit, SignedMessage, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::CallInfo,
+    runtime::{CallInfo, InstanceId},
 };
 
 /// The maximum number of blocks to return per blocks request, in this way
@@ -171,6 +171,23 @@ impl AsRef<[u8]> for TransactionHex {
     }
 }
 
+/// Call status response.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CallStatusResponse {
+    /// Call status
+    pub status: ExecutionStatus,
+}
+
+/// Call status query parameters.
+/// To check `before_transactions` or `after_transactions` call
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CallStatusQuery {
+    /// Height of a block
+    pub height: Height,
+    /// Numerical service identifier.
+    pub service_id: InstanceId,
+}
+
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
 pub struct ExplorerApi {
@@ -178,12 +195,12 @@ pub struct ExplorerApi {
 }
 
 impl ExplorerApi {
-    /// Create a new `ExplorerApi` instance.
+    /// Creates a new `ExplorerApi` instance.
     pub fn new(blockchain: Blockchain) -> Self {
         Self { blockchain }
     }
 
-    /// Return the explored range and the corresponding headers. The range specifies the smallest
+    /// Returns the explored range and the corresponding headers. The range specifies the smallest
     /// and largest heights traversed to collect the number of blocks specified in
     /// the [`BlocksQuery`] struct.
     ///
@@ -251,7 +268,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Return the content for a block at a specific height.
+    /// Returns the content for a block at a specific height.
     pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
         let explorer = BlockchainExplorer::new(snapshot);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
@@ -263,7 +280,7 @@ impl ExplorerApi {
         })
     }
 
-    /// Search for a transaction, either committed or uncommitted, by the hash.
+    /// Searches for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
         snapshot: &dyn Snapshot,
         query: TransactionQuery,
@@ -274,6 +291,59 @@ impl ExplorerApi {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
                 ApiError::NotFound(description)
             })
+    }
+
+    /// Returns call status of committed transaction.
+    pub fn transaction_status(
+        snapshot: &dyn Snapshot,
+        query: TransactionQuery,
+    ) -> Result<CallStatusResponse, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+
+        let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
+            ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
+        })?;
+
+        let tx_info = match tx_info {
+            TransactionInfo::Committed(info) => info,
+            TransactionInfo::InPool { .. } => {
+                let err = ApiError::NotFound(format!(
+                    "Requested transaction ({}) is not executed yet",
+                    query.hash
+                ));
+                return Err(err);
+            }
+        };
+
+        let call_in_block = CallInBlock::transaction(tx_info.location().position_in_block());
+        let block_height = tx_info.location().block_height();
+
+        let status = ExecutionStatus(explorer.call_status(block_height, call_in_block));
+        Ok(CallStatusResponse { status })
+    }
+
+    /// Returns call status of `before_transactions` hook.
+    pub fn before_transactions_status(
+        snapshot: &dyn Snapshot,
+        query: CallStatusQuery,
+    ) -> Result<CallStatusResponse, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+        let call_in_block = CallInBlock::before_transactions(query.service_id);
+
+        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
+        Ok(CallStatusResponse { status })
+    }
+
+    /// Returns call status of `after_transactions` hook.
+    pub fn after_transactions_status(
+        snapshot: &dyn Snapshot,
+        query: CallStatusQuery,
+    ) -> Result<CallStatusResponse, ApiError> {
+        let explorer = BlockchainExplorer::new(snapshot);
+        let call_in_block = CallInBlock::after_transactions(query.service_id);
+
+        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
+        Ok(CallStatusResponse { status })
     }
 
     /// Adds transaction into the pool of unconfirmed transactions if it's valid
@@ -349,7 +419,7 @@ impl ExplorerApi {
         });
     }
 
-    /// Add explorer API endpoints to the corresponding scope.
+    /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire(
         self,
         api_scope: &mut ApiScope,
@@ -399,6 +469,18 @@ impl ExplorerApi {
             .endpoint("v1/block", {
                 let blockchain = self.blockchain.clone();
                 move |query| Self::block(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/call_status/transaction", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::transaction_status(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/call_status/after_transactions", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::after_transactions_status(blockchain.snapshot().as_ref(), query)
+            })
+            .endpoint("v1/call_status/before_transactions", {
+                let blockchain = self.blockchain.clone();
+                move |query| Self::before_transactions_status(blockchain.snapshot().as_ref(), query)
             })
             .endpoint("v1/transactions", {
                 let blockchain = self.blockchain.clone();

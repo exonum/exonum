@@ -50,7 +50,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<crate::node::
     };
     use exonum_keys::Keys;
 
-    let keys: (Vec<_>) = (0..count as usize)
+    let keys: Vec<_> = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
         .collect();
