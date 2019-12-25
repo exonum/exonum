@@ -24,12 +24,12 @@ extern crate assert_matches;
 extern crate serde_json;
 
 use exonum::{
-    api::{self, node::public::explorer::TransactionQuery},
+    api,
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use exonum_testkit::{explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi};
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{

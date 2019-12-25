@@ -13,14 +13,16 @@
 // limitations under the License.
 
 use exonum::{
-    api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
     messages::Verified,
     runtime::{rust::ServiceFactory, AnyTx, InstanceId},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{
+    explorer::api::{TransactionQuery, TransactionResponse},
+    ApiKind, TestKit, TestKitApi, TestKitBuilder,
+};
 use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use serde_json::json;
 

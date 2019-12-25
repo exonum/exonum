@@ -19,12 +19,14 @@
 //! about the storage state.
 
 use exonum::{
-    api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use exonum_testkit::{
+    explorer::api::{TransactionQuery, TransactionResponse},
+    ApiKind, TestKit, TestKitApi,
+};
 use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.

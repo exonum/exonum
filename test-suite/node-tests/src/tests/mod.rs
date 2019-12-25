@@ -13,4 +13,5 @@
 // limitations under the License.
 
 mod node;
-mod websocket;
+// FIXME: move to explorer service
+//mod websocket;

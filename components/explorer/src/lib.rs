@@ -322,8 +322,23 @@ impl Index<usize> for BlockWithTransactions {
             panic!(
                 "Index exceeds number of transactions in block {}",
                 self.len()
-            )
+            );
         })
+    }
+}
+
+/// Returns a transaction in the block by its hash. Beware that this is a slow operation
+/// (linear w.r.t. the number of transactions in a block).
+impl Index<Hash> for BlockWithTransactions {
+    type Output = CommittedTransaction;
+
+    fn index(&self, index: Hash) -> &CommittedTransaction {
+        self.transactions
+            .iter()
+            .find(|&tx| tx.content.object_hash() == index)
+            .unwrap_or_else(|| {
+                panic!("No transaction with hash {} in the block", index);
+            })
     }
 }
 

@@ -29,7 +29,7 @@ use std::{
 };
 
 use exonum::{
-    api::{self, ApiAggregator},
+    api::{self, node::public::system::DispatcherInfo, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
 };
@@ -126,6 +126,11 @@ impl TestKitApi {
             ApiAccess::Private,
             kind.to_string(),
         )
+    }
+
+    /// Performs a GET request to the "/services" system endpoint.
+    pub fn dispatcher_info(&self) -> DispatcherInfo {
+        self.public(ApiKind::System).get("v1/services").unwrap()
     }
 }
 
@@ -413,14 +418,6 @@ impl<'a> ExonumNodeApi<'a> {
         for &tx_hash in tx_hashes {
             self.assert_tx_success(tx_hash);
         }
-    }
-
-    /// Performs a GET request to the "/services" system endpoint.
-    pub fn services(&self) -> DispatcherInfo {
-        self.inner
-            .public(ApiKind::System)
-            .get("v1/services")
-            .unwrap()
     }
 }
 */
