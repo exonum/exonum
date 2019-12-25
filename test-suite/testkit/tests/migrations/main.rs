@@ -197,7 +197,7 @@ fn merkelize_wallets(ctx: &mut MigrationContext) {
     new_schema.total_balance.set(total_balance);
 }
 
-/// Second migration script.
+/// Second migration script. Transforms the wallet type and reorganizes the service summary.
 fn transform_wallet_type(ctx: &mut MigrationContext) {
     let old_schema = v02::Schema::new(ctx.helper.old_data());
     let mut new_schema = v05::Schema::new(ctx.helper.new_data());
@@ -224,6 +224,8 @@ fn transform_wallet_type(ctx: &mut MigrationContext) {
         new_schema.wallets.put(&key, new_wallet);
     }
 }
+
+// FIXME: add incorrect and correct migrations with DB merges
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.6.2")]
