@@ -87,7 +87,7 @@
 //!
 //! - For service schemas, `BlockchainData` and `SnapshotExt` expose the [`service_schema`]
 //!   method. This allows to run versioning checks automatically.
-//! - For transactions, clients may use the milddleware service.
+//! - For transactions, clients may use the middleware service.
 //!
 //! # Examples
 //!
