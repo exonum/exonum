@@ -304,7 +304,7 @@ impl Service for Supervisor {
         for request in requests_to_remove {
             schema.pending_deployments.remove(&request.artifact);
             if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
-                // If state is marked as pending, change is to failed as well.
+                // If state is marked as pending, change it to failed as well.
                 schema.deploy_states.put(
                     &request,
                     DeployState::Failed(request.deadline_height, DeployFailCause::Deadline),
