@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Blockchain explorer module provides API for getting information about blocks and transactions
+//! Blockchain explorer provides API for getting information about blocks and transactions
 //! from the blockchain.
 //!
-//! See the `explorer` example in the crate for examples of usage.
+//! See the examples in the crate for examples of usage.
 
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{ListProof, MapProof, ObjectHash, Snapshot};
 use serde::{Serialize, Serializer};
+use serde_derive::*;
 
 use std::{
     cell::{Ref, RefCell},
@@ -30,13 +31,15 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use crate::{
-    blockchain::{Block, CallInBlock, ExecutionError, ExecutionStatus, Schema, TxLocation},
+use exonum::{
+    blockchain::{Block, CallInBlock, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
     messages::{AnyTx, Precommit, Verified},
-    runtime::error::execution_error,
+    runtime::{ExecutionError, ExecutionStatus},
 };
+
+mod execution_error;
 
 /// Ending height of the range (exclusive), given the a priori max height.
 fn end_height(bound: Bound<&Height>, max: Height) -> Height {
@@ -267,7 +270,7 @@ pub struct ErrorWithLocation {
     /// Location of the error.
     pub location: CallInBlock,
     /// Error data.
-    #[serde(with = "execution_error")]
+    #[serde(with = "crate::execution_error")]
     pub error: ExecutionError,
 }
 
@@ -553,8 +556,13 @@ impl<'a> BlockchainExplorer<'a> {
         Some(TransactionInfo::Committed(tx))
     }
 
-    /// Return status of call in block
-    pub(crate) fn call_status(
+    /// Returns the status of a call in a block.
+    ///
+    /// # Return value
+    ///
+    /// Note that this will return `Ok(())` both if the call completed successfully, or if
+    /// was not performed at all. The caller is responsible to distinguish these two outcomes.
+    pub fn call_status(
         &self,
         block_height: Height,
         call_location: CallInBlock,

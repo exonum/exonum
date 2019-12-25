@@ -14,10 +14,12 @@
 
 //! The set of errors for the Runtime module.
 
-pub(crate) mod execution_error;
 mod execution_result;
 #[cfg(test)]
 mod tests;
+
+// This import is used in the blockchain explorer.
+pub use self::execution_result::ExecutionStatus as SerdeExecutionStatus;
 
 use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;

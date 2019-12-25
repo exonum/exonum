@@ -1119,8 +1119,6 @@ impl Node {
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
 
-        let api_state = self.handler.api_state.clone();
-
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
             self.state().consensus_public_key(),
@@ -1130,8 +1128,6 @@ impl Node {
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-        // Stop ws server.
-        api_state.shutdown_broadcast_server();
         Ok(())
     }
 

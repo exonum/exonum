@@ -142,6 +142,7 @@ pub use crate::{
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
+pub use exonum_explorer as explorer;
 
 use exonum::{
     api::{
@@ -155,7 +156,6 @@ use exonum::{
         Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
-    explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
@@ -165,6 +165,7 @@ use exonum::{
         InstanceId, RuntimeInstance, SnapshotExt,
     },
 };
+use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 

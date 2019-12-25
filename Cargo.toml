@@ -20,6 +20,7 @@ members = [
     "components/build",
     "components/crypto",
     "components/derive",
+    "components/explorer",
     "components/keys",
     "components/merkledb",
     "components/proto",

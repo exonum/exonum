@@ -23,7 +23,7 @@ pub use self::{
 
 pub mod config;
 
-pub(crate) use crate::runtime::{ExecutionError, ExecutionStatus};
+pub(crate) use crate::runtime::ExecutionError;
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{

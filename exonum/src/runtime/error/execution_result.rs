@@ -28,8 +28,10 @@ enum ExecutionType {
     ServiceError,
 }
 
+/// Version of `ExecutionStatus` suitable for `serde`.
+#[doc(hidden)]
 #[derive(Debug, Serialize, Deserialize)]
-pub(super) struct ExecutionStatus {
+pub struct ExecutionStatus {
     #[serde(rename = "type")]
     typ: ExecutionType,
     #[serde(skip_serializing_if = "String::is_empty", default)]
@@ -74,7 +76,7 @@ impl From<Result<(), &ExecutionError>> for ExecutionStatus {
 impl ExecutionStatus {
     /// Converts an execution status from an untrusted format (e.g., received in JSON via HTTP API)
     /// into an actionable `Result`.
-    pub(super) fn into_result(self) -> Result<Result<(), ExecutionError>, &'static str> {
+    pub fn into_result(self) -> Result<Result<(), ExecutionError>, &'static str> {
         Ok(if let ExecutionType::Success = self.typ {
             Ok(())
         } else {

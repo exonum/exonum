@@ -631,8 +631,6 @@ impl NodeHandler {
             (committed_txs, proposer)
         };
 
-        self.api_state.broadcast(&block_hash);
-
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();

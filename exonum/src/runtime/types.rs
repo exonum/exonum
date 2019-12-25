@@ -565,6 +565,8 @@ fn parse_artifact_id_correct() {
 
 #[test]
 fn artifact_id_in_json() {
+    use serde_json::json;
+
     let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
     assert_eq!(
         serde_json::to_value(artifact_id).unwrap(),

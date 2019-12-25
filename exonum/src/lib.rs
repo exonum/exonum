@@ -53,8 +53,6 @@ extern crate failure;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate serde_json;
 
 // Test dependencies.
 #[cfg(all(test, feature = "long_benchmarks"))]
@@ -71,7 +69,6 @@ pub mod helpers;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
-pub mod explorer;
 pub mod node;
 #[macro_use]
 pub mod runtime;

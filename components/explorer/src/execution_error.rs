@@ -16,20 +16,20 @@
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{execution_result::ExecutionStatus, ExecutionError};
+use exonum::runtime::{ExecutionError, SerdeExecutionStatus};
 
 pub fn serialize<S>(inner: &ExecutionError, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    ExecutionStatus::from(Err(inner)).serialize(serializer)
+    SerdeExecutionStatus::from(Err(inner)).serialize(serializer)
 }
 
 pub fn deserialize<'a, D>(deserializer: D) -> Result<ExecutionError, D::Error>
 where
     D: Deserializer<'a>,
 {
-    ExecutionStatus::deserialize(deserializer).and_then(|status| {
+    SerdeExecutionStatus::deserialize(deserializer).and_then(|status| {
         status
             .into_result()
             .and_then(|res| match res {
