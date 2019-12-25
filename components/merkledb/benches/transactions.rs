@@ -21,8 +21,9 @@ use serde_derive::*;
 use std::{borrow::Cow, collections::HashMap, fmt};
 
 use exonum_merkledb::{
-    access::Access, impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group,
-    ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    access::{Access, FromAccess},
+    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
+    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -203,7 +204,6 @@ impl Transaction {
 }
 
 #[derive(FromAccess)]
-#[from_access(schema)]
 struct Schema<T: Access> {
     transactions: MapIndex<T::Base, Hash, Transaction>,
     blocks: ListIndex<T::Base, Hash>,
@@ -211,7 +211,13 @@ struct Schema<T: Access> {
     wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
 
-impl<'a> Schema<&'a Fork> {
+impl<T: Access> Schema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
+}
+
+impl Schema<&Fork> {
     fn add_transaction_to_history(&self, owner: &PublicKey, tx_hash: Hash) -> Hash {
         let mut history = self.wallet_history.get(owner);
         history.push(tx_hash);

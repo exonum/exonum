@@ -33,7 +33,7 @@ use std::borrow::Cow;
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
-    access::{Access, AccessExt, Prefixed},
+    access::{Access, AccessExt, FromAccess, Prefixed},
     impl_object_hash_for_binary_value,
     migration::Migration,
     BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
@@ -63,7 +63,6 @@ mod v1 {
     }
 
     #[derive(Debug, FromAccess)]
-    #[from_access(schema)]
     pub struct Schema<T: Access> {
         pub ticker: Entry<T::Base, String>,
         pub divisibility: Entry<T::Base, u8>,
@@ -72,6 +71,10 @@ mod v1 {
     }
 
     impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+
         pub fn print_wallets(&self) {
             for (public_key, wallet) in self.wallets.iter().take(10) {
                 println!("Wallet[{:?}] = {:?}", public_key, wallet);
@@ -155,7 +158,6 @@ mod v2 {
     impl_object_hash_for_binary_value! { Wallet, Config }
 
     #[derive(Debug, FromAccess)]
-    #[from_access(schema)]
     pub struct Schema<T: Access> {
         pub config: ProofEntry<T::Base, Config>,
         pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
@@ -163,6 +165,10 @@ mod v2 {
     }
 
     impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+
         pub fn print_wallets(&self) {
             for (public_key, wallet) in self.wallets.iter().take(10) {
                 println!("Wallet[{:?}] = {:?}", public_key, wallet);

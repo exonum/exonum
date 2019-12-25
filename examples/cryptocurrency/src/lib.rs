@@ -43,7 +43,10 @@ mod tx_tests;
 /// Persistent data.
 pub mod schema {
     use exonum::crypto::PublicKey;
-    use exonum_merkledb::{access::Access, MapIndex};
+    use exonum_merkledb::{
+        access::{Access, FromAccess},
+        MapIndex,
+    };
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -95,10 +98,15 @@ pub mod schema {
     ///
     /// Note that the schema is fully private; it is exposed to the clients via service HTTP API.
     #[derive(Debug, FromAccess)]
-    #[from_access(schema)]
     pub(crate) struct CurrencySchema<T: Access> {
         /// Correspondence of public keys of users to the account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+    }
+
+    impl<T: Access> CurrencySchema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
     }
 }
 

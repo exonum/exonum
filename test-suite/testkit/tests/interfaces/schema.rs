@@ -14,7 +14,10 @@
 
 use exonum::{
     crypto::PublicKey,
-    merkledb::{access::Access, MapIndex},
+    merkledb::{
+        access::{Access, FromAccess},
+        MapIndex,
+    },
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -32,7 +35,12 @@ pub struct Wallet {
 }
 
 #[derive(FromAccess)]
-#[from_access(schema)]
 pub struct WalletSchema<T: Access> {
     pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+}
+
+impl<T: Access> WalletSchema<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }

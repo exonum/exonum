@@ -14,8 +14,8 @@
 
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_merkledb::{
-    access::Access, BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot,
-    SystemSchema,
+    access::{Access, FromAccess},
+    BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot, SystemSchema,
 };
 use futures::{Future, IntoFuture};
 use semver::Version;
@@ -68,9 +68,14 @@ fn create_genesis_config() -> GenesisConfig {
 }
 
 #[derive(Debug, FromAccess)]
-#[from_access(schema)]
 struct InspectorSchema<T: Access> {
     values: ProofListIndex<T::Base, u64>,
+}
+
+impl<T: Access> InspectorSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 /// Actions that performs at the `initiate_adding_service` stage.

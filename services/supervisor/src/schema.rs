@@ -18,7 +18,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, Prefixed},
+    access::{Access, FromAccess, Prefixed},
     Entry, Fork, ProofEntry, ProofMapIndex,
 };
 
@@ -29,7 +29,6 @@ use super::{
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
-#[from_access(schema)]
 pub(crate) struct SchemaImpl<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
@@ -59,6 +58,10 @@ pub struct Schema<T: Access> {
 }
 
 impl<T: Access> SchemaImpl<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
+
     /// Gets the stored configuration number.
     pub fn get_configuration_number(&self) -> u64 {
         self.configuration_number.get().unwrap_or(0)

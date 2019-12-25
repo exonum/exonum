@@ -160,8 +160,6 @@ struct FromAccess {
 struct FromAccessAttrs {
     #[darling(default)]
     transparent: bool,
-    #[darling(default)]
-    schema: bool,
 }
 
 #[derive(Debug, Default, FromMeta)]
@@ -398,23 +396,6 @@ impl ToTokens for FromAccess {
             }
         };
         tokens.extend(expanded);
-
-        if self.attrs.schema {
-            let expanded = quote! {
-                impl #impl_generics #name #ty_generics #where_clause {
-                    /// Creates a new schema instance rooted in the provided `access`.
-                    ///
-                    /// # Panics
-                    ///
-                    /// Panics if the schema components cannot be instantiated
-                    /// (e.g., because an index included in the schema has a wrong type).
-                    pub fn new(access: #access_ident) -> Self {
-                        #tr::from_root(access).unwrap()
-                    }
-                }
-            };
-            tokens.extend(expanded);
-        }
     }
 }
 

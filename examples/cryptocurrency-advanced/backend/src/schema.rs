@@ -15,7 +15,7 @@
 //! Cryptocurrency database schema.
 
 use exonum_merkledb::{
-    access::{Access, RawAccessMut},
+    access::{Access, FromAccess, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,
 };
 
@@ -27,7 +27,6 @@ use crate::{wallet::Wallet, INITIAL_BALANCE};
 ///
 /// Note that the schema is crate-private, but it has a public part.
 #[derive(Debug, FromAccess)]
-#[from_access(schema)]
 pub(crate) struct SchemaImpl<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
@@ -41,6 +40,12 @@ pub(crate) struct SchemaImpl<T: Access> {
 pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
+}
+
+impl<T: Access> SchemaImpl<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T> SchemaImpl<T>

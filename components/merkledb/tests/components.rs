@@ -33,7 +33,6 @@ where
 }
 
 #[derive(FromAccess)]
-#[from_access(schema)]
 struct ComplexSchema<T: Access> {
     count: Entry<T::Base, u64>,
     generic: Generic<T, String>,
@@ -58,7 +57,7 @@ fn embedded_components() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut complex = ComplexSchema::new(&fork);
+        let mut complex = ComplexSchema::from_root(&fork).unwrap();
         assert!(!complex.count.exists());
         complex.modify(1, "!".to_owned());
         complex.modify(2, "!!".to_owned());
@@ -169,7 +168,6 @@ fn wrapper_with_named_field() {
 #[test]
 fn component_with_implicit_type_param() {
     #[derive(FromAccess)]
-    #[from_access(schema)]
     struct Schema<T>
     where
         T: Access,
@@ -181,28 +179,7 @@ fn component_with_implicit_type_param() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = Schema::new(&fork);
-    assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
-}
-
-#[test]
-fn opt_out_from_schema() {
-    #[derive(FromAccess)]
-    #[from_access(schema = false)]
-    struct NotSchema<T: Access> {
-        map: ProofMapIndex<T::Base, u64, u64>,
-    }
-
-    impl<T: Access> NotSchema<T> {
-        fn new(access: T, msg: &str) -> Self {
-            Self::from_root(access).expect(msg)
-        }
-    }
-
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = NotSchema::new(&fork, "huh?");
+    let schema = Schema::from_root(&fork).unwrap();
     assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
 }
 
@@ -215,7 +192,6 @@ fn public_schema_pattern() {
     }
 
     #[derive(Debug, FromAccess)]
-    #[from_access(schema)]
     struct SchemaImpl<T: Access> {
         /// Flattened components are useful to split schemas into a public interface
         /// and implementation details.
@@ -228,7 +204,7 @@ fn public_schema_pattern() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut schema: SchemaImpl<_> = SchemaImpl::new(&fork);
+        let mut schema: SchemaImpl<_> = SchemaImpl::from_root(&fork).unwrap();
         schema.public.wallets.put("Alice", 10);
         schema.public.wallets.put("Bob", 20);
         schema.public.total_balance.set(30);
@@ -282,7 +258,6 @@ fn multiple_flattened_fields() {
     }
 
     #[derive(FromAccess)]
-    #[from_access(schema)]
     struct Schema<T: Access> {
         #[from_access(flatten)]
         first: Flattened<T>,
@@ -293,7 +268,7 @@ fn multiple_flattened_fields() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut schema = Schema::new(&fork);
+        let mut schema = Schema::from_root(&fork).unwrap();
         schema.first.entry.set("Some".to_owned());
         schema.first.other_entry.set(1);
         schema.second.list.push(vec![2, 3, 4]);

@@ -220,7 +220,10 @@ mod tests {
     use assert_matches::assert_matches;
     use exonum_crypto::PublicKey;
     use exonum_derive::*;
-    use exonum_merkledb::{access::Access, Entry, ProofMapIndex};
+    use exonum_merkledb::{
+        access::{Access, FromAccess},
+        Entry, ProofMapIndex,
+    };
     use futures::sync::mpsc;
 
     use super::*;
@@ -244,7 +247,6 @@ mod tests {
     }
 
     #[derive(Debug, FromAccess)]
-    #[from_access(schema)]
     struct SchemaImpl<T: Access> {
         #[from_access(flatten)]
         public: Schema<T>,
@@ -327,7 +329,7 @@ mod tests {
         let mut blockchain = create_blockchain();
         let fork = blockchain.fork();
         {
-            let mut schema: SchemaImpl<_> = SchemaImpl::new(Prefixed::new("token", &fork));
+            let mut schema = SchemaImpl::from_root(Prefixed::new("token", &fork)).unwrap();
             schema.public.wallets.put(&PublicKey::new([0; 32]), 100);
             schema.public.wallets.put(&PublicKey::new([1; 32]), 200);
             schema.private.set("Some value".to_owned());

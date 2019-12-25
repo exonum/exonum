@@ -102,20 +102,6 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
 /// A struct with the transparent layout must have a single field. The field will be created at
 /// the same address as the struct itself (i.e., no suffix will be added).
 ///
-/// ## `schema`
-///
-/// ```text
-/// #[from_access(schema)]
-/// ```
-///
-/// Derives schema-specific interfaces:
-///
-/// - Constructor `pub fn new(access: T) -> Self` with a generic doc comment. Implemented
-///   by `unwrap()`ing the value returned by `FromAccess::from_root`.
-///
-/// The `schema` param is automatically switched on if the struct name ends with `Schema`.
-/// To opt out, use `#[from_access(schema = false)]`.
-///
 /// # Field Attributes
 ///
 /// ## `rename`

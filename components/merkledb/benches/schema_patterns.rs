@@ -21,7 +21,7 @@ use std::borrow::Cow;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt, Prefixed, RawAccessMut},
+    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Group, KeySetIndex, Lazy, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -63,7 +63,6 @@ trait ExecuteTransaction {
 }
 
 #[derive(FromAccess)]
-#[from_access(schema)]
 struct EagerSchema<T: Access> {
     // Accessed once per transaction.
     transactions: MapIndex<T::Base, Hash, Transaction>,
@@ -75,6 +74,12 @@ struct EagerSchema<T: Access> {
     cold_group: Group<T, u64, ProofListIndex<T::Base, u64>>,
     // Accessed once per ~`COLD_DIVISOR` transactions.
     other_cold_index: KeySetIndex<T::Base, u64>,
+}
+
+impl<T: Access> EagerSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T: Access> EagerSchema<T>
@@ -121,7 +126,6 @@ impl ExecuteTransaction for EagerStyle {
 }
 
 #[derive(FromAccess)]
-#[from_access(schema)]
 struct LazySchema<T: Access> {
     transactions: MapIndex<T::Base, Hash, Transaction>,
     hot_index: ProofMapIndex<T::Base, u64, Hash>,
@@ -130,6 +134,12 @@ struct LazySchema<T: Access> {
     // groups are already lazy
     cold_group: Group<T, u64, ProofListIndex<T::Base, u64>>,
     other_cold_index: Lazy<T, KeySetIndex<T::Base, u64>>,
+}
+
+impl<T: Access> LazySchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T: Access> LazySchema<T>

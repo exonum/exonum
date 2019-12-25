@@ -18,7 +18,10 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
-    merkledb::{access::Access, ProofMapIndex},
+    merkledb::{
+        access::{Access, FromAccess},
+        ProofMapIndex,
+    },
     runtime::{
         rust::{CallContext, Service, ServiceFactory},
         ExecutionError, InstanceId, SnapshotExt,
@@ -74,11 +77,16 @@ struct MarkerService;
 
 /// Marker service database schema.
 #[derive(Debug, FromAccess, RequireArtifact)]
-#[from_access(schema)]
 #[require_artifact(name = "marker", version = "0.1.x")]
 // ^-- Must match the name / version specified for `MarkerService`.
 pub struct MarkerSchema<T: Access> {
     pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
+}
+
+impl<T: Access> MarkerSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl MarkerTransactions<CallContext<'_>> for MarkerService {
