@@ -22,7 +22,7 @@ pub use self::schema::{
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
-        TransactionsResponse,
+        TransactionsResponse, Verified,
     },
     proofs::{BlockProof, IndexProof},
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},

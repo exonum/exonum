@@ -22,9 +22,11 @@ use serde::{
 
 use std::{borrow::Cow, convert::TryFrom};
 
-use super::types::{ExonumMessage, SignedMessage};
-use crate::crypto::{self, Hash, PublicKey, SecretKey};
-use crate::proto::schema;
+use crate::{
+    crypto::{self, Hash, PublicKey, SecretKey},
+    messages::types::{ExonumMessage, SignedMessage},
+    proto,
+};
 
 impl SignedMessage {
     /// Creates a new signed message from the given binary value.
@@ -204,7 +206,7 @@ impl<T> ProtobufConvert for Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    type ProtoStruct = schema::consensus::Verified;
+    type ProtoStruct = proto::Verified;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut verified = Self::ProtoStruct::new();
