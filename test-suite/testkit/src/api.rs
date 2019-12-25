@@ -54,12 +54,13 @@ pub enum ApiKind {
 }
 
 impl fmt::Display for ApiKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApiKind::System => write!(f, "api/system"),
-            ApiKind::Explorer => write!(f, "api/explorer"),
-            ApiKind::RustRuntime => write!(f, "api/runtimes/rust"),
-            ApiKind::Service(name) => write!(f, "api/services/{}", name),
+            ApiKind::System => write!(formatter, "api/system"),
+            // FIXME: revert to `api/explorer`
+            ApiKind::Explorer => write!(formatter, "api/services/explorer"),
+            ApiKind::RustRuntime => write!(formatter, "api/runtimes/rust"),
+            ApiKind::Service(name) => write!(formatter, "api/services/{}", name),
         }
     }
 }
