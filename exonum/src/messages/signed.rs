@@ -212,9 +212,9 @@ where
         verified
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let raw = SignedMessage::from_pb(pb.get_raw().clone()).unwrap();
-        Ok(raw.into_verified().unwrap())
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let raw = SignedMessage::from_pb(pb.take_raw())?;
+        Ok(raw.into_verified()?)
     }
 }
 
