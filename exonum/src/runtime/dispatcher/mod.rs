@@ -53,7 +53,7 @@ struct ServiceInfo {
 /// Lookup table for the committed service instances.
 #[derive(Debug, Default)]
 struct CommittedServices {
-    instances: HashMap<InstanceId, ServiceInfo>,
+    instances: BTreeMap<InstanceId, ServiceInfo>,
     instance_names: HashMap<String, InstanceId>,
 }
 

@@ -17,24 +17,21 @@ extern crate pretty_assertions;
 
 use exonum::{
     blockchain::{
-        config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
+        config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainBuilder, BlockchainMut, Schema as CoreSchema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        ArtifactId, CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
-        Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, CallInfo, Caller, DispatcherError, ErrorMatch, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
+        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
+use exonum_crypto::{Hash};
 use exonum_derive::exonum_interface;
 use exonum_derive::*;
-use exonum_merkledb::{
-    access::AccessExt, BinaryValue, Fork, ObjectHash, Patch, Snapshot, SystemSchema,
-};
-use exonum_proto::ProtobufConvert;
+use exonum_merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema};
 use exonum_rust_runtime::{
     CallContext, RustRuntime, {DefaultInstance, Service, ServiceFactory},
 };
@@ -43,8 +40,7 @@ use serde_derive::*;
 
 use std::{
     collections::BTreeMap,
-    mem,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Arc, Mutex},
 };
 
 macro_rules! impl_binary_value_for_bincode {
@@ -1119,85 +1115,125 @@ fn dependent_service_with_no_dependency() {
         .is_none());
 }
 
-// #[test]
-// fn dependent_service_in_same_block() {
-//     let runtime = RustRuntime::new(mpsc::channel(1).0)
-//         .with_factory(TestServiceImpl)
-//         .with_factory(DependentServiceImpl);
+#[test]
+fn dependent_service_in_same_block() {
+    let (mut blockchain, _) = create_runtime(
+        Blockchain::build_for_tests(),
+        create_genesis_config_with_supervisor(),
+    )
+    .unwrap();
+    let keypair = blockchain.as_ref().service_keypair().clone();
 
-//     let config = generate_testnet_config(1, 0)[0].clone();
-//     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+    // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
+    let main_inst = TestServiceImpl.default_instance();
+    let dep_inst = DependentServiceImpl.default_instance();
 
-//     let mut blockchain = Blockchain::build_for_tests()
-//         .into_mut(genesis_config)
-//         .with_runtime(runtime)
-//         .build()
-//         .unwrap();
+    let patch = create_block_with_transactions(
+        &mut blockchain,
+        vec![
+            keypair.deploy_artifact(
+                ToySupervisorService::INSTANCE_ID,
+                DeployArtifact {
+                    test_service_artifact: main_inst.instance_spec.artifact.clone(),
+                    spec: vec![],
+                },
+            ),
+            keypair.deploy_artifact(
+                ToySupervisorService::INSTANCE_ID,
+                DeployArtifact {
+                    test_service_artifact: dep_inst.instance_spec.artifact.clone(),
+                    spec: vec![],
+                },
+            ),
+        ],
+    );
+    blockchain
+        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
+        .unwrap();
 
-//     // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
-//     let fork = create_block(&blockchain);
-//     let main_inst = TestServiceImpl.default_instance();
-//     let dep_inst = DependentServiceImpl.default_instance();
-//     Dispatcher::commit_artifact(&fork, main_inst.instance_spec.test_service_artifact.clone(), vec![]).unwrap();
-//     Dispatcher::commit_artifact(&fork, dep_inst.instance_spec.test_service_artifact.clone(), vec![]).unwrap();
-//     commit_block(&mut blockchain, fork);
+    // Start both services in the same block.
+    let patch = create_block_with_transactions(
+        &mut blockchain,
+        vec![
+            keypair.start_service(
+                ToySupervisorService::INSTANCE_ID,
+                StartService {
+                    spec: main_inst.instance_spec,
+                    constructor: main_inst.constructor,
+                },
+            ),
+            keypair.start_service(
+                ToySupervisorService::INSTANCE_ID,
+                StartService {
+                    spec: dep_inst.instance_spec,
+                    constructor: dep_inst.constructor,
+                },
+            ),
+        ],
+    );
+    blockchain
+        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
+        .unwrap();
 
-//     // Deploy both services in the same block after genesis.
-//     let mut fork = create_block(&blockchain);
-//     let mut ctx = ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain);
-//     ctx.initiate_adding_service(main_inst.instance_spec, main_inst.constructor)
-//         .unwrap();
-//     ctx.initiate_adding_service(dep_inst.instance_spec, dep_inst.constructor)
-//         .unwrap();
-//     commit_block(&mut blockchain, fork);
+    let snapshot = blockchain.snapshot();
+    let schema = snapshot.for_dispatcher();
+    assert_eq!(
+        schema
+            .get_instance(DependentServiceImpl::INSTANCE_NAME)
+            .unwrap()
+            .status
+            .unwrap(),
+        InstanceStatus::Active
+    );
+}
 
-//     let snapshot = blockchain.snapshot();
-//     let schema = DispatcherSchema::new(&snapshot);
-//     assert_eq!(
-//         schema
-//             .get_instance("dependent-service")
-//             .unwrap()
-//             .status
-//             .unwrap(),
-//         InstanceStatus::Active
-//     );
-// }
+#[test]
+fn dependent_service_in_successive_block() {
+    let (mut blockchain, _) = create_runtime(
+        Blockchain::build_for_tests(),
+        create_genesis_config_builder()
+            .with_artifact(ToySupervisorService.artifact_id())
+            .with_instance(ToySupervisorService.default_instance())
+            .with_artifact(TestServiceImpl.artifact_id())
+            .with_instance(TestServiceImpl.default_instance())
+            .build(),
+    )
+    .unwrap();
+    let keypair = blockchain.as_ref().service_keypair().clone();
 
-// #[test]
-// fn dependent_service_in_successive_block() {
-//     let main_service = TestServiceImpl;
-//     let dep_service = DependentServiceImpl;
-//     let genesis_config = TestServiceImpl::genesis_config();
+    let dep_service = DependentServiceImpl.default_instance();
+    execute_transaction(
+        &mut blockchain,
+        keypair.deploy_artifact(
+            ToySupervisorService::INSTANCE_ID,
+            DeployArtifact {
+                test_service_artifact: dep_service.instance_spec.artifact.clone(),
+                spec: vec![],
+            },
+        ),
+    )
+    .unwrap();
 
-//     let runtime = RustRuntime::new(mpsc::channel(1).0)
-//         .with_factory(main_service)
-//         .with_factory(dep_service);
+    execute_transaction(
+        &mut blockchain,
+        keypair.start_service(
+            ToySupervisorService::INSTANCE_ID,
+            StartService {
+                spec: dep_service.instance_spec.clone(),
+                constructor: dep_service.constructor.clone(),
+            },
+        ),
+    )
+    .unwrap();
 
-//     let mut blockchain = Blockchain::build_for_tests()
-//         .into_mut(genesis_config)
-//         .with_runtime(runtime)
-//         .build()
-//         .unwrap();
-
-//     let fork = create_block(&blockchain);
-//     let dep_spec = DependentServiceImpl.default_instance();
-//     Dispatcher::commit_artifact(&fork, dep_spec.instance_spec.test_service_artifact.clone(), vec![]).unwrap();
-//     commit_block(&mut blockchain, fork);
-
-//     let mut fork = create_block(&blockchain);
-//     ExecutionContext::new(blockchain.dispatcher(), &mut fork, Caller::Blockchain)
-//         .initiate_adding_service(dep_spec.instance_spec, dep_spec.constructor)
-//         .unwrap();
-//     commit_block(&mut blockchain, fork);
-
-//     let snapshot = blockchain.snapshot();
-//     let schema = DispatcherSchema::new(&snapshot);
-//     assert_eq!(
-//         schema
-//             .get_instance("dependent-service")
-//             .unwrap()
-//             .status
-//             .unwrap(),
-//         InstanceStatus::Active
-//     );
-// }
+    let snapshot = blockchain.snapshot();
+    let schema = snapshot.for_dispatcher();
+    assert_eq!(
+        schema
+            .get_instance(DependentServiceImpl::INSTANCE_NAME)
+            .unwrap()
+            .status
+            .unwrap(),
+        InstanceStatus::Active
+    );
+}
