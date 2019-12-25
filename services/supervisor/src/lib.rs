@@ -372,6 +372,8 @@ impl Service for Supervisor {
                 .values()
                 .filter(|request| {
                     if schema.deploy_states.get(&request) == Some(DeployState::Pending) {
+                        // From all pending requests we are interested only in ones not
+                        // confirmed by us.
                         !schema
                             .deploy_confirmations
                             .confirmed_by(&request, &service_key)

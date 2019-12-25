@@ -121,9 +121,8 @@ impl BinaryValue for Height {
     }
 
     fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        Ok(Self(
-            <u64 as BinaryValue>::from_bytes(value).expect("Error while deserializing value"),
-        ))
+        let value = <u64 as BinaryValue>::from_bytes(value)?;
+        Ok(Self(value))
     }
 }
 
@@ -261,9 +260,8 @@ impl BinaryValue for Round {
     }
 
     fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        Ok(Round(
-            <u32 as BinaryValue>::from_bytes(value).expect("Error while deserializing value"),
-        ))
+        let value = <u32 as BinaryValue>::from_bytes(value)?;
+        Ok(Self(value))
     }
 }
 
