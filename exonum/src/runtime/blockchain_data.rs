@@ -237,17 +237,19 @@ mod tests {
     use exonum_crypto::PublicKey;
     use exonum_derive::*;
     use exonum_merkledb::{
-        access::{Access, FromAccess},
-        Entry, ProofMapIndex,
+        access::{Access, AccessExt, FromAccess},
+        Entry, HashTag, ProofMapIndex,
     };
     use futures::sync::mpsc;
+
+    use std::collections::BTreeMap;
 
     use super::*;
     use crate::runtime::versioning::ArtifactReq;
     use crate::{
         blockchain::config::GenesisConfigBuilder,
         blockchain::{Blockchain, BlockchainMut},
-        helpers::generate_testnet_config,
+        helpers::{generate_testnet_config, Height, ValidatorId},
         runtime::rust::{DefaultInstance, RustRuntime, Service, ServiceFactory},
     };
 
@@ -338,6 +340,62 @@ mod tests {
             .with_runtime(runtime)
             .build()
             .unwrap()
+    }
+
+    fn setup_blockchain_for_index_proofs() -> Box<dyn Snapshot> {
+        let mut blockchain = create_blockchain();
+        let fork = blockchain.fork();
+        fork.get_proof_list("test.list").push(1_u32);
+        fork.get_proof_entry(("test.entry", &0_u8))
+            .set("!".to_owned());
+        fork.get_value_set("test.set").insert(2_u64);
+        blockchain.merge(fork.into_patch()).unwrap();
+
+        let (block_hash, patch) =
+            blockchain.create_patch(ValidatorId(0).into(), Height(1), &[], &mut BTreeMap::new());
+        blockchain
+            .commit(patch, block_hash, vec![], &mut BTreeMap::new())
+            .unwrap();
+        blockchain.snapshot()
+    }
+
+    fn check_list_proof(proof: &IndexProof) {
+        let block = &proof.block_proof.block;
+        assert_eq!(block.height, Height(1));
+        let checked_proof = proof
+            .index_proof
+            .check_against_hash(block.state_hash)
+            .unwrap();
+        let entries: Vec<_> = checked_proof
+            .entries()
+            .map(|(name, hash)| (name.as_str(), *hash))
+            .collect();
+        assert_eq!(entries, vec![("test.list", HashTag::hash_list(&[1_u32]))]);
+    }
+
+    #[test]
+    fn proof_for_index_in_snapshot() {
+        let snapshot = setup_blockchain_for_index_proofs();
+        let proof = snapshot.proof_for_index("test.list").unwrap();
+        check_list_proof(&proof);
+        // Since the entry has non-empty ID in group, a proof for it should not be returned.
+        assert!(snapshot.proof_for_index("test.entry").is_none());
+        // Value sets are not Merkelized.
+        assert!(snapshot.proof_for_index("test.set").is_none());
+    }
+
+    #[test]
+    fn proof_for_service_index() {
+        let snapshot = setup_blockchain_for_index_proofs();
+        let instance = InstanceDescriptor {
+            id: 100,
+            name: "test",
+        };
+        let data = BlockchainData::new(snapshot.as_ref(), instance);
+        let proof = data.proof_for_service_index("list").unwrap();
+        check_list_proof(&proof);
+        assert!(data.proof_for_service_index("entry").is_none());
+        assert!(data.proof_for_service_index("set").is_none());
     }
 
     #[test]
