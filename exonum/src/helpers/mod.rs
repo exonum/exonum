@@ -22,8 +22,12 @@ pub use self::user_agent::user_agent;
 // `Milliseconds` is just `u64`, but more readable within context.
 pub(crate) use self::types::Milliseconds;
 
+pub(crate) use self::ordered_map::OrderedMap;
+
 #[doc(hidden)]
 pub mod config;
+
+mod ordered_map;
 
 use env_logger::Builder;
 use log::SetLoggerError;

@@ -16,9 +16,8 @@
 
 use failure::Error;
 
-pub use self::ordered_map::OrderedMap;
 pub use self::schema::{
-    blockchain::{Block, CallInBlock, TxLocation},
+    blockchain::{AdditionalHeaders, Block, CallInBlock, TxLocation},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
@@ -30,7 +29,6 @@ pub use self::schema::{
 use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
 
-mod ordered_map;
 pub mod schema;
 
 #[cfg(test)]
