@@ -144,6 +144,7 @@ mod timestamping {
             AnyTx, ExecutionError, InstanceId,
         },
     };
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_merkledb::ObjectHash;
     use rand::rngs::StdRng;
 
@@ -203,6 +204,9 @@ mod cryptocurrency {
             rust::{CallContext, DefaultInstance, Service},
             AnyTx, ErrorKind, ExecutionError, InstanceId,
         },
+    };
+    use exonum_derive::{
+        exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
     };
     use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
@@ -360,6 +364,7 @@ mod foreign_interface_call {
             AnyTx, ExecutionError, InstanceId,
         },
     };
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use futures::sync::mpsc;
     use rand::rngs::StdRng;
     use tempdir::TempDir;
