@@ -17,15 +17,16 @@
 // For protobuf generated files.
 #![allow(bare_trait_objects)]
 
-use failure::Error;
+pub use self::{list_proof::*, map_proof::*};
+
+use exonum_crypto::proto::*;
+use exonum_proto::ProtobufConvert;
+use failure::{ensure, Error};
 use protobuf::{well_known_types::Empty, RepeatedField};
+
 use std::borrow::Cow;
 
 use crate::{proof_map::ProofPath, BinaryKey, BinaryValue};
-use exonum_crypto::proto::*;
-use exonum_proto::ProtobufConvert;
-
-pub use self::{list_proof::*, map_proof::*};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
@@ -122,13 +123,14 @@ where
 mod tests {
     use exonum_crypto::{proto::types, PublicKey};
     use exonum_proto::ProtobufConvert;
+    use protobuf::RepeatedField;
+
     use std::fmt;
 
     use crate::{
         access::AccessExt, indexes::proof_map::ToProofPath, proto, BinaryKey, BinaryValue,
         Database, ListProof, MapProof, ObjectHash, TemporaryDB,
     };
-    use protobuf::RepeatedField;
 
     #[test]
     fn serialize_map_proof() {
