@@ -21,12 +21,7 @@
 //! suited for Exonum.
 
 #[macro_use]
-extern crate serde_derive;
-
-#[macro_use]
-extern crate failure;
-
-pub use self::proto::*;
+extern crate serde_derive; // Required for Protobuf.
 
 #[doc(inline)]
 pub use self::crypto_impl::{
@@ -34,7 +29,12 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
+pub use self::proto::*;
 
+#[cfg(feature = "with-protobuf")]
+pub mod proto;
+
+use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     Serialize, Serializer,
@@ -46,17 +46,12 @@ use std::{
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
-use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
-
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
 use self::crypto_lib::sodiumoxide as crypto_impl;
 
 #[macro_use]
 mod macros;
-
-#[cfg(feature = "with-protobuf")]
-pub mod proto;
 
 pub(crate) mod crypto_lib;
 
