@@ -39,7 +39,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
-
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
 - Interaction with services from the Rust runtime has been changed. Instead of
@@ -78,11 +77,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   To get the sources of an artifact, use query `type=artifact&name=$name&version=$version`,
   where `$name` and `$version` are replaced with appropriate values. (#1590)
 
-#### exonum-merkledb
+#### exonum-cli
 
-- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
-
-- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
+- `supervisor-mode` parameter has been added for `generate-template` subcommand.
+  (#1598)
 
 #### exonum-supervisor
 
@@ -92,6 +90,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - The crate has been restructured, indexes are now located in separate module.
 Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
+
+- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
 
 ### exonum-testkit
 

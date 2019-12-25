@@ -1,4 +1,4 @@
-[common.consensus]
+[consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -8,12 +8,10 @@ propose_timeout_threshold = 500
 status_timeout = 5000
 txs_block_limit = 1000
 
-[common.general]
+[general]
+supervisor_mode = "simple"
 validators_count = 4
 
-[node]
-address = "127.0.0.1:8001"
-
-[node.validator_keys]
-consensus_key = "6296ccc5b48851ccc3c25628914a51428c0a7cf64e03c8477df1a2e57b4d9ebb"
-service_key = "54808c7a0a1f7114bb198798ed1a5eab16f69eb8cada1ffac31f4cf1a6194e88"
+[validator_keys]
+consensus_key = "11e1b1902690aa22c8c976cb74a27f167b3899141c1c6ce8e19bafef32715d40"
+service_key = "4e3faeef8d488463983cf6a221df3a29f9446daace3bbc88beb85327dbd0c051"

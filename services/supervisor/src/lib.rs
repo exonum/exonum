@@ -261,7 +261,7 @@ impl Supervisor {
 
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
-    fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
+    pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
         Supervisor
             .artifact_id()
             .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)

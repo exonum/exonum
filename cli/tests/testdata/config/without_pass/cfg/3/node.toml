@@ -1,26 +1,47 @@
-external_address = "127.0.0.1:8004"
-listen_address = "0.0.0.0:8004"
+[private_config]
+external_address = "127.0.0.1:5403"
+listen_address = "0.0.0.0:5403"
 master_key_path = "master.key.toml"
 
-[api]
+[private_config.api]
 state_update_timeout = 10000
-[[connect_list.peers]]
-address = "127.0.0.1:8003"
-public_key = "4c6dab7819244758e2b987d37daecc132458d03ce2364e558e3a281ed9f93aed"
+[[private_config.connect_list.peers]]
+address = "127.0.0.1:5403"
+public_key = "11e1b1902690aa22c8c976cb74a27f167b3899141c1c6ce8e19bafef32715d40"
 
-[[connect_list.peers]]
-address = "127.0.0.1:8004"
-public_key = "5833f7fc72487e256240b081017638589bfb7c98d8537c5b10d6c2c32ee11730"
+[[private_config.connect_list.peers]]
+address = "127.0.0.1:5403"
+public_key = "242a4e1fc9d0f5ba2003189bded859153aaa9e86f033a7cadb213ec4328601bf"
 
-[[connect_list.peers]]
-address = "127.0.0.1:8001"
-public_key = "6296ccc5b48851ccc3c25628914a51428c0a7cf64e03c8477df1a2e57b4d9ebb"
+[[private_config.connect_list.peers]]
+address = "127.0.0.1:5403"
+public_key = "531cd1323febe624a34cda4efa68d9bb78c9e59e0fcb9b5702a8f94dbf7080e1"
 
-[[connect_list.peers]]
-address = "127.0.0.1:8002"
-public_key = "8e4974569d89871f529f6319b6c6394d19e8c0581bf1ff956cee83d124321296"
+[[private_config.connect_list.peers]]
+address = "127.0.0.1:5403"
+public_key = "6f3f614692d678b664be7eaafbe280d14e2d4191299ae146874eec389c93ece7"
 
-[consensus]
+[private_config.database]
+compression_type = "none"
+create_if_missing = true
+[private_config.mempool.events_pool_capacity]
+api_requests_capacity = 1024
+internal_events_capacity = 128
+network_events_capacity = 512
+network_requests_capacity = 512
+
+[private_config.network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
+
+[private_config.network.http_backend_config]
+server_restart_max_retries = 20
+server_restart_retry_timeout = 500
+
+[public_config.consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -30,36 +51,22 @@ propose_timeout_threshold = 500
 status_timeout = 5000
 txs_block_limit = 1000
 
-[[consensus.validator_keys]]
-consensus_key = "4c6dab7819244758e2b987d37daecc132458d03ce2364e558e3a281ed9f93aed"
-service_key = "b75a0944556a6cf385e6ba6f32a349b2c6717bc207df8b19f91b459aa44ab4d4"
+[[public_config.consensus.validator_keys]]
+consensus_key = "11e1b1902690aa22c8c976cb74a27f167b3899141c1c6ce8e19bafef32715d40"
+service_key = "4e3faeef8d488463983cf6a221df3a29f9446daace3bbc88beb85327dbd0c051"
 
-[[consensus.validator_keys]]
-consensus_key = "5833f7fc72487e256240b081017638589bfb7c98d8537c5b10d6c2c32ee11730"
-service_key = "f9aaf4a5b7a6f5dc2e2f3f8bc618d4645bf2638f4eecb3ee56b00e87b5d6b210"
+[[public_config.consensus.validator_keys]]
+consensus_key = "242a4e1fc9d0f5ba2003189bded859153aaa9e86f033a7cadb213ec4328601bf"
+service_key = "e9a180d443c054d63797acbb61b7cee23e01522e39a58e7761923773fabecc4e"
 
-[[consensus.validator_keys]]
-consensus_key = "6296ccc5b48851ccc3c25628914a51428c0a7cf64e03c8477df1a2e57b4d9ebb"
-service_key = "54808c7a0a1f7114bb198798ed1a5eab16f69eb8cada1ffac31f4cf1a6194e88"
+[[public_config.consensus.validator_keys]]
+consensus_key = "531cd1323febe624a34cda4efa68d9bb78c9e59e0fcb9b5702a8f94dbf7080e1"
+service_key = "afdb7d47ea28bdb28cb8384d652bb241fe367b349f3158b7c2f89df8d1c31cc7"
 
-[[consensus.validator_keys]]
-consensus_key = "8e4974569d89871f529f6319b6c6394d19e8c0581bf1ff956cee83d124321296"
-service_key = "38e803636bd685ed29a64b89a32bd84f1a37a96b05c5c50b85176ca57c993451"
+[[public_config.consensus.validator_keys]]
+consensus_key = "6f3f614692d678b664be7eaafbe280d14e2d4191299ae146874eec389c93ece7"
+service_key = "7662a94afdaac0b24dc239fd151ed5f9d9a384f5f240540c1e4f382d2b5a526d"
 
-[database]
-compression_type = "none"
-create_if_missing = true
-[mempool.events_pool_capacity]
-api_requests_capacity = 1024
-internal_events_capacity = 128
-network_events_capacity = 512
-network_requests_capacity = 512
-
-[network]
-max_incoming_connections = 128
-max_outgoing_connections = 128
-tcp_connect_max_retries = 10
-tcp_connect_retry_timeout = 15000
-tcp_nodelay = true
-
-[services_configs]
+[public_config.general]
+supervisor_mode = "simple"
+validators_count = 4

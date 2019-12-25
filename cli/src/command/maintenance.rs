@@ -17,7 +17,6 @@
 use exonum::{
     exonum_merkledb::{Database, RocksDB},
     helpers::clear_consensus_messages_cache,
-    node::NodeConfig,
 };
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
@@ -27,6 +26,7 @@ use std::path::PathBuf;
 
 use crate::{
     command::{ExonumCommand, StandardResult},
+    config::NodeConfig,
     io::load_config_file,
 };
 
@@ -55,7 +55,10 @@ pub enum Action {
 impl Action {
     fn clear_cache(node_config: PathBuf, db_path: PathBuf) -> Result<(), Error> {
         let node_config: NodeConfig = load_config_file(node_config)?;
-        let db: Box<dyn Database> = Box::new(RocksDB::open(db_path, &node_config.database)?);
+        let db: Box<dyn Database> = Box::new(RocksDB::open(
+            db_path,
+            &node_config.private_config.database,
+        )?);
         let fork = db.fork();
         clear_consensus_messages_cache(&fork);
         db.merge_sync(fork.into_patch())?;
