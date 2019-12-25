@@ -15,6 +15,7 @@
 //! Standard Exonum CLI command used to run the node with default parameters
 //! for developing purposes.
 
+use exonum_supervisor::mode::Mode as SupervisorMode;
 use failure::{Error, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -23,7 +24,7 @@ use std::{fs, path::PathBuf, str::FromStr};
 
 use crate::command::{
     finalize::Finalize,
-    generate_config::{GenerateConfig, PUB_CONFIG_FILE_NAME, SEC_CONFIG_FILE_NAME},
+    generate_config::{GenerateConfig, PRIVATE_CONFIG_FILE_NAME, PUBLIC_CONFIG_FILE_NAME},
     generate_template::GenerateTemplate,
     run::Run,
     ExonumCommand, StandardResult,
@@ -63,6 +64,7 @@ impl ExonumCommand for RunDev {
         let generate_template = GenerateTemplate {
             common_config: common_config.clone(),
             validators_count: 1,
+            supervisor_mode: SupervisorMode::Simple,
         };
         generate_template.execute()?;
 
@@ -80,9 +82,9 @@ impl ExonumCommand for RunDev {
         let node_config_file_name = "node.toml";
 
         let finalize = Finalize {
-            secret_config_path: self.artifact_path(SEC_CONFIG_FILE_NAME),
+            private_config_path: self.artifact_path(PRIVATE_CONFIG_FILE_NAME),
             output_config_path: self.artifact_path(node_config_file_name),
-            public_configs: vec![self.artifact_path(PUB_CONFIG_FILE_NAME)],
+            public_configs: vec![self.artifact_path(PUBLIC_CONFIG_FILE_NAME)],
             public_api_address: Some("127.0.0.1:8080".parse().unwrap()),
             private_api_address: Some("127.0.0.1:8081".parse().unwrap()),
             public_allow_origin: Some("http://127.0.0.1:8080, http://localhost:8080".to_string()),

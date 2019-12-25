@@ -1,14 +1,34 @@
-external_address = "127.0.0.1:8001"
-listen_address = "0.0.0.0:8001"
+[private_config]
+external_address = "127.0.0.1:5400"
+listen_address = "0.0.0.0:5400"
 master_key_path = "master.key.toml"
 
-[api]
+[private_config.api]
 state_update_timeout = 10000
-[[connect_list.peers]]
-address = "127.0.0.1:8001"
-public_key = "0a4cdd514e319d8dd65e9903786f1efdff5530f0c39243c556f7b7ffdad7f37b"
+[[private_config.connect_list.peers]]
+address = "127.0.0.1:5400"
+public_key = "12285e9b9d6440ffe0e0dc8e8d381cf6a071c38d053d9f1273c7b794175529fc"
 
-[consensus]
+[private_config.database]
+compression_type = "none"
+create_if_missing = true
+[private_config.mempool.events_pool_capacity]
+api_requests_capacity = 1024
+internal_events_capacity = 128
+network_events_capacity = 512
+network_requests_capacity = 512
+
+[private_config.network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
+
+[private_config.network.http_backend_config]
+server_restart_max_retries = 20
+server_restart_retry_timeout = 500
+[public_config.consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
 max_propose_timeout = 200
@@ -18,24 +38,10 @@ propose_timeout_threshold = 500
 status_timeout = 5000
 txs_block_limit = 1000
 
-[[consensus.validator_keys]]
-consensus_key = "0a4cdd514e319d8dd65e9903786f1efdff5530f0c39243c556f7b7ffdad7f37b"
-service_key = "4192d6ccb6ef82fc40f3624bbccad675ce4ba5537e07da00f34d0b968256b04a"
+[[public_config.consensus.validator_keys]]
+consensus_key = "12285e9b9d6440ffe0e0dc8e8d381cf6a071c38d053d9f1273c7b794175529fc"
+service_key = "31f88427fd23788e6c46b7df319689267cb09a7938f84c2a2d8db9fde2b42eac"
 
-[database]
-compression_type = "none"
-create_if_missing = true
-[mempool.events_pool_capacity]
-api_requests_capacity = 1024
-internal_events_capacity = 128
-network_events_capacity = 512
-network_requests_capacity = 512
-
-[network]
-max_incoming_connections = 128
-max_outgoing_connections = 128
-tcp_connect_max_retries = 10
-tcp_connect_retry_timeout = 15000
-tcp_nodelay = true
-
-[services_configs]
+[public_config.general]
+supervisor_mode = "simple"
+validators_count = 1

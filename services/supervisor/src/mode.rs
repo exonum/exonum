@@ -27,11 +27,15 @@ use exonum::helpers::byzantine_quorum;
 use exonum_crypto::Hash;
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
+use failure::{self, format_err};
+
+use std::str::FromStr;
 
 use super::{multisig::MultisigIndex, proto, DeployRequest};
 
 /// Supervisor operating mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -65,7 +69,7 @@ impl ProtobufConvert for Mode {
 impl Mode {
     /// Checks whether deploy should be performed within the network.
     pub fn deploy_approved<T: Access>(
-        &self,
+        self,
         deploy: &DeployRequest,
         deploy_requests: &MultisigIndex<T, DeployRequest>,
         validators: usize,
@@ -85,7 +89,7 @@ impl Mode {
 
     /// Checks whether config can be applied for the network.
     pub fn config_approved<T: Access>(
-        &self,
+        self,
         config_hash: &Hash,
         config_confirms: &MultisigIndex<T, Hash>,
         validators: usize,
@@ -101,5 +105,47 @@ impl Mode {
                 confirmations >= byzantine_quorum(validators)
             }
         }
+    }
+}
+
+impl FromStr for Mode {
+    type Err = failure::Error;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "simple" => Ok(Mode::Simple),
+            "decentralized" => Ok(Mode::Decentralized),
+            _ => Err(format_err!(
+                "Invalid supervisor mode: {}. Could be 'simple' or 'decentralized'",
+                input
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Mode;
+    use std::str::FromStr;
+
+    #[test]
+    fn simple_mode_from_str() {
+        let input = "simple";
+        let mode = Mode::from_str(input).unwrap();
+        assert_eq!(mode, Mode::Simple);
+    }
+
+    #[test]
+    fn decentralized_mode_from_str() {
+        let input = "decentralized";
+        let mode = Mode::from_str(input).unwrap();
+        assert_eq!(mode, Mode::Decentralized);
+    }
+
+    #[test]
+    fn invalid_mode_from_str() {
+        let input = "invalid_mode";
+        let err = Mode::from_str(input).unwrap_err();
+        assert!(err.to_string().contains("Invalid supervisor mode"));
     }
 }

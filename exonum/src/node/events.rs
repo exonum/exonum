@@ -61,14 +61,11 @@ impl NodeHandler {
                 self.state.add_peer_to_connect_list(info.clone());
                 self.connect(info.public_key);
 
-                if self.config_manager.is_some() {
+                if let Some(ref mut config_manager) = self.config_manager {
                     let connect_list_config =
                         ConnectListConfig::from_connect_list(&self.state.connect_list());
 
-                    self.config_manager
-                        .as_ref()
-                        .unwrap()
-                        .store_connect_list(connect_list_config);
+                    config_manager.store_connect_list(connect_list_config);
                 }
             }
             ExternalMessage::Enable(value) => {
