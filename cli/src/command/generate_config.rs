@@ -37,9 +37,9 @@ use crate::{
 };
 
 /// Name for a file containing the public part of the node configuration.
-pub const PUB_CONFIG_FILE_NAME: &str = "pub.toml";
+pub const PUBLIC_CONFIG_FILE_NAME: &str = "pub.toml";
 /// Name for a file containing the secret part of the node configuration.
-pub const SEC_CONFIG_FILE_NAME: &str = "sec.toml";
+pub const PRIVATE_CONFIG_FILE_NAME: &str = "sec.toml";
 /// Name for a encrypted file containing the node master key.
 pub const MASTER_KEY_FILE_NAME: &str = "master.key.toml";
 
@@ -126,8 +126,8 @@ impl ExonumCommand for GenerateConfig {
     fn execute(self) -> Result<StandardResult, Error> {
         let common_config: NodePublicConfig = load_config_file(&self.common_config)?;
 
-        let public_config_path = self.output_dir.join(PUB_CONFIG_FILE_NAME);
-        let secret_config_path = self.output_dir.join(SEC_CONFIG_FILE_NAME);
+        let public_config_path = self.output_dir.join(PUBLIC_CONFIG_FILE_NAME);
+        let private_config_path = self.output_dir.join(PRIVATE_CONFIG_FILE_NAME);
         let master_key_path = get_master_key_path(self.master_key_path.clone())?;
 
         let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
@@ -165,11 +165,11 @@ impl ExonumCommand for GenerateConfig {
             keys,
         };
 
-        save_config_file(&private_config, &secret_config_path)?;
+        save_config_file(&private_config, &private_config_path)?;
 
         Ok(StandardResult::GenerateConfig {
             public_config_path,
-            secret_config_path,
+            private_config_path,
             master_key_path,
         })
     }

@@ -106,17 +106,17 @@ impl ConfigSpec {
         self.output_dir().join(index.to_string())
     }
 
-    fn output_sec_config(&self, index: usize) -> PathBuf {
+    fn output_private_config(&self, index: usize) -> PathBuf {
         self.output_node_config_dir(index).join("sec.toml")
     }
 
-    fn output_pub_config(&self, index: usize) -> PathBuf {
+    fn output_public_config(&self, index: usize) -> PathBuf {
         self.output_node_config_dir(index).join("pub.toml")
     }
 
     fn output_pub_configs(&self) -> Vec<PathBuf> {
         (0..self.validators_count)
-            .map(|i| self.output_pub_config(i))
+            .map(|i| self.output_public_config(i))
             .collect()
     }
 
@@ -286,8 +286,8 @@ fn test_generate_config_key_files() {
         .run()
         .unwrap();
 
-    let sec_cfg: toml::Value = load_config_file(&env.output_sec_config(0)).unwrap();
-    assert_eq!(sec_cfg["master_key_path"], "master.key.toml".into());
+    let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
+    assert_eq!(private_cfg["master_key_path"], "master.key.toml".into());
 }
 
 #[test]
@@ -309,9 +309,9 @@ fn master_key_path_current_dir() {
     let current_dir = std::env::current_dir().unwrap();
     let expected_path = current_dir.join("master.key.toml");
 
-    let sec_cfg: toml::Value = load_config_file(&env.output_sec_config(0)).unwrap();
+    let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
     assert_eq!(
-        sec_cfg["master_key_path"],
+        private_cfg["master_key_path"],
         expected_path.to_str().unwrap().into()
     );
 }
@@ -362,7 +362,7 @@ fn test_finalize_run_without_pass() {
         env.copy_node_config_to_output(i);
         let node_config = env.output_node_config(i);
         env.command("finalize")
-            .with_arg(env.output_sec_config(i))
+            .with_arg(env.output_private_config(i))
             .with_arg(&node_config)
             .with_arg("--public-configs")
             .with_args(env.expected_pub_configs())
@@ -388,7 +388,7 @@ fn test_finalize_run_with_pass() {
     env.copy_node_config_to_output(0);
     let node_config = env.output_node_config(0);
     env.command("finalize")
-        .with_arg(env.output_sec_config(0))
+        .with_arg(env.output_private_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs())
@@ -415,7 +415,7 @@ fn test_more_validators_count() {
     let node_config = env.output_node_config(0);
     env.copy_node_config_to_output(0);
     env.command("finalize")
-        .with_arg(env.output_sec_config(0))
+        .with_arg(env.output_private_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs())
@@ -449,7 +449,7 @@ fn test_full_workflow() {
     for i in 0..env.validators_count {
         let node_config = env.output_node_config(i);
         env.command("finalize")
-            .with_arg(env.output_sec_config(i))
+            .with_arg(env.output_private_config(i))
             .with_arg(&node_config)
             .with_arg("--public-configs")
             .with_args(env.output_pub_configs())
@@ -514,7 +514,7 @@ fn run_node_with_decentralized_supervisor() {
 fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> {
     let pub_config_1 = public_config(SupervisorMode::Simple);
     let pub_config_2 = public_config(SupervisorMode::Decentralized);
-    let sec_config = NodePrivateConfig {
+    let private_config = NodePrivateConfig {
         listen_address: "127.0.0.1:5400".parse().unwrap(),
         external_address: "127.0.0.1:5400".to_string(),
         master_key_path: Default::default(),
@@ -530,11 +530,11 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
     let testnet_dir = tempfile::tempdir()?;
     let pub_config_1_path = testnet_dir.path().join("pub1.toml");
     let pub_config_2_path = testnet_dir.path().join("pub2.toml");
-    let sec_config_path = testnet_dir.path().join("sec.toml");
+    let private_config_path = testnet_dir.path().join("sec.toml");
 
     save_config_file(&pub_config_1, &pub_config_1_path)?;
     save_config_file(&pub_config_2, &pub_config_2_path)?;
-    save_config_file(&sec_config, &sec_config_path)?;
+    save_config_file(&private_config, &private_config_path)?;
 
     let finalize = Finalize {
         private_config_path: testnet_dir.path().join("sec.toml"),
@@ -591,7 +591,7 @@ fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), fail
     let (public_config, secret_config) = match generate_config.execute()? {
         StandardResult::GenerateConfig {
             public_config_path,
-            secret_config_path,
+            private_config_path: secret_config_path,
             ..
         } => (public_config_path, secret_config_path),
         _ => unreachable!("Invalid result of generate-config"),
@@ -620,8 +620,8 @@ fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), fail
 
     if let StandardResult::Run(config) = run.execute()? {
         assert_eq!(
-            &config.node_config.public_config.general.supervisor_mode,
-            supervisor_mode
+            config.node_config.public_config.general.supervisor_mode,
+            *supervisor_mode
         );
     } else {
         unreachable!("Invalid result of run");

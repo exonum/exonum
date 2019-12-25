@@ -100,7 +100,7 @@ pub enum StandardResult {
         /// Path to a generated public config of the node.
         public_config_path: PathBuf,
         /// Path to a generated private config of the node.
-        secret_config_path: PathBuf,
+        private_config_path: PathBuf,
         /// Path to a master key of the node.
         master_key_path: PathBuf,
     },
