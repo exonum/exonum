@@ -226,7 +226,7 @@ fn send_deploy_request(api: &TestKitApi, request: &DeployRequest) -> Hash {
         .expect("Call for `deploy-artifact` API endpoint failed")
 }
 
-/// Gets a deploy status for a certai request.
+/// Gets a deploy status for a certain request.
 fn get_deploy_status(api: &TestKitApi, request: &DeployRequest) -> DeployResponse {
     let query = DeployInfoQuery::from(request.clone());
     api.private(ApiKind::Service("supervisor"))
@@ -271,7 +271,7 @@ fn deploy_success() {
 }
 
 /// Checks that deployment fails if there was no enough confirmations
-/// when the deadline height was acheieved.
+/// when the deadline height was achieved.
 #[test]
 fn deploy_failure_because_not_confirmed() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
@@ -434,11 +434,11 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     assert_eq!(response.state, DeployState::Failed(Height(1), fail_cause));
 }
 
-/// Checks that after unsuccessfull deploy attempt we can perform another try and it can
+/// Checks that after unsuccessful deploy attempt we can perform another try and it can
 /// result in a success.
 #[test]
 fn deploy_successfully_after_failure() {
-    // 1. Perform the same rountime as in `deploy_failure_because_other_node_cannot_deploy`:
+    // 1. Perform the same routine as in `deploy_failure_because_other_node_cannot_deploy`:
     // - attempt to deploy an artifact that can be deployed;
     // - receive failure report from the other node;
     // - ensure that deployment is failed.
@@ -475,7 +475,7 @@ fn deploy_successfully_after_failure() {
     let fail_cause = DeployFailCause::DeployError(error);
     assert_eq!(response.state, DeployState::Failed(Height(1), fail_cause));
 
-    // 2. Update the deadline height and perform the same routime as in `deploy_success`:
+    // 2. Update the deadline height and perform the same routine as in `deploy_success`:
     // - attempt to deploy the same artifact;
     // - receive the confirmation;
     // - ensure that artifact is now deployed.
@@ -514,7 +514,7 @@ fn deploy_successfully_after_failure() {
 
 /// Checks that `deploy-status` returns `NotRequested` for unknown requests.
 #[test]
-fn unrequested_deploy_status() {
+fn not_requested_deploy_status() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 

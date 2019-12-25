@@ -34,7 +34,7 @@ pub enum DeployFailCause {
     /// At least one node failed the deployment attempt.
     /// Stored field contains the error from the *first* received transaction
     /// reporting a deployment failure. If two different nodes failed the deployment
-    /// due to different reasons, it won't be afftected in the cause.
+    /// due to different reasons, it won't be represented in the cause.
     #[serde(with = "execution_error")]
     DeployError(ExecutionError),
 }
