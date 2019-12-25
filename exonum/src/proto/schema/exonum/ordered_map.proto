@@ -18,6 +18,8 @@ syntax = "proto3";
 
 package exonum;
 
+option java_package = "com.exonum.core.messages";
+
 // Some non-scalar key-value pair.
 message KeyValue {
   string key = 1;
