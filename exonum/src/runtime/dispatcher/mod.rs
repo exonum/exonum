@@ -540,7 +540,7 @@ pub enum Action {
     StartDeploy {
         artifact: ArtifactId,
         spec: Vec<u8>,
-        and_then: Box<dyn FnOnce(Result<(), ()>) -> ExecutionFuture + Send>,
+        then: Box<dyn FnOnce(Result<(), ExecutionError>) -> ExecutionFuture + Send>,
     },
 }
 
@@ -562,11 +562,11 @@ impl Action {
             Action::StartDeploy {
                 artifact,
                 spec,
-                and_then,
+                then,
             } => {
                 dispatcher
                     .deploy_artifact(artifact.clone(), spec)
-                    .then(|result| and_then(result.map_err(drop)))
+                    .then(|result| then(result))
                     .wait()
                     .unwrap_or_else(|e| {
                         error!("Deploying artifact {:?} failed: {}", artifact, e);

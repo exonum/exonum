@@ -18,8 +18,42 @@ package exonum.supervisor;
 
 import "types.proto";
 import "service.proto";
+import "runtime.proto";
+import "google/protobuf/empty.proto";
 
 message ConfigProposalWithHash {
     exonum.crypto.Hash propose_hash = 1;
     ConfigPropose config_propose = 2;
+}
+
+// Reason for a deployment failure.
+message DeployFailCause {
+    oneof type {
+        // Failure caused by deadline reaching.
+        google.protobuf.Empty deadline = 1;
+        // Failure caused by the execution error.
+        exonum.runtime.ExecutionError error = 2;
+    }
+}
+
+// Information about deploy failure.
+message FailureInfo {
+    // Height on which failure occurred.
+    uint64 height = 1;
+    // Reason for the failure.
+    DeployFailCause cause = 2;
+}
+
+// Deployment state.
+message DeployState {
+    oneof type {
+        // There was no such a deploy request.
+        google.protobuf.Empty not_requested = 1;
+        // Deploy is in process.
+        google.protobuf.Empty pending = 2;
+        // Deployment failed.
+        FailureInfo failed = 3;
+        // Deployment succeed.
+        google.protobuf.Empty succeed = 4;
+    }
 }

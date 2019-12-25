@@ -26,7 +26,8 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployRequest, DeployResult, Error, Schema, StartService, StopService, Supervisor,
+    DeployFailCause, DeployRequest, DeployResult, DeployState, Error, Schema, StartService,
+    StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -293,6 +294,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         schema.deploy_requests.confirm(&deploy, author);
         let supervisor_mode = schema.supervisor_config().mode;
         if supervisor_mode.deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
+            schema.deploy_states.put(&deploy, DeployState::Pending);
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments.put(&artifact, deploy);
@@ -326,7 +328,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let mut schema = Schema::new(context.service_data());
 
         // Check if deployment already failed.
-        if schema.deploy_failures.contains(&deploy_result.request) {
+        if let Some(DeployState::Failed(_, _)) = schema.deploy_states.get(&deploy_result.request) {
             // This deployment is already resulted in failure, no further
             // processing needed.
             return Ok(());
@@ -349,32 +351,42 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             return Err(Error::DeadlineExceeded.into());
         }
 
-        if deploy_result.success {
-            let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
-            let validator_count = core_schema.consensus_config().validator_keys.len();
-            if confirmations == validator_count {
-                log::trace!(
-                    "Registering deployed artifact in dispatcher {:?}",
-                    deploy_request.artifact
-                );
+        match deploy_result.result {
+            Ok(()) => {
+                let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
+                let validator_count = core_schema.consensus_config().validator_keys.len();
+                if confirmations == validator_count {
+                    log::trace!(
+                        "Registering deployed artifact in dispatcher {:?}",
+                        deploy_request.artifact
+                    );
 
-                // Remove artifact from pending deployments.
-                schema.pending_deployments.remove(&deploy_request.artifact);
-                // We have enough confirmations to register the deployed artifact in the dispatcher;
-                // if this action fails, this transaction will be canceled.
-                context
-                    .start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+                    // Remove artifact from pending deployments.
+                    schema.pending_deployments.remove(&deploy_request.artifact);
+                    schema
+                        .deploy_states
+                        .put(&deploy_request, DeployState::Succeed);
+                    // We have enough confirmations to register the deployed artifact in the dispatcher;
+                    // if this action fails, this transaction will be canceled.
+                    context.start_artifact_registration(
+                        deploy_request.artifact,
+                        deploy_request.spec,
+                    )?;
+                }
             }
-        } else {
-            // Mark deploy as failed.
-            schema.deploy_failures.put(&deploy_request, current_height);
+            Err(error) => {
+                // Mark deploy as failed.
+                let cause = DeployFailCause::DeployError(error);
+                schema
+                    .deploy_states
+                    .put(&deploy_request, DeployState::Failed(current_height, cause));
 
-            // Remove artifact from pending deployments: since we require
-            // a confirmation from every node, failure for one node means failure
-            // for the whole network.
-            schema.pending_deployments.remove(&deploy_request.artifact);
+                // Remove artifact from pending deployments: since we require
+                // a confirmation from every node, failure for one node means failure
+                // for the whole network.
+                schema.pending_deployments.remove(&deploy_request.artifact);
+            }
         }
-
         Ok(())
     }
 }

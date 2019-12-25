@@ -30,7 +30,7 @@ use std::{convert::TryFrom, str::FromStr};
 
 use super::{
     schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
-    ConfigVote, DeployRequest, SupervisorConfig,
+    ConfigVote, DeployRequest, DeployState, SupervisorConfig,
 };
 
 /// Query for retrieving information about deploy state.
@@ -79,20 +79,6 @@ impl From<DeployRequest> for DeployInfoQuery {
             deadline_height,
         }
     }
-}
-
-/// State of the deployment performed by `Supervisor`.
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Serialize, Deserialize)]
-pub enum DeployState {
-    /// Deploy with provided spec was not requested.
-    NotRequested,
-    /// Deployment is in process.
-    Pending,
-    /// Deployment resulted in a failure on a certain height.
-    Failed(Height),
-    /// Deployment finished successfully.
-    Succeed,
 }
 
 /// Response with deploy status for a certain deploy request.
@@ -188,35 +174,13 @@ impl PrivateApi for ApiImpl<'_> {
 
     fn deploy_status(&self, query: DeployInfoQuery) -> Result<DeployResponse, Self::Error> {
         let request = DeployRequest::try_from(query)?;
-
         let schema = Schema::new(self.0.service_data());
-        if let Some(stored_request) = schema.pending_deployments.get(&request.artifact) {
-            // Artifact is currently in the pending deployments, check that request is the same.
-            if request == stored_request {
-                return Ok(DeployState::Pending.into());
-            }
-        }
-        if let Some(height) = schema.deploy_failures.get(&request) {
-            // Request in the list of failed deployments.
-            return Ok(DeployState::Failed(height).into());
-        }
+        let status = schema
+            .deploy_states
+            .get(&request)
+            .unwrap_or(DeployState::NotRequested);
 
-        let dispatcher_schema = self.0.data().for_dispatcher();
-        let core_schema = self.0.data().for_core();
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        // Check that artifact is deployed and was confirmed *for the same deploy request*.
-        if dispatcher_schema.get_artifact(&request.artifact).is_some()
-            && schema.deploy_confirmations.confirmations(&request) == validator_count
-        {
-            // Deploy for this request was confirmed by every validator,
-            // and artifact is marked as deployed by the dispatcher =>
-            // deploy succeed.
-            return Ok(DeployState::Succeed.into());
-        }
-
-        // Request isn't stored as pending, failed or deployed =>
-        // there was no such a request.
-        Ok(DeployState::NotRequested.into())
+        Ok(status.into())
     }
 }
 

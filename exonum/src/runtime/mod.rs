@@ -170,7 +170,8 @@ use crate::{
 
 mod blockchain_data;
 mod dispatcher;
-pub(crate) mod error;
+#[doc(hidden)]
+pub mod error;
 mod types;
 
 /// Persistent identifier of a supervisor service instance.

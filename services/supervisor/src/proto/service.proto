@@ -19,6 +19,7 @@ package exonum.supervisor;
 import "types.proto";
 import "runtime.proto";
 import "blockchain.proto";
+import "google/protobuf/empty.proto";
 
 // Transactions
 
@@ -37,7 +38,10 @@ message DeployResult {
   // Artifact identifier.
   DeployRequest request = 1;
   // Result of deployment.
-  bool success = 2;
+  oneof result {
+    google.protobuf.Empty success = 2;
+    exonum.runtime.ExecutionError error = 3;
+  }
 }
 
 // Request for the start service instance.

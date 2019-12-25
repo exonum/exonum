@@ -25,16 +25,16 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::ServiceFactory, SUPERVISOR_INSTANCE_ID},
+    runtime::{rust::ServiceFactory, ExecutionError, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    DeployInfoQuery, DeployRequest, DeployResponse, DeployResult, DeployState, Supervisor,
-    SupervisorInterface,
+    DeployFailCause, DeployInfoQuery, DeployRequest, DeployResponse, DeployResult, DeployState,
+    Supervisor, SupervisorInterface,
 };
 
-use failing_runtime::FailingRuntime;
+use failing_runtime::{FailingRuntime, FailingRuntimeError};
 
 mod failing_runtime {
     use std::str::FromStr;
@@ -81,7 +81,7 @@ mod failing_runtime {
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[derive(ExecutionFail)]
     #[execution_fail(kind = "runtime")]
-    enum FailingRuntimeError {
+    pub(crate) enum FailingRuntimeError {
         /// Generic deployment error.
         GenericError = 0,
         /// Deployment error upon a request.
@@ -194,7 +194,7 @@ fn testkit_with_failing_runtime(validator_count: u16) -> TestKit {
 fn build_result_transaction(
     testkit: &TestKit,
     request: &DeployRequest,
-    success: bool,
+    result: Result<(), ExecutionError>,
 ) -> Verified<AnyTx> {
     testkit
         .network()
@@ -206,11 +206,16 @@ fn build_result_transaction(
                 SUPERVISOR_INSTANCE_ID,
                 DeployResult {
                     request: request.clone(),
-                    success,
+                    result,
                 },
             )
         })
         .unwrap()
+}
+
+/// Creates `DeployFailCause` for planned error of `FailingRuntime`.
+fn fail_cause() -> DeployFailCause {
+    DeployFailCause::DeployError(FailingRuntimeError::PlannedError.into())
 }
 
 /// Sends a deploy request through API.
@@ -253,8 +258,8 @@ fn deploy_success() {
     assert_eq!(response.state, DeployState::Pending);
 
     // Confirm deploy.
-    let success = true;
-    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, success);
+    let result = Ok(());
+    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, result);
     testkit.create_block_with_transaction(deploy_confirmation);
 
     testkit.create_blocks_until(DEPLOY_HEIGHT.next());
@@ -292,7 +297,10 @@ fn deploy_failure_because_not_confirmed() {
     // Check that status is `Failed` at the deadline height.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(DEPLOY_HEIGHT));
+    assert_eq!(
+        response.state,
+        DeployState::Failed(DEPLOY_HEIGHT, DeployFailCause::Deadline)
+    );
 }
 
 /// Checks that if deployment attempt fails for our node, the deploy
@@ -317,8 +325,8 @@ fn deploy_failure_because_cannot_deploy() {
     assert_eq!(response.state, DeployState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
-    let success = true;
-    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, success);
+    let result = Ok(());
+    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, result);
     testkit.create_block_with_transaction(deploy_confirmation);
 
     testkit.create_blocks_until(DEPLOY_HEIGHT.next());
@@ -328,7 +336,7 @@ fn deploy_failure_because_cannot_deploy() {
     // `after_commit`, thus height is 2.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(2)));
+    assert_eq!(response.state, DeployState::Failed(Height(2), fail_cause()));
 }
 
 /// This test has the same idea as `deploy_failure_because_not_confirmed`,
@@ -361,8 +369,8 @@ fn deploy_failure_check_no_extra_actions() {
     assert_eq!(response.state, DeployState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
-    let success = true;
-    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, success);
+    let result = Ok(());
+    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, result);
     testkit.create_block_with_transaction(deploy_confirmation);
 
     // Now, in `after_commit` we should attempt to deploy an artifact, and send result tx.
@@ -372,7 +380,7 @@ fn deploy_failure_check_no_extra_actions() {
 
     // Check that deployment is already marked as failed.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(2)));
+    assert_eq!(response.state, DeployState::Failed(Height(2), fail_cause()));
 
     // Ensure that there are no more transactions until the deadline height.
     // This is sufficient, since after any deploy attempt we are sending a transaction
@@ -387,7 +395,7 @@ fn deploy_failure_check_no_extra_actions() {
     // it should not change.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(2)));
+    assert_eq!(response.state, DeployState::Failed(Height(2), fail_cause()));
 }
 
 /// Checks that if other node sends a failure report, deployment fails as well.
@@ -411,8 +419,9 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     assert_eq!(response.state, DeployState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
-    let success = false;
-    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, success);
+    let error: ExecutionError = FailingRuntimeError::GenericError.into();
+    let deploy_confirmation =
+        build_result_transaction(&testkit, &deploy_request, Err(error.clone()));
     testkit.create_block_with_transaction(deploy_confirmation);
 
     testkit.create_blocks_until(DEPLOY_HEIGHT.next());
@@ -421,7 +430,8 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(1)));
+    let fail_cause = DeployFailCause::DeployError(error);
+    assert_eq!(response.state, DeployState::Failed(Height(1), fail_cause));
 }
 
 /// Checks that after unsuccessfull deploy attempt we can perform another try and it can
@@ -451,8 +461,9 @@ fn deploy_successfully_after_failure() {
     assert_eq!(response.state, DeployState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
-    let success = false;
-    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, success);
+    let error: ExecutionError = FailingRuntimeError::GenericError.into();
+    let deploy_confirmation =
+        build_result_transaction(&testkit, &deploy_request, Err(error.clone()));
     testkit.create_block_with_transaction(deploy_confirmation);
 
     testkit.create_blocks_until(DEPLOY_HEIGHT.next());
@@ -461,7 +472,8 @@ fn deploy_successfully_after_failure() {
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(1)));
+    let fail_cause = DeployFailCause::DeployError(error);
+    assert_eq!(response.state, DeployState::Failed(Height(1), fail_cause));
 
     // 2. Update the deadline height and perform the same routime as in `deploy_success`:
     // - attempt to deploy the same artifact;
@@ -488,8 +500,8 @@ fn deploy_successfully_after_failure() {
     assert_eq!(response.state, DeployState::Pending);
 
     // Confirm deploy.
-    let success = true;
-    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, success);
+    let result = Ok(());
+    let deploy_confirmation = build_result_transaction(&testkit, &deploy_request, result);
     testkit.create_block_with_transaction(deploy_confirmation);
 
     testkit.create_blocks_until(NEW_DEPLOY_HEIGHT.next());

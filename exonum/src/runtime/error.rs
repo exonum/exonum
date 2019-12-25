@@ -14,7 +14,8 @@
 
 //! The set of errors for the Runtime module.
 
-pub(crate) mod execution_error;
+#[doc(hidden)]
+pub mod execution_error;
 mod execution_result;
 #[cfg(test)]
 mod tests;

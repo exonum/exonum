@@ -366,8 +366,6 @@ fn deploy_service() {
         .query(&deploy_request)
         .post("deploy-artifact")
         .unwrap();
-    testkit.create_block();
-
     testkit.create_blocks_until(deadline_height);
 
     // Check that request was executed.

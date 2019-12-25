@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum::{
@@ -20,7 +21,9 @@ use exonum::{
     exonum_merkledb::ObjectHash,
     helpers::Height,
     messages::{AnyTx, Verified},
-    runtime::{rust::TxStub, ArtifactId, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        rust::TxStub, ArtifactId, ExecutionError, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+    },
 };
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
@@ -55,13 +58,41 @@ pub struct DeployRequest {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::DeployResult")]
+#[derive(Debug, Clone, BinaryValue, ObjectHash)]
 pub struct DeployResult {
     /// Artifact identifier.
     pub request: DeployRequest,
     /// Result of deployment.
-    pub success: bool,
+    pub result: Result<(), ExecutionError>,
+}
+
+impl ProtobufConvert for DeployResult {
+    type ProtoStruct = proto::DeployResult;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        pb.set_request(ProtobufConvert::to_pb(&self.request));
+        match self.result {
+            Ok(()) => pb.set_success(Default::default()),
+            Err(ref err) => pb.set_error(ProtobufConvert::to_pb(err)),
+        }
+        pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let request = DeployRequest::from_pb(pb.take_request())?;
+        let result = if pb.has_success() {
+            Ok(())
+        } else if pb.has_error() {
+            let error = ExecutionError::from_pb(pb.take_error())?;
+            Err(error)
+        } else {
+            return Err(format_err!("Invalid `DeployResult` format"));
+        };
+
+        let result = Self { request, result };
+        Ok(result)
+    }
 }
 
 /// Request for the start service instance.
@@ -241,9 +272,10 @@ impl_serde_hex_for_binary_value! { StopService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 
-impl From<(DeployRequest, bool)> for DeployResult {
-    fn from((request, success): (DeployRequest, bool)) -> Self {
-        Self { request, success }
+impl DeployResult {
+    /// Creates a new `DeployRequest` object.
+    pub fn new(request: DeployRequest, result: Result<(), ExecutionError>) -> Self {
+        Self { request, result }
     }
 }
 

@@ -67,8 +67,9 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, DeployResponse, DeployState},
+    api::{DeployInfoQuery, DeployResponse},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
+    deploy_state::{DeployFailCause, DeployState},
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
@@ -97,6 +98,7 @@ pub mod mode;
 
 mod api;
 mod configure;
+mod deploy_state;
 mod errors;
 mod multisig;
 mod proto;
@@ -301,9 +303,13 @@ impl Service for Supervisor {
 
         for request in requests_to_remove {
             schema.pending_deployments.remove(&request.artifact);
-            schema
-                .deploy_failures
-                .put(&request, request.deadline_height);
+            if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
+                // If state is marked as pending, change is to failed as well.
+                schema.deploy_states.put(
+                    &request,
+                    DeployState::Failed(request.deadline_height, DeployFailCause::Deadline),
+                );
+            }
             log::trace!("Removed outdated deployment request {:?}", request);
         }
 
@@ -365,10 +371,13 @@ impl Service for Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    !schema.deploy_failures.contains(&request)
-                        && !schema
+                    if schema.deploy_states.get(&request) == Some(DeployState::Pending) {
+                        !schema
                             .deploy_confirmations
                             .confirmed_by(&request, &service_key)
+                    } else {
+                        false
+                    }
                 })
                 .collect()
         };
@@ -382,10 +391,9 @@ impl Service for Supervisor {
             // We should deploy the artifact for all nodes, but send confirmations only
             // if the node is a validator.
             extensions.start_deploy(artifact, spec, move |result| {
-                let success = result.is_ok();
                 if let Some(tx_sender) = tx_sender {
                     log::trace!("Sending deployment result report {:?}", unconfirmed_request);
-                    let confirmation = DeployResult::from((unconfirmed_request, success));
+                    let confirmation = DeployResult::new(unconfirmed_request, result);
                     if let Err(e) = tx_sender.confirm_artifact_deploy((), confirmation) {
                         log::error!("Cannot send `DeployResult`: {}", e);
                     }

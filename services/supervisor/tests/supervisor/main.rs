@@ -136,7 +136,7 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let confirmation = (request.to_owned(), true).into();
+    let confirmation = DeployResult::new(request.to_owned(), Ok(()));
     testkit
         .validator(validator_id)
         .service_keypair()
@@ -752,7 +752,7 @@ fn test_auditor_cant_send_requests() {
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let confirmation: DeployResult = (request_deploy.clone(), true).into();
+        let confirmation = DeployResult::new(request_deploy.clone(), Ok(()));
         testkit
             .us()
             .service_keypair()
