@@ -30,7 +30,7 @@ use serde_json::json;
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency_advanced::{
     api::{WalletInfo, WalletQuery},
-    schema::SchemaInterface,
+    schema::Schema,
     transactions::{CreateWallet, Transfer},
     wallet::Wallet,
     CryptocurrencyInterface, CryptocurrencyService,
@@ -97,7 +97,7 @@ fn test_transfer() {
 
     // Check the balances via public schema.
     let snapshot = testkit.snapshot();
-    let schema: SchemaInterface<_> = snapshot.service_schema(SERVICE_ID).unwrap();
+    let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
     let alice_wallet = schema.wallets.get(&tx_alice.author()).unwrap();
     assert_eq!(alice_wallet.balance, 90);
     let bob_wallet = schema.wallets.get(&tx_bob.author()).unwrap();
@@ -151,7 +151,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
     // Same check via schema.
     let snapshot = testkit.snapshot();
-    let schema: SchemaInterface<_> = snapshot.service_schema(SERVICE_ID).unwrap();
+    let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
     let wallet = schema.wallets.get(&tx_bob.author()).unwrap();
     assert_eq!(wallet.balance, 100);
 }

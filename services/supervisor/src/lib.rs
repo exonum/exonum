@@ -74,7 +74,7 @@ pub use self::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
         DeployRequest, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
-    schema::SchemaInterface,
+    schema::Schema,
     transactions::SupervisorInterface,
 };
 
@@ -91,7 +91,7 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 
-use crate::{configure::ConfigureMut, mode::Mode, schema::Schema};
+use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};
 
 pub mod mode;
 
@@ -192,7 +192,7 @@ fn update_configs(
 /// Assigns the instance ID for a new service, initializing the schema `vacant_instance_id`
 /// entry if needed.
 fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
-    let mut schema = Schema::new(context.service_data());
+    let mut schema = SchemaImpl::new(context.service_data());
     match schema.assign_instance_id() {
         Some(id) => id,
         None => {
@@ -280,7 +280,7 @@ impl Service for Supervisor {
         let config =
             SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         schema.public.configuration.set(config);
 
         Ok(())
@@ -288,7 +288,7 @@ impl Service for Supervisor {
 
     fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         // Perform a cleanup for outdated requests.
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
 
@@ -316,7 +316,7 @@ impl Service for Supervisor {
     }
 
     fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
         let next_height = core_schema.next_height();
@@ -357,7 +357,7 @@ impl Service for Supervisor {
         let service_key = context.service_key();
 
         let deployments: Vec<_> = {
-            let schema = Schema::new(context.service_data());
+            let schema = SchemaImpl::new(context.service_data());
             schema
                 .pending_deployments
                 .values()
@@ -416,7 +416,7 @@ impl Configure for Supervisor {
         context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         schema.public.configuration.set(params);
         Ok(())
     }

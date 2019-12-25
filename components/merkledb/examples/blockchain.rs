@@ -97,6 +97,7 @@ impl Transaction {
 }
 
 #[derive(FromAccess)]
+#[from_access(schema)]
 struct Schema<T: Access> {
     pub transactions: MapIndex<T::Base, Hash, Transaction>,
     pub blocks: ListIndex<T::Base, Hash>,

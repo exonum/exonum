@@ -20,7 +20,7 @@ use exonum::{
 };
 use exonum_proto::ProtobufConvert;
 
-use super::{proto, schema::Schema, CryptocurrencyService};
+use super::{proto, schema::SchemaImpl, CryptocurrencyService};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, ExecutionFail)]
@@ -116,7 +116,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         let to = arg.to;
         let amount = arg.amount;
@@ -149,7 +149,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         if let Some(wallet) = schema.public.wallets.get(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
@@ -165,7 +165,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         if schema.public.wallets.get(&from).is_none() {
             let name = &arg.name;
             schema.create_wallet(&from, name, tx_hash);

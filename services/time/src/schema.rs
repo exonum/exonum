@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 
 use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
 use exonum_merkledb::{
-    access::{Access, RawAccessMut},
+    access::{Access, FromAccess, RawAccessMut},
     ProofEntry, ProofMapIndex,
 };
 
@@ -27,6 +27,12 @@ pub struct TimeSchema<T: Access> {
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
     /// Consolidated time.
     pub time: ProofEntry<T::Base, DateTime<Utc>>,
+}
+
+impl<T: Access> TimeSchema<T> {
+    pub(crate) fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T: Access> TimeSchema<T>

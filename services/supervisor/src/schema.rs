@@ -29,10 +29,11 @@ use super::{
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
-pub(crate) struct Schema<T: Access> {
+#[from_access(schema)]
+pub(crate) struct SchemaImpl<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
-    pub public: SchemaInterface<T>,
+    pub public: Schema<T>,
 
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
@@ -50,14 +51,14 @@ pub(crate) struct Schema<T: Access> {
 
 /// Public part of the supervisor service.
 #[derive(Debug, FromAccess, RequireArtifact)]
-pub struct SchemaInterface<T: Access> {
+pub struct Schema<T: Access> {
     /// Supervisor configuration.
     pub configuration: ProofEntry<T::Base, SupervisorConfig>,
     /// Current pending configuration proposal.
     pub pending_proposal: ProofEntry<T::Base, ConfigProposalWithHash>,
 }
 
-impl<T: Access> Schema<T> {
+impl<T: Access> SchemaImpl<T> {
     /// Gets the stored configuration number.
     pub fn get_configuration_number(&self) -> u64 {
         self.configuration_number.get().unwrap_or(0)
@@ -75,7 +76,7 @@ impl<T: Access> Schema<T> {
     }
 }
 
-impl Schema<Prefixed<'_, &Fork>> {
+impl SchemaImpl<Prefixed<'_, &Fork>> {
     /// Increases the stored configuration number.
     pub fn increase_configuration_number(&mut self) {
         let new_configuration_number = self.get_configuration_number() + 1;

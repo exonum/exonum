@@ -203,6 +203,7 @@ impl Transaction {
 }
 
 #[derive(FromAccess)]
+#[from_access(schema)]
 struct Schema<T: Access> {
     transactions: MapIndex<T::Base, Hash, Transaction>,
     blocks: ListIndex<T::Base, Hash>,

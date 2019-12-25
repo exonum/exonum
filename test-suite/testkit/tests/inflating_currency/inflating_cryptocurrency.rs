@@ -80,6 +80,7 @@ impl Wallet {
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
 #[derive(FromAccess)]
+#[from_access(schema)]
 pub struct CurrencySchema<T: Access> {
     pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
 }

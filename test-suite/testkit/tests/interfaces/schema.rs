@@ -32,6 +32,7 @@ pub struct Wallet {
 }
 
 #[derive(FromAccess)]
+#[from_access(schema)]
 pub struct WalletSchema<T: Access> {
     pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
 }

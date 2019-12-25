@@ -72,7 +72,8 @@ impl TimestampEntry {
 
 /// Timestamping database schema.
 #[derive(Debug, FromAccess)]
-pub struct Schema<T: Access> {
+#[from_access(schema)]
+pub(crate) struct Schema<T: Access> {
     pub config: Entry<T::Base, Config>,
     pub timestamps: RawProofMapIndex<T::Base, Hash, TimestampEntry>,
 }

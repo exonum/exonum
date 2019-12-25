@@ -45,6 +45,7 @@ pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 2;
 
 #[derive(FromAccess, RequireArtifact)]
+#[from_access(schema)]
 #[require_artifact(name = "counter-service", version = "1")]
 pub struct CounterSchema<T: Access> {
     pub counter: ProofEntry<T::Base, u64>,

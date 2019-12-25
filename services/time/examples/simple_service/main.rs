@@ -74,6 +74,7 @@ struct MarkerService;
 
 /// Marker service database schema.
 #[derive(Debug, FromAccess, RequireArtifact)]
+#[from_access(schema)]
 #[require_artifact(name = "marker", version = "0.1.x")]
 // ^-- Must match the name / version specified for `MarkerService`.
 pub struct MarkerSchema<T: Access> {

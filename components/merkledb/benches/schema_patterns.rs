@@ -63,6 +63,7 @@ trait ExecuteTransaction {
 }
 
 #[derive(FromAccess)]
+#[from_access(schema)]
 struct EagerSchema<T: Access> {
     // Accessed once per transaction.
     transactions: MapIndex<T::Base, Hash, Transaction>,
@@ -120,6 +121,7 @@ impl ExecuteTransaction for EagerStyle {
 }
 
 #[derive(FromAccess)]
+#[from_access(schema)]
 struct LazySchema<T: Access> {
     transactions: MapIndex<T::Base, Hash, Transaction>,
     hot_index: ProofMapIndex<T::Base, u64, Hash>,

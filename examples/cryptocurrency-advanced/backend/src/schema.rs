@@ -27,22 +27,23 @@ use crate::{wallet::Wallet, INITIAL_BALANCE};
 ///
 /// Note that the schema is crate-private, but it has a public part.
 #[derive(Debug, FromAccess)]
-pub(crate) struct Schema<T: Access> {
+#[from_access(schema)]
+pub(crate) struct SchemaImpl<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
-    pub public: SchemaInterface<T>,
+    pub public: Schema<T>,
     /// History for specific wallets.
     pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
 }
 
 /// Public part of the cryptocurrency schema.
 #[derive(Debug, FromAccess, RequireArtifact)]
-pub struct SchemaInterface<T: Access> {
+pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
 }
 
-impl<T> Schema<T>
+impl<T> SchemaImpl<T>
 where
     T: Access,
     T::Base: RawAccessMut,

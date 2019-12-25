@@ -233,21 +233,22 @@ mod tests {
     };
 
     #[derive(Debug, FromAccess)]
-    struct SchemaInterface<T: Access> {
+    struct Schema<T: Access> {
         pub wallets: ProofMapIndex<T::Base, PublicKey, u64>,
     }
 
-    #[derive(Debug, FromAccess)]
-    struct Schema<T: Access> {
-        #[from_access(flatten)]
-        public: SchemaInterface<T>,
-        private: Entry<T::Base, String>,
-    }
-
-    impl<T: Access> RequireArtifact for SchemaInterface<T> {
+    impl<T: Access> RequireArtifact for Schema<T> {
         fn required_artifact() -> ArtifactReq {
             "exonum.Token@^1.3.0".parse().unwrap()
         }
+    }
+
+    #[derive(Debug, FromAccess)]
+    #[from_access(schema)]
+    struct SchemaImpl<T: Access> {
+        #[from_access(flatten)]
+        public: Schema<T>,
+        private: Entry<T::Base, String>,
     }
 
     #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -326,7 +327,7 @@ mod tests {
         let mut blockchain = create_blockchain();
         let fork = blockchain.fork();
         {
-            let mut schema: Schema<_> = Schema::new(Prefixed::new("token", &fork));
+            let mut schema: SchemaImpl<_> = SchemaImpl::new(Prefixed::new("token", &fork));
             schema.public.wallets.put(&PublicKey::new([0; 32]), 100);
             schema.public.wallets.put(&PublicKey::new([1; 32]), 200);
             schema.private.set("Some value".to_owned());
@@ -335,20 +336,20 @@ mod tests {
         let instance = InstanceDescriptor { id: 0, name: "who" };
         let data = BlockchainData::new(&fork, instance);
         {
-            let schema: SchemaInterface<_> = data.service_schema("token").unwrap();
+            let schema: Schema<_> = data.service_schema("token").unwrap();
             assert_eq!(schema.wallets.values().sum::<u64>(), 300);
         }
 
         let err = data
-            .service_schema::<SchemaInterface<_>, _>("what")
+            .service_schema::<Schema<_>, _>("what")
             .expect_err("Retrieving schema for non-existing service should fail");
         assert_matches!(err, ArtifactReqError::NoService);
         let err = data
-            .service_schema::<SchemaInterface<_>, _>("old-token")
+            .service_schema::<Schema<_>, _>("old-token")
             .expect_err("Retrieving schema for old service should fail");
         assert_matches!(err, ArtifactReqError::IncompatibleVersion { .. });
         let err = data
-            .service_schema::<SchemaInterface<_>, _>("other")
+            .service_schema::<Schema<_>, _>("other")
             .expect_err("Retrieving schema for unrelated service should fail");
         assert_matches!(
             err,
@@ -357,7 +358,7 @@ mod tests {
 
         blockchain.merge(fork.into_patch()).unwrap();
         let snapshot = blockchain.snapshot();
-        let schema: SchemaInterface<_> = snapshot.service_schema("token").unwrap();
+        let schema: Schema<_> = snapshot.service_schema("token").unwrap();
         assert_eq!(schema.wallets.values().sum::<u64>(), 300);
     }
 }

@@ -22,7 +22,7 @@ extern crate exonum_derive;
 #[macro_use]
 extern crate serde_derive;
 
-pub use crate::{schema::SchemaInterface, transactions::CryptocurrencyInterface};
+pub use crate::{schema::Schema, transactions::CryptocurrencyInterface};
 
 pub mod api;
 pub mod proto;
@@ -35,7 +35,7 @@ use exonum::runtime::{
     ExecutionError,
 };
 
-use crate::{api::PublicApi as CryptocurrencyApi, schema::Schema};
+use crate::{api::PublicApi as CryptocurrencyApi, schema::SchemaImpl};
 
 /// Initial balance of the wallet.
 pub const INITIAL_BALANCE: u64 = 100;
@@ -50,7 +50,7 @@ impl Service for CryptocurrencyService {
     fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
         // Initialize indexes. Not doing this may lead to errors in HTTP API, since it relies on
         // `wallets` indexes being initialized for returning corresponding proofs.
-        Schema::new(context.service_data());
+        SchemaImpl::new(context.service_data());
         Ok(())
     }
 

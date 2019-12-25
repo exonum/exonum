@@ -63,6 +63,7 @@ mod v1 {
     }
 
     #[derive(Debug, FromAccess)]
+    #[from_access(schema)]
     pub struct Schema<T: Access> {
         pub ticker: Entry<T::Base, String>,
         pub divisibility: Entry<T::Base, u8>,
@@ -154,6 +155,7 @@ mod v2 {
     impl_object_hash_for_binary_value! { Wallet, Config }
 
     #[derive(Debug, FromAccess)]
+    #[from_access(schema)]
     pub struct Schema<T: Access> {
         pub config: ProofEntry<T::Base, Config>,
         pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,

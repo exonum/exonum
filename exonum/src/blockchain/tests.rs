@@ -68,6 +68,7 @@ fn create_genesis_config() -> GenesisConfig {
 }
 
 #[derive(Debug, FromAccess)]
+#[from_access(schema)]
 struct InspectorSchema<T: Access> {
     values: ProofListIndex<T::Base, u64>,
 }

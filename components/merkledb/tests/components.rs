@@ -33,7 +33,7 @@ where
 }
 
 #[derive(FromAccess)]
-// Since the name ends with `Schema`, the `new` constructor is derived automatically
+#[from_access(schema)]
 struct ComplexSchema<T: Access> {
     count: Entry<T::Base, u64>,
     generic: Generic<T, String>,
@@ -169,6 +169,7 @@ fn wrapper_with_named_field() {
 #[test]
 fn component_with_implicit_type_param() {
     #[derive(FromAccess)]
+    #[from_access(schema)]
     struct Schema<T>
     where
         T: Access,
@@ -181,21 +182,6 @@ fn component_with_implicit_type_param() {
     let fork = db.fork();
     fork.get_proof_map("map").put(&1_u64, 2_u64);
     let schema = Schema::new(&fork);
-    assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
-}
-
-#[test]
-fn schema_with_non_standard_naming() {
-    #[derive(FromAccess)]
-    #[from_access(schema)]
-    struct NonStandard<T: Access> {
-        map: ProofMapIndex<T::Base, u64, u64>,
-    }
-
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = NonStandard::new(&fork);
     assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
 }
 
@@ -221,19 +207,20 @@ fn opt_out_from_schema() {
 }
 
 #[test]
-fn schema_interface_pattern() {
+fn public_schema_pattern() {
     #[derive(Debug, FromAccess)]
-    struct SchemaInterface<T: Access> {
+    struct Schema<T: Access> {
         pub wallets: ProofMapIndex<T::Base, str, u64>,
         pub total_balance: ProofEntry<T::Base, u64>,
     }
 
     #[derive(Debug, FromAccess)]
-    struct FlattenedSchema<T: Access> {
+    #[from_access(schema)]
+    struct SchemaImpl<T: Access> {
         /// Flattened components are useful to split schemas into a public interface
         /// and implementation details.
         #[from_access(flatten)]
-        public: SchemaInterface<T>,
+        public: Schema<T>,
         private_entry: Entry<T::Base, String>,
         private_list: ListIndex<T::Base, u64>,
     }
@@ -241,7 +228,7 @@ fn schema_interface_pattern() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut schema: FlattenedSchema<_> = FlattenedSchema::new(&fork);
+        let mut schema: SchemaImpl<_> = SchemaImpl::new(&fork);
         schema.public.wallets.put("Alice", 10);
         schema.public.wallets.put("Bob", 20);
         schema.public.total_balance.set(30);
@@ -249,7 +236,7 @@ fn schema_interface_pattern() {
         schema.private_list.extend(vec![10, 20]);
     }
 
-    let interface = SchemaInterface::from_root(fork.readonly()).unwrap();
+    let interface = Schema::from_root(fork.readonly()).unwrap();
     assert_eq!(interface.wallets.values().sum::<u64>(), 30);
     assert_eq!(interface.total_balance.get(), Some(30));
 }
@@ -295,6 +282,7 @@ fn multiple_flattened_fields() {
     }
 
     #[derive(FromAccess)]
+    #[from_access(schema)]
     struct Schema<T: Access> {
         #[from_access(flatten)]
         first: Flattened<T>,

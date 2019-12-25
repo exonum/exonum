@@ -30,10 +30,17 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-pub mod api;
+mod api;
+#[doc(hidden)]
 pub mod proto;
-pub mod schema;
-pub mod transactions;
+mod schema;
+mod transactions;
+
+pub use crate::{
+    api::{TimestampProof, TimestampQuery},
+    schema::{Timestamp, TimestampEntry},
+    transactions::{Config, Error, TimestampingInterface},
+};
 
 use exonum::{
     merkledb::BinaryValue,
@@ -43,11 +50,7 @@ use exonum::{
     },
 };
 
-use crate::{
-    api::PublicApi as TimestampingApi,
-    schema::{Schema, TimestampEntry},
-    transactions::{Config, Error, TimestampingInterface},
-};
+use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("TimestampingInterface"))]

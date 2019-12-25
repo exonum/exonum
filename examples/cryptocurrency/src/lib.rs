@@ -95,9 +95,10 @@ pub mod schema {
     ///
     /// Note that the schema is fully private; it is exposed to the clients via service HTTP API.
     #[derive(Debug, FromAccess)]
+    #[from_access(schema)]
     pub(crate) struct CurrencySchema<T: Access> {
         /// Correspondence of public keys of users to the account information.
-        pub(crate) wallets: MapIndex<T::Base, PublicKey, Wallet>,
+        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 }
 

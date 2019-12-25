@@ -26,7 +26,7 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployConfirmation, DeployRequest, Error, Schema, StartService, StopService, Supervisor,
+    DeployConfirmation, DeployRequest, Error, SchemaImpl, StartService, StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -160,7 +160,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             return Err(Error::ActualFromIsPast.into());
         }
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that there are no pending config changes.
         if let Some(proposal) = schema.public.pending_proposal.get() {
@@ -177,7 +177,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
         // Verify changes in the proposal.
         self.verify_config_changeset(&mut context, &propose.changes)?;
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // After all the checks verify that configuration number is expected one.
         if propose.configuration_number != schema.get_configuration_number() {
@@ -209,7 +209,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let entry = schema
             .public
             .pending_proposal
@@ -259,7 +259,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         if deploy.deadline_height < core_schema.height() {
             return Err(Error::ActualFromIsPast.into());
         }
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -322,7 +322,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         // Verifies that this deployment is registered.
         let deploy_request = schema
             .pending_deployments

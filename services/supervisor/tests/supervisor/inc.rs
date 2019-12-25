@@ -32,6 +32,7 @@ pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "inc";
 
 #[derive(Debug, FromAccess)]
+#[from_access(schema)]
 pub struct Schema<T: Access> {
     count: Entry<T::Base, u64>,
     params: Entry<T::Base, String>,

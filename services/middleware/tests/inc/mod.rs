@@ -29,6 +29,7 @@ use semver::Version;
 use exonum_middleware_service::ArtifactReq;
 
 #[derive(Debug, FromAccess, RequireArtifact)]
+#[from_access(schema)]
 #[require_artifact(name = "exonum.services.test.Inc", version = "*")]
 // ^-- Since the schema does not change across versions, we use a wildcard `version` requirement.
 // This is a bad idea for real services.

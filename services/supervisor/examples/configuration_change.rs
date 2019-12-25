@@ -38,6 +38,7 @@ const SERVICE_NAME: &str = "config";
 pub struct ConfigChangeService;
 
 #[derive(Debug, FromAccess)]
+#[from_access(schema)]
 pub struct Schema<T: Access> {
     params: Entry<T::Base, String>,
 }

@@ -101,10 +101,10 @@
 //! # use exonum_derive::*;
 //! /// Full schema which embeds the public part.
 //! #[derive(Debug, FromAccess)]
-//! pub(crate) struct Schema<T: Access> {
+//! pub(crate) struct SchemaImpl<T: Access> {
 //!     /// Public part of the schema.
 //!     #[from_access(flatten)]
-//!     pub public: SchemaInterface<T>,
+//!     pub public: Schema<T>,
 //!
 //!     // Private fields (public within the crate). These fields may arbitrarily change
 //!     // without breaking compatibility.
@@ -115,21 +115,21 @@
 //! /// Public part of the schema.
 //! #[derive(Debug, FromAccess, RequireArtifact)]
 //! #[require_artifact(name = "some.Token", version = "^1")]
-//! pub struct SchemaInterface<T: Access> {
+//! pub struct Schema<T: Access> {
 //!     /// Public index. Note that changing key or value type will be a breaking change.
 //!     /// To extend interface longevity, it makes sense to make key / value types
 //!     /// Protobuf messages.
 //!     pub wallets: ProofMapIndex<T::Base, str, u64>,
 //! }
 //!
-//! // Then, the `SchemaInterface` may be used like this:
+//! // Then, the `Schema` may be used like this:
 //! use exonum::runtime::SnapshotExt;
 //!
 //! # fn access_schema() -> Result<(), failure::Error> {
 //! # let db = TemporaryDB::new();
 //! let snapshot: Box<dyn Snapshot> = // ...
 //! #   db.snapshot();
-//! let schema: SchemaInterface<_> = snapshot.service_schema("my-service")?;
+//! let schema: Schema<_> = snapshot.service_schema("my-service")?;
 //! let balance = schema.wallets.get("Alice").unwrap_or(0);
 //! # Ok(())
 //! # }
@@ -255,12 +255,12 @@ impl fmt::Display for ArtifactReq {
 ///
 /// #[derive(Debug, FromAccess, RequireArtifact)]
 /// #[require_artifact(name = "some.Service", version = "1")]
-/// pub struct SchemaInterface<T: Access> {
+/// pub struct Schema<T: Access> {
 ///     pub wallets: ProofMapIndex<T::Base, str, u64>,
 /// }
 ///
 /// assert_eq!(
-///     SchemaInterface::<&'static Fork>::required_artifact(),
+///     Schema::<&'static Fork>::required_artifact(),
 ///     "some.Service@^1".parse().unwrap()
 /// );
 /// ```
@@ -284,13 +284,13 @@ impl fmt::Display for ArtifactReq {
 /// # use exonum::runtime::versioning::RequireArtifact;
 /// #[derive(Debug, FromAccess, RequireArtifact)]
 /// #[require_artifact(name = "some.Service", version = "1.3.0")]
-/// pub struct ExtendedSchemaInterface<T: Access> {
+/// pub struct ExtendedSchema<T: Access> {
 ///     pub wallets: ProofMapIndex<T::Base, str, u64>,
 ///     /// Added in version 1.3.0.
 ///     pub total_token_amount: ProofEntry<T::Base, u64>,
 /// }
 /// # assert_eq!(
-/// #     ExtendedSchemaInterface::<&'static Fork>::required_artifact(),
+/// #     ExtendedSchema::<&'static Fork>::required_artifact(),
 /// #     "some.Service@^1.3.0".parse().unwrap()
 /// # );
 /// ```
