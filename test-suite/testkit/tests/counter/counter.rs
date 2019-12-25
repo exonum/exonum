@@ -18,7 +18,6 @@ use exonum::{
     api::{
         self,
         backends::actix::{HttpRequest, RawHandler, RequestHandler},
-        node::public::explorer::TransactionResponse,
         ApiBackend,
     },
     blockchain::{IndexProof, ValidatorKeys},
@@ -31,6 +30,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
+use exonum_explorer::api::TransactionResponse;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     ObjectHash, ProofEntry,

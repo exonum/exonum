@@ -18,6 +18,7 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
+    merkledb::{BinaryValue, ObjectHash, TemporaryDB},
     messages::Verified,
     node::ApiSender,
     runtime::{
@@ -26,7 +27,6 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{BinaryValue, ObjectHash, TemporaryDB};
 use futures::sync::mpsc;
 use serde_derive::*;
 

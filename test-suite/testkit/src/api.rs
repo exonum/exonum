@@ -29,15 +29,9 @@ use std::{
 };
 
 use exonum::{
-    api::{
-        self,
-        node::public::{explorer::TransactionQuery, system::DispatcherInfo},
-        ApiAggregator,
-    },
-    crypto::Hash,
+    api::{self, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::{ErrorMatch, ExecutionStatus},
 };
 
 use crate::TestKit;
@@ -132,11 +126,6 @@ impl TestKitApi {
             ApiAccess::Private,
             kind.to_string(),
         )
-    }
-
-    /// Creates a wrapper over Exonum node API.
-    pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
-        ExonumNodeApi::new(self)
     }
 }
 
@@ -381,6 +370,8 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     server
 }
 
+// FIXME: move to explorer service
+/*
 /// A convenience wrapper for Exonum node API to reduce the boilerplate code.
 #[derive(Debug)]
 pub struct ExonumNodeApi<'a> {
@@ -432,3 +423,4 @@ impl<'a> ExonumNodeApi<'a> {
             .unwrap()
     }
 }
+*/

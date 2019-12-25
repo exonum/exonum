@@ -17,9 +17,9 @@ use exonum::{
     api::{self, ApiAggregator, ApiBuilder, FutureResult},
     blockchain::ConsensusConfig,
     crypto::Hash,
-    explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
 };
+use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 
 use std::thread::{self, JoinHandle};
@@ -175,7 +175,6 @@ mod tests {
     use exonum::{
         api,
         crypto::{gen_keypair, Hash},
-        explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::{
@@ -183,6 +182,7 @@ mod tests {
             ExecutionError,
         },
     };
+    use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
 
     use std::time::Duration;

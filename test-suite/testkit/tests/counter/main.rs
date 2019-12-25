@@ -12,34 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use assert_matches::assert_matches;
 use exonum::{
-    api::{
-        node::public::explorer::{
-            CallStatusQuery, CallStatusResponse, TransactionQuery, TransactionResponse,
-        },
-        Error as ApiError,
-    },
     blockchain::{CallInBlock, ValidatorKeys},
-    crypto::{self, gen_keypair, Hash},
-    explorer::BlockchainExplorer,
+    crypto::{gen_keypair, Hash},
     helpers::Height,
-    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{ErrorKind, ExecutionError, SnapshotExt},
+    runtime::SnapshotExt,
 };
+use exonum_explorer::api::TransactionResponse;
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestNode};
 use pretty_assertions::assert_eq;
-use serde_json::{json, Value};
 
 use crate::counter::{
     CounterSchema, CounterService, CounterServiceInterface, CounterWithProof, SERVICE_ID,
     SERVICE_NAME,
 };
-
-use exonum::blockchain::{AdditionalHeaders, ProposerId};
-use exonum::helpers::ValidatorId;
 
 mod counter;
 
@@ -305,6 +293,50 @@ fn test_duplicate_tx() {
     assert_eq!(counter, 5);
 }
 
+#[test]
+fn test_explorer_with_after_transactions_error() {
+    let (mut testkit, _) = init_testkit();
+    let tx1 = gen_keypair().increment(SERVICE_ID, 21);
+    let keypair = gen_keypair();
+    let tx2 = keypair.increment(SERVICE_ID, 21);
+
+    let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[&CallInBlock::after_transactions(SERVICE_ID)]
+        .description()
+        .contains("What's the question?"));
+    assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
+
+    let tx3 = keypair.increment(SERVICE_ID, 1);
+    let block = testkit.create_block_with_transaction(tx3);
+    assert!(block.errors.is_empty());
+    assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
+}
+
+#[test]
+fn test_explorer_with_before_transactions_error() {
+    let (mut testkit, _) = init_testkit();
+    let tx = gen_keypair().increment(SERVICE_ID, 13);
+
+    let block = testkit.create_block_with_transaction(tx);
+    let errors = block.error_map();
+    assert!(errors.is_empty(), "{:?}", errors);
+    let block = testkit.create_block();
+    let errors = block.error_map();
+    assert_eq!(errors.len(), 1);
+    assert!(errors[&CallInBlock::before_transactions(SERVICE_ID)]
+        .description()
+        .contains("Number 13"));
+
+    let snapshot = testkit.snapshot();
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.counter.get(), Some(13));
+    // ^-- The changes in `before_transactions` should be reverted.
+}
+
+// FIXME: move to explorer service
+/*
 #[test]
 fn test_explorer_blocks_basic() {
     use exonum::api::node::public::explorer::BlocksRange;
@@ -836,49 +868,8 @@ fn test_explorer_transaction_statuses() {
     check_statuses(&statuses);
 }
 
-#[test]
-fn test_explorer_with_after_transactions_error() {
-    let (mut testkit, _) = init_testkit();
-    let tx1 = gen_keypair().increment(SERVICE_ID, 21);
-    let keypair = gen_keypair();
-    let tx2 = keypair.increment(SERVICE_ID, 21);
-
-    let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
-    let errors = block.error_map();
-    assert_eq!(errors.len(), 1);
-    assert!(errors[&CallInBlock::after_transactions(SERVICE_ID)]
-        .description()
-        .contains("What's the question?"));
-    assert_ne!(block.header.error_hash, HashTag::empty_map_hash());
-
-    let tx3 = keypair.increment(SERVICE_ID, 1);
-    let block = testkit.create_block_with_transaction(tx3);
-    assert!(block.errors.is_empty());
-    assert_eq!(block.header.error_hash, HashTag::empty_map_hash());
-}
-
-#[test]
-fn test_explorer_with_before_transactions_error() {
-    let (mut testkit, _) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 13);
-
-    let block = testkit.create_block_with_transaction(tx);
-    let errors = block.error_map();
-    assert!(errors.is_empty(), "{:?}", errors);
-    let block = testkit.create_block();
-    let errors = block.error_map();
-    assert_eq!(errors.len(), 1);
-    assert!(errors[&CallInBlock::before_transactions(SERVICE_ID)]
-        .description()
-        .contains("Number 13"));
-
-    let snapshot = testkit.snapshot();
-    let schema = get_schema(&snapshot);
-    assert_eq!(schema.counter.get(), Some(13));
-    // ^-- The changes in `before_transactions` should be reverted.
-}
-
-/// Checks that `ExplorerApi` accepts valid transactions and discards transactions with incorrect instance ID.
+/// Checks that `ExplorerApi` accepts valid transactions and discards transactions with
+/// the incorrect instance ID.
 #[test]
 fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
@@ -1079,3 +1070,4 @@ fn test_explorer_api_without_error() {
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }
+*/

@@ -18,7 +18,14 @@
 //! See the examples in the crate for examples of usage.
 
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ListProof, MapProof, ObjectHash, Snapshot};
+use exonum::{
+    blockchain::{Block, CallInBlock, Schema, TxLocation},
+    crypto::Hash,
+    helpers::Height,
+    merkledb::{ListProof, MapProof, ObjectHash, Snapshot},
+    messages::{AnyTx, Precommit, Verified},
+    runtime::{ExecutionError, ExecutionStatus},
+};
 use serde::{Serialize, Serializer};
 use serde_derive::*;
 
@@ -31,14 +38,7 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use exonum::{
-    blockchain::{Block, CallInBlock, Schema, TxLocation},
-    crypto::Hash,
-    helpers::Height,
-    messages::{AnyTx, Precommit, Verified},
-    runtime::{ExecutionError, ExecutionStatus},
-};
-
+pub mod api;
 mod execution_error;
 
 /// Ending height of the range (exclusive), given the a priori max height.

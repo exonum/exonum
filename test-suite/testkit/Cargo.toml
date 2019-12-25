@@ -19,10 +19,16 @@ synchronously.
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
+exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
+exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
+exonum-explorer = { version = "0.13.0-rc.2", path = "../../components/explorer" }
+exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
+exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
+
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }
 chrono = "0.4.6"
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 failure = "0.1.5"
 futures = "0.1.25"
 reqwest = "0.9.8"
@@ -33,10 +39,6 @@ serde_json = "1.0"
 serde_urlencoded = "0.6.0"
 tokio-core = "0.1.17"
 protobuf = { version = "2.8.1", features = ["with-serde"] }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
 
 [dev-dependencies]
 hex = "0.4"

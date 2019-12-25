@@ -15,7 +15,6 @@
 //! Simple timestamping service implementation.
 
 use exonum::{
-    api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
     crypto::gen_keypair,
     runtime::{
         rust::{CallContext, Service, ServiceFactory},
@@ -24,7 +23,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, TestKitBuilder};
+use exonum_testkit::TestKitBuilder;
 
 #[exonum_interface]
 trait TimestampingInterface<Ctx> {
@@ -69,29 +68,10 @@ fn main() {
     assert_eq!(block.len(), 3);
     assert!(block.iter().all(|transaction| transaction.status().is_ok()));
 
-    // Check results with schema.
+    // Check results with the core schema.
     let snapshot = testkit.snapshot();
     let schema = snapshot.for_core();
     assert!(schema.transactions().contains(&tx1.object_hash()));
     assert!(schema.transactions().contains(&tx2.object_hash()));
     assert!(schema.transactions().contains(&tx3.object_hash()));
-
-    // Check results with api.
-    let api = testkit.api();
-    let blocks_range: BlocksRange = api
-        .public(ApiKind::Explorer)
-        .query(&BlocksQuery {
-            count: 10,
-            ..Default::default()
-        })
-        .get("v1/blocks")
-        .unwrap();
-    assert_eq!(blocks_range.blocks.len(), 2);
-
-    api.public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx1.object_hash(),
-        })
-        .get::<serde_json::Value>("v1/transactions")
-        .unwrap();
 }

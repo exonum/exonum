@@ -17,7 +17,6 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../merkledb" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
 serde = "1.0"
@@ -25,7 +24,6 @@ serde_derive = "1.0"
 
 [dev-dependencies]
 bincode = "1.2.1"
-exonum-crypto = { version = "0.13.0-rc.2", path = "../crypto" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../derive" }
 failure = "0.1.5"
 futures = "0.1.29"
