@@ -36,7 +36,7 @@ message SignedMessage {
   exonum.crypto.Signature signature = 3;
 }
 
-// Container for verified messages.
+// Container for a verified message.
 message Verified {
   SignedMessage raw = 1;
 }
