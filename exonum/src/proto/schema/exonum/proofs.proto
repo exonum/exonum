@@ -23,10 +23,16 @@ import "consensus.proto";
 import "map_proof.proto";
 
 // Block with its `Precommit` messages.
+//
+// This structure contains enough information to prove the correctness of
+// a block. It consists of the block itself and the `Precommit`
+// messages related to this block.
 message BlockProof {
-  // Block header data.
+  // Block header containing such information as the ID of the node which
+  // proposed the block, the height of the block, the number of transactions
+  // in the block, etc.
   Block block = 1;
-  // List of `Precommit` messages for block.
+  // List of `Precommit` messages for the block.
   repeated consensus.Verified precommits = 2;
 }
 
@@ -34,6 +40,8 @@ message BlockProof {
 message IndexProof {
   // Proof of authenticity for the block header.
   BlockProof block_proof = 1;
-  // Proof of authenticity for the index.
+  // Proof of authenticity for the index. Must contain a single key - a full index name
+  // in the form `$service_name.$name_within_service`, e.g., `cryptocurrency.wallets`.
+  // The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
   proof.MapProof index_proof = 2;
 }
