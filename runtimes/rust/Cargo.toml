@@ -31,12 +31,12 @@ serde = "1.0.101"
 serde_derive = "1.0.101"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
-
+bincode = "1.2.1"
 criterion = "0.3.0"
+pretty_assertions = "0.6.1"
+rand = "0.7"
 serde_json = "1.0.44"
 tempfile = "3"
-rand = "0.7"
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }

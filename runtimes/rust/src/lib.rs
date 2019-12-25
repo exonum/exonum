@@ -284,8 +284,6 @@ mod call_context;
 mod runtime_api;
 mod service;
 mod stubs;
-// #[cfg(test)]
-// mod tests;
 
 /// Rust runtime entity.
 ///

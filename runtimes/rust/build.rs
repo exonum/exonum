@@ -15,8 +15,8 @@
 use exonum_build::ProtobufGenerator;
 
 fn main() {
-    // Exonum benchmarks.
-    ProtobufGenerator::with_mod_name("exonum_benches_proto_mod.rs")
+    // Benchmarks.
+    ProtobufGenerator::with_mod_name("benches_proto_mod.rs")
         .with_input_dir("benches/criterion/proto")
         .with_crypto()
         .with_common()

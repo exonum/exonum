@@ -16,12 +16,12 @@ use exonum::{
     blockchain::Schema as CoreSchema,
     helpers::Height,
     runtime::{
-        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, ExecutionContext,
-        ExecutionContextUnstable, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, SupervisorExtensions, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, CallInfo, Caller, DispatcherError, ExecutionContext,
+        ExecutionContextUnstable, ExecutionError, InstanceDescriptor, InstanceQuery,
+        SupervisorExtensions, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
+use exonum_merkledb::{access::Prefixed, Fork};
 
 use super::{GenericCallMut, MethodDescriptor};
 
@@ -103,62 +103,6 @@ impl<'a> CallContext<'a> {
             panic!("`writeable_core_schema` called within a non-supervisor service");
         }
         CoreSchema::new(self.inner.fork)
-    }
-
-    /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
-    ///
-    /// If / when a block with this instruction is accepted, artifact deployment becomes
-    /// a requirement for all nodes in the network. A node that did not successfully
-    /// deploy the artifact previously blocks until the artifact is deployed successfully.
-    /// If a node cannot deploy the artifact, it panics.
-    ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    #[deprecated]
-    pub fn start_artifact_registration(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        self.supervisor_extensions()
-            .start_artifact_registration(artifact, spec)
-    }
-
-    /// Initiates adding a service instance to the blockchain.
-    ///
-    /// The service is not immediately activated; it activates if / when the block containing
-    /// the activation transaction is committed.
-    ///
-    /// # Panics
-    ///
-    /// - This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    #[deprecated]
-    pub fn initiate_adding_service(
-        &mut self,
-        instance_spec: InstanceSpec,
-        constructor: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        self.supervisor_extensions()
-            .initiate_adding_service(instance_spec, constructor)
-    }
-
-    /// Initiates stopping an active service instance in the blockchain.
-    ///
-    /// The service is not immediately stopped; it stops if / when the block containing
-    /// the stopping transaction is committed.
-    ///
-    /// # Panics
-    ///
-    /// - This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    #[deprecated]
-    pub fn initiate_stopping_service(
-        &mut self,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
-        self.supervisor_extensions()
-            .initiate_stopping_service(instance_id)
     }
 
     fn make_child_call<'q>(
