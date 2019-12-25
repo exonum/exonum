@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
+use exonum_proto::ProtobufConvert;
+use failure::Error;
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
@@ -20,12 +22,9 @@ use serde::{
 
 use std::{borrow::Cow, convert::TryFrom};
 
-use crate::crypto::{self, Hash, PublicKey, SecretKey};
-use crate::proto::schema::consensus::Verified as pb_verified;
-use exonum_proto::ProtobufConvert;
-use failure::Error;
-
 use super::types::{ExonumMessage, SignedMessage};
+use crate::crypto::{self, Hash, PublicKey, SecretKey};
+use crate::proto::schema;
 
 impl SignedMessage {
     /// Creates a new signed message from the given binary value.
@@ -205,10 +204,10 @@ impl<T> ProtobufConvert for Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    type ProtoStruct = pb_verified;
+    type ProtoStruct = schema::consensus::Verified;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        let mut verified = pb_verified::new();
+        let mut verified = Self::ProtoStruct::new();
         verified.set_raw(self.as_raw().to_pb());
         verified
     }
