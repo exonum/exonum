@@ -340,7 +340,8 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
         // Check that pending deployment is the same as in confirmation.
         if deploy_request != deploy_result.request {
-            return Err(Error::DeployRequestNotRegistered)?;
+            let error = ExecutionError::from(Error::DeployRequestNotRegistered);
+            return Err(error);
         }
 
         // Verify that we didn't reach deadline height.
