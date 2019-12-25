@@ -22,12 +22,18 @@ import "blockchain.proto";
 import "consensus.proto";
 import "map_proof.proto";
 
+// Block with its `Precommit` messages.
 message BlockProof {
+  // Block header data.
   Block block = 1;
+  // List of `Precommit` messages for block.
   repeated consensus.Verified precommits = 2;
 }
 
+// Proof of authenticity for a single index within the database.
 message IndexProof {
+  // Proof of authenticity for the block header.
   BlockProof block_proof = 1;
+  // Proof of authenticity for the index.
   proof.MapProof index_proof = 2;
 }
