@@ -7,8 +7,12 @@ from exonum_client.crypto import KeyPair
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
 
-from suite import assert_processes_exited_successfully, \
-  launcher_networks, run_4_nodes, ExonumCryptoAdvancedClient
+from suite import (
+    assert_processes_exited_successfully,
+    launcher_networks,
+    run_4_nodes,
+    ExonumCryptoAdvancedClient,
+)
 
 
 class CryptoAdvancedTest(unittest.TestCase):
@@ -18,13 +22,21 @@ class CryptoAdvancedTest(unittest.TestCase):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
         time.sleep(3)
         cryptocurrency_advanced_config_dict = {
-          "networks": launcher_networks(self.network),
-          "deadline_height": 10000,
-          "artifacts": {"cryptocurrency": {"runtime": "rust", "name": "exonum-cryptocurrency-advanced:0.13.0-rc.2"}},
-          "instances": {"crypto": {"artifact": "cryptocurrency"}},
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "artifacts": {
+                "cryptocurrency": {
+                    "runtime": "rust",
+                    "name": "exonum-cryptocurrency-advanced",
+                    "version": "0.13.0-rc.2",
+                }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency"}},
         }
 
-        cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
+        cryptocurrency_advanced_config = Configuration(
+            cryptocurrency_advanced_config_dict
+        )
         with Launcher(cryptocurrency_advanced_config) as launcher:
             explorer = launcher.explorer()
 
@@ -51,11 +63,13 @@ class CryptoAdvancedTest(unittest.TestCase):
                 crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
-                self.assertEqual(crypto_client.get_wallet_info(alice_keys).status_code, 200)
+                self.assertEqual(
+                    crypto_client.get_wallet_info(alice_keys).status_code, 200
+                )
                 # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                 time.sleep(2)
-                alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
-                ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
+                alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
+                alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
                 self.assertEqual(alice_balance, 100)
 
     def test_token_issue(self):
@@ -75,8 +89,8 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
-                    alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
-                                     ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
+                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
+                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
                     self.assertEqual(alice_balance, 200)
 
     def test_transfer_funds(self):
@@ -98,10 +112,10 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
-                    alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
-                                     ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
-                    bob_balance = (crypto_client.get_wallet_info(bob_keys).json()
-                                   ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
+                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
+                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                    bob_wallet = crypto_client.get_wallet_info(bob_keys).json()
+                    bob_balance = bob_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
                     self.assertEqual(alice_balance, 80)
                     self.assertEqual(bob_balance, 120)
 
@@ -118,13 +132,13 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     crypto_client.transfer(10, alice_keys, alice_keys.public_key.value)
                     subscriber.wait_for_new_event()
-                    alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
-                                     ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
+                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
+                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
                     self.assertEqual(alice_balance, 100)
 
     def test_create_wallet_same_name(self):
         """Tests the transaction with the same wallet name is rejected"""
-
+        client = None
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
@@ -138,7 +152,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
         # it should contain 4 txs for wallet creation plus 6 services txs
-        self.assertEqual(client.stats().json()['tx_count'], 10)
+        self.assertEqual(client.stats().json()["tx_count"], 10)
 
     def test_create_wallet_unique_for_key_pair(self):
         """Tests the transaction with the same keys for different wallets is failed"""
@@ -148,19 +162,23 @@ class CryptoAdvancedTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             with ExonumCryptoAdvancedClient(client) as crypto_client:
                 alice_keys = KeyPair.generate()
-                tx_response = crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
+                tx_response = crypto_client.create_wallet(
+                    alice_keys, "Alice" + str(validator_id)
+                )
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
                     # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
-                tx_status = client.get_tx_info(tx_response.json()['tx_hash']).json()['status']['type']
-                self.assertEqual(tx_status, 'success')
+                tx_status = client.get_tx_info(tx_response.json()["tx_hash"]).json()["status"]["type"]
+                self.assertEqual(tx_status, "success")
                 # create the wallet with the same keys again
-                tx_same_keys = crypto_client.create_wallet(alice_keys, "Alice_Dublicate" + str(validator_id))
+                tx_same_keys = crypto_client.create_wallet(
+                    alice_keys, "Alice_Dublicate" + str(validator_id)
+                )
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
-                tx_status = client.get_tx_info(tx_same_keys.json()['tx_hash']).json()['status']['type']
-                self.assertEqual(tx_status, 'service_error')
+                tx_status = client.get_tx_info(tx_same_keys.json()["tx_hash"]).json()["status"]["type"]
+                self.assertEqual(tx_status, "service_error")
 
     def test_transfer_funds_insufficient(self):
         """Tests the transfer insufficient amount of funds is failed"""
@@ -175,14 +193,17 @@ class CryptoAdvancedTest(unittest.TestCase):
                 crypto_client.create_wallet(bob_keys, "Bob" + str(validator_id))
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
-                    tx_response = crypto_client.transfer(110, alice_keys, bob_keys.public_key.value)
+                    tx_response = crypto_client.transfer(
+                        110, alice_keys, bob_keys.public_key.value
+                    )
                     subscriber.wait_for_new_event()
-                    tx_status = client.get_tx_info(tx_response.json()['tx_hash']).json()['status']['type']
-                    self.assertEqual(tx_status, 'service_error')
-                    alice_balance = (crypto_client.get_wallet_info(alice_keys).json()
-                                     ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
-                    bob_balance = (crypto_client.get_wallet_info(bob_keys).json()
-                                   ['wallet_proof']['to_wallet']['entries'][0]['value']['balance'])
+                    tx_info = client.get_tx_info(tx_response.json()["tx_hash"]).json()
+                    tx_status = tx_info["status"]["type"]
+                    self.assertEqual(tx_status, "service_error")
+                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
+                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                    bob_wallet = crypto_client.get_wallet_info(bob_keys).json()
+                    bob_balance = bob_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
                     self.assertEqual(alice_balance, 100)
                     self.assertEqual(bob_balance, 100)
 
@@ -194,7 +215,7 @@ class CryptoAdvancedTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             with ExonumCryptoAdvancedClient(client) as crypto_client:
                 alice_keys = KeyPair.generate()
-                wallet_history = crypto_client.get_wallet_info(alice_keys).json()['wallet_history']
+                wallet_history = crypto_client.get_wallet_info(alice_keys).json()["wallet_history"]
                 self.assertIsNone(wallet_history)
 
     def test_add_funds_to_nonexistent_wallet(self):
@@ -210,8 +231,9 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
-                    tx_status = client.get_tx_info(tx_response.json()['tx_hash']).json()['status']['type']
-                    self.assertEqual(tx_status, 'service_error')
+                    tx_info = client.get_tx_info(tx_response.json()["tx_hash"]).json()
+                    tx_status = tx_info["status"]["type"]
+                    self.assertEqual(tx_status, "service_error")
 
     def tearDown(self):
         outputs = self.network.stop()

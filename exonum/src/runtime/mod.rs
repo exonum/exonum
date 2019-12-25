@@ -195,6 +195,25 @@ impl From<RuntimeIdentifier> for u32 {
     }
 }
 
+impl RuntimeIdentifier {
+    fn transform(id: u32) -> Result<Self, ()> {
+        match id {
+            0 => Ok(RuntimeIdentifier::Rust),
+            1 => Ok(RuntimeIdentifier::Java),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for RuntimeIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RuntimeIdentifier::Rust => f.write_str("Rust runtime"),
+            RuntimeIdentifier::Java => f.write_str("Java runtime"),
+        }
+    }
+}
+
 /// Runtime environment for the Exonum services.
 ///
 /// You can read more about the life cycle of services and transactions

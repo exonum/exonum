@@ -169,7 +169,7 @@ fn execution_error_display() {
         }),
     };
     let err_string = err.to_string();
-    assert!(err_string.contains("Execution error `service:3`"));
+    assert!(err_string.contains("Execution error with code `service:3`"));
     assert!(err_string.contains("in constructor of service 100"));
     assert!(!err_string.ends_with(": ")); // Empty description should not be output
 
@@ -197,7 +197,7 @@ fn execution_error_display() {
     assert!(err.to_string().contains("in method 2 of service 300"));
 
     err.call_site = None;
-    assert!(err.to_string().contains("in runtime 1"));
+    assert!(err.to_string().contains("in Java runtime"));
 }
 
 #[test]
