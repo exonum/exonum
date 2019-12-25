@@ -70,6 +70,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - The artifact identifier now has first-class semantic version. Previously, it was
   specific to the Rust runtime. (#1590)
 
+- The `name` field of the artifact identifier cannot contain `:` symbol. (#1590)
+
 - The format of the `proto-sources` endpoint in the Rust runtime has been changed.
   To get the core Protobuf sources, use the endpoint with the `type=core` query.
   To get the sources of an artifact, use query `type=artifact&name=$name&version=$version`,
