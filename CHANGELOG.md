@@ -137,6 +137,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - API endpoints are now can be marked as deprecated. (#1607)
 
+- Added `ProtobufConvert` for `Verified`, `BlockProof` and `IndexProof`. (#1643)
+
 #### exonum-merkledb
 
 - MerkleDB now performs automated state aggregation allowing to construct proofs
