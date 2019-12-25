@@ -33,9 +33,11 @@ message DeployRequest {
 }
 
 // Confirmation that the artifact was successfully deployed by the validator.
-message DeployConfirmation {
+message DeployResult {
   // Artifact identifier.
-  exonum.runtime.ArtifactId artifact = 1;
+  DeployRequest request = 1;
+  // Result of deployment.
+  bool success = 2;
 }
 
 // Request for the start service instance.

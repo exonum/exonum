@@ -15,17 +15,99 @@
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::Hash,
-    runtime::rust::{
-        api::{self, ServiceApiBuilder, ServiceApiState},
-        Broadcaster,
+    helpers::Height,
+    runtime::{
+        rust::{
+            api::{self, ServiceApiBuilder, ServiceApiState},
+            Broadcaster,
+        },
+        ArtifactId,
     },
 };
 use failure::Fail;
+use serde_derive::{Deserialize, Serialize};
+use std::{convert::TryFrom, str::FromStr};
 
 use super::{
     schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
     ConfigVote, DeployRequest, SupervisorConfig,
 };
+
+/// Query for retrieving information about deploy state.
+/// This is flattened version of `DeployRequest` which can be
+/// encoded via URL query parameters.
+#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize)]
+pub struct DeployInfoQuery {
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:0.13.0-rc.2"
+    pub artifact: String,
+    /// Artifact spec bytes as hexadecimal string.
+    pub spec: String,
+    /// Deadline height.
+    pub deadline_height: u64,
+}
+
+impl TryFrom<DeployInfoQuery> for DeployRequest {
+    type Error = api::Error;
+
+    fn try_from(query: DeployInfoQuery) -> Result<Self, Self::Error> {
+        let artifact = ArtifactId::from_str(&query.artifact)
+            .map_err(|err| api::Error::BadRequest(err.to_string()))?;
+        let spec =
+            hex::decode(query.spec).map_err(|err| api::Error::BadRequest(err.to_string()))?;
+        let deadline_height = Height(query.deadline_height);
+
+        let request = Self {
+            artifact,
+            spec,
+            deadline_height,
+        };
+
+        Ok(request)
+    }
+}
+
+impl From<DeployRequest> for DeployInfoQuery {
+    fn from(request: DeployRequest) -> Self {
+        let artifact = request.artifact.to_string();
+        let spec = hex::encode(&request.spec);
+        let deadline_height = request.deadline_height.0;
+
+        Self {
+            artifact,
+            spec,
+            deadline_height,
+        }
+    }
+}
+
+/// State of the deployment performed by `Supervisor`.
+#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize)]
+pub enum DeployState {
+    /// Deploy with provided spec was not requested.
+    NotRequested,
+    /// Deployment is in process.
+    Pending,
+    /// Deployment resulted in a failure on a certain height.
+    Failed(Height),
+    /// Deployment finished successfully.
+    Succeed,
+}
+
+/// Response with deploy status for a certain deploy request.
+#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize)]
+pub struct DeployResponse {
+    /// State of deployment.
+    pub state: DeployState,
+}
+
+impl From<DeployState> for DeployResponse {
+    fn from(state: DeployState) -> Self {
+        Self { state }
+    }
+}
 
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
@@ -49,6 +131,9 @@ pub trait PrivateApi {
 
     /// Returns an actual supervisor config.
     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
+
+    /// Returns the state of deployment for the given deploy request.
+    fn deploy_status(&self, request: DeployInfoQuery) -> Result<DeployResponse, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -100,6 +185,39 @@ impl PrivateApi for ApiImpl<'_> {
         let config = Schema::new(self.0.service_data()).supervisor_config();
         Ok(config)
     }
+
+    fn deploy_status(&self, query: DeployInfoQuery) -> Result<DeployResponse, Self::Error> {
+        let request = DeployRequest::try_from(query)?;
+
+        let schema = Schema::new(self.0.service_data());
+        if let Some(stored_request) = schema.pending_deployments.get(&request.artifact) {
+            // Artifact is currently in the pending deployments, check that request is the same.
+            if request == stored_request {
+                return Ok(DeployState::Pending.into());
+            }
+        }
+        if let Some(height) = schema.deploy_failures.get(&request) {
+            // Request in the list of failed deployments.
+            return Ok(DeployState::Failed(height).into());
+        }
+
+        let dispatcher_schema = self.0.data().for_dispatcher();
+        let core_schema = self.0.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        // Check that artifact is deployed and was confirmed *for the same deploy request*.
+        if dispatcher_schema.get_artifact(&request.artifact).is_some()
+            && schema.deploy_confirmations.confirmations(&request) == validator_count
+        {
+            // Deploy for this request was confirmed by every validator,
+            // and artifact is marked as deployed by the dispatcher =>
+            // deploy succeed.
+            return Ok(DeployState::Succeed.into());
+        }
+
+        // Request isn't stored as pending, failed or deployed =>
+        // there was no such a request.
+        Ok(DeployState::NotRequested.into())
+    }
 }
 
 impl PublicApi for ApiImpl<'_> {
@@ -131,6 +249,9 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint("supervisor-config", |state, _query: ()| {
             ApiImpl(state).supervisor_config()
+        })
+        .endpoint("deploy-status", |state, query| {
+            ApiImpl(state).deploy_status(query)
         });
     builder
         .public_scope()

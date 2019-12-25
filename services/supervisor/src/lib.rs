@@ -67,11 +67,12 @@
 )]
 
 pub use self::{
+    api::{DeployInfoQuery, DeployResponse, DeployState},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
     errors::Error,
     proto_structures::{
-        ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-        DeployRequest, ServiceConfig, StartService, StopService, SupervisorConfig,
+        ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
+        DeployResult, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -295,11 +296,14 @@ impl Service for Supervisor {
         let requests_to_remove = schema
             .pending_deployments
             .values()
-            .filter(|request| request.deadline_height < height)
+            .filter(|request| request.deadline_height <= height)
             .collect::<Vec<_>>();
 
         for request in requests_to_remove {
             schema.pending_deployments.remove(&request.artifact);
+            schema
+                .deploy_failures
+                .put(&request, request.deadline_height);
             log::trace!("Removed outdated deployment request {:?}", request);
         }
 
@@ -361,10 +365,10 @@ impl Service for Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    let confirmation = DeployConfirmation::from(request.clone());
-                    !schema
-                        .deploy_confirmations
-                        .confirmed_by(&confirmation, &service_key)
+                    !schema.deploy_failures.contains(&request)
+                        && !schema
+                            .deploy_confirmations
+                            .confirmed_by(&request, &service_key)
                 })
                 .collect()
         };
@@ -377,15 +381,13 @@ impl Service for Supervisor {
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             // We should deploy the artifact for all nodes, but send confirmations only
             // if the node is a validator.
-            extensions.start_deploy(artifact, spec, move || {
+            extensions.start_deploy(artifact, spec, move |result| {
+                let success = result.is_ok();
                 if let Some(tx_sender) = tx_sender {
-                    log::trace!(
-                        "Sending confirmation for deployment request {:?}",
-                        unconfirmed_request
-                    );
-                    let confirmation = DeployConfirmation::from(unconfirmed_request);
+                    log::trace!("Sending deployment result report {:?}", unconfirmed_request);
+                    let confirmation = DeployResult::from((unconfirmed_request, success));
                     if let Err(e) = tx_sender.confirm_artifact_deploy((), confirmation) {
-                        log::error!("Cannot send confirmation: {}", e);
+                        log::error!("Cannot send `DeployResult`: {}", e);
                     }
                 }
                 Ok(())

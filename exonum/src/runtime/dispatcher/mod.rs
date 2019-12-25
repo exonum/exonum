@@ -540,7 +540,7 @@ pub enum Action {
     StartDeploy {
         artifact: ArtifactId,
         spec: Vec<u8>,
-        and_then: Box<dyn FnOnce() -> ExecutionFuture + Send>,
+        and_then: Box<dyn FnOnce(Result<(), ()>) -> ExecutionFuture + Send>,
     },
 }
 
@@ -566,7 +566,7 @@ impl Action {
             } => {
                 dispatcher
                     .deploy_artifact(artifact.clone(), spec)
-                    .and_then(|()| and_then())
+                    .then(|result| and_then(result.map_err(drop)))
                     .wait()
                     .unwrap_or_else(|e| {
                         error!("Deploying artifact {:?} failed: {}", artifact, e);

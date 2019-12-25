@@ -56,10 +56,12 @@ pub struct DeployRequest {
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::DeployConfirmation")]
-pub struct DeployConfirmation {
+#[protobuf_convert(source = "proto::DeployResult")]
+pub struct DeployResult {
     /// Artifact identifier.
-    pub artifact: ArtifactId,
+    pub request: DeployRequest,
+    /// Result of deployment.
+    pub success: bool,
 }
 
 /// Request for the start service instance.
@@ -226,24 +228,22 @@ pub struct ConfigProposalWithHash {
 }
 
 impl_binary_key_for_binary_value! { DeployRequest }
-impl_binary_key_for_binary_value! { DeployConfirmation }
+impl_binary_key_for_binary_value! { DeployResult }
 impl_binary_key_for_binary_value! { StartService }
 impl_binary_key_for_binary_value! { StopService }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
 
 impl_serde_hex_for_binary_value! { DeployRequest }
-impl_serde_hex_for_binary_value! { DeployConfirmation }
+impl_serde_hex_for_binary_value! { DeployResult }
 impl_serde_hex_for_binary_value! { StartService }
 impl_serde_hex_for_binary_value! { StopService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 
-impl From<DeployRequest> for DeployConfirmation {
-    fn from(v: DeployRequest) -> Self {
-        Self {
-            artifact: v.artifact,
-        }
+impl From<(DeployRequest, bool)> for DeployResult {
+    fn from((request, success): (DeployRequest, bool)) -> Self {
+        Self { request, success }
     }
 }
 

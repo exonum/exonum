@@ -26,7 +26,7 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployConfirmation, DeployRequest, Error, Schema, StartService, StopService, Supervisor,
+    DeployRequest, DeployResult, Error, Schema, StartService, StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -48,7 +48,7 @@ pub trait SupervisorInterface<Ctx> {
     ///
     /// The artifact is registered in the dispatcher if all validators send this confirmation.
     /// This confirmation is sent automatically by the node if the deploy succeeds.
-    fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployConfirmation) -> Self::Output;
+    fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployResult) -> Self::Output;
 
     /// Propose config change
     ///
@@ -303,16 +303,17 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
     fn confirm_artifact_deploy(
         &self,
         context: CallContext<'_>,
-        confirmation: DeployConfirmation,
+        deploy_result: DeployResult,
     ) -> Self::Output {
-        confirmation
+        deploy_result
+            .request
             .artifact
             .validate()
             .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
 
         let core_schema = context.data().for_core();
 
-        // Verifies that transaction author is validator.
+        // Verify that transaction author is validator.
         let author = context
             .caller()
             .author()
@@ -320,32 +321,57 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
+        let current_height = core_schema.height();
 
         let mut schema = Schema::new(context.service_data());
-        // Verifies that this deployment is registered.
+
+        // Check if deployment already failed.
+        if schema.deploy_failures.contains(&deploy_result.request) {
+            // This deployment is already resulted in failure, no further
+            // processing needed.
+            return Ok(());
+        }
+
+        // Verify that this deployment is registered.
         let deploy_request = schema
             .pending_deployments
-            .get(&confirmation.artifact)
+            .get(&deploy_result.request.artifact)
             .ok_or(Error::DeployRequestNotRegistered)?;
 
-        // Verifies that we didn't reach deadline height.
-        if deploy_request.deadline_height < core_schema.height() {
+        // Check that pending deployment is the same as in confirmation.
+        if deploy_request != deploy_result.request {
+            return Err(Error::DeployRequestNotRegistered)?;
+        }
+
+        // Verify that we didn't reach deadline height.
+        if deploy_request.deadline_height < current_height {
             return Err(Error::DeadlineExceeded.into());
         }
 
-        let confirmations = schema.deploy_confirmations.confirm(&confirmation, author);
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        if confirmations == validator_count {
-            log::trace!(
-                "Registering deployed artifact in dispatcher {:?}",
-                confirmation.artifact
-            );
+        if deploy_result.success {
+            let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
+            let validator_count = core_schema.consensus_config().validator_keys.len();
+            if confirmations == validator_count {
+                log::trace!(
+                    "Registering deployed artifact in dispatcher {:?}",
+                    deploy_request.artifact
+                );
 
-            // Removes artifact from pending deployments.
-            schema.pending_deployments.remove(&confirmation.artifact);
-            // We have enough confirmations to register the deployed artifact in the dispatcher;
-            // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+                // Remove artifact from pending deployments.
+                schema.pending_deployments.remove(&deploy_request.artifact);
+                // We have enough confirmations to register the deployed artifact in the dispatcher;
+                // if this action fails, this transaction will be canceled.
+                context
+                    .start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+            }
+        } else {
+            // Mark deploy as failed.
+            schema.deploy_failures.put(&deploy_request, current_height);
+
+            // Remove artifact from pending deployments: since we require
+            // a confirmation from every node, failure for one node means failure
+            // for the whole network.
+            schema.pending_deployments.remove(&deploy_request.artifact);
         }
 
         Ok(())

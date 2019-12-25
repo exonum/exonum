@@ -14,6 +14,7 @@
 
 use exonum::{
     crypto::Hash,
+    helpers::Height,
     runtime::{ArtifactId, InstanceId},
 };
 use exonum_derive::FromAccess;
@@ -22,10 +23,7 @@ use exonum_merkledb::{
     Entry, Fork, ProofEntry, ProofMapIndex,
 };
 
-use super::{
-    multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    SupervisorConfig,
-};
+use super::{multisig::MultisigIndex, ConfigProposalWithHash, DeployRequest, SupervisorConfig};
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
@@ -35,7 +33,11 @@ pub struct Schema<T: Access> {
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
-    pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
+    /// Note that `DeployRequest`s are stored instead of `ArtifactId` to
+    /// distinguish several attempts of the same artifact deployment.
+    pub deploy_confirmations: MultisigIndex<T, DeployRequest>,
+    /// Deployment failures.
+    pub deploy_failures: ProofMapIndex<T::Base, DeployRequest, Height>,
     /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
     /// Votes for a configuration change.

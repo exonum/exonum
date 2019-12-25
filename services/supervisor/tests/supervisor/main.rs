@@ -25,8 +25,7 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    ConfigPropose, DeployConfirmation, DeployRequest, Error as TxError, Supervisor,
-    SupervisorInterface,
+    ConfigPropose, DeployRequest, DeployResult, Error as TxError, Supervisor, SupervisorInterface,
 };
 
 use crate::{
@@ -37,6 +36,7 @@ use crate::{
 mod config;
 mod config_api;
 mod consensus_config;
+mod deploy_failures;
 mod inc;
 mod proto;
 mod service_lifecycle;
@@ -133,7 +133,7 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let confirmation = request.to_owned().into();
+    let confirmation = (request.to_owned(), true).into();
     testkit
         .validator(validator_id)
         .service_keypair()
@@ -747,7 +747,7 @@ fn test_auditor_cant_send_requests() {
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let confirmation: DeployConfirmation = request_deploy.clone().into();
+        let confirmation: DeployResult = (request_deploy.clone(), true).into();
         testkit
             .us()
             .service_keypair()
