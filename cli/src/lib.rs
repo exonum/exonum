@@ -93,7 +93,10 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::{rust::ServiceFactory, RuntimeInstance, WellKnownRuntime},
+    runtime::{
+        rust::{RustRuntimeBuilder, ServiceFactory},
+        RuntimeInstance, WellKnownRuntime,
+    },
 };
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 
@@ -111,21 +114,30 @@ mod config_manager;
 
 /// Rust-specific node builder used for constructing a node with a list
 /// of provided services.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct NodeBuilder {
-    services: Vec<Box<dyn ServiceFactory>>,
+    rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
+}
+
+impl Default for NodeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            rust_runtime: RustRuntimeBuilder::new().with_factory(Supervisor),
+            external_runtimes: vec![],
+        }
     }
 
     /// Adds new Rust service to the list of available services.
-    pub fn with_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        self.services.push(service.into());
+    pub fn with_service<S: ServiceFactory>(mut self, service: S) -> Self {
+        self.rust_runtime = self.rust_runtime.with_factory(service);
         self
     }
 
@@ -153,9 +165,6 @@ impl NodeBuilder {
             .with_instance(supervisor)
             .build();
 
-            let mut services: Vec<Box<dyn ServiceFactory>> = vec![Supervisor.into()];
-            services.extend(self.services);
-
             let db_options = &run_config.node_config.private_config.database;
             let database: Arc<dyn Database> =
                 Arc::new(RocksDB::open(run_config.db_path, db_options)?);
@@ -165,8 +174,8 @@ impl NodeBuilder {
 
             let node = Node::new(
                 database,
+                self.rust_runtime,
                 self.external_runtimes,
-                services,
                 run_config.node_config.into(),
                 genesis_config,
                 Some(config_manager),

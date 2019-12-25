@@ -149,7 +149,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
     runtime::{
-        rust::{RustRuntime, ServiceFactory},
+        rust::{RustRuntimeBuilder, ServiceFactory},
         InstanceId, RuntimeInstance, SnapshotExt,
     },
 };
@@ -207,12 +207,11 @@ impl fmt::Debug for TestKit {
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given Rust service.
     pub fn for_rust_service(
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
+        service_factory: impl ServiceFactory,
         name: impl Into<String>,
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         TestKitBuilder::validator()
             .with_artifact(artifact.clone())
@@ -761,11 +760,9 @@ impl TestKit {
 /// assert_eq!(stopped.height(), Height(5));
 ///
 /// // Resume with the same single service with a fresh state.
-/// let runtime = stopped.rust_runtime();
 /// let service = AfterCommitService::new();
-/// let mut testkit = stopped.resume(vec![
-///     runtime.with_factory(service.clone())
-/// ]);
+/// let rust_runtime = RustRuntime::builder().with_factory(service.clone());
+/// let mut testkit = stopped.resume(rust_runtime);
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
 /// ```
@@ -792,25 +789,29 @@ impl StoppedTestKit {
         &self.network
     }
 
-    /// Creates an empty Rust runtime.
-    pub fn rust_runtime(&self) -> RustRuntime {
-        RustRuntime::new(self.api_notifier_channel.0.clone())
+    /// Resume the operation of the testkit with the Rust runtime.
+    ///
+    /// Note that services in the Rust runtime may differ from the initially passed to the `TestKit`
+    /// (which is also what may happen with real Exonum apps).
+    pub fn resume(self, rust_runtime: RustRuntimeBuilder) -> TestKit {
+        self.resume_with_runtimes(rust_runtime, Vec::new())
     }
 
-    /// Resume the operation of the testkit.
-    ///
-    /// Note that `runtimes` may differ from the initially passed to the `TestKit`
-    /// (which is also what may happen with real Exonum apps).
-    ///
-    /// This method will not add the default Rust runtime, so you must do this explicitly.
-    pub fn resume(self, runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>) -> TestKit {
+    /// Resume the operation fo the testkit with the specified runtimes.
+    pub fn resume_with_runtimes(
+        self,
+        rust_runtime: RustRuntimeBuilder,
+        external_runtimes: Vec<RuntimeInstance>,
+    ) -> TestKit {
+        let rust_runtime = rust_runtime.build(self.api_notifier_channel.0.clone());
+        let mut runtimes = external_runtimes;
+        runtimes.push(rust_runtime.into());
         TestKit::assemble(
             self.db,
             self.network,
             // TODO make consensus config optional [ECR-3222]
             GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
-            runtimes.into_iter().map(|x| x.into()),
-            // In this context, it is not possible to add new service instances.
+            runtimes,
             self.api_notifier_channel,
         )
     }

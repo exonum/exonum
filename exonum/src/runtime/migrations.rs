@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! Migration tools.
+//!
+//! FIXME: more details
 
 // FIXME: Decouple after #1639 is merged.
 pub use semver::Version;
@@ -117,6 +119,8 @@ pub enum DataMigrationError {
 }
 
 /// Linearly ordered migrations.
+///
+/// FIXME: more details, examples
 ///
 /// # Limitations
 ///

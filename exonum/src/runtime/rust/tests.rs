@@ -16,7 +16,7 @@ use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemSchema};
 use exonum_proto::ProtobufConvert;
-use futures::{sync::mpsc, Future};
+use futures::Future;
 
 use std::{
     collections::BTreeMap,
@@ -79,7 +79,9 @@ fn commit_block(blockchain: &mut BlockchainMut, fork: Fork) {
 }
 
 fn create_runtime() -> (Inspected<RustRuntime>, Arc<Mutex<Vec<RuntimeEvent>>>) {
-    let runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(TestServiceImpl);
+    let runtime = RustRuntime::builder()
+        .with_factory(TestServiceImpl)
+        .build_for_tests();
     let event_handle = Arc::default();
     let runtime = Inspected {
         inner: runtime,
@@ -590,7 +592,9 @@ fn rust_runtime_with_builtin_services() {
 
 #[test]
 fn state_aggregation() {
-    let runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(TestServiceImpl);
+    let runtime = RustRuntime::builder()
+        .with_factory(TestServiceImpl)
+        .build_for_tests();
     let genesis_config = TestServiceImpl::genesis_config();
     let blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
@@ -617,9 +621,10 @@ fn state_aggregation() {
 fn multiple_service_versions() {
     const NEW_INSTANCE_ID: InstanceId = SERVICE_INSTANCE_ID + 1;
 
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntime::builder()
         .with_factory(TestServiceImpl)
-        .with_factory(TestServiceImplV2);
+        .with_factory(TestServiceImplV2)
+        .build_for_tests();
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
     let mut blockchain = Blockchain::build_for_tests()
@@ -876,9 +881,10 @@ fn dependent_builtin_service() {
         .with_instance(dep_service.default_instance())
         .build();
 
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntime::builder()
         .with_factory(main_service)
-        .with_factory(dep_service);
+        .with_factory(dep_service)
+        .build_for_tests();
 
     let blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
@@ -921,9 +927,10 @@ fn dependent_builtin_service_with_incorrect_order() {
         .with_instance(main_service.default_instance())
         .build();
 
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntime::builder()
         .with_factory(main_service)
-        .with_factory(dep_service);
+        .with_factory(dep_service)
+        .build_for_tests();
 
     let err = Blockchain::build_for_tests()
         .into_mut(genesis_config)
@@ -935,9 +942,10 @@ fn dependent_builtin_service_with_incorrect_order() {
 
 #[test]
 fn dependent_service_with_no_dependency() {
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntime::builder()
         .with_factory(TestServiceImpl)
-        .with_factory(DependentServiceImpl);
+        .with_factory(DependentServiceImpl)
+        .build_for_tests();
 
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
@@ -970,9 +978,10 @@ fn dependent_service_with_no_dependency() {
 
 #[test]
 fn dependent_service_in_same_block() {
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntime::builder()
         .with_factory(TestServiceImpl)
-        .with_factory(DependentServiceImpl);
+        .with_factory(DependentServiceImpl)
+        .build_for_tests();
 
     let config = generate_testnet_config(1, 0)[0].clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
@@ -1018,9 +1027,10 @@ fn dependent_service_in_successive_block() {
     let dep_service = DependentServiceImpl;
     let genesis_config = TestServiceImpl::genesis_config();
 
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntime::builder()
         .with_factory(main_service)
-        .with_factory(dep_service);
+        .with_factory(dep_service)
+        .build_for_tests();
 
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)

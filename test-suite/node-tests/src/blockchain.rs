@@ -28,7 +28,6 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::{ObjectHash, TemporaryDB};
 use exonum_proto::ProtobufConvert;
-use futures::sync::mpsc;
 use serde_derive::*;
 
 use std::collections::BTreeMap;
@@ -127,7 +126,9 @@ pub fn create_blockchain() -> BlockchainMut {
         .with_artifact(my_service_artifact.clone())
         .with_instance(my_service_artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(my_service);
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(my_service)
+        .build_for_tests();
     BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
         .build()
