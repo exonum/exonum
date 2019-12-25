@@ -14,31 +14,26 @@
 
 //! WebSocket API.
 
-// TODO Move module to the backends/actix directory. [ECR-3222]
-
 use actix::*;
 use actix_web::ws;
-use chrono::{DateTime, Utc};
-use exonum_merkledb::{access::Access, ListProof, ObjectHash};
+use exonum::{
+    blockchain::{Block, Blockchain, Schema},
+    crypto::Hash,
+    merkledb::ObjectHash,
+    messages::SignedMessage,
+};
+use exonum_explorer::api::{CommittedTransactionSummary, TransactionHex, TransactionResponse};
 use futures::Future;
 use hex::FromHex;
-use log::error;
 use rand::{rngs::ThreadRng, Rng};
+use serde_derive::*;
 
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
 };
 
-use crate::{
-    api::node::public::explorer::{TransactionHex, TransactionResponse},
-    blockchain::{Block, Blockchain, ExecutionStatus, Schema, TxLocation},
-    crypto::Hash,
-    explorer::median_precommits_time,
-    messages::SignedMessage,
-};
-
-/// Message, coming from websocket connection.
+/// Message coming from a websocket connection.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "type", content = "payload", rename_all = "kebab-case")]
 enum IncomingMessage {
@@ -82,54 +77,6 @@ impl TransactionFilter {
             service_id,
             message_id,
         }
-    }
-}
-
-/// Summary about a particular transaction in the blockchain (without transaction content).
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommittedTransactionSummary {
-    /// Transaction identifier.
-    pub tx_hash: Hash,
-    /// ID of service.
-    pub service_id: u16,
-    /// ID of transaction in service.
-    pub message_id: u16,
-    /// Result of transaction execution.
-    pub status: ExecutionStatus,
-    /// Transaction location in the blockchain.
-    pub location: TxLocation,
-    /// Proof of existence.
-    pub location_proof: ListProof<Hash>,
-    /// Approximate finalization time.
-    pub time: DateTime<Utc>,
-}
-
-impl CommittedTransactionSummary {
-    fn new(schema: &Schema<impl Access>, tx_hash: &Hash) -> Option<Self> {
-        let tx = schema.transactions().get(tx_hash)?;
-        let tx = tx.as_ref();
-        let service_id = tx.call_info.instance_id as u16;
-        let tx_id = tx.call_info.method_id as u16;
-        let location = schema.transactions_locations().get(tx_hash)?;
-        let tx_result = schema.transaction_result(location)?;
-        let location_proof = schema
-            .block_transactions(location.block_height())
-            .get_proof(location.position_in_block());
-        let time = median_precommits_time(
-            &schema
-                .block_and_precommits(location.block_height())
-                .unwrap()
-                .precommits,
-        );
-        Some(Self {
-            tx_hash: *tx_hash,
-            service_id,
-            message_id: tx_id,
-            status: ExecutionStatus(tx_result),
-            location,
-            location_proof,
-            time,
-        })
     }
 }
 
@@ -225,7 +172,10 @@ impl Server {
         for subscriber in self.subscribers.values_mut() {
             for recipient in subscriber.values_mut() {
                 if let Err(err) = recipient.do_send(Message::Close) {
-                    warn!("Can't send Close message to a websocket client: {:?}", err);
+                    log::warn!(
+                        "Can't send `Close` message to a websocket client: {:?}",
+                        err
+                    );
                 }
             }
             subscriber.clear();
@@ -313,7 +263,7 @@ impl Handler<Broadcast> for Server {
             .filter_map(|hash| {
                 let res = CommittedTransactionSummary::new(&schema, &hash);
                 if res.is_none() {
-                    error!(
+                    log::error!(
                         "BUG. Cannot build summary about committed transaction {:?} \
                          because it doesn't exist in \"transactions\", \
                          \"transaction_results\" nor \"transactions_locations\" indexes.",

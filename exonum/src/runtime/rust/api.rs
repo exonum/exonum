@@ -71,6 +71,12 @@ impl<'a> ServiceApiState<'a> {
         self.data().for_executing_service()
     }
 
+    /// Returns the access to the entire blockchain snapshot. Use [`data`](#method.data)
+    /// or [`service_data`](#method.service_data) for more structure snapshot presentations.
+    pub fn snapshot(&self) -> &dyn Snapshot {
+        &self.snapshot
+    }
+
     /// Returns the service key of this node.
     pub fn service_key(&self) -> PublicKey {
         self.broadcaster.keypair().0

@@ -553,14 +553,19 @@ pub struct BlockchainExplorer<'a> {
 }
 
 impl<'a> BlockchainExplorer<'a> {
-    /// Create a new `BlockchainExplorer` instance.
+    /// Creates a new `BlockchainExplorer` instance from the provided snapshot.
     pub fn new(snapshot: &'a dyn Snapshot) -> Self {
         BlockchainExplorer {
             schema: Schema::new(snapshot),
         }
     }
 
-    /// Return information about the transaction identified by the hash.
+    /// Creates a new `BlockchainExplorer` instance from the core schema.
+    pub fn from_schema(schema: Schema<&'a dyn Snapshot>) -> Self {
+        BlockchainExplorer { schema }
+    }
+
+    /// Returns information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
         let content = self.transaction_without_proof(tx_hash)?;
         if self.schema.transactions_pool().contains(tx_hash) {

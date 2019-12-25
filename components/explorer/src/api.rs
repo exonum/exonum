@@ -5,15 +5,18 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::Block,
+    blockchain::{Block, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
+    merkledb::{access::Access, ListProof},
     messages::{Precommit, Verified},
     runtime::{CallInfo, ExecutionStatus, InstanceId},
 };
 use serde_derive::*;
 
 use std::ops::Range;
+
+use crate::median_precommits_time;
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -55,6 +58,33 @@ pub struct BlockInfo {
     /// Median time from the block precommits.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time: Option<DateTime<Utc>>,
+}
+
+impl<'a> From<crate::BlockInfo<'a>> for BlockInfo {
+    fn from(inner: crate::BlockInfo<'a>) -> Self {
+        Self {
+            block: inner.header().clone(),
+            precommits: Some(inner.precommits().to_vec()),
+            txs: Some(
+                inner
+                    .transaction_hashes()
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, &tx_hash)| TxInfo {
+                        tx_hash,
+                        call_info: inner
+                            .transaction(idx)
+                            .unwrap()
+                            .content()
+                            .payload()
+                            .call_info
+                            .clone(),
+                    })
+                    .collect(),
+            ),
+            time: Some(median_precommits_time(&inner.precommits())),
+        }
+    }
 }
 
 /// Blocks in range parameters.
@@ -156,4 +186,53 @@ pub struct CallStatusQuery {
     pub height: Height,
     /// Numerical service identifier.
     pub service_id: InstanceId,
+}
+
+/// Summary about a particular transaction in the blockchain (without transaction content).
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommittedTransactionSummary {
+    /// Transaction identifier.
+    pub tx_hash: Hash,
+    /// ID of service.
+    pub service_id: u16,
+    /// ID of transaction in service.
+    pub message_id: u16,
+    /// Result of transaction execution.
+    pub status: ExecutionStatus,
+    /// Transaction location in the blockchain.
+    pub location: TxLocation,
+    /// Proof of existence.
+    pub location_proof: ListProof<Hash>,
+    /// Approximate finalization time.
+    pub time: DateTime<Utc>,
+}
+
+impl CommittedTransactionSummary {
+    /// Constructs a transaction summary from the core schema.
+    pub fn new(schema: &Schema<impl Access>, tx_hash: &Hash) -> Option<Self> {
+        let tx = schema.transactions().get(tx_hash)?;
+        let tx = tx.as_ref();
+        let service_id = tx.call_info.instance_id as u16;
+        let tx_id = tx.call_info.method_id as u16;
+        let location = schema.transactions_locations().get(tx_hash)?;
+        let tx_result = schema.transaction_result(location)?;
+        let location_proof = schema
+            .block_transactions(location.block_height())
+            .get_proof(location.position_in_block());
+        let time = median_precommits_time(
+            &schema
+                .block_and_precommits(location.block_height())
+                .unwrap()
+                .precommits,
+        );
+        Some(Self {
+            tx_hash: *tx_hash,
+            service_id,
+            message_id: tx_id,
+            status: ExecutionStatus(tx_result),
+            location,
+            location_proof,
+            time,
+        })
+    }
 }

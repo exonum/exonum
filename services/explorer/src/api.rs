@@ -12,37 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum blockchain explorer API.
+//! HTTP API for the explorer service.
+
+pub use exonum_explorer::{api::*, TransactionInfo};
 
 use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
-use chrono::{DateTime, Utc};
-use exonum_merkledb::{ObjectHash, Snapshot};
-use futures::{Future, IntoFuture, Sink};
-use hex::FromHex;
-
-use std::{
-    ops::{Bound, Range},
-    sync::{Arc, Mutex},
-};
-
-use crate::{
+use exonum::{
     api::{
         backends::actix::{
             self as actix_backend, FutureResponse, HttpRequest, RawHandler, RequestHandler,
         },
-        node::SharedNodeState,
-        websocket::{Server, Session, SubscriptionType, TransactionFilter},
-        ApiBackend, ApiScope, Error as ApiError, FutureResult,
+        ApiBackend, Error as ApiError, FutureResult,
     },
-    blockchain::{Block, Blockchain, CallInBlock, ExecutionStatus},
-    crypto::Hash,
-    explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
+    blockchain::{Blockchain, CallInBlock, Schema},
     helpers::Height,
-    messages::{Precommit, SignedMessage, Verified},
+    merkledb::{ObjectHash, Snapshot},
+    messages::SignedMessage,
     node::{ApiSender, ExternalMessage},
-    runtime::{CallInfo, InstanceId},
+    runtime::{rust::api::ServiceApiScope, ExecutionStatus},
 };
+use exonum_explorer::{median_precommits_time, BlockchainExplorer};
+use futures::{Future, IntoFuture, Sink};
+use hex::FromHex;
+use serde_json::json;
+
+use std::{
+    ops::Bound,
+    sync::{Arc, Mutex},
+};
+
+use crate::websocket::{Server, Session, SubscriptionType, TransactionFilter};
 
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
@@ -61,8 +61,11 @@ impl ExplorerApi {
     /// the [`BlocksQuery`] struct.
     ///
     /// [`BlocksQuery`]: struct.BlocksQuery.html
-    pub fn blocks(snapshot: &dyn Snapshot, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
-        let explorer = BlockchainExplorer::new(snapshot);
+    pub fn blocks(
+        schema: Schema<&dyn Snapshot>,
+        query: BlocksQuery,
+    ) -> Result<BlocksRange, ApiError> {
+        let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
                 "Max block count per request exceeded ({})",
@@ -125,8 +128,8 @@ impl ExplorerApi {
     }
 
     /// Returns the content for a block at a specific height.
-    pub fn block(snapshot: &dyn Snapshot, query: BlockQuery) -> Result<BlockInfo, ApiError> {
-        let explorer = BlockchainExplorer::new(snapshot);
+    pub fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> Result<BlockInfo, ApiError> {
+        let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             ApiError::NotFound(format!(
                 "Requested block height ({}) exceeds the blockchain height ({})",
@@ -138,10 +141,10 @@ impl ExplorerApi {
 
     /// Searches for a transaction, either committed or uncommitted, by the hash.
     pub fn transaction_info(
-        snapshot: &dyn Snapshot,
+        schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> Result<TransactionInfo, ApiError> {
-        BlockchainExplorer::new(snapshot)
+        BlockchainExplorer::from_schema(schema)
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
@@ -151,10 +154,10 @@ impl ExplorerApi {
 
     /// Returns call status of committed transaction.
     pub fn transaction_status(
-        snapshot: &dyn Snapshot,
+        schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> Result<CallStatusResponse, ApiError> {
-        let explorer = BlockchainExplorer::new(snapshot);
+        let explorer = BlockchainExplorer::from_schema(schema);
 
         let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
             ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
@@ -180,31 +183,28 @@ impl ExplorerApi {
 
     /// Returns call status of `before_transactions` hook.
     pub fn before_transactions_status(
-        snapshot: &dyn Snapshot,
+        schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
-        let explorer = BlockchainExplorer::new(snapshot);
+        let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::before_transactions(query.service_id);
-
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
         Ok(CallStatusResponse { status })
     }
 
     /// Returns call status of `after_transactions` hook.
     pub fn after_transactions_status(
-        snapshot: &dyn Snapshot,
+        schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
-        let explorer = BlockchainExplorer::new(snapshot);
+        let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::after_transactions(query.service_id);
-
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
         Ok(CallStatusResponse { status })
     }
 
     /// Adds transaction into the pool of unconfirmed transactions if it's valid
     /// and returns an error otherwise.
-    // TODO move this method to the public system API [ECR-3222]
     pub fn add_transaction(
         snapshot: &dyn Snapshot,
         sender: &ApiSender,
@@ -238,10 +238,9 @@ impl ExplorerApi {
 
     /// Subscribes to events.
     pub fn handle_ws<Q>(
-        name: &'static str,
+        name: &str,
         backend: &mut actix_backend::ApiBuilder,
         blockchain: Blockchain,
-        shared_node_state: SharedNodeState,
         extract_query: Q,
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
@@ -254,8 +253,7 @@ impl ExplorerApi {
             let mut address = server.lock().expect("Expected mutex lock");
             if address.is_none() {
                 *address = Some(Arbiter::start(|_| Server::new(blockchain)));
-
-                shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
+                //.set_broadcast_server_address(address.to_owned().unwrap());
             }
             let address = address.to_owned().unwrap();
 
@@ -276,17 +274,12 @@ impl ExplorerApi {
     }
 
     /// Adds explorer API endpoints to the corresponding scope.
-    pub fn wire(
-        self,
-        api_scope: &mut ApiScope,
-        shared_node_state: SharedNodeState,
-    ) -> &mut ApiScope {
+    pub fn wire(self, api_scope: &mut ServiceApiScope) {
         // Default subscription for blocks.
         Self::handle_ws(
             "v1/blocks/subscribe",
             api_scope.web_backend(),
             self.blockchain.clone(),
-            shared_node_state.clone(),
             |_| Ok(SubscriptionType::Blocks),
         );
         // Default subscription for transactions.
@@ -294,7 +287,6 @@ impl ExplorerApi {
             "v1/transactions/subscribe",
             api_scope.web_backend(),
             self.blockchain.clone(),
-            shared_node_state.clone(),
             |request| {
                 if request.query().is_empty() {
                     return Ok(SubscriptionType::Transactions { filter: None });
@@ -314,66 +306,32 @@ impl ExplorerApi {
             "v1/ws",
             api_scope.web_backend(),
             self.blockchain.clone(),
-            shared_node_state,
             |_| Ok(SubscriptionType::None),
         );
-        api_scope
-            .endpoint("v1/blocks", {
-                let blockchain = self.blockchain.clone();
-                move |query| Self::blocks(blockchain.snapshot().as_ref(), query)
-            })
-            .endpoint("v1/block", {
-                let blockchain = self.blockchain.clone();
-                move |query| Self::block(blockchain.snapshot().as_ref(), query)
-            })
-            .endpoint("v1/call_status/transaction", {
-                let blockchain = self.blockchain.clone();
-                move |query| Self::transaction_status(blockchain.snapshot().as_ref(), query)
-            })
-            .endpoint("v1/call_status/after_transactions", {
-                let blockchain = self.blockchain.clone();
-                move |query| Self::after_transactions_status(blockchain.snapshot().as_ref(), query)
-            })
-            .endpoint("v1/call_status/before_transactions", {
-                let blockchain = self.blockchain.clone();
-                move |query| Self::before_transactions_status(blockchain.snapshot().as_ref(), query)
-            })
-            .endpoint("v1/transactions", {
-                let blockchain = self.blockchain.clone();
-                move |query| Self::transaction_info(blockchain.snapshot().as_ref(), query)
-            })
-            .endpoint_mut("v1/transactions", {
-                let blockchain = self.blockchain.clone();
-                move |query| {
-                    Self::add_transaction(&blockchain.snapshot(), blockchain.sender(), query)
-                }
-            })
-    }
-}
 
-impl<'a> From<explorer::BlockInfo<'a>> for BlockInfo {
-    fn from(inner: explorer::BlockInfo<'a>) -> Self {
-        Self {
-            block: inner.header().clone(),
-            precommits: Some(inner.precommits().to_vec()),
-            txs: Some(
-                inner
-                    .transaction_hashes()
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, &tx_hash)| TxInfo {
-                        tx_hash,
-                        call_info: inner
-                            .transaction(idx)
-                            .unwrap()
-                            .content()
-                            .payload()
-                            .call_info
-                            .clone(),
-                    })
-                    .collect(),
-            ),
-            time: Some(median_precommits_time(&inner.precommits())),
-        }
+        api_scope
+            .endpoint("v1/blocks", |state, query| {
+                Self::blocks(state.data().for_core(), query)
+            })
+            .endpoint("v1/block", |state, query| {
+                Self::block(state.data().for_core(), query)
+            })
+            .endpoint("v1/call_status/transaction", |state, query| {
+                Self::transaction_status(state.data().for_core(), query)
+            })
+            .endpoint("v1/call_status/after_transactions", |state, query| {
+                Self::after_transactions_status(state.data().for_core(), query)
+            })
+            .endpoint("v1/call_status/before_transactions", |state, query| {
+                Self::before_transactions_status(state.data().for_core(), query)
+            })
+            .endpoint("v1/transactions", |state, query| {
+                Self::transaction_info(state.data().for_core(), query)
+            });
+
+        let tx_sender = self.blockchain.sender().to_owned();
+        api_scope.endpoint_mut("v1/transactions", move |state, query| {
+            Self::add_transaction(state.snapshot(), &tx_sender, query)
+        });
     }
 }
