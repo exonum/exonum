@@ -105,7 +105,11 @@ impl ProtobufConvert for DeployState {
             TIMEOUT => DeployState::Timeout,
             FAIL => {
                 if !pb.has_error() {
-                    return Err(format_err!("Protobuf representation of `DeployState` has type `FAIL` but has no cause set"));
+                    let error = format_err!(
+                        "Protobuf representation of `DeployState` has type \
+                         `FAIL` but has no cause set"
+                    );
+                    return Err(error);
                 }
                 let mut pb_error = pb.take_error();
                 let error = ExecutionError::from_pb(pb_error.take_error())?;
