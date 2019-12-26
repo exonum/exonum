@@ -172,6 +172,7 @@ impl Handler<RollBack> for TestKitActor {
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
     use exonum::{
         api,
         crypto::{gen_keypair, Hash},
