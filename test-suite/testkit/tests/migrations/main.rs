@@ -241,8 +241,8 @@ impl MigrateData for MigratedService {
         start_version: &Version,
     ) -> Result<Vec<MigrationScript>, DataMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
-            .migrate(Version::new(0, 2, 0), merkelize_wallets)
-            .migrate(Version::new(0, 5, 0), transform_wallet_type)
+            .add_script(Version::new(0, 2, 0), merkelize_wallets)
+            .add_script(Version::new(0, 5, 0), transform_wallet_type)
             .select(start_version)
     }
 }

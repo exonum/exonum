@@ -315,7 +315,7 @@ impl<T> MigrateData for WithoutMigrations<T> {
         &self,
         _start_version: &Version,
     ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::UnsupportedStart)
+        Err(DataMigrationError::NotSupported)
     }
 }
 
@@ -409,8 +409,7 @@ impl RustRuntimeBuilder {
         self
     }
 
-    /// Completes the build process.
-    #[doc(hidden)]
+    /// Completes the build process, converting the builder into a `RustRuntime`.
     pub fn build(self, api_notifier: mpsc::Sender<UpdateEndpoints>) -> RustRuntime {
         RustRuntime {
             blockchain: None,
@@ -425,7 +424,6 @@ impl RustRuntimeBuilder {
 
     /// Builds the Rust runtime without connection to the HTTP API. As the name implies,
     /// this method should only be used for testing.
-    #[doc(hidden)]
     pub fn build_for_tests(self) -> RustRuntime {
         self.build(mpsc::channel(1).0)
     }

@@ -60,7 +60,11 @@ impl MigrationScript {
         &self.name
     }
 
-    /// Return the version of the data after this script is applied.
+    /// Returns the version of the data after this script is applied. This version will be
+    /// as the artifact version in [`MigrationContext`] for the successive migration script
+    /// (if any).
+    ///
+    /// [`MigrationContext`]: struct.MigrationContext.html
     pub fn end_version(&self) -> &Version {
         &self.end_version
     }
@@ -76,23 +80,47 @@ impl MigrationScript {
 pub struct MigrationContext {
     /// The migration helper allowing to access service data and prepare migrated data.
     pub helper: MigrationHelper,
+
     /// Specification of the migrated instance.
+    ///
+    /// Note that the artifact version will change with each executed [`MigrationScript`]
+    /// to reflect the latest version of the service data. For example, if a [`MigrateData`]
+    /// implementation produces two scripts, which migrate service data to versions
+    /// 0.5.0 and 0.6.0 respectively, then the second script will get the `instance_spec`
+    /// with the version set to 0.5.0, regardless of the original version of the instance artifact.
+    ///
+    /// [`MigrationScript`]: struct.MigrationScript.html
+    /// [`MigrateData`]: trait.MigrateData.html
     pub instance_spec: InstanceSpec,
 }
 
 /// Encapsulates data migration logic.
 pub trait MigrateData {
     /// Provides a list of data migration scripts to execute in order to arrive from
-    /// the `start_version` of the service to the `end_version`. The list may be empty
+    /// the `start_version` of the service to the current version. The list may be empty
     /// if no data migrations have occurred between versions. The scripts in the list will
     /// be executed successively in the specified order, flushing the migration to the DB
     /// after each script is completed.
     ///
+    /// Scripts are not expected to fail; the failure should be eagerly signalled via an error.
+    ///
+    /// # Expectations
+    ///
+    /// The following constraints are expected from the migration scripts, although are currently
+    /// not checked by the core:
+    ///
+    /// - Scripts should be ordered by increasing [`end_version()`]
+    /// - The `end_version` of the initial script should be greater than `start_version`
+    /// - The `end_version` of the last script does not need to equal the target
+    ///   version of the artifact, but it should not exceed the target version
+    ///
     /// # Errors
     ///
     /// The error signifies that the service artifact does not know how to migrate
-    /// from the start version. This may be the case if the service version is too old,
+    /// from the start version. For example, this may be the case if the service version is too old,
     /// or too new.
+    ///
+    /// [`end_version()`]: struct.MigrationScript.html#method.end_version
     fn migration_scripts(
         &self,
         start_version: &Version,
@@ -100,22 +128,37 @@ pub trait MigrateData {
 }
 
 /// Errors that can occur during data migrations.
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum DataMigrationError {
     /// The start version is too far in the past.
+    #[fail(
+        display = "The provided start version is too far in the past; \
+                   the minimum supported version is {}",
+        min_supported_version
+    )]
     OldStartVersion {
         /// Minimum supported version.
         min_supported_version: Version,
     },
+
     /// The start version is in the future.
+    #[fail(
+        display = "The provided start version is greater than the maximum supported version ({})",
+        max_supported_version
+    )]
     FutureStartVersion {
         /// Maximum supported version.
         max_supported_version: Version,
     },
+
     /// The start version falls in the supported lower / upper bounds on versions,
     /// but is not supported itself. This can be the case, e.g., for pre-releases.
-    UnsupportedStart,
-    // TODO: probably need custom errors.
+    #[fail(display = "Start version is not supported: {}", _0)]
+    UnsupportedStart(String),
+
+    /// Data migrations are not supported by the artifact.
+    #[fail(display = "Data migrations are not supported by the artifact")]
+    NotSupported,
 }
 
 /// Linearly ordered migrations.
@@ -144,6 +187,10 @@ pub struct LinearMigrations {
 
 impl LinearMigrations {
     /// Creates a new set of migrations with the specified latest supported version.
+    ///
+    /// # Panics
+    ///
+    /// - If `latest_version` is a prerelease.
     pub fn new(latest_version: Version) -> Self {
         assert!(
             !latest_version.is_prerelease(),
@@ -178,14 +225,24 @@ impl LinearMigrations {
     }
 
     /// Signals to return an error if the starting version is less than the specified version.
-    pub fn forget_before(mut self, version: Version) -> Self {
+    ///
+    /// # Panics
+    ///
+    /// - If `version` is a prerelease and this instance was not created by the `with_prereleases`
+    ///   constructor.
+    pub fn set_min_version(mut self, version: Version) -> Self {
         self.check_prerelease(&version);
         self.min_start_version = Some(version);
         self
     }
 
     /// Adds a migration script at the specified version.
-    pub fn migrate<F>(mut self, version: Version, script: F) -> Self
+    ///
+    /// # Panics
+    ///
+    /// - If `version` is a prerelease and this instance was not created by the `with_prereleases`
+    ///   constructor.
+    pub fn add_script<F>(mut self, version: Version, script: F) -> Self
     where
         F: FnOnce(&mut MigrationContext) + Send + 'static,
     {
@@ -207,7 +264,8 @@ impl LinearMigrations {
         start_version: &Version,
     ) -> Result<Vec<MigrationScript>, DataMigrationError> {
         if !self.support_prereleases && start_version.is_prerelease() {
-            return Err(DataMigrationError::UnsupportedStart);
+            let msg = "the start version is a prerelease".to_owned();
+            return Err(DataMigrationError::UnsupportedStart(msg));
         }
         if *start_version > self.latest_version {
             return Err(DataMigrationError::FutureStartVersion {
@@ -286,9 +344,9 @@ mod tests {
 
     fn create_linear_migrations() -> LinearMigrations {
         LinearMigrations::new(Version::new(0, 6, 3))
-            .migrate(Version::new(0, 2, 0), migration_02)
-            .migrate(Version::new(0, 5, 0), migration_05)
-            .migrate(Version::new(0, 6, 0), migration_06)
+            .add_script(Version::new(0, 2, 0), migration_02)
+            .add_script(Version::new(0, 5, 0), migration_05)
+            .add_script(Version::new(0, 6, 0), migration_06)
     }
 
     fn execute_scripts(
@@ -377,7 +435,7 @@ mod tests {
         let migrations = create_linear_migrations();
         let start_version: Version = "0.2.0-pre.2".parse().unwrap();
         let err = migrations.select(&start_version).unwrap_err();
-        assert_matches!(err, DataMigrationError::UnsupportedStart);
+        assert_matches!(err, DataMigrationError::UnsupportedStart(_));
     }
 
     #[test]
@@ -390,7 +448,7 @@ mod tests {
     #[should_panic(expected = "Prerelease versions require using `with_prereleases`")]
     fn prerelease_in_migration_spec_leads_to_panic() {
         LinearMigrations::new(Version::new(0, 3, 1))
-            .migrate("0.2.0-pre.1".parse().unwrap(), migration_02);
+            .add_script("0.2.0-pre.1".parse().unwrap(), migration_02);
     }
 
     #[test]
@@ -406,8 +464,8 @@ mod tests {
 
         let start_version = Version::new(0, 1, 0);
         let migrations = LinearMigrations::new(Version::new(0, 5, 7))
-            .forget_before(Version::new(0, 4, 0))
-            .migrate(Version::new(0, 5, 0), migration_05);
+            .set_min_version(Version::new(0, 4, 0))
+            .add_script(Version::new(0, 5, 0), migration_05);
         let err = migrations.select(&start_version).unwrap_err();
         assert_matches!(
             err,
@@ -421,18 +479,18 @@ mod tests {
         let pre_version_ = pre_version.clone();
 
         LinearMigrations::with_prereleases(Version::new(0, 3, 2))
-            .migrate(pre_version.clone(), move |ctx| {
+            .add_script(pre_version.clone(), move |ctx| {
                 let start_version = &ctx.instance_spec.artifact.version;
                 assert!(*start_version < pre_version_);
                 ctx.helper.new_data().get_proof_entry("v02pre").set(1_u8);
             })
-            .migrate(Version::new(0, 2, 0), move |ctx| {
+            .add_script(Version::new(0, 2, 0), move |ctx| {
                 let start_version = &ctx.instance_spec.artifact.version;
                 assert!(*start_version >= pre_version);
                 assert!(*start_version < Version::new(0, 2, 0));
                 ctx.helper.new_data().get_proof_entry("v02").set(2_u8);
             })
-            .migrate(Version::new(0, 3, 0), |ctx| {
+            .add_script(Version::new(0, 3, 0), |ctx| {
                 let start_version = &ctx.instance_spec.artifact.version;
                 assert!(*start_version >= Version::new(0, 2, 0));
                 assert!(*start_version < Version::new(0, 3, 0));
