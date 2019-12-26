@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    views::IndexAddress,
+    views::{AsReadonly, GroupKeys, IndexAddress},
     BinaryKey,
 };
 
@@ -106,10 +106,27 @@ where
     }
 }
 
+impl<T, K, I> Group<T, K, I>
+where
+    T: Access,
+    T::Base: AsReadonly<Readonly = T::Base>,
+    K: BinaryKey + ?Sized,
+    I: FromAccess<T>,
+{
+    /// Iterator over keys in this group.
+    pub fn keys(&self) -> GroupKeys<T::Base, K> {
+        self.access.clone().group_keys(self.prefix.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, ProofListIndex, TemporaryDB};
+    use crate::{
+        access::{AccessExt, Prefixed, RawAccessMut},
+        migration::Migration,
+        Database, ProofListIndex, TemporaryDB,
+    };
 
     #[test]
     fn group() {
@@ -141,5 +158,88 @@ mod tests {
 
         // The next line fails to compile because `Snapshot` cannot be written to:
         // group.get(&3).push("quux".to_owned());
+    }
+
+    fn prepare_key_iter<A>(fork: A)
+    where
+        A: Access,
+        A::Base: RawAccessMut,
+    {
+        let group: Group<_, str, ProofListIndex<_, String>> = fork.clone().get_group("group");
+        group.get("foo").push("foo".to_owned());
+        group.get("bar").push("bar".to_owned());
+        group.get("baz").push("baz".to_owned());
+
+        let group: Group<_, u32, ProofListIndex<_, String>> =
+            Group::from_access(fork.clone(), ("prefixed", &0_u8).into()).unwrap();
+        group.get(&1).push("foo".to_owned());
+        group.get(&2).push("bar".to_owned());
+        group.get(&5).push("baz".to_owned());
+        group.get(&100_000).push("?".to_owned());
+
+        // Add some unrelated stuff to the DB.
+        fork.clone().get_entry("gr").set(42);
+        fork.clone().get_entry("group_").set("!".to_owned());
+        fork.clone()
+            .get_list(("group_", &1_u8))
+            .extend(vec![1, 2, 3]);
+        fork.clone().get_entry("prefix").set(".".to_owned());
+        fork.clone().get_entry("prefixed").set("??".to_owned());
+        fork.clone().get_list(("prefixed", &1_u8)).push(42);
+        fork.clone()
+            .get_entry(("prefixed", &concat_keys!(&1_u8, &42_u32)))
+            .set(42);
+        fork.clone().get_entry("t").set(21);
+        fork.clone().get_entry("unrelated").set(23);
+    }
+
+    fn test_key_iter<A>(snapshot: A)
+    where
+        A: Access,
+        A::Base: AsReadonly<Readonly = A::Base>,
+    {
+        let group: Group<_, str, ProofListIndex<_, String>> = snapshot.clone().get_group("group");
+        assert_eq!(
+            group.keys().collect::<Vec<_>>(),
+            vec!["bar".to_owned(), "baz".to_owned(), "foo".to_owned()]
+        );
+
+        let group: Group<_, u32, ProofListIndex<_, String>> =
+            Group::from_access(snapshot, ("prefixed", &0_u8).into()).unwrap();
+        assert_eq!(group.keys().collect::<Vec<_>>(), vec![1, 2, 5, 100_000]);
+    }
+
+    #[test]
+    fn iterating_over_keys() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        prepare_key_iter(&fork);
+        test_key_iter(fork.readonly());
+        let patch = fork.into_patch();
+        test_key_iter(&patch);
+    }
+
+    #[test]
+    fn iterating_over_keys_in_prefixed_access() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        prepare_key_iter(Prefixed::new("namespace", &fork));
+        test_key_iter(Prefixed::new("namespace", fork.readonly()));
+        let patch = fork.into_patch();
+        test_key_iter(Prefixed::new("namespace", &patch));
+        db.merge(patch).unwrap();
+        test_key_iter(Prefixed::new("namespace", &db.snapshot()));
+    }
+
+    #[test]
+    fn iterating_over_keys_in_migration() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        prepare_key_iter(Migration::new("namespace", &fork));
+        test_key_iter(Migration::new("namespace", fork.readonly()));
+        let patch = fork.into_patch();
+        test_key_iter(Migration::new("namespace", &patch));
+        db.merge(patch).unwrap();
+        test_key_iter(Migration::new("namespace", &db.snapshot()));
     }
 }

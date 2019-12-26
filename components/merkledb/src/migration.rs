@@ -223,7 +223,9 @@ impl<T: RawAccess> Access for Migration<'_, T> {
         K: BinaryKey + ?Sized,
         Self::Base: AsReadonly<Readonly = Self::Base>,
     {
-        unimplemented!()
+        let mut prefixed_addr = base_addr.prepend_name(self.namespace.as_ref());
+        prefixed_addr.set_in_migration();
+        self.access.group_keys(prefixed_addr)
     }
 }
 

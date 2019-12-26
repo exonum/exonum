@@ -149,7 +149,8 @@ impl<T: RawAccess> Access for Prefixed<'_, T> {
         K: BinaryKey + ?Sized,
         Self::Base: AsReadonly<Readonly = Self::Base>,
     {
-        unimplemented!()
+        let prefixed_addr = base_addr.prepend_name(self.prefix.as_ref());
+        self.access.group_keys(prefixed_addr)
     }
 }
 

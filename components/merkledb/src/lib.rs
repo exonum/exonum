@@ -187,10 +187,21 @@ pub use self::indexes::{
     Entry, Group, ProofEntry,
 };
 
+#[macro_use]
+mod macros;
 pub mod access;
+mod backends;
+mod db;
+mod error;
+mod hash;
 pub mod indexes;
+mod keys;
+mod lazy;
 pub mod migration;
+mod options;
 pub mod validation;
+mod values;
+mod views;
 
 #[cfg(feature = "with-protobuf")]
 pub mod proto;
@@ -200,15 +211,3 @@ use exonum_proto::ProtobufConvert;
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[macro_use]
-mod macros;
-mod backends;
-mod db;
-mod error;
-mod hash;
-mod keys;
-mod lazy;
-mod options;
-mod values;
-mod views;
