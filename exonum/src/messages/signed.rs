@@ -216,7 +216,7 @@ where
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
         let raw = SignedMessage::from_pb(pb.take_raw())?;
-        Ok(raw.into_verified()?)
+        raw.into_verified()
     }
 }
 
