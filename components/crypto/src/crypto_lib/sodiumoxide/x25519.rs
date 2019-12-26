@@ -47,7 +47,6 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// converts it to pair of Curve25519 keys.
 ///
 /// ```
-/// # extern crate exonum_crypto;
 /// # exonum_crypto::init();
 ///
 /// let (pk, sk) = exonum_crypto::gen_keypair();

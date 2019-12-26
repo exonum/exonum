@@ -16,9 +16,9 @@
 
 pub use self::proof::{CheckedListProof, ListProof, ListProofError, ValidationError};
 
-use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
-
 use exonum_crypto::Hash;
+
+use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
 
 use self::{
     key::{ProofListKey, MAX_INDEX},
@@ -749,14 +749,15 @@ where
 
 #[cfg(feature = "with-protobuf")]
 mod proto {
-    pub use crate::proto::{self, *};
-    use failure::Error;
+    use exonum_proto::ProtobufConvert;
+    use failure::{ensure, Error};
     use protobuf::RepeatedField;
+
     use std::borrow::Cow;
 
     use super::{HashedEntry, ListProof, ProofListKey};
+    pub use crate::proto::{self, *};
     use crate::{indexes::proof_list::MAX_INDEX, BinaryValue};
-    use exonum_proto::ProtobufConvert;
 
     impl ProtobufConvert for ProofListKey {
         type ProtoStruct = proto::ProofListKey;
