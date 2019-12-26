@@ -15,7 +15,6 @@
 //! Standard Exonum CLI command used to run the node using prepared node
 //! configuration file.
 
-use exonum::node::NodeConfig;
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -24,6 +23,7 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use crate::{
     command::{ExonumCommand, StandardResult},
+    config::NodeConfig,
     io::load_config_file,
     password::{PassInputMethod, PassphraseUsage},
 };
@@ -77,11 +77,11 @@ impl ExonumCommand for Run {
 
         // Override api options
         if let Some(public_addr) = public_addr {
-            config.api.public_api_address = Some(public_addr);
+            config.private_config.api.public_api_address = Some(public_addr);
         }
 
         if let Some(private_api_address) = private_addr {
-            config.api.private_api_address = Some(private_api_address);
+            config.private_config.api.private_api_address = Some(private_api_address);
         }
 
         let master_passphrase = self
@@ -89,7 +89,7 @@ impl ExonumCommand for Run {
             .unwrap_or_default()
             .get_passphrase(PassphraseUsage::Using)?;
 
-        let config = config.read_secret_keys(&config_path, master_passphrase.as_bytes());
+        config.read_secret_keys(&config_path, master_passphrase.as_bytes());
 
         let run_config = NodeRunConfig {
             node_config: config,

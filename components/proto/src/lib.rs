@@ -36,28 +36,25 @@
 //!
 //TODO: revert the example
 
-pub use protobuf_convert::*;
+#[macro_use]
+extern crate serde_derive; // Required for Protobuf.
 
-use proto::common::BitVec;
+pub use protobuf_convert::*;
 
 pub mod proto;
 
-#[macro_use]
-extern crate failure;
+use chrono::{DateTime, TimeZone, Utc};
+use failure::{ensure, format_err, Error};
+use protobuf::well_known_types;
 
-#[macro_use]
-extern crate serde_derive;
+use std::collections::HashMap;
+
+use proto::common::BitVec;
 
 #[macro_use]
 mod macros;
 #[cfg(test)]
 mod tests;
-
-use chrono::{DateTime, TimeZone, Utc};
-use failure::Error;
-use protobuf::well_known_types;
-
-use std::collections::HashMap;
 
 /// Used for establishing correspondence between rust struct
 /// and protobuf rust struct

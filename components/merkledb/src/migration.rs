@@ -574,4 +574,15 @@ mod tests {
     fn migration_rollback_with_merge() {
         test_migration_rollback(true);
     }
+
+    #[test]
+    fn concurrent_borrow_of_original_and_migrated_index() {
+        let db = TemporaryDB::new();
+        let helper = MigrationHelper::new(db, "test");
+        let old_entry = helper.old_data().get_proof_entry::<_, u32>("entry");
+        assert_eq!(old_entry.get(), None);
+        let mut new_entry = helper.new_data().get_proof_entry::<_, u32>("entry");
+        new_entry.set(1);
+        assert_eq!(old_entry.get(), None);
+    }
 }

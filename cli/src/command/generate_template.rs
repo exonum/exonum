@@ -14,6 +14,7 @@
 
 //! Standard Exonum CLI command used to generate common configuration file.
 
+use exonum_supervisor::mode::Mode as SupervisorMode;
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -22,7 +23,7 @@ use std::path::PathBuf;
 
 use crate::{
     command::{ExonumCommand, StandardResult},
-    config::{CommonConfigTemplate, GeneralConfig},
+    config::{GeneralConfig, NodePublicConfig},
     io::save_config_file,
 };
 
@@ -34,17 +35,22 @@ pub struct GenerateTemplate {
     /// Number of validators in the network.
     #[structopt(long)]
     pub validators_count: u32,
+    /// Supervisor service mode. Possible options are "simple" and "decentralized".
+    #[structopt(long)]
+    pub supervisor_mode: SupervisorMode,
 }
 
 impl ExonumCommand for GenerateTemplate {
     fn execute(self) -> Result<StandardResult, Error> {
-        let config_template = CommonConfigTemplate {
+        let config = NodePublicConfig {
             consensus: Default::default(),
             general: GeneralConfig {
                 validators_count: self.validators_count,
+                supervisor_mode: self.supervisor_mode,
             },
+            validator_keys: None,
         };
-        save_config_file(&config_template, &self.common_config)?;
+        save_config_file(&config, &self.common_config)?;
         Ok(StandardResult::GenerateTemplate {
             template_config_path: self.common_config,
         })

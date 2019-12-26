@@ -14,10 +14,11 @@
 
 pub use crate::proto::schema::*;
 
+use exonum_proto::ProtobufConvert;
+use failure::{ensure, format_err, Error};
+
 use crate::{Hash, PublicKey, Signature};
 use crate::{HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use exonum_proto::ProtobufConvert;
-use failure::Error;
 
 mod schema;
 #[cfg(test)]

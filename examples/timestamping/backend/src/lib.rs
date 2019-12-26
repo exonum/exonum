@@ -24,11 +24,7 @@
 )]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
 mod api;
 #[doc(hidden)]
@@ -42,13 +38,12 @@ pub use crate::{
     transactions::{Config, Error, TimestampingInterface},
 };
 
-use exonum::{
-    merkledb::BinaryValue,
-    runtime::{
-        rust::{api::ServiceApiBuilder, CallContext, Service},
-        DispatcherError, ExecutionError,
-    },
+use exonum::runtime::{
+    rust::{api::ServiceApiBuilder, CallContext, Service},
+    DispatcherError, ExecutionError,
 };
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_merkledb::BinaryValue;
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 

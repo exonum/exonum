@@ -18,11 +18,7 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-#[macro_use]
-extern crate assert_matches;
-#[macro_use]
-extern crate serde_json;
-
+use assert_matches::assert_matches;
 use exonum::{
     api::{self, node::public::explorer::TransactionQuery},
     crypto::{self, Hash, PublicKey, SecretKey},
@@ -30,6 +26,7 @@ use exonum::{
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
