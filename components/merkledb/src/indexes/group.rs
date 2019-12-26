@@ -45,12 +45,16 @@ use crate::{
 /// # use exonum_merkledb::{access::{AccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
-/// let group: Group<_, u64, ListIndex<_, u64>> =
-///     FromAccess::from_access(&fork, "group".into()).unwrap();
+/// let group: Group<_, u64, ListIndex<_, u64>> = fork.get_group("group");
 /// group.get(&1).push(1);
 /// group.get(&2).extend(vec![1, 2, 3]);
 /// // Members of the group can be accessed independently.
 /// assert_eq!(fork.get_list::<_, u64>(("group", &2_u64)).len(), 3);
+///
+/// // It is possible to enumerate keys in the group, but only if the underlying access
+/// // is readonly.
+/// let group: Group<_, u64, ListIndex<_, u64>> = fork.readonly().get_group("group");
+/// assert_eq!(group.keys().collect::<Vec<_>>(), vec![1, 2]);
 /// ```
 ///
 /// Group keys can be unsized:
