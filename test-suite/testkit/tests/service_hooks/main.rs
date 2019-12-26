@@ -18,6 +18,7 @@ pub use crate::hooks::{AfterCommitInterface, AfterCommitService, SERVICE_ID, SER
 use exonum::{explorer::BlockchainExplorer, helpers::Height};
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::TestKitBuilder;
+use pretty_assertions::assert_eq;
 
 mod hooks;
 
