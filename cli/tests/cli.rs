@@ -14,9 +14,6 @@
 
 // This is a regression test for exonum configuration.
 
-#[macro_use]
-extern crate pretty_assertions;
-
 use exonum::{api::backends::actix::AllowOrigin, blockchain::ValidatorKeys, crypto::gen_keypair};
 use exonum_cli::{
     command::{
@@ -28,6 +25,7 @@ use exonum_cli::{
     password::DEFAULT_MASTER_PASS_ENV_VAR,
 };
 use exonum_supervisor::mode::Mode as SupervisorMode;
+use pretty_assertions::assert_eq;
 use serde_derive::*;
 use structopt::StructOpt;
 use tempfile::TempDir;
