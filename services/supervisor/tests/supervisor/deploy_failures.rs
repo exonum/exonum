@@ -276,8 +276,7 @@ fn assert_deploy_state(actual: DeployState, expected: DeployState) {
         }
         // Non-symmetric variants.
         _ => {
-            assert!(
-                false,
+            panic!(
                 "Deploy states are not equal, got {:?}, expected {:?}",
                 actual, expected
             );
