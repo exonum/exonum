@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_crypto::{PublicKey, SecretKey};
+use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::Access, BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot,
     SystemSchema,
