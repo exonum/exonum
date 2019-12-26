@@ -117,7 +117,7 @@ impl<'a> CallContext<'a> {
         };
 
         self.inner
-            .make_child_call(caller, method.interface_name, &call_info, &args)
+            .make_child_call(method.interface_name, &call_info, &args, caller)
     }
 }
 

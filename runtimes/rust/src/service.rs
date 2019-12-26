@@ -96,7 +96,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// If you aren't interested in the processing of for the genesis block, you can use
     /// [`CallContext::in_genesis_block`] method and exit early if `true` is returned.
     ///
-    /// Also note that invocation of `exonum::blockchain::Schema::height` will **panic**
+    /// Invocation of `exonum::blockchain::Schema::height` will **panic**
     /// if invoked within `after_transactions` of the genesis block. If you are going
     /// to process the genesis block and need to know current height, use
     /// `exonum::blockchain::Schema::next_height` to infer the current blockchain height.

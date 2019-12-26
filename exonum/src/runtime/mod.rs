@@ -804,13 +804,14 @@ pub trait ExecutionContextUnstable {
     fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s>;
     /// Returns the service matching the specified query.
     fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
-
+    /// Invokes the interface method of the instance with the specified ID.
+    /// You may override the instance ID of the one who calls this method by the given one.
     fn make_child_call(
         &mut self,
-        caller: Option<InstanceId>,
         interface_name: &str,
         call_info: &CallInfo,
         arguments: &[u8],
+        caller: Option<InstanceId>,
     ) -> Result<(), ExecutionError>;
 }
 
@@ -835,10 +836,10 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
 
     fn make_child_call(
         &mut self,
-        caller: Option<InstanceId>,
         interface_name: &str,
         call_info: &CallInfo,
         arguments: &[u8],
+        caller: Option<InstanceId>,
     ) -> Result<(), ExecutionError> {
         self.child_context(caller)
             .call(interface_name, call_info, arguments)
