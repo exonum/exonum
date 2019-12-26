@@ -246,7 +246,7 @@ pub(crate) fn find_meta_attrs(name: &str, args: &[Attribute]) -> Option<NestedMe
         .map(NestedMeta::from)
 }
 
-#[derive(Debug, FromMeta, PartialEq, Eq)]
+#[derive(Debug, FromMeta)]
 #[darling(default)]
 struct MainCratePath(syn::Path);
 
@@ -262,7 +262,7 @@ impl ToTokens for MainCratePath {
     }
 }
 
-#[derive(Debug, FromMeta, PartialEq, Eq)]
+#[derive(Debug, FromMeta)]
 #[darling(default)]
 struct RustRuntimeCratePath(syn::Path);
 

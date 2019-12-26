@@ -906,11 +906,11 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    /// 
+    ///
     /// Due to the API is part of Node, it is hard to pass API restart notifier to the runtime
     /// instances. `with_runtimes` closure takes restart notifiers and returns list of runtime
     /// instances.
-    /// 
+    ///
     /// TODO [ECR-3949]
     #[doc(hidden)]
     pub fn new(

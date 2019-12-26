@@ -36,13 +36,8 @@
 //! ## Minimal complete example
 //!
 //! ```
-//! use exonum::{
-//!     proto::schema::doc_tests,
-//!     runtime::{
-//!         rust::{CallContext, Service},
-//!         BlockchainData, ExecutionError,
-//!     },
-//! };
+//! use exonum::proto::schema::doc_tests;
+//! use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
 //! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
@@ -112,7 +107,7 @@
 //! prototyping.
 //!
 //! ```
-//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
 //! # use exonum_crypto::Hash;
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! # use exonum_merkledb::Snapshot;
@@ -249,8 +244,9 @@
 //! ```
 
 pub use exonum::runtime::{
-    ArtifactId, Caller, DispatcherError, ErrorMatch, ExecutionError, ExecutionFail, InstanceId,
-    MethodId, RuntimeIdentifier, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    ArtifactId, BlockchainData, CallInfo, CallSite, Caller, DispatcherError, ErrorKind, ErrorMatch,
+    ExecutionError, ExecutionFail, InstanceId, MethodId, RuntimeIdentifier, SnapshotExt,
+    WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
 };
 
 pub use self::{
@@ -272,8 +268,8 @@ use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
-        catch_panic, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime,
+        catch_panic, ExecutionContext, InstanceDescriptor, InstanceSpec, InstanceStatus, Mailbox,
+        Runtime,
     },
 };
 use exonum_merkledb::Snapshot;
