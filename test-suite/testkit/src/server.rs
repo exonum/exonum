@@ -21,6 +21,7 @@ use exonum::{
     helpers::Height,
 };
 use futures::{sync::oneshot, Future};
+use serde::{Deserialize, Serialize};
 
 use std::thread::{self, JoinHandle};
 

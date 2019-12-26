@@ -123,9 +123,6 @@
 #![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
-#[macro_use]
-extern crate serde_derive;
-
 pub use crate::{
     api::{ApiKind, TestKitApi},
     builder::TestKitBuilder,
