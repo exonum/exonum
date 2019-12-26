@@ -21,6 +21,8 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
+use failure::{bail, ensure};
+
 use std::collections::{HashMap, HashSet};
 
 use crate::{

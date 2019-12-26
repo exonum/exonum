@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
+use failure::ensure;
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
