@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a regression test for exonum node.
+//! High-level tests for the Exonum node.
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
-    node::{ExternalMessage, Node, NodeConfig},
+    merkledb::{Database, TemporaryDB},
+    node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service, ServiceFactory},
         RuntimeInstance,
     },
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
@@ -35,7 +35,11 @@ use std::{
     time::Duration,
 };
 
-use crate::RunHandle;
+#[derive(Debug)]
+struct RunHandle {
+    node_thread: thread::JoinHandle<()>,
+    api_tx: ApiSender,
+}
 
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
 #[service_factory(
