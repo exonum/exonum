@@ -31,15 +31,14 @@
 )]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
 pub mod proto;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::crypto::PublicKey;
+    use exonum_crypto::PublicKey;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
     use exonum_merkledb::{access::Access, MapIndex};
     use exonum_proto::ProtobufConvert;
 
@@ -98,10 +97,11 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
-    use exonum::crypto::PublicKey;
+    use exonum_crypto::PublicKey;
+    use exonum_derive::{BinaryValue, ObjectHash};
+    use exonum_proto::ProtobufConvert;
 
     use super::proto;
-    use exonum_proto::ProtobufConvert;
 
     /// Service configuration parameters.
     #[derive(Clone, Debug)]
@@ -152,6 +152,8 @@ pub mod transactions {
 
 /// Contract errors.
 pub mod errors {
+    use exonum_derive::ExecutionFail;
+
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
     #[derive(Debug, ExecutionFail)]
     pub enum Error {
@@ -184,6 +186,7 @@ pub mod contracts {
         rust::{api::ServiceApiBuilder, CallContext, Service},
         ExecutionError,
     };
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 
     use crate::{
         api::CryptocurrencyApi,

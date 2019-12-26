@@ -18,6 +18,7 @@ use exonum::{
     crypto::PublicKey,
     runtime::{rust::CallContext, DispatcherError, ExecutionError},
 };
+use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
 use super::{proto, schema::Schema, CryptocurrencyService};
