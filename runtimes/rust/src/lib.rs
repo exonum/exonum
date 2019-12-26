@@ -38,14 +38,12 @@
 //! ```
 //! use exonum::{
 //!     proto::schema::doc_tests,
-//!     runtime::{
-//!         rust::{CallContext, Service},
-//!         BlockchainData, ExecutionError,
-//!     },
+//!     runtime::{BlockchainData, ExecutionError},
 //! };
 //! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
+//! use exonum_rust_runtime::{CallContext, Service};
 //! use exonum_crypto::Hash;
 //!
 //! // Determine the types of data that will be used in service transactions.
@@ -112,10 +110,11 @@
 //! prototyping.
 //!
 //! ```
-//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
+//! # use exonum::runtime::{BlockchainData, ExecutionError};
 //! # use exonum_crypto::Hash;
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! # use exonum_merkledb::Snapshot;
+//! # use exonum_rust_runtime::{CallContext, Service};
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //! #   type Output;
@@ -198,7 +197,8 @@
 //! ## Interface usage
 //!
 //! ```
-//! # use exonum::runtime::{rust::CallContext, ExecutionError};
+//! # use exonum::runtime::ExecutionError;
+//! # use exonum_rust_runtime::CallContext;
 //! # use exonum_crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;

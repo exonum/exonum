@@ -257,8 +257,8 @@ impl ServiceApiScope {
 ///     blockchain::Schema,
 ///     crypto::{self, Hash},
 ///     node::ExternalMessage,
-///     runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
 /// };
+/// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 /// use exonum_merkledb::ObjectHash;
 ///
 /// // Declare a type which describes an API specification and implementation.
@@ -320,6 +320,7 @@ impl ServiceApiScope {
 ///         .endpoint("v1/ping", MyApi::ping);
 ///     builder
 /// }
+/// #
 /// # fn main() {
 /// #     use exonum::{blockchain::Blockchain, node::ApiSender, runtime::InstanceDescriptor};
 /// #     use exonum_merkledb::TemporaryDB;

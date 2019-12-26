@@ -28,7 +28,7 @@ use exonum::{
         WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_crypto::{Hash};
+use exonum_crypto::Hash;
 use exonum_derive::exonum_interface;
 use exonum_derive::*;
 use exonum_merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema};
