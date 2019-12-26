@@ -23,7 +23,7 @@
 //! to add new artifacts.
 //!
 //! The Rust runtime does not provide any level of service isolation from the operation system.
-//! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
+//! Therefore, the security audit of the deployed artifacts is up to the node administrators.
 //!
 //! The artifact interface in the Rust runtime is represented by the
 //! [`ServiceFactory`] trait. The trait creates service instances and provides
@@ -248,6 +248,10 @@
 //! # }
 //! ```
 
+pub use exonum::runtime::{
+    DispatcherError, ExecutionError, ExecutionFail, InstanceId, RuntimeIdentifier, WellKnownRuntime,
+};
+
 pub use self::{
     call_context::CallContext,
     error::Error,
@@ -267,9 +271,8 @@ use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
-        catch_panic, ArtifactId, BlockchainData, CallInfo, DispatcherError, ExecutionContext,
-        ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, RuntimeIdentifier, WellKnownRuntime,
+        catch_panic, ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor,
+        InstanceSpec, InstanceStatus, Mailbox, Runtime,
     },
 };
 use exonum_merkledb::Snapshot;

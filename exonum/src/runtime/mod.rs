@@ -630,7 +630,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Returns extensions required for the Supervisor service implementation.
     ///
-    /// Make sure that this method invokes by the instance with the [`SUPERVISOR_INSTANCE_ID`]
+    /// Make sure that this method invoked by the instance with the [`SUPERVISOR_INSTANCE_ID`]
     /// identifier.
     ///
     /// [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html

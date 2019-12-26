@@ -35,11 +35,10 @@ pub mod proto;
 pub mod schema;
 pub mod transactions;
 
-use exonum::{
-    merkledb::BinaryValue,
-    runtime::{DispatcherError, ExecutionError},
+use exonum::merkledb::BinaryValue;
+use exonum_rust_runtime::{
+    api::ServiceApiBuilder, CallContext, DispatcherError, ExecutionError, Service,
 };
-use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
 
 use crate::{
     api::PublicApi as TimestampingApi,

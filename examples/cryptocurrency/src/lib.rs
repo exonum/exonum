@@ -99,9 +99,9 @@ pub mod schema {
 /// Transactions.
 pub mod transactions {
     use exonum::crypto::PublicKey;
+    use exonum_proto::ProtobufConvert;
 
     use super::proto;
-    use exonum_proto::ProtobufConvert;
 
     /// Service configuration parameters.
     #[derive(Clone, Debug)]
@@ -180,8 +180,7 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::runtime::ExecutionError;
-    use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
+    use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, ExecutionError, Service};
 
     use crate::{
         api::CryptocurrencyApi,

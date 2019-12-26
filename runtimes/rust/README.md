@@ -17,8 +17,8 @@ static. The set is defined at the time of compilation. Once the set is created,
 you can change it only by the node binary recompilation.
 
 The Rust runtime does not provide any level of service isolation from the
-operation system. Therefore, the security audit of the artifacts that should be
-deployed is up to the node administrators.
+operation system. Therefore, the security audit of the deployed artifacts
+is up to the node administrators.
 
 ## Usage
 

@@ -20,7 +20,7 @@ use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
 use exonum::{
-    api::{error::MovedPermanentlyError, ApiBuilder, ApiScope},
+    api::{backends::actix, error::MovedPermanentlyError, ApiBuilder, ApiScope},
     blockchain::{Blockchain, Schema as CoreSchema},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
@@ -239,7 +239,7 @@ impl ServiceApiScope {
     }
 
     /// Return a mutable reference to the underlying web backend.
-    pub fn web_backend(&mut self) -> &mut exonum::api::backends::actix::ApiBuilder {
+    pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         self.inner.web_backend()
     }
 }

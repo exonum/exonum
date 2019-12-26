@@ -255,7 +255,7 @@ impl ExonumService {
 
             quote! {
                 #id => {
-                    let arg: #arg_type = exonum_merkledb::BinaryValue::from_bytes(payload.into())
+                    let arg: #arg_type = exonum::merkledb::BinaryValue::from_bytes(payload.into())
                         .map_err(exonum::runtime::DispatcherError::malformed_arguments)?;
                     self.#name(context, arg)
                 }
@@ -310,7 +310,7 @@ impl ExonumService {
                         self,
                         context,
                         #descriptor,
-                        exonum_merkledb::BinaryValue::into_bytes(arg),
+                        exonum::merkledb::BinaryValue::into_bytes(arg),
                     )
                 }
             };
@@ -320,7 +320,7 @@ impl ExonumService {
                         self,
                         context,
                         #descriptor,
-                        exonum_merkledb::BinaryValue::into_bytes(arg),
+                        exonum::merkledb::BinaryValue::into_bytes(arg),
                     )
                 }
             };
