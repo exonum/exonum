@@ -31,7 +31,71 @@ use serde_derive::*;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
+    fmt,
+    sync::{Arc, Mutex, Weak},
+    time::Duration,
 };
+
+#[derive(Debug, Default)]
+pub struct SharedState {
+    inner: Arc<Mutex<SharedStateInner>>,
+}
+
+impl Drop for SharedState {
+    fn drop(&mut self) {
+        // If this is the last instance of the `SharedState`, send termination message
+        // to the server.
+        if Arc::strong_count(&self.inner) == 1 {
+            if let Ok(inner) = self.inner.lock() {
+                if let Some(ref addr) = inner.server_addr {
+                    addr.do_send(Terminate);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SharedStateRef {
+    inner: Weak<Mutex<SharedStateInner>>,
+}
+
+#[derive(Debug, Default)]
+struct SharedStateInner {
+    server_addr: Option<Addr<Server>>,
+}
+
+impl SharedState {
+    pub fn get_ref(&self) -> SharedStateRef {
+        SharedStateRef {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+
+    pub fn broadcast_block(&self, block_hash: Hash) {
+        let inner = self.inner.lock().expect("Cannot lock `SharedState`");
+        if let Some(ref addr) = inner.server_addr {
+            addr.do_send(Broadcast { block_hash });
+        }
+    }
+}
+
+impl SharedStateRef {
+    /// Returns `None` if the service has shut down.
+    pub fn ensure_server(&self, blockchain: &Blockchain) -> Option<Addr<Server>> {
+        let arc = self.inner.upgrade()?;
+        let mut inner = arc.lock().expect("Cannot lock `SharedState`");
+        Some(
+            inner
+                .server_addr
+                .get_or_insert_with(|| {
+                    let blockchain = blockchain.to_owned();
+                    Arbiter::start(|_| Server::new(blockchain))
+                })
+                .clone(),
+        )
+    }
+}
 
 /// Message coming from a websocket connection.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -93,7 +157,7 @@ pub enum Notification {
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]
-pub(crate) enum Message {
+enum Message {
     /// This message will send data to a client.
     Data(String),
     /// This message will terminate a client session.
@@ -102,45 +166,58 @@ pub(crate) enum Message {
 
 /// This message will terminate server.
 #[derive(Message)]
-pub(crate) struct Terminate;
+struct Terminate;
 
 #[derive(Message)]
 #[rtype(u64)]
-pub(crate) struct Subscribe {
-    pub address: Recipient<Message>,
-    pub subscriptions: Vec<SubscriptionType>,
+struct Subscribe {
+    address: Recipient<Message>,
+    subscriptions: Vec<SubscriptionType>,
 }
 
 #[derive(Message)]
-pub(crate) struct Unsubscribe {
+struct Unsubscribe {
     pub id: u64,
 }
 
 #[derive(Message)]
-pub(crate) struct UpdateSubscriptions {
+struct UpdateSubscriptions {
     pub id: u64,
     pub subscriptions: Vec<SubscriptionType>,
 }
 
 #[derive(Message)]
-pub(crate) struct Broadcast {
-    pub block_hash: Hash,
+struct Broadcast {
+    block_hash: Hash,
 }
 
 #[derive(Message)]
 #[rtype("Result<TransactionResponse, failure::Error>")]
-pub(crate) struct Transaction {
+struct Transaction {
     tx: TransactionHex,
 }
 
-pub(crate) struct Server {
-    pub subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
+pub struct Server {
+    subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
     blockchain: Blockchain,
     rng: RefCell<ThreadRng>,
 }
 
+impl fmt::Debug for Server {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Server")
+            .field("subscribers", &self.subscribers.keys().collect::<Vec<_>>())
+            .field("blockchain", &self.blockchain)
+            .finish()
+    }
+}
+
 impl Server {
-    pub fn new(blockchain: Blockchain) -> Self {
+    /// Wait to merge the block.
+    const MERGE_WAIT: Duration = Duration::from_millis(20);
+
+    fn new(blockchain: Blockchain) -> Self {
         Self {
             subscribers: BTreeMap::new(),
             blockchain,
@@ -246,10 +323,18 @@ impl Handler<UpdateSubscriptions> for Server {
 impl Handler<Broadcast> for Server {
     type Result = ();
 
-    fn handle(&mut self, Broadcast { block_hash }: Broadcast, _ctx: &mut Self::Context) {
+    fn handle(&mut self, Broadcast { block_hash }: Broadcast, ctx: &mut Self::Context) {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let block = schema.blocks().get(&block_hash).unwrap();
+        let block = match schema.blocks().get(&block_hash) {
+            Some(block) => block,
+            None => {
+                // The block is not yet merged into the database, which can happen since
+                // `after_commit` is called before the merge. Try again with a slight delay.
+                ctx.notify_later(Broadcast { block_hash }, Self::MERGE_WAIT);
+                return;
+            }
+        };
         let height = block.height;
         let block_header = Notification::Block(block);
 

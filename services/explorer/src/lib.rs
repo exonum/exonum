@@ -14,25 +14,49 @@
 
 //! Exonum explorer service.
 
-use exonum::runtime::rust::{api::ServiceApiBuilder, DefaultInstance, Service};
+use exonum::{
+    merkledb::ObjectHash,
+    runtime::rust::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service},
+};
 use exonum_derive::*;
 
 mod api;
 mod websocket;
 
-use crate::api::ExplorerApi;
+pub use crate::websocket::Notification;
 
-#[derive(Debug, Clone, ServiceFactory, ServiceDispatcher)]
-pub struct ExplorerService;
+use crate::{api::ExplorerApi, websocket::SharedState};
+
+#[derive(Debug, Default, ServiceDispatcher)]
+pub struct ExplorerService {
+    shared_state: SharedState,
+}
 
 impl Service for ExplorerService {
+    fn after_commit(&self, context: AfterCommitContext<'_>) {
+        let block_hash = context.data().for_core().last_block().object_hash();
+        self.shared_state.broadcast_block(block_hash);
+    }
+
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         // FIXME: use custom prefix for the service API
-        ExplorerApi::new(builder.blockchain().to_owned()).wire(builder.public_scope());
+        ExplorerApi::new(builder.blockchain().to_owned())
+            .wire(self.shared_state.get_ref(), builder.public_scope());
     }
 }
 
-impl DefaultInstance for ExplorerService {
+#[derive(Debug, Clone, Copy, ServiceFactory)]
+#[service_factory(service_constructor = "Self::new_instance")]
+pub struct ExplorerFactory;
+
+impl ExplorerFactory {
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(ExplorerService::default())
+    }
+}
+
+impl DefaultInstance for ExplorerFactory {
     const INSTANCE_ID: u32 = 2;
     const INSTANCE_NAME: &'static str = "explorer";
 }

@@ -63,7 +63,7 @@ pub enum Error {
 }
 
 #[exonum_interface]
-pub trait CounterServiceInterface<Ctx> {
+pub trait CounterInterface<Ctx> {
     type Output;
 
     // This method purposely does not check counter overflow in order to test
@@ -72,7 +72,7 @@ pub trait CounterServiceInterface<Ctx> {
     fn reset(&self, ctx: Ctx, _: ()) -> Self::Output;
 }
 
-impl CounterServiceInterface<CallContext<'_>> for CounterService {
+impl CounterInterface<CallContext<'_>> for CounterService {
     type Output = Result<(), ExecutionError>;
 
     fn increment(&self, context: CallContext<'_>, by: u64) -> Self::Output {
@@ -96,7 +96,7 @@ impl CounterServiceInterface<CallContext<'_>> for CounterService {
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_factory(artifact_name = "counter-service", artifact_version = "1.0.0")]
-#[service_dispatcher(implements("CounterServiceInterface"))]
+#[service_dispatcher(implements("CounterInterface"))]
 pub struct CounterService;
 
 impl DefaultInstance for CounterService {
