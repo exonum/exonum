@@ -43,10 +43,6 @@ impl TimeProvider for SystemTimeProvider {
 /// # Examples
 ///
 /// ```
-/// # extern crate exonum;
-/// # extern crate exonum_testkit;
-/// # extern crate exonum_time;
-/// # extern crate chrono;
 /// use chrono::{Utc, Duration, TimeZone};
 /// use exonum::{helpers::Height, runtime::SnapshotExt};
 /// use exonum_testkit::TestKit;

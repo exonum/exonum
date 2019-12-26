@@ -15,6 +15,7 @@
 use chrono::{DateTime, Utc};
 
 use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
+use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     ProofEntry, ProofMapIndex,
