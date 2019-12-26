@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore Trillian, Vogon
+
 use exonum::crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed};
 use exonum::runtime::{
     migrations::{
