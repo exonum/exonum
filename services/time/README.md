@@ -24,10 +24,7 @@ exonum-time = "0.13.0-rc.2"
 Add the time oracle service to the blockchain in the main project file:
 
 ```rust
-extern crate exonum;
-extern crate exonum_cli;
-extern crate exonum_time;
-
+use exonum::helpers::init_logger;
 use exonum_cli::NodeBuilder;
 use exonum_time::TimeServiceFactory;
 use simple_service::MarkerService;

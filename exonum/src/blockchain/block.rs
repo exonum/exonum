@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_derive::{BinaryValue, ObjectHash};
+use exonum_merkledb::{BinaryValue, MapProof};
+use exonum_proto::ProtobufConvert;
 use failure::Error;
 
-use exonum_merkledb::MapProof;
-use exonum_proto::ProtobufConvert;
+use std::{borrow::Cow, fmt};
 
 use crate::{
     crypto::Hash,
@@ -23,8 +25,6 @@ use crate::{
     messages::{Precommit, Verified},
     proto::{self, OrderedMap},
 };
-use exonum_merkledb::BinaryValue;
-use std::{borrow::Cow, fmt};
 
 /// Trait that represents key in block header entry map. Provide
 /// mapping between `NAME` of the entry and its value.
