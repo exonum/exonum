@@ -187,8 +187,16 @@ pub use self::indexes::{
     Entry, Group, ProofEntry,
 };
 
-#[macro_use]
-extern crate failure;
+pub mod access;
+pub mod indexes;
+pub mod migration;
+pub mod validation;
+
+#[cfg(feature = "with-protobuf")]
+pub mod proto;
+
+#[cfg(feature = "with-protobuf")]
+use exonum_proto::ProtobufConvert;
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -204,14 +212,3 @@ mod lazy;
 mod options;
 mod values;
 mod views;
-
-pub mod access;
-pub mod indexes;
-pub mod migration;
-pub mod validation;
-
-#[cfg(feature = "with-protobuf")]
-pub mod proto;
-
-#[cfg(feature = "with-protobuf")]
-use exonum_proto::ProtobufConvert;
