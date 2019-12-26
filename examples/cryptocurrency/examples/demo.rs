@@ -17,8 +17,13 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
-    runtime::{rust::ServiceFactory, RuntimeInstance},
+    runtime::{
+        rust::{DefaultInstance, ServiceFactory},
+        RuntimeInstance,
+    },
 };
+use exonum_explorer_service::ExplorerFactory;
+
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
 fn node_config() -> NodeConfig {
@@ -65,14 +70,17 @@ fn node_config() -> NodeConfig {
 fn main() {
     exonum::helpers::init_logger().unwrap();
     let external_runtimes: Vec<RuntimeInstance> = vec![];
-    let service = CryptocurrencyService;
-    let artifact_id = service.artifact_id();
-    let services = vec![service.into()];
+
     let node_config = node_config();
+    let artifact_id = CryptocurrencyService.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_config.consensus.clone())
+        .with_artifact(ExplorerFactory.artifact_id())
+        .with_instance(ExplorerFactory.default_instance())
         .with_artifact(artifact_id.clone())
         .with_instance(artifact_id.into_default_instance(1, "cryptocurrency"))
         .build();
+
+    let services = vec![ExplorerFactory.into(), CryptocurrencyService.into()];
 
     println!("Creating database in temporary dir...");
     let node = Node::new(

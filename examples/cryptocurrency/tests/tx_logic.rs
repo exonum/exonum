@@ -29,7 +29,7 @@ use exonum_testkit::TestKit;
 use exonum_cryptocurrency::{
     contracts::{CryptocurrencyInterface, CryptocurrencyService},
     schema::{CurrencySchema, Wallet},
-    transactions::{Config, CreateWallet, TxTransfer},
+    transactions::{CreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
@@ -249,7 +249,7 @@ fn test_fuzz_transfers() {
 
 /// Initializes testkit with `CurrencyService`.
 fn init_testkit() -> TestKit {
-    TestKit::for_rust_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, Config)
+    TestKit::for_rust_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, ())
 }
 
 /// Returns the wallet identified by the given public key or `None` such wallet doesn't exist.

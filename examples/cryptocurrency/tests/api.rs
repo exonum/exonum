@@ -27,16 +27,20 @@ use exonum::{
     api,
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
+    runtime::rust::ServiceFactory,
 };
+use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi};
+use exonum_testkit::{
+    explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi, TestKitBuilder,
+};
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
     api::WalletQuery,
     contracts::{CryptocurrencyInterface, CryptocurrencyService},
     schema::Wallet,
-    transactions::{Config, CreateWallet, TxTransfer},
+    transactions::{CreateWallet, TxTransfer},
 };
 
 // Imports shared test constants.
@@ -336,8 +340,13 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let mut testkit =
-        TestKit::for_rust_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, Config);
+    let artifact = CryptocurrencyService.artifact_id();
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(ExplorerFactory)
+        .with_rust_service(CryptocurrencyService)
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
+        .create();
     let api = CryptocurrencyApi {
         inner: testkit.api(),
     };
