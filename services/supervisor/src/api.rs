@@ -82,15 +82,16 @@ impl From<DeployRequest> for DeployInfoQuery {
 }
 
 /// Response with deploy status for a certain deploy request.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct DeployResponse {
     /// State of deployment.
-    pub state: DeployState,
+    pub state: Option<DeployState>,
 }
 
-impl From<DeployState> for DeployResponse {
-    fn from(state: DeployState) -> Self {
+impl DeployResponse {
+    /// Creates a new `DeployResponse` object.
+    pub fn new(state: Option<DeployState>) -> Self {
         Self { state }
     }
 }
@@ -175,12 +176,9 @@ impl PrivateApi for ApiImpl<'_> {
     fn deploy_status(&self, query: DeployInfoQuery) -> Result<DeployResponse, Self::Error> {
         let request = DeployRequest::try_from(query)?;
         let schema = Schema::new(self.0.service_data());
-        let status = schema
-            .deploy_states
-            .get(&request)
-            .unwrap_or(DeployState::NotRequested);
+        let status = schema.deploy_states.get(&request);
 
-        Ok(status.into())
+        Ok(DeployResponse::new(status))
     }
 }
 

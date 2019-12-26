@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum::{
+    crypto::PublicKey,
     helpers::{Height, ValidateInput},
     runtime::{
         rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec,
@@ -325,10 +326,10 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
         let current_height = core_schema.height();
 
-        let mut schema = Schema::new(context.service_data());
+        let schema = Schema::new(context.service_data());
 
         // Check if deployment already failed.
-        if let Some(DeployState::Failed(_, _)) = schema.deploy_states.get(&deploy_result.request) {
+        if let Some(DeployState::Failed(..)) = schema.deploy_states.get(&deploy_result.request) {
             // This deployment is already resulted in failure, no further
             // processing needed.
             return Ok(());
@@ -351,41 +352,10 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             return Err(Error::DeadlineExceeded.into());
         }
 
-        match deploy_result.result {
-            Ok(()) => {
-                let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
-                let validator_count = core_schema.consensus_config().validator_keys.len();
-                if confirmations == validator_count {
-                    log::trace!(
-                        "Registering deployed artifact in dispatcher {:?}",
-                        deploy_request.artifact
-                    );
-
-                    // Remove artifact from pending deployments.
-                    schema.pending_deployments.remove(&deploy_request.artifact);
-                    schema
-                        .deploy_states
-                        .put(&deploy_request, DeployState::Succeed);
-                    // We have enough confirmations to register the deployed artifact in the dispatcher;
-                    // if this action fails, this transaction will be canceled.
-                    context.start_artifact_registration(
-                        deploy_request.artifact,
-                        deploy_request.spec,
-                    )?;
-                }
-            }
-            Err(error) => {
-                // Mark deploy as failed.
-                let cause = DeployFailCause::DeployError(error);
-                schema
-                    .deploy_states
-                    .put(&deploy_request, DeployState::Failed(current_height, cause));
-
-                // Remove artifact from pending deployments: since we require
-                // a confirmation from every node, failure for one node means failure
-                // for the whole network.
-                schema.pending_deployments.remove(&deploy_request.artifact);
-            }
+        drop(schema);
+        match deploy_result.result.0 {
+            Ok(()) => self.confirm_deploy(context, deploy_request, author)?,
+            Err(error) => self.fail_deploy(context, deploy_request, error),
         }
         Ok(())
     }
@@ -450,5 +420,59 @@ impl Supervisor {
             }
         }
         Ok(())
+    }
+
+    /// Confirms a deploy by the given author's public key and checks
+    /// if all the confirmations are collected. If so, starts the artifact registration.
+    fn confirm_deploy(
+        &self,
+        context: CallContext<'_>,
+        deploy_request: DeployRequest,
+        author: PublicKey,
+    ) -> Result<(), ExecutionError> {
+        let core_schema = context.data().for_core();
+
+        let mut schema = Schema::new(context.service_data());
+
+        let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        if confirmations == validator_count {
+            log::trace!(
+                "Registering deployed artifact in dispatcher {:?}",
+                deploy_request.artifact
+            );
+
+            // Remove artifact from pending deployments.
+            schema.pending_deployments.remove(&deploy_request.artifact);
+            schema
+                .deploy_states
+                .put(&deploy_request, DeployState::Succeed);
+            // We have enough confirmations to register the deployed artifact in the dispatcher;
+            // if this action fails, this transaction will be canceled.
+            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+        }
+        Ok(())
+    }
+
+    /// Marks deployment as failed, discarding the furthing deployment steps.
+    fn fail_deploy(
+        &self,
+        context: CallContext<'_>,
+        deploy_request: DeployRequest,
+        error: ExecutionError,
+    ) {
+        let height = context.data().for_core().height();
+        let mut schema = Schema::new(context.service_data());
+
+        // Mark deploy as failed.
+        let cause = DeployFailCause::DeployError { height, error };
+        schema
+            .deploy_states
+            .put(&deploy_request, DeployState::Failed(cause));
+
+        // Remove artifact from pending deployments: since we require
+        // a confirmation from every node, failure for one node means failure
+        // for the whole network.
+        schema.pending_deployments.remove(&deploy_request.artifact);
     }
 }

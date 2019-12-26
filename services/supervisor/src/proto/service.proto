@@ -38,10 +38,7 @@ message DeployResult {
   // Artifact identifier.
   DeployRequest request = 1;
   // Result of deployment.
-  oneof result {
-    google.protobuf.Empty success = 2;
-    exonum.runtime.ExecutionError error = 3;
-  }
+  exonum.runtime.ExecutionStatus result = 2;
 }
 
 // Request for the start service instance.

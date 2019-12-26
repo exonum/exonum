@@ -305,10 +305,9 @@ impl Service for Supervisor {
             schema.pending_deployments.remove(&request.artifact);
             if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
                 // If state is marked as pending, change it to failed as well.
-                schema.deploy_states.put(
-                    &request,
-                    DeployState::Failed(request.deadline_height, DeployFailCause::Deadline),
-                );
+                schema
+                    .deploy_states
+                    .put(&request, DeployState::Failed(DeployFailCause::Deadline));
             }
             log::trace!("Removed outdated deployment request {:?}", request);
         }
@@ -371,7 +370,7 @@ impl Service for Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    if schema.deploy_states.get(&request) == Some(DeployState::Pending) {
+                    if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
                         // From all pending requests we are interested only in ones not
                         // confirmed by us.
                         !schema

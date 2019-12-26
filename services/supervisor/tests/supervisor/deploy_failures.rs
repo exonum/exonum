@@ -206,7 +206,7 @@ fn build_result_transaction(
                 SUPERVISOR_INSTANCE_ID,
                 DeployResult {
                     request: request.clone(),
-                    result,
+                    result: result.into(),
                 },
             )
         })
@@ -214,8 +214,11 @@ fn build_result_transaction(
 }
 
 /// Creates `DeployFailCause` for planned error of `FailingRuntime`.
-fn fail_cause() -> DeployFailCause {
-    DeployFailCause::DeployError(FailingRuntimeError::PlannedError.into())
+fn fail_cause(height: Height) -> DeployFailCause {
+    DeployFailCause::DeployError {
+        error: FailingRuntimeError::PlannedError.into(),
+        height,
+    }
 }
 
 /// Sends a deploy request through API.
@@ -233,6 +236,53 @@ fn get_deploy_status(api: &TestKitApi, request: &DeployRequest) -> DeployRespons
         .query(&query)
         .get("deploy-status")
         .expect("Call for `deploy-status` API endpoint failed")
+}
+
+// Verifies that two `DeployState` objects are equal, behaving similar
+// to `assert_eq`.
+// This function is required, since `DeployState` doesn't implement `PartialEq`.
+fn assert_deploy_state(actual: DeployState, expected: DeployState) {
+    use DeployState::*;
+    match (&actual, &expected) {
+        // Same variants, no actions needed.
+        (Pending, Pending)
+        | (Succeed, Succeed)
+        | (Failed(DeployFailCause::Deadline), Failed(DeployFailCause::Deadline)) => {}
+        // Failures caused by error, check that inner content equals.
+        (
+            Failed(left @ DeployFailCause::DeployError { .. }),
+            Failed(right @ DeployFailCause::DeployError { .. }),
+        ) => {
+            let assertion_failure_msg = format!(
+                "Different deploy states, got {:?}, expected {:?}",
+                actual, expected
+            );
+
+            // Compare height.
+            assert_eq!(
+                left.height().unwrap(),
+                right.height().unwrap(),
+                "{}",
+                &assertion_failure_msg,
+            );
+
+            // Compare errors, casting the expected one to match.
+            assert_eq!(
+                left.execution_error().unwrap(),
+                right.execution_error().unwrap().to_match(),
+                "{}",
+                &assertion_failure_msg,
+            )
+        }
+        // Non-symmetric variants.
+        _ => {
+            assert!(
+                false,
+                "Deploy states are not equal, got {:?}, expected {:?}",
+                actual, expected
+            );
+        }
+    }
 }
 
 /// Test for self-checking the `FailingRuntime` concept and `deploy-status` endpoint.
@@ -255,7 +305,8 @@ fn deploy_success() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Confirm deploy.
     let result = Ok(());
@@ -267,7 +318,8 @@ fn deploy_success() {
     // Check that status is `Succeed`.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Succeed);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Succeed);
 }
 
 /// Checks that deployment fails if there was no enough confirmations
@@ -289,7 +341,8 @@ fn deploy_failure_because_not_confirmed() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Do NOT confirm a deploy.
     testkit.create_blocks_until(DEPLOY_HEIGHT.next());
@@ -297,10 +350,8 @@ fn deploy_failure_because_not_confirmed() {
     // Check that status is `Failed` at the deadline height.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(
-        response.state,
-        DeployState::Failed(DEPLOY_HEIGHT, DeployFailCause::Deadline)
-    );
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Failed(DeployFailCause::Deadline));
 }
 
 /// Checks that if deployment attempt fails for our node, the deploy
@@ -322,7 +373,8 @@ fn deploy_failure_because_cannot_deploy() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
     let result = Ok(());
@@ -336,7 +388,8 @@ fn deploy_failure_because_cannot_deploy() {
     // `after_commit`, thus height is 2.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(2), fail_cause()));
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Failed(fail_cause(Height(2))));
 }
 
 /// This test has the same idea as `deploy_failure_because_not_confirmed`,
@@ -366,7 +419,8 @@ fn deploy_failure_check_no_extra_actions() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
     let result = Ok(());
@@ -380,7 +434,8 @@ fn deploy_failure_check_no_extra_actions() {
 
     // Check that deployment is already marked as failed.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(2), fail_cause()));
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Failed(fail_cause(Height(2))));
 
     // Ensure that there are no more transactions until the deadline height.
     // This is sufficient, since after any deploy attempt we are sending a transaction
@@ -395,7 +450,8 @@ fn deploy_failure_check_no_extra_actions() {
     // it should not change.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Failed(Height(2), fail_cause()));
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Failed(fail_cause(Height(2))));
 }
 
 /// Checks that if other node sends a failure report, deployment fails as well.
@@ -416,7 +472,8 @@ fn deploy_failure_because_other_node_cannot_deploy() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
     let error: ExecutionError = FailingRuntimeError::GenericError.into();
@@ -430,8 +487,12 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    let fail_cause = DeployFailCause::DeployError(error);
-    assert_eq!(response.state, DeployState::Failed(Height(1), fail_cause));
+    let fail_cause = DeployFailCause::DeployError {
+        height: Height(1),
+        error,
+    };
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Failed(fail_cause));
 }
 
 /// Checks that after unsuccessful deploy attempt we can perform another try and it can
@@ -458,7 +519,8 @@ fn deploy_successfully_after_failure() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
     let error: ExecutionError = FailingRuntimeError::GenericError.into();
@@ -472,8 +534,12 @@ fn deploy_successfully_after_failure() {
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    let fail_cause = DeployFailCause::DeployError(error);
-    assert_eq!(response.state, DeployState::Failed(Height(1), fail_cause));
+    let fail_cause = DeployFailCause::DeployError {
+        height: Height(1),
+        error,
+    };
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Failed(fail_cause));
 
     // 2. Update the deadline height and perform the same routine as in `deploy_success`:
     // - attempt to deploy the same artifact;
@@ -497,7 +563,8 @@ fn deploy_successfully_after_failure() {
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Pending);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Pending);
 
     // Confirm deploy.
     let result = Ok(());
@@ -509,7 +576,8 @@ fn deploy_successfully_after_failure() {
     // Check that status is `Succeed`.
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::Succeed);
+    let state = response.state.expect("There should be a state for request");
+    assert_deploy_state(state, DeployState::Succeed);
 }
 
 /// Checks that `deploy-status` returns `NotRequested` for unknown requests.
@@ -525,5 +593,8 @@ fn not_requested_deploy_status() {
     };
 
     let response = get_deploy_status(&api, &deploy_request);
-    assert_eq!(response.state, DeployState::NotRequested);
+    assert!(
+        response.state.is_none(),
+        "There should be no state for unknown request"
+    );
 }
