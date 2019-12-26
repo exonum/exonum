@@ -454,7 +454,7 @@ impl Supervisor {
         Ok(())
     }
 
-    /// Marks deployment as failed, discarding the furthing deployment steps.
+    /// Marks deployment as failed, discarding the further deployment steps.
     fn fail_deploy(
         &self,
         context: CallContext<'_>,
