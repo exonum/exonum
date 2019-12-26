@@ -1,3 +1,29 @@
-external_address = "127.0.0.1:8002"
-listen_address = "0.0.0.0:8002"
+external_address = "127.0.0.1:5401"
+listen_address = "0.0.0.0:5401"
 master_key_path = "master.key.toml"
+
+[api]
+state_update_timeout = 10000
+
+[connect_list]
+peers = []
+
+[database]
+compression_type = "none"
+create_if_missing = true
+[mempool.events_pool_capacity]
+api_requests_capacity = 1024
+internal_events_capacity = 128
+network_events_capacity = 512
+network_requests_capacity = 512
+
+[network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
+
+[network.http_backend_config]
+server_restart_max_retries = 20
+server_restart_retry_timeout = 500

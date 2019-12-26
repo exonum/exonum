@@ -33,13 +33,15 @@ class ExonumNetwork:
         # Cleanup after use.
         self._app_dir.remove()
 
-    def generate_template(self, validators_count: int) -> None:
+    def generate_template(self, validators_count: int, supervisor_mode: str = "simple") -> None:
         """Runs `generate-template` command."""
         common_config = self._common_config()
 
-        # {exonum-app} generate-template example/common.toml --validators-count 4
+        # {exonum-app} generate-template example/common.toml \
+        #   --validators-count 4 --supervisor-mode simple
         args = [common_config]
         args.append(f"--validators-count {validators_count}")
+        args.append(f"--supervisor-mode {supervisor_mode}")
 
         self._run_command("generate-template", args)
 

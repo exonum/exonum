@@ -90,21 +90,24 @@
 pub use structopt;
 
 use exonum::{
-    blockchain::config::GenesisConfigBuilder,
+    blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
     runtime::{rust::ServiceFactory, RuntimeInstance, WellKnownRuntime},
 };
-use exonum_supervisor::Supervisor;
+use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
 
-use crate::command::{Command, ExonumCommand, StandardResult};
+use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
+use crate::config_manager::DefaultConfigManager;
 
 pub mod command;
 pub mod config;
 pub mod io;
 pub mod password;
+
+mod config_manager;
 
 /// Rust-specific node builder used for constructing a node with a list
 /// of provided services.
@@ -142,33 +145,46 @@ impl NodeBuilder {
 
         if let StandardResult::Run(run_config) = command.execute()? {
             // Add builtin services to genesis config.
+            let supervisor = Self::supervisor_service(&run_config);
             let genesis_config = GenesisConfigBuilder::with_consensus_config(
-                run_config.node_config.consensus.clone(),
+                run_config.node_config.public_config.consensus.clone(),
             )
             .with_artifact(Supervisor.artifact_id())
-            .with_instance(Supervisor::simple())
+            .with_instance(supervisor)
             .build();
 
             let mut services: Vec<Box<dyn ServiceFactory>> = vec![Supervisor.into()];
             services.extend(self.services);
 
-            let db_options = &run_config.node_config.database;
+            let db_options = &run_config.node_config.private_config.database;
             let database: Arc<dyn Database> =
                 Arc::new(RocksDB::open(run_config.db_path, db_options)?);
 
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
+            let config_manager = Box::new(DefaultConfigManager::new(node_config_path));
+
             let node = Node::new(
                 database,
                 self.external_runtimes,
                 services,
-                run_config.node_config,
+                run_config.node_config.into(),
                 genesis_config,
-                Some(node_config_path),
+                Some(config_manager),
             );
 
             node.run()
         } else {
             Ok(())
         }
+    }
+
+    fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {
+        let mode = run_config
+            .node_config
+            .public_config
+            .general
+            .supervisor_mode
+            .clone();
+        Supervisor::builtin_instance(SupervisorConfig { mode })
     }
 }
