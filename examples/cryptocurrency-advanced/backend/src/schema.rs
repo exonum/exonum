@@ -14,12 +14,12 @@
 
 //! Cryptocurrency database schema.
 
+use exonum_crypto::{Hash, PublicKey};
+use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,
 };
-
-use exonum::crypto::{Hash, PublicKey};
 
 use crate::{wallet::Wallet, INITIAL_BALANCE};
 

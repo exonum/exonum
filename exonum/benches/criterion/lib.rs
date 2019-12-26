@@ -13,11 +13,9 @@
 // limitations under the License.
 
 #[macro_use]
-extern crate criterion;
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
+
+use criterion::{criterion_group, criterion_main};
 
 use crate::block::bench_block;
 use crate::crypto::bench_crypto;

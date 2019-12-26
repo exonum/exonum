@@ -213,7 +213,6 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 ///
 /// In `src/proto/mod.rs`
 /// ```ignore
-/// extern crate exonum;
 ///
 /// include!(concat!(env!("OUT_DIR"), "/example_mod.rs"));
 ///
