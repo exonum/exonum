@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::Schema as CoreSchema,
     helpers::Height,
     runtime::{
         BlockchainData, CallInfo, Caller, DispatcherError, ExecutionContext,
@@ -92,17 +91,6 @@ impl<'a> CallContext<'a> {
         }
 
         self.inner.supervisor_extensions()
-    }
-
-    /// Provides writeable access to core schema.
-    ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`writeable_core_schema` called within a non-supervisor service");
-        }
-        CoreSchema::new(self.inner.fork)
     }
 
     fn make_child_call<'q>(

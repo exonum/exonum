@@ -163,7 +163,7 @@ use std::fmt;
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 
 use crate::{
-    blockchain::Blockchain,
+    blockchain::{Blockchain, Schema as CoreSchema},
     crypto::{Hash, PublicKey},
     helpers::ValidateInput,
 };
@@ -768,6 +768,11 @@ impl<'a> SupervisorExtensions<'a> {
     /// the stopping transaction is committed.
     pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
+    }
+
+    /// Provides writeable access to core schema.
+    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
+        CoreSchema::new(self.0.fork)
     }
 }
 

@@ -122,6 +122,7 @@ fn update_configs(
                 log::trace!("Updating consensus configuration {:?}", config);
 
                 context
+                    .supervisor_extensions()
                     .writeable_core_schema()
                     .consensus_config_entry()
                     .set(config);

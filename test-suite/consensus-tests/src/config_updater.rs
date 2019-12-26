@@ -44,8 +44,9 @@ pub struct ConfigUpdaterService;
 impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
     type Output = Result<(), ExecutionError>;
 
-    fn update_config(&self, ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
-        ctx.writeable_core_schema()
+    fn update_config(&self, mut ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
+        ctx.supervisor_extensions()
+            .writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
