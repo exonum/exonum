@@ -15,7 +15,7 @@
 //! Cryptocurrency database schema.
 
 use exonum_crypto::{Hash, PublicKey};
-use exonum_derive::FromAccess;
+use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,

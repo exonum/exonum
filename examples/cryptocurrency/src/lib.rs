@@ -42,7 +42,10 @@ mod tx_tests;
 pub mod schema {
     use exonum_crypto::PublicKey;
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use exonum_merkledb::{access::Access, MapIndex};
+    use exonum_merkledb::{
+        access::{Access, FromAccess},
+        MapIndex,
+    };
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -51,6 +54,7 @@ pub mod schema {
     // See [serialization docs][1] for details.
     //
     // [1]: https://exonum.com/doc/version/latest/architecture/serialization
+
     /// Wallet struct used to persist data within the service.
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
