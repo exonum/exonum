@@ -56,11 +56,7 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
         .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();
 
-    let with_runtimes = |notifier| {
-        vec![RustRuntime::new(notifier)
-            .with_available_service(service)
-            .into()]
-    };
+    let with_runtimes = |notifier| vec![RustRuntime::new(notifier).with_factory(service).into()];
 
     let node = Node::new(
         TemporaryDB::new(),
@@ -155,7 +151,7 @@ fn test_send_transaction() {
         response,
         json!({
             "result": "error",
-            "description": "Execution error `dispatcher:7` occurred: Suitable runtime \
+            "description": "Execution error with code `dispatcher:7` occurred: Suitable runtime \
              for the given service instance ID is not found."
         })
     );

@@ -292,8 +292,7 @@ fn main() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .build();
-    let rust_runtime =
-        RustRuntime::new(channel.endpoints.0.clone()).with_available_service(Supervisor);
+    let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())

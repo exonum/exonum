@@ -92,9 +92,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
                 .build();
 
         let with_runtimes = |notifier| -> Vec<RuntimeInstance> {
-            vec![RustRuntime::new(notifier)
-                .with_available_service(service)
-                .into()]
+            vec![RustRuntime::new(notifier).with_factory(service).into()]
         };
 
         let node = Node::new(
@@ -149,9 +147,7 @@ fn test_node_restart_regression() {
                 .build();
 
         let with_runtimes = |notifier| -> Vec<RuntimeInstance> {
-            vec![RustRuntime::new(notifier)
-                .with_available_service(service)
-                .into()]
+            vec![RustRuntime::new(notifier).with_factory(service).into()]
         };
 
         let node = Node::new(db, with_runtimes, node_cfg, genesis_config, None);

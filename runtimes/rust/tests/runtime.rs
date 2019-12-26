@@ -512,10 +512,10 @@ fn create_runtime(
 ) -> Result<(BlockchainMut, EventsHandle), failure::Error> {
     let inspected = Inspected::new(
         RustRuntime::new(mpsc::channel(1).0)
-            .with_available_service(TestServiceImpl)
-            .with_available_service(TestServiceImplV2)
-            .with_available_service(ToySupervisorService)
-            .with_available_service(DependentServiceImpl),
+            .with_factory(TestServiceImpl)
+            .with_factory(TestServiceImplV2)
+            .with_factory(ToySupervisorService)
+            .with_factory(DependentServiceImpl),
     );
     let events_handle = inspected.events.clone();
 

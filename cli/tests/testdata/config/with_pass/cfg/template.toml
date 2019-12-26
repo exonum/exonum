@@ -9,5 +9,5 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [general]
+supervisor_mode = "simple"
 validators_count = 1
-

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The runtime is for running native services written in Rust.
+//! The current runtime is for running native services written in Rust.
 //!
 //! In the Rust runtime a set of service artifacts that you may want to deploy is static. The set
 //! is defined at the time of compilation. Once the set is created, you can change it only by
@@ -38,12 +38,14 @@
 //! ```
 //! use exonum::{
 //!     proto::schema::doc_tests,
-//!     runtime::{BlockchainData, ExecutionError},
+//!     runtime::{
+//!         rust::{CallContext, Service},
+//!         BlockchainData, ExecutionError,
+//!     },
 //! };
 //! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
-//! use exonum_rust_runtime::{CallContext, Service};
 //! use exonum_crypto::Hash;
 //!
 //! // Determine the types of data that will be used in service transactions.
@@ -110,11 +112,10 @@
 //! prototyping.
 //!
 //! ```
-//! # use exonum::runtime::{BlockchainData, ExecutionError};
+//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
 //! # use exonum_crypto::Hash;
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! # use exonum_merkledb::Snapshot;
-//! # use exonum_rust_runtime::{CallContext, Service};
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //! #   type Output;
@@ -197,8 +198,7 @@
 //! ## Interface usage
 //!
 //! ```
-//! # use exonum::runtime::ExecutionError;
-//! # use exonum_rust_runtime::CallContext;
+//! # use exonum::runtime::{rust::CallContext, ExecutionError};
 //! # use exonum_crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;
@@ -268,8 +268,8 @@ use exonum::{
     helpers::Height,
     runtime::{
         catch_panic, ArtifactId, BlockchainData, CallInfo, DispatcherError, ExecutionContext,
-        ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
-        Runtime, RuntimeIdentifier, WellKnownRuntime,
+        ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -348,28 +348,13 @@ impl RustRuntime {
             .expect("Method called before Rust runtime is initialized")
     }
 
-    /// Adds a new available to deploy service factory to the runtime and returns
+    /// Adds a new service factory to the runtime and returns
     /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_service(
-        mut self,
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
-    ) -> Self {
+    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
         let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         trace!("Added available artifact {}", artifact);
         self.available_artifacts.insert(artifact, service_factory);
-        self
-    }
-
-    /// Adds a new available to deploy service factories to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_available_services(
-        mut self,
-        service_factories: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
-    ) -> Self {
-        for factory in service_factories {
-            self = self.with_available_service(factory);
-        }
         self
     }
 
@@ -389,7 +374,13 @@ impl RustRuntime {
             return Err(DispatcherError::ArtifactAlreadyDeployed.into());
         }
         if !self.available_artifacts.contains_key(&artifact) {
-            return Err(Error::UnableToDeploy.into());
+            let description = format!(
+                "Runtime failed to deploy artifact with id {}, \
+                 it is not listed among available artifacts. Available artifacts: {}",
+                artifact,
+                self.artifacts_to_pretty_string()
+            );
+            return Err(Error::UnableToDeploy.with_description(description));
         }
 
         trace!("Deployed artifact: {}", artifact);
@@ -446,6 +437,18 @@ impl RustRuntime {
             }
         }
         self.changed_services_since_last_block = false;
+    }
+
+    fn artifacts_to_pretty_string(&self) -> String {
+        if self.available_artifacts.is_empty() {
+            return "None".to_string();
+        }
+
+        self.available_artifacts
+            .keys()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", ")
     }
 }
 

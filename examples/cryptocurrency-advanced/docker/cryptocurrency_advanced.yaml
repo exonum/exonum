@@ -22,8 +22,8 @@ supervisor_mode: "simple"
 artifacts:
   cryptocurrency:
     runtime: rust
-    name: "exonum-cryptocurrency-advanced:0.13.0-rc.2"
-
+    name: "exonum-cryptocurrency-advanced"
+    version: "0.13.0-rc.2"
 instances:
   crypto:
     artifact: cryptocurrency

@@ -73,11 +73,7 @@ fn main() {
         .with_instance(artifact_id.into_default_instance(1, "cryptocurrency"))
         .build();
 
-    let with_runtimes = |notifier| {
-        vec![RustRuntime::new(notifier)
-            .with_available_service(service)
-            .into()]
-    };
+    let with_runtimes = |notifier| vec![RustRuntime::new(notifier).with_factory(service).into()];
 
     println!("Creating database in temporary dir...");
     let node = Node::new(

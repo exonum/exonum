@@ -39,7 +39,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `after_transactions` hook is now invoked on the genesis block for the builtin
   services. Note that calling `blockchain::Schema::height` within `after_transactions`
   hook will cause a panic for a builtin service. (#1619)
-
 - `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
 
 - Interaction with services from the Rust runtime has been changed. Instead of
@@ -47,6 +46,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   directly as Rust traits. These interface traits can be applied to a keypair
   (to generate signed transactions), to `CallContext` (to call another service)
   and some other types. See Rust runtime docs for more details. (#1606)
+
 - The following public APIs were removed/made private: (#1629)
   - `blockchain::{error reexports}` (available from `runtime::`);
   - `blockchain::FatalError` public re-export;
@@ -67,11 +67,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `runtime::error` module (`catch_panic` was added to the list of public
     re-exports from `runtime::error`).
 
-#### exonum-merkledb
+- The artifact identifier now has first-class semantic version. Previously, it was
+  specific to the Rust runtime. (#1590)
 
-- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
+- The `name` field of the artifact identifier cannot contain `:` symbol. (#1590)
 
-- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
+- The format of the `proto-sources` endpoint in the Rust runtime has been changed.
+  To get the core Protobuf sources, use the endpoint with the `type=core` query.
+  To get the sources of an artifact, use query `type=artifact&name=$name&version=$version`,
+  where `$name` and `$version` are replaced with appropriate values. (#1590)
+
+#### exonum-cli
+
+- `supervisor-mode` parameter has been added for `generate-template` subcommand.
+  (#1598)
 
 #### exonum-supervisor
 
@@ -81,6 +90,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - The crate has been restructured, indexes are now located in separate module.
 Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
+
+- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
 
 ### exonum-testkit
 
@@ -97,6 +110,15 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `ErrorMatch` was introduced to test (e.g., using the testkit) that
   an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
+- We introduced a set of public endpoints to retrieve the status of calls
+  executed within a block:
+  - `v1/call_status/transaction` - gets the status of a transaction,
+  - `v1/call_status/before_transactions` - gets the status of a `before_transactions`
+   hook,
+  - `v1/call_status/after_transactions` - gets the status of an `after_transactions`
+   hook.
+  (#1612)
 
 - Service instances can now be stopped.
 
@@ -149,6 +171,12 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   
 - `ConfigChange::StopService` has been added to make requests to stop the service
   instance. (#1605)  
+
+#### exonum-middleware-service
+
+- Added *middleware* service that can batch transactions and perform checked calls
+  (calls that are executed if the target service corresponds to a specific
+  artifact and version requirement). (#1590)
 
 ### Internal Improvements
 

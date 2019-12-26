@@ -252,9 +252,7 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
 }
 
 fn add_available_services(runtime: RustRuntime) -> RustRuntime {
-    runtime
-        .with_available_service(IncService)
-        .with_available_service(Supervisor)
+    runtime.with_factory(IncService).with_factory(Supervisor)
 }
 
 /// Just test that the Inc service works as intended.

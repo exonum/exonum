@@ -17,17 +17,21 @@
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{
-    api::backends::actix::AllowOrigin,
-    crypto::{PublicKey, PUBLIC_KEY_LENGTH},
-    helpers::config::{ConfigFile, ConfigManager},
-    node::{ConnectInfo, ConnectListConfig, NodeConfig},
+use exonum::{api::backends::actix::AllowOrigin, blockchain::ValidatorKeys, crypto::gen_keypair};
+use exonum_cli::{
+    command::{
+        finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
+        run::Run, Command, ExonumCommand, StandardResult,
+    },
+    config::{GeneralConfig, NodePrivateConfig, NodePublicConfig},
+    io::{load_config_file, save_config_file},
+    password::DEFAULT_MASTER_PASS_ENV_VAR,
 };
-use exonum_cli::command::{Command, ExonumCommand, StandardResult};
+use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::*;
 use structopt::StructOpt;
+use tempfile::TempDir;
 
-use exonum_cli::password::DEFAULT_MASTER_PASS_ENV_VAR;
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
@@ -36,8 +40,8 @@ use std::{
     fs::{self, OpenOptions},
     panic,
     path::{Path, PathBuf},
+    str::FromStr,
 };
-use tempfile::TempDir;
 
 #[derive(Debug)]
 struct ConfigSpec {
@@ -102,17 +106,17 @@ impl ConfigSpec {
         self.output_dir().join(index.to_string())
     }
 
-    fn output_sec_config(&self, index: usize) -> PathBuf {
+    fn output_private_config(&self, index: usize) -> PathBuf {
         self.output_node_config_dir(index).join("sec.toml")
     }
 
-    fn output_pub_config(&self, index: usize) -> PathBuf {
+    fn output_public_config(&self, index: usize) -> PathBuf {
         self.output_node_config_dir(index).join("pub.toml")
     }
 
     fn output_pub_configs(&self) -> Vec<PathBuf> {
         (0..self.validators_count)
-            .map(|i| self.output_pub_config(i))
+            .map(|i| self.output_public_config(i))
             .collect()
     }
 
@@ -208,13 +212,9 @@ fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<(), fail
     Ok(())
 }
 
-fn load_node_config(path: impl AsRef<Path>) -> NodeConfig {
-    ConfigFile::load(path).expect("Can't load node config file")
-}
-
 fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
-    let cfg_1: toml::Value = ConfigFile::load(&path_1).unwrap();
-    let cfg_2: toml::Value = ConfigFile::load(&path_2).unwrap();
+    let cfg_1: toml::Value = load_config_file(&path_1).unwrap();
+    let cfg_2: toml::Value = load_config_file(&path_2).unwrap();
     assert_eq!(
         cfg_1,
         cfg_2,
@@ -222,16 +222,6 @@ fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
         path_1.as_ref(),
         path_2.as_ref()
     );
-}
-
-// Special case for NodeConfig because it uses absolute paths for secret key files.
-fn assert_node_config_files_eq(actual: impl AsRef<Path>, expected: impl AsRef<Path>) {
-    let (actual, expected) = (actual.as_ref(), expected.as_ref());
-
-    let actual = load_node_config(actual);
-    let expected = load_node_config(expected);
-
-    assert_eq!(actual, expected);
 }
 
 #[test]
@@ -265,6 +255,20 @@ fn test_generate_template() {
     env.command("generate-template")
         .with_arg(&output_template_file)
         .with_named_arg("--validators-count", env.validators_count.to_string())
+        .with_named_arg("--supervisor-mode", "simple")
+        .run()
+        .unwrap();
+    assert_config_files_eq(&output_template_file, env.expected_template_file());
+}
+
+#[test]
+fn test_generate_template_simple_supervisor() {
+    let env = ConfigSpec::new_without_pass();
+    let output_template_file = env.output_template_file();
+    env.command("generate-template")
+        .with_arg(&output_template_file)
+        .with_named_arg("--validators-count", env.validators_count.to_string())
+        .with_named_arg("--supervisor-mode", "simple")
         .run()
         .unwrap();
     assert_config_files_eq(&output_template_file, env.expected_template_file());
@@ -282,8 +286,8 @@ fn test_generate_config_key_files() {
         .run()
         .unwrap();
 
-    let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
-    assert_eq!(sec_cfg["master_key_path"], "master.key.toml".into());
+    let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
+    assert_eq!(private_cfg["master_key_path"], "master.key.toml".into());
 }
 
 #[test]
@@ -305,9 +309,9 @@ fn master_key_path_current_dir() {
     let current_dir = std::env::current_dir().unwrap();
     let expected_path = current_dir.join("master.key.toml");
 
-    let sec_cfg: toml::Value = ConfigFile::load(&env.output_sec_config(0)).unwrap();
+    let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
     assert_eq!(
-        sec_cfg["master_key_path"],
+        private_cfg["master_key_path"],
         expected_path.to_str().unwrap().into()
     );
 }
@@ -358,13 +362,13 @@ fn test_finalize_run_without_pass() {
         env.copy_node_config_to_output(i);
         let node_config = env.output_node_config(i);
         env.command("finalize")
-            .with_arg(env.output_sec_config(i))
+            .with_arg(env.output_private_config(i))
             .with_arg(&node_config)
             .with_arg("--public-configs")
             .with_args(env.expected_pub_configs())
             .run()
             .unwrap();
-        assert_node_config_files_eq(&node_config, env.expected_node_config_file(i));
+        assert_config_files_eq(&node_config, env.expected_node_config_file(i));
 
         let feedback = env
             .command("run")
@@ -384,13 +388,13 @@ fn test_finalize_run_with_pass() {
     env.copy_node_config_to_output(0);
     let node_config = env.output_node_config(0);
     env.command("finalize")
-        .with_arg(env.output_sec_config(0))
+        .with_arg(env.output_private_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs())
         .run()
         .unwrap();
-    assert_node_config_files_eq(&node_config, env.expected_node_config_file(0));
+    assert_config_files_eq(&node_config, env.expected_node_config_file(0));
 
     let feedback = env
         .command("run")
@@ -402,30 +406,16 @@ fn test_finalize_run_with_pass() {
 }
 
 #[test]
-#[should_panic(expected = "The number of validators does not match the number of validators keys.")]
-fn test_less_validators_count() {
-    let env = ConfigSpec::new_more_validators();
-
-    let node_config = env.output_node_config(0);
-    env.copy_node_config_to_output(0);
-    env.command("finalize")
-        .with_arg(env.output_sec_config(0))
-        .with_arg(&node_config)
-        .with_arg("--public-configs")
-        .with_args(env.expected_pub_configs().into_iter())
-        .run()
-        .unwrap();
-}
-
-#[test]
-#[should_panic(expected = "The number of validators does not match the number of validators keys.")]
+#[should_panic(
+    expected = "The number of validators (3) does not match the number of validators keys (4)."
+)]
 fn test_more_validators_count() {
     let env = ConfigSpec::new_more_validators();
 
     let node_config = env.output_node_config(0);
     env.copy_node_config_to_output(0);
     env.command("finalize")
-        .with_arg(env.output_sec_config(0))
+        .with_arg(env.output_private_config(0))
         .with_arg(&node_config)
         .with_arg("--public-configs")
         .with_args(env.expected_pub_configs())
@@ -441,6 +431,7 @@ fn test_full_workflow() {
     env.command("generate-template")
         .with_arg(&output_template_file)
         .with_named_arg("--validators-count", env.validators_count.to_string())
+        .with_named_arg("--supervisor-mode", "simple")
         .run()
         .unwrap();
 
@@ -458,7 +449,7 @@ fn test_full_workflow() {
     for i in 0..env.validators_count {
         let node_config = env.output_node_config(i);
         env.command("finalize")
-            .with_arg(env.output_sec_config(i))
+            .with_arg(env.output_private_config(i))
             .with_arg(&node_config)
             .with_arg("--public-configs")
             .with_args(env.output_pub_configs())
@@ -497,29 +488,6 @@ fn test_run_dev() {
 }
 
 #[test]
-fn test_update_config() {
-    let env = ConfigSpec::new_without_pass();
-    let config_path = env.output_dir().join("node.toml");
-    fs::create_dir(&config_path.parent().unwrap()).unwrap();
-    fs::copy(&env.expected_node_config_file(0), &config_path).unwrap();
-
-    // Test config update.
-    let peer = ConnectInfo {
-        address: "0.0.0.1:8080".to_owned(),
-        public_key: PublicKey::new([1; PUBLIC_KEY_LENGTH]),
-    };
-
-    let connect_list = ConnectListConfig { peers: vec![peer] };
-
-    ConfigManager::update_connect_list(connect_list.clone(), &config_path)
-        .expect("Unable to update connect list");
-    let config = load_node_config(&config_path);
-
-    let new_connect_list = config.connect_list;
-    assert_eq!(new_connect_list.peers, connect_list.peers);
-}
-
-#[test]
 fn test_clear_cache() {
     let env = ConfigSpec::new_without_pass();
     let db_path = env.output_dir().join("db0");
@@ -530,4 +498,134 @@ fn test_clear_cache() {
         .with_arg("clear-cache")
         .run()
         .unwrap();
+}
+
+#[test]
+fn run_node_with_simple_supervisor() {
+    run_node_with_supervisor(&SupervisorMode::Simple).unwrap();
+}
+
+#[test]
+fn run_node_with_decentralized_supervisor() {
+    run_node_with_supervisor(&SupervisorMode::Decentralized).unwrap();
+}
+
+#[test]
+fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> {
+    let pub_config_1 = public_config(SupervisorMode::Simple);
+    let pub_config_2 = public_config(SupervisorMode::Decentralized);
+    let private_config = NodePrivateConfig {
+        listen_address: "127.0.0.1:5400".parse().unwrap(),
+        external_address: "127.0.0.1:5400".to_string(),
+        master_key_path: Default::default(),
+        api: Default::default(),
+        network: Default::default(),
+        mempool: Default::default(),
+        database: Default::default(),
+        thread_pool_size: None,
+        connect_list: Default::default(),
+        keys: Default::default(),
+    };
+
+    let testnet_dir = tempfile::tempdir()?;
+    let pub_config_1_path = testnet_dir.path().join("pub1.toml");
+    let pub_config_2_path = testnet_dir.path().join("pub2.toml");
+    let private_config_path = testnet_dir.path().join("sec.toml");
+
+    save_config_file(&pub_config_1, &pub_config_1_path)?;
+    save_config_file(&pub_config_2, &pub_config_2_path)?;
+    save_config_file(&private_config, &private_config_path)?;
+
+    let finalize = Finalize {
+        private_config_path: testnet_dir.path().join("sec.toml"),
+        output_config_path: testnet_dir.path().join("node.toml"),
+        public_configs: vec![pub_config_1_path, pub_config_2_path],
+        public_api_address: None,
+        private_api_address: None,
+        public_allow_origin: None,
+        private_allow_origin: None,
+    };
+    let err = finalize.execute().err().unwrap();
+    assert!(err
+        .to_string()
+        .contains("Found public configs with different general configuration."));
+    Ok(())
+}
+
+fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
+    let keys = ValidatorKeys {
+        consensus_key: gen_keypair().0,
+        service_key: gen_keypair().0,
+    };
+    NodePublicConfig {
+        consensus: Default::default(),
+        general: GeneralConfig {
+            validators_count: 2,
+            supervisor_mode,
+        },
+        validator_keys: Some(keys),
+    }
+}
+
+fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), failure::Error> {
+    let testnet_dir = tempfile::tempdir()?;
+
+    let common_config_path = testnet_dir.path().join("common.toml");
+
+    let generate_template = GenerateTemplate {
+        common_config: common_config_path.clone(),
+        validators_count: 1,
+        supervisor_mode: supervisor_mode.clone(),
+    };
+    generate_template.execute()?;
+
+    let generate_config = GenerateConfig {
+        common_config: common_config_path.clone(),
+        output_dir: testnet_dir.path().to_owned(),
+        peer_address: "127.0.0.1:5400".parse().unwrap(),
+        listen_address: None,
+        no_password: true,
+        master_key_pass: None,
+        master_key_path: None,
+    };
+    let (public_config, secret_config) = match generate_config.execute()? {
+        StandardResult::GenerateConfig {
+            public_config_path,
+            private_config_path: secret_config_path,
+            ..
+        } => (public_config_path, secret_config_path),
+        _ => unreachable!("Invalid result of generate-config"),
+    };
+
+    let node_config_path = testnet_dir.path().join("node.toml");
+
+    let finalize = Finalize {
+        private_config_path: secret_config,
+        output_config_path: node_config_path.clone(),
+        public_configs: vec![public_config],
+        public_api_address: None,
+        private_api_address: None,
+        public_allow_origin: None,
+        private_allow_origin: None,
+    };
+    finalize.execute()?;
+
+    let run = Run {
+        node_config: node_config_path.clone(),
+        db_path: testnet_dir.path().to_owned(),
+        public_api_address: None,
+        private_api_address: None,
+        master_key_pass: Some(FromStr::from_str("pass:")?),
+    };
+
+    if let StandardResult::Run(config) = run.execute()? {
+        assert_eq!(
+            config.node_config.public_config.general.supervisor_mode,
+            *supervisor_mode
+        );
+    } else {
+        unreachable!("Invalid result of run");
+    }
+
+    Ok(())
 }

@@ -85,7 +85,7 @@ fn create_blockchain(
     let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
     let factory: Box<dyn ServiceFactory> = service.clone().into();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_available_service(factory);
+    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(service.artifact_id())
         .with_instance(service.default_instance())
@@ -455,7 +455,7 @@ mod foreign_interface_call {
         let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
         let factory: Box<_> = Timestamping.into();
-        let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_available_service(factory);
+        let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
             .with_artifact(Timestamping.artifact_id())
             .with_instance(default_instance(SELF_INTERFACE_SERVICE_ID, "timestamping"))
