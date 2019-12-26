@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
     impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,

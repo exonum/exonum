@@ -21,6 +21,8 @@
 //! validators, consensus related parameters, hash of the previous configuration,
 //! etc.
 
+use exonum_derive::{BinaryValue, ObjectHash};
+use exonum_proto::ProtobufConvert;
 use failure::{bail, ensure};
 
 use std::collections::{HashMap, HashSet};
@@ -33,8 +35,6 @@ use crate::{
     proto::schema::{blockchain, runtime},
     runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };
-
-use exonum_proto::ProtobufConvert;
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,

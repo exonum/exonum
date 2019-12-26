@@ -21,6 +21,7 @@ use exonum::{
     helpers::Height,
 };
 use futures::{sync::oneshot, Future};
+use serde::{Deserialize, Serialize};
 
 use std::thread::{self, JoinHandle};
 
@@ -172,6 +173,7 @@ impl Handler<RollBack> for TestKitActor {
 
 #[cfg(test)]
 mod tests {
+    use assert_matches::assert_matches;
     use exonum::{
         api,
         crypto::{gen_keypair, Hash},
@@ -183,6 +185,7 @@ mod tests {
             ExecutionError,
         },
     };
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_merkledb::ObjectHash;
 
     use std::time::Duration;
