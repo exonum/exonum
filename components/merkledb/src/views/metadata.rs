@@ -261,7 +261,9 @@ impl IndexMetadata {
 #[derive(Debug)]
 pub struct IndexState<T, V> {
     metadata: IndexMetadata<V>,
-    index_access: T,
+    // Access is used to update metadata for the index. For phantom indexes, the access
+    // is set to `None`.
+    index_access: Option<T>,
     index_full_name: Vec<u8>,
 }
 
@@ -280,22 +282,21 @@ where
     T: RawAccessMut,
     V: BinaryAttribute,
 {
+    fn update_metadata_view(&self) {
+        if let Some(access) = self.index_access.clone() {
+            View::new(access, ResolvedAddress::system(INDEXES_POOL_NAME))
+                .put(&self.index_full_name, self.metadata.to_bytes());
+        }
+    }
+
     pub fn set(&mut self, state: V) {
         self.metadata.state = Some(state);
-        View::new(
-            self.index_access.clone(),
-            ResolvedAddress::system(INDEXES_POOL_NAME),
-        )
-        .put(&self.index_full_name, self.metadata.to_bytes());
+        self.update_metadata_view();
     }
 
     pub fn unset(&mut self) {
         self.metadata.state = None;
-        View::new(
-            self.index_access.clone(),
-            ResolvedAddress::system(INDEXES_POOL_NAME),
-        )
-        .put(&self.index_full_name, self.metadata.to_bytes());
+        self.update_metadata_view();
     }
 }
 
@@ -629,7 +630,11 @@ where
             None
         };
 
-        let mut view = View::new(index_access, addr);
+        let mut view = if is_phantom {
+            View::new_phantom()
+        } else {
+            View::new(index_access, addr)
+        };
         view.set_or_forget_aggregation(namespace);
         let this = Self {
             view,
@@ -665,7 +670,7 @@ where
     {
         let state = IndexState {
             metadata: self.metadata.convert(),
-            index_access: self.view.index_access.clone(),
+            index_access: self.view.access().cloned(),
             index_full_name: self.index_full_name,
         };
         (self.view, state)
@@ -681,7 +686,7 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, TemporaryDB};
+    use crate::{access::AccessExt, Database, Fork, TemporaryDB};
 
     use std::collections::{BTreeSet, HashMap};
 
@@ -722,6 +727,13 @@ mod tests {
         assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
     }
 
+    fn is_aggregated(view: &View<&Fork>) -> bool {
+        match view {
+            View::Real(inner) => inner.changes.is_aggregated(),
+            View::Phantom => panic!("Checking aggregation for a phantom view"),
+        }
+    }
+
     #[test]
     fn aggregated_indexes_updates() {
         let db = TemporaryDB::new();
@@ -731,19 +743,19 @@ mod tests {
         let view = ViewWithMetadata::get_or_create(&fork, &"foo".into(), IndexType::List)
             .unwrap()
             .view;
-        assert!(!view.changes.is_aggregated());
+        assert!(!is_aggregated(&view));
 
         // Single `ProofListIndex` is aggregated.
         let view = ViewWithMetadata::get_or_create(&fork, &"bar".into(), IndexType::ProofList)
             .unwrap()
             .view;
-        assert!(view.changes.is_aggregated());
+        assert!(is_aggregated(&view));
         // ...but a `ProofListIndex` in a family isn't.
         let view =
             ViewWithMetadata::get_or_create(&fork, &("baz", &0_u8).into(), IndexType::ProofList)
                 .unwrap()
                 .view;
-        assert!(!view.changes.is_aggregated());
+        assert!(!is_aggregated(&view));
     }
 
     #[test]

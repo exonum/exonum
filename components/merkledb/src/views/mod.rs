@@ -38,15 +38,22 @@ mod tests;
 /// Represents current view of the database by specified `address` and
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
-pub struct View<T: RawAccess> {
+#[derive(Debug)]
+pub enum View<T: RawAccess> {
+    Real(ViewInner<T>),
+    Phantom,
+}
+
+pub struct ViewInner<T: RawAccess> {
     address: ResolvedAddress,
     index_access: T,
     changes: T::Changes,
 }
 
-impl<T: RawAccess> fmt::Debug for View<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("View")
+impl<T: RawAccess> fmt::Debug for ViewInner<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ViewInner")
             .field("address", &self.address)
             .finish()
     }
@@ -173,18 +180,7 @@ impl_snapshot_access!(&'_ Box<dyn Snapshot>);
 impl_snapshot_access!(std::rc::Rc<dyn Snapshot>);
 impl_snapshot_access!(std::sync::Arc<dyn Snapshot>);
 
-impl<T: RawAccess> View<T> {
-    /// Creates a new view for an index with the specified address.
-    pub(crate) fn new(index_access: T, address: impl Into<ResolvedAddress>) -> Self {
-        let address = address.into();
-        let changes = index_access.changes(&address);
-        Self {
-            index_access,
-            changes,
-            address,
-        }
-    }
-
+impl<T: RawAccess> ViewInner<T> {
     fn snapshot(&self) -> &dyn Snapshot {
         self.index_access.snapshot()
     }
@@ -222,6 +218,54 @@ impl<T: RawAccess> View<T> {
                 self.snapshot().iter(&self.address, from),
                 changes_iter,
             ))
+        }
+    }
+}
+
+impl<T: RawAccess> View<T> {
+    /// Creates a new view for an index with the specified address.
+    pub(crate) fn new(index_access: T, address: impl Into<ResolvedAddress>) -> Self {
+        let address = address.into();
+        let changes = index_access.changes(&address);
+        View::Real(ViewInner {
+            index_access,
+            changes,
+            address,
+        })
+    }
+
+    /// Creates a new phantom view. The phantom views do not borrow changes and do not retain
+    /// resolved address / access.
+    pub(crate) fn new_phantom() -> Self {
+        View::Phantom
+    }
+
+    /// Returns the access this view is attached to. If this view is phantom, returns `None`.
+    pub(crate) fn access(&self) -> Option<&T> {
+        match self {
+            View::Real(ViewInner { index_access, .. }) => Some(index_access),
+            View::Phantom => None,
+        }
+    }
+
+    fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
+        match self {
+            View::Real(inner) => inner.get_bytes(key),
+            View::Phantom => None,
+        }
+    }
+
+    fn contains_raw_key(&self, key: &[u8]) -> bool {
+        match self {
+            View::Real(inner) => inner.contains_raw_key(key),
+            View::Phantom => false,
+        }
+    }
+
+    fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
+        match self {
+            View::Real(inner) => inner.iter_bytes(from),
+            View::Phantom => Box::new(EmptyIterator),
         }
     }
 
@@ -296,14 +340,15 @@ impl<T: RawAccess> View<T> {
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        if let Some(changes) = self.changes.as_mut() {
-            changes
-                .data
-                .insert(concat_keys!(key), Change::Put(value.into_bytes()));
-            true
-        } else {
-            false
+        if let View::Real(inner) = self {
+            if let Some(changes) = inner.changes.as_mut() {
+                changes
+                    .data
+                    .insert(concat_keys!(key), Change::Put(value.into_bytes()));
+                return true;
+            }
         }
+        false
     }
 
     /// Sets the aggregation flag for the view, unless the view is backed by a readonly access
@@ -311,22 +356,31 @@ impl<T: RawAccess> View<T> {
     ///
     /// The aggregation flag is used by `Fork::into_patch()` to update the state aggregator.
     pub(crate) fn set_or_forget_aggregation(&mut self, namespace: Option<String>) {
-        if let Some(changes) = self.changes.as_mut() {
-            changes.set_aggregation(namespace);
+        if let View::Real(ViewInner { changes, .. }) = self {
+            if let Some(changes) = changes.as_mut() {
+                changes.set_aggregation(namespace);
+            }
         }
     }
 }
 
 impl<T: RawAccessMut> View<T> {
+    fn changes_mut(&mut self) -> &mut ViewChanges {
+        match self {
+            View::Real(ViewInner { changes, .. }) => changes.as_mut().unwrap(),
+            View::Phantom => unreachable!(
+                "Mutable accesses should create views on demand rather than return phantom views"
+            ),
+        }
+    }
+
     /// Inserts a key-value pair into the fork.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        self.changes
-            .as_mut()
-            .unwrap()
+        self.changes_mut()
             .data
             .insert(concat_keys!(key), Change::Put(value.into_bytes()));
     }
@@ -336,16 +390,27 @@ impl<T: RawAccessMut> View<T> {
     where
         K: BinaryKey + ?Sized,
     {
-        self.changes
-            .as_mut()
-            .unwrap()
+        self.changes_mut()
             .data
             .insert(concat_keys!(key), Change::Delete);
     }
 
     /// Clears the view removing all its elements.
     pub fn clear(&mut self) {
-        self.changes.as_mut().unwrap().clear();
+        self.changes_mut().clear();
+    }
+}
+
+/// A bytes iterator implementation that has no items.
+struct EmptyIterator;
+
+impl BytesIterator for EmptyIterator {
+    fn next(&mut self) -> Option<(&[u8], &[u8])> {
+        None
+    }
+
+    fn peek(&mut self) -> Option<(&[u8], &[u8])> {
+        None
     }
 }
 
