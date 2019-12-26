@@ -69,7 +69,7 @@
 pub use self::{
     api::{DeployInfoQuery, DeployResponse},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
-    deploy_state::{DeployFailCause, DeployState},
+    deploy_state::DeployState,
     errors::Error,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
@@ -305,9 +305,7 @@ impl Service for Supervisor {
             schema.pending_deployments.remove(&request.artifact);
             if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
                 // If state is marked as pending, change it to failed as well.
-                schema
-                    .deploy_states
-                    .put(&request, DeployState::Failed(DeployFailCause::Deadline));
+                schema.deploy_states.put(&request, DeployState::Timeout);
             }
             log::trace!("Removed outdated deployment request {:?}", request);
         }

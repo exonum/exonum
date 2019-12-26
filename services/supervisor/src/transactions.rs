@@ -27,8 +27,7 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployFailCause, DeployRequest, DeployResult, DeployState, Error, Schema, StartService,
-    StopService, Supervisor,
+    DeployRequest, DeployResult, DeployState, Error, Schema, StartService, StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -329,7 +328,12 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let schema = Schema::new(context.service_data());
 
         // Check if deployment already failed.
-        if let Some(DeployState::Failed(..)) = schema.deploy_states.get(&deploy_result.request) {
+        if schema
+            .deploy_states
+            .get(&deploy_result.request)
+            .map(|state| state.is_failed())
+            .unwrap_or_default()
+        {
             // This deployment is already resulted in failure, no further
             // processing needed.
             return Ok(());
@@ -465,10 +469,9 @@ impl Supervisor {
         let mut schema = Schema::new(context.service_data());
 
         // Mark deploy as failed.
-        let cause = DeployFailCause::DeployError { height, error };
         schema
             .deploy_states
-            .put(&deploy_request, DeployState::Failed(cause));
+            .put(&deploy_request, DeployState::Failed { height, error });
 
         // Remove artifact from pending deployments: since we require
         // a confirmation from every node, failure for one node means failure

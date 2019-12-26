@@ -34,29 +34,21 @@ message ErrorInfo {
     exonum.runtime.ExecutionError error = 2;
 }
 
-// Reason for a deployment failure.
-message DeployFailCause {
-    oneof type {
-        // Failure caused by deadline reaching.
-        google.protobuf.Empty deadline = 1;
-        // Failure caused by the execution error.
-        ErrorInfo error = 2;
-    }
-}
-
 // Deployment state.
 message DeployState {
     enum Type {
         // Deploy is in process.
         PENDING = 0;
-        // Deployment failed.
+        // Deployment errored.
         FAIL = 1;
+        // Deadline was reached.
+        TIMEOUT = 2;
         // Deployment succeed.
-        SUCCESS = 2;
+        SUCCESS = 3;
     }
 
     // Deploy state.
     Type state = 1;
     // Set only for `type == FAIL`.
-    DeployFailCause cause = 2;
+    ErrorInfo error = 2;
 }

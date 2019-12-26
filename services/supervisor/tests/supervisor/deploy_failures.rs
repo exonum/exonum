@@ -30,8 +30,8 @@ use exonum::{
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    DeployFailCause, DeployInfoQuery, DeployRequest, DeployResponse, DeployResult, DeployState,
-    Supervisor, SupervisorInterface,
+    DeployInfoQuery, DeployRequest, DeployResponse, DeployResult, DeployState, Supervisor,
+    SupervisorInterface,
 };
 
 use failing_runtime::{FailingRuntime, FailingRuntimeError};
@@ -213,9 +213,9 @@ fn build_result_transaction(
         .unwrap()
 }
 
-/// Creates `DeployFailCause` for planned error of `FailingRuntime`.
-fn fail_cause(height: Height) -> DeployFailCause {
-    DeployFailCause::DeployError {
+/// Creates `DeployState::Failed` for planned error of `FailingRuntime`.
+fn fail_state(height: Height) -> DeployState {
+    DeployState::Failed {
         error: FailingRuntimeError::PlannedError.into(),
         height,
     }
@@ -245,14 +245,9 @@ fn assert_deploy_state(actual: DeployState, expected: DeployState) {
     use DeployState::*;
     match (&actual, &expected) {
         // Same variants, no actions needed.
-        (Pending, Pending)
-        | (Succeed, Succeed)
-        | (Failed(DeployFailCause::Deadline), Failed(DeployFailCause::Deadline)) => {}
+        (Pending, Pending) | (Succeed, Succeed) | (Timeout, Timeout) => {}
         // Failures caused by error, check that inner content equals.
-        (
-            Failed(left @ DeployFailCause::DeployError { .. }),
-            Failed(right @ DeployFailCause::DeployError { .. }),
-        ) => {
+        (left @ Failed { .. }, right @ Failed { .. }) => {
             let assertion_failure_msg = format!(
                 "Different deploy states, got {:?}, expected {:?}",
                 actual, expected
@@ -350,7 +345,7 @@ fn deploy_failure_because_not_confirmed() {
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
     let state = response.state.expect("There should be a state for request");
-    assert_deploy_state(state, DeployState::Failed(DeployFailCause::Deadline));
+    assert_deploy_state(state, DeployState::Timeout);
 }
 
 /// Checks that if deployment attempt fails for our node, the deploy
@@ -388,7 +383,7 @@ fn deploy_failure_because_cannot_deploy() {
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
     let state = response.state.expect("There should be a state for request");
-    assert_deploy_state(state, DeployState::Failed(fail_cause(Height(2))));
+    assert_deploy_state(state, fail_state(Height(2)));
 }
 
 /// This test has the same idea as `deploy_failure_because_not_confirmed`,
@@ -434,7 +429,7 @@ fn deploy_failure_check_no_extra_actions() {
     // Check that deployment is already marked as failed.
     let response = get_deploy_status(&api, &deploy_request);
     let state = response.state.expect("There should be a state for request");
-    assert_deploy_state(state, DeployState::Failed(fail_cause(Height(2))));
+    assert_deploy_state(state, fail_state(Height(2)));
 
     // Ensure that there are no more transactions until the deadline height.
     // This is sufficient, since after any deploy attempt we are sending a transaction
@@ -450,7 +445,7 @@ fn deploy_failure_check_no_extra_actions() {
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
     let state = response.state.expect("There should be a state for request");
-    assert_deploy_state(state, DeployState::Failed(fail_cause(Height(2))));
+    assert_deploy_state(state, fail_state(Height(2)));
 }
 
 /// Checks that if other node sends a failure report, deployment fails as well.
@@ -486,12 +481,12 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    let fail_cause = DeployFailCause::DeployError {
+    let fail_state = DeployState::Failed {
         height: Height(1),
         error,
     };
     let state = response.state.expect("There should be a state for request");
-    assert_deploy_state(state, DeployState::Failed(fail_cause));
+    assert_deploy_state(state, fail_state);
 }
 
 /// Checks that after unsuccessful deploy attempt we can perform another try and it can
@@ -533,12 +528,12 @@ fn deploy_successfully_after_failure() {
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
     let response = get_deploy_status(&api, &deploy_request);
-    let fail_cause = DeployFailCause::DeployError {
+    let fail_state = DeployState::Failed {
         height: Height(1),
         error,
     };
     let state = response.state.expect("There should be a state for request");
-    assert_deploy_state(state, DeployState::Failed(fail_cause));
+    assert_deploy_state(state, fail_state);
 
     // 2. Update the deadline height and perform the same routine as in `deploy_success`:
     // - attempt to deploy the same artifact;

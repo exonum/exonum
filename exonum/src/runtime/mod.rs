@@ -170,9 +170,12 @@ use crate::{
 
 mod blockchain_data;
 mod dispatcher;
-#[doc(hidden)]
-pub mod error;
+pub(crate) mod error;
 mod types;
+
+// Re-export for serializing `ExecutionError` via `serde`.
+#[doc(hidden)]
+pub use error::execution_error as execution_error_serde;
 
 /// Persistent identifier of a supervisor service instance.
 ///

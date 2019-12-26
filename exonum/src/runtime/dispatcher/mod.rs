@@ -566,7 +566,7 @@ impl Action {
             } => {
                 dispatcher
                     .deploy_artifact(artifact.clone(), spec)
-                    .then(|result| then(result))
+                    .then(then)
                     .wait()
                     .unwrap_or_else(|e| {
                         error!("Deploying artifact {:?} failed: {}", artifact, e);
