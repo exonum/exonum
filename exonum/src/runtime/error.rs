@@ -271,6 +271,18 @@ impl ErrorMatch {
         Self::new(fail.kind(), fail.description())
     }
 
+    /// Creates a matcher for `Unexpected` kind of errors.
+    /// By default it will match any description.
+    pub fn from_panic() -> Self {
+        Self {
+            kind: ErrorKind::Unexpected,
+            description: StringMatch::Any,
+            runtime_id: None,
+            instance_id: None,
+            call_type: None,
+        }
+    }
+
     fn new(kind: ErrorKind, description: String) -> Self {
         Self {
             kind,

@@ -200,7 +200,11 @@ impl Execute for Transaction {
             }
 
             Transaction::DeployArtifact(artifact_id) => {
-                Dispatcher::commit_artifact(&*context.fork, artifact_id, Vec::new())
+                // Code below will panic if there is already deployed artifact with the
+                // same ID. This sort of expected behaviour, since we're intentionally skipping
+                // the `start_deploy` step (which will make the test nature much more complex).
+                Dispatcher::commit_artifact(&*context.fork, artifact_id, Vec::new());
+                Ok(())
             }
 
             Transaction::AddService(spec, constructor) => {
@@ -274,6 +278,11 @@ impl Runtime for RuntimeInspector {
         _deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         assert!(self.available.contains(&artifact));
+        if self.deployed.contains(&artifact) {
+            let error = Err(DispatcherError::ArtifactAlreadyDeployed.into());
+            return Box::new(error.into_future());
+        }
+
         self.deployed.push(artifact);
         Box::new(Ok(()).into_future())
     }
@@ -300,8 +309,7 @@ impl Runtime for RuntimeInspector {
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
         _status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
+    ) {
     }
 
     fn execute(
@@ -551,7 +559,10 @@ fn deploy_already_deployed() {
     )
     .unwrap_err();
 
-    let expect_err = ErrorMatch::from_fail(&DispatcherError::ArtifactAlreadyDeployed);
+    // Since `RuntimeInspector` transactions skip the `start_deploy`,
+    // we expect transaction to panic (`commit_service` is called within transaction body).
+    let expect_err = ErrorMatch::from_panic()
+        .with_description_containing("Artifact with the given identifier is already deployed");
     assert_eq!(actual_err, expect_err);
 }
 

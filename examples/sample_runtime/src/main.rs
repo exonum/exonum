@@ -119,10 +119,10 @@ impl Runtime for SampleRuntime {
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         match status {
             InstanceStatus::Active => {
-                let instance = self.start_service(spec)?;
+                let instance = self.start_service(spec).unwrap();
                 println!("Starting service {}: {:?}", spec, instance);
                 self.started_services.insert(spec.id, instance);
             }
@@ -132,8 +132,6 @@ impl Runtime for SampleRuntime {
                 println!("Stopping service {}: {:?}", spec, instance);
             }
         }
-
-        Ok(())
     }
 
     /// Initiates adding a new service and sets the counter value for this.

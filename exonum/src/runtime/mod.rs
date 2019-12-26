@@ -389,21 +389,17 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// # Return value
     ///
-    /// An error or panic returned from this method will not be processed and will lead
-    /// to the node stopping. Thus, a runtime should only return an error / panic if the error is local
-    /// to the node or affects less than 1/3 of nodes in the network. The error should contain a
-    /// description allowing the node administrator to determine
-    /// the root cause of the error and recover the node(s) by eliminating the cause.
+    /// This method does not return value, meaning that any error occured during this method execution
+    /// is considered critical and should lead to the node stopping.
     ///
-    /// This error / panic must not be common to all nodes in the network.
-    /// The errors common for the whole network should be produced during the preceding
-    /// `initiate_adding_service` call.
+    /// It is assumed that if `initiate_adding_service` didn't return an error previously, it is able
+    /// to update service status and within normal conditions no error is expected to happen.
     fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError>;
+    );
 
     /// Dispatches payload to the method of a specific service instance.
     ///

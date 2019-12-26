@@ -71,7 +71,7 @@ impl BlockchainBuilder {
         let has_genesis_block = !Schema::new(&snapshot).block_hashes_by_height().is_empty();
 
         if has_genesis_block {
-            blockchain.dispatcher.restore_state(&snapshot)?;
+            blockchain.dispatcher.restore_state(&snapshot);
         } else {
             blockchain.create_genesis_block(self.genesis_config)?;
         };

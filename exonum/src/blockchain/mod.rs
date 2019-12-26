@@ -222,7 +222,7 @@ impl BlockchainMut {
             .set(genesis_config.consensus_config);
 
         for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
-            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone())?;
+            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone());
             self.dispatcher.deploy_artifact(artifact, payload).wait()?
         }
         // Add service instances.

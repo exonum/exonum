@@ -160,7 +160,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
             .unwrap();
@@ -171,7 +171,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .lock()
             .unwrap()
             .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
-        self.inner.update_service_status(snapshot, spec, status)
+        self.inner.update_service_status(snapshot, spec, status);
     }
 
     fn execute(
@@ -370,7 +370,7 @@ fn basic_rust_runtime() {
 
     // Deploy service artifact.
     let fork = create_block(&blockchain);
-    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
     assert_eq!(
@@ -630,7 +630,7 @@ fn multiple_service_versions() {
 
     let fork = create_block(&blockchain);
     let artifact = TestServiceImpl.artifact_id();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
 
     let mut fork = create_block(&blockchain);
@@ -655,7 +655,7 @@ fn multiple_service_versions() {
     let new_artifact = TestServiceImplV2.artifact_id();
     assert_ne!(new_artifact, artifact);
     assert!(schema.get_artifact(&new_artifact).is_none());
-    Dispatcher::commit_artifact(&fork, new_artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, new_artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
 
     // ...and a service based on the new artifact.
@@ -746,7 +746,7 @@ fn conflicting_service_instances() {
         .unwrap();
 
     let fork = create_block(&blockchain);
-    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
     event_handle.lock().unwrap().clear();
 
@@ -950,7 +950,7 @@ fn dependent_service_with_no_dependency() {
 
     let fork = create_block(&blockchain);
     let inst = DependentServiceImpl.default_instance();
-    Dispatcher::commit_artifact(&fork, inst.instance_spec.artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, inst.instance_spec.artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
 
     let mut fork = create_block(&blockchain);
@@ -987,8 +987,8 @@ fn dependent_service_in_same_block() {
     let fork = create_block(&blockchain);
     let main_inst = TestServiceImpl.default_instance();
     let dep_inst = DependentServiceImpl.default_instance();
-    Dispatcher::commit_artifact(&fork, main_inst.instance_spec.artifact.clone(), vec![]).unwrap();
-    Dispatcher::commit_artifact(&fork, dep_inst.instance_spec.artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, main_inst.instance_spec.artifact.clone(), vec![]);
+    Dispatcher::commit_artifact(&fork, dep_inst.instance_spec.artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
 
     // Deploy both services in the same block after genesis.
@@ -1030,7 +1030,7 @@ fn dependent_service_in_successive_block() {
 
     let fork = create_block(&blockchain);
     let dep_spec = DependentServiceImpl.default_instance();
-    Dispatcher::commit_artifact(&fork, dep_spec.instance_spec.artifact.clone(), vec![]).unwrap();
+    Dispatcher::commit_artifact(&fork, dep_spec.instance_spec.artifact.clone(), vec![]);
     commit_block(&mut blockchain, fork);
 
     let mut fork = create_block(&blockchain);
