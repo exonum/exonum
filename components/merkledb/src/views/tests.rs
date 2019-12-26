@@ -861,6 +861,13 @@ fn test_metadata_index_family() {
     test_metadata(("family", "family_id"));
 }
 
+fn get_address<T: RawAccess>(view: &View<T>) -> &ResolvedAddress {
+    match view {
+        View::Real(inner) => &inner.address,
+        View::Phantom => panic!("Getting address for a phantom view"),
+    }
+}
+
 #[test]
 fn test_metadata_index_identifiers() {
     let db = TemporaryDB::new();
@@ -871,8 +878,9 @@ fn test_metadata_index_identifiers() {
             .map_err(drop)
             .unwrap()
             .into();
-    assert_eq!(view.address.name, "simple");
-    let id = view.address.id.unwrap().get();
+    let address = get_address(&view);
+    assert_eq!(address.name, "simple");
+    let id = address.id.unwrap().get();
     drop(view); // Prevent "multiple mutable borrows" error later
 
     // Creates the second index metadata.
@@ -881,8 +889,9 @@ fn test_metadata_index_identifiers() {
             .map_err(drop)
             .unwrap()
             .into();
-    assert_eq!(view.address.name, "second");
-    assert_eq!(view.address.id.unwrap().get(), id + 1);
+    let second_address = get_address(&view);
+    assert_eq!(second_address.name, "second");
+    assert_eq!(second_address.id.unwrap().get(), id + 1);
 
     // Recreates the first index instance.
     let view: View<_> =
@@ -890,8 +899,9 @@ fn test_metadata_index_identifiers() {
             .map_err(drop)
             .unwrap()
             .into();
-    assert_eq!(view.address.name, "simple");
-    assert_eq!(view.address.id.unwrap().get(), id);
+    let recreated_address = get_address(&view);
+    assert_eq!(recreated_address.name, "simple");
+    assert_eq!(recreated_address.id.unwrap().get(), id);
 }
 
 #[test]
@@ -903,8 +913,9 @@ fn test_metadata_in_migrated_indexes() {
         .map_err(drop)
         .unwrap()
         .into();
-    assert_eq!(view.address.name, "simple");
-    let old_id = view.address.id.unwrap().get();
+    let address = get_address(&view);
+    assert_eq!(address.name, "simple");
+    let old_id = address.id.unwrap().get();
 
     let mut addr = IndexAddress::from_root("simple");
     addr.set_in_migration();
@@ -912,8 +923,9 @@ fn test_metadata_in_migrated_indexes() {
         .map_err(drop)
         .unwrap()
         .into();
-    assert_eq!(view.address.name, "simple");
-    let new_id = view.address.id.unwrap().get();
+    let migrated_address = get_address(&view);
+    assert_eq!(migrated_address.name, "simple");
+    let new_id = migrated_address.id.unwrap().get();
     assert_ne!(old_id, new_id);
 }
 
