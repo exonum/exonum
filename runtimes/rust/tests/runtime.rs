@@ -712,6 +712,16 @@ fn basic_runtime_workflow() {
     .expect_err("incorrect transaction");
 }
 
+/// In this test, we try to create Rust runtime artifact with the non-empty spec.
+#[test]
+fn create_runtime_non_empty_spec() {
+    let genesis_config = create_genesis_config_builder()
+        .with_parametric_artifact(TestServiceImpl.artifact_id(), vec![1, 2, 3, 4])
+        .build();
+    let err = create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap_err();
+    assert!(err.to_string().contains("specified artifact has non-empty spec"));
+}
+
 /// In this test, we simulate blockchain restart and check events from inspector.
 #[test]
 fn runtime_restart() {
