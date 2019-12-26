@@ -244,9 +244,9 @@
 //! ```
 
 pub use exonum::runtime::{
-    ArtifactId, BlockchainData, CallInfo, CallSite, Caller, DispatcherError, ErrorKind, ErrorMatch,
-    ExecutionError, ExecutionFail, InstanceId, MethodId, RuntimeIdentifier, SnapshotExt,
-    WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, Caller, DispatcherError, ErrorKind,
+    ErrorMatch, ExecutionError, ExecutionFail, InstanceId, MethodId, RuntimeIdentifier,
+    SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
 };
 
 pub use self::{

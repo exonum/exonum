@@ -719,7 +719,9 @@ fn create_runtime_non_empty_spec() {
         .with_parametric_artifact(TestServiceImpl.artifact_id(), vec![1, 2, 3, 4])
         .build();
     let err = create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap_err();
-    assert!(err.to_string().contains("specified artifact has non-empty spec"));
+    assert!(err
+        .to_string()
+        .contains("specified artifact has non-empty spec"));
 }
 
 /// In this test, we simulate blockchain restart and check events from inspector.

@@ -94,7 +94,7 @@ impl GenericCall<InstanceId> for ArtifactReq {
 ///     }
 /// }
 ///
-/// # use exonum::runtime::{rust::DefaultInstance, InstanceId};
+/// # use exonum_rust_runtime::{DefaultInstance, InstanceId};
 /// use exonum_middleware_service::{
 ///     ArtifactReq, Batch, MiddlewareInterfaceMut, MiddlewareService,
 /// };
