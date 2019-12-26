@@ -23,7 +23,7 @@ use syn::{
 
 use std::convert::TryFrom;
 
-use super::{find_meta_attrs, ExonumRustRuntimeCratePath};
+use super::{find_meta_attrs, RustRuntimeCratePath};
 
 #[derive(Debug)]
 struct ServiceMethodDescriptor {
@@ -141,14 +141,14 @@ impl ServiceMethodDescriptor {
 #[darling(default)]
 struct ExonumServiceAttrs {
     #[darling(rename = "crate")]
-    cr: ExonumRustRuntimeCratePath,
+    cr: RustRuntimeCratePath,
     interface: Option<String>,
 }
 
 impl Default for ExonumServiceAttrs {
     fn default() -> Self {
         Self {
-            cr: ExonumRustRuntimeCratePath::default(),
+            cr: RustRuntimeCratePath::default(),
             interface: None,
         }
     }

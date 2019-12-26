@@ -20,20 +20,20 @@ use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Variant}
 
 use std::convert::TryFrom;
 
-use super::{find_meta_attrs, ExonumCratePath};
+use super::{find_meta_attrs, MainCratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ExecutionFailAttrs {
     #[darling(rename = "crate")]
-    cr: ExonumCratePath,
+    cr: MainCratePath,
     kind: String,
 }
 
 impl Default for ExecutionFailAttrs {
     fn default() -> Self {
         Self {
-            cr: ExonumCratePath::default(),
+            cr: MainCratePath::default(),
             kind: "Service".to_owned(),
         }
     }

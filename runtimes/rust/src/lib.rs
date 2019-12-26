@@ -198,7 +198,7 @@
 //! ## Interface usage
 //!
 //! ```
-//! # use exonum::runtime::{rust::CallContext, ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, ExecutionError};
 //! # use exonum_crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;
@@ -249,7 +249,8 @@
 //! ```
 
 pub use exonum::runtime::{
-    DispatcherError, ExecutionError, ExecutionFail, InstanceId, RuntimeIdentifier, WellKnownRuntime,
+    ArtifactId, Caller, DispatcherError, ErrorMatch, ExecutionError, ExecutionFail, InstanceId,
+    MethodId, RuntimeIdentifier, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
 };
 
 pub use self::{
@@ -271,8 +272,8 @@ use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
-        catch_panic, ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor,
-        InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        catch_panic, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime,
     },
 };
 use exonum_merkledb::Snapshot;

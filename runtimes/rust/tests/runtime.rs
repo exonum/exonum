@@ -23,9 +23,8 @@ use exonum::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        ArtifactId, CallInfo, Caller, DispatcherError, ErrorMatch, ExecutionContext,
-        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        CallInfo, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        WellKnownRuntime,
     },
 };
 use exonum_crypto::Hash;
@@ -33,7 +32,8 @@ use exonum_derive::exonum_interface;
 use exonum_derive::*;
 use exonum_merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema};
 use exonum_rust_runtime::{
-    CallContext, RustRuntime, {DefaultInstance, Service, ServiceFactory},
+    ArtifactId, CallContext, Caller, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError,
+    InstanceId, RustRuntime, Service, ServiceFactory, SnapshotExt, SUPERVISOR_INSTANCE_ID,
 };
 use futures::{sync::mpsc, Future};
 use serde_derive::*;

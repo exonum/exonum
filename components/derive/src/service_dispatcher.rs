@@ -17,7 +17,7 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{DeriveInput, Generics, Ident, Lit, Meta, NestedMeta, Path};
 
-use super::ExonumRustRuntimeCratePath;
+use super::RustRuntimeCratePath;
 
 #[derive(Debug)]
 struct ServiceInterface {
@@ -81,7 +81,7 @@ impl FromMeta for ServiceInterfaces {
 struct ServiceDispatcher {
     ident: Ident,
     #[darling(rename = "crate", default)]
-    cr: ExonumRustRuntimeCratePath,
+    cr: RustRuntimeCratePath,
     #[darling(default)]
     implements: ServiceInterfaces,
     #[darling(default)]
@@ -94,7 +94,7 @@ impl ToTokens for ServiceDispatcher {
         let cr = &self.cr;
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
         let ctx = quote!(#cr::CallContext<'_>);
-        let res = quote!(std::result::Result<(), exonum::runtime::ExecutionError>);
+        let res = quote!(std::result::Result<(), #cr::ExecutionError>);
 
         let match_arms = self.implements.0.iter().map(|interface| {
             let trait_name = &interface.path;
@@ -117,13 +117,13 @@ impl ToTokens for ServiceDispatcher {
                 fn call(
                     &self,
                     interface_name: &str,
-                    method: exonum::runtime::MethodId,
+                    method: #cr::MethodId,
                     ctx: #ctx,
                     payload: &[u8],
-                ) -> Result<(), exonum::runtime::ExecutionError> {
+                ) -> Result<(), #cr::ExecutionError> {
                     match interface_name {
                         #( #match_arms )*
-                        other => Err(exonum::runtime::DispatcherError::NoSuchInterface.into()),
+                        other => Err(#cr::DispatcherError::NoSuchInterface.into()),
                     }
                 }
             }

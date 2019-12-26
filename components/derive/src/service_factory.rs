@@ -18,7 +18,7 @@ use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Generics, Ident, Path};
 
-use super::ExonumRustRuntimeCratePath;
+use super::RustRuntimeCratePath;
 
 fn is_allowed_artifact_name_char(c: u8) -> bool {
     match c {
@@ -44,7 +44,7 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
 struct ServiceFactory {
     ident: Ident,
     #[darling(rename = "crate", default)]
-    cr: ExonumRustRuntimeCratePath,
+    cr: RustRuntimeCratePath,
     #[darling(default)]
     artifact_name: Option<String>,
     #[darling(default)]
