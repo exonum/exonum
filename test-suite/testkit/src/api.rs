@@ -18,6 +18,7 @@ pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
 use failure::format_err;
+use log::{info, trace};
 use reqwest::{
     header, Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response,
     StatusCode,
