@@ -111,9 +111,24 @@ where
     T: Access,
     T::Base: AsReadonly<Readonly = T::Base>,
     K: BinaryKey + ?Sized,
-    I: FromAccess<T>,
 {
     /// Iterator over keys in this group.
+    ///
+    /// The iterator buffers keys in memory and may become inconsistent. Although
+    /// the Rust type system prevents iterating over keys in a group based on [`Fork`],
+    /// it it still possible to make the iterator return inconsistent results. Indeed,
+    /// for a group is based on [`ReadonlyFork`], it is possible to add new indexes via `Fork`
+    /// while the iteration is in progress.
+    ///
+    /// For this reason, it is advised to use this method for groups based on `ReadonlyFork`
+    /// only in the case where stale reads are tolerated or are prevented on the application level.
+    /// Groups based on [`Snapshot`] implementations (including [`Patch`]es) are not affected
+    /// by this issue.
+    ///
+    /// [`Fork`]: ../struct.Fork.html
+    /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
+    /// [`Snapshot`]: ../trait.Snapshot.html
+    /// [`Patch`]: ../struct.Patch.html
     pub fn keys(&self) -> GroupKeys<T::Base, K> {
         self.access.clone().group_keys(self.prefix.clone())
     }
@@ -190,7 +205,7 @@ mod tests {
             .get_entry(("prefixed", &concat_keys!(&1_u8, &42_u32)))
             .set(42);
         fork.clone().get_entry("t").set(21);
-        fork.clone().get_entry("unrelated").set(23);
+        fork.get_entry("unrelated").set(23);
     }
 
     fn test_key_iter<A>(snapshot: A)

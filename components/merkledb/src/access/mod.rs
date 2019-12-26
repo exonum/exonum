@@ -57,6 +57,11 @@ pub trait Access: Clone {
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError>;
 
     /// Returns an iterator over keys in a group with the specified address.
+    ///
+    /// The iterator buffers keys in memory and may become inconsistent for accesses
+    /// based on [`ReadonlyFork`].
+    ///
+    /// [`ReadonlyFork`]: ../struct.ReadonlyFork.html
     fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
     where
         K: BinaryKey + ?Sized,

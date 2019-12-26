@@ -765,10 +765,10 @@ mod tests {
         fork.get_entry("unrelated").set(0_u32);
         let addr: IndexAddress = "test".into();
 
-        let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        let mut keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
         assert_eq!(keys.key_prefix, b"test\0");
         assert_eq!(keys.next_key, None);
-        assert!(keys.collect::<Vec<_>>().is_empty());
+        assert!(keys.next().is_none());
 
         fork.get_entry(("test", &0_u8)).set(0_u32);
         let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
