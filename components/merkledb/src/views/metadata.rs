@@ -809,6 +809,24 @@ mod tests {
     }
 
     #[test]
+    fn keys_within_a_group_with_prefix() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        let addr: IndexAddress = ("test", &0_u32).into();
+        let mut keys: GroupKeys<_, u32> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.key_prefix, b"test\0\0\0\0\0");
+        assert_eq!(keys.next_key, None);
+        assert!(keys.next().is_none());
+
+        fork.get_entry(("test", &concat_keys!(&0_u32, &5_u32)))
+            .set("!".to_owned());
+        let keys: GroupKeys<_, u32> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, None);
+        assert_eq!(keys.collect::<Vec<_>>(), vec![5]);
+    }
+
+    #[test]
     fn group_keys_mini_fuzz() {
         const GROUPS: &[&str] = &["bar", "foo", "test"];
 
@@ -844,5 +862,140 @@ mod tests {
                 .collect();
             assert_eq!(actual_keys, expected_keys);
         }
+    }
+}
+
+#[cfg(test)]
+mod prop_tests {
+    use super::*;
+    use crate::{access::AccessExt, Database, TemporaryDB};
+
+    use proptest::{
+        collection::vec,
+        num, prop_assert_eq, prop_oneof, proptest, sample,
+        strategy::{self, Strategy},
+        test_runner::TestCaseResult,
+    };
+
+    use std::collections::{BTreeSet, HashMap};
+
+    const ACTIONS_MAX_LEN: usize = 30;
+    const DEFAULT_BUFFER_SIZE: usize = 1_000;
+    const SMALL_BUFFER_SIZE: usize = 3;
+
+    type GroupKey = (&'static str, Option<u32>);
+
+    fn group_address(group: GroupKey) -> IndexAddress {
+        if let Some(prefix) = group.1 {
+            (group.0, &prefix).into()
+        } else {
+            group.0.into()
+        }
+    }
+
+    // Note that the case where both "foo" and ("foo", _) are groups leads to unexpected results.
+    // We warn against this in the docs and don't consider this case here.
+    const GROUPS: &[GroupKey] = &[
+        ("fo", None),
+        ("foo", Some(0)),
+        ("foo", Some(1)),
+        ("foo", Some(256)),
+        ("foo", Some(u32::max_value())),
+        ("foo_", None),
+        ("foo1", Some(0)),
+    ];
+
+    fn check_groups<T: RawAccess + Copy>(
+        access: T,
+        expected_groups: &HashMap<GroupKey, BTreeSet<u32>>,
+        buffer_size: usize,
+    ) -> TestCaseResult {
+        for &group in GROUPS {
+            let group_addr = group_address(group);
+            let keys: GroupKeys<_, u32> =
+                GroupKeys::with_custom_buffer(access, &group_addr, buffer_size);
+            let keys: Vec<_> = keys.collect();
+            let expected_keys = expected_groups
+                .get(&group)
+                .map(|set| set.iter().copied().collect::<Vec<_>>())
+                .unwrap_or_default();
+            prop_assert_eq!(keys, expected_keys);
+        }
+        Ok(())
+    }
+
+    #[derive(Debug, Clone)]
+    enum Action {
+        CreateEntry { group: GroupKey, id_in_group: u32 },
+        FlushFork,
+        MergeFork,
+    }
+
+    fn generate_action(keys: impl Strategy<Value = u32>) -> impl Strategy<Value = Action> {
+        prop_oneof![
+            4 => (sample::select(GROUPS), keys)
+                .prop_map(|(group, id_in_group)| Action::CreateEntry {
+                    group,
+                    id_in_group,
+                }),
+            1 => strategy::Just(Action::FlushFork),
+            1 => strategy::Just(Action::MergeFork),
+        ]
+    }
+
+    fn apply_actions(db: &TemporaryDB, buffer_size: usize, actions: Vec<Action>) -> TestCaseResult {
+        let mut fork = db.fork();
+        let mut groups: HashMap<GroupKey, BTreeSet<_>> = HashMap::new();
+        for action in actions {
+            match action {
+                Action::CreateEntry { group, id_in_group } => {
+                    let addr = group_address(group).append_key(&id_in_group);
+                    fork.get_entry(addr).set(1_u32);
+                    groups.entry(group).or_default().insert(id_in_group);
+                }
+                Action::FlushFork => {
+                    fork.flush();
+                }
+                Action::MergeFork => {
+                    let patch = fork.into_patch();
+                    check_groups(&patch, &groups, buffer_size)?;
+                    db.merge(patch).unwrap();
+                    check_groups(&db.snapshot(), &groups, buffer_size)?;
+                    fork = db.fork();
+                }
+            }
+            check_groups(&fork, &groups, buffer_size)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn normal_buffer_and_small_keys() {
+        let actions_generator = vec(generate_action(0_u32..4), 1..ACTIONS_MAX_LEN);
+        let db = TemporaryDB::new();
+        proptest!(|(actions in actions_generator)| {
+            apply_actions(&db, DEFAULT_BUFFER_SIZE, actions)?;
+            db.clear().unwrap();
+        });
+    }
+
+    #[test]
+    fn small_buffer_and_small_keys() {
+        let actions_generator = vec(generate_action(0_u32..4), 1..ACTIONS_MAX_LEN);
+        let db = TemporaryDB::new();
+        proptest!(|(actions in actions_generator)| {
+            apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
+            db.clear().unwrap();
+        });
+    }
+
+    #[test]
+    fn small_buffer_and_any_keys() {
+        let actions_generator = vec(generate_action(num::u32::ANY), 1..ACTIONS_MAX_LEN);
+        let db = TemporaryDB::new();
+        proptest!(|(actions in actions_generator)| {
+            apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
+            db.clear().unwrap();
+        });
     }
 }
