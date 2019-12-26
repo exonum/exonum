@@ -184,6 +184,7 @@ mod tests {
             ExecutionError,
         },
     };
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_merkledb::ObjectHash;
 
     use std::time::Duration;

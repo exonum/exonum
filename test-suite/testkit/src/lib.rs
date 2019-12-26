@@ -125,9 +125,6 @@
 
 #[macro_use]
 extern crate serde_derive;
-#[cfg_attr(test, macro_use)]
-#[cfg(test)]
-extern crate exonum_derive;
 
 pub use crate::{
     api::{ApiKind, TestKitApi},
