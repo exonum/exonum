@@ -24,11 +24,7 @@
 )]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
 pub mod api;
 pub mod proto;
@@ -36,6 +32,7 @@ pub mod schema;
 pub mod transactions;
 
 use exonum::merkledb::BinaryValue;
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{
     api::ServiceApiBuilder, CallContext, DispatcherError, ExecutionError, Service,
 };

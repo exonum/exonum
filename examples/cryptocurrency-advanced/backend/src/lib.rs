@@ -18,9 +18,7 @@
 #![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
 pub use crate::{schema::Schema, transactions::CryptocurrencyInterface};
 
@@ -31,6 +29,7 @@ pub mod transactions;
 pub mod wallet;
 
 use exonum::runtime::ExecutionError;
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
 
 use crate::api::PublicApi as CryptocurrencyApi;

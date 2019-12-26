@@ -15,7 +15,8 @@
 //! Timestamping database schema.
 
 use chrono::{DateTime, Utc};
-use exonum::crypto::Hash;
+use exonum_crypto::Hash;
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use exonum_merkledb::{
     access::{Access, RawAccessMut},
     Entry, RawProofMapIndex,

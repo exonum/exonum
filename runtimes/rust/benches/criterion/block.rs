@@ -54,9 +54,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::SnapshotExt,
 };
-use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory, SnapshotExt};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -134,14 +133,10 @@ fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash
 }
 
 mod timestamping {
-    use exonum::{
-        crypto::Hash,
-        messages::Verified,
-        runtime::{AnyTx, ExecutionError, InstanceId},
-    };
-    use exonum_derive::*;
+    use exonum::{crypto::Hash, messages::Verified, runtime::AnyTx};
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
+    use exonum_rust_runtime::{CallContext, DefaultInstance, ExecutionError, InstanceId, Service};
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -198,12 +193,14 @@ mod cryptocurrency {
         messages::Verified,
         runtime::{AnyTx, ErrorKind, ExecutionError, InstanceId},
     };
-    use exonum_derive::*;
+    use exonum_derive::{
+        exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
+    };
     use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
     use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
     use rand::{rngs::StdRng, seq::SliceRandom};
-    use serde_derive::*;
+    use serde_derive::{Deserialize, Serialize};
 
     use super::gen_keypair_from_rng;
     use crate::proto;
@@ -354,7 +351,7 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{AnyTx, ExecutionError, InstanceId},
     };
-    use exonum_derive::*;
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory as _};
     use futures::sync::mpsc;
     use rand::rngs::StdRng;

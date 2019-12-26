@@ -14,6 +14,7 @@
 
 //! An implementation of `Error` type.
 
+use failure::Fail;
 use std::error::Error as StdError;
 
 /// The error type for I/O operations with the `Database`.
