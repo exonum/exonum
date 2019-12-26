@@ -201,7 +201,7 @@ impl Execute for Transaction {
 
             Transaction::DeployArtifact(artifact_id) => {
                 // Code below will panic if there is already deployed artifact with the
-                // same ID. This sort of expected behaviour, since we're intentionally skipping
+                // same ID. This sort of expected behavior, since we're intentionally skipping
                 // the `start_deploy` step (which will make the test nature much more complex).
                 Dispatcher::commit_artifact(&*context.fork, artifact_id, Vec::new());
                 Ok(())

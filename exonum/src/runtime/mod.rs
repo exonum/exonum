@@ -389,7 +389,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// # Return value
     ///
-    /// This method does not return value, meaning that any error occured during this method execution
+    /// This method does not return a value, meaning that any error occurred during this method execution
     /// is considered critical and should lead to the node stopping.
     ///
     /// It is assumed that if `initiate_adding_service` didn't return an error previously, it is able
