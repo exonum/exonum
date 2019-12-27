@@ -35,7 +35,7 @@ use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, Prefixed},
     impl_object_hash_for_binary_value,
-    migration::Migration,
+    migration::{Migration, MigrationHelper},
     BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
     ProofListIndex, ProofMapIndex, ReadonlyFork, SystemSchema, TemporaryDB,
 };
@@ -260,7 +260,7 @@ fn main() {
     assert_eq!(new_state_hash, migration_view.state_hash());
 
     let mut fork = db.fork();
-    fork.flush_migration("test");
+    MigrationHelper::flush_migration(&mut fork, "test");
     let patch = fork.into_patch();
 
     // Now, the new indexes have replaced the old ones.

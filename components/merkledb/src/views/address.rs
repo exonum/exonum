@@ -150,7 +150,7 @@ impl IndexAddress {
     }
 
     /// Full address with a separator between `name` and `bytes` represented as byte array.
-    pub(super) fn fully_qualified_name(&self) -> Vec<u8> {
+    pub(crate) fn fully_qualified_name(&self) -> Vec<u8> {
         /// Separator between the name and the additional bytes in family indexes.
         const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
         const MIGRATION_PREFIX: &[u8] = &[MIGRATION_CHAR];
