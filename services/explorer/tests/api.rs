@@ -377,7 +377,7 @@ fn test_explorer_transaction_info() {
     assert_eq!(
         info,
         json!({
-            "type": "in-pool",
+            "type": "in_pool",
             "content": tx,
         })
     );

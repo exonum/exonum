@@ -45,7 +45,7 @@ use crate::TestKit;
 pub enum ApiKind {
     /// `api/system` endpoints of the built-in Exonum REST API.
     System,
-    /// `api/explorer` endpoints of the built-in Exonum REST API.
+    /// Endpoints of the REST API of the explorer service.
     Explorer,
     /// `api/runtimes/rust` endpoints corresponding to Rust runtime of the Exonum REST API.
     RustRuntime,
@@ -57,8 +57,7 @@ impl fmt::Display for ApiKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ApiKind::System => write!(formatter, "api/system"),
-            // FIXME: revert to `api/explorer`
-            ApiKind::Explorer => write!(formatter, "api/services/explorer"),
+            ApiKind::Explorer => write!(formatter, "api/explorer"),
             ApiKind::RustRuntime => write!(formatter, "api/runtimes/rust"),
             ApiKind::Service(name) => write!(formatter, "api/services/{}", name),
         }

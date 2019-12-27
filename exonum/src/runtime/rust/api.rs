@@ -353,6 +353,7 @@ pub struct ServiceApiBuilder {
     blockchain: Blockchain,
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
+    root_path: Option<String>,
 }
 
 impl ServiceApiBuilder {
@@ -363,6 +364,7 @@ impl ServiceApiBuilder {
             blockchain: blockchain.clone(),
             public_scope: ServiceApiScope::new(blockchain.clone(), instance),
             private_scope: ServiceApiScope::new(blockchain, instance),
+            root_path: None,
         }
     }
 
@@ -379,6 +381,25 @@ impl ServiceApiBuilder {
     /// Return a reference to the blockchain.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
+    }
+
+    /// Overrides the service root path as opposed to the default `services/$service_name`.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for the path not interfering with root paths of other services
+    /// or that of the Rust runtime (`runtimes/rust`).
+    #[doc(hidden)]
+    pub fn with_root_path(&mut self, root_path: impl Into<String>) -> &mut Self {
+        let root_path = root_path.into();
+        self.root_path = Some(root_path);
+        self
+    }
+
+    /// Takes the root path associated redefined by the service. If the service didn't redefine
+    /// the root path, returns `None`.
+    pub(super) fn take_root_path(&mut self) -> Option<String> {
+        self.root_path.take()
     }
 }
 

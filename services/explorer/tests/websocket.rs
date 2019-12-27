@@ -116,8 +116,8 @@ fn recv_text_msg(client: &mut Client<TcpStream>) -> Option<String> {
 fn test_send_transaction() {
     let node_handler = run_node(6330, 8079);
 
-    let mut client = create_ws_client("ws://localhost:8079/api/services/explorer/v1/ws")
-        .expect("Cannot connect to node");
+    let mut client =
+        create_ws_client("ws://localhost:8079/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -177,9 +177,8 @@ fn test_send_transaction() {
 fn test_blocks_subscribe() {
     let node_handler = run_node(6331, 8080);
 
-    let mut client =
-        create_ws_client("ws://localhost:8080/api/services/explorer/v1/blocks/subscribe")
-            .expect("Cannot connect to node");
+    let mut client = create_ws_client("ws://localhost:8080/api/explorer/v1/blocks/subscribe")
+        .expect("Cannot connect to node");
     client
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(30)))
@@ -208,9 +207,8 @@ fn test_blocks_subscribe() {
 fn test_transactions_subscribe() {
     let node_handler = run_node(6332, 8081);
 
-    let mut client =
-        create_ws_client("ws://localhost:8081/api/services/explorer/v1/transactions/subscribe")
-            .expect("Cannot connect to node");
+    let mut client = create_ws_client("ws://localhost:8081/api/explorer/v1/transactions/subscribe")
+        .expect("Cannot connect to node");
     client
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -222,7 +220,7 @@ fn test_transactions_subscribe() {
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
-        .post("http://localhost:8081/api/services/explorer/v1/transactions")
+        .post("http://localhost:8081/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -255,7 +253,7 @@ fn test_transactions_subscribe_with_filter() {
 
     // Create client with filter
     let mut client = create_ws_client(&format!(
-        "ws://localhost:8082/api/services/explorer/v1/transactions/subscribe?service_id={}&message_id=0",
+        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id={}&message_id=0",
         SERVICE_ID
     ))
     .expect("Cannot connect to node");
@@ -268,7 +266,7 @@ fn test_transactions_subscribe_with_filter() {
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
-        .post("http://localhost:8082/api/services/explorer/v1/transactions")
+        .post("http://localhost:8082/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -289,7 +287,7 @@ fn test_transactions_subscribe_with_filter() {
     let tx = alice.reset(SERVICE_ID, ());
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
-        .post("http://localhost:8082/api/services/explorer/v1/transactions")
+        .post("http://localhost:8082/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -313,7 +311,7 @@ fn test_transactions_subscribe_with_partial_filter() {
 
     // Create client with filter
     let mut client = create_ws_client(&format!(
-        "ws://localhost:8083/api/services/explorer/v1/transactions/subscribe?service_id={}",
+        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id={}",
         SERVICE_ID
     ))
     .expect("Cannot connect to node");
@@ -326,7 +324,7 @@ fn test_transactions_subscribe_with_partial_filter() {
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
-        .post("http://localhost:8083/api/services/explorer/v1/transactions")
+        .post("http://localhost:8083/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -347,7 +345,7 @@ fn test_transactions_subscribe_with_partial_filter() {
     let tx = alice.reset(SERVICE_ID, ());
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
-        .post("http://localhost:8083/api/services/explorer/v1/transactions")
+        .post("http://localhost:8083/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -378,10 +376,9 @@ fn test_transactions_subscribe_with_partial_filter() {
 fn test_transactions_subscribe_with_bad_filter() {
     let node_handler = run_node(6335, 8084);
     // `service_id` is missing from the filter.
-    let mut client = create_ws_client(
-        "ws://localhost:8084/api/services/explorer/v1/transactions/subscribe?message_id=0",
-    )
-    .unwrap();
+    let mut client =
+        create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?message_id=0")
+            .unwrap();
 
     client
         .stream_ref()
@@ -391,7 +388,7 @@ fn test_transactions_subscribe_with_bad_filter() {
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
-        .post("http://localhost:8084/api/services/explorer/v1/transactions")
+        .post("http://localhost:8084/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -413,8 +410,8 @@ fn test_transactions_subscribe_with_bad_filter() {
 fn test_subscribe() {
     let node_handler = run_node(6336, 8085);
 
-    let mut client = create_ws_client("ws://localhost:8085/api/services/explorer/v1/ws")
-        .expect("Cannot connect to node");
+    let mut client =
+        create_ws_client("ws://localhost:8085/api/explorer/v1/ws").expect("Cannot connect to node");
     client
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(10)))
@@ -462,7 +459,7 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
 
     let mut clients = (0..8)
         .map(|_| {
-            let client = create_ws_client("ws://localhost:8086/api/services/explorer/v1/ws")
+            let client = create_ws_client("ws://localhost:8086/api/explorer/v1/ws")
                 .expect("Cannot connect to node");
             client
                 .stream_ref()
@@ -500,9 +497,8 @@ fn test_blocks_and_tx_both_subscribe() {
     let node_handler = run_node(6338, 8087);
 
     // Open block ws first
-    let mut block_client =
-        create_ws_client("ws://localhost:8087/api/services/explorer/v1/blocks/subscribe")
-            .expect("Cannot connect to node");
+    let mut block_client = create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
+        .expect("Cannot connect to node");
     block_client
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
@@ -520,7 +516,7 @@ fn test_blocks_and_tx_both_subscribe() {
 
     // Open tx ws and test it
     let mut tx_client =
-        create_ws_client("ws://localhost:8087/api/services/explorer/v1/transactions/subscribe")
+        create_ws_client("ws://localhost:8087/api/explorer/v1/transactions/subscribe")
             .expect("Cannot connect to node");
     tx_client
         .stream_ref()
@@ -532,7 +528,7 @@ fn test_blocks_and_tx_both_subscribe() {
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
-        .post("http://localhost:8087/api/services/explorer/v1/transactions")
+        .post("http://localhost:8087/api/explorer/v1/transactions")
         .json(&tx_json)
         .send()
         .unwrap();
@@ -551,7 +547,7 @@ fn test_blocks_and_tx_both_subscribe() {
 
     // Open block ws and check it receives data again
     let mut block_again_client =
-        create_ws_client("ws://localhost:8087/api/services/explorer/v1/blocks/subscribe")
+        create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
             .expect("Cannot connect to node");
     block_again_client
         .stream_ref()

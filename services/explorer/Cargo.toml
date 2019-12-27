@@ -33,6 +33,7 @@ rand = "0.7"
 
 [dev-dependencies]
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
+exonum-supervisor = { version = "0.13.0-rc.2", path = "../supervisor" }
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
 
 assert_matches = "1.3.0"
