@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Testing framework for data migrations.
+//!
+//! FIXME: more documentation, examples
+
 use exonum::{
     merkledb::{
         access::Prefixed, migration::MigrationHelper, Database, Fork, Snapshot, TemporaryDB,
     },
     runtime::{
-        migrations::{MigrateData, MigrationContext, Version},
+        migrations::{MigrateData, MigrationContext, MigrationScript, Version},
         rust::ServiceFactory,
         InstanceSpec,
     },
@@ -30,14 +34,14 @@ use std::sync::Arc;
 pub struct MigrationTest<S> {
     db: Arc<dyn Database>,
     service_factory: S,
-    start_version: Version,
+    data_version: Version,
     start_snapshot: Option<Box<dyn Snapshot>>,
     end_snapshot: Option<Box<dyn Snapshot>>,
 }
 
 impl<S> MigrationTest<S>
 where
-    S: ServiceFactory + MigrateData,
+    S: ServiceFactory,
 {
     const SERVICE_NAME: &'static str = "test";
 
@@ -46,7 +50,7 @@ where
         Self {
             db: Arc::new(TemporaryDB::new()),
             service_factory,
-            start_version,
+            data_version: start_version,
             start_snapshot: None,
             end_snapshot: None,
         }
@@ -61,40 +65,6 @@ where
         let access = Prefixed::new(Self::SERVICE_NAME, &fork);
         setup(access);
         self.db.merge(fork.into_patch()).unwrap();
-        self
-    }
-
-    /// Performs the migration and returns the migrated data.
-    pub fn migrate(&mut self) -> &mut Self {
-        let mut artifact = self.service_factory.artifact_id();
-        artifact.version = self.start_version.clone();
-        let instance = InstanceSpec {
-            id: 100,
-            name: "test".to_owned(),
-            artifact,
-        };
-
-        let scripts = self
-            .service_factory
-            .migration_scripts(&self.start_version)
-            .expect("Failed to extract migration scripts");
-
-        self.start_snapshot = Some(self.db.snapshot());
-
-        for script in scripts {
-            let mut context = MigrationContext {
-                helper: MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
-                instance_spec: instance.clone(),
-            };
-            script.execute(&mut context);
-            context.helper.finish().unwrap();
-
-            let mut fork = self.db.fork();
-            fork.flush_migration(&Self::SERVICE_NAME);
-            self.db.merge(fork.into_patch()).unwrap();
-        }
-
-        self.end_snapshot = Some(self.db.snapshot());
         self
     }
 
@@ -114,5 +84,173 @@ where
             .as_ref()
             .expect("Cannot take snapshot before `migrate` method is called");
         Prefixed::new(Self::SERVICE_NAME, snapshot)
+    }
+
+    /// Executes a single migration script.
+    pub fn execute_script(&mut self, script: MigrationScript) -> &mut Self {
+        self.start_snapshot = Some(self.db.snapshot());
+        self.do_execute_script(script);
+        self.end_snapshot = Some(self.db.snapshot());
+        self
+    }
+
+    fn do_execute_script(&mut self, script: MigrationScript) {
+        let mut artifact = self.service_factory.artifact_id();
+        artifact.version = self.data_version.clone();
+        let instance_spec = InstanceSpec {
+            id: 100,
+            name: Self::SERVICE_NAME.to_owned(),
+            artifact,
+        };
+
+        let mut context = MigrationContext {
+            helper: MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
+            instance_spec,
+        };
+        let end_version = script.end_version().to_owned();
+        script.execute(&mut context);
+        context.helper.finish().unwrap();
+
+        let mut fork = self.db.fork();
+        fork.flush_migration(Self::SERVICE_NAME);
+        self.db.merge(fork.into_patch()).unwrap();
+        self.data_version = end_version;
+    }
+}
+
+impl<S> MigrationTest<S>
+where
+    S: ServiceFactory + MigrateData,
+{
+    /// Performs the migration based on the `MigrateData` implementation.
+    pub fn migrate(&mut self) -> &mut Self {
+        let scripts = self
+            .service_factory
+            .migration_scripts(&self.data_version)
+            .expect("Failed to extract migration scripts");
+
+        self.start_snapshot = Some(self.db.snapshot());
+        for script in scripts {
+            self.do_execute_script(script);
+        }
+        self.end_snapshot = Some(self.db.snapshot());
+        self
+    }
+}
+
+/// Extension trait to build `MigrationScript`s easily.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::runtime::migrations::{MigrationContext, MigrationScript};
+/// # use exonum_derive::*;
+/// use exonum_testkit::migrations::ScriptExt as _;
+///
+/// fn some_script(ctx: &mut MigrationContext) {
+///     // business logic skipped
+/// }
+///
+/// let script: MigrationScript = some_script.with_end_version("0.2.0");
+/// ```
+pub trait ScriptExt {
+    /// Converts a function to a migration script.
+    fn with_end_version(self, version: &str) -> MigrationScript;
+}
+
+impl<F> ScriptExt for F
+where
+    F: FnOnce(&mut MigrationContext) + Send + 'static,
+{
+    fn with_end_version(self, version: &str) -> MigrationScript {
+        MigrationScript::new(self, version.parse().expect("Cannot parse end version"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use exonum::runtime::{
+        migrations::DataMigrationError,
+        rust::{ArtifactProtobufSpec, Service},
+        ArtifactId,
+    };
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+
+    fn script_1(ctx: &mut MigrationContext) {
+        assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 1, 0));
+    }
+
+    fn script_2(ctx: &mut MigrationContext) {
+        assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 2, 0));
+    }
+
+    #[derive(Debug, Clone, Default)]
+    struct SomeService {
+        script_counters: [Arc<AtomicUsize>; 2],
+    }
+
+    impl ServiceFactory for SomeService {
+        fn artifact_id(&self) -> ArtifactId {
+            ArtifactId {
+                runtime_id: 0,
+                name: "exonum.test.Migrations".to_owned(),
+                version: Version::new(0, 3, 2),
+            }
+        }
+
+        fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+            ArtifactProtobufSpec::default()
+        }
+
+        fn create_instance(&self) -> Box<dyn Service> {
+            unimplemented!()
+        }
+    }
+
+    impl MigrateData for SomeService {
+        fn migration_scripts(
+            &self,
+            _: &Version,
+        ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+            let first_counter = Arc::clone(&self.script_counters[0]);
+            let second_counter = Arc::clone(&self.script_counters[1]);
+
+            Ok(vec![
+                (move |ctx: &mut MigrationContext| {
+                    script_1(ctx);
+                    first_counter.fetch_add(1, Ordering::SeqCst);
+                })
+                .with_end_version("0.2.0"),
+                (move |ctx: &mut MigrationContext| {
+                    script_2(ctx);
+                    second_counter.fetch_add(1, Ordering::SeqCst);
+                })
+                .with_end_version("0.3.0"),
+            ])
+        }
+    }
+
+    #[test]
+    fn start_version_is_updated_between_scripts() {
+        let mut test = MigrationTest::new(SomeService::default(), Version::new(0, 1, 0));
+        test.setup(|_| {})
+            .execute_script(script_1.with_end_version("0.2.0"))
+            .execute_script(script_2.with_end_version("0.3.0"));
+        assert_eq!(test.data_version, Version::new(0, 3, 0));
+    }
+
+    #[test]
+    fn migrate_calls_all_scripts() {
+        let factory = SomeService::default();
+        let mut test = MigrationTest::new(factory.clone(), Version::new(0, 1, 0));
+        test.setup(|_| {}).migrate();
+        assert_eq!(test.data_version, Version::new(0, 3, 0));
+        assert_eq!(factory.script_counters[0].load(Ordering::SeqCst), 1);
+        assert_eq!(factory.script_counters[1].load(Ordering::SeqCst), 1);
     }
 }

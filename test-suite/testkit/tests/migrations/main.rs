@@ -30,7 +30,7 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use std::borrow::Cow;
 
-use exonum_testkit::MigrationTest;
+use exonum_testkit::migrations::{MigrationTest, ScriptExt};
 
 mod proto;
 
@@ -257,7 +257,7 @@ fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) {
         }
         ctx.helper.merge().unwrap();
     }
-    // FIXME: Remove "__next_key"
+    // FIXME: Remove "__next_key", introduce persistent iterator in `MigrationHelper`
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
@@ -348,31 +348,6 @@ fn migration_with_large_data() {
     v05::verify_schema(snapshot, &users);
 }
 
-#[derive(Debug, ServiceFactory)]
-#[service_factory(
-    artifact_name = "exonum.test.Migration",
-    artifact_version = "0.3.0",
-    service_constructor = "Self::new_instance"
-)]
-struct MigratedServiceWithMerges;
-
-impl MigratedServiceWithMerges {
-    fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(MigratedService)
-    }
-}
-
-impl MigrateData for MigratedServiceWithMerges {
-    fn migration_scripts(
-        &self,
-        start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        LinearMigrations::new(self.artifact_id().version)
-            .add_script(Version::new(0, 2, 0), merkelize_wallets_with_merges)
-            .select(start_version)
-    }
-}
-
 #[test]
 fn migration_with_large_data_and_merges() {
     const USER_COUNT: usize = 3_456;
@@ -380,10 +355,10 @@ fn migration_with_large_data_and_merges() {
     let mut rng = thread_rng();
     let users = generate_users(&mut rng, USER_COUNT);
 
-    let mut test = MigrationTest::new(MigratedServiceWithMerges, Version::new(0, 1, 0));
+    let mut test = MigrationTest::new(MigratedService, Version::new(0, 1, 0));
     let snapshot = test
         .setup(|fork| v01::generate_test_data(fork, &users))
-        .migrate()
+        .execute_script(merkelize_wallets_with_merges.with_end_version("0.2.0"))
         .end_snapshot();
     v02::verify_schema(snapshot, &users);
 }
