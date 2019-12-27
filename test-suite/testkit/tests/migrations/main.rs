@@ -14,13 +14,16 @@
 
 // cspell:ignore Trillian, Vogon
 
-use exonum::crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed};
-use exonum::runtime::{
-    migrations::{
-        DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
-        Version,
+use exonum::{
+    crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
+    merkledb::access::AccessExt,
+    runtime::{
+        migrations::{
+            DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
+            Version,
+        },
+        rust::{Service, ServiceFactory},
     },
-    rust::{Service, ServiceFactory},
 };
 use exonum_derive::*;
 use rand::{seq::SliceRandom, thread_rng, Rng};
@@ -117,14 +120,34 @@ mod v01 {
 mod v02 {
     use exonum_crypto::PublicKey;
     use exonum_derive::*;
-    use exonum_merkledb::{access::Access, ProofEntry, ProofMapIndex};
+    use exonum_merkledb::{
+        access::{Access, Prefixed},
+        ProofEntry, ProofMapIndex, Snapshot,
+    };
 
-    use super::v01::Wallet;
+    use crate::{v01::Wallet, TestUser};
 
     #[derive(Debug, FromAccess)]
     pub struct Schema<T: Access> {
         pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
         pub total_balance: ProofEntry<T::Base, u64>,
+    }
+
+    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>, users: &[TestUser]) {
+        let schema = Schema::new(snapshot);
+        for user in users {
+            let (key, _) = user.keypair();
+            let wallet = schema.wallets.get(&key).unwrap();
+            assert_eq!(wallet.balance, user.balance);
+            assert_eq!(wallet.username, user.full_name);
+        }
+        assert_eq!(schema.wallets.iter().count(), users.len());
+
+        let total_balance = schema.total_balance.get().unwrap();
+        assert_eq!(
+            total_balance,
+            users.iter().map(|user| user.balance).sum::<u64>()
+        );
     }
 }
 
@@ -191,12 +214,50 @@ fn merkelize_wallets(ctx: &mut MigrationContext) {
     let mut new_schema = v02::Schema::new(ctx.helper.new_data());
 
     let mut total_balance = 0;
-    new_schema.total_balance.set(total_balance);
     for (key, wallet) in &old_schema.wallets {
         total_balance += wallet.balance;
         new_schema.wallets.put(&key, wallet);
     }
     new_schema.total_balance.set(total_balance);
+}
+
+/// The alternative version of the previous migration script, which uses database merges.
+fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) {
+    const CHUNK_SIZE: usize = 500;
+
+    loop {
+        {
+            let old_schema = v01::Schema::new(ctx.helper.old_data());
+            let mut new_schema = v02::Schema::new(ctx.helper.new_data());
+
+            let mut next_key_entry = ctx
+                .helper
+                .new_data()
+                .get_entry::<_, PublicKey>("__next_key");
+            let next_key = next_key_entry.take();
+            let mut iter = if let Some(next_key) = next_key {
+                old_schema.wallets.iter_from(&next_key)
+            } else {
+                old_schema.wallets.iter()
+            };
+
+            let mut total_balance = 0;
+            for (key, wallet) in iter.by_ref().take(CHUNK_SIZE) {
+                total_balance += wallet.balance;
+                new_schema.wallets.put(&key, wallet);
+            }
+            let prev_balance = new_schema.total_balance.get().unwrap_or(0);
+            new_schema.total_balance.set(prev_balance + total_balance);
+
+            if let Some((key, _)) = iter.next() {
+                next_key_entry.set(key);
+            } else {
+                break;
+            }
+        }
+        ctx.helper.merge().unwrap();
+    }
+    // FIXME: Remove "__next_key"
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
@@ -227,7 +288,7 @@ fn transform_wallet_type(ctx: &mut MigrationContext) {
     }
 }
 
-// FIXME: add incorrect and correct migrations with DB merges
+// FIXME: add incorrect migration with DB merges and test it
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.6.2")]
@@ -257,14 +318,10 @@ fn migration_with_two_scripts() {
     v05::verify_schema(snapshot, USERS);
 }
 
-#[test]
-fn migration_with_large_data() {
-    const USER_COUNT: usize = 10_000;
-
-    let mut rng = thread_rng();
-    let users: Vec<_> = (0..USER_COUNT)
+fn generate_users(rng: &mut impl Rng, user_count: usize) -> Vec<TestUser> {
+    (0..user_count)
         .map(|i| {
-            let first_name = ["Mouse", "Vogon"].choose(&mut rng).unwrap().to_string();
+            let first_name = ["Mouse", "Vogon"].choose(rng).unwrap().to_string();
             let last_name = format!("#{}", i);
             TestUser {
                 full_name: format!("{} {}", first_name, last_name).into(),
@@ -273,7 +330,15 @@ fn migration_with_large_data() {
                 balance: rng.gen_range(0, 10_000),
             }
         })
-        .collect();
+        .collect()
+}
+
+#[test]
+fn migration_with_large_data() {
+    const USER_COUNT: usize = 1_234;
+
+    let mut rng = thread_rng();
+    let users = generate_users(&mut rng, USER_COUNT);
 
     let mut test = MigrationTest::new(MigratedService, Version::new(0, 1, 0));
     let snapshot = test
@@ -281,4 +346,44 @@ fn migration_with_large_data() {
         .migrate()
         .end_snapshot();
     v05::verify_schema(snapshot, &users);
+}
+
+#[derive(Debug, ServiceFactory)]
+#[service_factory(
+    artifact_name = "exonum.test.Migration",
+    artifact_version = "0.3.0",
+    service_constructor = "Self::new_instance"
+)]
+struct MigratedServiceWithMerges;
+
+impl MigratedServiceWithMerges {
+    fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(MigratedService)
+    }
+}
+
+impl MigrateData for MigratedServiceWithMerges {
+    fn migration_scripts(
+        &self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        LinearMigrations::new(self.artifact_id().version)
+            .add_script(Version::new(0, 2, 0), merkelize_wallets_with_merges)
+            .select(start_version)
+    }
+}
+
+#[test]
+fn migration_with_large_data_and_merges() {
+    const USER_COUNT: usize = 3_456;
+
+    let mut rng = thread_rng();
+    let users = generate_users(&mut rng, USER_COUNT);
+
+    let mut test = MigrationTest::new(MigratedServiceWithMerges, Version::new(0, 1, 0));
+    let snapshot = test
+        .setup(|fork| v01::generate_test_data(fork, &users))
+        .migrate()
+        .end_snapshot();
+    v02::verify_schema(snapshot, &users);
 }
