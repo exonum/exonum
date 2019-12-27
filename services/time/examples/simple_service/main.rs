@@ -18,12 +18,16 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
-    merkledb::{access::Access, ProofMapIndex},
-    runtime::{ExecutionError, InstanceId, SnapshotExt},
+    merkledb::{
+        access::{Access, FromAccess},
+        ProofMapIndex,
+    },
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{
+    CallContext, ExecutionError, InstanceId, Service, ServiceFactory, SnapshotExt,
+};
 use exonum_testkit::TestKitBuilder;
 use serde_derive::*;
 
@@ -71,9 +75,17 @@ pub trait MarkerTransactions<Ctx> {
 struct MarkerService;
 
 /// Marker service database schema.
-#[derive(Debug, FromAccess)]
+#[derive(Debug, FromAccess, RequireArtifact)]
+#[require_artifact(name = "marker", version = "0.1.x")]
+// ^-- Must match the name / version specified for `MarkerService`.
 pub struct MarkerSchema<T: Access> {
     pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
+}
+
+impl<T: Access> MarkerSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl MarkerTransactions<CallContext<'_>> for MarkerService {
@@ -86,10 +98,8 @@ impl MarkerTransactions<CallContext<'_>> for MarkerService {
             .expect("Wrong `TxMarker` initiator");
 
         let data = context.data();
-        let time_service_data = data
-            .for_service(TIME_SERVICE_NAME)
-            .expect("No time service data");
-        let time = TimeSchema::new(time_service_data).time.get();
+        let time_schema: TimeSchema<_> = data.service_schema(TIME_SERVICE_NAME)?;
+        let time = time_schema.time.get();
         match time {
             Some(current_time) if current_time <= arg.time => {
                 let mut schema = MarkerSchema::new(context.service_data());
@@ -138,8 +148,7 @@ fn main() {
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
-    let snapshot = snapshot.for_service(TIME_SERVICE_NAME).unwrap();
-    let time_schema = TimeSchema::new(snapshot);
+    let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
     assert_eq!(
         time_schema.time.get().map(|time| time),
         Some(mock_provider.time())
@@ -160,7 +169,7 @@ fn main() {
     testkit.create_block_with_transactions(vec![tx1, tx2, tx3]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(snapshot.for_service(SERVICE_NAME).unwrap());
+    let schema: MarkerSchema<_> = snapshot.service_schema(SERVICE_NAME).unwrap();
     assert_eq!(schema.marks.get(&keypair1.0), Some(1));
     assert_eq!(schema.marks.get(&keypair2.0), Some(2));
     assert_eq!(schema.marks.get(&keypair3.0), None);
@@ -169,6 +178,6 @@ fn main() {
     testkit.create_block_with_transactions(vec![tx4]);
 
     let snapshot = testkit.snapshot();
-    let schema = MarkerSchema::new(snapshot.for_service(SERVICE_NAME).unwrap());
+    let schema: MarkerSchema<_> = snapshot.service_schema(SERVICE_NAME).unwrap();
     assert_eq!(schema.marks.get(&keypair3.0), Some(4));
 }

@@ -16,9 +16,6 @@
 //! integration test, with the difference that the balance of each created wallet increases by 1
 //! on each block. Correspondingly, the initial wallet balance is set to 0.
 
-#[macro_use]
-extern crate pretty_assertions;
-
 use exonum::{
     api::node::public::explorer::TransactionResponse,
     crypto::{self, PublicKey, SecretKey},
@@ -27,6 +24,7 @@ use exonum::{
 };
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use pretty_assertions::assert_eq;
 use rand::Rng;
 use serde_json::json;
 

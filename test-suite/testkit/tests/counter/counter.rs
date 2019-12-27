@@ -26,7 +26,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, RawAccessMut},
+    access::{Access, FromAccess, RawAccessMut},
     ObjectHash, ProofEntry,
 };
 use exonum_rust_runtime::{
@@ -42,9 +42,16 @@ use std::{collections::HashSet, sync::Arc};
 pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 2;
 
-#[derive(FromAccess)]
+#[derive(FromAccess, RequireArtifact)]
+#[require_artifact(name = "counter-service", version = "1")]
 pub struct CounterSchema<T: Access> {
     pub counter: ProofEntry<T::Base, u64>,
+}
+
+impl<T: Access> CounterSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T> CounterSchema<T>

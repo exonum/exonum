@@ -39,6 +39,7 @@ fn main() {
         .with_input_dir("src/proto/schema/exonum")
         .with_crypto()
         .with_common()
+        .with_merkledb()
         .generate();
 }
 

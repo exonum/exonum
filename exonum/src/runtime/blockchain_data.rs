@@ -13,11 +13,14 @@
 // limitations under the License.
 
 use exonum_merkledb::{
-    access::{AsReadonly, Prefixed, RawAccess},
+    access::{AsReadonly, FromAccess, Prefixed, RawAccess},
     Snapshot, SystemSchema,
 };
 
-use super::{DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceStatus};
+use super::{
+    versioning::{ArtifactReqError, RequireArtifact},
+    DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceSpec, InstanceStatus,
+};
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
 /// Provides access to blockchain data for the executing service.
@@ -50,14 +53,38 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// Returns a mount point for another service. If the service with `id` does not exist,
     /// returns `None`.
     ///
-    /// Note that this method does not check the service type; the caller is responsible
+    /// # Safety
+    ///
+    /// This method does not check the service type; the caller is responsible
     /// for constructing a schema of a correct type around the returned access. Constructing
-    /// an incorrect schema can lead to a panic or unexpected behavior.
+    /// an incorrect schema can lead to a panic or unexpected behavior. Use [`service_schema`]
+    /// as a safer alternative, which performs all necessary checks.
+    ///
+    /// [`service_schema`]: #method.service_schema
     pub fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
     ) -> Option<Prefixed<'static, T::Readonly>> {
-        mount_point_for_service(self.access.as_readonly(), id)
+        mount_point_for_service(self.access.as_readonly(), id).map(|(access, _)| access)
+    }
+
+    /// Retrieves schema for a service.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in the following situations (see [`ArtifactReqError`] for more details):
+    ///
+    /// - Service with the given ID does not exist
+    /// - Service has an unexpected artifact name
+    /// - Service has an incompatible artifact version
+    ///
+    /// [`ArtifactReqError`]: versioning/enum.ArtifactReqError.html
+    pub fn service_schema<'q, S, I>(&self, service_id: I) -> Result<S, ArtifactReqError>
+    where
+        S: RequireArtifact + FromAccess<Prefixed<'static, T::Readonly>>,
+        I: Into<InstanceQuery<'q>>,
+    {
+        schema_for_service(self.access.as_readonly(), service_id)
     }
 
     /// Returns a mount point for the data of the executing service instance.
@@ -88,14 +115,30 @@ impl BlockchainData<'_, &dyn Snapshot> {
 fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
-) -> Option<Prefixed<'static, T>> {
+) -> Option<(Prefixed<'static, T>, InstanceSpec)> {
     let state = DispatcherSchema::new(access.clone())
         .get_instance(id)
         .filter(|state| match (state.status, state.pending_status) {
             (Some(InstanceStatus::Active), _) | (None, Some(InstanceStatus::Active)) => true,
             _ => false,
         })?;
-    Some(Prefixed::new(state.spec.name, access))
+    Some((Prefixed::new(state.spec.name.clone(), access), state.spec))
+}
+
+fn schema_for_service<'q, T, S>(
+    access: T,
+    service_id: impl Into<InstanceQuery<'q>>,
+) -> Result<S, ArtifactReqError>
+where
+    T: RawAccess,
+    S: RequireArtifact + FromAccess<Prefixed<'static, T>>,
+{
+    let (access, spec) =
+        mount_point_for_service(access, service_id).ok_or(ArtifactReqError::NoService)?;
+
+    let artifact_req = S::required_artifact();
+    artifact_req.try_match(&spec.artifact)?;
+    Ok(S::from_root(access).unwrap())
 }
 
 /// Extension trait for `Snapshot` allowing to access blockchain data in a more structured way.
@@ -104,7 +147,17 @@ pub trait SnapshotExt {
     fn for_core(&self) -> CoreSchema<&'_ dyn Snapshot>;
     /// Returns dispatcher schema.
     fn for_dispatcher(&self) -> DispatcherSchema<&'_ dyn Snapshot>;
+
     /// Returns a mount point for a service. If the service does not exist, returns `None`.
+    ///
+    /// # Safety
+    ///
+    /// This method does not check the service type; the caller is responsible
+    /// for constructing a schema of a correct type around the returned access. Constructing
+    /// an incorrect schema can lead to a panic or unexpected behavior. Use [`service_schema`]
+    /// as a safer alternative, which performs all necessary checks.
+    ///
+    /// [`service_schema`]: #tymethod.service_schema
     fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
@@ -121,6 +174,22 @@ pub trait SnapshotExt {
     /// (e.g., during service initialization).
     #[doc(hidden)]
     fn proof_for_index(&self, index_name: &str) -> Option<IndexProof>;
+
+    /// Retrieves schema for a service.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error in the following situations (see [`ArtifactReqError`] for more details):
+    ///
+    /// - Service with the given ID does not exist
+    /// - Service has an unexpected artifact name
+    /// - Service has an incompatible artifact version
+    ///
+    /// [`ArtifactReqError`]: versioning/enum.ArtifactReqError.html
+    fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>
+    where
+        S: RequireArtifact + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
+        I: Into<InstanceQuery<'q>>;
 }
 
 impl SnapshotExt for dyn Snapshot {
@@ -136,7 +205,7 @@ impl SnapshotExt for dyn Snapshot {
         &self,
         id: impl Into<InstanceQuery<'q>>,
     ) -> Option<Prefixed<'static, &dyn Snapshot>> {
-        mount_point_for_service(self, id)
+        mount_point_for_service(self, id).map(|(access, _)| access)
     }
 
     fn proof_for_index(&self, index_name: &str) -> Option<IndexProof> {
@@ -151,5 +220,13 @@ impl SnapshotExt for dyn Snapshot {
             block_proof,
             index_proof,
         })
+    }
+
+    fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>
+    where
+        S: RequireArtifact + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
+        I: Into<InstanceQuery<'q>>,
+    {
+        schema_for_service(self, service_id)
     }
 }

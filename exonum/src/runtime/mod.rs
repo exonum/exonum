@@ -156,6 +156,8 @@ pub use self::{
     },
 };
 
+pub mod versioning;
+
 use futures::Future;
 
 use std::fmt;

@@ -18,7 +18,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, AccessExt},
+    access::{Access, AccessExt, FromAccess},
     Entry, ObjectHash,
 };
 use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
@@ -38,6 +38,12 @@ pub struct ConfigChangeService;
 #[derive(Debug, FromAccess)]
 pub struct Schema<T: Access> {
     params: Entry<T::Base, String>,
+}
+
+impl<T: Access> Schema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl Service for ConfigChangeService {}

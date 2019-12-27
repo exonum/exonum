@@ -26,11 +26,6 @@
     missing_debug_implementations
 )]
 
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate exonum_derive;
-
 /// Node API.
 pub mod api;
 /// Protobuf generated structs.
@@ -42,6 +37,7 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, Service};
 
 use std::sync::Arc;

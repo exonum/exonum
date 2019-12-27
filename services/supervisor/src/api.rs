@@ -20,7 +20,7 @@ use exonum_rust_runtime::{
 use failure::Fail;
 
 use super::{
-    schema::Schema, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
+    schema::SchemaImpl, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
     ConfigVote, DeployRequest, SupervisorConfig,
 };
 
@@ -89,12 +89,13 @@ impl PrivateApi for ApiImpl<'_> {
     }
 
     fn configuration_number(&self) -> Result<u64, Self::Error> {
-        let configuration_number = Schema::new(self.0.service_data()).get_configuration_number();
+        let configuration_number =
+            SchemaImpl::new(self.0.service_data()).get_configuration_number();
         Ok(configuration_number)
     }
 
     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
-        let config = Schema::new(self.0.service_data()).supervisor_config();
+        let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
         Ok(config)
     }
 }
@@ -107,7 +108,10 @@ impl PublicApi for ApiImpl<'_> {
     }
 
     fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
-        Ok(Schema::new(self.0.service_data()).pending_proposal.get())
+        Ok(SchemaImpl::new(self.0.service_data())
+            .public
+            .pending_proposal
+            .get())
     }
 }
 

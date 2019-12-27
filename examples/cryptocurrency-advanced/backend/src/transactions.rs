@@ -22,7 +22,7 @@ use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::CallContext;
 
-use super::{proto, schema::Schema, CryptocurrencyService};
+use super::{proto, schema::SchemaImpl, CryptocurrencyService};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, ExecutionFail)]
@@ -118,7 +118,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         let to = arg.to;
         let amount = arg.amount;
@@ -126,8 +126,16 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             return Err(Error::SenderSameAsReceiver.into());
         }
 
-        let sender = schema.wallets.get(&from).ok_or(Error::SenderNotFound)?;
-        let receiver = schema.wallets.get(&to).ok_or(Error::ReceiverNotFound)?;
+        let sender = schema
+            .public
+            .wallets
+            .get(&from)
+            .ok_or(Error::SenderNotFound)?;
+        let receiver = schema
+            .public
+            .wallets
+            .get(&to)
+            .ok_or(Error::ReceiverNotFound)?;
         if sender.balance < amount {
             Err(Error::InsufficientCurrencyAmount.into())
         } else {
@@ -143,8 +151,8 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let mut schema = Schema::new(context.service_data());
-        if let Some(wallet) = schema.wallets.get(&from) {
+        let mut schema = SchemaImpl::new(context.service_data());
+        if let Some(wallet) = schema.public.wallets.get(&from) {
             let amount = arg.amount;
             schema.increase_wallet_balance(wallet, amount, tx_hash);
             Ok(())
@@ -159,8 +167,8 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             .as_transaction()
             .ok_or(DispatcherError::UnauthorizedCaller)?;
 
-        let mut schema = Schema::new(context.service_data());
-        if schema.wallets.get(&from).is_none() {
+        let mut schema = SchemaImpl::new(context.service_data());
+        if schema.public.wallets.get(&from).is_none() {
             let name = &arg.name;
             schema.create_wallet(&from, name, tx_hash);
             Ok(())

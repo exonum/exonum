@@ -4,7 +4,8 @@ use exonum_derive::FromAccess;
 
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, RawAccessMut},
-    BinaryKey, Database, Entry, Group, Lazy, ListIndex, ObjectHash, ProofMapIndex, TemporaryDB,
+    BinaryKey, Database, Entry, Group, Lazy, ListIndex, ObjectHash, ProofEntry, ProofMapIndex,
+    TemporaryDB,
 };
 
 #[derive(FromAccess)]
@@ -32,7 +33,6 @@ where
 }
 
 #[derive(FromAccess)]
-// Since the name ends with `Schema`, the `new` constructor is derived automatically
 struct ComplexSchema<T: Access> {
     count: Entry<T::Base, u64>,
     generic: Generic<T, String>,
@@ -57,7 +57,7 @@ fn embedded_components() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     {
-        let mut complex = ComplexSchema::new(&fork);
+        let mut complex = ComplexSchema::from_root(&fork).unwrap();
         assert!(!complex.count.exists());
         complex.modify(1, "!".to_owned());
         complex.modify(2, "!!".to_owned());
@@ -179,42 +179,105 @@ fn component_with_implicit_type_param() {
     let db = TemporaryDB::new();
     let fork = db.fork();
     fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = Schema::new(&fork);
+    let schema = Schema::from_root(&fork).unwrap();
     assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
 }
 
 #[test]
-fn schema_with_non_standard_naming() {
-    #[derive(FromAccess)]
-    #[from_access(schema)]
-    struct NonStandard<T: Access> {
-        map: ProofMapIndex<T::Base, u64, u64>,
+fn public_schema_pattern() {
+    #[derive(Debug, FromAccess)]
+    struct Schema<T: Access> {
+        pub wallets: ProofMapIndex<T::Base, str, u64>,
+        pub total_balance: ProofEntry<T::Base, u64>,
+    }
+
+    #[derive(Debug, FromAccess)]
+    struct SchemaImpl<T: Access> {
+        /// Flattened components are useful to split schemas into a public interface
+        /// and implementation details.
+        #[from_access(flatten)]
+        public: Schema<T>,
+        private_entry: Entry<T::Base, String>,
+        private_list: ListIndex<T::Base, u64>,
     }
 
     let db = TemporaryDB::new();
     let fork = db.fork();
-    fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = NonStandard::new(&fork);
-    assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
+    {
+        let mut schema: SchemaImpl<_> = SchemaImpl::from_root(&fork).unwrap();
+        schema.public.wallets.put("Alice", 10);
+        schema.public.wallets.put("Bob", 20);
+        schema.public.total_balance.set(30);
+        schema.private_entry.set("XNM".to_owned());
+        schema.private_list.extend(vec![10, 20]);
+    }
+
+    let interface = Schema::from_root(fork.readonly()).unwrap();
+    assert_eq!(interface.wallets.values().sum::<u64>(), 30);
+    assert_eq!(interface.total_balance.get(), Some(30));
 }
 
 #[test]
-fn opt_out_from_schema() {
+fn flattened_unnamed_fields() {
     #[derive(FromAccess)]
-    #[from_access(schema = false)]
-    struct NotSchema<T: Access> {
-        map: ProofMapIndex<T::Base, u64, u64>,
+    struct Flattened<T: Access> {
+        entry: Entry<T::Base, String>,
+        other_entry: Entry<T::Base, u64>,
     }
 
-    impl<T: Access> NotSchema<T> {
-        fn new(access: T, msg: &str) -> Self {
-            Self::from_root(access).expect(msg)
-        }
+    #[derive(FromAccess)]
+    struct Wrapper<T: Access>(
+        #[from_access(flatten)] Flattened<T>,
+        #[from_access(rename = "list")] ListIndex<T::Base, u8>,
+    );
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    {
+        let mut wrapper = Wrapper::from_root(&fork).unwrap();
+        wrapper.0.entry.set("!!".to_owned());
+        wrapper.0.other_entry.set(42);
+        wrapper.1.extend(vec![1, 2, 3]);
+    }
+    assert_eq!(fork.get_entry::<_, String>("entry").get().unwrap(), "!!");
+    assert_eq!(fork.get_list::<_, u8>("list").get(1), Some(2));
+}
+
+#[test]
+fn multiple_flattened_fields() {
+    #[derive(FromAccess)]
+    struct Flattened<T: Access> {
+        entry: Entry<T::Base, String>,
+        other_entry: Entry<T::Base, u64>,
+    }
+
+    #[derive(FromAccess)]
+    struct OtherFlattened<T: Access> {
+        list: ListIndex<T::Base, Vec<u8>>,
+        maps: Group<T, u32, ProofMapIndex<T::Base, str, u64>>,
+    }
+
+    #[derive(FromAccess)]
+    struct Schema<T: Access> {
+        #[from_access(flatten)]
+        first: Flattened<T>,
+        #[from_access(flatten)]
+        second: OtherFlattened<T>,
     }
 
     let db = TemporaryDB::new();
     let fork = db.fork();
-    fork.get_proof_map("map").put(&1_u64, 2_u64);
-    let schema = NotSchema::new(&fork, "huh?");
-    assert_eq!(schema.map.get(&1_u64).unwrap(), 2);
+    {
+        let mut schema = Schema::from_root(&fork).unwrap();
+        schema.first.entry.set("Some".to_owned());
+        schema.first.other_entry.set(1);
+        schema.second.list.push(vec![2, 3, 4]);
+        schema.second.maps.get(&23).put("Alice", 1);
+    }
+    assert_eq!(fork.get_entry::<_, String>("entry").get().unwrap(), "Some");
+    assert_eq!(fork.get_list::<_, Vec<u8>>("list").len(), 1);
+    assert_eq!(
+        fork.get_proof_map(("maps", &23_u32)).get("Alice"),
+        Some(1_u64)
+    );
 }

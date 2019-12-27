@@ -244,9 +244,10 @@
 //! ```
 
 pub use exonum::runtime::{
-    AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, Caller, DispatcherError, ErrorKind,
-    ErrorMatch, ExecutionError, ExecutionFail, InstanceId, MethodId, RuntimeIdentifier,
-    SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    versioning, AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, Caller, DispatcherError,
+    DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail, InstanceDescriptor,
+    InstanceId, InstanceSpec, InstanceStatus, MethodId, RuntimeIdentifier, SnapshotExt,
+    WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
 };
 
 pub use self::{
@@ -267,10 +268,7 @@ use exonum::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
-    runtime::{
-        catch_panic, ExecutionContext, InstanceDescriptor, InstanceSpec, InstanceStatus, Mailbox,
-        Runtime,
-    },
+    runtime::{catch_panic, ExecutionContext, Mailbox, Runtime},
 };
 use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};

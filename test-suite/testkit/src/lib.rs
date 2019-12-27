@@ -120,19 +120,6 @@
 #![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
-#[cfg_attr(test, macro_use)]
-#[cfg(test)]
-extern crate assert_matches;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-#[cfg_attr(test, macro_use)]
-#[cfg(test)]
-extern crate exonum_derive;
-
 pub use crate::{
     api::{ApiKind, TestKitApi},
     builder::TestKitBuilder,

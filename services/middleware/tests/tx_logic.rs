@@ -16,9 +16,11 @@
 
 use exonum::{
     crypto::gen_keypair,
-    runtime::{DispatcherError, ErrorMatch, InstanceId, SnapshotExt},
+    merkledb::{access::Access, Snapshot},
 };
-use exonum_rust_runtime::{DefaultInstance, ServiceFactory, TxStub};
+use exonum_rust_runtime::{
+    DefaultInstance, DispatcherError, ErrorMatch, InstanceId, ServiceFactory, SnapshotExt, TxStub,
+};
 use exonum_testkit::{TestKit, TestKitBuilder};
 use semver::Version;
 
@@ -49,6 +51,13 @@ fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
     builder.create()
 }
 
+fn inc_schema<'a>(
+    snapshot: &'a dyn Snapshot,
+    service_id: InstanceId,
+) -> IncSchema<impl Access + 'a> {
+    snapshot.service_schema(service_id).unwrap()
+}
+
 #[test]
 fn checked_call_normal_workflow() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
@@ -77,9 +86,7 @@ fn checked_call_normal_workflow() {
             .unwrap_or_else(|e| panic!("version req = {}: {}", version, e));
         let snapshot = testkit.snapshot();
         assert_eq!(
-            IncSchema::new(snapshot.for_service(100).unwrap())
-                .counts
-                .get(&keypair.0),
+            inc_schema(&snapshot, INC_ID).counts.get(&keypair.0),
             Some(i as u64 + 1),
             "version req = {}",
             version
@@ -119,7 +126,6 @@ fn checked_call_with_mismatched_artifact() {
 #[test]
 fn checked_call_with_mismatched_version() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
-    let service_id = 100;
 
     // All versions match the installed predicate version.
     const VERSIONS: &[&str] = &[
@@ -137,7 +143,7 @@ fn checked_call_with_mismatched_version() {
 
     let keypair = gen_keypair();
     for &version in VERSIONS {
-        let checked_call = IncFactory::req(version).increment(service_id, 0);
+        let checked_call = IncFactory::req(version).increment(INC_ID, 0);
         let signed = keypair.checked_call(MIDDLEWARE_ID, checked_call.clone());
         let block = testkit.create_block_with_transaction(signed);
         let err = block[0].status().unwrap_err();
@@ -148,12 +154,11 @@ fn checked_call_with_mismatched_version() {
 #[test]
 fn batch_normal_workflow() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
-    let service_id = 100;
 
-    let checked_call = IncFactory::req("^1.0.0").increment(service_id, 0);
+    let checked_call = IncFactory::req("^1.0.0").increment(INC_ID, 0);
     let mut batch = Batch::new();
-    batch.increment(service_id, 0);
-    batch.increment(service_id, 0);
+    batch.increment(INC_ID, 0);
+    batch.increment(INC_ID, 0);
     batch.checked_call(MIDDLEWARE_ID, checked_call);
     let keypair = gen_keypair();
     let batch = keypair.batch(MIDDLEWARE_ID, batch);
@@ -161,25 +166,21 @@ fn batch_normal_workflow() {
     block[0].status().unwrap();
 
     let snapshot = testkit.snapshot();
-    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    let schema = inc_schema(&snapshot, INC_ID);
     assert_eq!(schema.counts.get(&keypair.0), Some(3));
 }
 
 #[test]
 fn batch_with_calls_to_different_services() {
-    let mut testkit = create_testkit(vec![
-        "1.1.3".parse().unwrap(),
-        "2.0.0-rc.0".parse().unwrap(),
-    ]);
-    let service_id = 100;
+    let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap(), "2.0.0".parse().unwrap()]);
     let mut inner_batch = Batch::new();
-    inner_batch.increment(service_id, 0);
-    inner_batch.increment(service_id + 1, 0);
-    inner_batch.increment(service_id, 0);
+    inner_batch.increment(INC_ID, 0);
+    inner_batch.increment(INC_ID + 1, 0);
+    inner_batch.increment(INC_ID, 0);
     let mut batch = Batch::new();
-    batch.increment(service_id, 1);
+    batch.increment(INC_ID, 1);
     batch.batch(MIDDLEWARE_ID, inner_batch);
-    batch.increment(service_id + 1, 1);
+    batch.increment(INC_ID + 1, 1);
 
     let keypair = gen_keypair();
     let signed = keypair.batch(MIDDLEWARE_ID, batch);
@@ -187,20 +188,19 @@ fn batch_with_calls_to_different_services() {
     block[0].status().unwrap();
 
     let snapshot = testkit.snapshot();
-    let schema = IncSchema::new(snapshot.for_service(service_id).unwrap());
+    let schema = inc_schema(&snapshot, INC_ID);
     assert_eq!(schema.counts.get(&keypair.0), Some(3));
-    let schema = IncSchema::new(snapshot.for_service(service_id + 1).unwrap());
+    let schema = inc_schema(&snapshot, INC_ID + 1);
     assert_eq!(schema.counts.get(&keypair.0), Some(2));
 }
 
 #[test]
 fn batch_with_call_to_non_existing_service() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
-    let service_id = 100;
     let batch = Batch::new()
-        .with_call(TxStub.increment(service_id, 0))
-        .with_call(TxStub.increment(service_id + 1, 0)) // <- service doesn't exist
-        .with_call(TxStub.increment(service_id, 0));
+        .with_call(TxStub.increment(INC_ID, 0))
+        .with_call(TxStub.increment(INC_ID + 1, 0)) // <- service doesn't exist
+        .with_call(TxStub.increment(INC_ID, 0));
 
     let keypair = gen_keypair();
     let batch = keypair.batch(MIDDLEWARE_ID, batch);
@@ -212,7 +212,7 @@ fn batch_with_call_to_non_existing_service() {
     );
 
     let snapshot = testkit.snapshot();
-    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    let schema = inc_schema(&snapshot, INC_ID);
     assert_eq!(schema.counts.get(&keypair.0), None);
 }
 
@@ -238,6 +238,6 @@ fn batch_with_service_error() {
     );
 
     let snapshot = testkit.snapshot();
-    let schema = IncSchema::new(snapshot.for_service(100).unwrap());
+    let schema = inc_schema(&snapshot, INC_ID);
     assert_eq!(schema.counts.get(&keypair.0), None);
 }

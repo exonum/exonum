@@ -16,7 +16,7 @@
 
 #![allow(bare_trait_objects)]
 
-pub use self::service::{Config, Timestamp, TimestampEntry, TxTimestamp};
+pub use self::service::{Config, Timestamp, TimestampEntry};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 

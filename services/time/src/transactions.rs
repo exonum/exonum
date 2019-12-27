@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::runtime::ExecutionError;
+use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::CallContext;
+use exonum_rust_runtime::{CallContext, ExecutionError};
+use serde::{Deserialize, Serialize};
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
