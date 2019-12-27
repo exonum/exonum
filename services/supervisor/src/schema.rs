@@ -16,9 +16,9 @@ use exonum::{
     crypto::Hash,
     runtime::{ArtifactId, InstanceId},
 };
-use exonum_derive::FromAccess;
+use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, Prefixed},
+    access::{Access, FromAccess, Prefixed},
     Entry, Fork, ProofEntry, ProofMapIndex,
 };
 
@@ -29,9 +29,11 @@ use super::{
 
 /// Service information schema.
 #[derive(Debug, FromAccess)]
-pub struct Schema<T: Access> {
-    /// Supervisor configuration.
-    pub configuration: ProofEntry<T::Base, SupervisorConfig>,
+pub(crate) struct SchemaImpl<T: Access> {
+    /// Public part of the schema.
+    #[from_access(flatten)]
+    pub public: Schema<T>,
+
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
@@ -40,15 +42,26 @@ pub struct Schema<T: Access> {
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
     /// Votes for a configuration change.
     pub config_confirms: MultisigIndex<T, Hash>,
-    /// Current pending configuration proposal.
-    pub pending_proposal: Entry<T::Base, ConfigProposalWithHash>,
     /// Number of the processed configurations. Used to avoid conflicting configuration proposals.
     pub configuration_number: Entry<T::Base, u64>,
     /// The following free instance ID for assignment.
     pub vacant_instance_id: Entry<T::Base, InstanceId>,
 }
 
-impl<T: Access> Schema<T> {
+/// Public part of the supervisor service.
+#[derive(Debug, FromAccess, RequireArtifact)]
+pub struct Schema<T: Access> {
+    /// Supervisor configuration.
+    pub configuration: ProofEntry<T::Base, SupervisorConfig>,
+    /// Current pending configuration proposal.
+    pub pending_proposal: ProofEntry<T::Base, ConfigProposalWithHash>,
+}
+
+impl<T: Access> SchemaImpl<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
+
     /// Gets the stored configuration number.
     pub fn get_configuration_number(&self) -> u64 {
         self.configuration_number.get().unwrap_or(0)
@@ -59,13 +72,14 @@ impl<T: Access> Schema<T> {
         // Configuration is required to be set, and there is no valid way
         // to obtain `Supervisor` without configuration, thus this expect
         // is intended to be safe.
-        self.configuration
+        self.public
+            .configuration
             .get()
             .expect("Supervisor entity was not configured; unable to load configuration")
     }
 }
 
-impl Schema<Prefixed<'_, &Fork>> {
+impl SchemaImpl<Prefixed<'_, &Fork>> {
     /// Increases the stored configuration number.
     pub fn increase_configuration_number(&mut self) {
         let new_configuration_number = self.get_configuration_number() + 1;

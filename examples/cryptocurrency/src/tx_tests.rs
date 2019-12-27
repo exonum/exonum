@@ -26,18 +26,22 @@ use exonum_merkledb::{access::Access, Snapshot};
 use exonum_testkit::TestKit;
 
 // Import data types used in tests from the crate where the service is defined.
-use exonum_cryptocurrency::{
+use crate::{
     contracts::{CryptocurrencyInterface, CryptocurrencyService},
     schema::{CurrencySchema, Wallet},
     transactions::{CreateWallet, TxTransfer},
 };
 
-// Imports shared test constants.
-use crate::constants::{ALICE_NAME, BOB_NAME, INSTANCE_ID, INSTANCE_NAME};
+/// Alice's wallets name.
+const ALICE_NAME: &str = "Alice";
+/// Bob's wallet name.
+const BOB_NAME: &str = "Bob";
+/// Service instance id.
+const INSTANCE_ID: u32 = 1010;
+/// Service instance name.
+const INSTANCE_NAME: &str = "nnm-token";
 
-mod constants;
-
-pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CurrencySchema<impl Access + 'a> {
+fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CurrencySchema<impl Access + 'a> {
     CurrencySchema::new(snapshot.for_service(INSTANCE_NAME).unwrap())
 }
 

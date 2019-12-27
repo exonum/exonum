@@ -15,7 +15,7 @@
 //! Sample counter service.
 use exonum::{
     merkledb::{
-        access::{Access, RawAccessMut},
+        access::{Access, FromAccess, RawAccessMut},
         ProofEntry,
     },
     runtime::{
@@ -31,6 +31,12 @@ pub const SERVICE_ID: InstanceId = 100;
 #[derive(FromAccess)]
 pub struct CounterSchema<T: Access> {
     pub counter: ProofEntry<T::Base, u64>,
+}
+
+impl<T: Access> CounterSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T> CounterSchema<T>

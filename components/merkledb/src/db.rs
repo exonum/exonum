@@ -1346,4 +1346,38 @@ mod tests {
             patch.get_proof_list::<_, u64>("other_list").object_hash()
         );
     }
+
+    #[test]
+    fn concurrent_borrow_from_fork_and_readonly_fork() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        // This entry is phantom.
+        let _readonly_entry = fork.readonly().get_entry::<_, u32>(("entry", &1_u8));
+        // This one is not phantom, but it has the same `ResolvedAddress` as the phantom entry.
+        // Since phantom entries do not borrow changes from the `Fork`, this works fine.
+        let _entry = fork.get_entry::<_, u32>("entry");
+    }
+
+    #[test]
+    fn stale_read_from_phantom_index() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        // Phantom entries are unusual in that they can lead to stale reads (sort of; we assume
+        // that the database writer is smart enough to separate readonly and read-write parts
+        // of the `Fork`, e.g., via `Prefixed` accesses).
+        let phantom_entry = fork.readonly().get_entry::<_, u32>("entry");
+        let mut entry = fork.get_entry::<_, u32>("entry");
+        entry.set(1);
+        assert_eq!(phantom_entry.get(), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "immutably while it's borrowed mutably")]
+    fn borrow_from_readonly_fork_after_index_is_created() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let _entry = fork.get_entry::<_, u32>("entry");
+        // Since the index is already created, this should lead to a panic.
+        let _readonly_entry = fork.readonly().get_entry::<_, u32>("entry");
+    }
 }

@@ -16,6 +16,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{crypto::PublicKey, runtime::rust::api};
+use serde::{Deserialize, Serialize};
 
 use crate::TimeSchema;
 

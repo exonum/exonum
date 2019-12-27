@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! These are tests concerning the API of the cryptocurrency service. See `tx_logic.rs`
-//! for tests focused on the business logic of transactions.
+//! These are tests concerning the API of the cryptocurrency service.
 //!
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
@@ -21,7 +20,7 @@
 use exonum::{
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
-    runtime::rust::ServiceFactory,
+    runtime::{rust::ServiceFactory, SnapshotExt},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
@@ -34,6 +33,7 @@ use serde_json::json;
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency_advanced::{
     api::{WalletInfo, WalletQuery},
+    schema::Schema,
     transactions::{CreateWallet, Transfer},
     wallet::Wallet,
     CryptocurrencyInterface, CryptocurrencyService,
@@ -97,6 +97,14 @@ fn test_transfer() {
     assert_eq!(wallet.balance, 90);
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
     assert_eq!(wallet.balance, 110);
+
+    // Check the balances via public schema.
+    let snapshot = testkit.snapshot();
+    let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
+    let alice_wallet = schema.wallets.get(&tx_alice.author()).unwrap();
+    assert_eq!(alice_wallet.balance, 90);
+    let bob_wallet = schema.wallets.get(&tx_bob.author()).unwrap();
+    assert_eq!(bob_wallet.balance, 110);
 }
 
 /// Check that a transfer from a non-existing wallet fails as expected.
@@ -142,6 +150,12 @@ fn test_transfer_from_nonexisting_wallet() {
 
     // Check that Bob's balance doesn't change.
     let wallet = api.get_wallet(tx_bob.author()).unwrap();
+    assert_eq!(wallet.balance, 100);
+
+    // Same check via schema.
+    let snapshot = testkit.snapshot();
+    let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
+    let wallet = schema.wallets.get(&tx_bob.author()).unwrap();
     assert_eq!(wallet.balance, 100);
 }
 

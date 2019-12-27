@@ -21,7 +21,7 @@ use exonum::runtime::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, RawAccessMut},
+    access::{Access, FromAccess, RawAccessMut},
     Entry,
 };
 
@@ -38,6 +38,10 @@ pub struct Schema<T: Access> {
 }
 
 impl<T: Access> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
+
     pub fn count(&self) -> Option<u64> {
         self.count.get()
     }

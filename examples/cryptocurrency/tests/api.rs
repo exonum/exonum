@@ -18,11 +18,7 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-#[macro_use]
-extern crate assert_matches;
-#[macro_use]
-extern crate serde_json;
-
+use assert_matches::assert_matches;
 use exonum::{
     api,
     crypto::{self, Hash, PublicKey, SecretKey},
@@ -34,6 +30,7 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::{
     explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi, TestKitBuilder,
 };
+use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
@@ -43,10 +40,14 @@ use exonum_cryptocurrency::{
     transactions::{CreateWallet, TxTransfer},
 };
 
-// Imports shared test constants.
-use crate::constants::{ALICE_NAME, BOB_NAME, INSTANCE_ID, INSTANCE_NAME};
-
-mod constants;
+/// Alice's wallets name.
+const ALICE_NAME: &str = "Alice";
+/// Bob's wallet name.
+const BOB_NAME: &str = "Bob";
+/// Service instance id.
+const INSTANCE_ID: u32 = 1010;
+/// Service instance name.
+const INSTANCE_NAME: &str = "nnm-token";
 
 /// Check that the wallet creation transaction works when invoked via API.
 #[test]

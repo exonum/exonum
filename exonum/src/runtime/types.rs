@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_crypto::{PublicKey, SecretKey};
+use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
     validation::{is_valid_identifier, is_valid_index_name_component},

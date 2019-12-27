@@ -19,6 +19,7 @@ use exonum::helpers::Height;
 use exonum_explorer::BlockchainExplorer;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::TestKitBuilder;
+use pretty_assertions::assert_eq;
 
 mod hooks;
 

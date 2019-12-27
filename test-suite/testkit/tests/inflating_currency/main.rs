@@ -16,14 +16,12 @@
 //! integration test, with the difference that the balance of each created wallet increases by 1
 //! on each block. Correspondingly, the initial wallet balance is set to 0.
 
-#[macro_use]
-extern crate pretty_assertions;
-
 use exonum::{
     crypto::{self, PublicKey, SecretKey},
     helpers::Height,
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use pretty_assertions::assert_eq;
 use rand::Rng;
 
 use crate::inflating_cryptocurrency::{

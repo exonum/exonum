@@ -33,7 +33,7 @@ pub mod constants {
 
 pub(crate) use self::state::SharedConnectList;
 
-use exonum_keys::{read_keys_from_file, Keys};
+use exonum_keys::Keys;
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
@@ -46,7 +46,7 @@ use std::{
     convert::TryFrom,
     fmt,
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
     thread,
     time::{Duration, SystemTime},
@@ -152,7 +152,7 @@ pub struct NodeHandler {
     /// Node role.
     node_role: NodeRole,
     /// Configuration file manager.
-    config_manager: Option<ConfigManager>,
+    config_manager: Option<Box<dyn ConfigManager>>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
 }
@@ -281,38 +281,6 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    /// Converts `NodeConfig<PathBuf>` to `NodeConfig<SecretKey>` reading the key files.
-    pub fn read_secret_keys(
-        self,
-        config_file_path: impl AsRef<Path>,
-        master_key_passphrase: &[u8],
-    ) -> NodeConfig {
-        let config_folder = config_file_path.as_ref().parent().unwrap();
-        let master_key_path = if self.master_key_path.is_absolute() {
-            self.master_key_path.clone()
-        } else {
-            config_folder.join(&self.master_key_path)
-        };
-
-        let keys = read_keys_from_file(&master_key_path, master_key_passphrase)
-            .expect("Could not read master_key_path from file");
-
-        NodeConfig {
-            consensus: self.consensus,
-            listen_address: self.listen_address,
-            external_address: self.external_address,
-            network: self.network,
-            api: self.api,
-            mempool: self.mempool,
-            services_configs: self.services_configs,
-            database: self.database,
-            connect_list: self.connect_list,
-            thread_pool_size: self.thread_pool_size,
-            master_key_path: self.master_key_path,
-            keys,
-        }
-    }
-
     /// Returns a service key pair of the node.
     pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
         (self.keys.service_pk(), self.keys.service_sk().clone())
@@ -478,7 +446,7 @@ impl NodeHandler {
         system_state: Box<dyn SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
-        config_file_path: Option<String>,
+        config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
         let (last_hash, last_height) = {
             let block = blockchain.as_ref().last_block();
@@ -521,11 +489,6 @@ impl NodeHandler {
         let node_role = NodeRole::new(validator_id);
         let is_enabled = api_state.is_enabled();
         api_state.set_node_role(node_role);
-
-        let config_manager = match config_file_path {
-            Some(path) => Some(ConfigManager::new(path)),
-            None => None,
-        };
 
         Self {
             blockchain,
@@ -952,7 +915,7 @@ impl Node {
         services: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
         node_cfg: NodeConfig,
         genesis_config: GenesisConfig,
-        config_file_path: Option<String>,
+        config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
         node_cfg
             .validate()
@@ -980,7 +943,7 @@ impl Node {
             )
         });
 
-        Self::with_blockchain(blockchain, channel, node_cfg, config_file_path)
+        Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }
 
     /// Creates a node for the given blockchain and node configuration.
@@ -988,7 +951,7 @@ impl Node {
         blockchain: BlockchainMut,
         channel: NodeChannel,
         node_cfg: NodeConfig,
-        config_file_path: Option<String>,
+        config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
         crypto::init();
 
@@ -1062,7 +1025,7 @@ impl Node {
             system_state,
             config,
             api_state,
-            config_file_path,
+            config_manager,
         );
 
         Self {
