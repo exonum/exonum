@@ -17,6 +17,10 @@ exonum = "0.13.0-rc.2"
 exonum-explorer-service = "0.13.0-rc.2"
 ```
 
+The service should usually be included at the blockchain start
+with the default identifiers. The service will refuse to instantiate
+if an explorer service is already instantiated on the blockchain.
+
 Consult [the crate docs](https://docs.rs/exonum-explorer-service)
 for more details about the service API.
 

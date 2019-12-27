@@ -14,6 +14,8 @@
 
 //! Simplified node emulation for testing websockets.
 
+// TODO: Test that service terminates WS connections when it's stopped (ECR-4084).
+
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     crypto::gen_keypair,

@@ -13,6 +13,46 @@
 // limitations under the License.
 
 //! Exonum explorer service.
+//!
+//! The explorer service does not define transactions, but it has several REST / WebSocket
+//! endpoints allowing to retrieve information from the blockchain in a structured way.
+//! Usually, the explorer service should be instantiated at the blockchain start
+//! with the default identifiers. There may be no more than 1 explorer service on a blockchain;
+//! an attempt to create a second service instance will lead to an error in the service
+//! constructor.
+//!
+//! The API types necessary to interact with the service HTTP API are defined in a separate
+//! crate, `exonum-explorer`.
+//!
+//! # Examples
+//!
+//! ## Use with Testkit
+//!
+//! ```
+//! use exonum_explorer::api::BlocksRange;
+//! use exonum_explorer_service::ExplorerFactory;
+//! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//!
+//! let mut testkit: TestKit = TestKitBuilder::validator()
+//!     .with_default_rust_service(ExplorerFactory)
+//!     // Add other services here
+//!     .create();
+//! // The explorer endpoints can be accessed via `api()`:
+//! let api = testkit.api();
+//! let BlocksRange { blocks, range } = api
+//!     .public(ApiKind::Explorer)
+//!     .get("v1/blocks?count=10")
+//!     .unwrap();
+//! ```
+
+// TODO: provide endpoint descriptions with examples (ECR-4040)
+
+#![deny(
+    unsafe_code,
+    bare_trait_objects,
+    missing_docs,
+    missing_debug_implementations
+)]
 
 use exonum::{
     merkledb::ObjectHash,
@@ -37,6 +77,7 @@ pub enum Error {
     DuplicateExplorer = 0,
 }
 
+/// Explorer service.
 #[derive(Debug, Default, ServiceDispatcher)]
 pub struct ExplorerService {
     shared_state: SharedState,
@@ -72,6 +113,7 @@ impl Service for ExplorerService {
     }
 }
 
+/// Explorer service factory.
 #[derive(Debug, Clone, Copy, ServiceFactory)]
 #[service_factory(service_constructor = "Self::new_instance")]
 pub struct ExplorerFactory;
