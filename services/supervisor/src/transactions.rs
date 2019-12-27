@@ -27,7 +27,7 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployRequest, DeployResult, DeployState, Error, Schema, StartService, StopService, Supervisor,
+    DeployRequest, DeployResult, DeployState, Error, SchemaImpl, StartService, StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -161,24 +161,24 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             return Err(Error::ActualFromIsPast.into());
         }
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that there are no pending config changes.
-        if let Some(proposal) = schema.pending_proposal.get() {
+        if let Some(proposal) = schema.public.pending_proposal.get() {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
                 return Err(Error::ConfigProposeExists.into());
             } else {
                 // Proposal is outdated but was not removed (e.g. because of the panic
                 // during config applying), clean it.
-                schema.pending_proposal.remove();
+                schema.public.pending_proposal.remove();
             }
         }
         drop(schema);
 
         // Verify changes in the proposal.
         self.verify_config_changeset(&mut context, &propose.changes)?;
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // After all the checks verify that configuration number is expected one.
         if propose.configuration_number != schema.get_configuration_number() {
@@ -193,7 +193,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             config_propose: propose,
             propose_hash,
         };
-        schema.pending_proposal.set(config_entry);
+        schema.public.pending_proposal.set(config_entry);
 
         Ok(())
     }
@@ -210,8 +210,9 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let entry = schema
+            .public
             .pending_proposal
             .get()
             .ok_or(Error::ConfigProposeNotRegistered)?;
@@ -259,7 +260,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         if deploy.deadline_height < core_schema.height() {
             return Err(Error::ActualFromIsPast.into());
         }
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -325,7 +326,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
         let current_height = core_schema.height();
 
-        let schema = Schema::new(context.service_data());
+        le schema = SchemaImpl::new(context.service_data());
 
         // Check if deployment already failed.
         if schema

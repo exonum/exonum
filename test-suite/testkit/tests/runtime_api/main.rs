@@ -17,6 +17,7 @@ use exonum::{
     api::Error as ApiError,
     runtime::rust::{ProtoSourceFile, ProtoSourcesQuery},
 };
+use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
 
@@ -56,6 +57,9 @@ fn test_exonum_core_protos(api: &TestKitApi) {
         "tests.proto",
         "common.proto",
         "types.proto",
+        "proofs.proto",
+        "list_proof.proto",
+        "map_proof.proto",
     ]
     .into_iter()
     .map(|s| s.to_owned())

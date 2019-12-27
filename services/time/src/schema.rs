@@ -15,18 +15,25 @@
 use chrono::{DateTime, Utc};
 
 use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
+use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, RawAccessMut},
+    access::{Access, FromAccess, RawAccessMut},
     ProofEntry, ProofMapIndex,
 };
 
-/// `Exonum-time` service database schema.
-#[derive(Debug, FromAccess)]
+/// Database schema of the time service. The schema is fully public.
+#[derive(Debug, FromAccess, RequireArtifact)]
 pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
     /// Consolidated time.
     pub time: ProofEntry<T::Base, DateTime<Utc>>,
+}
+
+impl<T: Access> TimeSchema<T> {
+    pub(crate) fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T: Access> TimeSchema<T>

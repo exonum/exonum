@@ -33,7 +33,7 @@ use std::borrow::Cow;
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
-    access::{Access, AccessExt, Prefixed},
+    access::{Access, AccessExt, FromAccess, Prefixed},
     impl_object_hash_for_binary_value,
     migration::Migration,
     BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
@@ -71,6 +71,10 @@ mod v1 {
     }
 
     impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+
         pub fn print_wallets(&self) {
             for (public_key, wallet) in self.wallets.iter().take(10) {
                 println!("Wallet[{:?}] = {:?}", public_key, wallet);
@@ -161,6 +165,10 @@ mod v2 {
     }
 
     impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+
         pub fn print_wallets(&self) {
             for (public_key, wallet) in self.wallets.iter().take(10) {
                 println!("Wallet[{:?}] = {:?}", public_key, wallet);
