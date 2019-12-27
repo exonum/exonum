@@ -18,6 +18,7 @@ use exonum::{
     runtime::{CallInfo, DispatcherError, ErrorMatch, ExecutionError},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
+use pretty_assertions::assert_eq;
 
 use crate::{
     error::Error,

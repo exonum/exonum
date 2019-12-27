@@ -17,6 +17,7 @@ use exonum::{
     api::Error as ApiError,
     runtime::rust::{ProtoSourceFile, ProtoSourcesQuery},
 };
+use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
 
