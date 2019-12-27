@@ -16,9 +16,13 @@
 
 use exonum::{
     crypto::PublicKey,
-    merkledb::{access::Access, MapIndex},
+    merkledb::{
+        access::{Access, FromAccess},
+        MapIndex,
+    },
     runtime::{
         rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
+        versioning::ArtifactReq as CoreReq,
         ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
     },
 };
@@ -27,9 +31,18 @@ use semver::Version;
 
 use exonum_middleware_service::ArtifactReq;
 
-#[derive(Debug, FromAccess)]
+#[derive(Debug, FromAccess, RequireArtifact)]
+#[require_artifact(name = "exonum.services.test.Inc", version = "*")]
+// ^-- Since the schema does not change across versions, we use a wildcard `version` requirement.
+// This is a bad idea for real services.
 pub struct IncSchema<T: Access> {
     pub counts: MapIndex<T::Base, PublicKey, u64>,
+}
+
+impl<T: Access> IncSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 #[exonum_interface]
@@ -72,12 +85,7 @@ impl IncFactory {
     }
 
     pub fn req(version_req: &str) -> ArtifactReq {
-        ArtifactReq {
-            name: Self::ARTIFACT_NAME.to_owned(),
-            version: version_req
-                .parse()
-                .expect("Cannot parse version requirement"),
-        }
+        CoreReq::new(Self::ARTIFACT_NAME, version_req.parse().unwrap()).into()
     }
 }
 

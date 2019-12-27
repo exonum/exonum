@@ -34,7 +34,7 @@ use exonum::runtime::{
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 
-use crate::api::PublicApi as CryptocurrencyApi;
+use crate::{api::PublicApi as CryptocurrencyApi, schema::SchemaImpl};
 
 /// Initial balance of the wallet.
 pub const INITIAL_BALANCE: u64 = 100;
@@ -49,7 +49,7 @@ impl Service for CryptocurrencyService {
     fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
         // Initialize indexes. Not doing this may lead to errors in HTTP API, since it relies on
         // `wallets` indexes being initialized for returning corresponding proofs.
-        Schema::new(context.service_data());
+        SchemaImpl::new(context.service_data());
         Ok(())
     }
 

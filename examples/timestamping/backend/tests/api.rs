@@ -27,10 +27,7 @@ use serde_json::json;
 use std::time::SystemTime;
 
 use exonum_timestamping::{
-    api::TimestampQuery,
-    schema::{Timestamp, TimestampEntry},
-    transactions::{Config, TimestampingInterface, TxTimestamp},
-    TimestampingService,
+    Config, Timestamp, TimestampEntry, TimestampQuery, TimestampingInterface, TimestampingService,
 };
 
 const TIME_SERVICE_ID: InstanceId = 2;
@@ -97,7 +94,7 @@ fn test_api_get_timestamp_nothing() {
 fn test_api_post_timestamp() {
     let (mut testkit, _) = init_testkit();
     let content = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = gen_keypair().timestamp(SERVICE_ID, TxTimestamp { content });
+    let tx = gen_keypair().timestamp(SERVICE_ID, content);
 
     let api = testkit.api();
     let tx_info: TransactionResponse = api
@@ -116,7 +113,7 @@ fn test_api_get_timestamp_proof() {
 
     // Create timestamp
     let content = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = keypair.timestamp(SERVICE_ID, TxTimestamp { content });
+    let tx = keypair.timestamp(SERVICE_ID, content);
     testkit.create_block_with_transaction(tx.clone());
 
     // Get proof.
@@ -136,12 +133,7 @@ fn test_api_get_timestamp_entry() {
 
     // Create timestamp
     let content = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = gen_keypair().timestamp(
-        SERVICE_ID,
-        TxTimestamp {
-            content: content.clone(),
-        },
-    );
+    let tx = gen_keypair().timestamp(SERVICE_ID, content.clone());
     testkit.create_block_with_transaction(tx.clone());
 
     let api = testkit.api();
@@ -164,19 +156,8 @@ fn test_api_can_not_add_same_content_hash() {
     let content_hash = hash(&[1]);
     let timestamp1 = Timestamp::new(&content_hash, "metadata");
     let timestamp2 = Timestamp::new(&content_hash, "other metadata");
-
-    let tx_ok = keypair.timestamp(
-        SERVICE_ID,
-        TxTimestamp {
-            content: timestamp1.clone(),
-        },
-    );
-    let tx_err = keypair.timestamp(
-        SERVICE_ID,
-        TxTimestamp {
-            content: timestamp2.clone(),
-        },
-    );
+    let tx_ok = keypair.timestamp(SERVICE_ID, timestamp1.clone());
+    let tx_err = keypair.timestamp(SERVICE_ID, timestamp2.clone());
 
     testkit.create_block_with_transaction(tx_ok.clone());
     assert_status(&api, &tx_ok, &json!({ "type": "success" }));

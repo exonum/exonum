@@ -37,7 +37,7 @@ const INSTANCE_ID: InstanceId = 112;
 const INSTANCE_NAME: &str = "my-time";
 
 fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> TimeSchema<impl Access + 'a> {
-    TimeSchema::new(snapshot.for_service(INSTANCE_NAME).unwrap())
+    snapshot.service_schema(INSTANCE_NAME).unwrap()
 }
 
 fn assert_storage_times_eq(
