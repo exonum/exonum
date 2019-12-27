@@ -257,7 +257,7 @@ fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) {
         }
         ctx.helper.merge().unwrap();
     }
-    // FIXME: Remove "__next_key", introduce persistent iterator in `MigrationHelper`
+    // FIXME: Remove "__next_key", introduce persistent iterators (ECR-4078, ECR-4079)
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
@@ -288,7 +288,7 @@ fn transform_wallet_type(ctx: &mut MigrationContext) {
     }
 }
 
-// FIXME: add incorrect migration with DB merges and test it
+// FIXME: add incorrect migration with DB merges and test it (ECR-4080)
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.6.2")]

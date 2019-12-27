@@ -14,7 +14,7 @@
 
 //! Testing framework for data migrations.
 //!
-//! FIXME: more documentation, examples
+//! FIXME: more documentation, examples (ECR-4081)
 
 use exonum::{
     merkledb::{

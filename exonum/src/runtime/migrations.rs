@@ -14,7 +14,7 @@
 
 //! Migration tools.
 //!
-//! FIXME: more details
+//! FIXME: more details (ECR-4081)
 
 // FIXME: Decouple after #1639 is merged.
 pub use semver::Version;
@@ -163,7 +163,7 @@ pub enum DataMigrationError {
 
 /// Linearly ordered migrations.
 ///
-/// FIXME: more details, examples
+/// FIXME: more details, examples (ECR-4081)
 ///
 /// # Limitations
 ///
