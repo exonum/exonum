@@ -27,7 +27,8 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployRequest, DeployResult, DeployState, Error, SchemaImpl, StartService, StopService, Supervisor,
+    DeployRequest, DeployResult, DeployState, Error, SchemaImpl, StartService, StopService,
+    Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -326,7 +327,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .ok_or(Error::UnknownAuthor)?;
         let current_height = core_schema.height();
 
-        le schema = SchemaImpl::new(context.service_data());
+        let schema = SchemaImpl::new(context.service_data());
 
         // Check if deployment already failed.
         if schema
@@ -437,7 +438,7 @@ impl Supervisor {
     ) -> Result<(), ExecutionError> {
         let core_schema = context.data().for_core();
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
         let validator_count = core_schema.consensus_config().validator_keys.len();
@@ -467,7 +468,7 @@ impl Supervisor {
         error: ExecutionError,
     ) {
         let height = context.data().for_core().height();
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Mark deploy as failed.
         schema

@@ -176,7 +176,7 @@ impl PrivateApi for ApiImpl<'_> {
 
     fn deploy_status(&self, query: DeployInfoQuery) -> Result<DeployResponse, Self::Error> {
         let request = DeployRequest::try_from(query)?;
-        let schema = Schema::new(self.0.service_data());
+        let schema = SchemaImpl::new(self.0.service_data());
         let status = schema.deploy_states.get(&request);
 
         Ok(DeployResponse::new(status))
