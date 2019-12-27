@@ -236,3 +236,14 @@ impl CommittedTransactionSummary {
         })
     }
 }
+
+/// Websocket notification message. This enum describes data which is sent
+/// to a WebSocket listener.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Notification {
+    /// Notification about new block.
+    Block(Block),
+    /// Notification about new transaction.
+    Transaction(CommittedTransactionSummary),
+}

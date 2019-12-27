@@ -17,12 +17,14 @@
 use actix::*;
 use actix_web::ws;
 use exonum::{
-    blockchain::{Block, Blockchain, Schema},
+    blockchain::{Blockchain, Schema},
     crypto::Hash,
     merkledb::ObjectHash,
     messages::SignedMessage,
 };
-use exonum_explorer::api::{CommittedTransactionSummary, TransactionHex, TransactionResponse};
+use exonum_explorer::api::{
+    CommittedTransactionSummary, Notification, TransactionHex, TransactionResponse,
+};
 use futures::Future;
 use hex::FromHex;
 use rand::{rngs::ThreadRng, Rng};
@@ -142,17 +144,6 @@ impl TransactionFilter {
             message_id,
         }
     }
-}
-
-/// Websocket notification message. This enum describe data, which is sent to
-/// subscriber of websocket.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
-pub enum Notification {
-    /// Notification about new block.
-    Block(Block),
-    /// Notification about new transaction.
-    Transaction(CommittedTransactionSummary),
 }
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).

@@ -27,6 +27,7 @@ use exonum::{
         RuntimeInstance,
     },
 };
+use exonum_explorer::api::Notification;
 use serde_json::json;
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
@@ -39,7 +40,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use exonum_explorer_service::{ExplorerFactory, Notification};
+use exonum_explorer_service::ExplorerFactory;
 
 mod counter;
 use crate::counter::{CounterInterface, CounterService, SERVICE_ID};

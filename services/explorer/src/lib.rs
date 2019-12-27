@@ -66,8 +66,6 @@ use exonum_derive::*;
 mod api;
 mod websocket;
 
-pub use crate::websocket::Notification;
-
 use crate::{api::ExplorerApi, websocket::SharedState};
 
 /// Errors that can occur during explorer service operation.
