@@ -153,6 +153,9 @@ pub use self::{
     },
 };
 
+// Re-export for serializing `ExecutionError` via `serde`.
+#[doc(hidden)]
+pub use error::execution_error as execution_error_serde;
 #[macro_use]
 pub mod rust;
 pub mod versioning;

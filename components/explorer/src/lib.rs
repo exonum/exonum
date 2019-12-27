@@ -24,7 +24,7 @@ use exonum::{
     helpers::Height,
     merkledb::{ListProof, MapProof, ObjectHash, Snapshot},
     messages::{AnyTx, Precommit, Verified},
-    runtime::{ExecutionError, ExecutionStatus},
+    runtime::{execution_error_serde, ExecutionError, ExecutionStatus},
 };
 use serde::{Serialize, Serializer};
 use serde_derive::*;
@@ -39,7 +39,6 @@ use std::{
 };
 
 pub mod api;
-mod execution_error;
 
 /// Ending height of the range (exclusive), given the a priori max height.
 fn end_height(bound: Bound<&Height>, max: Height) -> Height {
@@ -270,7 +269,7 @@ pub struct ErrorWithLocation {
     /// Location of the error.
     pub location: CallInBlock,
     /// Error data.
-    #[serde(with = "crate::execution_error")]
+    #[serde(with = "execution_error_serde")]
     pub error: ExecutionError,
 }
 

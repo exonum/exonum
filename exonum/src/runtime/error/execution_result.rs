@@ -76,7 +76,7 @@ impl From<Result<(), &ExecutionError>> for ExecutionStatus {
 impl ExecutionStatus {
     /// Converts an execution status from an untrusted format (e.g., received in JSON via HTTP API)
     /// into an actionable `Result`.
-    pub fn into_result(self) -> Result<Result<(), ExecutionError>, &'static str> {
+    pub(super) fn into_result(self) -> Result<Result<(), ExecutionError>, &'static str> {
         Ok(if let ExecutionType::Success = self.typ {
             Ok(())
         } else {
