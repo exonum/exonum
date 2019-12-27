@@ -18,14 +18,14 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{DefaultInstance, ServiceFactory},
-        ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
+        ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{ConfigPropose, Error, Supervisor};
 
-use crate::{inc::IncService, utils::latest_assigned_instance_id};
+use crate::inc::IncService;
 
 /// Creates block with the specified transaction and returns its execution result.
 fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(), ExecutionError> {
@@ -69,7 +69,12 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
     )
     .expect("Start service transaction should be processed");
     // Get started service instance ID.
-    latest_assigned_instance_id(&testkit).unwrap()
+    let service_info = testkit
+        .snapshot()
+        .for_dispatcher()
+        .get_instance(IncService::INSTANCE_NAME)
+        .unwrap();
+    service_info.spec.id
 }
 
 #[test]

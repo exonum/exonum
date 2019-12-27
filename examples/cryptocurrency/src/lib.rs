@@ -35,11 +35,17 @@ extern crate serde_derive; // Required for Protobuf.
 
 pub mod proto;
 
+#[cfg(test)]
+mod tx_tests;
+
 /// Persistent data.
 pub mod schema {
     use exonum_crypto::PublicKey;
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use exonum_merkledb::{access::Access, MapIndex};
+    use exonum_merkledb::{
+        access::{Access, FromAccess},
+        MapIndex,
+    };
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -48,6 +54,7 @@ pub mod schema {
     // See [serialization docs][1] for details.
     //
     // [1]: https://exonum.com/doc/version/latest/architecture/serialization
+
     /// Wallet struct used to persist data within the service.
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
@@ -88,10 +95,18 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
+    ///
+    /// Note that the schema is fully private; it is exposed to the clients via service HTTP API.
     #[derive(Debug, FromAccess)]
-    pub struct CurrencySchema<T: Access> {
-        /// Correspondence of public keys of users to account information.
+    pub(crate) struct CurrencySchema<T: Access> {
+        /// Correspondence of public keys of users to the account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+    }
+
+    impl<T: Access> CurrencySchema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
     }
 }
 

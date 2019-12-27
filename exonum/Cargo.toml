@@ -63,6 +63,7 @@ exonum-merkledb = { version = "0.13.0-rc.2", path = "../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../components/proto" }
 
 [dev-dependencies]
+assert_matches = "1.3.0"
 bincode = "1.2.0"
 criterion = "0.3.0"
 modifier = "0.1.0"
@@ -83,7 +84,7 @@ float_serialize = []
 long_benchmarks = []
 sodiumoxide-crypto = ["exonum_sodiumoxide"]
 with-serde = []
-with-protobuf = []
+with-protobuf = ["with-serde"]
 rocksdb_snappy = ["exonum-merkledb/rocksdb_snappy"]
 rocksdb_lz4 = ["exonum-merkledb/rocksdb_lz4"]
 rocksdb_zlib = ["exonum-merkledb/rocksdb_zlib"]

@@ -68,7 +68,7 @@ fn inc_count(api: &TestKitApi, by: u64) -> Hash {
 }
 
 fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a> {
-    CounterSchema::new(snapshot.for_service(SERVICE_NAME).unwrap())
+    snapshot.service_schema(SERVICE_NAME).unwrap()
 }
 
 fn gen_inc_tx(by: u64) -> Verified<AnyTx> {

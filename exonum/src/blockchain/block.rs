@@ -208,7 +208,8 @@ impl Block {
 /// This structure contains enough information to prove the correctness of
 /// a block. It consists of the block itself and the `Precommit`
 /// messages related to this block.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[protobuf_convert(source = "proto::BlockProof")]
 pub struct BlockProof {
     /// Block header containing such information as the ID of the node which
     /// proposed the block, the height of the block, the number of transactions
@@ -219,7 +220,8 @@ pub struct BlockProof {
 }
 
 /// Proof of authenticity for a single index within the database.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
+#[protobuf_convert(source = "proto::IndexProof")]
 pub struct IndexProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]

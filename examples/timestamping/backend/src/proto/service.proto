@@ -19,9 +19,6 @@ package exonum.examples.timestamping;
 import "types.proto";
 import "google/protobuf/timestamp.proto";
 
-/// Timestamping transaction.
-message TxTimestamp { Timestamp content = 1; }
-
 // Stores content's hash and some metadata about it.
 message Timestamp {
   exonum.crypto.Hash content_hash = 1;
