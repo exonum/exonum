@@ -36,10 +36,14 @@ use exonum_cryptocurrency::{
     transactions::{Config, CreateWallet, TxTransfer},
 };
 
-// Imports shared test constants.
-use crate::constants::{ALICE_NAME, BOB_NAME, INSTANCE_ID, INSTANCE_NAME};
-
-mod constants;
+/// Alice's wallets name.
+const ALICE_NAME: &str = "Alice";
+/// Bob's wallet name.
+const BOB_NAME: &str = "Bob";
+/// Service instance id.
+const INSTANCE_ID: u32 = 1010;
+/// Service instance name.
+const INSTANCE_NAME: &str = "nnm-token";
 
 /// Check that the wallet creation transaction works when invoked via API.
 #[test]

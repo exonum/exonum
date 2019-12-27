@@ -156,6 +156,7 @@ pub use self::{
 #[macro_use]
 pub mod rust;
 pub mod migrations;
+pub mod versioning;
 
 use futures::Future;
 

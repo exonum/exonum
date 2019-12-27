@@ -264,6 +264,7 @@ pub mod error;
 
 use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
+use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -274,7 +275,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Mailbox},
         error::{catch_panic, ExecutionError, ExecutionFail},
-        migrations::{DataMigrationError, MigrateData, MigrationScript, Version},
+        migrations::{DataMigrationError, MigrateData, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },

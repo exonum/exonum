@@ -160,22 +160,14 @@ struct FromAccess {
 struct FromAccessAttrs {
     #[darling(default)]
     transparent: bool,
-
-    // We need an `Option` in order to discern explicit `schema = false` opt-out.
-    #[darling(default)]
-    schema: Option<bool>,
-}
-
-impl FromAccessAttrs {
-    fn is_schema(&self) -> bool {
-        self.schema.unwrap_or_default()
-    }
 }
 
 #[derive(Debug, Default, FromMeta)]
 struct FromAccessFieldAttrs {
     #[darling(default)]
     rename: Option<String>,
+    #[darling(default)]
+    flatten: bool,
 }
 
 impl FromAccess {
@@ -221,13 +213,9 @@ impl FromAccess {
 
 impl FromDeriveInput for FromAccess {
     fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
-        let mut attrs = find_meta_attrs("from_access", &input.attrs)
+        let attrs = find_meta_attrs("from_access", &input.attrs)
             .map(|meta| FromAccessAttrs::from_nested_meta(&meta))
             .unwrap_or_else(|| Ok(FromAccessAttrs::default()))?;
-
-        if attrs.schema.is_none() && input.ident.to_string().ends_with("Schema") {
-            attrs.schema = Some(true);
-        }
 
         match &input.data {
             Data::Struct(DataStruct { fields, .. }) => {
@@ -258,7 +246,7 @@ impl FromDeriveInput for FromAccess {
                                 let e = "Duplicate field name";
                                 return Err(darling::Error::custom(e).with_span(&field.span));
                             }
-                        } else {
+                        } else if !field.flatten {
                             let msg = if this.fields.len() == 1 {
                                 "Unnamed fields necessitate #[from_access(rename = ...)]. \
                                  To use a wrapper, add #[from_access(transparent)] to the struct"
@@ -284,6 +272,7 @@ struct AccessField {
     span: Span,
     ident: Option<Ident>,
     name_suffix: Option<String>,
+    flatten: bool,
 }
 
 impl FromField for AccessField {
@@ -301,6 +290,7 @@ impl FromField for AccessField {
             ident,
             name_suffix,
             span: field.span(),
+            flatten: attrs.flatten,
         })
     }
 }
@@ -318,15 +308,23 @@ impl AccessField {
     fn constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(exonum_merkledb::access::FromAccess);
         let ident = self.ident(field_index);
-        let name = self.name_suffix.as_ref().unwrap();
-        quote!(#ident: #from_access::from_access(access.clone(), addr.clone().append_name(#name))?)
+        if self.flatten {
+            quote!(#ident: #from_access::from_access(access.clone(), addr.clone())?)
+        } else {
+            let name = self.name_suffix.as_ref().unwrap();
+            quote!(#ident: #from_access::from_access(access.clone(), addr.clone().append_name(#name))?)
+        }
     }
 
     fn root_constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(exonum_merkledb::access::FromAccess);
         let ident = self.ident(field_index);
-        let name = &self.name_suffix;
-        quote!(#ident: #from_access::from_access(access.clone(), #name.into())?)
+        if self.flatten {
+            quote!(#ident: #from_access::from_root(access.clone())?)
+        } else {
+            let name = &self.name_suffix;
+            quote!(#ident: #from_access::from_access(access.clone(), #name.into())?)
+        }
     }
 }
 
@@ -398,23 +396,6 @@ impl ToTokens for FromAccess {
             }
         };
         tokens.extend(expanded);
-
-        if self.attrs.is_schema() {
-            let expanded = quote! {
-                impl #impl_generics #name #ty_generics #where_clause {
-                    /// Creates a new schema instance rooted in the provided `access`.
-                    ///
-                    /// # Panics
-                    ///
-                    /// Panics if the schema components cannot be instantiated
-                    /// (e.g., because an index included in the schema has a wrong type).
-                    pub fn new(access: #access_ident) -> Self {
-                        #tr::from_root(access).unwrap()
-                    }
-                }
-            };
-            tokens.extend(expanded);
-        }
     }
 }
 

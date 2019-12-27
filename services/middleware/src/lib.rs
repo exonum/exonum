@@ -49,11 +49,9 @@ mod transactions;
 
 use exonum::runtime::{
     rust::{DefaultInstance, Service},
-    InstanceId,
+    versioning, InstanceId,
 };
 use exonum_derive::*;
-use failure::format_err;
-use semver::VersionReq;
 
 use std::{fmt, str::FromStr};
 
@@ -70,19 +68,19 @@ impl DefaultInstance for MiddlewareService {
     const INSTANCE_NAME: &'static str = "middleware";
 }
 
-/// Requirement on an artifact.
+/// A wrapper around an artifact requirement.
 ///
-/// # Examples
-///
-/// Requirements can be used as a stub, generating a [`CheckedCall`].
+/// Necessary as a separate type because of Rust orphaning rules: we want to use the requirement
+/// as a stub, but the return type ([`CheckedCall`]) is defined in this crate.
 ///
 /// [`CheckedCall`]: struct.CheckedCall.html
+///
+/// # Examples
 ///
 /// ```
 /// # use exonum::runtime::InstanceId;
 /// # use exonum_derive::*;
 /// # use exonum_middleware_service::{ArtifactReq, CheckedCall};
-/// // Requirements can be parsed from a string.
 /// let req: ArtifactReq = "some.Service@^1.3.0".parse().unwrap();
 ///
 /// // Suppose the interface for `some.Service` is defined as follows:
@@ -96,42 +94,37 @@ impl DefaultInstance for MiddlewareService {
 /// const SERVICE_ID: InstanceId = 100;
 /// let checked_call: CheckedCall = req.do_something(SERVICE_ID, "Arg".into());
 /// ```
-#[derive(Debug, Clone, PartialEq)]
-pub struct ArtifactReq {
-    /// Artifact name.
-    pub name: String,
-    /// Allowed artifact versions.
-    pub version: VersionReq,
+#[derive(Clone, PartialEq)]
+pub struct ArtifactReq(pub versioning::ArtifactReq);
+
+impl From<versioning::ArtifactReq> for ArtifactReq {
+    fn from(value: versioning::ArtifactReq) -> Self {
+        ArtifactReq(value)
+    }
 }
 
-impl FromStr for ArtifactReq {
-    type Err = failure::Error;
+impl From<ArtifactReq> for versioning::ArtifactReq {
+    fn from(value: ArtifactReq) -> Self {
+        value.0
+    }
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<_> = s.splitn(2, '@').collect();
-        match &parts[..] {
-            [name, version] => Ok(Self {
-                name: name.to_string(),
-                version: version.parse()?,
-            }),
-            _ => Err(format_err!(
-                "Invalid artifact requirement. Use `name@version` format, \
-                 e.g., `exonum.Token@^1.3.0`"
-            )),
-        }
+impl fmt::Debug for ArtifactReq {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.0, formatter)
     }
 }
 
 impl fmt::Display for ArtifactReq {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}@{}", self.name, self.version)
+        fmt::Display::fmt(&self.0, formatter)
     }
 }
 
-#[test]
-fn artifact_req_parsing() {
-    let req: ArtifactReq = "exonum.Token@^1.0.5".parse().unwrap();
-    assert_eq!(req.name, "exonum.Token");
-    assert_eq!(req.version, "^1.0.5".parse().unwrap());
-    assert_eq!(req.to_string(), "exonum.Token@^1.0.5");
+impl FromStr for ArtifactReq {
+    type Err = <versioning::ArtifactReq as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        versioning::ArtifactReq::from_str(s).map(ArtifactReq)
+    }
 }

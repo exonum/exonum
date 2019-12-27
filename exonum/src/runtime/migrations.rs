@@ -16,14 +16,11 @@
 //!
 //! FIXME: more details (ECR-4081)
 
-// FIXME: Decouple after #1639 is merged.
-pub use semver::Version;
-
 use exonum_merkledb::migration::MigrationHelper;
 
 use std::{collections::BTreeMap, fmt};
 
-use crate::runtime::InstanceSpec;
+use crate::runtime::{versioning::Version, InstanceSpec};
 
 /// Atomic migration script.
 pub struct MigrationScript {

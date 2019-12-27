@@ -21,8 +21,9 @@ use exonum::{
         access::Prefixed, migration::MigrationHelper, Database, Fork, Snapshot, TemporaryDB,
     },
     runtime::{
-        migrations::{MigrateData, MigrationContext, MigrationScript, Version},
+        migrations::{MigrateData, MigrationContext, MigrationScript},
         rust::ServiceFactory,
+        versioning::Version,
         InstanceSpec,
     },
 };

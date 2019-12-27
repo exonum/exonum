@@ -20,9 +20,9 @@ use exonum::{
     runtime::{
         migrations::{
             DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
-            Version,
         },
         rust::{Service, ServiceFactory},
+        versioning::Version,
     },
 };
 use exonum_derive::*;
@@ -82,7 +82,7 @@ mod v01 {
     use exonum::{
         crypto::PublicKey,
         merkledb::{
-            access::{Access, Prefixed},
+            access::{Access, FromAccess, Prefixed},
             Fork, MapIndex,
         },
     };
@@ -104,6 +104,12 @@ mod v01 {
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+    }
+
     pub(crate) fn generate_test_data(access: Prefixed<'_, &Fork>, users: &[TestUser]) {
         let mut schema = Schema::new(access);
         for user in users {
@@ -121,7 +127,7 @@ mod v02 {
     use exonum_crypto::PublicKey;
     use exonum_derive::*;
     use exonum_merkledb::{
-        access::{Access, Prefixed},
+        access::{Access, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
 
@@ -131,6 +137,12 @@ mod v02 {
     pub struct Schema<T: Access> {
         pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
         pub total_balance: ProofEntry<T::Base, u64>,
+    }
+
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
     }
 
     pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>, users: &[TestUser]) {
@@ -155,7 +167,7 @@ mod v05 {
     use exonum_crypto::PublicKey;
     use exonum_derive::*;
     use exonum_merkledb::{
-        access::{Access, AccessExt, Prefixed},
+        access::{Access, AccessExt, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
     use exonum_proto::ProtobufConvert;
@@ -183,6 +195,12 @@ mod v05 {
     pub struct Schema<T: Access> {
         pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
         pub summary: ProofEntry<T::Base, Summary>,
+    }
+
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
     }
 
     pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>, users: &[TestUser]) {
