@@ -23,7 +23,7 @@ use hex::FromHex;
 
 use std::{
     ops::{Bound, Range},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use crate::{
@@ -390,18 +390,16 @@ impl ExplorerApi {
     ) where
         Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
     {
-        let server = Arc::new(Mutex::new(None));
-
         let index = move |request: HttpRequest| -> FutureResponse {
-            let server = server.clone();
             let blockchain = blockchain.clone();
-            let mut address = server.lock().expect("Expected mutex lock");
-            if address.is_none() {
-                *address = Some(Arbiter::start(|_| Server::new(blockchain)));
-
-                shared_node_state.set_broadcast_server_address(address.to_owned().unwrap());
-            }
-            let address = address.to_owned().unwrap();
+            let address = match shared_node_state.broadcast_server_address() {
+                None => {
+                    let addr = Arbiter::start(|_| Server::new(blockchain));
+                    shared_node_state.set_broadcast_server_address(addr.clone());
+                    addr
+                }
+                Some(addr) => addr,
+            };
 
             extract_query(&request)
                 .into_future()
