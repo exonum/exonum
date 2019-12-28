@@ -86,6 +86,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Supervisor` structure isn't generic anymore. (#1587)
 
+- `DeployConfirmation` structure was renamed to `DeployResult` and extended with
+  `success` field. (#1648)
+
 #### exonum-merkledb
 
 - The crate has been restructured, indexes are now located in separate module.
@@ -167,7 +170,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   `Configure` interface. (#1587)
   
 - `ConfigChange::StopService` has been added to make requests to stop the service
-  instance. (#1605)  
+  instance. (#1605)
+
+- New private endpoint `deploy-status` was added. (#1648)
 
 #### exonum-middleware-service
 
