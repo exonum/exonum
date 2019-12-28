@@ -112,6 +112,8 @@
 //! # }
 //! ```
 
+pub use self::persistent_iter::{ContinueIterator, PersistentIter, PersistentIters};
+
 use exonum_crypto::Hash;
 
 use std::{fmt, mem, sync::Arc};
@@ -127,6 +129,8 @@ use crate::{
     },
     Database, Fork, ObjectHash, ProofMapIndex, ReadonlyFork,
 };
+
+mod persistent_iter;
 
 /// Access to migrated indexes.
 ///
@@ -356,6 +360,23 @@ impl MigrationHelper {
         Ok(())
     }
 
+    /// FIXME
+    pub fn loop_iter(
+        &mut self,
+        mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<'_, &Fork>>),
+    ) -> crate::Result<()> {
+        loop {
+            let mut iterators = PersistentIters::new(self.scratchpad());
+            step(self, &mut iterators);
+            let should_break = iterators.all_ended();
+            self.merge()?;
+            if should_break {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     /// Merges the changes to the migrated data to the database.
     /// Returns hash representing migrated data state, or an error if the merge has failed.
     ///
@@ -389,6 +410,8 @@ mod tests {
         access::{AccessExt, RawAccess},
         HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
+
+    use std::{collections::HashMap, iter::FromIterator};
 
     #[test]
     fn in_memory_migration() {
@@ -802,5 +825,46 @@ mod tests {
         helper.scratchpad().get_entry("entry").set(1_u8);
         MigrationHelper::rollback_migration(&mut fork, "test");
         assert_eq!(Scratchpad::new("test", &fork).index_type("entry"), None);
+    }
+
+    #[test]
+    fn loop_iter_simple() -> crate::Result<()> {
+        const CHUNK_SIZE: usize = 2;
+        const DATA: &[(&str, u64)] = &[
+            ("Alice", 100),
+            ("Bob", 75),
+            ("Carol", 11),
+            ("Dave", 99),
+            ("Eve", 42),
+        ];
+
+        let db = TemporaryDB::new();
+        // Create initial data for migration.
+        let fork = db.fork();
+        {
+            let mut map = fork.get_map("test.balances");
+            for &(name, balance) in DATA {
+                map.put(name, balance);
+            }
+        }
+        db.merge(fork.into_patch())?;
+
+        let mut helper = MigrationHelper::new(db, "test");
+        helper.loop_iter(|helper, iters| {
+            let balances = helper.old_data().get_map::<_, str, u64>("balances");
+            let mut new_balances = helper.new_data().get_proof_map::<_, str, u64>("balances");
+            for (name, balance) in iters.create("balances", &balances).take(CHUNK_SIZE) {
+                new_balances.put(&name, balance + 10);
+            }
+        })?;
+
+        // Check the data after migration.
+        let old_balances: HashMap<_, _> = HashMap::from_iter(DATA.iter().copied());
+        let new_balances = helper.new_data().get_proof_map::<_, str, u64>("balances");
+        for (name, balance) in &new_balances {
+            assert_eq!(balance, old_balances[&name.as_str()] + 10);
+        }
+
+        Ok(())
     }
 }
