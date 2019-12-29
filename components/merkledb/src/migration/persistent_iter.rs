@@ -251,6 +251,57 @@ where
 }
 
 /// Persistent iterator that stores its position in the database.
+///
+/// Persistent iterators iterate over an index and automatically persist iteration
+/// results in the DB. This allows to build fault-tolerant migration scripts that work correctly
+/// after being restarted while merging the intermediate changes to the database.
+///
+/// Like indexes, persistent iterators are identified by an address. Likewise, they are subject
+/// to the borrowing rules (e.g., attempting to create two instances of the same iterator will
+/// result in a runtime error). When migrating data, it makes sense to store iterators
+/// in the associated [`Scratchpad`]. In this way, iterators will be automatically removed
+/// when the migration is over.
+///
+/// # Examples
+///
+/// [`MigrationHelper`] offers convenient iterator API via `iter_loop` method, which covers
+/// basic use cases. When `iter_loop` is not enough, a persistent iterator can be instantiated
+/// independently:
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, Database, TemporaryDB};
+/// # use exonum_merkledb::migration::{MigrationHelper, PersistentIter};
+/// let db = TemporaryDB::new();
+/// // Create data for migration.
+/// let fork = db.fork();
+/// fork.get_proof_list("migration.list").extend((0..123).map(|i| i.to_string()));
+/// db.merge(fork.into_patch()).unwrap();
+///
+/// let helper = MigrationHelper::new(db, "migration");
+/// // The old data is here.
+/// let list = helper.old_data().get_proof_list::<_, String>("list");
+/// // In the context of migration, persistent iterators should use
+/// // the scratchpad data access.
+/// let iter = PersistentIter::new(helper.scratchpad(), "list_iter", &list);
+/// // Now, we can use `iter` as any other iterator. Persistence is most useful
+/// // together with the `take` combinator; it allows to break migrated data
+/// // into manageable chunks.
+/// for (_, item) in iter.take(100) {
+///     // Migrate `item`. The first component of a tuple is the index of the item
+///     // in the list, which we ignore.
+/// }
+///
+/// // If we recreate the iterator, it will resume iteration from the last
+/// // known position (the element with 0-based index 100, in our case).
+/// let mut iter = PersistentIter::new(helper.scratchpad(), "list_iter", &list);
+/// let (i, item) = iter.next().unwrap();
+/// assert_eq!(i, 100);
+/// assert_eq!(item, "100");
+/// assert_eq!(iter.count(), 22); // number of remaining items
+/// ```
+///
+/// [`Scratchpad`]: struct.Scratchpad.html
+/// [`MigrationHelper`]: struct.MigrationHelper.html
 pub struct PersistentIter<T: RawAccess, I: ContinueIterator> {
     inner: Inner<T, I>,
 }
@@ -303,7 +354,8 @@ where
     T: RawAccessMut,
     I: ContinueIterator,
 {
-    fn new<A>(access: A, name: &str, index: I) -> Self
+    /// Creates a new persistent iterator.
+    pub fn new<A>(access: A, name: &str, index: I) -> Self
     where
         A: Access<Base = T>,
     {

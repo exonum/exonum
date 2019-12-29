@@ -23,6 +23,9 @@
 //! they behave like indexes in other regards. For example, it is impossible to create a tombstone
 //! and then create an ordinary index at the same address, or vice versa.
 //!
+//! A migration can also store temporary data in a [`Scratchpad`]. This data will be removed
+//! when the migration is finalized.
+//!
 //! Indexes created within a migration are not [aggregated] in the default state hash. Instead,
 //! they are placed in a separate namespace, the aggregator and state hash for which can be
 //! obtained via respective [`Migration`] methods.
@@ -30,21 +33,24 @@
 //! It is possible to periodically persist migrated data to the database
 //! (indeed, this is a best practice to avoid out-of-memory errors). It is even possible
 //! to restart the process handling the migration, provided it can recover from such a restart
-//! on the application level.
+//! on the application level. To assist with fault tolerance, use [persistent iterators].
 //!
 //! # Finalizing Migration
 //!
-//! To finalize a migration, one needs to call [`Fork::flush_migration`]. This will replace
+//! To finalize a migration, one needs to call [`MigrationHelper::flush_migration`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
-//! to the default state aggregator. To roll back a migration, use [`Fork::rollback_migration`].
-//! This will remove the new index data and corresponding metadata.
+//! to the default state aggregator. To roll back a migration,
+//! use [`MigrationHelper::rollback_migration`]. This will remove the new index data and
+//! corresponding metadata.
 //!
 //! [`Migration`]: struct.Migration.html
 //! [`Prefixed`]: ../access/struct.Prefixed.html
 //! [`create_tombstone`]: struct.Migration.html#method.create_tombstone
+//! [`Scratchpad`]: struct.Scratchpad.html
 //! [aggregated]: ../index.html#state-aggregation
-//! [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
-//! [`Fork::rollback_migration`]: ../struct.Fork.html#method.rollback_migration
+//! [persistent iterators]: struct.PersistentIter.html
+//! [`MigrationHelper::flush_migration`]: struct.MigrationHelper.html#method.flush_migration
+//! [`MigrationHelper::rollback_migration`]: struct.MigrationHelper.html#method.rollback_migration
 //!
 //! # Examples
 //!
@@ -100,7 +106,7 @@
 //!
 //! // The migration can be committed as follows.
 //! let mut fork = db.fork();
-//! fork.flush_migration("test");
+//! MigrationHelper::flush_migration(&mut fork, "test");
 //! db.merge(fork.into_patch())?;
 //! let snapshot = db.snapshot();
 //! assert_eq!(snapshot.get_proof_list::<_, u32>("test.list").len(), 3);
@@ -301,7 +307,49 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 
 /// Migration helper.
 ///
-/// See the [module docs](index.html) for examples of usage.
+/// # Examples
+///
+/// See the [module docs](index.html) for a basic example of usage.
+///
+/// ## Using persistent iterators
+///
+/// `MigrationHelper` offers the [`iter_loop`](#method.iter_loop) method, which allows to further
+/// simplify working with [persistent iterators].
+///
+/// Say we want to migrate `MapIndex` data to a `ProofMapIndex` while merging changes to the DB
+/// from time to time. To do this, we use the following script:
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
+/// # use exonum_merkledb::migration::MigrationHelper;
+/// # fn main() -> exonum_merkledb::Result<()> {
+/// /// Number of accounts processed per DB merge.
+/// const CHUNK_SIZE: usize = 100;
+///
+/// let db = TemporaryDB::new();
+/// let mut helper = MigrationHelper::new(db, "test");
+/// helper.iter_loop(|helper, iters| {
+///     // The data before migration is stored in this map
+///     let old_map = helper.old_data().get_map::<_, str, u64>("wallets");
+///     // ...and the new data is in this merkelized map.
+///     let mut new_map = helper.new_data().get_proof_map::<_, str, u64>("wallets");
+///
+///     // Create an iterator over the old data.
+///     let iter = iters.create("wallets", &old_map);
+///     // Take a fixed amount of records from the iterator and migrate them.
+///     // Since `iter` is persistent, it will not return the same record twice,
+///     // even if this script is restarted.
+///     for (name, balance) in iter.take(CHUNK_SIZE) {
+///         new_map.put(&name, balance);
+///     }
+/// })?;
+/// // Here, the iterator has run out of items. The script can now perform
+/// // other actions if necessary.
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [persistent iterators]: struct.PersistentIter.html
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
     fork: Fork,
@@ -360,8 +408,12 @@ impl MigrationHelper {
         Ok(())
     }
 
-    /// FIXME
-    pub fn loop_iter(
+    /// Executes the provided closure in a loop until all persistent iterators instantiated
+    /// within the closure have ended. After each iteration, the changes in migrated data are
+    /// merged to the database; an error is returned if this merge fails.
+    ///
+    /// If no iterators are instantiated within the closure, a single iteration will be performed.
+    pub fn iter_loop(
         &mut self,
         mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<'_, &Fork>>),
     ) -> crate::Result<()> {
@@ -850,7 +902,7 @@ mod tests {
         db.merge(fork.into_patch())?;
 
         let mut helper = MigrationHelper::new(db, "test");
-        helper.loop_iter(|helper, iters| {
+        helper.iter_loop(|helper, iters| {
             let balances = helper.old_data().get_map::<_, str, u64>("balances");
             let mut new_balances = helper.new_data().get_proof_map::<_, str, u64>("balances");
             for (name, balance) in iters.create("balances", &balances).take(CHUNK_SIZE) {
