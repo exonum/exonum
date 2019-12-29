@@ -36,6 +36,11 @@ message SignedMessage {
   exonum.crypto.Signature signature = 3;
 }
 
+// Container for a verified message.
+message Verified {
+  SignedMessage raw = 1;
+}
+
 // List of consensus messages
 
 message Connect {

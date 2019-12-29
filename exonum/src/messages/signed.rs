@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
-use failure::ensure;
+use exonum_proto::ProtobufConvert;
+use failure::{ensure, Error};
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
@@ -21,9 +22,11 @@ use serde::{
 
 use std::{borrow::Cow, convert::TryFrom};
 
-use crate::crypto::{self, Hash, PublicKey, SecretKey};
-
-use super::types::{ExonumMessage, SignedMessage};
+use crate::{
+    crypto::{self, Hash, PublicKey, SecretKey},
+    messages::types::{ExonumMessage, SignedMessage},
+    proto,
+};
 
 impl SignedMessage {
     /// Creates a new signed message from the given binary value.
@@ -199,6 +202,24 @@ impl<T> From<Verified<T>> for SignedMessage {
     }
 }
 
+impl<T> ProtobufConvert for Verified<T>
+where
+    T: TryFrom<SignedMessage>,
+{
+    type ProtoStruct = proto::Verified;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut verified = Self::ProtoStruct::new();
+        verified.set_raw(self.as_raw().to_pb());
+        verified
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let raw = SignedMessage::from_pb(pb.take_raw())?;
+        raw.into_verified()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289,5 +310,27 @@ mod tests {
         let bytes = msg.to_bytes();
         let msg2 = Verified::<AnyTx>::from_bytes(bytes.into()).unwrap();
         assert_eq!(msg, msg2);
+    }
+
+    #[test]
+    fn test_verified_protobuf_convert() {
+        let keypair = crypto::gen_keypair();
+
+        let msg = Verified::from_value(
+            AnyTx {
+                call_info: CallInfo {
+                    instance_id: 5,
+                    method_id: 2,
+                },
+                arguments: vec![1, 2, 3, 4],
+            },
+            keypair.0,
+            &keypair.1,
+        );
+
+        let to_pb = msg.to_pb();
+        let from_pb = Verified::from_pb(to_pb).expect("Failed to convert from protobuf.");
+
+        assert_eq!(msg, from_pb);
     }
 }

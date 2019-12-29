@@ -45,7 +45,7 @@ struct ApiNodeState {
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
-    broadcast_server_addresses: Vec<Addr<websocket::Server>>,
+    broadcast_server_address: Option<Addr<websocket::Server>>,
     tx_cache_len: usize,
 }
 
@@ -230,15 +230,28 @@ impl SharedNodeState {
             .remove(addr)
     }
 
+    /// Get current active broadcast server address.
+    pub(crate) fn broadcast_server_address(&self) -> Option<Addr<websocket::Server>> {
+        self.node
+            .read()
+            .expect("Expected read lock")
+            .broadcast_server_address
+            .clone()
+    }
+
     pub(crate) fn set_broadcast_server_address(&self, address: Addr<websocket::Server>) {
-        let mut node = self.node.write().expect("Expected write lock");
-        node.broadcast_server_addresses.push(address);
+        let mut state = self.node.write().expect("Expected write lock");
+        state.broadcast_server_address = Some(address);
     }
 
     /// Broadcast message to all subscribers.
     pub(crate) fn broadcast(&self, block_hash: &Hash) {
-        let state = self.node.read().expect("Expected read lock");
-        for address in state.broadcast_server_addresses.iter() {
+        if let Some(ref address) = self
+            .node
+            .read()
+            .expect("Expected read lock")
+            .broadcast_server_address
+        {
             address.do_send(websocket::Broadcast {
                 block_hash: *block_hash,
             })
@@ -247,7 +260,7 @@ impl SharedNodeState {
 
     pub(crate) fn shutdown_broadcast_server(&self) {
         let state = self.node.read().expect("Expected read lock");
-        for server in state.broadcast_server_addresses.iter() {
+        if let Some(server) = state.broadcast_server_address.as_ref() {
             server.do_send(websocket::Terminate);
         }
     }

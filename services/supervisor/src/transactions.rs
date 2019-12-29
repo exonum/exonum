@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum::{
+    crypto::PublicKey,
     helpers::{Height, ValidateInput},
     runtime::{
         rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec,
@@ -26,7 +27,8 @@ use std::collections::HashSet;
 
 use super::{
     configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployConfirmation, DeployRequest, Error, Schema, StartService, StopService, Supervisor,
+    DeployRequest, DeployResult, DeployState, Error, SchemaImpl, StartService, StopService,
+    Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -48,7 +50,7 @@ pub trait SupervisorInterface<Ctx> {
     ///
     /// The artifact is registered in the dispatcher if all validators send this confirmation.
     /// This confirmation is sent automatically by the node if the deploy succeeds.
-    fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployConfirmation) -> Self::Output;
+    fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployResult) -> Self::Output;
 
     /// Propose config change
     ///
@@ -160,24 +162,24 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             return Err(Error::ActualFromIsPast.into());
         }
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that there are no pending config changes.
-        if let Some(proposal) = schema.pending_proposal.get() {
+        if let Some(proposal) = schema.public.pending_proposal.get() {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
                 return Err(Error::ConfigProposeExists.into());
             } else {
                 // Proposal is outdated but was not removed (e.g. because of the panic
                 // during config applying), clean it.
-                schema.pending_proposal.remove();
+                schema.public.pending_proposal.remove();
             }
         }
         drop(schema);
 
         // Verify changes in the proposal.
         self.verify_config_changeset(&mut context, &propose.changes)?;
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // After all the checks verify that configuration number is expected one.
         if propose.configuration_number != schema.get_configuration_number() {
@@ -192,7 +194,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             config_propose: propose,
             propose_hash,
         };
-        schema.pending_proposal.set(config_entry);
+        schema.public.pending_proposal.set(config_entry);
 
         Ok(())
     }
@@ -209,8 +211,9 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
 
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let entry = schema
+            .public
             .pending_proposal
             .get()
             .ok_or(Error::ConfigProposeNotRegistered)?;
@@ -258,7 +261,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         if deploy.deadline_height < core_schema.height() {
             return Err(Error::ActualFromIsPast.into());
         }
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that transaction author is validator.
         let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
@@ -293,6 +296,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         schema.deploy_requests.confirm(&deploy, author);
         let supervisor_mode = schema.supervisor_config().mode;
         if supervisor_mode.deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
+            schema.deploy_states.put(&deploy, DeployState::Pending);
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments.put(&artifact, deploy);
@@ -303,16 +307,17 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
     fn confirm_artifact_deploy(
         &self,
         context: CallContext<'_>,
-        confirmation: DeployConfirmation,
+        deploy_result: DeployResult,
     ) -> Self::Output {
-        confirmation
+        deploy_result
+            .request
             .artifact
             .validate()
             .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
 
         let core_schema = context.data().for_core();
 
-        // Verifies that transaction author is validator.
+        // Verify that transaction author is validator.
         let author = context
             .caller()
             .author()
@@ -320,34 +325,44 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;
+        let current_height = core_schema.height();
 
-        let mut schema = Schema::new(context.service_data());
-        // Verifies that this deployment is registered.
+        let schema = SchemaImpl::new(context.service_data());
+
+        // Check if deployment already failed.
+        if schema
+            .deploy_states
+            .get(&deploy_result.request)
+            .map(|state| state.is_failed())
+            .unwrap_or_default()
+        {
+            // This deployment is already resulted in failure, no further
+            // processing needed.
+            return Ok(());
+        }
+
+        // Verify that this deployment is registered.
         let deploy_request = schema
             .pending_deployments
-            .get(&confirmation.artifact)
+            .get(&deploy_result.request.artifact)
             .ok_or(Error::DeployRequestNotRegistered)?;
 
-        // Verifies that we didn't reach deadline height.
-        if deploy_request.deadline_height < core_schema.height() {
+        // Check that pending deployment is the same as in confirmation.
+        if deploy_request != deploy_result.request {
+            let error = ExecutionError::from(Error::DeployRequestNotRegistered);
+            return Err(error);
+        }
+
+        // Verify that we didn't reach deadline height.
+        if deploy_request.deadline_height < current_height {
             return Err(Error::DeadlineExceeded.into());
         }
 
-        let confirmations = schema.deploy_confirmations.confirm(&confirmation, author);
-        let validator_count = core_schema.consensus_config().validator_keys.len();
-        if confirmations == validator_count {
-            log::trace!(
-                "Registering deployed artifact in dispatcher {:?}",
-                confirmation.artifact
-            );
-
-            // Removes artifact from pending deployments.
-            schema.pending_deployments.remove(&confirmation.artifact);
-            // We have enough confirmations to register the deployed artifact in the dispatcher;
-            // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+        drop(schema);
+        match deploy_result.result.0 {
+            Ok(()) => self.confirm_deploy(context, deploy_request, author)?,
+            Err(error) => self.fail_deploy(context, deploy_request, error),
         }
-
         Ok(())
     }
 }
@@ -411,5 +426,58 @@ impl Supervisor {
             }
         }
         Ok(())
+    }
+
+    /// Confirms a deploy by the given author's public key and checks
+    /// if all the confirmations are collected. If so, starts the artifact registration.
+    fn confirm_deploy(
+        &self,
+        context: CallContext<'_>,
+        deploy_request: DeployRequest,
+        author: PublicKey,
+    ) -> Result<(), ExecutionError> {
+        let core_schema = context.data().for_core();
+
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        if confirmations == validator_count {
+            log::trace!(
+                "Registering deployed artifact in dispatcher {:?}",
+                deploy_request.artifact
+            );
+
+            // Remove artifact from pending deployments.
+            schema.pending_deployments.remove(&deploy_request.artifact);
+            schema
+                .deploy_states
+                .put(&deploy_request, DeployState::Succeed);
+            // We have enough confirmations to register the deployed artifact in the dispatcher;
+            // if this action fails, this transaction will be canceled.
+            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec)?;
+        }
+        Ok(())
+    }
+
+    /// Marks deployment as failed, discarding the further deployment steps.
+    fn fail_deploy(
+        &self,
+        context: CallContext<'_>,
+        deploy_request: DeployRequest,
+        error: ExecutionError,
+    ) {
+        let height = context.data().for_core().height();
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        // Mark deploy as failed.
+        schema
+            .deploy_states
+            .put(&deploy_request, DeployState::Failed { height, error });
+
+        // Remove artifact from pending deployments: since we require
+        // a confirmation from every node, failure for one node means failure
+        // for the whole network.
+        schema.pending_deployments.remove(&deploy_request.artifact);
     }
 }

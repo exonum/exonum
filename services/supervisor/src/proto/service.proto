@@ -19,6 +19,7 @@ package exonum.supervisor;
 import "types.proto";
 import "runtime.proto";
 import "blockchain.proto";
+import "google/protobuf/empty.proto";
 
 // Transactions
 
@@ -33,9 +34,11 @@ message DeployRequest {
 }
 
 // Confirmation that the artifact was successfully deployed by the validator.
-message DeployConfirmation {
+message DeployResult {
   // Artifact identifier.
-  exonum.runtime.ArtifactId artifact = 1;
+  DeployRequest request = 1;
+  // Result of deployment.
+  exonum.runtime.ExecutionStatus result = 2;
 }
 
 // Request for the start service instance.

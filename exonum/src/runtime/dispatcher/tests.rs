@@ -611,7 +611,7 @@ impl DeploymentRuntime {
             .push(Action::StartDeploy {
                 artifact: artifact.clone(),
                 spec: Self::SPEC.to_vec(),
-                and_then: Box::new(|| Box::new(Ok(()).into_future())),
+                then: Box::new(|_| Box::new(Ok(()).into_future())),
             });
         let fork = db.fork();
         dispatcher.activate_pending(&fork);

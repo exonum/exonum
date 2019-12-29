@@ -18,6 +18,7 @@
 #![allow(bare_trait_objects)]
 
 use crate::crypto::proto::*;
+use crate::merkledb::proto::*;
 use exonum_proto::proto::*;
 
 include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
