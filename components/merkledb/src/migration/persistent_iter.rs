@@ -354,6 +354,7 @@ where
                         IteratorPosition::Ended
                     });
                 } else {
+                    position_entry.set(IteratorPosition::Ended);
                     self.inner = Inner::Ended;
                 }
                 next
@@ -522,6 +523,19 @@ mod tests {
 
         let iter = PersistentIter::new(scratchpad, "list", &list);
         assert_eq!(iter.count(), 2);
+    }
+
+    #[test]
+    fn empty_persistent_iter() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let list = fork.get_list::<_, String>("list");
+
+        let scratchpad = Scratchpad::new("iter", &fork);
+        let iter = PersistentIter::new(scratchpad, "list", &list);
+        assert_eq!(iter.count(), 0);
+        let position_entry = scratchpad.get_entry::<_, IteratorPosition<u64>>("list");
+        assert_eq!(position_entry.get(), Some(IteratorPosition::Ended));
     }
 
     #[test]
