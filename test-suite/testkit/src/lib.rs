@@ -16,17 +16,16 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
+//!
 //! ```
 //! use exonum::{
+//!     blockchain::{Block, Schema},
+//!     crypto::{gen_keypair, Hash},
+//!     helpers::Height,
 //!     runtime::{
 //!         rust::{ServiceFactory, CallContext, Service},
 //!         BlockchainData, SnapshotExt, ExecutionError,
 //!     },
-//!     blockchain::{Block, Schema},
-//!     crypto::{gen_keypair, Hash},
-//!     explorer::TransactionInfo,
-//!     helpers::Height,
-//!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
 //! use serde_derive::*;
 //! use exonum_derive::*;
