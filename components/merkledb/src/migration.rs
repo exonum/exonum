@@ -57,7 +57,7 @@
 //!
 //! ```
 //! # use exonum_merkledb::{access::AccessExt, Database, SystemSchema, TemporaryDB};
-//! # use exonum_merkledb::migration::{Migration, MigrationHelper};
+//! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
 //! # fn main() -> exonum_merkledb::Result<()> {
 //! let db = Arc::new(TemporaryDB::new());
@@ -107,7 +107,7 @@
 //!
 //! // The migration can be committed as follows.
 //! let mut fork = db.fork();
-//! MigrationHelper::flush_migration(&mut fork, "test");
+//! flush_migration(&mut fork, "test");
 //! db.merge(fork.into_patch())?;
 //! let snapshot = db.snapshot();
 //! assert_eq!(snapshot.get_proof_list::<_, u32>("test.list").len(), 3);
