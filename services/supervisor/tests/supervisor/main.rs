@@ -25,18 +25,21 @@ use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    ConfigPropose, DeployConfirmation, DeployRequest, Error as TxError, Supervisor,
-    SupervisorInterface,
+    ConfigPropose, DeployRequest, DeployResult, Error as TxError, Supervisor, SupervisorInterface,
 };
 
 use crate::{
     inc::{IncInterface, IncService, SERVICE_ID, SERVICE_NAME},
-    utils::build_confirmation_transactions,
+    utils::{build_confirmation_transactions, CFG_CHANGE_HEIGHT},
 };
+
+const DEPLOY_HEIGHT: Height = CFG_CHANGE_HEIGHT;
+const START_HEIGHT: Height = Height(DEPLOY_HEIGHT.0 * 2 + 1);
 
 mod config;
 mod config_api;
 mod consensus_config;
+mod deploy_failures;
 mod inc;
 mod proto;
 mod service_lifecycle;
@@ -133,7 +136,7 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let confirmation = request.to_owned().into();
+    let confirmation = DeployResult::ok(request.to_owned());
     testkit
         .validator(validator_id)
         .service_keypair()
@@ -175,7 +178,7 @@ fn deploy_default(testkit: &mut TestKit) {
 
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request = deploy_request(artifact.clone(), testkit.height().next());
+    let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(testkit, &request);
     let hash = deploy_artifact(&api, request);
     let block = testkit.create_block();
@@ -183,7 +186,8 @@ fn deploy_default(testkit: &mut TestKit) {
 
     // Confirmation is ready.
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_hash));
-    testkit.create_block();
+    testkit.create_blocks_until(DEPLOY_HEIGHT);
+
     // Confirmation is gone now.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
@@ -194,10 +198,12 @@ fn deploy_default(testkit: &mut TestKit) {
 fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
     let api = testkit.api();
     assert!(!service_instance_exists(&api, instance_name));
-    let request = start_service_request(default_artifact(), instance_name, testkit.height().next());
+
+    let request = start_service_request(default_artifact(), instance_name, START_HEIGHT);
     let hash = start_service(&api, request);
     let block = testkit.create_block();
     block[hash].status().unwrap();
+    testkit.create_blocks_until(START_HEIGHT);
 
     let api = testkit.api(); // Update the API
     assert!(service_instance_exists(&api, instance_name));
@@ -365,7 +371,7 @@ fn test_bad_artifact_name() {
         name: "does-not-exist".to_owned(),
         version: "1.0.0".parse().unwrap(),
     };
-    let request = deploy_request(bad_artifact.clone(), testkit.height().next());
+    let request = deploy_request(bad_artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
 
@@ -391,7 +397,7 @@ fn test_bad_runtime_id() {
         runtime_id: bad_runtime_id,
         ..IncService.artifact_id()
     };
-    let request = deploy_request(artifact.clone(), testkit.height().next());
+    let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
     let block = testkit.create_block();
@@ -434,6 +440,7 @@ fn test_bad_service_instance_name() {
     let api = testkit.api();
     let artifact = default_artifact();
     let bad_instance_name = "\u{2764}";
+
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, bad_instance_name, deadline_height);
     let hash = start_service(&api, request);
@@ -578,7 +585,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT.next());
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
@@ -619,7 +626,7 @@ fn test_two_validators() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
@@ -650,7 +657,7 @@ fn test_two_validators() {
     {
         assert!(!service_instance_exists(&api, instance_name));
         // Add two heights to the deadline: one for block with config proposal and one for confirmation.
-        let deadline = testkit.height().next().next();
+        let deadline = DEPLOY_HEIGHT.next();
         let request_start = start_service_request(default_artifact(), instance_name, deadline);
         let propose_hash = request_start.object_hash();
 
@@ -695,7 +702,7 @@ fn test_multiple_validators_no_confirmation() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
 
     // Send an artifact deploy request from this validator.
@@ -723,12 +730,12 @@ fn test_auditor_cant_send_requests() {
 
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let confirmation: DeployConfirmation = request_deploy.clone().into();
+        let confirmation = DeployResult::ok(request_deploy.clone());
         testkit
             .us()
             .service_keypair()
@@ -764,7 +771,7 @@ fn test_auditor_normal_workflow() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
 
     // Emulate an artifact deploy request from the validator.
@@ -788,7 +795,7 @@ fn test_auditor_normal_workflow() {
     {
         let api = testkit.api();
         assert!(!service_instance_exists(&api, instance_name));
-        let deadline = testkit.height().next();
+        let deadline = DEPLOY_HEIGHT;
         let request_start = start_service_request(default_artifact(), instance_name, deadline);
 
         // Emulate a start instance request from the validator.
@@ -825,7 +832,8 @@ fn test_multiple_validators_deploy_confirm() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
+
     // Send deploy requests by every validator.
     for i in 0..validators_count {
         deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i));
@@ -861,7 +869,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_majority() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
     // Send deploy requests by byzantine majority of validators.
     for i in 0..byzantine_majority {
@@ -894,7 +902,8 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
+
     // Send deploy requests by byzantine majority of validators.
     for i in 0..byzantine_minority {
         deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i));
