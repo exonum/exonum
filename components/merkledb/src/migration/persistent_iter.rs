@@ -284,7 +284,7 @@ where
 /// // the scratchpad data access.
 /// let iter = PersistentIter::new(helper.scratchpad(), "list_iter", &list);
 /// // Now, we can use `iter` as any other iterator. Persistence is most useful
-/// // together with the `take` combinator; it allows to break migrated data
+/// // together with the `take` adapter; it allows to break migrated data
 /// // into manageable chunks.
 /// for (_, item) in iter.take(100) {
 ///     // Migrate `item`. The first component of a tuple is the index of the item
@@ -554,7 +554,7 @@ mod tests {
 
         let scratchpad = Scratchpad::new("iter", &fork);
         let iter = PersistentIter::new(scratchpad, "list", &list);
-        // Test that iterators work with combinators as expected.
+        // Test that iterators work with adapters as expected.
         let items: Vec<_> = iter.take(5).filter(|(i, _)| i % 2 == 1).collect();
         assert_eq!(items, vec![(1, "1".to_owned()), (3, "3".to_owned())]);
 

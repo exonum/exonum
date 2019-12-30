@@ -149,7 +149,7 @@ fn generate_action(collections: &'static [Collection]) -> impl Strategy<Value = 
 // Since collection contents is not the subject of the test, we do not include into `Action`s.
 // Instead, we use an RNG to fill each of predefined collections with 25-100 pseudo-random elements.
 fn fill_collections(db: &TemporaryDB) {
-    const RNG_SEED: [u8; 16] = *b"seedseedseedseed";
+    const RNG_SEED: [u8; 16] = *b"_seed_seed_seed_";
 
     let fork = db.fork();
     let mut rng = XorShiftRng::from_seed(RNG_SEED);
