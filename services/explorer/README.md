@@ -5,7 +5,14 @@
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
 `exonum-explorer-service` provides HTTP endpoints for exploring
-the Exonum blockchain.
+Exonum blockchains.
+
+This crate is distinct from the base [explorer][explorer] crate.
+The base explorer provides Rust language APIs for retrieving info
+from the blockchain, while this crate translates these APIs into
+REST and WebSocket endpoints and packages this logic as an Exonum service.
+Thus, this crate is useful if you want to provide the way for external apps
+to query the blockchain info.
 
 ## Usage
 
@@ -17,7 +24,7 @@ exonum = "0.13.0-rc.2"
 exonum-explorer-service = "0.13.0-rc.2"
 ```
 
-The service should usually be included at the blockchain start
+The explorer service should usually be initialized at the blockchain start
 with the default identifiers. The service will refuse to instantiate
 if an explorer service is already instantiated on the blockchain.
 

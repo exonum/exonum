@@ -17,12 +17,15 @@
 //! The explorer service does not define transactions, but it has several REST / WebSocket
 //! endpoints allowing to retrieve information from the blockchain in a structured way.
 //! Usually, the explorer service should be instantiated at the blockchain start
-//! with the default identifiers. There may be no more than 1 explorer service on a blockchain;
+//! with the default identifiers. There may be no more than one explorer service on a blockchain;
 //! an attempt to create a second service instance will lead to an error in the service
 //! constructor.
 //!
 //! The API types necessary to interact with the service HTTP API are defined in a separate
-//! crate, `exonum-explorer`.
+//! crate, [`exonum-explorer`]. The base explorer provides Rust language APIs for retrieving info
+//! from the blockchain, while this crate translates these APIs into REST and WebSocket endpoints
+//! and packages this logic as an Exonum service. Thus, this crate is useful if you want to provide
+//! the way for external apps to query the blockchain info.
 //!
 //! # Examples
 //!
@@ -44,6 +47,8 @@
 //!     .get("v1/blocks?count=10")
 //!     .unwrap();
 //! ```
+//!
+//! [`exonum-explorer`]: https://docs.rs/exonum-explorer
 
 // TODO: provide endpoint descriptions with examples (ECR-4040)
 

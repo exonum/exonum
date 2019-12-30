@@ -9,6 +9,13 @@ for the [Exonum blockchain framework](https://exonum.com/). For example,
 it allows to request transactions from a block together with the execution
 statuses, iterate over blocks, etc.
 
+This crate is distinct from the [explorer *service*][explorer-service] crate.
+While this crate provides Rust language APIs for retrieving info from the blockchain,
+the explorer service translates these APIs into REST and WebSocket endpoints.
+Correspondingly, this crate is primarily useful for Rust-language client apps.
+Another use case is testing; the [testkit] relies on types in this crate
+and re-exports it as the `explorer` module.
+
 ## Usage
 
 Include `exonum-explorer` as a dependency in your `Cargo.toml`:
@@ -26,3 +33,6 @@ and [examples](examples) for more details about the service API.
 
 `exonum-explorer` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
+
+[explorer-service]: https://crates.io/crates/exonum-explorer-service/
+[testkit]: https://crates.io/crate/exonum-testkit/
