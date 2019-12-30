@@ -139,6 +139,9 @@ use crate::{
 
 mod persistent_iter;
 
+/// Name of the column family used to store `Scratchpad`s.
+const SCRATCHPAD_NAME: &str = "__scratchpad__";
+
 /// Access to migrated indexes.
 ///
 /// `Migration` is conceptually similar to a [`Prefixed`] access. For example, an index with
@@ -251,23 +254,11 @@ impl<'a, T: RawAccess> Scratchpad<'a, T> {
 
     fn get_scratchpad_addr(&self, addr: IndexAddress) -> IndexAddress {
         let prefixed_addr = addr.prepend_name(self.namespace);
-        IndexAddress::from_root("__scratchpad__").append_key(&prefixed_addr.fully_qualified_name())
+        IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.fully_qualified_name())
     }
 }
 
 impl<T: RawAccessMut> Scratchpad<'_, T> {
-    /// Removes an index with the specified address.
-    ///
-    /// # Panics
-    ///
-    /// This method will panic if the index is borrowed.
-    pub fn remove_index(self, addr: impl Into<IndexAddress>) {
-        let addr = self.get_scratchpad_addr(addr.into());
-        if let Some(resolved_addr) = IndexesPool::new(self.access.clone()).remove_view(&addr) {
-            View::new(self.access, resolved_addr).clear();
-        }
-    }
-
     /// Removes all indexes and their data from the scratchpad.
     ///
     /// # Panics
@@ -276,7 +267,7 @@ impl<T: RawAccessMut> Scratchpad<'_, T> {
     fn clear(&self) {
         let addr = self.get_scratchpad_addr(IndexAddress::default());
         let addr = addr.append_key(&b'.');
-        let removed = IndexesPool::new(self.access.clone()).remove_views(&addr);
+        let removed = IndexesPool::new(self.access.clone()).remove_indexes(&addr);
         for resolved_addr in removed {
             View::new(self.access.clone(), resolved_addr).clear();
         }
@@ -778,18 +769,12 @@ mod tests {
 
         // Check entry address.
         {
-            let addr: IndexAddress = ("__scratchpad__", "test.entry").into();
+            let addr: IndexAddress = (SCRATCHPAD_NAME, "test.entry").into();
             let view =
                 ViewWithMetadata::get_or_create_unchecked(&fork, &addr, IndexType::Entry).unwrap();
             let (view, _) = view.into_parts::<()>();
             assert_eq!(view.get::<_, u8>(&()), Some(1));
         }
-
-        // Check entry removal.
-        scratchpad.remove_index("entry");
-        assert_eq!(scratchpad.index_type("entry"), None);
-        // The same address can then be reused.
-        scratchpad.get_list("entry").extend(vec![2_u32, 3]);
 
         // Check that info persists to `Patch`es and `Snapshot`s.
         let patch = fork.into_patch();;
@@ -812,7 +797,7 @@ mod tests {
         let scratchpad = Scratchpad::new("test", &fork);
         scratchpad.get_entry(("entry", &5_u32)).set(1_u8);
 
-        let addr: IndexAddress = ("__scratchpad__", &b"test.entry\0\0\0\0\x05"[..]).into();
+        let addr: IndexAddress = (SCRATCHPAD_NAME, &b"test.entry\0\0\0\0\x05"[..]).into();
         let view =
             ViewWithMetadata::get_or_create_unchecked(&fork, &addr, IndexType::Entry).unwrap();
         let (view, _) = view.into_parts::<()>();

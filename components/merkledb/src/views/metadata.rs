@@ -405,12 +405,21 @@ impl<T: RawAccessMut> IndexesPool<T> {
         })
     }
 
-    pub(crate) fn remove_views(&mut self, prefix: &IndexAddress) -> Vec<ResolvedAddress> {
+    /// Removes indexes which address starts from the specified `prefix` (i.e., which can be
+    /// obtained from the prefix by calling `append_key`).
+    ///
+    /// # Return value
+    ///
+    /// Returns resolved addresses of the removed indexes.
+    pub(crate) fn remove_indexes(&mut self, prefix: &IndexAddress) -> Vec<ResolvedAddress> {
         let name = prefix.name();
         let prefix = prefix.fully_qualified_name();
         self.remove_by_prefix(&prefix, |_| name.to_owned())
     }
 
+    /// Removes views with the full name starting with the specified prefix. The `extract_name`
+    /// argument provides a way to map from a full name to the name of the column family
+    /// where the view is stored.
     fn remove_by_prefix(
         &mut self,
         prefix: &[u8],
@@ -431,21 +440,6 @@ impl<T: RawAccessMut> IndexesPool<T> {
             self.0.remove(full_name);
         }
         removed_addrs
-    }
-
-    /// Removes a view by clearing its content and removing the metadata record.
-    ///
-    /// Removing a view can break invariants (e.g., state aggregation logic), thus, we use this
-    /// method only for indexes that are guaranteed to not be aggregated (namely, in a scratchpad).
-    pub(crate) fn remove_view(&mut self, addr: &IndexAddress) -> Option<ResolvedAddress> {
-        let full_name = addr.fully_qualified_name();
-        self.0.get::<_, IndexMetadata>(&full_name).map(|metadata| {
-            self.0.remove(&full_name);
-            ResolvedAddress {
-                name: addr.name().to_owned(),
-                id: NonZeroU64::new(metadata.identifier),
-            }
-        })
     }
 }
 
