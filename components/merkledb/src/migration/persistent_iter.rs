@@ -391,26 +391,26 @@ where
     type Item = <I::Iter as Iterator>::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner {
-            Inner::Ended => None,
-            Inner::Active {
-                ref mut iter,
-                ref mut position_entry,
-            } => {
-                let next = iter.next();
-                if next.is_some() {
-                    position_entry.set(if let Some(ref item) = iter.peek() {
-                        let key = I::extract_key(item);
-                        IteratorPosition::NextKey(key)
-                    } else {
-                        IteratorPosition::Ended
-                    });
+        if let Inner::Active {
+            ref mut iter,
+            ref mut position_entry,
+        } = self.inner
+        {
+            let next = iter.next();
+            if next.is_some() {
+                position_entry.set(if let Some(ref item) = iter.peek() {
+                    let key = I::extract_key(item);
+                    IteratorPosition::NextKey(key)
                 } else {
-                    position_entry.set(IteratorPosition::Ended);
-                    self.inner = Inner::Ended;
-                }
-                next
+                    IteratorPosition::Ended
+                });
+            } else {
+                position_entry.set(IteratorPosition::Ended);
+                self.inner = Inner::Ended;
             }
+            next
+        } else {
+            None
         }
     }
 }

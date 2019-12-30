@@ -386,7 +386,7 @@ impl MigrationHelper {
         Prefixed::new(&self.namespace, self.fork.readonly())
     }
 
-    /// Merges the changes to the migrated data to the database. Returns an error
+    /// Merges the changes to the migrated data and the scratchpad to the database. Returns an error
     /// if the merge has failed.
     ///
     /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
@@ -409,19 +409,17 @@ impl MigrationHelper {
         &mut self,
         mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<'_, &Fork>>),
     ) -> crate::Result<()> {
-        loop {
+        let mut should_break = false;
+        while !should_break {
             let mut iterators = PersistentIters::new(self.scratchpad());
             step(self, &mut iterators);
-            let should_break = iterators.all_ended();
+            should_break = iterators.all_ended();
             self.merge()?;
-            if should_break {
-                break;
-            }
         }
         Ok(())
     }
 
-    /// Merges the changes to the migrated data to the database.
+    /// Merges the changes to the migrated data and the migration scratchpad to the database.
     /// Returns hash representing migrated data state, or an error if the merge has failed.
     ///
     /// `finish` does not flush the migration; the migrated data remains in a separate namespace.
@@ -776,16 +774,18 @@ mod tests {
             assert_eq!(view.get::<_, u8>(&()), Some(1));
         }
 
+        scratchpad.get_list("list").extend(vec![2_u32, 3]);
+
         // Check that info persists to `Patch`es and `Snapshot`s.
         let patch = fork.into_patch();;
         let scratchpad = Scratchpad::new("test", &patch);
-        let list = scratchpad.get_list::<_, u32>("entry");
+        let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
         db.merge(patch).unwrap();
         let snapshot = db.snapshot();
         let scratchpad = Scratchpad::new("test", &snapshot);
-        let list = scratchpad.get_list::<_, u32>("entry");
+        let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
     }
