@@ -244,7 +244,7 @@ fn main() {
     assert_eq!(
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({
-            "type": "in-pool",
+            "type": "in_pool",
             "content": serde_json::to_value(tx_in_pool.content()).unwrap(),
         })
     );
