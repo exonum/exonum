@@ -93,8 +93,12 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::{rust::ServiceFactory, RuntimeInstance, WellKnownRuntime},
+    runtime::{
+        rust::{DefaultInstance, ServiceFactory},
+        RuntimeInstance, WellKnownRuntime,
+    },
 };
+use exonum_explorer_service::ExplorerFactory;
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
@@ -151,9 +155,12 @@ impl NodeBuilder {
             )
             .with_artifact(Supervisor.artifact_id())
             .with_instance(supervisor)
+            .with_artifact(ExplorerFactory.artifact_id())
+            .with_instance(ExplorerFactory.default_instance())
             .build();
 
-            let mut services: Vec<Box<dyn ServiceFactory>> = vec![Supervisor.into()];
+            let mut services: Vec<Box<dyn ServiceFactory>> =
+                vec![Supervisor.into(), ExplorerFactory.into()];
             services.extend(self.services);
 
             let db_options = &run_config.node_config.private_config.database;
