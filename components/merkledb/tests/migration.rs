@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 
 use exonum_merkledb::{
     access::{Access, AccessExt},
-    migration::{Migration, MigrationHelper},
+    migration::{flush_migration, rollback_migration, Migration},
     Database, HashTag, IndexAddress, IndexType, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
 };
 
@@ -319,7 +319,7 @@ fn apply_actions(
             }
 
             MigrationAction::Rollback(namespace) => {
-                MigrationHelper::rollback_migration(&mut fork, namespace);
+                rollback_migration(&mut fork, namespace);
                 new_indexes.retain(|(ns, _), _| *ns != namespace);
             }
 
@@ -341,7 +341,7 @@ fn apply_actions(
     }
 
     for &namespace in namespaces {
-        MigrationHelper::flush_migration(&mut fork, namespace);
+        flush_migration(&mut fork, namespace);
     }
 
     // Compute the final list of indexes. Note that indexes removed in the migration

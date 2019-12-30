@@ -37,11 +37,12 @@
 //!
 //! # Finalizing Migration
 //!
-//! To finalize a migration, one needs to call [`MigrationHelper::flush_migration`]. This will replace
+//! To finalize a migration, one needs to call [`flush_migration`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
 //! to the default state aggregator. To roll back a migration,
-//! use [`MigrationHelper::rollback_migration`]. This will remove the new index data and
-//! corresponding metadata.
+//! use [`rollback_migration`]. This will remove the new index data and corresponding metadata.
+//! Both `flush_migration` and `rollback_migration` will remove the `Scratchpad` associated
+//! with the migration.
 //!
 //! [`Migration`]: struct.Migration.html
 //! [`Prefixed`]: ../access/struct.Prefixed.html
@@ -49,8 +50,8 @@
 //! [`Scratchpad`]: struct.Scratchpad.html
 //! [aggregated]: ../index.html#state-aggregation
 //! [persistent iterators]: struct.PersistentIter.html
-//! [`MigrationHelper::flush_migration`]: struct.MigrationHelper.html#method.flush_migration
-//! [`MigrationHelper::rollback_migration`]: struct.MigrationHelper.html#method.rollback_migration
+//! [`flush_migration`]: fn.flush_migration.html
+//! [`rollback_migration`]: fn.rollback_migration.html
 //!
 //! # Examples
 //!
@@ -400,7 +401,7 @@ impl MigrationHelper {
     /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
     /// Use [`flush_migration`] to flush the migrated data.
     ///
-    /// [`flush_migration`]: #method.flush_migration
+    /// [`flush_migration`]: fn.flush_migration.html
     pub fn merge(&mut self) -> crate::Result<()> {
         let fork = mem::replace(&mut self.fork, self.db.fork());
         self.db.merge(fork.into_patch())?;
@@ -435,24 +436,36 @@ impl MigrationHelper {
     /// `finish` does not flush the migration; the migrated data remains in a separate namespace.
     /// Use [`flush_migration`] to flush the migrated data.
     ///
-    /// [`flush_migration`]: #method.flush_migration
+    /// [`flush_migration`]: fn.flush_migration.html
     pub fn finish(self) -> crate::Result<Hash> {
         let patch = self.fork.into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
         self.db.merge(patch).map(|()| hash)
     }
+}
 
-    /// Flushes the migration to the fork. Once the `fork` is merged, the migration is complete.
-    pub fn flush_migration(fork: &mut Fork, namespace: &str) {
-        fork.flush_migration(namespace);
-        Scratchpad::new(namespace, &*fork).clear();
-    }
+/// Flushes the migration to the fork. Once the `fork` is merged, the migration is complete.
+///
+/// The following operations will be performed:
+///
+/// - Migrated indexes will replace their old versions
+/// - Migrated indexes will be aggregated in the default namespace
+/// - Indexes marked with tombstones will be removed
+/// - Scratchpad associated with the migration will be cleared
+pub fn flush_migration(fork: &mut Fork, namespace: &str) {
+    fork.flush_migration(namespace);
+    Scratchpad::new(namespace, &*fork).clear();
+}
 
-    /// Rolls back the migration.
-    pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
-        fork.rollback_migration(namespace);
-        Scratchpad::new(namespace, &*fork).clear();
-    }
+/// Rolls back the migration.
+///
+/// The following operations will be performed:
+///
+/// - Migrated indexes will be erased (both data and metadata)
+/// - Scratchpad associated with the migration will be cleared
+pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
+    fork.rollback_migration(namespace);
+    Scratchpad::new(namespace, &*fork).clear();
 }
 
 #[cfg(test)]
@@ -870,12 +883,12 @@ mod tests {
         );
 
         let mut fork = db.fork();
-        MigrationHelper::flush_migration(&mut fork, "test");
+        flush_migration(&mut fork, "test");
         assert_eq!(Scratchpad::new("test", &fork).index_type("entry"), None);
 
         let helper = MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test");
         helper.scratchpad().get_entry("entry").set(1_u8);
-        MigrationHelper::rollback_migration(&mut fork, "test");
+        rollback_migration(&mut fork, "test");
         assert_eq!(Scratchpad::new("test", &fork).index_type("entry"), None);
     }
 
