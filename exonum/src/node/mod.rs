@@ -514,49 +514,49 @@ impl NodeHandler {
     }
 
     /// Return internal `SharedNodeState`
-    pub fn api_state(&self) -> &SharedNodeState {
+    fn api_state(&self) -> &SharedNodeState {
         &self.api_state
     }
 
     /// Returns value of the `first_round_timeout` field from the current `ConsensusConfig`.
-    pub fn first_round_timeout(&self) -> Milliseconds {
+    fn first_round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().first_round_timeout
     }
 
     /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
-    pub fn round_timeout_increase(&self) -> Milliseconds {
+    fn round_timeout_increase(&self) -> Milliseconds {
         (self.state().consensus_config().first_round_timeout
             * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT)
             / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
-    pub fn status_timeout(&self) -> Milliseconds {
+    fn status_timeout(&self) -> Milliseconds {
         self.state().consensus_config().status_timeout
     }
 
     /// Returns value of the `peers_timeout` field from the current `ConsensusConfig`.
-    pub fn peers_timeout(&self) -> Milliseconds {
+    fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
     }
 
     /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
-    pub fn txs_block_limit(&self) -> u32 {
+    fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
     }
 
     /// Returns value of the minimal propose timeout.
-    pub fn min_propose_timeout(&self) -> Milliseconds {
+    fn min_propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().min_propose_timeout
     }
 
     /// Returns value of the maximal propose timeout.
-    pub fn max_propose_timeout(&self) -> Milliseconds {
+    fn max_propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().max_propose_timeout
     }
 
     /// Returns threshold starting from which the minimal propose timeout value is used.
-    pub fn propose_timeout_threshold(&self) -> u32 {
+    fn propose_timeout_threshold(&self) -> u32 {
         self.state().consensus_config().propose_timeout_threshold
     }
 
@@ -621,14 +621,14 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
+    fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
         let message = message.into();
         let request = NetworkRequest::SendMessage(public_key, message);
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
-    pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
+    fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
         let peers: Vec<PublicKey> = self
             .state
             .peers()
@@ -648,7 +648,7 @@ impl NodeHandler {
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&mut self, key: PublicKey) {
+    fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
         self.send_to_peer(key, connect);
     }
@@ -671,7 +671,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
-    pub fn add_round_timeout(&mut self) {
+    fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round().next());
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
@@ -684,7 +684,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
-    pub fn add_propose_timeout(&mut self) {
+    fn add_propose_timeout(&mut self) {
         let timeout = if self.need_faster_propose() {
             self.min_propose_timeout()
         } else {
@@ -719,7 +719,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
-    pub fn add_status_timeout(&mut self) {
+    fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
         let height = self.state.height();
         self.add_timeout(NodeTimeout::Status(height), time);
@@ -733,31 +733,31 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
-    pub fn add_peer_exchange_timeout(&mut self) {
+    fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
-    pub fn add_update_api_state_timeout(&mut self) {
+    fn add_update_api_state_timeout(&mut self) {
         let time = self.system_state.current_time()
             + Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
     /// Returns hash of the last block.
-    pub fn last_block_hash(&self) -> Hash {
+    fn last_block_hash(&self) -> Hash {
         self.blockchain.as_ref().last_block().object_hash()
     }
 
     /// Returns the number of uncommitted transactions.
-    pub fn uncommitted_txs_count(&self) -> u64 {
+    fn uncommitted_txs_count(&self) -> u64 {
         self.blockchain.as_ref().pool_size() + self.state.tx_cache_len() as u64
     }
 
     /// Returns start time of the requested round.
-    pub fn round_start_time(&self, round: Round) -> SystemTime {
+    fn round_start_time(&self, round: Round) -> SystemTime {
         // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt
         // Where:
         // H - height start time
@@ -772,12 +772,13 @@ impl NodeHandler {
 }
 
 impl fmt::Debug for NodeHandler {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
-            self.blockchain, self.peer_discovery
-        )
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NodeHandler")
+            .field("channel", &self.channel)
+            .field("blockchain", &self.blockchain)
+            .field("peer_discovery", &self.peer_discovery)
+            .finish()
     }
 }
 
