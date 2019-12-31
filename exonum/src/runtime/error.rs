@@ -24,6 +24,7 @@ use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::{bail, ensure, Fail};
 
 use std::{
     any::Any,

@@ -143,6 +143,7 @@
 
 pub use semver::{Version, VersionReq};
 
+use failure::{format_err, Fail};
 use std::{fmt, str::FromStr};
 
 use crate::runtime::{ArtifactId, DispatcherError, ExecutionError, ExecutionFail};

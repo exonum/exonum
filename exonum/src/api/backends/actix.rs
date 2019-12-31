@@ -24,7 +24,7 @@ use actix_web::{
     error::ResponseError, http::header, AsyncResponder, FromRequest, HttpMessage, HttpResponse,
     Query,
 };
-use failure::Error;
+use failure::{bail, ensure, format_err, Error};
 use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
 use serde::{
     de::{self, DeserializeOwned},
