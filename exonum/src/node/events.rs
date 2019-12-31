@@ -16,7 +16,10 @@ use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 
 use crate::{
     blockchain::Schema,
-    events::{error::LogError, Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent},
+    events::{
+        error::LogError, Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest,
+        NetworkEvent,
+    },
 };
 
 impl EventHandler for NodeHandler {
@@ -31,12 +34,13 @@ impl EventHandler for NodeHandler {
 
 impl NodeHandler {
     fn handle_internal_event(&mut self, event: InternalEvent) {
-        match event {
-            InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
-            InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
-            InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
-            InternalEvent::MessageVerified(msg) => self.handle_message(*msg),
-            InternalEvent::RestartApi => unreachable!(),
+        match event.0 {
+            InternalEventInner::Timeout(timeout) => self.handle_timeout(timeout),
+            InternalEventInner::JumpToRound(height, round) => self.handle_new_round(height, round),
+            InternalEventInner::Shutdown => {
+                panic!("Shutdown should be processed in the event loop")
+            }
+            InternalEventInner::MessageVerified(msg) => self.handle_message(*msg),
         }
     }
 

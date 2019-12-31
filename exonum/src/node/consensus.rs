@@ -27,7 +27,7 @@ use crate::{
         Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
         TransactionsRequest, TransactionsResponse, Verified,
     },
-    node::{NodeHandler, RequestData},
+    node::{state::RequestData, NodeHandler},
 };
 
 // Shortcut to get verified messages from bytes.

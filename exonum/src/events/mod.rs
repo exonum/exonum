@@ -45,7 +45,39 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
 #[derive(Debug, PartialEq)]
-pub enum InternalEvent {
+pub struct InternalEvent(pub(crate) InternalEventInner);
+
+impl InternalEvent {
+    // FIXME: review visibility
+    #[doc(hidden)]
+    pub fn jump_to_round(height: Height, round: Round) -> Self {
+        InternalEvent(InternalEventInner::JumpToRound(height, round))
+    }
+
+    #[doc(hidden)]
+    pub fn message_verified(message: Message) -> Self {
+        InternalEvent(InternalEventInner::MessageVerified(Box::new(message)))
+    }
+
+    #[doc(hidden)]
+    pub fn is_message_verified(&self) -> bool {
+        match self {
+            InternalEvent(InternalEventInner::MessageVerified(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn timeout(timeout: NodeTimeout) -> Self {
+        InternalEvent(InternalEventInner::Timeout(timeout))
+    }
+
+    pub(crate) fn shutdown() -> Self {
+        InternalEvent(InternalEventInner::Shutdown)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum InternalEventInner {
     /// Round update event.
     JumpToRound(Height, Round),
     /// Timeout event.
@@ -55,8 +87,6 @@ pub enum InternalEvent {
     /// Message has been successfully verified.
     /// Message is boxed here so that enum variants have similar size.
     MessageVerified(Box<Message>),
-    /// Restart actix ver api.
-    RestartApi,
 }
 
 #[derive(Debug)]
@@ -70,7 +100,19 @@ pub enum InternalRequest {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
+pub struct TimeoutRequest(pub(crate) SystemTime, pub(crate) NodeTimeout);
+
+impl TimeoutRequest {
+    /// Gets the timeout of the request.
+    pub fn time(&self) -> SystemTime {
+        self.0
+    }
+
+    /// Converts this request into an event.
+    pub fn event(self) -> Event {
+        self.1.into()
+    }
+}
 
 #[derive(Debug)]
 pub enum Event {
@@ -132,7 +174,7 @@ impl Into<Event> for NetworkEvent {
 
 impl Into<Event> for NodeTimeout {
     fn into(self) -> Event {
-        Event::Internal(InternalEvent::Timeout(self))
+        Event::Internal(InternalEvent::timeout(self))
     }
 }
 
@@ -193,7 +235,8 @@ where
             Ok(Async::Ready(None))
         } else {
             match self.internal.poll()? {
-                Async::Ready(None) | Async::Ready(Some(InternalEvent::Shutdown)) => {
+                Async::Ready(None)
+                | Async::Ready(Some(InternalEvent(InternalEventInner::Shutdown))) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
                 }

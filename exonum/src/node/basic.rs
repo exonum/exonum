@@ -14,12 +14,13 @@
 
 use rand::Rng;
 
-use super::{NodeHandler, NodeRole, RequestData};
-use crate::crypto::PublicKey;
-use crate::events::error::LogError;
-use crate::events::network::ConnectedPeerAddr;
-use crate::helpers::Height;
-use crate::messages::{Connect, Message, PeersRequest, Responses, Service, Status, Verified};
+use super::{state::RequestData, NodeHandler, NodeRole};
+use crate::{
+    crypto::PublicKey,
+    events::{error::LogError, network::ConnectedPeerAddr},
+    helpers::Height,
+    messages::{Connect, Message, PeersRequest, Responses, Service, Status, Verified},
+};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.

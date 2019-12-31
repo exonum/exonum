@@ -107,9 +107,9 @@ pub struct State {
     keys: Keys,
 }
 
-/// State of a validator-node.
+/// State of a validator node.
 #[derive(Debug, Clone)]
-pub struct ValidatorState {
+pub(crate) struct ValidatorState {
     id: ValidatorId,
     our_prevotes: HashMap<Round, Verified<Prevote>>,
     our_precommits: HashMap<Round, Verified<Precommit>>,
@@ -118,7 +118,7 @@ pub struct ValidatorState {
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
 /// translated to the corresponding request-message.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum RequestData {
+pub(crate) enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
     /// Represents `PoolTransactionsRequest` message.
@@ -508,7 +508,7 @@ impl State {
     }
 
     /// Returns `ValidatorState` if the node is validator.
-    pub fn validator_state(&self) -> &Option<ValidatorState> {
+    fn validator_state(&self) -> &Option<ValidatorState> {
         &self.validator_state
     }
 
@@ -1252,7 +1252,7 @@ impl State {
     }
 
     /// Adds data-request to the queue. Returns `true` if it is a new request.
-    pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
+    pub(super) fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
         let state = self.requests.entry(data).or_insert_with(RequestState::new);
         let is_new = state.is_empty();
         state.insert(peer);
@@ -1261,7 +1261,11 @@ impl State {
 
     /// Returns public key of a peer that has required information. Returned key is removed from
     /// the corresponding validators list, so next time request will be sent to a different peer.
-    pub fn retry(&mut self, data: &RequestData, peer: Option<PublicKey>) -> Option<PublicKey> {
+    pub(super) fn retry(
+        &mut self,
+        data: &RequestData,
+        peer: Option<PublicKey>,
+    ) -> Option<PublicKey> {
         let next = {
             let state = if let Some(state) = self.requests.get_mut(data) {
                 state
@@ -1281,7 +1285,7 @@ impl State {
     }
 
     /// Removes the specified request from the pending request list.
-    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
+    pub(super) fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
         let state = self.requests.remove(data);
         state.map(|s| s.known_nodes).unwrap_or_default()
     }

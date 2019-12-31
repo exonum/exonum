@@ -19,7 +19,7 @@
 
 pub use self::{
     connect_list::{ConnectList, PeerAddress},
-    state::{RequestData, State, ValidatorState},
+    state::State,
 };
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
@@ -52,6 +52,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use self::state::RequestData;
 use crate::{
     api::{
         backends::actix::{
@@ -105,7 +106,7 @@ pub enum ExternalMessage {
 
 /// Node timeout types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum NodeTimeout {
+pub(crate) enum NodeTimeout {
     /// Status timeout with the current height.
     Status(Height),
     /// Round timeout.
@@ -363,7 +364,7 @@ pub struct NodeSender {
 
 /// Node role.
 #[derive(Debug, Clone, Copy)]
-pub enum NodeRole {
+pub(crate) enum NodeRole {
     /// Validator node.
     Validator(ValidatorId),
     /// Auditor node.
@@ -389,14 +390,6 @@ impl NodeRole {
     pub fn is_validator(self) -> bool {
         match self {
             NodeRole::Validator(_) => true,
-            _ => false,
-        }
-    }
-
-    /// Checks if node is auditor.
-    pub fn is_auditor(self) -> bool {
-        match self {
-            NodeRole::Auditor => true,
             _ => false,
         }
     }
@@ -648,8 +641,8 @@ impl NodeHandler {
         self.send_to_peer(key, connect);
     }
 
-    /// Add timeout request.
-    pub fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
+    /// Adds a timeout request.
+    fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
         self.channel
             .internal_requests
@@ -658,7 +651,7 @@ impl NodeHandler {
     }
 
     /// Adds request timeout if it isn't already requested.
-    pub fn request(&mut self, data: RequestData, peer: PublicKey) {
+    fn request(&mut self, data: RequestData, peer: PublicKey) {
         let is_new = self.state.request(data.clone(), peer);
         if is_new {
             self.add_request_timeout(data, None);
@@ -721,7 +714,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
-    pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+    fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
         self.add_timeout(NodeTimeout::Request(data, peer), time);
