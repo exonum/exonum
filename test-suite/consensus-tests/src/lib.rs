@@ -882,21 +882,14 @@ impl Sandbox {
             internal_requests: internal_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
-        let connect_list = ConnectList::from_peers(
-            inner
-                .handler
-                .state
-                .peers()
-                .iter()
-                .map(|(public_key, connect)| (*public_key, connect.clone())),
-        );
-
-        let keys = Keys::from_keys(
-            inner.handler.state.consensus_public_key(),
-            inner.handler.state.consensus_secret_key().clone(),
-            inner.handler.state.service_public_key(),
-            inner.handler.state.service_secret_key().clone(),
-        );
+        let peers = inner
+            .handler
+            .state()
+            .peers()
+            .iter()
+            .map(|(pk, connect)| (*pk, connect.to_owned()));
+        let connect_list = ConnectList::from_peers(peers);
+        let keys = inner.handler.state().keys().to_owned();
 
         let config = Configuration {
             listener: ListenerConfig {
@@ -904,8 +897,8 @@ impl Sandbox {
                 connect_list,
             },
             service: ServiceConfig {
-                service_public_key: inner.handler.state.service_public_key(),
-                service_secret_key: inner.handler.state.service_secret_key().clone(),
+                service_public_key: keys.service.public_key(),
+                service_secret_key: keys.service.secret_key().clone(),
             },
             network: NetworkConfiguration::default(),
             peer_discovery: Vec::new(),
@@ -952,11 +945,11 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        self.node_state().consensus_public_key()
+        self.node_state().keys().consensus_pk()
     }
 
     fn node_secret_key(&self) -> SecretKey {
-        self.node_state().consensus_secret_key().clone()
+        self.node_state().keys().consensus_sk().to_owned()
     }
 }
 
@@ -1278,7 +1271,7 @@ mod tests {
             let public_key = validator_keys.consensus_key;
             let config = {
                 let inner = &self.inner.borrow_mut();
-                let state = &inner.handler.state;
+                let state = inner.handler.state();
                 let mut config = state.config().clone();
                 config.validator_keys.push(validator_keys);
                 config
@@ -1288,7 +1281,7 @@ mod tests {
             self.inner
                 .borrow_mut()
                 .handler
-                .state
+                .state_mut()
                 .add_peer_to_connect_list(ConnectInfo {
                     address: addr.to_string(),
                     public_key,
@@ -1296,7 +1289,11 @@ mod tests {
         }
 
         fn update_config(&self, config: ConsensusConfig) {
-            self.inner.borrow_mut().handler.state.update_config(config);
+            self.inner
+                .borrow_mut()
+                .handler
+                .state_mut()
+                .update_config(config);
         }
     }
 

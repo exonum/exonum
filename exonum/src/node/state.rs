@@ -25,7 +25,7 @@ use std::{
 
 use crate::{
     blockchain::{contains_transaction, ConsensusConfig, ProposerId, ValidatorKeys},
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::{Hash, PublicKey},
     events::network::ConnectedPeerAddr,
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     messages::{
@@ -52,6 +52,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
+#[doc(hidden)]
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Verified<Connect>,
@@ -310,11 +311,6 @@ impl RequestState {
 }
 
 impl ProposeState {
-    /// Returns hash of the propose.
-    pub fn hash(&self) -> Hash {
-        self.propose.object_hash()
-    }
-
     /// Returns block hash propose was executed.
     pub fn block_hash(&self) -> Option<Hash> {
         self.block_hash
@@ -357,21 +353,6 @@ impl ProposeState {
 }
 
 impl BlockState {
-    /// Creates a new `BlockState` instance with the given parameters.
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ProposerId) -> Self {
-        Self {
-            hash,
-            patch: Some(patch),
-            txs,
-            proposer_id,
-        }
-    }
-
-    /// Returns hash of the block.
-    pub fn hash(&self) -> Hash {
-        self.hash
-    }
-
     /// Returns the changes that should be made for block committing.
     pub fn patch(&mut self) -> Patch {
         self.patch.take().expect("Patch is already committed")
@@ -513,13 +494,13 @@ impl State {
     }
 
     /// Returns validator id of the node if it is a validator. Returns `None` otherwise.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
+    pub(crate) fn validator_id(&self) -> Option<ValidatorId> {
         self.validator_state.as_ref().map(ValidatorState::id)
     }
 
     /// Updates the validator id. If there hasn't been `ValidatorState` for that id, then a new
     /// state will be created.
-    pub fn renew_validator_id(&mut self, id: Option<ValidatorId>) {
+    fn renew_validator_id(&mut self, id: Option<ValidatorId>) {
         let validator_state = self.validator_state.take();
         self.validator_state = id.map(move |id| match validator_state {
             Some(mut state) => {
@@ -531,7 +512,7 @@ impl State {
     }
 
     /// Checks if the node is a validator.
-    pub fn is_validator(&self) -> bool {
+    pub(super) fn is_validator(&self) -> bool {
         self.validator_state().is_some()
     }
 
@@ -548,7 +529,7 @@ impl State {
     }
 
     /// Returns public (consensus and service) keys of known validators.
-    pub fn validators(&self) -> &[ValidatorKeys] {
+    pub(crate) fn validators(&self) -> &[ValidatorKeys] {
         &self.config.validator_keys
     }
 
@@ -557,20 +538,12 @@ impl State {
         &self.config
     }
 
-    /// Returns validator id with a specified public key.
-    pub fn find_validator(&self, peer: PublicKey) -> Option<ValidatorId> {
-        self.validators()
-            .iter()
-            .position(|pk| pk.consensus_key == peer)
-            .map(|id| ValidatorId(id as u16))
-    }
-
     /// Returns `ConsensusConfig`.
-    pub fn consensus_config(&self) -> &ConsensusConfig {
+    pub(super) fn consensus_config(&self) -> &ConsensusConfig {
         &self.config
     }
 
-    /// Replaces `ConsensusConfig` with a new one and updates validator id of the current node
+    /// Replaces `ConsensusConfig` with a new one and updates validator ID of the current node
     /// if the new config is different from the previous one.
     pub fn update_config(&mut self, config: ConsensusConfig) {
         if self.config == config {
@@ -581,7 +554,7 @@ impl State {
         let validator_id = config
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == self.consensus_public_key())
+            .position(|pk| pk.consensus_key == self.keys().consensus_pk())
             .map(|id| ValidatorId(id as u16));
 
         // TODO: update connect list (ECR-1745)
@@ -593,18 +566,18 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Verified<Connect>) -> bool {
+    pub(super) fn add_peer(&mut self, pubkey: PublicKey, msg: Verified<Connect>) -> bool {
         self.peers.insert(pubkey, msg).is_none()
     }
 
     /// Add connection to the connection list.
-    pub fn add_connection(&mut self, pubkey: PublicKey, address: ConnectedPeerAddr) {
+    pub(super) fn add_connection(&mut self, pubkey: PublicKey, address: ConnectedPeerAddr) {
         self.connections.insert(pubkey, address);
     }
 
     /// Removes a peer by the socket address. Returns `Some` (connect message) of the peer if it was
     /// indeed connected or `None` if there was no connection with given socket address.
-    pub fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Verified<Connect>> {
+    pub(super) fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Verified<Connect>> {
         self.connections.remove(key);
         if let Some(c) = self.peers.remove(key) {
             Some(c)
@@ -614,7 +587,7 @@ impl State {
     }
 
     /// Checks if this node considers a peer to be a validator.
-    pub fn peer_is_validator(&self, pubkey: &PublicKey) -> bool {
+    pub(super) fn peer_is_validator(&self, pubkey: &PublicKey) -> bool {
         self.config
             .validator_keys
             .iter()
@@ -622,7 +595,7 @@ impl State {
     }
 
     /// Checks if a peer is in this node's connection list.
-    pub fn peer_in_connect_list(&self, pubkey: &PublicKey) -> bool {
+    pub(super) fn peer_in_connect_list(&self, pubkey: &PublicKey) -> bool {
         self.connect_list.is_peer_allowed(pubkey)
     }
 
@@ -632,34 +605,19 @@ impl State {
     }
 
     /// Returns the addresses of known connections with public keys of its' validators.
-    pub fn connections(&self) -> &HashMap<PublicKey, ConnectedPeerAddr> {
+    pub(crate) fn connections(&self) -> &HashMap<PublicKey, ConnectedPeerAddr> {
         &self.connections
     }
 
     /// Returns public key of a validator identified by id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
+    pub(super) fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         let id: usize = id.into();
         self.validators().get(id).map(|x| x.consensus_key)
     }
 
-    /// Returns the consensus public key of the current node.
-    pub fn consensus_public_key(&self) -> PublicKey {
-        self.keys.consensus_pk()
-    }
-
-    /// Returns the consensus secret key of the current node.
-    pub fn consensus_secret_key(&self) -> &SecretKey {
-        &self.keys.consensus_sk()
-    }
-
-    /// Returns the service public key of the current node.
-    pub fn service_public_key(&self) -> PublicKey {
-        self.keys.service_pk()
-    }
-
-    /// Returns the service secret key of the current node.
-    pub fn service_secret_key(&self) -> &SecretKey {
-        &self.keys.service_sk()
+    /// Returns the keys of this node.
+    pub fn keys(&self) -> &Keys {
+        &self.keys
     }
 
     /// Returns the leader id for the specified round and current height.
@@ -672,7 +630,11 @@ impl State {
     /// Updates known round for a validator and returns
     /// a new actual round if at least one non byzantine validators is guaranteed to be on a higher round.
     /// Otherwise returns None.
-    pub fn update_validator_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+    pub(super) fn update_validator_round(
+        &mut self,
+        id: ValidatorId,
+        round: Round,
+    ) -> Option<Round> {
         // Update known round.
         {
             let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
@@ -710,12 +672,12 @@ impl State {
     }
 
     /// Returns the height for a validator identified by the public key.
-    pub fn node_height(&self, key: &PublicKey) -> Height {
+    pub(super) fn node_height(&self, key: &PublicKey) -> Height {
         *self.nodes_max_height.get(key).unwrap_or(&Height::zero())
     }
 
     /// Updates known height for a validator identified by the public key.
-    pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
+    pub(super) fn set_node_height(&mut self, key: PublicKey, height: Height) {
         *self
             .nodes_max_height
             .entry(key)
@@ -723,7 +685,7 @@ impl State {
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.
-    pub fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
+    pub(super) fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
         self.nodes_max_height
             .iter()
             .filter(|&(_, h)| *h > self.height())
@@ -732,7 +694,7 @@ impl State {
     }
 
     /// Returns sufficient number of votes for current validators number.
-    pub fn majority_count(&self) -> usize {
+    pub(crate) fn majority_count(&self) -> usize {
         byzantine_quorum(self.validators().len())
     }
 
@@ -742,7 +704,7 @@ impl State {
     }
 
     /// Returns start time of the current height.
-    pub fn height_start_time(&self) -> SystemTime {
+    pub(super) fn height_start_time(&self) -> SystemTime {
         self.height_start_time
     }
 
@@ -752,7 +714,7 @@ impl State {
     }
 
     /// Returns a hash of the last block.
-    pub fn last_hash(&self) -> Hash {
+    pub(super) fn last_hash(&self) -> Hash {
         self.last_hash
     }
 
@@ -761,7 +723,7 @@ impl State {
     /// # Panics
     ///
     /// Panics if the current "locked round" is bigger or equal to the new one.
-    pub fn lock(&mut self, round: Round, hash: Hash) {
+    pub(super) fn lock(&mut self, round: Round, hash: Hash) {
         if self.locked_round >= round {
             panic!("Incorrect lock")
         }
@@ -780,41 +742,42 @@ impl State {
     }
 
     /// Returns mutable propose state identified by hash.
-    pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
+    pub(super) fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
     }
+
     /// Returns propose state identified by hash.
-    pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
+    pub(super) fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
         self.proposes.get(hash)
     }
 
     /// Returns a block with the specified hash.
-    pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
+    pub(super) fn block(&self, hash: &Hash) -> Option<&BlockState> {
         self.blocks.get(hash)
     }
 
     /// Returns a mutable block with the specified hash.
-    pub fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
+    pub(super) fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
         self.blocks.get_mut(hash)
     }
 
     /// Updates mode's round.
-    pub fn jump_round(&mut self, round: Round) {
+    pub(super) fn jump_round(&mut self, round: Round) {
         self.round = round;
     }
 
     /// Increments node's round by one.
-    pub fn new_round(&mut self) {
+    pub(super) fn new_round(&mut self) {
         self.round.increment();
     }
 
     /// Return incomplete block.
-    pub fn incomplete_block(&self) -> Option<&IncompleteBlock> {
+    pub(super) fn incomplete_block(&self) -> Option<&IncompleteBlock> {
         self.incomplete_block.as_ref()
     }
 
     /// Increments the node height by one and resets previous height data.
-    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
+    pub(super) fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height.increment();
         self.height_start_time = height_start_time;
         self.round = Round::first();
@@ -837,14 +800,14 @@ impl State {
     }
 
     /// Returns a list of queued consensus messages.
-    pub fn queued(&mut self) -> Vec<ConsensusMessage> {
+    pub(super) fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queued = Vec::new();
         std::mem::swap(&mut self.queued, &mut queued);
         queued
     }
 
     /// Add consensus message to the queue.
-    pub fn add_queued(&mut self, msg: ConsensusMessage) {
+    pub(super) fn add_queued(&mut self, msg: ConsensusMessage) {
         self.queued.push(msg);
     }
 
@@ -855,7 +818,7 @@ impl State {
     ///
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block
-    pub fn check_incomplete_proposes(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
+    pub(super) fn check_incomplete_proposes(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
@@ -933,7 +896,7 @@ impl State {
     /// # Panics
     ///
     /// Panics if transaction for incomplete block is known as invalid.
-    pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
+    pub(super) fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
         if let Some(ref mut incomplete_block) = self.incomplete_block {
             if self.invalid_txs.contains(&tx_hash) {
                 panic!("Received a block with transaction known as invalid");
@@ -948,14 +911,14 @@ impl State {
     }
 
     /// Returns pre-votes for the specified round and propose hash.
-    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Verified<Prevote>] {
+    pub(super) fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Verified<Prevote>] {
         self.prevotes
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
     }
 
     /// Returns pre-commits for the specified round and propose hash.
-    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Verified<Precommit>] {
+    pub(super) fn precommits(&self, round: Round, propose_hash: Hash) -> &[Verified<Precommit>] {
         self.precommits
             .get(&(round, propose_hash))
             .map_or_else(|| [].as_ref(), |votes| votes.messages().as_slice())
@@ -966,7 +929,7 @@ impl State {
     /// # Panics
     ///
     /// Panics if this method is called for a non-validator node.
-    pub fn have_prevote(&self, propose_round: Round) -> bool {
+    pub(super) fn have_prevote(&self, propose_round: Round) -> bool {
         if let Some(ref validator_state) = *self.validator_state() {
             validator_state.have_prevote(propose_round)
         } else {
@@ -976,7 +939,7 @@ impl State {
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
     /// cannot contain unknown transactions. Returns hash of the propose.
-    pub fn add_self_propose(&mut self, msg: Verified<Propose>) -> Hash {
+    pub(super) fn add_self_propose(&mut self, msg: Verified<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.object_hash();
         self.proposes.insert(
@@ -998,7 +961,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose<T: RawAccess>(
+    pub(super) fn add_propose<T: RawAccess>(
         &mut self,
         msg: Verified<Propose>,
         transactions: &MapIndex<T, Hash, Verified<AnyTx>>,
@@ -1054,7 +1017,7 @@ impl State {
 
     /// Adds block to the list of blocks for the current height. Returns `BlockState` if it is a
     /// new block.
-    pub fn add_block(
+    pub(super) fn add_block(
         &mut self,
         block_hash: Hash,
         patch: Patch,
@@ -1080,7 +1043,7 @@ impl State {
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
     /// - Block contains a transaction that is incorrect.
-    pub fn create_incomplete_block<S: RawAccess>(
+    pub(super) fn create_incomplete_block<S: RawAccess>(
         &mut self,
         msg: &Verified<BlockResponse>,
         txs: &MapIndex<S, Hash, Verified<AnyTx>>,
@@ -1117,7 +1080,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Prevote` for the same round.
-    pub fn add_prevote(&mut self, msg: Verified<Prevote>) -> bool {
+    pub(super) fn add_prevote(&mut self, msg: Verified<Prevote>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1145,7 +1108,7 @@ impl State {
     }
 
     /// Returns `true` if there are +2/3 pre-votes for the specified round and hash.
-    pub fn has_majority_prevotes(&self, round: Round, propose_hash: Hash) -> bool {
+    pub(super) fn has_majority_prevotes(&self, round: Round, propose_hash: Hash) -> bool {
         match self.prevotes.get(&(round, propose_hash)) {
             Some(votes) => votes.count() >= self.majority_count(),
             None => false,
@@ -1153,18 +1116,10 @@ impl State {
     }
 
     /// Returns ids of validators that that sent pre-votes for the specified propose.
-    pub fn known_prevotes(&self, round: Round, propose_hash: Hash) -> BitVec {
+    pub(super) fn known_prevotes(&self, round: Round, propose_hash: Hash) -> BitVec {
         let len = self.validators().len();
         self.prevotes
             .get(&(round, propose_hash))
-            .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
-    }
-
-    /// Returns ids of validators that that sent pre-commits for the specified propose.
-    pub fn known_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let len = self.validators().len();
-        self.precommits
-            .get(&(round, *propose_hash))
             .map_or_else(|| BitVec::from_elem(len, false), |x| x.validators().clone())
     }
 
@@ -1173,7 +1128,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Precommit` for the same round.
-    pub fn add_precommit(&mut self, msg: Verified<Precommit>) -> bool {
+    pub(super) fn add_precommit(&mut self, msg: Verified<Precommit>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1204,7 +1159,7 @@ impl State {
 
     /// Adds a propose that was confirmed by a majority of
     /// validator nodes without our participation.
-    pub fn add_propose_confirmed_by_majority(
+    pub(super) fn add_propose_confirmed_by_majority(
         &mut self,
         round: Round,
         propose_hash: Hash,
@@ -1221,12 +1176,12 @@ impl State {
     }
 
     /// Removes a propose from the list of unknown proposes and returns its round and hash.
-    pub fn take_confirmed_propose(&mut self, propose_hash: &Hash) -> Option<(Round, Hash)> {
+    pub(super) fn take_confirmed_propose(&mut self, propose_hash: &Hash) -> Option<(Round, Hash)> {
         self.precommits_confirmed_by_majority.remove(propose_hash)
     }
 
     /// Returns true if the node has +2/3 pre-commits for the specified round and block hash.
-    pub fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
+    pub(super) fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
         match self.precommits.get(&(round, block_hash)) {
             Some(votes) => votes.count() >= self.majority_count(),
             None => false,
@@ -1234,7 +1189,7 @@ impl State {
     }
 
     /// Returns `true` if the node doesn't have proposes different from the locked one.
-    pub fn have_incompatible_prevotes(&self) -> bool {
+    pub(super) fn have_incompatible_prevotes(&self) -> bool {
         for round in self.locked_round.next().iter_to(self.round.next()) {
             match self.validator_state {
                 Some(ref validator_state) => {
@@ -1291,13 +1246,8 @@ impl State {
     }
 
     /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Verified<Connect> {
+    pub(super) fn our_connect_message(&self) -> &Verified<Connect> {
         &self.our_connect_message
-    }
-
-    /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Verified<Connect>) {
-        self.our_connect_message = msg;
     }
 
     /// Add peer to node's `ConnectList`.
@@ -1321,17 +1271,12 @@ impl State {
     }
 
     /// Returns mutable reference to the transactions cache.
-    pub fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
+    pub(super) fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
         &mut self.tx_cache
     }
 
-    /// Returns reference to the invalid transactions cache.
-    pub fn invalid_txs(&self) -> &HashSet<Hash> {
-        &self.invalid_txs
-    }
-
     /// Returns mutable reference to the invalid transactions cache.
-    pub fn invalid_txs_mut(&mut self) -> &mut HashSet<Hash> {
+    pub(super) fn invalid_txs_mut(&mut self) -> &mut HashSet<Hash> {
         &mut self.invalid_txs
     }
 }

@@ -135,19 +135,24 @@ pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
 pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
+///
+/// # Stability
+///
+/// This type and its methods are considered an implementation detail of the Exonum node and are
+/// thus exempt from semantic versioning.
 pub struct NodeHandler {
-    /// State of the `NodeHandler`.
-    pub state: State,
-    /// Shared api state.
+    /// Shared API state.
     pub api_state: SharedNodeState,
-    /// System state.
-    pub system_state: Box<dyn SystemStateProvider>,
-    /// Channel for messages and timeouts.
-    pub channel: NodeSender,
     /// Blockchain.
     pub blockchain: BlockchainMut,
+    /// State of the `NodeHandler`.
+    state: State,
+    /// System state.
+    system_state: Box<dyn SystemStateProvider>,
+    /// Channel for messages and timeouts.
+    channel: NodeSender,
     /// Known peer addresses.
-    pub peer_discovery: Vec<String>,
+    peer_discovery: Vec<String>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Node role.
@@ -503,8 +508,8 @@ impl NodeHandler {
     {
         Verified::from_value(
             message,
-            self.state.consensus_public_key(),
-            self.state.consensus_secret_key(),
+            self.state.keys().consensus_pk(),
+            self.state.keys().consensus_sk(),
         )
     }
 
@@ -556,8 +561,15 @@ impl NodeHandler {
     }
 
     /// Returns `State` of the node.
+    #[doc(hidden)]
     pub fn state(&self) -> &State {
         &self.state
+    }
+
+    /// Returns a mutable reference to the `State` of the node.
+    #[doc(hidden)]
+    pub fn state_mut(&mut self) -> &mut State {
+        &mut self.state
     }
 
     /// Performs node initialization, so it starts consensus process from the first round.
@@ -1034,7 +1046,7 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
+    fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
         let pool_size = self.thread_pool_size;
@@ -1079,8 +1091,8 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            self.state().consensus_public_key(),
-            self.state().consensus_secret_key().clone(),
+            self.state().keys().consensus_pk(),
+            self.state().keys().consensus_sk().to_owned(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,
@@ -1125,19 +1137,9 @@ impl Node {
         (handler_part, network_part, internal_part)
     }
 
-    /// Returns `Blockchain` instance.
-    pub fn blockchain(&self) -> Blockchain {
-        self.handler.blockchain.as_ref().clone()
-    }
-
-    /// Returns `State`.
-    pub fn state(&self) -> &State {
+    /// Returns `State` of the node.
+    fn state(&self) -> &State {
         self.handler.state()
-    }
-
-    /// Returns `NodeHandler`.
-    pub fn handler(&self) -> &NodeHandler {
-        &self.handler
     }
 
     /// Returns channel.
