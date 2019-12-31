@@ -42,7 +42,7 @@ use exonum::{
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-        ListenerConfig, NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
+        NodeHandler, NodeSender, State, SystemStateProvider,
     },
     runtime::{
         rust::{DefaultInstance, RustRuntime, ServiceFactory},
@@ -892,14 +892,7 @@ impl Sandbox {
         let keys = inner.handler.state().keys().to_owned();
 
         let config = Configuration {
-            listener: ListenerConfig {
-                address,
-                connect_list,
-            },
-            service: ServiceConfig {
-                service_public_key: keys.service.public_key(),
-                service_secret_key: keys.service.secret_key().clone(),
-            },
+            connect_list,
             network: NetworkConfiguration::default(),
             peer_discovery: Vec::new(),
             mempool: Default::default(),
@@ -1183,14 +1176,7 @@ fn sandbox_with_services_uninitialized(
         .unwrap();
 
     let config = Configuration {
-        listener: ListenerConfig {
-            address: addresses[0],
-            connect_list: ConnectList::from_config(connect_list_config),
-        },
-        service: ServiceConfig {
-            service_public_key: service_keys[0].0,
-            service_secret_key: service_keys[0].1.clone(),
-        },
+        connect_list: ConnectList::from_config(connect_list_config),
         network: NetworkConfiguration::default(),
         peer_discovery: Vec::new(),
         mempool: Default::default(),

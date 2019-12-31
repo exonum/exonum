@@ -386,10 +386,7 @@ impl NetworkHandler {
             .map(jitter)
             .take(max_tries);
 
-        let unresolved_address = self
-            .connect_list
-            .find_address_by_key(&key)
-            .map(|a| a.address.clone());
+        let unresolved_address = self.connect_list.find_address_by_key(&key);
 
         if let Some(unresolved_address) = unresolved_address {
             let action = {

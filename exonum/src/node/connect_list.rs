@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Mapping between peers public keys and IP-addresses.
+//! Mapping between peers public keys and IP addresses / domain names.
 
 use std::collections::BTreeMap;
 
@@ -22,35 +22,20 @@ use crate::{
     node::{ConnectInfo, ConnectListConfig},
 };
 
-/// Network address of the peer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PeerAddress {
-    /// External address of the peer hostname:port.
-    pub address: String,
-}
-
-impl PeerAddress {
-    /// New unresolved address.
-    pub fn new(address: String) -> Self {
-        PeerAddress { address }
-    }
-}
-
-/// `ConnectList` stores mapping between IP-addresses and public keys.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// `ConnectList` stores mapping between IP addresses / domain names and public keys.
+#[derive(Debug, Clone, Default)]
 pub struct ConnectList {
     /// Peers to which we can connect.
-    #[serde(default)]
-    pub peers: BTreeMap<PublicKey, PeerAddress>,
+    pub(super) peers: BTreeMap<PublicKey, String>,
 }
 
 impl ConnectList {
     /// Creates `ConnectList` from config.
     pub fn from_config(config: ConnectListConfig) -> Self {
-        let peers: BTreeMap<PublicKey, PeerAddress> = config
+        let peers: BTreeMap<_, _> = config
             .peers
             .into_iter()
-            .map(|peer| (peer.public_key, PeerAddress::new(peer.address)))
+            .map(|peer| (peer.public_key, peer.address))
             .collect();
 
         ConnectList { peers }
@@ -61,37 +46,29 @@ impl ConnectList {
         Self {
             peers: peers
                 .into_iter()
-                .map(|(public_key, connect)| {
-                    (public_key, PeerAddress::new(connect.payload().host.clone()))
-                })
+                .map(|(public_key, connect)| (public_key, connect.payload().host.clone()))
                 .collect(),
         }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
-    pub fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
+    pub(super) fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
         self.peers.contains_key(peer)
     }
 
-    /// Check if we allow to connect to `address`.
-    pub fn is_address_allowed(&self, address: &str) -> bool {
-        self.peers.values().any(|a| a.address == address)
+    /// Gets address of a peer with the specified public key.
+    pub(super) fn find_address_by_pubkey(&self, key: &PublicKey) -> Option<&str> {
+        self.peers.get(key).map(String::as_str)
     }
 
-    /// Get peer address with public key.
-    pub fn find_address_by_pubkey(&self, key: &PublicKey) -> Option<&PeerAddress> {
-        self.peers.get(key)
+    /// Adds peer to the `ConnectList`.
+    pub(crate) fn add(&mut self, peer: ConnectInfo) {
+        self.peers.insert(peer.public_key, peer.address);
     }
 
-    /// Adds peer to the ConnectList.
-    pub fn add(&mut self, peer: ConnectInfo) {
-        self.peers
-            .insert(peer.public_key, PeerAddress::new(peer.address));
-    }
-
-    /// Update peer address.
-    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
-        self.peers.insert(*public_key, PeerAddress::new(address));
+    /// Updates peer address.
+    pub(super) fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+        self.peers.insert(*public_key, address);
     }
 }
 
@@ -200,12 +177,18 @@ mod test {
         let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();
-        assert!(!connect_list.is_address_allowed(&address));
+        assert!(connect_list
+            .peers
+            .values()
+            .all(|peer_addr| *peer_addr != address));
 
         connect_list.add(ConnectInfo {
             public_key,
             address: address.clone(),
         });
-        assert!(connect_list.is_address_allowed(&address));
+        assert!(connect_list
+            .peers
+            .values()
+            .any(|peer_addr| *peer_addr == address));
     }
 }

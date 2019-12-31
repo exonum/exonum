@@ -17,10 +17,7 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{
-    connect_list::{ConnectList, PeerAddress},
-    state::State,
-};
+pub use self::{connect_list::ConnectList, state::State};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 /// Node timeout constants.
@@ -140,6 +137,7 @@ pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 ///
 /// This type and its methods are considered an implementation detail of the Exonum node and are
 /// thus exempt from semantic versioning.
+#[doc(hidden)]
 pub struct NodeHandler {
     /// Shared API state.
     pub api_state: SharedNodeState,
@@ -161,24 +159,6 @@ pub struct NodeHandler {
     config_manager: Option<Box<dyn ConfigManager>>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
-}
-
-/// Service configuration.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ServiceConfig {
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Service secret key.
-    pub service_secret_key: SecretKey,
-}
-
-/// Listener config.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ListenerConfig {
-    /// ConnectList.
-    pub connect_list: ConnectList,
-    /// Socket address.
-    pub address: SocketAddr,
 }
 
 /// An api configuration options.
@@ -218,13 +198,13 @@ impl Default for NodeApiConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EventsPoolCapacity {
     /// Maximum number of queued outgoing network messages.
-    pub network_requests_capacity: usize,
+    network_requests_capacity: usize,
     /// Maximum number of queued incoming network messages.
-    pub network_events_capacity: usize,
+    network_events_capacity: usize,
     /// Maximum number of queued internal events.
-    pub internal_events_capacity: usize,
+    internal_events_capacity: usize,
     /// Maximum number of queued requests from api.
-    pub api_requests_capacity: usize,
+    api_requests_capacity: usize,
 }
 
 impl Default for EventsPoolCapacity {
@@ -243,7 +223,7 @@ impl Default for EventsPoolCapacity {
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    pub events_pool_capacity: EventsPoolCapacity,
+    events_pool_capacity: EventsPoolCapacity,
 }
 
 impl Default for MemoryPoolConfig {
@@ -340,12 +320,14 @@ impl ValidateInput for NodeConfig {
 }
 
 /// Configuration for the `NodeHandler`.
+///
+/// This type is considered an implementation detail of the node handler; it is exempt from
+/// semantic versioning.
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct Configuration {
-    /// Current node socket address, public and secret keys.
-    pub listener: ListenerConfig,
-    /// Service configuration.
-    pub service: ServiceConfig,
+    /// Connection list.
+    pub connect_list: ConnectList,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Known peer addresses.
@@ -401,21 +383,22 @@ impl NodeRole {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-/// ConnectList representation in node's config file.
+/// `ConnectList` representation in node's config file.
 pub struct ConnectListConfig {
     /// Peers to which we can connect.
     pub peers: Vec<ConnectInfo>,
 }
 
 impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
+    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses
+    /// or domain names.
     pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
         let peers = peers
             .iter()
-            .zip(validators_keys.iter())
-            .map(|(a, v)| ConnectInfo {
-                address: a.clone(),
-                public_key: v.consensus_key,
+            .zip(validators_keys)
+            .map(|(address, keys)| ConnectInfo {
+                address: address.to_owned(),
+                public_key: keys.consensus_key,
             })
             .collect();
 
@@ -423,14 +406,14 @@ impl ConnectListConfig {
     }
 
     /// Creates `ConnectListConfig` from `ConnectList`.
-    pub fn from_connect_list(connect_list: &SharedConnectList) -> Self {
+    fn from_connect_list(connect_list: &SharedConnectList) -> Self {
         ConnectListConfig {
             peers: connect_list.peers(),
         }
     }
 
     /// `ConnectListConfig` peers addresses.
-    pub fn addresses(&self) -> Vec<String> {
+    fn addresses(&self) -> Vec<String> {
         self.peers.iter().map(|p| p.address.clone()).collect()
     }
 }
@@ -471,7 +454,7 @@ impl NodeHandler {
             &config.keys.consensus_sk(),
         );
 
-        let connect_list = config.listener.connect_list;
+        let connect_list = config.connect_list;
         let state = State::new(
             validator_id,
             connect_list,
@@ -878,7 +861,8 @@ pub struct NodeChannel {
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
-/// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
+/// Node capable of processing requests from external clients and participating in the consensus
+/// algorithm.
 #[derive(Debug)]
 pub struct Node {
     api_runtime_config: SystemRuntimeConfig,
@@ -963,14 +947,7 @@ impl Node {
 
         let peers = node_cfg.connect_list.addresses();
         let config = Configuration {
-            listener: ListenerConfig {
-                connect_list: ConnectList::from_config(node_cfg.connect_list),
-                address: node_cfg.listen_address,
-            },
-            service: ServiceConfig {
-                service_public_key: node_cfg.keys.service_pk(),
-                service_secret_key: node_cfg.keys.service_sk().clone(),
-            },
+            connect_list: ConnectList::from_config(node_cfg.connect_list),
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,

@@ -282,7 +282,7 @@ fn main() {
     let node_cfg = node_config();
     let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
-    let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+    let channel = NodeChannel::new(&Default::default());
     let api_sender = ApiSender::new(channel.api_requests.0.clone());
 
     println!("Creating blockchain with additional runtime...");

@@ -32,10 +32,7 @@ use crate::{
         AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
         Verified,
     },
-    node::{
-        connect_list::{ConnectList, PeerAddress},
-        ConnectInfo,
-    },
+    node::{connect_list::ConnectList, ConnectInfo},
 };
 use exonum_keys::Keys;
 
@@ -401,35 +398,37 @@ impl SharedConnectList {
     }
 
     /// Returns `true` if a peer with the given public key can connect.
-    pub fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
+    pub(crate) fn is_peer_allowed(&self, public_key: &PublicKey) -> bool {
         let connect_list = self.inner.read().expect("ConnectList read lock");
         connect_list.is_peer_allowed(public_key)
     }
 
-    /// Return `peers` from underlying `ConnectList`
-    pub fn peers(&self) -> Vec<ConnectInfo> {
+    /// Return `peers` from the underlying `ConnectList`.
+    pub(crate) fn peers(&self) -> Vec<ConnectInfo> {
         let connect_list = self.inner.read().expect("ConnectList read lock");
 
         connect_list
             .peers
             .iter()
-            .map(|(pk, a)| ConnectInfo {
-                address: a.address.clone(),
+            .map(|(pk, addr)| ConnectInfo {
+                address: addr.to_owned(),
                 public_key: *pk,
             })
             .collect()
     }
 
     /// Update peer address in the connect list.
-    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+    pub(super) fn update_peer(&mut self, public_key: &PublicKey, address: String) {
         let mut conn_list = self.inner.write().expect("ConnectList write lock");
         conn_list.update_peer(public_key, address);
     }
 
     /// Get peer address using public key.
-    pub fn find_address_by_key(&self, public_key: &PublicKey) -> Option<PeerAddress> {
+    pub(crate) fn find_address_by_key(&self, public_key: &PublicKey) -> Option<String> {
         let connect_list = self.inner.read().expect("ConnectList read lock");
-        connect_list.find_address_by_pubkey(public_key).cloned()
+        connect_list
+            .find_address_by_pubkey(public_key)
+            .map(str::to_string)
     }
 }
 
