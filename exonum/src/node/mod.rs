@@ -219,19 +219,14 @@ impl Default for EventsPoolCapacity {
 }
 
 /// Memory pool configuration parameters.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+///
+/// The internal structure of this type is an implementation detail. For most applications,
+/// you should use the value returned by `Default::default()`.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
     events_pool_capacity: EventsPoolCapacity,
-}
-
-impl Default for MemoryPoolConfig {
-    fn default() -> Self {
-        Self {
-            events_pool_capacity: EventsPoolCapacity::default(),
-        }
-    }
 }
 
 /// Configuration for the `Node`.
@@ -820,15 +815,16 @@ impl fmt::Display for ConnectInfo {
     }
 }
 
-/// Default system state provider implementation which just uses `SystemTime::now`
-/// to get current time.
+/// Default system state provider implementation which uses `SystemTime::now`
+/// to get the current time.
 #[derive(Debug)]
-pub struct DefaultSystemState(pub SocketAddr);
+struct DefaultSystemState(SocketAddr);
 
 impl SystemStateProvider for DefaultSystemState {
     fn listen_address(&self) -> SocketAddr {
         self.0
     }
+
     fn current_time(&self) -> SystemTime {
         SystemTime::now()
     }
