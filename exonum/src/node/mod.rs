@@ -169,14 +169,14 @@ pub struct NodeHandler {
     allow_expedited_propose: bool,
 }
 
-/// An api configuration options.
+/// HTTP API configuration options.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeApiConfig {
-    /// Timeout to update api state.
+    /// Timeout to update API state.
     pub state_update_timeout: usize,
-    /// Listen address for public api endpoints.
+    /// Listen address for public API endpoints.
     pub public_api_address: Option<SocketAddr>,
-    /// Listen address for private api endpoints.
+    /// Listen address for private API endpoints.
     pub private_api_address: Option<SocketAddr>,
     /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
     /// by public API handlers.
@@ -188,6 +188,10 @@ pub struct NodeApiConfig {
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     pub private_allow_origin: Option<AllowOrigin>,
+    /// HTTP server restart policy. The server is restarted each time the list of endpoints
+    /// is updated (e.g., due to a new service initializtion).
+    #[serde(default)]
+    pub server_restart: ServerRestartPolicy,
 }
 
 impl Default for NodeApiConfig {
@@ -198,6 +202,25 @@ impl Default for NodeApiConfig {
             private_api_address: None,
             public_allow_origin: None,
             private_allow_origin: None,
+            server_restart: Default::default(),
+        }
+    }
+}
+
+/// HTTP server restart policy.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct ServerRestartPolicy {
+    /// The number of attempts to restart the HTTP server.
+    pub max_retries: u16,
+    /// The interval in milliseconds between attempts of restarting the HTTP server.
+    pub retry_timeout: u64,
+}
+
+impl Default for ServerRestartPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: 20,
+            retry_timeout: 500,
         }
     }
 }
@@ -284,16 +307,14 @@ impl ValidateInput for NodeConfig {
             capacity.network_requests_capacity
         );
 
-        let backend_config = &self.network.http_backend_config;
+        let restart_policy = &self.api.server_restart;
         ensure!(
-            backend_config.server_restart_max_retries > 0,
-            "server_restart_max_retries({}) must be strictly larger than 0",
-            backend_config.server_restart_max_retries
+            restart_policy.max_retries > 0,
+            "`server_restart.max_retries` must be strictly larger than 0"
         );
         ensure!(
-            backend_config.server_restart_retry_timeout > 0,
-            "server_restart_retry_timeout({}) must be strictly larger than 0",
-            backend_config.server_restart_retry_timeout
+            restart_policy.retry_timeout > 0,
+            "`server_restart.retry_timeout` must be strictly larger than 0"
         );
 
         // Sanity checks for cases of accidental negative overflows.
@@ -1023,14 +1044,8 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
-            server_restart_retry_timeout: node_cfg
-                .network
-                .http_backend_config
-                .server_restart_retry_timeout,
-            server_restart_max_retries: node_cfg
-                .network
-                .http_backend_config
-                .server_restart_max_retries,
+            server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
+            server_restart_max_retries: node_cfg.api.server_restart.max_retries,
         };
 
         let handler = NodeHandler::new(
