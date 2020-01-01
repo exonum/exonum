@@ -78,10 +78,9 @@ pub enum NetworkRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub struct HttpBackendConfig {
-    /// The interval in milliseconds between attempts of restarting HTTP-server in case
-    /// the server failed to restart
+    /// The number of attempts to restart the HTTP server.
     pub server_restart_max_retries: u16,
-    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    /// The interval in milliseconds between attempts of restarting the HTTP server.
     pub server_restart_retry_timeout: u64,
 }
 

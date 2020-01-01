@@ -98,11 +98,8 @@ impl Into<CoreNodeConfig> for NodeConfig {
             network: self.private_config.network,
             api: self.private_config.api,
             mempool: self.private_config.mempool,
-            services_configs: Default::default(),
-            database: self.private_config.database,
             connect_list: self.private_config.connect_list,
             thread_pool_size: self.private_config.thread_pool_size,
-            master_key_path: self.private_config.master_key_path,
             keys: self.private_config.keys,
         }
     }

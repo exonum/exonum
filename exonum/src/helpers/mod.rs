@@ -76,10 +76,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<crate::node::
             connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
-            services_configs: Default::default(),
-            database: Default::default(),
             thread_pool_size: Default::default(),
-            master_key_path: "master.key.toml".into(),
             keys,
         })
         .collect::<Vec<_>>()

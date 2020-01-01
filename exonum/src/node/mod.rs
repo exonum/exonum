@@ -37,19 +37,17 @@ pub mod constants {
 pub(crate) use self::state::SharedConnectList;
 
 use exonum_keys::Keys;
-use exonum_merkledb::{Database, DbOptions, ObjectHash};
+use exonum_merkledb::{Database, ObjectHash};
 use failure::Error;
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
-use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     convert::TryFrom,
     fmt,
     net::SocketAddr,
-    path::PathBuf,
     sync::Arc,
     thread,
     time::{Duration, SystemTime},
@@ -254,18 +252,10 @@ pub struct NodeConfig {
     pub api: NodeApiConfig,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
-    /// Additional config, usable for services.
-    #[serde(default)]
-    pub services_configs: BTreeMap<String, Value>,
-    /// Optional database configuration.
-    #[serde(default)]
-    pub database: DbOptions,
     /// Node's ConnectList.
     pub connect_list: ConnectListConfig,
     /// Transaction Verification Thread Pool size.
     pub thread_pool_size: Option<u8>,
-    /// Path to the master key file.
-    pub master_key_path: PathBuf,
     /// Validator keys.
     #[serde(skip)]
     pub keys: Keys,
