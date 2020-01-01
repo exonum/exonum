@@ -88,7 +88,13 @@ mod events;
 mod requests;
 mod state;
 
-/// External messages.
+/// External messages sent to the node via `ApiSender`.
+///
+/// # Stability
+///
+/// This type and its methods are considered an implementation detail of the Exonum node and are
+/// thus exempt from semantic versioning.
+#[doc(hidden)]
 #[derive(Debug)]
 pub enum ExternalMessage {
     /// Add a new connection.
@@ -131,7 +137,7 @@ pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
 #[derive(Clone)]
 pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 
-/// Handler that that performs consensus algorithm.
+/// Handler responsible for the consensus algorithm.
 ///
 /// # Stability
 ///
@@ -763,6 +769,7 @@ impl fmt::Debug for NodeHandler {
 
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
+    #[doc(hidden)]
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
     }
@@ -772,14 +779,19 @@ impl ApiSender {
         ApiSender(mpsc::channel(0).0)
     }
 
-    /// Add peer to peer list
-    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), Error> {
+    /// Adds a peer to the peer list.
+    pub fn add_peer(&self, addr: ConnectInfo) -> Result<(), Error> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
 
+    /// Sends a request for the node to shut down.
+    pub fn shutdown(&self) -> Result<(), Error> {
+        self.send_external_message(ExternalMessage::Shutdown)
+    }
+
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
+    pub(crate) fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
         self.0
             .clone()
             .send(message)
@@ -933,11 +945,8 @@ impl Node {
             .validate()
             .expect("Node configuration is inconsistent");
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let blockchain = Blockchain::new(
-            database,
-            node_cfg.service_keypair(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        );
+        let blockchain =
+            Blockchain::new(database, node_cfg.service_keypair(), channel.api_sender());
         let rust_runtime = services.into_iter().fold(
             RustRuntime::new(channel.endpoints.0.clone()),
             |runtime, factory| runtime.with_factory(factory),
@@ -1142,7 +1151,7 @@ impl Node {
         self.handler.state()
     }
 
-    /// Returns channel.
+    /// Returns API sender.
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }

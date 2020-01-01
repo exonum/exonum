@@ -23,7 +23,7 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
-    node::{ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
+    node::{Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         rust::{RustRuntime, ServiceFactory},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
@@ -373,9 +373,7 @@ fn main() {
             ))
             .unwrap();
         thread::sleep(Duration::from_secs(2));
-        api_sender
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        api_sender.shutdown().unwrap();
     });
 
     node.run().unwrap();

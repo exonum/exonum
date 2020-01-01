@@ -260,13 +260,8 @@ impl TestKit {
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
             Box::new(api_channel.1.and_then(move |event| {
                 let _guard = processing_lock_.lock().unwrap();
-                match event {
-                    ExternalMessage::Transaction(tx) => {
-                        BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(tx));
-                    }
-                    ExternalMessage::PeerAdd(_)
-                    | ExternalMessage::Enable(_)
-                    | ExternalMessage::Shutdown => { /* Ignored */ }
+                if let ExternalMessage::Transaction(tx) = event {
+                    BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(tx));
                 }
                 Ok(())
             }));

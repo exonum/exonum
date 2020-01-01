@@ -17,7 +17,7 @@
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
-    node::{ExternalMessage, Node, NodeConfig},
+    node::{Node, NodeConfig},
     runtime::{
         rust::{AfterCommitContext, Service, ServiceFactory},
         RuntimeInstance,
@@ -128,10 +128,7 @@ fn test_node_run() {
     }
 
     for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        handle.api_tx.shutdown().unwrap();
         handle.node_thread.join().unwrap();
     }
 }
@@ -162,9 +159,7 @@ fn test_node_restart_regression() {
             node.run().unwrap();
         });
         // Wait for shutdown
-        api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        api_tx.shutdown().unwrap();
         node_thread.join().unwrap();
     };
 

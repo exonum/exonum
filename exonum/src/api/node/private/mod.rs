@@ -155,7 +155,7 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |connect_info: ConnectInfo| -> Result<(), ApiError> {
-                self.sender.peer_add(connect_info).map_err(ApiError::from)
+                self.sender.add_peer(connect_info).map_err(ApiError::from)
             },
         );
         self_

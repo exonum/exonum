@@ -18,7 +18,7 @@ use exonum::{
     api::websocket::Notification,
     blockchain::config::GenesisConfigBuilder,
     helpers,
-    node::{ExternalMessage, Node},
+    node::Node,
     runtime::{rust::ServiceFactory, RuntimeInstance},
 };
 use exonum_crypto::gen_keypair;
@@ -159,10 +159,7 @@ fn test_send_transaction() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -189,10 +186,7 @@ fn test_blocks_subscribe() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -233,10 +227,7 @@ fn test_transactions_subscribe() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -292,10 +283,7 @@ fn test_transactions_subscribe_with_filter() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -360,10 +348,7 @@ fn test_transactions_subscribe_with_partial_filter() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -394,10 +379,7 @@ fn test_transactions_subscribe_with_bad_filter() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -441,10 +423,7 @@ fn test_subscribe() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }
 
@@ -467,10 +446,7 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
     let now = Instant::now();
 
     // Shutdown node before clients.
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 
     assert!(now.elapsed().as_secs() < 15);
@@ -559,9 +535,6 @@ fn test_blocks_and_tx_both_subscribe() {
     }
     block_again_client.shutdown().unwrap();
 
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
+    node_handler.api_tx.shutdown().unwrap();
     node_handler.node_thread.join().unwrap();
 }

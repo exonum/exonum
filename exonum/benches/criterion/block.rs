@@ -120,7 +120,7 @@ fn create_consensus_config_and_blockchain_base(
         ..ConsensusConfig::default()
     };
 
-    let api_sender = ApiSender::new(mpsc::channel(0).0);
+    let api_sender = ApiSender::closed();
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
 
     (consensus_config, blockchain_base)

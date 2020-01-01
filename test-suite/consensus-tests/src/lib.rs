@@ -1165,7 +1165,7 @@ fn sandbox_with_services_uninitialized(
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
         service_keys[0].clone(),
-        ApiSender(api_channel.0.clone()),
+        ApiSender::new(api_channel.0.clone()),
     );
 
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
