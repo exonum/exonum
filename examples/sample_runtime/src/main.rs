@@ -298,6 +298,7 @@ fn main() {
 
     let blockchain_ref = blockchain.as_ref().to_owned();
     let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
+    let shutdown_handle = node.shutdown_handle();
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");
 
@@ -310,7 +311,7 @@ fn main() {
             spec: Vec::default(),
         };
         let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
-        api_sender.broadcast_transaction(tx).unwrap();
+        api_sender.broadcast_transaction(tx).wait().unwrap();
 
         // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
@@ -328,6 +329,7 @@ fn main() {
                     )
                     .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )
+            .wait()
             .unwrap();
         // Wait until instance identifier is assigned.
         thread::sleep(Duration::from_secs(1));
@@ -353,6 +355,7 @@ fn main() {
                 service_keypair.0,
                 &service_keypair.1,
             ))
+            .wait()
             .unwrap();
         thread::sleep(Duration::from_secs(2));
         // Send a reset counter transaction.
@@ -368,9 +371,11 @@ fn main() {
                 service_keypair.0,
                 &service_keypair.1,
             ))
+            .wait()
             .unwrap();
+
         thread::sleep(Duration::from_secs(2));
-        api_sender.shutdown().unwrap();
+        shutdown_handle.shutdown().wait().unwrap();
     });
 
     node.run().unwrap();

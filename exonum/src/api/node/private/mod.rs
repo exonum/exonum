@@ -17,10 +17,12 @@
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. view the list of services on the current node.
 
+use futures::Future;
+
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    api::{node::SharedNodeState, ApiBackend, ApiScope, Error as ApiError},
+    api::{node::SharedNodeState, ApiBackend, ApiScope, Error as ApiError, FutureResult},
     crypto::PublicKey,
     node::{ApiSender, ConnectInfo, ExternalMessage},
     runtime::InstanceId,
@@ -92,7 +94,7 @@ struct ConsensusEnabledQuery {
 }
 
 /// Private system API.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SystemApi {
     info: NodeInfo,
     shared_api_state: SharedNodeState,
@@ -121,11 +123,11 @@ impl SystemApi {
     }
 
     fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
+        let shared_api_state = self.shared_api_state.clone();
         api_scope.endpoint(name, move |_query: ()| {
             let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
-            for connect_info in self.shared_api_state.outgoing_connections() {
+            for connect_info in shared_api_state.outgoing_connections() {
                 outgoing_connections.insert(
                     connect_info.address.parse().unwrap(),
                     IncomingConnection {
@@ -135,7 +137,7 @@ impl SystemApi {
                 );
             }
 
-            for (s, delay) in self.shared_api_state.reconnects_timeout() {
+            for (s, delay) in shared_api_state.reconnects_timeout() {
                 outgoing_connections
                     .entry(s)
                     .or_insert_with(Default::default)
@@ -143,49 +145,48 @@ impl SystemApi {
             }
 
             Ok(PeersInfo {
-                incoming_connections: self.shared_api_state.incoming_connections(),
+                incoming_connections: shared_api_state.incoming_connections(),
                 outgoing_connections,
             })
         });
-        self_
+        self
     }
 
     fn handle_peer_add(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint_mut(
-            name,
-            move |connect_info: ConnectInfo| -> Result<(), ApiError> {
-                self.sender.add_peer(connect_info).map_err(ApiError::from)
-            },
-        );
-        self_
+        let sender = self.sender.clone();
+        api_scope.endpoint_mut(name, move |connect_info: ConnectInfo| -> FutureResult<()> {
+            let handler = sender
+                .send_external_message(ExternalMessage::PeerAdd(connect_info))
+                .map_err(|e| ApiError::InternalError(e.into()));
+            Box::new(handler)
+        });
+        self
     }
 
     fn handle_network_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint(name, move |_query: ()| Ok(self.info.clone()));
-        self_
+        let info = self.info.clone();
+        api_scope.endpoint(name, move |_query: ()| Ok(info.clone()));
+        self
     }
 
     fn handle_is_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
-        api_scope.endpoint(name, move |_query: ()| {
-            Ok(self.shared_api_state.is_enabled())
-        });
-        self_
+        let shared_api_state = self.shared_api_state.clone();
+        api_scope.endpoint(name, move |_query: ()| Ok(shared_api_state.is_enabled()));
+        self
     }
 
     fn handle_set_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let self_ = self.clone();
+        let sender = self.sender.clone();
         api_scope.endpoint_mut(
             name,
-            move |query: ConsensusEnabledQuery| -> Result<(), ApiError> {
-                self.sender
+            move |query: ConsensusEnabledQuery| -> FutureResult<()> {
+                let handler = sender
                     .send_external_message(ExternalMessage::Enable(query.enabled))
-                    .map_err(ApiError::from)
+                    .map_err(|e| ApiError::InternalError(e.into()));
+                Box::new(handler)
             },
         );
-        self_
+        self
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
@@ -194,32 +195,26 @@ impl SystemApi {
         // those features (and as a result get a completely backend-dependent code).
         use crate::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
         use actix_web::{HttpRequest, HttpResponse};
-        use futures::IntoFuture;
 
-        let self_ = self.clone();
-
-        let handler = move || -> Result<HttpResponse, ApiError> {
-            self.sender
+        let sender = self.sender.clone();
+        let index = move |_: HttpRequest| -> FutureResponse {
+            let handler = sender
                 .send_external_message(ExternalMessage::Shutdown)
-                .map_err(ApiError::from)?;
-
-            let ok_response = HttpResponse::Ok().json(());
-            Ok(ok_response)
-        };
-
-        let index = move |_request: HttpRequest| -> FutureResponse {
-            let future = handler().map_err(From::from).into_future();
-            Box::new(future)
+                .map(|()| HttpResponse::Ok().json(()))
+                .map_err(|e| {
+                    let e: ApiError = e.into();
+                    actix_web::Error::from(e)
+                });
+            Box::new(handler)
         };
 
         let handler = RequestHandler {
             name: name.to_owned(),
             method: actix_web::http::Method::POST,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::new(index) as Arc<RawHandler>,
         };
-
         api_scope.web_backend().raw_handler(handler);
 
-        self_
+        self
     }
 }

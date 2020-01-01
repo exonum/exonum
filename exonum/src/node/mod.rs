@@ -140,7 +140,7 @@ pub trait SystemStateProvider: fmt::Debug + Send + 'static {
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
+pub struct ApiSender(mpsc::Sender<ExternalMessage>);
 
 /// Handler responsible for the consensus algorithm.
 ///
@@ -794,37 +794,61 @@ impl ApiSender {
         ApiSender(mpsc::channel(0).0)
     }
 
-    /// Adds a peer to the peer list.
-    pub fn add_peer(&self, addr: ConnectInfo) -> Result<(), Error> {
-        let msg = ExternalMessage::PeerAdd(addr);
-        self.send_external_message(msg)
-    }
-
-    /// Sends a request for the node to shut down.
-    pub fn shutdown(&self) -> Result<(), Error> {
-        self.send_external_message(ExternalMessage::Shutdown)
-    }
-
     /// Sends an external message.
-    pub(crate) fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub(crate) fn send_external_message(
+        &self,
+        message: ExternalMessage,
+    ) -> impl Future<Item = (), Error = SendError> {
         self.0
             .clone()
             .send(message)
-            .wait()
             .map(drop)
-            .map_err(into_failure)
+            .map_err(|_| SendError(()))
     }
 
-    /// Broadcast transaction to other nodes in the blockchain network.
-    pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
-        let msg = ExternalMessage::Transaction(tx);
-        self.send_external_message(msg)
+    /// Broadcasts transaction to other nodes in the blockchain network. This is an asynchronous
+    /// operation that can take some time if the node is overloaded with requests.
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub fn broadcast_transaction(
+        &self,
+        tx: Verified<AnyTx>,
+    ) -> impl Future<Item = (), Error = SendError> {
+        self.send_external_message(ExternalMessage::Transaction(tx))
     }
 }
 
 impl fmt::Debug for ApiSender {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_struct("ApiSender").finish()
+        formatter.debug_tuple("ApiSender").field(&"..").finish()
+    }
+}
+
+/// Errors that can occur during sending a message via `ApiSender`.
+#[derive(Debug, Fail)]
+#[fail(display = "Failed to send API request to the node: the node is being shut down")]
+pub struct SendError(());
+
+/// Handle allowing to shut down the node.
+#[derive(Debug, Clone)]
+pub struct ShutdownHandle {
+    inner: ApiSender,
+}
+
+impl ShutdownHandle {
+    /// Shuts down the node.
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is already being shut down.
+    pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
+        self.inner.send_external_message(ExternalMessage::Shutdown)
     }
 }
 
@@ -843,7 +867,7 @@ impl SystemStateProvider for DefaultSystemState {
     }
 }
 
-/// Channel between the `NodeHandler` and events source.
+/// Channel between the node and external event producers / consumers.
 #[derive(Debug)]
 pub struct NodeChannel {
     /// Channel for network requests.
@@ -1152,9 +1176,13 @@ impl Node {
         self.handler.state()
     }
 
-    /// Returns API sender.
-    pub fn channel(&self) -> ApiSender {
-        ApiSender::new(self.channel.api_requests.0.clone())
+    /// Returns a shutdown handle for the node. It is possible to instantiate multiple handles
+    /// using this method; only the first call to shutdown the node is guaranteed to succeed
+    /// (but this single call is enough to stop the node).
+    pub fn shutdown_handle(&self) -> ShutdownHandle {
+        ShutdownHandle {
+            inner: ApiSender::new(self.channel.api_requests.0.clone()),
+        }
     }
 }
 

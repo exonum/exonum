@@ -19,15 +19,31 @@
 pub mod blockchain;
 pub mod proto;
 
-use exonum::node::ApiSender;
+use exonum::node::{Node, ShutdownHandle};
+use futures::Future;
 
-use std::thread::JoinHandle;
+use std::thread::{self, JoinHandle};
 
 #[cfg(test)]
 mod tests;
 
 #[derive(Debug)]
 pub struct RunHandle {
-    pub node_thread: JoinHandle<()>,
-    pub api_tx: ApiSender,
+    node_thread: JoinHandle<()>,
+    shutdown_handle: ShutdownHandle,
+}
+
+impl RunHandle {
+    pub fn new(node: Node) -> Self {
+        let shutdown_handle = node.shutdown_handle();
+        Self {
+            shutdown_handle,
+            node_thread: thread::spawn(|| node.run().unwrap()),
+        }
+    }
+
+    pub fn join(self) {
+        self.shutdown_handle.shutdown().wait().unwrap();
+        self.node_thread.join().unwrap();
+    }
 }

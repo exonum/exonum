@@ -31,7 +31,6 @@ use tokio_core::reactor::Core;
 
 use std::{
     sync::{Arc, Mutex},
-    thread::{self},
     time::Duration,
 };
 
@@ -104,13 +103,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
             None,
         );
 
-        let api_tx = node.channel();
-        node_threads.push(RunHandle {
-            node_thread: thread::spawn(move || {
-                node.run().unwrap();
-            }),
-            api_tx,
-        });
+        node_threads.push(RunHandle::new(node));
         commit_rxs.push(commit_rx);
     }
     (node_threads, commit_rxs)
@@ -128,8 +121,7 @@ fn test_node_run() {
     }
 
     for handle in nodes {
-        handle.api_tx.shutdown().unwrap();
-        handle.node_thread.join().unwrap();
+        handle.join();
     }
 }
 
@@ -154,13 +146,7 @@ fn test_node_restart_regression() {
             genesis_config,
             None,
         );
-        let api_tx = node.channel();
-        let node_thread = thread::spawn(move || {
-            node.run().unwrap();
-        });
-        // Wait for shutdown
-        api_tx.shutdown().unwrap();
-        node_thread.join().unwrap();
+        RunHandle::new(node).join();
     };
 
     let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;

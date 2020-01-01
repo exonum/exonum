@@ -18,7 +18,8 @@ use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{ObjectHash, Snapshot};
-use futures::{Future, IntoFuture, Sink};
+use failure::format_err;
+use futures::{Future, IntoFuture};
 use hex::FromHex;
 
 use std::{
@@ -40,7 +41,7 @@ use crate::{
     explorer::{self, median_precommits_time, BlockchainExplorer, TransactionInfo},
     helpers::Height,
     messages::{Precommit, SignedMessage, Verified},
-    node::{ApiSender, ExternalMessage},
+    node::ApiSender,
     runtime::{CallInfo, InstanceId},
 };
 
@@ -365,11 +366,9 @@ impl ExplorerApi {
         let sender = sender.clone();
         let send_transaction = move |(verified, tx_hash)| {
             sender
-                .clone()
-                .0
-                .send(ExternalMessage::Transaction(verified))
+                .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| ApiError::InternalError(e.into()))
+                .map_err(|_| ApiError::InternalError(format_err!("Cannot send transaction")))
         };
 
         Box::new(
