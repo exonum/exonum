@@ -18,13 +18,16 @@
 
 // spell-checker:ignore cors
 
-pub use self::{connect_list::ConnectList, state::State};
+pub use self::{
+    connect_list::{ConnectInfo, ConnectList, ConnectListConfig},
+    state::State,
+};
 
 /// Node timeout constants.
 ///
 /// # Stability
 ///
-/// The contsnts of this module is considered an implementation detail of the Exonum node and are
+/// The constants of this module is considered an implementation detail of the Exonum node and are
 /// thus exempt from semantic versioning.
 #[doc(hidden)]
 pub mod constants {
@@ -65,7 +68,7 @@ use crate::{
     },
     blockchain::{
         config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        Schema, ValidatorKeys,
+        Schema,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     events::{
@@ -127,7 +130,8 @@ pub(crate) enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
+#[doc(hidden)]
+pub trait SystemStateProvider: fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -188,7 +192,7 @@ pub struct NodeApiConfig {
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     pub private_allow_origin: Option<AllowOrigin>,
     /// HTTP server restart policy. The server is restarted each time the list of endpoints
-    /// is updated (e.g., due to a new service initializtion).
+    /// is updated (e.g., due to a new service initialization).
     #[serde(default)]
     pub server_restart: ServerRestartPolicy,
 }
@@ -301,15 +305,15 @@ pub struct NodeConfig {
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
     pub external_address: String,
-    /// Network configuration.
+    /// P2P network configuration.
     pub network: NetworkConfiguration,
-    /// Api configuration.
+    /// HTTP API configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
-    /// Node's ConnectList.
+    /// List of peers the node will connect to on start.
     pub connect_list: ConnectListConfig,
-    /// Transaction Verification Thread Pool size.
+    /// Number of threads allocated for transaction verification.
     pub thread_pool_size: Option<u8>,
     /// Validator keys.
     #[serde(skip)]
@@ -428,42 +432,6 @@ impl NodeRole {
             NodeRole::Validator(_) => true,
             _ => false,
         }
-    }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-/// `ConnectList` representation in node's config file.
-pub struct ConnectListConfig {
-    /// Peers to which we can connect.
-    pub peers: Vec<ConnectInfo>,
-}
-
-impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses
-    /// or domain names.
-    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
-        let peers = peers
-            .iter()
-            .zip(validators_keys)
-            .map(|(address, keys)| ConnectInfo {
-                address: address.to_owned(),
-                public_key: keys.consensus_key,
-            })
-            .collect();
-
-        ConnectListConfig { peers }
-    }
-
-    /// Creates `ConnectListConfig` from `ConnectList`.
-    fn from_connect_list(connect_list: &SharedConnectList) -> Self {
-        ConnectListConfig {
-            peers: connect_list.peers(),
-        }
-    }
-
-    /// `ConnectListConfig` peers addresses.
-    fn addresses(&self) -> Vec<String> {
-        self.peers.iter().map(|p| p.address.clone()).collect()
     }
 }
 
@@ -855,23 +823,8 @@ impl ApiSender {
 }
 
 impl fmt::Debug for ApiSender {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiSender").finish()
-    }
-}
-
-/// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ConnectInfo {
-    /// Peer address.
-    pub address: String,
-    /// Peer public key.
-    pub public_key: PublicKey,
-}
-
-impl fmt::Display for ConnectInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.address)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("ApiSender").finish()
     }
 }
 

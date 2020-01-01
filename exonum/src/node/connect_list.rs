@@ -14,16 +14,35 @@
 
 //! Mapping between peers public keys and IP addresses / domain names.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
+use super::SharedConnectList;
 use crate::{
+    blockchain::ValidatorKeys,
     crypto::PublicKey,
     messages::{Connect, Verified},
-    node::{ConnectInfo, ConnectListConfig},
 };
 
-/// `ConnectList` stores mapping between IP addresses / domain names and public keys.
+/// Data needed to connect to a peer node.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ConnectInfo {
+    /// Peer address.
+    pub address: String,
+    /// Peer public key.
+    pub public_key: PublicKey,
+}
+
+impl fmt::Display for ConnectInfo {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.address)
+    }
+}
+
+/// Stores mapping between IP addresses / domain names and public keys.
 #[derive(Debug, Clone, Default)]
+#[doc(hidden)]
+// ^-- Unlike `ConnectListConfig`, this type is considered an implementation detail
+// since it's used exclusively by `NodeHandler`.
 pub struct ConnectList {
     /// Peers to which we can connect.
     pub(super) peers: BTreeMap<PublicKey, String>,
@@ -69,6 +88,42 @@ impl ConnectList {
     /// Updates peer address.
     pub(super) fn update_peer(&mut self, public_key: &PublicKey, address: String) {
         self.peers.insert(*public_key, address);
+    }
+}
+
+/// Stores mapping between IP addresses / domain names and public keys.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ConnectListConfig {
+    /// Peers to which the node knows how to connect.
+    pub peers: Vec<ConnectInfo>,
+}
+
+impl ConnectListConfig {
+    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses
+    /// or domain names.
+    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
+        let peers = peers
+            .iter()
+            .zip(validators_keys)
+            .map(|(address, keys)| ConnectInfo {
+                address: address.to_owned(),
+                public_key: keys.consensus_key,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
+    }
+
+    /// Creates a `ConnectListConfig` from `ConnectList`.
+    pub(super) fn from_connect_list(connect_list: &SharedConnectList) -> Self {
+        ConnectListConfig {
+            peers: connect_list.peers(),
+        }
+    }
+
+    /// Returns peer addresses.
+    pub(super) fn addresses(&self) -> Vec<String> {
+        self.peers.iter().map(|p| p.address.clone()).collect()
     }
 }
 
