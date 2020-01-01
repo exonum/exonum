@@ -23,7 +23,7 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
-    node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
+    node::{ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         rust::{RustRuntime, ServiceFactory},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,

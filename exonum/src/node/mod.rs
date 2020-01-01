@@ -333,8 +333,9 @@ pub struct Configuration {
     pub keys: Keys,
 }
 
-/// Channel for messages, timeouts and api requests.
+/// Channel for messages, timeouts and api requests. Consumed by the `NodeHandler` constructor.
 #[derive(Debug)]
+#[doc(hidden)]
 pub struct NodeSender {
     /// Internal requests sender.
     pub internal_requests: SyncSender<InternalRequest>,
@@ -909,7 +910,7 @@ impl NodeChannel {
     }
 
     /// Returns the channel for sending timeouts, networks and API requests.
-    pub fn node_sender(&self) -> NodeSender {
+    fn node_sender(&self) -> NodeSender {
         NodeSender {
             internal_requests: self.internal_requests.0.clone().wait(),
             network_requests: self.network_requests.0.clone().wait(),
