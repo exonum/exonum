@@ -15,7 +15,7 @@
 #![allow(missing_debug_implementations, missing_docs)]
 
 pub use self::internal::InternalPart;
-pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
+pub use self::network::{NetworkEvent, NetworkPart, NetworkRequest};
 
 pub mod codec;
 pub mod error;

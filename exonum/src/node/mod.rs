@@ -71,9 +71,8 @@ use crate::{
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
-        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest,
-        NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
-        TimeoutRequest,
+        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
+        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
@@ -221,6 +220,39 @@ impl Default for ServerRestartPolicy {
         Self {
             max_retries: 20,
             retry_timeout: 500,
+        }
+    }
+}
+
+/// P2P network configuration of an Exonum node.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct NetworkConfiguration {
+    /// Maximum number of incoming connections established with peers at any given time.
+    pub max_incoming_connections: usize,
+    /// Maximum number of outgoing connections established with peers at any given time.
+    pub max_outgoing_connections: usize,
+    /// Switches on [`TCP_NODELAY`] option.
+    ///
+    /// [`TCP_NODELAY`]: https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.set_nodelay
+    pub tcp_nodelay: bool,
+    /// Allows to set interval between keep-alive TCP probes. If set to `None`, keep-alive probes
+    /// will be disabled.
+    pub tcp_keep_alive: Option<u64>,
+    /// Retry timeout if an outgoing connection to a peer fails.
+    pub tcp_connect_retry_timeout: Milliseconds,
+    /// Maximum number of retries when connecting to a peer.
+    pub tcp_connect_max_retries: u64,
+}
+
+impl Default for NetworkConfiguration {
+    fn default() -> Self {
+        Self {
+            max_incoming_connections: 128,
+            max_outgoing_connections: 128,
+            tcp_keep_alive: None,
+            tcp_nodelay: true,
+            tcp_connect_retry_timeout: 15_000,
+            tcp_connect_max_retries: 10,
         }
     }
 }

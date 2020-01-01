@@ -29,15 +29,16 @@ use crate::{
         SEED_LENGTH, SIGNATURE_LENGTH,
     },
     events::{
-        error::log_error,
-        network::{NetworkConfiguration, NetworkPart},
-        noise::HandshakeParams,
-        NetworkEvent, NetworkRequest,
+        error::log_error, network::NetworkPart, noise::HandshakeParams, NetworkEvent,
+        NetworkRequest,
     },
     helpers::user_agent,
     merkledb::BinaryValue,
     messages::{Connect, SignedMessage, Verified},
-    node::{ConnectInfo, ConnectList, EventsPoolCapacity, NodeChannel, SharedConnectList},
+    node::{
+        ConnectInfo, ConnectList, EventsPoolCapacity, NetworkConfiguration, NodeChannel,
+        SharedConnectList,
+    },
 };
 
 #[derive(Debug)]

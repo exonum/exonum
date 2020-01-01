@@ -31,8 +31,8 @@ use exonum::{
     },
     crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
-        network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
-        NetworkEvent, NetworkRequest, TimeoutRequest,
+        Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
+        TimeoutRequest,
     },
     helpers::{user_agent, Height, Round, ValidatorId},
     messages::{
@@ -42,7 +42,7 @@ use exonum::{
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-        NodeHandler, NodeSender, State, SystemStateProvider,
+        NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
     },
     runtime::{
         rust::{DefaultInstance, RustRuntime, ServiceFactory},
