@@ -834,26 +834,35 @@ impl SystemStateProvider for DefaultSystemState {
 #[derive(Debug)]
 pub struct NodeChannel {
     /// Channel for network requests.
-    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    pub(crate) network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+
     /// Channel for timeout requests.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub internal_requests: (
         mpsc::Sender<InternalRequest>,
         mpsc::Receiver<InternalRequest>,
     ),
+
     /// Channel for transferring API endpoints from producers (e.g., Rust runtime) to the
     /// `ApiManager`.
-    pub endpoints: (
+    endpoints: (
         mpsc::Sender<UpdateEndpoints>,
         mpsc::Receiver<UpdateEndpoints>,
     ),
+
     /// Channel for API requests.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub api_requests: (
         mpsc::Sender<ExternalMessage>,
         mpsc::Receiver<ExternalMessage>,
     ),
+
     /// Channel for network events.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
+
     /// Channel for internal events.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
@@ -870,6 +879,12 @@ pub struct Node {
     thread_pool_size: Option<u8>,
 }
 
+impl Default for NodeChannel {
+    fn default() -> Self {
+        Self::new(&EventsPoolCapacity::default())
+    }
+}
+
 impl NodeChannel {
     /// Creates `NodeChannel` with the given pool capacities.
     pub fn new(buffer_sizes: &EventsPoolCapacity) -> Self {
@@ -883,7 +898,17 @@ impl NodeChannel {
         }
     }
 
-    /// Returns the channel for sending timeouts, networks and api requests.
+    /// Returns the sender for API requests.
+    pub fn api_sender(&self) -> ApiSender {
+        ApiSender(self.api_requests.0.clone())
+    }
+
+    /// Returns the sender for HTTP endpoints.
+    pub fn endpoints_sender(&self) -> mpsc::Sender<UpdateEndpoints> {
+        self.endpoints.0.clone()
+    }
+
+    /// Returns the channel for sending timeouts, networks and API requests.
     pub fn node_sender(&self) -> NodeSender {
         NodeSender {
             internal_requests: self.internal_requests.0.clone().wait(),

@@ -282,8 +282,8 @@ fn main() {
     let node_cfg = node_config();
     let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
-    let channel = NodeChannel::new(&Default::default());
-    let api_sender = ApiSender::new(channel.api_requests.0.clone());
+    let channel = NodeChannel::default();
+    let api_sender = channel.api_sender();
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
@@ -292,7 +292,7 @@ fn main() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .build();
-    let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
+    let rust_runtime = RustRuntime::new(channel.endpoints_sender()).with_factory(Supervisor);
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())
