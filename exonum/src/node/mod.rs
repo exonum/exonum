@@ -77,9 +77,7 @@ use crate::{
         NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
         TimeoutRequest,
     },
-    helpers::{
-        config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
-    },
+    helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     runtime::{
         rust::{RustRuntime, ServiceFactory},
@@ -883,6 +881,13 @@ pub struct NodeChannel {
     /// Channel for internal events.
     #[doc(hidden)] // public because of the `transactions` benchmark
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
+}
+
+/// Interface of the configuration manager usable for updating node configuration on
+/// the fly.
+pub trait ConfigManager: Send {
+    /// Update connect list in the node configuration.
+    fn store_connect_list(&mut self, connect_list: ConnectListConfig);
 }
 
 /// Node capable of processing requests from external clients and participating in the consensus
