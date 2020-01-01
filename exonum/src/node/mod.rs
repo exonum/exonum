@@ -15,12 +15,18 @@
 //! Exonum node that performs consensus algorithm.
 //!
 //! For details about consensus message handling see messages module documentation.
+
 // spell-checker:ignore cors
 
 pub use self::{connect_list::ConnectList, state::State};
 
-// TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 /// Node timeout constants.
+///
+/// # Stability
+///
+/// The contsnts of this module is considered an implementation detail of the Exonum node and are
+/// thus exempt from semantic versioning.
+#[doc(hidden)]
 pub mod constants {
     pub use super::state::{
         BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
