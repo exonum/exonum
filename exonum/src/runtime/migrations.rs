@@ -17,6 +17,7 @@
 //! FIXME: more details (ECR-4081)
 
 use exonum_merkledb::migration::MigrationHelper;
+use failure::Fail;
 
 use std::{collections::BTreeMap, fmt};
 
@@ -298,7 +299,9 @@ mod tests {
 
     use assert_matches::assert_matches;
     use exonum_crypto::Hash;
-    use exonum_merkledb::{access::AccessExt, Database, Snapshot, TemporaryDB};
+    use exonum_merkledb::{
+        access::AccessExt, migration::flush_migration, Database, Snapshot, TemporaryDB,
+    };
 
     use std::{collections::HashSet, sync::Arc};
 
@@ -387,7 +390,7 @@ mod tests {
             assert!(migration_hashes.insert(migration_hash));
 
             let mut fork = db.fork();
-            fork.flush_migration("test");
+            flush_migration(&mut fork, "test");
             db.merge(fork.into_patch()).unwrap();
         }
         db.snapshot()

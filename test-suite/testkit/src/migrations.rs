@@ -18,7 +18,9 @@
 
 use exonum::{
     merkledb::{
-        access::Prefixed, migration::MigrationHelper, Database, Fork, Snapshot, TemporaryDB,
+        access::Prefixed,
+        migration::{flush_migration, MigrationHelper},
+        Database, Fork, Snapshot, TemporaryDB,
     },
     runtime::{
         migrations::{MigrateData, MigrationContext, MigrationScript},
@@ -113,7 +115,7 @@ where
         context.helper.finish().unwrap();
 
         let mut fork = self.db.fork();
-        fork.flush_migration(Self::SERVICE_NAME);
+        flush_migration(&mut fork, Self::SERVICE_NAME);
         self.db.merge(fork.into_patch()).unwrap();
         self.data_version = end_version;
     }
