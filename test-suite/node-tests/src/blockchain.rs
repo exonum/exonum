@@ -131,7 +131,6 @@ pub fn create_blockchain() -> BlockchainMut {
     BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
         .build()
-        .unwrap()
 }
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*

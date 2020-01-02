@@ -1186,8 +1186,7 @@ fn sandbox_with_services_uninitialized(
 
     let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let config = Configuration {
         listener: ListenerConfig {

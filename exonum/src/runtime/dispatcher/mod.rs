@@ -147,7 +147,7 @@ impl Dispatcher {
                     panic!(
                         "BUG: Can't restore state, artifact {:?} has not been deployed now, \
                          but was deployed previously. Reported error: {}",
-                        &artifact, err
+                        artifact, err
                     );
                 });
         }
@@ -505,7 +505,7 @@ impl Dispatcher {
     /// # Panics
     ///
     /// This method assumes that it was previously checked if runtime can change the state
-    /// of the service, and will panic if the it cannot be done.
+    /// of the service, and will panic if it cannot be done.
     fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,

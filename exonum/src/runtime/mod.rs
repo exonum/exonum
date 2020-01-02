@@ -397,8 +397,9 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// This method does not return a value, meaning that any error occurred during this method execution
     /// is considered critical and should lead to the node stopping.
     ///
-    /// It is assumed that if `initiate_adding_service` didn't return an error previously, it is able
-    /// to update service status and within normal conditions no error is expected to happen.
+    /// It is assumed that if `initiate_adding_service` didn't return an error previously,
+    /// the runtime is able to update service status and within normal conditions no error is
+    /// expected to happen.
     fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,

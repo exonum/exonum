@@ -43,7 +43,7 @@ use crate::{
 
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 const TEST_SERVICE_NAME: &str = "test_service";
-const PANIC_STR: &str = "42";
+const PANIC_STR: &str = "Panicking on request";
 
 macro_rules! impl_binary_value_for_bincode {
     ($( $type:ty ),*) => {
@@ -360,7 +360,7 @@ impl Runtime for RuntimeInspector {
 // Attempts to create blockchain for particular Rust services and its instances assuming all of
 // these are builtin services.
 fn check_finalizing_services(artifacts: Vec<ArtifactId>, instances: Vec<InstanceInitParams>) {
-    create_blockchain(RuntimeInspector::new(artifacts), instances).unwrap();
+    create_blockchain(RuntimeInspector::new(artifacts), instances);
 }
 
 fn execute_transaction(
@@ -403,7 +403,7 @@ fn execute_transaction(
 fn create_blockchain(
     runtime: RuntimeInspector,
     instances: Vec<InstanceInitParams>,
-) -> Result<BlockchainMut, failure::Error> {
+) -> BlockchainMut {
     let genesis_config = instances
         .into_iter()
         .fold(
@@ -430,8 +430,7 @@ fn after_transactions_invoked_on_genesis() {
         RuntimeInspector::default()
             .with_after_transactions_action(AfterTransactionsAction::AddValue(1)),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     // After creation of the genesis block, check that value was set.
     let snapshot = blockchain.snapshot();
@@ -444,17 +443,11 @@ fn after_transactions_invoked_on_genesis() {
 /// Checks that if `after_transactions` fails on the genesis block,
 /// the blockchain is not created.
 #[test]
+#[should_panic(expected = "Panicking on request")]
 fn after_transactions_failure_causes_genesis_failure() {
-    let actual_err = create_blockchain(
+    create_blockchain(
         RuntimeInspector::default().with_after_transactions_action(AfterTransactionsAction::Panic),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap_err();
-
-    // Unfortunately, `failure::Error` doesn't implement `PartialEq`, so we have to string-compare them.
-    assert!(
-        actual_err.to_string().contains(PANIC_STR),
-        "Expected error should be caused by `after_transactions` hook"
     );
 }
 
@@ -465,8 +458,7 @@ fn handling_tx_panic_error() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     // Check that failed transactions do not modify inspector schema.
     let failed_transactions = vec![
@@ -508,8 +500,7 @@ fn handling_tx_merkledb_error() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     execute_transaction(
         &mut blockchain,
@@ -523,8 +514,7 @@ fn initialize_service_ok() {
     create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 }
 
 #[test]
@@ -536,8 +526,7 @@ fn deploy_available() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default().with_available_artifact(artifact_id.clone()),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     execute_transaction(
         &mut blockchain,
@@ -553,8 +542,7 @@ fn deploy_already_deployed() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     let actual_err = execute_transaction(
         &mut blockchain,
@@ -568,7 +556,7 @@ fn deploy_already_deployed() {
 
     // Since `RuntimeInspector` transactions skip the `start_deploy`,
     // we expect transaction to panic (`commit_service` is called within transaction body).
-    let expect_err = ErrorMatch::from_panic()
+    let expect_err = ErrorMatch::unexpected()
         .with_description_containing("Artifact with the given identifier is already deployed");
     assert_eq!(actual_err, expect_err);
 }
@@ -581,8 +569,7 @@ fn deploy_unavailable_artifact() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     let artifact_id =
         ArtifactId::new(RuntimeInspector::ID, "secondary", Version::new(1, 0, 0)).unwrap();
@@ -600,8 +587,7 @@ fn start_stop_service_instance() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     // Start secondary service instance.
     let instance_spec = InstanceSpec {
@@ -664,8 +650,7 @@ fn test_check_tx() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     let snapshot = blockchain.snapshot();
 
@@ -783,9 +768,7 @@ fn blockchain_next_height_does_not_panic_before_genesis() {
 #[test]
 fn blockchain_height() {
     let mut blockchain =
-        BlockchainBuilder::new(Blockchain::build_for_tests(), create_genesis_config())
-            .build()
-            .unwrap();
+        BlockchainBuilder::new(Blockchain::build_for_tests(), create_genesis_config()).build();
 
     // Check that height is 0 after genesis creation.
     let snapshot = blockchain.snapshot();
@@ -816,8 +799,7 @@ fn state_aggregation() {
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
-    )
-    .unwrap();
+    );
 
     execute_transaction(
         &mut blockchain,

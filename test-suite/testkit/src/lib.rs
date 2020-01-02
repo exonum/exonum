@@ -247,8 +247,7 @@ impl TestKit {
                 BlockchainBuilder::new(blockchain, genesis_config),
                 |builder, runtime| builder.with_runtime(runtime),
             )
-            .build()
-            .expect("Unable to create blockchain instance");
+            .build();
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
         let api_aggregator =

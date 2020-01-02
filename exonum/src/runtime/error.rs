@@ -275,7 +275,7 @@ impl ErrorMatch {
 
     /// Creates a matcher for `Unexpected` kind of errors.
     /// By default it will match any description.
-    pub fn from_panic() -> Self {
+    pub fn unexpected() -> Self {
         Self {
             kind: ErrorKind::Unexpected,
             description: StringMatch::Any,

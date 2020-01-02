@@ -57,9 +57,9 @@ impl BlockchainBuilder {
     ///
     /// # Panics
     ///
-    /// * If the genesis block was not committed.
+    /// * If the genesis block cannot be created.
     /// * If storage version is not specified or not supported.
-    pub fn build(self) -> Result<BlockchainMut, failure::Error> {
+    pub fn build(self) -> BlockchainMut {
         let mut blockchain = BlockchainMut {
             dispatcher: Dispatcher::new(&self.blockchain, self.runtimes),
             inner: self.blockchain,
@@ -73,8 +73,8 @@ impl BlockchainBuilder {
         if has_genesis_block {
             blockchain.dispatcher.restore_state(&snapshot);
         } else {
-            blockchain.create_genesis_block(self.genesis_config)?;
+            blockchain.create_genesis_block(self.genesis_config);
         };
-        Ok(blockchain)
+        blockchain
     }
 }

@@ -507,11 +507,11 @@ impl Runtime for RustRuntime {
     ) {
         match status {
             InstanceStatus::Active => {
-                let instance = self
-                    .new_service(spec)
-                    .expect("BUG: Attempt to create a new service instance failed; \
-                             within `instantiate_adding_service` we were able to create a new instance,
-                             but now we are not.");
+                let instance = self.new_service(spec).expect(
+                    "BUG: Attempt to create a new service instance failed; \
+                     within `instantiate_adding_service` we were able to create a new instance, \
+                     but now we are not.",
+                );
                 self.add_started_service(instance);
             }
 

@@ -354,8 +354,7 @@ fn basic_rust_runtime() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     // The dispatcher should initialize the runtime and call `after_commit` for
     // the genesis block.
@@ -518,8 +517,7 @@ fn rust_runtime_with_builtin_services() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config.clone())
         .with_runtime(runtime)
-        .build()
-        .expect("Can't create a blockchain instance");
+        .build();
 
     let events = mem::replace(&mut *event_handle.lock().unwrap(), vec![]);
     let artifact = TestServiceImpl.artifact_id();
@@ -554,8 +552,7 @@ fn rust_runtime_with_builtin_services() {
     let mut blockchain = blockchain
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let events = mem::replace(
         &mut *event_handle
@@ -595,8 +592,7 @@ fn state_aggregation() {
     let blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     // The constructor entry has been written to; `method_*` `ProofEntry`s are empty.
     let snapshot = blockchain.snapshot();
@@ -625,8 +621,7 @@ fn multiple_service_versions() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let fork = create_block(&blockchain);
     let artifact = TestServiceImpl.artifact_id();
@@ -742,8 +737,7 @@ fn conflicting_service_instances() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let fork = create_block(&blockchain);
     Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
@@ -883,8 +877,7 @@ fn dependent_builtin_service() {
     let blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let snapshot = blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -907,6 +900,7 @@ fn dependent_builtin_service() {
 }
 
 #[test]
+#[should_panic(expected = "no dependency")]
 fn dependent_builtin_service_with_incorrect_order() {
     let main_service = TestServiceImpl;
     let dep_service = DependentServiceImpl;
@@ -925,12 +919,10 @@ fn dependent_builtin_service_with_incorrect_order() {
         .with_factory(main_service)
         .with_factory(dep_service);
 
-    let err = Blockchain::build_for_tests()
+    Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap_err();
-    assert!(err.to_string().contains("no dependency"));
+        .build();
 }
 
 #[test]
@@ -945,8 +937,7 @@ fn dependent_service_with_no_dependency() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let fork = create_block(&blockchain);
     let inst = DependentServiceImpl.default_instance();
@@ -980,8 +971,7 @@ fn dependent_service_in_same_block() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
     let fork = create_block(&blockchain);
@@ -1025,8 +1015,7 @@ fn dependent_service_in_successive_block() {
     let mut blockchain = Blockchain::build_for_tests()
         .into_mut(genesis_config)
         .with_runtime(runtime)
-        .build()
-        .unwrap();
+        .build();
 
     let fork = create_block(&blockchain);
     let dep_spec = DependentServiceImpl.default_instance();
