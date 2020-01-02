@@ -32,9 +32,28 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{Attribute, NestedMeta};
 
-/// Derives `BinaryValue` trait. The target type must implement `ProtobufConvert` trait.
+/// Derives `BinaryValue` trait. The target type must implement (de)serialization logic,
+/// which should be provided externally.
 ///
-/// # Example
+/// The trait currently supports two codecs:
+///
+/// - Protobuf serialization (used by default) via `exonum-proto` crate and its `ProtobufConvert`
+///   trait.
+/// - `bincode` serialization via the eponymous crate. Switched on by the
+///   `#[binary_value(codec = "bincode")` attribute. Beware that `bincode` format is not as
+///   forward / backward compatible as Protobuf; hence, this codec is better suited for tests
+///   than for production code.
+///
+/// # Container Attributes
+///
+/// ## `codec`
+///
+/// Selects the serialization codec to use. Allowed values are `protobuf` (used by default)
+/// and `bincode`.
+///
+/// # Examples
+///
+/// With Protobuf serialization:
 ///
 /// ```ignore
 /// #[derive(Clone, Debug, BinaryValue)]
@@ -47,6 +66,24 @@ use syn::{Attribute, NestedMeta};
 /// }
 ///
 /// let wallet = Wallet::new();
+/// let bytes = wallet.to_bytes();
+/// ```
+///
+/// With `bincode` serialization:
+///
+/// ```ignore
+/// #[derive(Clone, Debug, Serialize, Deserialize, BinaryValue)]
+/// #[binary_value(codec = "bincode")]
+/// pub struct Wallet {
+///     pub username: PublicKey,
+///     /// Current balance of the wallet.
+///     pub balance: u64,
+/// }
+///
+/// let wallet = Wallet {
+///     username: "Alice".to_owned(),
+///     balance: 100,
+/// };
 /// let bytes = wallet.to_bytes();
 /// ```
 #[proc_macro_derive(BinaryValue, attributes(binary_value))]
