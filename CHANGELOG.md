@@ -79,6 +79,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `update_service_status` now does not return a value. (#1659)
 
+- `BlockchainBuilder::build` now returns `BlockchainMut` instead of `Result`. (#1659)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
