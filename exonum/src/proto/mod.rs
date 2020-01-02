@@ -14,8 +14,6 @@
 
 //! Module that contains Protobuf messages used by Exonum.
 
-use failure::Error;
-
 pub use self::schema::{
     blockchain::{AdditionalHeaders, Block, CallInBlock, TxLocation},
     consensus::{
@@ -27,8 +25,10 @@ pub use self::schema::{
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 
-use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
+use failure::{ensure, Error};
+
+use crate::helpers::{Height, Round, ValidatorId};
 
 pub mod schema;
 

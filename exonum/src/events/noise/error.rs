@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure::Fail;
 use snow::error::Error;
 
 #[derive(Fail, Debug)]

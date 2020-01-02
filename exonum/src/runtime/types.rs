@@ -20,6 +20,7 @@ use exonum_merkledb::{
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
+use failure::{bail, ensure, format_err};
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 

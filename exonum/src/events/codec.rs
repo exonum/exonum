@@ -14,6 +14,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use failure::bail;
 use std::mem;
 use tokio_io::codec::{Decoder, Encoder};
 

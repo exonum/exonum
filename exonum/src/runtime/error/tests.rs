@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::BinaryValue;
+use failure::format_err;
 use protobuf::Message;
 use std::panic;
 

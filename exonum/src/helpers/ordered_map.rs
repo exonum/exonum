@@ -16,6 +16,7 @@ use crate::proto;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::ensure;
 use protobuf::Message;
 
 use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};

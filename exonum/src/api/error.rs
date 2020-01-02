@@ -14,6 +14,7 @@
 
 //! The set of errors for the Exonum API module.
 
+use failure::Fail;
 use serde::Serialize;
 use std::io;
 

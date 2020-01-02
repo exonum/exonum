@@ -23,6 +23,7 @@
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::{bail, ensure};
 
 use std::collections::{HashMap, HashSet};
 
