@@ -400,13 +400,37 @@ impl<T: RawAccessMut> IndexesPool<T> {
 
     pub(crate) fn rollback_migration(&mut self, prefix: &str) -> Vec<ResolvedAddress> {
         let prefix = IndexAddress::qualify_migration_namespace(prefix);
+        self.remove_by_prefix(&prefix, |key| {
+            IndexAddress::parse_fully_qualified_name(key, prefix.len()).0
+        })
+    }
+
+    /// Removes indexes which address starts from the specified `prefix` (i.e., which can be
+    /// obtained from the prefix by calling `append_key`).
+    ///
+    /// # Return value
+    ///
+    /// Returns resolved addresses of the removed indexes.
+    pub(crate) fn remove_indexes(&mut self, prefix: &IndexAddress) -> Vec<ResolvedAddress> {
+        let name = prefix.name();
+        let prefix = prefix.fully_qualified_name();
+        self.remove_by_prefix(&prefix, |_| name.to_owned())
+    }
+
+    /// Removes views with the full name starting with the specified prefix. The `extract_name`
+    /// argument provides a way to map from a full name to the name of the column family
+    /// where the view is stored.
+    fn remove_by_prefix(
+        &mut self,
+        prefix: &[u8],
+        extract_name: impl Fn(&[u8]) -> String,
+    ) -> Vec<ResolvedAddress> {
         let (removed_names, removed_addrs): (Vec<_>, Vec<_>) = self
             .0
-            .iter::<_, Vec<u8>, IndexMetadata>(&prefix)
+            .iter::<_, Vec<u8>, IndexMetadata>(prefix)
             .map(|(key, metadata)| {
-                let (name, _) = IndexAddress::parse_fully_qualified_name(&key, prefix.len());
                 let resolved = ResolvedAddress {
-                    name,
+                    name: extract_name(&key),
                     id: NonZeroU64::new(metadata.identifier),
                 };
                 (key, resolved)
@@ -581,9 +605,17 @@ where
             addr: index_address.to_owned(),
             kind,
         })?;
+        Ok(Self::get_metadata_unchecked(index_access, index_address))
+    }
+
+    /// Gets index metadata without running address checks.
+    pub(crate) fn get_metadata_unchecked(
+        index_access: T,
+        index_address: &IndexAddress,
+    ) -> Option<IndexMetadata> {
         let index_full_name = index_address.fully_qualified_name();
         let pool = IndexesPool::new(index_access);
-        Ok(pool.index_metadata(&index_full_name))
+        pool.index_metadata(&index_full_name)
     }
 
     /// Gets an index with the specified address and type. Unlike `get_or_create`, this method
@@ -592,7 +624,7 @@ where
     /// # Safety
     ///
     /// This method should only be used to create system indexes within this crate.
-    pub(super) fn get_or_create_unchecked(
+    pub(crate) fn get_or_create_unchecked(
         index_access: T,
         index_address: &IndexAddress,
         index_type: IndexType,
@@ -610,12 +642,11 @@ where
         let index_full_name = index_address.fully_qualified_name();
 
         let mut pool = IndexesPool::new(index_access.clone());
-        let mut is_phantom = false;
-        let metadata = pool.index_metadata(&index_full_name).unwrap_or_else(|| {
-            let (metadata, phantom_flag) = pool.create_index_metadata(&index_full_name, index_type);
-            is_phantom = phantom_flag;
-            metadata
-        });
+        let (metadata, is_phantom) = pool.index_metadata(&index_full_name).map_or_else(
+            || pool.create_index_metadata(&index_full_name, index_type),
+            |metadata| (metadata, false),
+        );
+
         let real_index_type = metadata.index_type;
         let addr = ResolvedAddress {
             name: index_name,
