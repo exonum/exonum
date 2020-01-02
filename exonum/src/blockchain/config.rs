@@ -24,6 +24,7 @@
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use failure::{bail, ensure};
+use log::warn;
 
 use std::collections::{HashMap, HashSet};
 
