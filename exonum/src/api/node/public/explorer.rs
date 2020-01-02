@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ use chrono::{DateTime, Utc};
 use exonum_merkledb::{ObjectHash, Snapshot};
 use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
+use serde_json::json;
 
 use std::{
     ops::{Bound, Range},

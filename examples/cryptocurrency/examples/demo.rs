@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,10 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
-    runtime::{rust::ServiceFactory, RuntimeInstance},
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        RuntimeInstance,
+    },
 };
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
@@ -67,7 +70,7 @@ fn main() {
     let external_runtimes: Vec<RuntimeInstance> = vec![];
     let service = CryptocurrencyService;
     let artifact_id = service.artifact_id();
-    let services = vec![service.into()];
+    let rust_runtime = RustRuntime::builder().with_factory(service);
     let node_config = node_config();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_config.consensus.clone())
         .with_artifact(artifact_id.clone())
@@ -77,8 +80,8 @@ fn main() {
     println!("Creating database in temporary dir...");
     let node = Node::new(
         TemporaryDB::new(),
+        rust_runtime,
         external_runtimes,
-        services,
         node_config,
         genesis_config,
         None,

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     runtime::{
-        rust::{RustRuntime, ServiceFactory},
+        rust::{RustRuntimeBuilder, ServiceFactory},
         ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -257,8 +257,10 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
         .create()
 }
 
-fn add_available_services(runtime: RustRuntime) -> RustRuntime {
-    runtime.with_factory(IncService).with_factory(Supervisor)
+fn available_services() -> RustRuntimeBuilder {
+    RustRuntimeBuilder::new()
+        .with_factory(IncService)
+        .with_factory(Supervisor)
 }
 
 /// Just test that the Inc service works as intended.
@@ -542,8 +544,7 @@ fn test_restart_node_and_start_service_instance() {
     // Stop the node.
     let stopped_testkit = testkit.stop();
     // ...and start it again with the same service factory.
-    let runtime = add_available_services(stopped_testkit.rust_runtime());
-    let mut testkit = stopped_testkit.resume(vec![runtime]);
+    let mut testkit = stopped_testkit.resume(available_services());
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -571,8 +572,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Restart the node again.
     let stopped_testkit = testkit.stop();
-    let runtime = add_available_services(stopped_testkit.rust_runtime());
-    let mut testkit = stopped_testkit.resume(vec![runtime]);
+    let mut testkit = stopped_testkit.resume(available_services());
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -614,8 +614,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
 
     // Restart the node again after the first block was created.
     let testkit = testkit.stop();
-    let runtime = add_available_services(testkit.rust_runtime());
-    let mut testkit = testkit.resume(vec![runtime]);
+    let mut testkit = testkit.resume(available_services());
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
