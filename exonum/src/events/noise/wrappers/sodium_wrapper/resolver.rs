@@ -277,6 +277,7 @@ impl Hash for SodiumSha256 {
 mod tests {
     use super::*;
     use hex::FromHex;
+    use pretty_assertions::assert_eq;
 
     // Random data generator.
     struct MockRandom(u8);

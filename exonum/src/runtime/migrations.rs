@@ -17,6 +17,7 @@
 //! FIXME: more details (ECR-4081)
 
 use exonum_merkledb::migration::MigrationHelper;
+use failure::Fail;
 
 use std::{collections::BTreeMap, fmt};
 

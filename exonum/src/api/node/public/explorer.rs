@@ -20,6 +20,7 @@ use chrono::{DateTime, Utc};
 use exonum_merkledb::{ObjectHash, Snapshot};
 use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
+use serde_json::json;
 
 use std::{
     ops::{Bound, Range},
