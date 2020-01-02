@@ -339,7 +339,6 @@ mod tests {
             .into_mut(genesis_config)
             .with_runtime(runtime.build_for_tests())
             .build()
-            .unwrap()
     }
 
     fn setup_blockchain_for_index_proofs() -> Box<dyn Snapshot> {

@@ -77,6 +77,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   To get the sources of an artifact, use query `type=artifact&name=$name&version=$version`,
   where `$name` and `$version` are replaced with appropriate values. (#1590)
 
+- `update_service_status` now does not return a value. (#1659)
+
+- `BlockchainBuilder::build` now returns `BlockchainMut` instead of `Result`. (#1659)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.

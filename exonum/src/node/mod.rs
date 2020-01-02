@@ -931,12 +931,7 @@ impl Node {
         for runtime in external_runtimes {
             blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
-        let blockchain = blockchain_builder.build().unwrap_or_else(|err| {
-            panic!(
-                "Blockchain initialization failed with the following error: {}",
-                err
-            )
-        });
+        let blockchain = blockchain_builder.build();
 
         Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }
