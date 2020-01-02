@@ -266,6 +266,11 @@ impl<'a, T: RawAccess> Scratchpad<'a, T> {
         let prefixed_addr = addr.prepend_name(self.namespace);
         IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.fully_qualified_name())
     }
+
+    fn get_scratchpad_prefix(&self, addr: IndexAddress) -> IndexAddress {
+        let prefixed_addr = addr.prepend_name(self.namespace);
+        IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.qualified_prefix())
+    }
 }
 
 impl<T: RawAccessMut> Scratchpad<'_, T> {
@@ -311,7 +316,7 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
         K: BinaryKey + ?Sized,
         Self::Base: AsReadonly<Readonly = Self::Base>,
     {
-        let base_addr = self.get_scratchpad_addr(base_addr);
+        let base_addr = self.get_scratchpad_prefix(base_addr);
         self.access.group_keys(base_addr)
     }
 }

@@ -165,8 +165,8 @@ impl IndexAddress {
         }
     }
 
-    /// Returns common prefix of fully qualified names for the child indexes.
-    pub(super) fn qualified_prefix(&self) -> Vec<u8> {
+    /// Returns the common prefix of fully qualified names for the child indexes.
+    pub(crate) fn qualified_prefix(&self) -> Vec<u8> {
         let mut prefix = self.fully_qualified_name();
         if self.id_in_group.is_none() {
             prefix.push(SEPARATOR_CHAR);
