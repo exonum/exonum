@@ -19,7 +19,6 @@ pub mod sandbox_tests_helper;
 pub mod timestamping;
 
 mod guarded_queue;
-mod proto;
 
 use bit_vec::BitVec;
 use exonum::{

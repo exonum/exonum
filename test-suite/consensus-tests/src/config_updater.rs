@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::proto::TxConfig;
-
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::{PublicKey, SecretKey},
@@ -26,7 +24,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
-use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
+use serde_derive::*;
 
 #[exonum_interface]
 pub trait ConfigUpdater<Ctx> {
@@ -36,11 +34,7 @@ pub trait ConfigUpdater<Ctx> {
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("ConfigUpdater"))]
-#[service_factory(
-    artifact_name = "config_updater",
-    artifact_version = "0.1.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "config_updater", artifact_version = "0.1.0")]
 pub struct ConfigUpdaterService;
 
 impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
@@ -65,6 +59,14 @@ impl DefaultInstance for ConfigUpdaterService {
     const INSTANCE_NAME: &'static str = "config-updater";
 }
 
+#[derive(Debug, Serialize, Deserialize, BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
+pub struct TxConfig {
+    from: PublicKey,
+    config: Vec<u8>,
+    actual_from: Height,
+}
+
 impl TxConfig {
     pub fn create_signed(
         from: PublicKey,
@@ -72,14 +74,14 @@ impl TxConfig {
         actual_from: Height,
         signer: &SecretKey,
     ) -> Verified<AnyTx> {
-        let mut msg = TxConfig::new();
-        msg.set_from(from.to_pb());
-        msg.set_config(config.to_vec());
-        msg.set_actual_from(actual_from.0);
+        let msg = TxConfig {
+            from,
+            config: config.to_owned(),
+            actual_from,
+        };
+
         TxStub
             .update_config(ConfigUpdaterService::ID, msg)
             .sign(from, signer)
     }
 }
-
-impl_binary_value_for_pb_message! { TxConfig }

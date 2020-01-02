@@ -34,11 +34,7 @@ pub trait Timestamping<Ctx> {
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("Timestamping"))]
-#[service_factory(
-    artifact_name = "timestamping",
-    artifact_version = "0.1.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "timestamping", artifact_version = "0.1.0")]
 pub struct TimestampingService;
 
 impl Timestamping<CallContext<'_>> for TimestampingService {

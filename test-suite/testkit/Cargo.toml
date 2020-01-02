@@ -41,12 +41,13 @@ tokio-core = "0.1.17"
 protobuf = { version = "2.8.1", features = ["with-serde"] }
 
 [dev-dependencies]
+assert_matches = "1.2.0"
+bincode = "1.2.1"
 hex = "0.4"
+lazy_static = "1.0.0"
 rand = "0.7"
 pretty_assertions = "0.6.1"
-assert_matches = "1.2.0"
 thread_local = "1.0.0"
-lazy_static = "1.0.0"
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
