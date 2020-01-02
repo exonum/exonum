@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,8 +23,7 @@ use exonum_merkledb::{
 };
 
 use super::{
-    multisig::MultisigIndex, ConfigProposalWithHash, DeployConfirmation, DeployRequest,
-    SupervisorConfig,
+    multisig::MultisigIndex, ConfigProposalWithHash, DeployRequest, DeployState, SupervisorConfig,
 };
 
 /// Service information schema.
@@ -37,7 +36,11 @@ pub(crate) struct SchemaImpl<T: Access> {
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
-    pub deploy_confirmations: MultisigIndex<T, DeployConfirmation>,
+    /// Note that `DeployRequest`s are stored instead of `ArtifactId` to
+    /// distinguish several attempts of the same artifact deployment.
+    pub deploy_confirmations: MultisigIndex<T, DeployRequest>,
+    /// Deployment failures.
+    pub deploy_states: ProofMapIndex<T::Base, DeployRequest, DeployState>,
     /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
     /// Votes for a configuration change.

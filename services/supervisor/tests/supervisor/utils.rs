@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ use exonum_supervisor::{
     SupervisorInterface,
 };
 
-pub const CFG_CHANGE_HEIGHT: Height = Height(2);
+pub const CFG_CHANGE_HEIGHT: Height = Height(3);
 
 pub const SECOND_SERVICE_ID: InstanceId = 119;
 pub const SECOND_SERVICE_NAME: &str = "change-service";

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,17 +15,86 @@
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::Hash,
-    runtime::rust::{
-        api::{self, ServiceApiBuilder, ServiceApiState},
-        Broadcaster,
+    helpers::Height,
+    runtime::{
+        rust::{
+            api::{self, ServiceApiBuilder, ServiceApiState},
+            Broadcaster,
+        },
+        ArtifactId,
     },
 };
 use failure::Fail;
+use serde_derive::{Deserialize, Serialize};
+use std::{convert::TryFrom, str::FromStr};
 
 use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
-    ConfigVote, DeployRequest, SupervisorConfig,
+    ConfigVote, DeployRequest, DeployState, SupervisorConfig,
 };
+
+/// Query for retrieving information about deploy state.
+/// This is flattened version of `DeployRequest` which can be
+/// encoded via URL query parameters.
+#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize)]
+pub struct DeployInfoQuery {
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:0.13.0-rc.2"
+    pub artifact: String,
+    /// Artifact spec bytes as hexadecimal string.
+    pub spec: String,
+    /// Deadline height.
+    pub deadline_height: u64,
+}
+
+impl TryFrom<DeployInfoQuery> for DeployRequest {
+    type Error = api::Error;
+
+    fn try_from(query: DeployInfoQuery) -> Result<Self, Self::Error> {
+        let artifact = ArtifactId::from_str(&query.artifact)
+            .map_err(|err| api::Error::BadRequest(err.to_string()))?;
+        let spec =
+            hex::decode(query.spec).map_err(|err| api::Error::BadRequest(err.to_string()))?;
+        let deadline_height = Height(query.deadline_height);
+
+        let request = Self {
+            artifact,
+            spec,
+            deadline_height,
+        };
+
+        Ok(request)
+    }
+}
+
+impl From<DeployRequest> for DeployInfoQuery {
+    fn from(request: DeployRequest) -> Self {
+        let artifact = request.artifact.to_string();
+        let spec = hex::encode(&request.spec);
+        let deadline_height = request.deadline_height.0;
+
+        Self {
+            artifact,
+            spec,
+            deadline_height,
+        }
+    }
+}
+
+/// Response with deploy status for a certain deploy request.
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct DeployResponse {
+    /// State of deployment.
+    pub state: Option<DeployState>,
+}
+
+impl DeployResponse {
+    /// Creates a new `DeployResponse` object.
+    pub fn new(state: Option<DeployState>) -> Self {
+        Self { state }
+    }
+}
 
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
@@ -49,6 +118,9 @@ pub trait PrivateApi {
 
     /// Returns an actual supervisor config.
     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
+
+    /// Returns the state of deployment for the given deploy request.
+    fn deploy_status(&self, request: DeployInfoQuery) -> Result<DeployResponse, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -101,6 +173,14 @@ impl PrivateApi for ApiImpl<'_> {
         let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
         Ok(config)
     }
+
+    fn deploy_status(&self, query: DeployInfoQuery) -> Result<DeployResponse, Self::Error> {
+        let request = DeployRequest::try_from(query)?;
+        let schema = SchemaImpl::new(self.0.service_data());
+        let status = schema.deploy_states.get(&request);
+
+        Ok(DeployResponse::new(status))
+    }
 }
 
 impl PublicApi for ApiImpl<'_> {
@@ -135,6 +215,9 @@ pub fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint("supervisor-config", |state, _query: ()| {
             ApiImpl(state).supervisor_config()
+        })
+        .endpoint("deploy-status", |state, query| {
+            ApiImpl(state).deploy_status(query)
         });
     builder
         .public_scope()

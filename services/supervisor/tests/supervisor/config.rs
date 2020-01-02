@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ fn test_sent_new_config_after_expired_one() {
     assert_eq!(config_propose_entry(&testkit), None);
 
     // Send config one more time and vote for it
-    let cfg_change_height = Height(5);
+    let cfg_change_height = Height(7);
     let second_consensus_config = consensus_config_propose_second_variant(&testkit);
 
     let config_proposal = ConfigProposeBuilder::new(cfg_change_height)
@@ -522,7 +522,7 @@ fn test_test_configuration_and_rollbacks() {
     let mut testkit = testkit_with_supervisor(4);
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
 
-    let cfg_change_height = Height(4);
+    let cfg_change_height = Height(5);
     let old_config = testkit.consensus_config();
     testkit.checkpoint();
 
@@ -561,7 +561,7 @@ fn test_test_configuration_and_rollbacks() {
     testkit.rollback();
     // As rollback is behind the time a proposal entered the blockchain,
     // the proposal is effectively forgotten.
-    testkit.create_blocks_until(Height(4));
+    testkit.create_blocks_until(cfg_change_height);
     assert_eq!(testkit.consensus_config(), old_config);
     assert_eq!(config_propose_entry(&testkit), None);
 }

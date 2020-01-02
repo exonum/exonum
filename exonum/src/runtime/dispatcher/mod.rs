@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -540,7 +540,7 @@ pub enum Action {
     StartDeploy {
         artifact: ArtifactId,
         spec: Vec<u8>,
-        and_then: Box<dyn FnOnce() -> ExecutionFuture + Send>,
+        then: Box<dyn FnOnce(Result<(), ExecutionError>) -> ExecutionFuture + Send>,
     },
 }
 
@@ -562,11 +562,11 @@ impl Action {
             Action::StartDeploy {
                 artifact,
                 spec,
-                and_then,
+                then,
             } => {
                 dispatcher
                     .deploy_artifact(artifact.clone(), spec)
-                    .and_then(|()| and_then())
+                    .then(then)
                     .wait()
                     .unwrap_or_else(|e| {
                         error!("Deploying artifact {:?} failed: {}", artifact, e);

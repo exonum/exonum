@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ use exonum_merkledb::{
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
+use failure::{bail, ensure, format_err};
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 
@@ -547,49 +548,55 @@ impl InstanceState {
     }
 }
 
-#[test]
-fn parse_artifact_id_correct() {
-    let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
-    assert_eq!(artifact_id.runtime_id, 0);
-    assert_eq!(artifact_id.name, "my-service");
-    assert_eq!(artifact_id.version, Version::new(1, 0, 0));
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
 
-    let artifact_id = "1:com.my.java.service:3.1.5-beta.2"
-        .parse::<ArtifactId>()
-        .unwrap();
-    assert_eq!(artifact_id.runtime_id, 1);
-    assert_eq!(artifact_id.name, "com.my.java.service");
-    assert_eq!(artifact_id.version.major, 3);
-    assert_eq!(artifact_id.version.minor, 1);
-    assert_eq!(artifact_id.version.patch, 5);
-}
+    use super::{ArtifactId, InstanceSpec, Version};
 
-#[test]
-fn artifact_id_in_json() {
-    let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
-    assert_eq!(
-        serde_json::to_value(artifact_id).unwrap(),
-        json!({
-            "runtime_id": 0,
-            "name": "my-service",
-            "version": "1.0.0",
-        })
-    );
+    #[test]
+    fn parse_artifact_id_correct() {
+        let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
+        assert_eq!(artifact_id.runtime_id, 0);
+        assert_eq!(artifact_id.name, "my-service");
+        assert_eq!(artifact_id.version, Version::new(1, 0, 0));
 
-    let artifact_id = "0:my-service:2.0.0-rc.3".parse::<ArtifactId>().unwrap();
-    assert_eq!(
-        serde_json::to_value(artifact_id).unwrap(),
-        json!({
-            "runtime_id": 0,
-            "name": "my-service",
-            "version": "2.0.0-rc.3",
-        })
-    );
-}
+        let artifact_id = "1:com.my.java.service:3.1.5-beta.2"
+            .parse::<ArtifactId>()
+            .unwrap();
+        assert_eq!(artifact_id.runtime_id, 1);
+        assert_eq!(artifact_id.name, "com.my.java.service");
+        assert_eq!(artifact_id.version.major, 3);
+        assert_eq!(artifact_id.version.minor, 1);
+        assert_eq!(artifact_id.version.patch, 5);
+    }
 
-#[test]
-fn parse_artifact_id_incorrect_layout() {
-    let artifacts = [
+    #[test]
+    fn artifact_id_in_json() {
+        let artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>().unwrap();
+        assert_eq!(
+            serde_json::to_value(artifact_id).unwrap(),
+            json!({
+                "runtime_id": 0,
+                "name": "my-service",
+                "version": "1.0.0",
+            })
+        );
+
+        let artifact_id = "0:my-service:2.0.0-rc.3".parse::<ArtifactId>().unwrap();
+        assert_eq!(
+            serde_json::to_value(artifact_id).unwrap(),
+            json!({
+                "runtime_id": 0,
+                "name": "my-service",
+                "version": "2.0.0-rc.3",
+            })
+        );
+    }
+
+    #[test]
+    fn parse_artifact_id_incorrect_layout() {
+        let artifacts = [
         ("15", "Wrong `ArtifactId` format"),
         ("0::3.1.0", "Artifact name should not be empty"),
         (":test:1.0.0", "cannot parse integer from empty string"),
@@ -611,26 +618,26 @@ fn parse_artifact_id_incorrect_layout() {
         ("1:test:1.0.0:garbage", "Extra junk after valid version"),
     ];
 
-    for (artifact, expected_err) in &artifacts {
-        let actual_err = artifact.parse::<ArtifactId>().unwrap_err().to_string();
-        assert!(
-            actual_err.contains(expected_err),
-            "artifact: '{}' actual_err '{}', expected_err '{}'",
-            artifact,
-            actual_err,
-            expected_err
-        );
+        for (artifact, expected_err) in &artifacts {
+            let actual_err = artifact.parse::<ArtifactId>().unwrap_err().to_string();
+            assert!(
+                actual_err.contains(expected_err),
+                "artifact: '{}' actual_err '{}', expected_err '{}'",
+                artifact,
+                actual_err,
+                expected_err
+            );
+        }
     }
-}
 
-#[test]
-fn test_instance_spec_validate_correct() {
-    InstanceSpec::new(15, "foo-service", "0:my-service:1.0.0").unwrap();
-}
+    #[test]
+    fn test_instance_spec_validate_correct() {
+        InstanceSpec::new(15, "foo-service", "0:my-service:1.0.0").unwrap();
+    }
 
-#[test]
-fn test_instance_spec_validate_incorrect() {
-    let specs = [
+    #[test]
+    fn test_instance_spec_validate_incorrect() {
+        let specs = [
         (
             InstanceSpec::new(1, "", "0:my-service:1.0.0"),
             "Service instance name should not be empty",
@@ -660,13 +667,14 @@ fn test_instance_spec_validate_incorrect() {
         ),
     ];
 
-    for (instance_spec, expected_err) in &specs {
-        let actual_err = instance_spec.as_ref().unwrap_err().to_string();
-        assert!(
-            actual_err.contains(expected_err),
-            "actual_err '{:?}', expected_err '{}'",
-            instance_spec,
-            expected_err,
-        );
+        for (instance_spec, expected_err) in &specs {
+            let actual_err = instance_spec.as_ref().unwrap_err().to_string();
+            assert!(
+                actual_err.contains(expected_err),
+                "actual_err '{:?}', expected_err '{}'",
+                instance_spec,
+                expected_err,
+            );
+        }
     }
 }

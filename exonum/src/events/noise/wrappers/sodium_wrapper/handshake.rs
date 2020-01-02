@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_merkledb::BinaryValue;
+use failure::bail;
 use futures::future::{done, Future};
 use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::net::SocketAddr;
-
-use exonum_merkledb::BinaryValue;
 
 use super::wrapper::NoiseWrapper;
 use crate::{

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -611,7 +611,7 @@ impl DeploymentRuntime {
             .push(Action::StartDeploy {
                 artifact: artifact.clone(),
                 spec: Self::SPEC.to_vec(),
-                and_then: Box::new(|| Box::new(Ok(()).into_future())),
+                then: Box::new(|_| Box::new(Ok(()).into_future())),
             });
         let fork = db.fork();
         dispatcher.activate_pending(&fork);

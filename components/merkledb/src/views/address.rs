@@ -165,6 +165,15 @@ impl IndexAddress {
         }
     }
 
+    /// Returns common prefix of fully qualified names for the child indexes.
+    pub(super) fn qualified_prefix(&self) -> Vec<u8> {
+        let mut prefix = self.fully_qualified_name();
+        if self.id_in_group.is_none() {
+            prefix.push(SEPARATOR_CHAR);
+        }
+        prefix
+    }
+
     /// Infers the name part of the fully qualified name that was obtained with
     /// `fully_qualified_name`. This is the part corresponding to `ResolvedAddress.name`.
     /// `min_name_len` specifies the minimum known length of the name part.

@@ -31,7 +31,7 @@ class ExonumCryptoAdvancedClient:
         self.types_module = ModuleManager.import_service_module(
             cryptocurrency_service_name, cryptocurrency_service_version, "types"
         )
-        instance_id = client.get_instance_id_by_name("crypto")
+        instance_id = client.public_api.get_instance_id_by_name("crypto")
         self.msg_generator = MessageGenerator(
             instance_id=instance_id,
             artifact_name=cryptocurrency_service_name,
@@ -50,7 +50,7 @@ class ExonumCryptoAdvancedClient:
         create_wallet.name = wallet_name
         create_wallet_tx = self.msg_generator.create_message(create_wallet)
         create_wallet_tx.sign(keys)
-        return self.client.send_transaction(create_wallet_tx)
+        return self.client.public_api.send_transaction(create_wallet_tx)
 
     def issue(self, keys, amount):
         """Wrapper for issue operation."""
@@ -59,12 +59,13 @@ class ExonumCryptoAdvancedClient:
         issue.seed = gen_seed()
         issue_tx = self.msg_generator.create_message(issue)
         issue_tx.sign(keys)
-        return self.client.send_transaction(issue_tx)
+        return self.client.public_api.send_transaction(issue_tx)
 
     def get_wallet_info(self, keys):
         """Wrapper for get wallet info operation."""
-        return self.client.get_service(
-            "crypto/v1", "wallets/info?pub_key=" + keys.public_key.hex()
+        public_service_api = self.client.service_public_api("crypto")
+        return public_service_api.get_service(
+            "v1/wallets/info?pub_key=" + keys.public_key.hex()
         )
 
     def transfer(self, amount, from_wallet, to_wallet):
@@ -75,7 +76,7 @@ class ExonumCryptoAdvancedClient:
         transfer.to.CopyFrom(self.types_module.PublicKey(data=to_wallet))
         transfer_tx = self.msg_generator.create_message(transfer)
         transfer_tx.sign(from_wallet)
-        return self.client.send_transaction(transfer_tx)
+        return self.client.public_api.send_transaction(transfer_tx)
 
 
 def gen_seed():

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,13 +19,13 @@ use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{borrow::Cow, io::Error, mem, num::NonZeroU64};
+use std::{borrow::Cow, io::Error, mem, num::NonZeroU64, vec};
 
 use super::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View};
 use crate::{
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
-    BinaryValue,
+    BinaryKey, BinaryValue,
 };
 
 /// Name of the column family used to store `IndexesPool`.
@@ -443,6 +443,83 @@ impl<T: RawAccessMut> IndexesPool<T> {
     }
 }
 
+#[derive(Debug)]
+pub struct GroupKeys<T: RawAccess, K: BinaryKey + ?Sized> {
+    access: T,
+    key_prefix: Vec<u8>,
+    next_key: Option<Vec<u8>>,
+    buffered_keys: vec::IntoIter<K::Owned>,
+    buffer_size: usize,
+}
+
+impl<T, K> GroupKeys<T, K>
+where
+    T: RawAccess,
+    K: BinaryKey + ?Sized,
+{
+    pub fn new(access: T, addr: &IndexAddress) -> Self {
+        const DEFAULT_BUFFER_SIZE: usize = 1_000;
+        Self::with_custom_buffer(access, addr, DEFAULT_BUFFER_SIZE)
+    }
+
+    fn with_custom_buffer(access: T, addr: &IndexAddress, buffer_size: usize) -> Self {
+        assert!(buffer_size > 0);
+
+        let key_prefix = addr.qualified_prefix();
+        let mut this = Self {
+            access,
+            key_prefix: key_prefix.clone(),
+            next_key: None,
+            buffered_keys: Vec::new().into_iter(),
+            buffer_size,
+        };
+        this.buffer_keys(&key_prefix);
+        this
+    }
+
+    fn buffer_keys(&mut self, start_key: &[u8]) {
+        let indexes_pool = IndexesPool::new(self.access.clone());
+        let mut buffer = Vec::with_capacity(self.buffer_size);
+
+        let mut iter = indexes_pool.0.iter_bytes(start_key);
+        while let Some((key, _)) = iter.next() {
+            if !key.starts_with(&self.key_prefix) {
+                // We've run out of keys.
+                break;
+            } else if buffer.len() == self.buffer_size {
+                // Store the next key in the raw form.
+                self.next_key = Some(key.to_owned());
+                break;
+            } else {
+                // Store the key into the buffer.
+                buffer.push(K::read(&key[self.key_prefix.len()..]));
+            }
+        }
+        debug_assert!(buffer.len() <= self.buffer_size);
+        self.buffered_keys = buffer.into_iter();
+    }
+}
+
+impl<T, K> Iterator for GroupKeys<T, K>
+where
+    T: RawAccess,
+    K: BinaryKey + ?Sized,
+{
+    type Item = K::Owned;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.buffered_keys.next().or_else(|| {
+            if let Some(next_key) = self.next_key.take() {
+                // Buffer more keys.
+                self.buffer_keys(&next_key);
+                self.buffered_keys.next()
+            } else {
+                None
+            }
+        })
+    }
+}
+
 /// Obtains `object_hash` for an aggregated index.
 pub fn get_object_hash<T: RawAccess>(
     access: T,
@@ -640,7 +717,11 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Database, Fork, TemporaryDB};
+    use crate::{access::AccessExt, Database, Fork, TemporaryDB};
+
+    use std::collections::{BTreeSet, HashMap};
+
+    use rand::{seq::SliceRandom, thread_rng, Rng};
 
     #[test]
     fn test_index_metadata_binary_value() {
@@ -710,8 +791,6 @@ mod tests {
 
     #[test]
     fn index_type_does_not_create_indexes() {
-        use crate::access::AccessExt;
-
         let db = TemporaryDB::new();
         let fork = db.fork();
         let index_count = IndexesPool::new(&fork).len();
@@ -719,5 +798,235 @@ mod tests {
         let pool = IndexesPool::new(&fork);
         assert!(pool.index_metadata(b"foo").is_none());
         assert_eq!(pool.len(), index_count);
+    }
+
+    #[test]
+    fn group_keys_edge_cases() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_entry("before").set(0_u32);
+        fork.get_entry("unrelated").set(0_u32);
+        let addr: IndexAddress = "test".into();
+
+        let mut keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.key_prefix, b"test\0");
+        assert_eq!(keys.next_key, None);
+        assert!(keys.next().is_none());
+
+        fork.get_entry(("test", &0_u8)).set(0_u32);
+        let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, None);
+        assert_eq!(keys.collect::<Vec<_>>(), vec![0]);
+
+        fork.get_entry(("test", &1_u8)).set(0_u32);
+        let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, None);
+        assert_eq!(keys.collect::<Vec<_>>(), vec![0, 1]);
+
+        fork.get_entry(("test", &2_u8)).set(0_u32);
+        let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, Some(b"test\0\x02".to_vec()));
+        assert_eq!(keys.collect::<Vec<_>>(), vec![0, 1, 2]);
+
+        fork.get_entry(("test", &3_u8)).set(0_u32);
+        let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, Some(b"test\0\x02".to_vec()));
+        assert_eq!(keys.collect::<Vec<_>>(), vec![0, 1, 2, 3]);
+
+        fork.get_entry(("test", &4_u8)).set(0_u32);
+        let keys: GroupKeys<_, u8> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, Some(b"test\0\x02".to_vec()));
+        assert_eq!(keys.collect::<Vec<_>>(), vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn keys_within_a_group_with_prefix() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        let addr: IndexAddress = ("test", &0_u32).into();
+        let mut keys: GroupKeys<_, u32> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.key_prefix, b"test\0\0\0\0\0");
+        assert_eq!(keys.next_key, None);
+        assert!(keys.next().is_none());
+
+        fork.get_entry(("test", &concat_keys!(&0_u32, &5_u32)))
+            .set("!".to_owned());
+        let keys: GroupKeys<_, u32> = GroupKeys::with_custom_buffer(&fork, &addr, 2);
+        assert_eq!(keys.next_key, None);
+        assert_eq!(keys.collect::<Vec<_>>(), vec![5]);
+    }
+
+    #[test]
+    fn group_keys_mini_fuzz() {
+        const GROUPS: &[&str] = &["bar", "foo", "test"];
+
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        // Create some unrelated indexes.
+        fork.get_entry("ba").set(0_u8);
+        fork.get_entry(("ba", "r")).set(0_u8);
+        fork.get_entry("bar_").set(0_u8);
+        fork.get_entry("fo").set(0_u8);
+        fork.get_entry(("fo", "oo")).set(0_u8);
+        fork.get_entry("foo1").set(0_u8);
+        fork.get_entry("test").set(0_u8);
+        fork.get_entry(("te", "st")).set(0_u8);
+        fork.get_entry("test_test").set(0_u8);
+
+        let mut rng = thread_rng();
+        let mut groups: HashMap<&'static str, BTreeSet<_>> = HashMap::new();
+        for _ in 0..1_000 {
+            let group = *GROUPS.choose(&mut rng).unwrap();
+            let prefix: u32 = rng.gen();
+            groups.entry(group).or_default().insert(prefix);
+            fork.get_entry((group, &prefix)).set(0_u8);
+        }
+
+        for &group in GROUPS {
+            let actual_keys: Vec<_> =
+                GroupKeys::<_, u32>::with_custom_buffer(&fork, &group.into(), 10).collect();
+            let expected_keys: Vec<_> = groups
+                .remove(&group)
+                .unwrap_or_default()
+                .into_iter()
+                .collect();
+            assert_eq!(actual_keys, expected_keys);
+        }
+    }
+}
+
+#[cfg(test)]
+mod prop_tests {
+    use super::*;
+    use crate::{access::AccessExt, Database, TemporaryDB};
+
+    use proptest::{
+        collection::vec,
+        num, prop_assert_eq, prop_oneof, proptest, sample,
+        strategy::{self, Strategy},
+        test_runner::TestCaseResult,
+    };
+
+    use std::collections::{BTreeSet, HashMap};
+
+    const ACTIONS_MAX_LEN: usize = 30;
+    const DEFAULT_BUFFER_SIZE: usize = 1_000;
+    const SMALL_BUFFER_SIZE: usize = 3;
+
+    type GroupKey = (&'static str, Option<u32>);
+
+    fn group_address(group: GroupKey) -> IndexAddress {
+        if let Some(prefix) = group.1 {
+            (group.0, &prefix).into()
+        } else {
+            group.0.into()
+        }
+    }
+
+    // Note that the case where both "foo" and ("foo", _) are groups leads to unexpected results.
+    // We warn against this in the docs and don't consider this case here.
+    const GROUPS: &[GroupKey] = &[
+        ("fo", None),
+        ("foo", Some(0)),
+        ("foo", Some(1)),
+        ("foo", Some(256)),
+        ("foo", Some(u32::max_value())),
+        ("foo_", None),
+        ("foo1", Some(0)),
+    ];
+
+    fn check_groups<T: RawAccess + Copy>(
+        access: T,
+        expected_groups: &HashMap<GroupKey, BTreeSet<u32>>,
+        buffer_size: usize,
+    ) -> TestCaseResult {
+        for &group in GROUPS {
+            let group_addr = group_address(group);
+            let keys: GroupKeys<_, u32> =
+                GroupKeys::with_custom_buffer(access, &group_addr, buffer_size);
+            let keys: Vec<_> = keys.collect();
+            let expected_keys = expected_groups
+                .get(&group)
+                .map(|set| set.iter().copied().collect::<Vec<_>>())
+                .unwrap_or_default();
+            prop_assert_eq!(keys, expected_keys);
+        }
+        Ok(())
+    }
+
+    #[derive(Debug, Clone)]
+    enum Action {
+        CreateEntry { group: GroupKey, id_in_group: u32 },
+        FlushFork,
+        MergeFork,
+    }
+
+    fn generate_action(keys: impl Strategy<Value = u32>) -> impl Strategy<Value = Action> {
+        prop_oneof![
+            4 => (sample::select(GROUPS), keys)
+                .prop_map(|(group, id_in_group)| Action::CreateEntry {
+                    group,
+                    id_in_group,
+                }),
+            1 => strategy::Just(Action::FlushFork),
+            1 => strategy::Just(Action::MergeFork),
+        ]
+    }
+
+    fn apply_actions(db: &TemporaryDB, buffer_size: usize, actions: Vec<Action>) -> TestCaseResult {
+        let mut fork = db.fork();
+        let mut groups: HashMap<GroupKey, BTreeSet<_>> = HashMap::new();
+        for action in actions {
+            match action {
+                Action::CreateEntry { group, id_in_group } => {
+                    let addr = group_address(group).append_key(&id_in_group);
+                    fork.get_entry(addr).set(1_u32);
+                    groups.entry(group).or_default().insert(id_in_group);
+                }
+                Action::FlushFork => {
+                    fork.flush();
+                }
+                Action::MergeFork => {
+                    let patch = fork.into_patch();
+                    check_groups(&patch, &groups, buffer_size)?;
+                    db.merge(patch).unwrap();
+                    check_groups(&db.snapshot(), &groups, buffer_size)?;
+                    fork = db.fork();
+                }
+            }
+            check_groups(&fork, &groups, buffer_size)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn normal_buffer_and_small_keys() {
+        let actions_generator = vec(generate_action(0_u32..4), 1..ACTIONS_MAX_LEN);
+        let db = TemporaryDB::new();
+        proptest!(|(actions in actions_generator)| {
+            apply_actions(&db, DEFAULT_BUFFER_SIZE, actions)?;
+            db.clear().unwrap();
+        });
+    }
+
+    #[test]
+    fn small_buffer_and_small_keys() {
+        let actions_generator = vec(generate_action(0_u32..4), 1..ACTIONS_MAX_LEN);
+        let db = TemporaryDB::new();
+        proptest!(|(actions in actions_generator)| {
+            apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
+            db.clear().unwrap();
+        });
+    }
+
+    #[test]
+    fn small_buffer_and_any_keys() {
+        let actions_generator = vec(generate_action(num::u32::ANY), 1..ACTIONS_MAX_LEN);
+        let db = TemporaryDB::new();
+        proptest!(|(actions in actions_generator)| {
+            apply_actions(&db, SMALL_BUFFER_SIZE, actions)?;
+            db.clear().unwrap();
+        });
     }
 }

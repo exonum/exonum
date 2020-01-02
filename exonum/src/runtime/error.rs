@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
 
 //! The set of errors for the Runtime module.
 
-pub(crate) mod execution_error;
+#[doc(hidden)]
+pub mod execution_error;
 mod execution_result;
 #[cfg(test)]
 mod tests;
@@ -23,6 +24,7 @@ use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::{bail, ensure, Fail};
 
 use std::{
     any::Any,

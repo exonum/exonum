@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,9 @@
 
 //! Common widely used type definitions.
 
-use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryValue, ObjectHash};
+use exonum_merkledb::{
+    impl_binary_key_for_binary_value, impl_object_hash_for_binary_value, BinaryValue, ObjectHash,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{borrow::Cow, fmt, num::ParseIntError, str::FromStr};
 
@@ -112,6 +114,20 @@ impl Height {
         self.0 -= 1;
     }
 }
+
+impl BinaryValue for Height {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        let value = <u64 as BinaryValue>::from_bytes(value)?;
+        Ok(Self(value))
+    }
+}
+
+impl_binary_key_for_binary_value! { Height }
+impl_object_hash_for_binary_value! { Height }
 
 /// Consensus round index.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -244,9 +260,8 @@ impl BinaryValue for Round {
     }
 
     fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        Ok(Round(
-            <u32 as BinaryValue>::from_bytes(value).expect("Error while deserializing value"),
-        ))
+        let value = <u32 as BinaryValue>::from_bytes(value)?;
+        Ok(Self(value))
     }
 }
 
