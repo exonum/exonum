@@ -556,7 +556,7 @@ fn deploy_already_deployed() {
 
     // Since `RuntimeInspector` transactions skip the `start_deploy`,
     // we expect transaction to panic (`commit_service` is called within transaction body).
-    let expect_err = ErrorMatch::unexpected()
+    let expect_err = ErrorMatch::any_unexpected()
         .with_description_containing("Artifact with the given identifier is already deployed");
     assert_eq!(actual_err, expect_err);
 }

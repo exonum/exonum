@@ -228,7 +228,7 @@ impl Runtime for SampleRuntime {
                 self.new_services.insert(spec.id, new_status);
             }
         } else {
-            panic!(DispatcherError::IncorrectRuntime)
+            panic!("Incorrect runtime")
         }
     }
 
