@@ -241,6 +241,7 @@ mod tests {
         Entry, HashTag, ProofMapIndex,
     };
     use futures::sync::mpsc;
+    use pretty_assertions::assert_eq;
 
     use std::collections::BTreeMap;
 

@@ -17,6 +17,7 @@ use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFac
 use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemSchema};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};
+use pretty_assertions::{assert_eq, assert_ne};
 
 use std::{
     collections::BTreeMap,

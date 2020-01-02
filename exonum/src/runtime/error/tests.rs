@@ -14,6 +14,7 @@
 
 use exonum_merkledb::BinaryValue;
 use failure::format_err;
+use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
 use std::panic;
 
