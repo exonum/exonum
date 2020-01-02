@@ -35,7 +35,6 @@ use futures::Future;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    convert::TryInto,
     iter,
     sync::Arc,
 };
@@ -308,14 +307,8 @@ impl BlockchainMut {
         }
 
         // Save & execute transactions.
-        for (index, hash) in tx_hashes.iter().enumerate() {
-            self.execute_transaction(
-                *hash,
-                height,
-                index.try_into().unwrap(),
-                &mut fork,
-                tx_cache,
-            );
+        for (index, hash) in (0..).zip(tx_hashes.iter()) {
+            self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
 
         // During processing of the genesis block, this hook is already called in another method.
