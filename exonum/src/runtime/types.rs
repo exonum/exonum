@@ -23,6 +23,8 @@ use exonum_proto::ProtobufConvert;
 use failure::{bail, ensure, format_err};
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
+#[cfg(test)]
+use serde_json::json;
 
 use std::{
     borrow::Cow,
