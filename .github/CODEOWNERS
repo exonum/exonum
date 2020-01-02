@@ -1,42 +1,8 @@
 # Default owners for everything in the repository:
-* @aleksuss @alekseysidorov
+* @aleksuss @slowli @alekseysidorov @popzxc @Kormick
+
+# Integration python tests:
+test-suite/exonum-py-tests/* @aleksuss @alekseysidorov @popzxc @Kormick @ivan-ochc
 
 # Javascript specific changes:
 *.js @aleksuss @qvantor
-
-# Cryptography:
-components/crypto/* @aleksuss @alekseysidorov @pavel-mukhanov @slowli
-
-# MerkleDB storage:
-components/merkledb/* @aleksuss @alekseysidorov @pavel-mukhanov
-
-# Cryptocurrency examples:
-examples/cryptocurrency/* @aleksuss @alekseysidorov @popzxc
-examples/cryptocurrency-advanced/* @aleksuss @alekseysidorov @popzxc
-
-# Timestamping:
-examples/timestamping/* @aleksuss @alekseysidorov @ozkriff @popzxc
-
-# Configuration service:
-services/configuration/* @aleksuss @alekseysidorov @popzxc
-
-# Time-oracle service:
-services/time/* @aleksuss @alekseysidorov @slowli
-
-# Testkit:
-testkit/* @aleksuss @alekseysidorov @slowli
-
-# Benchmarks:
-exonum/benches/* @aleksuss @alekseysidorov @popzxc
-
-# Web api:
-exonum/src/api/* @aleksuss @alekseysidorov @popzxc
-
-# Encoding:
-exonum/src/encoding/* @aleksuss @alekseysidorov @popzxc
-
-# Events:
-exonum/src/events/* @aleksuss @alekseysidorov @pavel-mukhanov @popzxc
-
-# Node (consensus):
-exonum/src/node/* @aleksuss @alekseysidorov @slowli @popzxc
