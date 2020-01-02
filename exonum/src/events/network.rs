@@ -19,6 +19,7 @@ use futures::{
     sync::mpsc,
     unsync, Future, IntoFuture, Sink, Stream,
 };
+use log::{error, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
 use tokio_core::reactor::Handle;

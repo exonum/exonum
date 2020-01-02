@@ -264,6 +264,7 @@ pub mod error;
 
 use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
+use log::trace;
 use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};

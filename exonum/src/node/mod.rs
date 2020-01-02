@@ -37,6 +37,7 @@ use exonum_keys::Keys;
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
+use log::{info, trace};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;

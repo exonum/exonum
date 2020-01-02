@@ -14,6 +14,7 @@
 
 use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 use failure::{bail, format_err};
+use log::{error, info, trace, warn};
 
 use std::{collections::HashSet, convert::TryFrom};
 
