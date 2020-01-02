@@ -13,17 +13,15 @@
 // limitations under the License.
 
 use criterion::{black_box, Bencher, Benchmark, Criterion, Throughput};
-use exonum_derive::FromAccess;
+use exonum_derive::*;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
-
-use std::borrow::Cow;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
-    impl_object_hash_for_binary_value, BinaryValue, Database, Group, KeySetIndex, Lazy, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    Database, Group, KeySetIndex, Lazy, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+    TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -39,22 +37,12 @@ const COLD_DIVISOR: u64 = 13;
 const COLD_CHANCE: u64 = 29;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Transaction {
     value: u64,
     _payload: [u8; 32],
 }
-
-impl BinaryValue for Transaction {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
-impl_object_hash_for_binary_value! { Transaction }
 
 trait ExecuteTransaction {
     fn execute<T: Access>(fork: T, transaction: &Transaction)

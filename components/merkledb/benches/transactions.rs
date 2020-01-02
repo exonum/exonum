@@ -14,16 +14,16 @@
 
 use criterion::{AxisScale, Bencher, Criterion, PlotConfiguration, Throughput};
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
-use exonum_derive::FromAccess;
+use exonum_derive::*;
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use serde_derive::*;
 
-use std::{borrow::Cow, collections::HashMap, fmt};
+use std::{collections::HashMap, fmt};
 
 use exonum_merkledb::{
     access::{Access, FromAccess},
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    BinaryValue, Database, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex,
+    ProofMapIndex, TemporaryDB,
 };
 
 const SEED: [u8; 32] = [100; 32];
@@ -134,54 +134,28 @@ impl fmt::Display for BenchParams {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Wallet {
     incoming: u32,
     outgoing: u32,
     history_root: Hash,
 }
 
-impl BinaryValue for Wallet {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Transaction {
     sender: PublicKey,
     receiver: PublicKey,
     amount: u32,
 }
 
-impl BinaryValue for Transaction {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
-impl_object_hash_for_binary_value! { Transaction, Block, Wallet }
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Block {
     transactions: Vec<Transaction>,
-}
-
-impl BinaryValue for Block {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
 }
 
 impl Transaction {

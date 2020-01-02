@@ -12,69 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::Error;
 use serde_derive::{Deserialize, Serialize};
-
-use std::{borrow::Cow, convert::AsRef};
 
 use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
-    impl_object_hash_for_binary_value, BinaryValue, Database, Fork, Group, ListIndex, MapIndex,
-    ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
+    Database, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+    TemporaryDB,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Wallet {
     incoming: u32,
     outgoing: u32,
     history_root: Hash,
 }
 
-impl BinaryValue for Wallet {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Transaction {
     sender: PublicKey,
     receiver: PublicKey,
     amount: u32,
 }
 
-impl BinaryValue for Transaction {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
-}
-
-impl_object_hash_for_binary_value! { Transaction, Block, Wallet }
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 struct Block {
     prev_block: Hash,
     transactions: Vec<Transaction>,
-}
-
-impl BinaryValue for Block {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(From::from)
-    }
 }
 
 impl Transaction {
@@ -134,11 +105,11 @@ impl Block {
 
 fn create_user(name: &str) -> PublicKey {
     let name = name.to_string().object_hash();
-    PublicKey::from_bytes(name.as_ref().into()).unwrap()
+    PublicKey::from_slice(name.as_ref()).unwrap()
 }
 
 fn main() {
-    // Creates a database instance in the /tmp dir. It will be
+    // Creates a database instance in the temporary directory. It will be
     // removed when the DB object gets out of scope.
     let db = TemporaryDB::new();
 
