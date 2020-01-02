@@ -71,12 +71,12 @@ pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,
     /// Zero-based position of this transaction in the block.
-    position_in_block: u64,
+    position_in_block: u32,
 }
 
 impl TxLocation {
     /// Creates a new transaction location.
-    pub fn new(block_height: Height, position_in_block: u64) -> Self {
+    pub fn new(block_height: Height, position_in_block: u32) -> Self {
         Self {
             block_height,
             position_in_block,
@@ -89,7 +89,7 @@ impl TxLocation {
     }
 
     /// Zero-based position of this transaction in the block.
-    pub fn position_in_block(&self) -> u64 {
+    pub fn position_in_block(&self) -> u32 {
         self.position_in_block
     }
 }
@@ -143,7 +143,8 @@ impl<T: Access> Schema<T> {
     /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
-        if self.block_transactions(location.block_height).len() <= location.position_in_block {
+        if self.block_transactions(location.block_height).len() <= location.position_in_block as u64
+        {
             return None;
         }
 
@@ -389,7 +390,7 @@ pub enum CallInBlock {
     /// Call of a transaction within the block.
     Transaction {
         /// Zero-based transaction index.
-        index: u64,
+        index: u32,
     },
     /// Call of `after_transactions` hook in a service.
     AfterTransactions {
@@ -437,7 +438,7 @@ impl CallInBlock {
     }
 
     /// Creates a location corresponding to a transaction.
-    pub fn transaction(index: u64) -> Self {
+    pub fn transaction(index: u32) -> Self {
         CallInBlock::Transaction { index }
     }
 

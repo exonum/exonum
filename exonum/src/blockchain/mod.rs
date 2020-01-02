@@ -35,6 +35,7 @@ use futures::Future;
 
 use std::{
     collections::{BTreeMap, HashMap},
+    convert::TryInto,
     iter,
     sync::Arc,
 };
@@ -308,7 +309,13 @@ impl BlockchainMut {
 
         // Save & execute transactions.
         for (index, hash) in tx_hashes.iter().enumerate() {
-            self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
+            self.execute_transaction(
+                *hash,
+                height,
+                index.try_into().unwrap(),
+                &mut fork,
+                tx_cache,
+            );
         }
 
         // During processing of the genesis block, this hook is already called in another method.
@@ -368,7 +375,7 @@ impl BlockchainMut {
         &self,
         tx_hash: Hash,
         height: Height,
-        index: usize,
+        index: u32,
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) {
@@ -377,19 +384,17 @@ impl BlockchainMut {
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
-        let tx_result = self
-            .dispatcher
-            .execute(fork, tx_hash, index as u64, &transaction);
+        let tx_result = self.dispatcher.execute(fork, tx_hash, index, &transaction);
         let mut schema = Schema::new(&*fork);
 
         if let Err(e) = tx_result {
             schema
                 .call_errors(height)
-                .put(&CallInBlock::transaction(index as u64), e);
+                .put(&CallInBlock::transaction(index), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
-        let location = TxLocation::new(height, index as u64);
+        let location = TxLocation::new(height, index);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
     }

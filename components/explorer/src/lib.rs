@@ -656,7 +656,7 @@ impl<'a> BlockchainExplorer<'a> {
         let location_proof = self
             .schema
             .block_transactions(location.block_height())
-            .get_proof(location.position_in_block());
+            .get_proof(location.position_in_block() as u64);
 
         let block_precommits = self
             .schema

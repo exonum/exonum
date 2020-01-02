@@ -80,6 +80,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `update_service_status` now does not return a value. (#1659)
 
 - `BlockchainBuilder::build` now returns `BlockchainMut` instead of `Result`. (#1659)
+- A type for transaction position in block has been changed for `u32`. (#1668)
 
 #### exonum-cli
 

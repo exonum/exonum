@@ -30,7 +30,7 @@ use exonum_consensus_tests::{
 use exonum_merkledb::ObjectHash;
 use rand::{thread_rng, Rng};
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, convert::TryFrom};
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader
@@ -278,7 +278,10 @@ fn test_store_txs_positions() {
     let locations = schema.transactions_locations();
     for (expected_idx, hash) in hashes.iter().enumerate() {
         let location = locations.get(hash).unwrap();
-        assert_eq!(expected_idx as u64, location.position_in_block());
+        assert_eq!(
+            u32::try_from(expected_idx).unwrap(),
+            location.position_in_block()
+        );
         assert_eq!(committed_height, location.block_height());
     }
 }
