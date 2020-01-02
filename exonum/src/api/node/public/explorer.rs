@@ -18,7 +18,6 @@ use actix::Arbiter;
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, Query};
 use chrono::{DateTime, Utc};
 use exonum_merkledb::{ObjectHash, Snapshot};
-use failure::format_err;
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 
@@ -368,7 +367,7 @@ impl ExplorerApi {
             sender
                 .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|_| ApiError::InternalError(format_err!("Cannot send transaction")))
+                .map_err(ApiError::from)
         };
 
         Box::new(

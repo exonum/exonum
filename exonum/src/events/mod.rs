@@ -48,18 +48,14 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 pub struct InternalEvent(pub(crate) InternalEventInner);
 
 impl InternalEvent {
-    // FIXME: review visibility
-    #[doc(hidden)]
     pub fn jump_to_round(height: Height, round: Round) -> Self {
         InternalEvent(InternalEventInner::JumpToRound(height, round))
     }
 
-    #[doc(hidden)]
     pub fn message_verified(message: Message) -> Self {
         InternalEvent(InternalEventInner::MessageVerified(Box::new(message)))
     }
 
-    #[doc(hidden)]
     pub fn is_message_verified(&self) -> bool {
         match self {
             InternalEvent(InternalEventInner::MessageVerified(_)) => true,
