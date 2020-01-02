@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure::{bail, ensure, format_err};
 use futures::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},

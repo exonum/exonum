@@ -15,8 +15,10 @@
 //! Timestamping transactions.
 
 use exonum::runtime::{rust::CallContext, DispatcherError, ExecutionError};
+use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_time::schema::TimeSchema;
+use log::trace;
 
 use crate::{
     proto,
@@ -33,16 +35,6 @@ pub enum Error {
     TimeServiceNotFound = 1,
 }
 
-/// Timestamping transaction.
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxTimestamp")]
-pub struct TxTimestamp {
-    /// Timestamp content.
-    pub content: Timestamp,
-}
-
 /// Timestamping configuration parameters.
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
@@ -56,13 +48,13 @@ pub struct Config {
 #[exonum_interface]
 pub trait TimestampingInterface<Ctx> {
     type Output;
-    fn timestamp(&self, ctx: Ctx, arg: TxTimestamp) -> Self::Output;
+    fn timestamp(&self, ctx: Ctx, arg: Timestamp) -> Self::Output;
 }
 
 impl TimestampingInterface<CallContext<'_>> for TimestampingService {
     type Output = Result<(), ExecutionError>;
 
-    fn timestamp(&self, context: CallContext<'_>, arg: TxTimestamp) -> Self::Output {
+    fn timestamp(&self, context: CallContext<'_>, arg: Timestamp) -> Self::Output {
         let (tx_hash, _) = context
             .caller()
             .as_transaction()
@@ -72,20 +64,14 @@ impl TimestampingInterface<CallContext<'_>> for TimestampingService {
         let config = schema.config.get().expect("Can't read service config");
 
         let data = context.data();
-        let time_service_data = data
-            .for_service(config.time_service_name.as_str())
-            .ok_or(Error::TimeServiceNotFound)?;
-        let time = TimeSchema::new(time_service_data)
-            .time
-            .get()
-            .ok_or(Error::TimeServiceNotFound)?;
+        let time_schema: TimeSchema<_> = data.service_schema(config.time_service_name.as_str())?;
+        let time = time_schema.time.get().ok_or(Error::TimeServiceNotFound)?;
 
-        let hash = &arg.content.content_hash;
-        if schema.timestamps.get(hash).is_some() {
+        if schema.timestamps.get(&arg.content_hash).is_some() {
             Err(Error::HashAlreadyExists.into())
         } else {
             trace!("Timestamp added: {:?}", arg);
-            let entry = TimestampEntry::new(arg.content.clone(), tx_hash, time);
+            let entry = TimestampEntry::new(arg.clone(), tx_hash, time);
             schema.add_timestamp(entry);
             Ok(())
         }

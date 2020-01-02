@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate pretty_assertions;
-
 use exonum::{
     api::node::{
         private::NodeInfo,
@@ -23,6 +20,7 @@ use exonum::{
     helpers::user_agent,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
+use pretty_assertions::assert_eq;
 
 #[test]
 fn healthcheck() {

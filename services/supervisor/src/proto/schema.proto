@@ -18,8 +18,37 @@ package exonum.supervisor;
 
 import "types.proto";
 import "service.proto";
+import "runtime.proto";
+import "google/protobuf/empty.proto";
 
 message ConfigProposalWithHash {
     exonum.crypto.Hash propose_hash = 1;
     ConfigPropose config_propose = 2;
+}
+
+// Information about deploy error.
+message ErrorInfo {
+    // Height on which error occurred.
+    uint64 height = 1;
+    // Occurred error.
+    exonum.runtime.ExecutionError error = 2;
+}
+
+// Deployment state.
+message DeployState {
+    enum Type {
+        // Deploy is in process.
+        PENDING = 0;
+        // Deployment errored.
+        FAIL = 1;
+        // Deadline was reached.
+        TIMEOUT = 2;
+        // Deployment succeed.
+        SUCCESS = 3;
+    }
+
+    // Deploy state.
+    Type state = 1;
+    // Set only for `type == FAIL`.
+    ErrorInfo error = 2;
 }

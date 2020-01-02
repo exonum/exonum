@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
-use exonum_derive::exonum_interface;
+use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemSchema};
 use exonum_proto::ProtobufConvert;
 use futures::{sync::mpsc, Future};

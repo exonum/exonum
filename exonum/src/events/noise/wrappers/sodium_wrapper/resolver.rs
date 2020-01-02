@@ -15,6 +15,9 @@
 // spell-checker:ignore chacha, privkey, authtext, ciphertext
 
 use byteorder::{ByteOrder, LittleEndian};
+use exonum_sodiumoxide::crypto::{
+    aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
+};
 use rand::{thread_rng, CryptoRng, Error, RngCore};
 use snow::{
     params::{CipherChoice, DHChoice, HashChoice},
@@ -25,9 +28,6 @@ use snow::{
 use crate::crypto::{
     x25519, PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
     SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH,
-};
-use crate::sodiumoxide::crypto::{
-    aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
 
 #[derive(Debug, Clone, Copy, Default)]

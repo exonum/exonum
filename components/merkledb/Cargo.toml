@@ -26,7 +26,7 @@ hex = "0.4"
 leb128 = "0.2"
 num-traits = "0.2"
 rocksdb = { version = "0.12.3", default-features = false }
-rust_decimal = "1.0"
+rust_decimal = "1.0, <1.1.0" # The 1.1.0 version requires Rust 1.39+
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -54,7 +54,8 @@ harness = false
 [features]
 default = ["rocksdb_snappy", "with-protobuf"]
 long_benchmarks = []
-with-protobuf = ["protobuf", "exonum-proto"]
+with-protobuf = ["with-serde", "protobuf", "exonum-proto"]
+with-serde = []
 rocksdb_snappy = ["rocksdb/snappy"]
 rocksdb_lz4 = ["rocksdb/lz4"]
 rocksdb_zlib = ["rocksdb/zlib"]

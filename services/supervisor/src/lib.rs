@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! Supervisor is an [Exonum][exonum] service capable of the following activities:
+//!
 //! - Service artifact deployment;
 //! - Service instances creation;
 //! - Changing consensus configuration;
@@ -67,11 +68,13 @@
 )]
 
 pub use self::{
+    api::{DeployInfoQuery, DeployResponse},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
+    deploy_state::DeployState,
     errors::Error,
     proto_structures::{
-        ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployConfirmation,
-        DeployRequest, ServiceConfig, StartService, StopService, SupervisorConfig,
+        ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
+        DeployResult, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -90,12 +93,13 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 
-use crate::{configure::ConfigureMut, mode::Mode};
+use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};
 
 pub mod mode;
 
 mod api;
 mod configure;
+mod deploy_state;
 mod errors;
 mod multisig;
 mod proto;
@@ -191,7 +195,7 @@ fn update_configs(
 /// Assigns the instance ID for a new service, initializing the schema `vacant_instance_id`
 /// entry if needed.
 fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
-    let mut schema = Schema::new(context.service_data());
+    let mut schema = SchemaImpl::new(context.service_data());
     match schema.assign_instance_id() {
         Some(id) => id,
         None => {
@@ -279,15 +283,15 @@ impl Service for Supervisor {
         let config =
             SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
 
-        let mut schema = Schema::new(context.service_data());
-        schema.configuration.set(config);
+        let mut schema = SchemaImpl::new(context.service_data());
+        schema.public.configuration.set(config);
 
         Ok(())
     }
 
     fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
         // Perform a cleanup for outdated requests.
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
 
@@ -295,34 +299,38 @@ impl Service for Supervisor {
         let requests_to_remove = schema
             .pending_deployments
             .values()
-            .filter(|request| request.deadline_height < height)
+            .filter(|request| request.deadline_height <= height)
             .collect::<Vec<_>>();
 
         for request in requests_to_remove {
             schema.pending_deployments.remove(&request.artifact);
+            if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
+                // If state is marked as pending, change it to failed as well.
+                schema.deploy_states.put(&request, DeployState::Timeout);
+            }
             log::trace!("Removed outdated deployment request {:?}", request);
         }
 
-        let entry = schema.pending_proposal.get();
+        let entry = schema.public.pending_proposal.get();
         if let Some(entry) = entry {
             if entry.config_propose.actual_from <= height {
                 // Remove pending config proposal for which deadline was exceeded.
                 log::trace!("Removed outdated config proposal");
-                schema.pending_proposal.remove();
+                schema.public.pending_proposal.remove();
             }
         }
         Ok(())
     }
 
     fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
         let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
         let next_height = core_schema.next_height();
         let validator_count = core_schema.consensus_config().validator_keys.len();
 
         // Check if we should apply a new config.
-        let entry = schema.pending_proposal.get();
+        let entry = schema.public.pending_proposal.get();
         if let Some(entry) = entry {
             if entry.config_propose.actual_from == next_height {
                 // Config should be applied at the next height.
@@ -340,7 +348,7 @@ impl Service for Supervisor {
                     // If the config update will fail, this entry will be restored due to rollback.
                     // However, it won't be actual anymore and will be removed at the beginning
                     // of the next height (within `before_transactions` hook).
-                    schema.pending_proposal.remove();
+                    schema.public.pending_proposal.remove();
                     drop(schema);
 
                     // Perform the application of configs.
@@ -356,15 +364,20 @@ impl Service for Supervisor {
         let service_key = context.service_key();
 
         let deployments: Vec<_> = {
-            let schema = Schema::new(context.service_data());
+            let schema = SchemaImpl::new(context.service_data());
             schema
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    let confirmation = DeployConfirmation::from(request.clone());
-                    !schema
-                        .deploy_confirmations
-                        .confirmed_by(&confirmation, &service_key)
+                    if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
+                        // From all pending requests we are interested only in ones not
+                        // confirmed by us.
+                        !schema
+                            .deploy_confirmations
+                            .confirmed_by(&request, &service_key)
+                    } else {
+                        false
+                    }
                 })
                 .collect()
         };
@@ -377,15 +390,12 @@ impl Service for Supervisor {
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             // We should deploy the artifact for all nodes, but send confirmations only
             // if the node is a validator.
-            extensions.start_deploy(artifact, spec, move || {
+            extensions.start_deploy(artifact, spec, move |result| {
                 if let Some(tx_sender) = tx_sender {
-                    log::trace!(
-                        "Sending confirmation for deployment request {:?}",
-                        unconfirmed_request
-                    );
-                    let confirmation = DeployConfirmation::from(unconfirmed_request);
+                    log::trace!("Sending deployment result report {:?}", unconfirmed_request);
+                    let confirmation = DeployResult::new(unconfirmed_request, result);
                     if let Err(e) = tx_sender.confirm_artifact_deploy((), confirmation) {
-                        log::error!("Cannot send confirmation: {}", e);
+                        log::error!("Cannot send `DeployResult`: {}", e);
                     }
                 }
                 Ok(())
@@ -415,10 +425,8 @@ impl Configure for Supervisor {
         context: CallContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_data());
-
-        schema.configuration.set(params);
-
+        let mut schema = SchemaImpl::new(context.service_data());
+        schema.public.configuration.set(params);
         Ok(())
     }
 }

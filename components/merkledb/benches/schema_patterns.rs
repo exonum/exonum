@@ -21,7 +21,7 @@ use std::borrow::Cow;
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessExt, Prefixed, RawAccessMut},
+    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
     impl_object_hash_for_binary_value, BinaryValue, Database, Group, KeySetIndex, Lazy, MapIndex,
     ObjectHash, ProofListIndex, ProofMapIndex, TemporaryDB,
 };
@@ -76,6 +76,12 @@ struct EagerSchema<T: Access> {
     other_cold_index: KeySetIndex<T::Base, u64>,
 }
 
+impl<T: Access> EagerSchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
+}
+
 impl<T: Access> EagerSchema<T>
 where
     T::Base: RawAccessMut,
@@ -128,6 +134,12 @@ struct LazySchema<T: Access> {
     // groups are already lazy
     cold_group: Group<T, u64, ProofListIndex<T::Base, u64>>,
     other_cold_index: Lazy<T, KeySetIndex<T::Base, u64>>,
+}
+
+impl<T: Access> LazySchema<T> {
+    fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
 }
 
 impl<T: Access> LazySchema<T>

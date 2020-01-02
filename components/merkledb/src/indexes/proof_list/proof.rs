@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
+
 use exonum_crypto::Hash;
+use failure::Fail;
 use serde_derive::*;
 
 use std::cmp::Ordering;
 
 use super::{key::ProofListKey, tree_height_by_length};
 use crate::{BinaryValue, HashTag};
-
-pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 #[cfg(feature = "with-protobuf")]
 use crate::{proto, ProtobufConvert};
