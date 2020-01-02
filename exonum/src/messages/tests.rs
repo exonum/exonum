@@ -15,6 +15,7 @@
 use chrono::Utc;
 use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
+use pretty_assertions::assert_eq;
 use protobuf::Message as PbMessage;
 
 use std::convert::TryFrom;

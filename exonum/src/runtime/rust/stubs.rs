@@ -133,6 +133,7 @@ mod explanation {
     use super::*;
     use exonum_crypto::gen_keypair;
     use exonum_merkledb::BinaryValue;
+    use pretty_assertions::assert_eq;
 
     // Suppose we have the following trait describing user service.
     trait Token<Ctx> {
