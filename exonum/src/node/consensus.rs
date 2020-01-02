@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
+use failure::{bail, format_err};
 
 use std::{collections::HashSet, convert::TryFrom};
 

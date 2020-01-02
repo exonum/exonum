@@ -16,6 +16,7 @@
 
 use bit_vec::BitVec;
 use exonum_merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
+use failure::bail;
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},

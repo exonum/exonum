@@ -59,7 +59,7 @@ pub(crate) use self::state::SharedConnectList;
 
 use exonum_keys::Keys;
 use exonum_merkledb::{Database, ObjectHash};
-use failure::Error;
+use failure::{ensure, format_err, Error, Fail};
 use futures::{sync::mpsc, Future, Sink};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;

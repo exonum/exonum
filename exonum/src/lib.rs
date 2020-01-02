@@ -44,8 +44,6 @@
 extern crate pretty_assertions;
 pub use exonum_merkledb;
 #[macro_use]
-extern crate failure;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
