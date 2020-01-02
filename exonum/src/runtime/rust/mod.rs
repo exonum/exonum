@@ -589,10 +589,14 @@ impl Runtime for RustRuntime {
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         match status {
             InstanceStatus::Active => {
-                let instance = self.new_service(spec)?;
+                let instance = self.new_service(spec).expect(
+                    "BUG: Attempt to create a new service instance failed; \
+                     within `instantiate_adding_service` we were able to create a new instance, \
+                     but now we are not.",
+                );
                 self.add_started_service(instance);
             }
 
@@ -601,7 +605,6 @@ impl Runtime for RustRuntime {
             }
         }
         self.changed_services_since_last_block = true;
-        Ok(())
     }
 
     fn execute(

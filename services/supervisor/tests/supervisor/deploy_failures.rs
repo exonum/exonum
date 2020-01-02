@@ -125,7 +125,7 @@ mod failing_runtime {
             _snapshot: &dyn Snapshot,
             _spec: &InstanceSpec,
             _status: InstanceStatus,
-        ) -> Result<(), ExecutionError> {
+        ) {
             unimplemented!("This runtime does not support service instantiation");
         }
 

@@ -718,7 +718,7 @@ impl Fork {
     }
 
     /// Finishes a migration of indexes with the specified prefix.
-    pub fn flush_migration(&mut self, prefix: &str) {
+    pub(crate) fn flush_migration(&mut self, prefix: &str) {
         assert_valid_name_component(prefix);
 
         // Mutable `self` reference ensures that no indexes are instantiated in the client code.
@@ -753,7 +753,7 @@ impl Fork {
 
     /// Rolls back the migration with the specified name. This will remove all indexes
     /// within the migration.
-    pub fn rollback_migration(&mut self, prefix: &str) {
+    pub(crate) fn rollback_migration(&mut self, prefix: &str) {
         assert_valid_name_component(prefix);
         self.flush();
         SystemSchema::new(&*self).remove_namespace(prefix);

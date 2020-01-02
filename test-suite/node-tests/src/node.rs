@@ -20,7 +20,7 @@ use exonum::{
     merkledb::{Database, TemporaryDB},
     node::{ApiSender, ExternalMessage, Node, NodeConfig},
     runtime::{
-        rust::{AfterCommitContext, Service, ServiceFactory},
+        rust::{AfterCommitContext, RustRuntime, Service, ServiceFactory},
         RuntimeInstance,
     },
 };
@@ -31,11 +31,9 @@ use tokio_core::reactor::Core;
 
 use std::{
     sync::{Arc, Mutex},
-    thread::{self},
+    thread,
     time::Duration,
 };
-
-use exonum::runtime::rust::RustRuntime;
 
 #[derive(Debug)]
 struct RunHandle {

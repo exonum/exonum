@@ -125,8 +125,7 @@ impl Runtime for TestRuntime {
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
         _status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
+    ) {
     }
 
     fn execute(

@@ -23,6 +23,9 @@
 //! they behave like indexes in other regards. For example, it is impossible to create a tombstone
 //! and then create an ordinary index at the same address, or vice versa.
 //!
+//! A migration can also store temporary data in a [`Scratchpad`]. This data will be removed
+//! when the migration is finalized.
+//!
 //! Indexes created within a migration are not [aggregated] in the default state hash. Instead,
 //! they are placed in a separate namespace, the aggregator and state hash for which can be
 //! obtained via respective [`Migration`] methods.
@@ -30,27 +33,31 @@
 //! It is possible to periodically persist migrated data to the database
 //! (indeed, this is a best practice to avoid out-of-memory errors). It is even possible
 //! to restart the process handling the migration, provided it can recover from such a restart
-//! on the application level.
+//! on the application level. To assist with fault tolerance, use [persistent iterators].
 //!
 //! # Finalizing Migration
 //!
-//! To finalize a migration, one needs to call [`Fork::flush_migration`]. This will replace
+//! To finalize a migration, one needs to call [`flush_migration`]. This will replace
 //! old index data with new, remove indexes marked with tombstones, and return migrated indexes
-//! to the default state aggregator. To roll back a migration, use [`Fork::rollback_migration`].
-//! This will remove the new index data and corresponding metadata.
+//! to the default state aggregator. To roll back a migration,
+//! use [`rollback_migration`]. This will remove the new index data and corresponding metadata.
+//! Both `flush_migration` and `rollback_migration` will remove the `Scratchpad` associated
+//! with the migration.
 //!
 //! [`Migration`]: struct.Migration.html
 //! [`Prefixed`]: ../access/struct.Prefixed.html
 //! [`create_tombstone`]: struct.Migration.html#method.create_tombstone
+//! [`Scratchpad`]: struct.Scratchpad.html
 //! [aggregated]: ../index.html#state-aggregation
-//! [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
-//! [`Fork::rollback_migration`]: ../struct.Fork.html#method.rollback_migration
+//! [persistent iterators]: struct.PersistentIter.html
+//! [`flush_migration`]: fn.flush_migration.html
+//! [`rollback_migration`]: fn.rollback_migration.html
 //!
 //! # Examples
 //!
 //! ```
 //! # use exonum_merkledb::{access::AccessExt, Database, SystemSchema, TemporaryDB};
-//! # use exonum_merkledb::migration::{Migration, MigrationHelper};
+//! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
 //! # fn main() -> exonum_merkledb::Result<()> {
 //! let db = Arc::new(TemporaryDB::new());
@@ -100,7 +107,7 @@
 //!
 //! // The migration can be committed as follows.
 //! let mut fork = db.fork();
-//! fork.flush_migration("test");
+//! flush_migration(&mut fork, "test");
 //! db.merge(fork.into_patch())?;
 //! let snapshot = db.snapshot();
 //! assert_eq!(snapshot.get_proof_list::<_, u32>("test.list").len(), 3);
@@ -112,20 +119,28 @@
 //! # }
 //! ```
 
+pub use self::persistent_iter::{ContinueIterator, PersistentIter, PersistentIters};
+
 use exonum_crypto::Hash;
 
 use std::{fmt, mem, sync::Arc};
 
+use crate::validation::check_index_valid_full_name;
 use crate::views::IndexMetadata;
 use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
     validation::assert_valid_name_component,
     views::{
-        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexType, RawAccessMut,
-        ViewWithMetadata,
+        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexType, IndexesPool,
+        RawAccessMut, View, ViewWithMetadata,
     },
     BinaryKey, Database, Fork, ObjectHash, ProofMapIndex, ReadonlyFork,
 };
+
+mod persistent_iter;
+
+/// Name of the column family used to store `Scratchpad`s.
+const SCRATCHPAD_NAME: &str = "__scratchpad__";
 
 /// Access to migrated indexes.
 ///
@@ -203,7 +218,7 @@ impl<T: RawAccess> Access for Migration<'_, T> {
     type Base = T;
 
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
-        let mut prefixed_addr = addr.prepend_name(self.namespace.as_ref());
+        let mut prefixed_addr = addr.prepend_name(self.namespace);
         prefixed_addr.set_in_migration();
         self.access.get_index_metadata(prefixed_addr)
     }
@@ -213,7 +228,7 @@ impl<T: RawAccess> Access for Migration<'_, T> {
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        let mut prefixed_addr = addr.prepend_name(self.namespace.as_ref());
+        let mut prefixed_addr = addr.prepend_name(self.namespace);
         prefixed_addr.set_in_migration();
         self.access.get_or_create_view(prefixed_addr, index_type)
     }
@@ -229,9 +244,128 @@ impl<T: RawAccess> Access for Migration<'_, T> {
     }
 }
 
+/// Access to temporary data that can be used during migration. The scratchpad is cleared
+/// at the end of the migration, regardless of whether the migration is successful.
+///
+/// Like `Migration`s, `Scratchpad`s are separated via namespaces. Scratchpads are optimized
+/// for small amounts of data per index. Indexes in a `Scratchpad` are not aggregated into
+/// the overall database state or the migration state.
+#[derive(Debug, Clone, Copy)]
+pub struct Scratchpad<'a, T> {
+    access: T,
+    namespace: &'a str,
+}
+
+impl<'a, T: RawAccess> Scratchpad<'a, T> {
+    /// Creates a scratchpad in the specified namespace.
+    pub fn new(namespace: &'a str, access: T) -> Self {
+        Self { namespace, access }
+    }
+
+    fn get_scratchpad_addr(&self, addr: IndexAddress) -> IndexAddress {
+        let prefixed_addr = addr.prepend_name(self.namespace);
+        IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.fully_qualified_name())
+    }
+
+    fn get_scratchpad_prefix(&self, addr: IndexAddress) -> IndexAddress {
+        let prefixed_addr = addr.prepend_name(self.namespace);
+        IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.qualified_prefix())
+    }
+}
+
+impl<T: RawAccessMut> Scratchpad<'_, T> {
+    /// Removes all indexes and their data from the scratchpad.
+    ///
+    /// # Panics
+    ///
+    /// This operation will panic if any of the removed indexes are borrowed.
+    fn clear(&self) {
+        let addr = self.get_scratchpad_addr(IndexAddress::default());
+        let addr = addr.append_key(&b'.');
+        let removed = IndexesPool::new(self.access.clone()).remove_indexes(&addr);
+        for resolved_addr in removed {
+            View::new(self.access.clone(), resolved_addr).clear();
+        }
+    }
+}
+
+impl<T: RawAccess> Access for Scratchpad<'_, T> {
+    type Base = T;
+
+    fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
+        let addr = self.get_scratchpad_addr(addr);
+        Ok(ViewWithMetadata::get_metadata_unchecked(self.access, &addr))
+    }
+
+    fn get_or_create_view(
+        self,
+        addr: IndexAddress,
+        index_type: IndexType,
+    ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
+        // Since we transform the address into `id_in_group`, we need to ensure that addresses
+        // cannot alias each other. We do this by running the sanity check on the original address.
+        if let Err(kind) = check_index_valid_full_name(addr.name()) {
+            return Err(AccessError { addr, kind });
+        }
+        let addr = self.get_scratchpad_addr(addr);
+        ViewWithMetadata::get_or_create_unchecked(self.access, &addr, index_type)
+    }
+
+    fn group_keys<K>(self, base_addr: IndexAddress) -> GroupKeys<Self::Base, K>
+    where
+        K: BinaryKey + ?Sized,
+        Self::Base: AsReadonly<Readonly = Self::Base>,
+    {
+        let base_addr = self.get_scratchpad_prefix(base_addr);
+        self.access.group_keys(base_addr)
+    }
+}
+
 /// Migration helper.
 ///
-/// See the [module docs](index.html) for examples of usage.
+/// # Examples
+///
+/// See the [module docs](index.html) for a basic example of usage.
+///
+/// ## Using persistent iterators
+///
+/// `MigrationHelper` offers the [`iter_loop`](#method.iter_loop) method, which allows to further
+/// simplify working with [persistent iterators].
+///
+/// Say we want to migrate `MapIndex` data to a `ProofMapIndex` while merging changes to the DB
+/// from time to time. To do this, we use the following script:
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
+/// # use exonum_merkledb::migration::MigrationHelper;
+/// # fn main() -> exonum_merkledb::Result<()> {
+/// /// Number of accounts processed per DB merge.
+/// const CHUNK_SIZE: usize = 100;
+///
+/// let db = TemporaryDB::new();
+/// let mut helper = MigrationHelper::new(db, "test");
+/// helper.iter_loop(|helper, iters| {
+///     // The data before migration is stored in this map
+///     let old_map = helper.old_data().get_map::<_, str, u64>("wallets");
+///     // ...and the new data is in this merkelized map.
+///     let mut new_map = helper.new_data().get_proof_map::<_, str, u64>("wallets");
+///
+///     // Create an iterator over the old data.
+///     let iter = iters.create("wallets", &old_map);
+///     // Take a fixed amount of records from the iterator and migrate them.
+///     // Since `iter` is persistent, it will not return the same record twice,
+///     // even if this script is restarted.
+///     for (name, balance) in iter.take(CHUNK_SIZE) {
+///         new_map.put(&name, balance);
+///     }
+/// })?;
+/// // Here, the iterator has run out of items. The script can now perform
+/// // other actions if necessary.
+/// # Ok(())
+/// # }
+/// ```
+///
+/// [persistent iterators]: struct.PersistentIter.html
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
     fork: Fork,
@@ -266,18 +400,23 @@ impl MigrationHelper {
         Migration::new(&self.namespace, &self.fork)
     }
 
+    /// Returns the scratchpad for temporary data to use during migration.
+    pub fn scratchpad(&self) -> Scratchpad<'_, &Fork> {
+        Scratchpad::new(&self.namespace, &self.fork)
+    }
+
     /// Returns readonly access to the old version of migrated data.
     pub fn old_data(&self) -> Prefixed<'_, ReadonlyFork<'_>> {
         Prefixed::new(&self.namespace, self.fork.readonly())
     }
 
-    /// Merges the changes to the migrated data to the database. Returns an error
+    /// Merges the changes to the migrated data and the scratchpad to the database. Returns an error
     /// if the merge has failed.
     ///
     /// `merge` does not flush the migration; the migrated data remains in a separate namespace.
-    /// Use [`Fork::flush_migration`] to flush the migrated data.
+    /// Use [`flush_migration`] to flush the migrated data.
     ///
-    /// [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
+    /// [`flush_migration`]: fn.flush_migration.html
     pub fn merge(&mut self) -> crate::Result<()> {
         let fork = mem::replace(&mut self.fork, self.db.fork());
         self.db.merge(fork.into_patch())?;
@@ -285,18 +424,61 @@ impl MigrationHelper {
         Ok(())
     }
 
-    /// Merges the changes to the migrated data to the database.
+    /// Executes the provided closure in a loop until all persistent iterators instantiated
+    /// within the closure have ended. After each iteration, the changes in migrated data are
+    /// merged to the database; an error is returned if this merge fails.
+    ///
+    /// If no iterators are instantiated within the closure, a single iteration will be performed.
+    pub fn iter_loop(
+        &mut self,
+        mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<'_, &Fork>>),
+    ) -> crate::Result<()> {
+        let mut should_break = false;
+        while !should_break {
+            let mut iterators = PersistentIters::new(self.scratchpad());
+            step(self, &mut iterators);
+            should_break = iterators.all_ended();
+            self.merge()?;
+        }
+        Ok(())
+    }
+
+    /// Merges the changes to the migrated data and the migration scratchpad to the database.
     /// Returns hash representing migrated data state, or an error if the merge has failed.
     ///
     /// `finish` does not flush the migration; the migrated data remains in a separate namespace.
-    /// Use [`Fork::flush_migration`] to flush the migrated data.
+    /// Use [`flush_migration`] to flush the migrated data.
     ///
-    /// [`Fork::flush_migration`]: ../struct.Fork.html#method.flush_migration
+    /// [`flush_migration`]: fn.flush_migration.html
     pub fn finish(self) -> crate::Result<Hash> {
         let patch = self.fork.into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
         self.db.merge(patch).map(|()| hash)
     }
+}
+
+/// Flushes the migration to the fork. Once the `fork` is merged, the migration is complete.
+///
+/// The following operations will be performed:
+///
+/// - Migrated indexes will replace their old versions
+/// - Migrated indexes will be aggregated in the default namespace
+/// - Indexes marked with tombstones will be removed
+/// - Scratchpad associated with the migration will be cleared
+pub fn flush_migration(fork: &mut Fork, namespace: &str) {
+    fork.flush_migration(namespace);
+    Scratchpad::new(namespace, &*fork).clear();
+}
+
+/// Rolls back the migration.
+///
+/// The following operations will be performed:
+///
+/// - Migrated indexes will be erased (both data and metadata)
+/// - Scratchpad associated with the migration will be cleared
+pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
+    fork.rollback_migration(namespace);
+    Scratchpad::new(namespace, &*fork).clear();
 }
 
 #[cfg(test)]
@@ -306,6 +488,8 @@ mod tests {
         access::{AccessExt, RawAccess},
         HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
+
+    use std::{collections::HashMap, iter::FromIterator};
 
     #[test]
     fn in_memory_migration() {
@@ -595,5 +779,166 @@ mod tests {
         let mut new_entry = helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(1);
         assert_eq!(old_entry.get(), None);
+    }
+
+    #[test]
+    fn scratchpad_basics() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let scratchpad = Scratchpad::new("test", &fork);
+        scratchpad.get_entry("entry").set(1_u8);
+        assert_eq!(scratchpad.get_entry::<_, u8>("entry").get(), Some(1));
+
+        // Check entry address.
+        {
+            let addr: IndexAddress = (SCRATCHPAD_NAME, "test.entry").into();
+            let view =
+                ViewWithMetadata::get_or_create_unchecked(&fork, &addr, IndexType::Entry).unwrap();
+            let (view, _) = view.into_parts::<()>();
+            assert_eq!(view.get::<_, u8>(&()), Some(1));
+        }
+
+        scratchpad.get_list("list").extend(vec![2_u32, 3]);
+
+        // Check that info persists to `Patch`es and `Snapshot`s.
+        let patch = fork.into_patch();;
+        let scratchpad = Scratchpad::new("test", &patch);
+        let list = scratchpad.get_list::<_, u32>("list");
+        assert_eq!(list.len(), 2);
+        assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
+        db.merge(patch).unwrap();
+        let snapshot = db.snapshot();
+        let scratchpad = Scratchpad::new("test", &snapshot);
+        let list = scratchpad.get_list::<_, u32>("list");
+        assert_eq!(list.len(), 2);
+        assert_eq!(list.iter().collect::<Vec<_>>(), vec![2, 3]);
+    }
+
+    #[test]
+    fn scratchpad_address_resolution() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let scratchpad = Scratchpad::new("test", &fork);
+        scratchpad.get_entry(("entry", &5_u32)).set(1_u8);
+
+        let addr: IndexAddress = (SCRATCHPAD_NAME, &b"test.entry\0\0\0\0\x05"[..]).into();
+        let view =
+            ViewWithMetadata::get_or_create_unchecked(&fork, &addr, IndexType::Entry).unwrap();
+        let (view, _) = view.into_parts::<()>();
+        assert_eq!(view.get::<_, u8>(&()), Some(1));
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid characters used in name")]
+    fn scratchpad_invalid_address() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let scratchpad = Scratchpad::new("test", &fork);
+        scratchpad.get_entry("entry\0key").set(1_u8);
+    }
+
+    #[test]
+    fn clearing_scratchpad() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let scratchpad = Scratchpad::new("test", &fork);
+        scratchpad.get_entry("entry").set(1_u8);
+        scratchpad
+            .get_proof_entry(("other_entry", &1_u32))
+            .set("!!".to_owned());
+        scratchpad.get_list("list").extend(vec![1, 2, 3]);
+        scratchpad.clear();
+
+        let scratchpad = Scratchpad::new("test", &fork);
+        assert_eq!(scratchpad.index_type("entry"), None);
+        assert_eq!(scratchpad.index_type(("other_entry", &1_u32)), None);
+        assert_eq!(scratchpad.index_type("list"), None);
+
+        let mut list = scratchpad.get_proof_list::<_, u32>("list");
+        assert!(list.is_empty());
+        assert_eq!(list.object_hash(), HashTag::empty_list_hash());
+        list.extend(vec![1, 2, 3]);
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn clearing_scratchpad_does_not_influence_other_scratchpads() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let scratchpad = Scratchpad::new("test", &fork);
+        scratchpad.get_entry("entry").set(1_u8);
+        scratchpad.get_list("list").extend(vec![1, 2, 3]);
+        let other_scratchpad = Scratchpad::new("test_", &fork);
+        other_scratchpad.get_proof_entry("entry").set(2_u8);
+
+        scratchpad.clear();
+        let other_scratchpad = Scratchpad::new("test_", &fork);
+        assert_eq!(
+            other_scratchpad.get_proof_entry::<_, u8>("entry").get(),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn scratchpad_is_cleared_after_migration() {
+        let db = Arc::new(TemporaryDB::new());
+        let mut helper = MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test");
+        helper.scratchpad().get_entry("entry").set(1_u8);
+        helper.merge().unwrap();
+        assert_eq!(
+            helper.scratchpad().get_entry::<_, u8>("entry").get(),
+            Some(1)
+        );
+
+        let mut fork = db.fork();
+        flush_migration(&mut fork, "test");
+        assert_eq!(Scratchpad::new("test", &fork).index_type("entry"), None);
+
+        let helper = MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test");
+        helper.scratchpad().get_entry("entry").set(1_u8);
+        rollback_migration(&mut fork, "test");
+        assert_eq!(Scratchpad::new("test", &fork).index_type("entry"), None);
+    }
+
+    #[test]
+    fn loop_iter_simple() -> crate::Result<()> {
+        const CHUNK_SIZE: usize = 2;
+        const DATA: &[(&str, u64)] = &[
+            ("Alice", 100),
+            ("Bob", 75),
+            ("Carol", 11),
+            ("Dave", 99),
+            ("Eve", 42),
+        ];
+
+        let db = TemporaryDB::new();
+        // Create initial data for migration.
+        let fork = db.fork();
+        {
+            let mut map = fork.get_map("test.balances");
+            for &(name, balance) in DATA {
+                map.put(name, balance);
+            }
+        }
+        db.merge(fork.into_patch())?;
+
+        let mut helper = MigrationHelper::new(db, "test");
+        helper.iter_loop(|helper, iters| {
+            let balances = helper.old_data().get_map::<_, str, u64>("balances");
+            let mut new_balances = helper.new_data().get_proof_map::<_, str, u64>("balances");
+            for (name, balance) in iters.create("balances", &balances).take(CHUNK_SIZE) {
+                new_balances.put(&name, balance + 10);
+            }
+        })?;
+
+        // Check the data after migration.
+        let old_balances: HashMap<_, _> = HashMap::from_iter(DATA.iter().copied());
+        let new_balances = helper.new_data().get_proof_map::<_, str, u64>("balances");
+        for (name, balance) in &new_balances {
+            assert_eq!(balance, old_balances[&name.as_str()] + 10);
+        }
+
+        Ok(())
     }
 }
