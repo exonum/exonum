@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use futures::{sync::mpsc, Future, Sink, Stream};
+use pretty_assertions::assert_eq;
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 

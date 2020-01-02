@@ -16,6 +16,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
+use pretty_assertions::assert_eq;
 use semver::Version;
 
 use std::{

@@ -240,6 +240,7 @@ mod tests {
         access::{Access, AccessExt, FromAccess},
         Entry, HashTag, ProofMapIndex,
     };
+    use pretty_assertions::assert_eq;
 
     use std::collections::BTreeMap;
 
