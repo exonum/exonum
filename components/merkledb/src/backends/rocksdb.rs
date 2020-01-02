@@ -16,7 +16,7 @@
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use crossbeam::sync::ShardedLock;
+use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
 use rocksdb::{
     self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
 };
@@ -108,17 +108,13 @@ impl RocksDB {
     ///
     /// [RocksDB docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
-        let checkpoint = Checkpoint::new(&*self.db.read().expect("Couldn't get read lock to DB"))?;
+        let checkpoint = Checkpoint::new(&*self.get_lock_guard())?;
         checkpoint.create_checkpoint(path)?;
         Ok(())
     }
 
     fn cf_exists(&self, cf_name: &str) -> bool {
-        self.db
-            .read()
-            .expect("Couldn't get read lock to DB")
-            .cf_handle(cf_name)
-            .is_some()
+        self.get_lock_guard().cf_handle(cf_name).is_some()
     }
 
     fn create_cf(&self, cf_name: &str) -> crate::Result<()> {
@@ -129,6 +125,10 @@ impl RocksDB {
             .map_err(Into::into)
     }
 
+    fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+        self.db.read().expect("Couldn't get read lock to DB")
+    }
+
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
         for (resolved, changes) in patch.into_changes() {
@@ -136,7 +136,7 @@ impl RocksDB {
                 self.create_cf(&resolved.name)?;
             }
 
-            let db_reader = self.db.read().expect("Couldn't get read lock to DB");
+            let db_reader = self.get_lock_guard();
             let cf = db_reader.cf_handle(&resolved.name).unwrap();
 
             if changes.is_cleared() {
@@ -171,9 +171,7 @@ impl RocksDB {
             }
         }
 
-        self.db
-            .read()
-            .expect("Couldn't get read lock to DB")
+        self.get_lock_guard()
             .write_opt(batch, w_opts)
             .map_err(Into::into)
     }
@@ -199,31 +197,24 @@ impl RocksDB {
         RocksDBSnapshot {
             // SAFETY:
             // The snapshot carries an `Arc` to the database to make sure that database
-            // is not dropped before the snapshot.
-            snapshot: unsafe {
-                mem::transmute(
-                    self.db
-                        .read()
-                        .expect("Couldn't get read lock to DB")
-                        .snapshot(),
-                )
-            },
+            // is not dropped before the snapshot. We don't care about changes in the database
+            // after taking a snapshot which could occur from another threads.
+            snapshot: unsafe { mem::transmute(self.get_lock_guard().snapshot()) },
             db: Arc::clone(&self.db),
         }
     }
 }
 
 impl RocksDBSnapshot {
+    fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+        self.db.read().expect("Couldn't get read lock to DB")
+    }
+
     fn rocksdb_iter(&self, name: &ResolvedAddress, from: &[u8]) -> RocksDBIterator<'_> {
         use rocksdb::{Direction, IteratorMode};
 
         let from = name.keyed(from);
-        let iter = match self
-            .db
-            .read()
-            .expect("Couldn't get read lock to DB")
-            .cf_handle(&name.name)
-        {
+        let iter = match self.get_lock_guard().cf_handle(&name.name) {
             Some(cf) => self
                 .snapshot
                 .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward))
@@ -259,12 +250,7 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self
-            .db
-            .read()
-            .expect("Couldn't get read lock to DB")
-            .cf_handle(&resolved_addr.name)
-        {
+        if let Some(cf) = self.get_lock_guard().cf_handle(&resolved_addr.name) {
             match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
                 Ok(value) => value.map(|v| v.to_vec()),
                 Err(e) => panic!(e),
