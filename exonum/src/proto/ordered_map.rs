@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ use crate::proto;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::ensure;
 use protobuf::Message;
 
 use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};

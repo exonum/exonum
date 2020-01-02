@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
 
 //! Module that contains Protobuf messages used by Exonum.
 
-use failure::Error;
-
 pub use self::ordered_map::OrderedMap;
 pub use self::schema::{
     blockchain::{Block, CallInBlock, TxLocation},
@@ -28,8 +26,10 @@ pub use self::schema::{
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 
-use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
+use failure::{ensure, Error};
+
+use crate::helpers::{Height, Round, ValidatorId};
 
 mod ordered_map;
 pub mod schema;

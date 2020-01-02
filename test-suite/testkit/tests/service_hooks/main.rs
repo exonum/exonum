@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 // HACK: Silent "dead_code" warning.
 pub use crate::hooks::{AfterCommitInterface, AfterCommitService, SERVICE_ID, SERVICE_NAME};
 
-use exonum::helpers::Height;
+use exonum::{helpers::Height, runtime::rust::RustRuntime};
 use exonum_explorer::BlockchainExplorer;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_testkit::TestKitBuilder;
@@ -94,8 +94,8 @@ fn restart_testkit() {
     assert_eq!(stopped.height(), Height(5));
     assert_eq!(stopped.network().validators().len(), 3);
     let service = AfterCommitService::new();
-    let runtime = stopped.rust_runtime().with_factory(service.clone());
-    let mut testkit = stopped.resume(vec![runtime]);
+    let rust_runtime = RustRuntime::builder().with_factory(service.clone());
+    let mut testkit = stopped.resume(rust_runtime);
     for _ in 0..3 {
         testkit.create_block();
     }
@@ -144,10 +144,8 @@ fn tx_pool_is_retained_on_restart() {
         .collect();
 
     let stopped = testkit.stop();
-    let runtime = stopped
-        .rust_runtime()
-        .with_factory(AfterCommitService::new());
-    let testkit = stopped.resume(vec![runtime]);
+    let rust_runtime = RustRuntime::builder().with_factory(AfterCommitService::new());
+    let testkit = stopped.resume(rust_runtime);
     assert!(tx_hashes
         .iter()
         .all(|tx_hash| testkit.is_tx_in_pool(tx_hash)));

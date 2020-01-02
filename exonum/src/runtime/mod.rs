@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -158,6 +158,7 @@ pub use self::{
 pub use error::execution_error as execution_error_serde;
 #[macro_use]
 pub mod rust;
+pub mod migrations;
 pub mod versioning;
 
 use futures::Future;

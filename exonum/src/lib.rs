@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,12 +39,7 @@
 //     clippy::default_trait_access,
 // )]
 
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
 pub use exonum_merkledb;
-#[macro_use]
-extern crate failure;
 #[macro_use]
 extern crate log;
 #[macro_use]

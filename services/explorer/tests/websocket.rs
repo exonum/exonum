@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ use exonum::{
     merkledb::{ObjectHash, TemporaryDB},
     node::{ApiSender, ExternalMessage, Node},
     runtime::{
-        rust::{DefaultInstance, ServiceFactory},
+        rust::{DefaultInstance, RustRuntime, ServiceFactory},
         RuntimeInstance,
     },
 };
@@ -47,8 +47,8 @@ use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
 
 #[derive(Debug)]
 struct RunHandle {
-    pub node_thread: thread::JoinHandle<()>,
-    pub api_tx: ApiSender,
+    node_thread: thread::JoinHandle<()>,
+    api_tx: ApiSender,
 }
 
 fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
@@ -66,12 +66,14 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
         .with_artifact(CounterService.artifact_id())
         .with_instance(CounterService.default_instance())
         .build();
-    let services = vec![ExplorerFactory.into(), CounterService.into()];
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(ExplorerFactory)
+        .with_factory(CounterService);
 
     let node = Node::new(
         TemporaryDB::new(),
+        rust_runtime,
         external_runtimes,
-        services,
         node_cfg,
         genesis_config,
         None,

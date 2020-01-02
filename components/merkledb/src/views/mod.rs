@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 pub use self::{
     address::{IndexAddress, ResolvedAddress},
     metadata::{
-        get_object_hash, BinaryAttribute, IndexMetadata, IndexState, IndexType, IndexesPool,
-        ViewWithMetadata,
+        get_object_hash, BinaryAttribute, GroupKeys, IndexMetadata, IndexState, IndexType,
+        IndexesPool, ViewWithMetadata,
     },
     system_schema::{get_state_aggregator, SystemSchema},
 };

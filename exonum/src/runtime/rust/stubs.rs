@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -133,6 +133,7 @@ mod explanation {
     use super::*;
     use exonum_crypto::gen_keypair;
     use exonum_merkledb::BinaryValue;
+    use pretty_assertions::assert_eq;
 
     // Suppose we have the following trait describing user service.
     trait Token<Ctx> {

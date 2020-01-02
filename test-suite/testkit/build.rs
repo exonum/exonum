@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,11 @@ fn main() {
                 ProtoSources::Crypto,
             ],
             "currency_example_protobuf_mod.rs",
+        ),
+        (
+            "tests/migrations/proto",
+            vec!["tests/migrations/proto".into()],
+            "migrations_protobuf_mod.rs",
         ),
         (
             "tests/runtime_api/proto",

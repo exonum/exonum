@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
+use pretty_assertions::assert_eq;
 
 use std::{borrow::Cow, collections::HashMap};
 
