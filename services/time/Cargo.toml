@@ -16,13 +16,13 @@ description = "The time oracle service for Exonum."
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-chrono = { version = "0.4.6", features = ["serde"] }
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 
+chrono = { version = "0.4.6", features = ["serde"] }
 failure = "0.1.5"
 serde = "1.0"
 serde_derive = "1.0"
@@ -33,6 +33,8 @@ protobuf = "2.8.0"
 exonum-supervisor = { version = "0.13.0-rc.2", path = "../supervisor" }
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
 exonum-cli = { version = "0.13.0-rc.2", path = "../../cli" }
+
+bincode = "1.2.1"
 pretty_assertions = "0.6.1"
 
 [build-dependencies]

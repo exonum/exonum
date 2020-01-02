@@ -41,7 +41,6 @@ mod config_api;
 mod consensus_config;
 mod deploy_failures;
 mod inc;
-mod proto;
 mod service_lifecycle;
 mod supervisor_config;
 mod utils;
