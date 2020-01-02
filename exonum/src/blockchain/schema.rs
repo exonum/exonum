@@ -467,6 +467,7 @@ impl fmt::Display for CallInBlock {
 
 #[test]
 fn location_json_serialization() {
+    use pretty_assertions::assert_eq;
     use serde_json::json;
 
     let location = CallInBlock::transaction(1);

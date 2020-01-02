@@ -35,6 +35,7 @@ pub fn user_agent() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     // Checks that user agent string contains three nonempty components.
     #[test]
