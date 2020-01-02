@@ -219,6 +219,8 @@ pub struct IndexProof {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::{assert_eq, assert_ne};
+
     use super::*;
     use crate::crypto::hash;
     use crate::merkledb::ObjectHash;

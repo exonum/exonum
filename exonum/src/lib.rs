@@ -39,12 +39,7 @@
 //     clippy::default_trait_access,
 // )]
 
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
 pub use exonum_merkledb;
-#[macro_use]
-extern crate log;
 #[macro_use]
 extern crate serde_derive;
 

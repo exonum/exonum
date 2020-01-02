@@ -22,7 +22,7 @@ use chrono::{DateTime, Utc};
 use exonum_merkledb::{access::Access, ListProof, ObjectHash};
 use futures::Future;
 use hex::FromHex;
-use log::error;
+use log::{error, warn};
 use rand::{rngs::ThreadRng, Rng};
 
 use std::{

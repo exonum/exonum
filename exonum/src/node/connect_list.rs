@@ -97,6 +97,7 @@ impl ConnectList {
 
 #[cfg(test)]
 mod test {
+    use pretty_assertions::assert_eq;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
     use super::*;
