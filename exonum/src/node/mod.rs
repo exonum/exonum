@@ -12,9 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum node that performs consensus algorithm.
+//! Exonum node that handles consensus algorithm, interaction with other nodes and external clients.
 //!
-//! For details about consensus message handling see messages module documentation.
+//! # Overview
+//!
+//! This module contains the following APIs:
+//!
+//! - [`Node`] encapsulates a full-fledged Exonum node
+//! - [`ApiSender`], [`NodeChannel`] and [`ShutdownHandle`] allow to interact with the node
+//!   (mind that `NodeChannel` is relatively low-level)
+//! - Configuration types, "rooted" in [`NodeConfig`], allow to configure aspects
+//!   of the `Node` behavior
+//!
+//! There are also some types / methods excluded from the docs, but they are hidden for a reason:
+//! such APIs are considered an implementation detail and are exempt from semantic versioning.
+//! (In other words, these APIs may change or be removed in any release without prior warning.)
+//!
+//! [`Node`]: struct.Node.html
+//! [`ApiSender`]: struct.ApiSender.html
+//! [`NodeChannel`]: struct.NodeChannel.html
+//! [`ShutdownHandle`]: struct.ShutdownHandle.html
+//! [`NodeConfig`]: struct.NodeConfig.html
 
 // spell-checker:ignore cors
 
@@ -789,7 +807,7 @@ impl ApiSender {
         ApiSender(inner)
     }
 
-    /// Creates a dummy sender which cannot send messages.
+    /// Creates a dummy sender which is not connected to the node and thus cannot send messages.
     pub fn closed() -> Self {
         ApiSender(mpsc::channel(0).0)
     }
@@ -830,7 +848,7 @@ impl fmt::Debug for ApiSender {
     }
 }
 
-/// Errors that can occur during sending a message via `ApiSender`.
+/// Errors that can occur during sending a message to the node via `ApiSender` or `ShutdownHandle`.
 #[derive(Debug, Fail)]
 #[fail(display = "Failed to send API request to the node: the node is being shut down")]
 pub struct SendError(());
@@ -1113,11 +1131,8 @@ impl Node {
         network_thread.join().unwrap()
     }
 
-    /// A generic implementation that launches `Node` and optionally creates threads
-    /// for public and private api handlers.
-    /// Explorer api prefix is `/api/explorer`
-    /// Public api prefix is `/api/services/{service_name}`
-    /// Private api prefix is `/api/services/{service_name}`
+    /// Launches a `Node` and optionally creates threads for public and private API handlers,
+    /// depending on the provided `NodeConfig`.
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
 
