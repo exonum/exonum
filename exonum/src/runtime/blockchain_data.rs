@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -240,7 +240,7 @@ mod tests {
         access::{Access, AccessExt, FromAccess},
         Entry, HashTag, ProofMapIndex,
     };
-    use futures::sync::mpsc;
+    use pretty_assertions::assert_eq;
 
     use std::collections::BTreeMap;
 
@@ -330,14 +330,14 @@ mod tests {
             .with_instance(OtherService.default_instance())
             .build();
 
-        let runtime = RustRuntime::new(mpsc::channel(1).0)
+        let runtime = RustRuntime::builder()
             .with_factory(TokenService)
             .with_factory(OldService)
             .with_factory(OtherService);
 
         Blockchain::build_for_tests()
             .into_mut(genesis_config)
-            .with_runtime(runtime)
+            .with_runtime(runtime.build_for_tests())
             .build()
             .unwrap()
     }

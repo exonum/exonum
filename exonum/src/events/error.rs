@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,9 +13,10 @@
 // limitations under the License.
 
 // These functions transform source error types into other.
-#![cfg_attr(feature="cargo-clippy", allow(clippy::needless_pass_by_value))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use failure::Error;
+use log::error;
 
 use std::{error::Error as StdError, fmt::Display};
 

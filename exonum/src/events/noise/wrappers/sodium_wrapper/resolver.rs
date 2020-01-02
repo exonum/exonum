@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use exonum_sodiumoxide::crypto::{
     aead::chacha20poly1305_ietf as sodium_chacha20poly1305, hash::sha256 as sodium_sha256,
 };
+use log::error;
 use rand::{thread_rng, CryptoRng, Error, RngCore};
 use snow::{
     params::{CipherChoice, DHChoice, HashChoice},
@@ -276,6 +277,7 @@ impl Hash for SodiumSha256 {
 mod tests {
     use super::*;
     use hex::FromHex;
+    use pretty_assertions::assert_eq;
 
     // Random data generator.
     struct MockRandom(u8);

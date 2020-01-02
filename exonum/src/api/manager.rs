@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ use actix::prelude::*;
 use actix_net::server::Server;
 use actix_web::server::{HttpServer, StopServer};
 use futures::{sync::mpsc, Future};
+use log::{error, info, warn};
 
 use std::{collections::HashMap, fmt, io, time::Duration};
 

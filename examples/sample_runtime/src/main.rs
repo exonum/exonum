@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -289,7 +289,9 @@ fn main() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .build();
-    let rust_runtime = RustRuntime::new(channel.endpoints_sender()).with_factory(Supervisor);
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(Supervisor)
+        .build(channel.endpoints_sender());
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())

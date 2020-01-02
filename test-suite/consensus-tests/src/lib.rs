@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ use exonum::{
         NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
     },
     runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        rust::{DefaultInstance, RustRuntimeBuilder, ServiceFactory},
         ArtifactId, SnapshotExt,
     },
 };
@@ -952,7 +952,7 @@ pub struct SandboxBuilder {
     services: Vec<InstanceInitParams>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
-    rust_runtime: RustRuntime,
+    rust_runtime: RustRuntimeBuilder,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
 }
@@ -974,7 +974,7 @@ impl Default for SandboxBuilder {
                 propose_timeout_threshold: std::u32::MAX,
                 validator_keys: Vec::default(),
             },
-            rust_runtime: RustRuntime::new(mpsc::channel(1).0),
+            rust_runtime: RustRuntimeBuilder::new(),
             instances: Vec::new(),
             artifacts: HashMap::new(),
         }
@@ -1041,9 +1041,8 @@ impl SandboxBuilder {
         self
     }
 
-    /// Adds a Rust service to the testkit.
-    pub fn with_rust_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        let service = service.into();
+    /// Adds a Rust service to the sandbox.
+    pub fn with_rust_service<S: ServiceFactory>(mut self, service: S) -> Self {
         self.rust_runtime = self.rust_runtime.with_factory(service);
         self
     }
@@ -1085,7 +1084,7 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
-/// Creates and initializes RustRuntime and GenesisConfig with information from collection of InstanceCollection.
+/// Creates and initializes `GenesisConfig` with the provided information.
 fn create_genesis_config(
     consensus_config: ConsensusConfig,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
@@ -1106,7 +1105,7 @@ fn create_genesis_config(
 
 /// Constructs an uninitialized instance of a `Sandbox`.
 fn sandbox_with_services_uninitialized(
-    rust_runtime: RustRuntime,
+    rust_runtime: RustRuntimeBuilder,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
     instances: Vec<InstanceInitParams>,
     consensus: ConsensusConfig,
@@ -1171,7 +1170,7 @@ fn sandbox_with_services_uninitialized(
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
 
     let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
-        .with_runtime(rust_runtime)
+        .with_runtime(rust_runtime.build_for_tests())
         .build()
         .unwrap();
 

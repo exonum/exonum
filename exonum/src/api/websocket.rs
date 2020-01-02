@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ use chrono::{DateTime, Utc};
 use exonum_merkledb::{access::Access, ListProof, ObjectHash};
 use futures::Future;
 use hex::FromHex;
-use log::error;
+use log::{error, warn};
 use rand::{rngs::ThreadRng, Rng};
 
 use std::{

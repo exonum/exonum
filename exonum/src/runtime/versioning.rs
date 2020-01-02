@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -335,6 +335,8 @@ impl From<ArtifactReqError> for ExecutionError {
 
 #[test]
 fn artifact_req_parsing() {
+    use pretty_assertions::assert_eq;
+
     let req: ArtifactReq = "exonum.Token@^1.0.5".parse().unwrap();
     assert_eq!(req.name, "exonum.Token");
     assert_eq!(req.version, "^1.0.5".parse().unwrap());

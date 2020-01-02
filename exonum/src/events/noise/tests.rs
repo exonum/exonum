@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ use futures::{
     sync::{mpsc, mpsc::Sender},
     Future, Sink, Stream,
 };
+use pretty_assertions::assert_eq;
 use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream},

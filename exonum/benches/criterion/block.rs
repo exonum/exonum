@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
-use futures::sync::mpsc;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempdir::TempDir;
 
@@ -55,7 +54,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     node::ApiSender,
     runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        rust::{DefaultInstance, RustRuntime},
         SnapshotExt,
     },
 };
@@ -86,8 +85,10 @@ fn create_blockchain(
 ) -> BlockchainMut {
     let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
-    let factory: Box<dyn ServiceFactory> = service.clone().into();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+    let factory = service.clone();
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(factory)
+        .build_for_tests();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(service.artifact_id())
         .with_instance(service.default_instance())
@@ -364,8 +365,7 @@ mod foreign_interface_call {
             AnyTx, ExecutionError, InstanceId,
         },
     };
-    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-    use futures::sync::mpsc;
+    use exonum_derive::*;
     use rand::rngs::StdRng;
     use tempdir::TempDir;
 
@@ -463,8 +463,9 @@ mod foreign_interface_call {
         let db = create_rocksdb(&tempdir);
         let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
-        let factory: Box<_> = Timestamping.into();
-        let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+        let rust_runtime = RustRuntime::builder()
+            .with_factory(Timestamping)
+            .build_for_tests();
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
             .with_artifact(Timestamping.artifact_id())
             .with_instance(default_instance(SELF_INTERFACE_SERVICE_ID, "timestamping"))

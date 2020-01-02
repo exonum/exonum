@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ use actix_web::{
 };
 use failure::{bail, ensure, format_err, Error};
 use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
+use log::trace;
 use serde::{
     de::{self, DeserializeOwned},
     ser, Serialize,
@@ -510,6 +511,8 @@ impl From<AllowOrigin> for Cors {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     #[test]

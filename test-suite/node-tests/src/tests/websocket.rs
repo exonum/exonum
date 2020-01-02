@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,10 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
     node::Node,
-    runtime::{rust::ServiceFactory, RuntimeInstance},
+    runtime::{
+        rust::{RustRuntime, ServiceFactory},
+        RuntimeInstance,
+    },
 };
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{ObjectHash, TemporaryDB};
@@ -56,12 +59,12 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();
-    let services = vec![service.into()];
+    let rust_runtime = RustRuntime::builder().with_factory(service);
 
     let node = Node::new(
         TemporaryDB::new(),
+        rust_runtime,
         external_runtimes,
-        services,
         node_cfg,
         genesis_config,
         None,

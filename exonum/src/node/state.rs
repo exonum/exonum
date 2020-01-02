@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 use bit_vec::BitVec;
 use exonum_merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
 use failure::bail;
+use log::{error, trace};
 
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
