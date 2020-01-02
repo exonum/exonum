@@ -143,7 +143,8 @@ impl<T: Access> Schema<T> {
     /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
-        if self.block_transactions(location.block_height).len() <= location.position_in_block as u64
+        if self.block_transactions(location.block_height).len()
+            <= u64::from(location.position_in_block)
         {
             return None;
         }
