@@ -49,7 +49,7 @@ use syn::{Attribute, NestedMeta};
 /// let wallet = Wallet::new();
 /// let bytes = wallet.to_bytes();
 /// ```
-#[proc_macro_derive(BinaryValue)]
+#[proc_macro_derive(BinaryValue, attributes(binary_value))]
 pub fn binary_value(input: TokenStream) -> TokenStream {
     db_traits::impl_binary_value(input)
 }
