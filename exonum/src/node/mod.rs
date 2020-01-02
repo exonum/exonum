@@ -78,10 +78,7 @@ use crate::{
         config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
     },
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
-    runtime::{
-        rust::{RustRuntime, ServiceFactory},
-        RuntimeInstance,
-    },
+    runtime::{rust::RustRuntimeBuilder, RuntimeInstance},
 };
 
 mod basic;
@@ -912,8 +909,8 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
+        rust_runtime: RustRuntimeBuilder,
         external_runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
-        services: impl IntoIterator<Item = Box<dyn ServiceFactory>>,
         node_cfg: NodeConfig,
         genesis_config: GenesisConfig,
         config_manager: Option<Box<dyn ConfigManager>>,
@@ -927,10 +924,7 @@ impl Node {
             node_cfg.service_keypair(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
-        let rust_runtime = services.into_iter().fold(
-            RustRuntime::new(channel.endpoints.0.clone()),
-            |runtime, factory| runtime.with_factory(factory),
-        );
+        let rust_runtime = rust_runtime.build(channel.endpoints.0.clone());
 
         let mut blockchain_builder =
             BlockchainBuilder::new(blockchain, genesis_config).with_runtime(rust_runtime);
@@ -1164,15 +1158,14 @@ mod tests {
     #[test]
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![];
         let external_runtimes: Vec<RuntimeInstance> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
         let _ = Node::new(
             db,
+            RustRuntimeBuilder::new(),
             external_runtimes,
-            services,
             node_cfg,
             genesis_config,
             None,
@@ -1183,7 +1176,6 @@ mod tests {
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![];
         let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1194,8 +1186,8 @@ mod tests {
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
         let _ = Node::new(
             db,
+            RustRuntimeBuilder::new(),
             external_runtimes,
-            services,
             node_cfg,
             genesis_config,
             None,
@@ -1206,7 +1198,6 @@ mod tests {
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let services = vec![];
         let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1217,8 +1208,8 @@ mod tests {
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
         let _ = Node::new(
             db,
+            RustRuntimeBuilder::new(),
             external_runtimes,
-            services,
             node_cfg,
             genesis_config,
             None,
@@ -1228,11 +1219,9 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_internal_events_capacity_too_large() {
-        let accidental_large_value = 0_usize.overflowing_sub(1).0;
+        let accidental_large_value = usize::max_value();
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-
         let external_runtimes: Vec<RuntimeInstance> = vec![];
-        let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1243,8 +1232,8 @@ mod tests {
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
         let _ = Node::new(
             db,
+            RustRuntimeBuilder::new(),
             external_runtimes,
-            services,
             node_cfg,
             genesis_config,
             None,
@@ -1254,11 +1243,10 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_network_requests_capacity_too_large() {
-        let accidental_large_value = 0_usize.overflowing_sub(1).0;
+        let accidental_large_value = usize::max_value();
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
         let external_runtimes: Vec<RuntimeInstance> = vec![];
-        let services = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1269,8 +1257,8 @@ mod tests {
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
         let _ = Node::new(
             db,
+            RustRuntimeBuilder::new(),
             external_runtimes,
-            services,
             node_cfg,
             genesis_config,
             None,

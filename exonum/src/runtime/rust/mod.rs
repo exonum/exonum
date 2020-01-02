@@ -265,6 +265,7 @@ pub mod error;
 use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
+use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -275,6 +276,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Mailbox},
         error::{catch_panic, ExecutionError, ExecutionFail},
+        migrations::{DataMigrationError, MigrateData, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
@@ -289,6 +291,36 @@ mod stubs;
 #[cfg(test)]
 mod tests;
 
+trait FactoryWithMigrations: ServiceFactory + MigrateData {}
+impl<T: ServiceFactory + MigrateData> FactoryWithMigrations for T {}
+
+/// Wrapper around a service factory that does not support migrations.
+#[derive(Debug)]
+struct WithoutMigrations<T>(T);
+
+impl<T: ServiceFactory> ServiceFactory for WithoutMigrations<T> {
+    fn artifact_id(&self) -> ArtifactId {
+        self.0.artifact_id()
+    }
+
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        self.0.artifact_protobuf_spec()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
+        self.0.create_instance()
+    }
+}
+
+impl<T> MigrateData for WithoutMigrations<T> {
+    fn migration_scripts(
+        &self,
+        _start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        Err(DataMigrationError::NotSupported)
+    }
+}
+
 /// Rust runtime entity.
 ///
 /// [Detailed description of the Rust runtime](index.html).
@@ -296,11 +328,17 @@ mod tests;
 pub struct RustRuntime {
     blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
-    available_artifacts: HashMap<ArtifactId, Box<dyn ServiceFactory>>,
+    available_artifacts: HashMap<ArtifactId, Box<dyn FactoryWithMigrations>>,
     deployed_artifacts: HashSet<ArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
     changed_services_since_last_block: bool,
+}
+
+/// Builder of the `RustRuntime`.
+#[derive(Debug, Default)]
+pub struct RustRuntimeBuilder {
+    available_artifacts: HashMap<ArtifactId, Box<dyn FactoryWithMigrations>>,
 }
 
 #[derive(Debug)]
@@ -323,22 +361,62 @@ impl Instance {
     }
 }
 
-impl AsRef<dyn Service + 'static> for Instance {
-    fn as_ref(&self) -> &(dyn Service + 'static) {
+impl AsRef<dyn Service> for Instance {
+    fn as_ref(&self) -> &dyn Service {
         self.service.as_ref()
     }
 }
 
-impl RustRuntime {
-    /// Rust runtime name.
-    pub const NAME: &'static str = "rust";
+impl RustRuntimeBuilder {
+    /// Creates a new builder instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    /// Creates a new Rust runtime instance.
-    pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
-        Self {
+    /// Adds a new service factory to the runtime. The service factory does not support data
+    /// migrations. Use [`with_migrating_factory`](#method.with_migrating_factory) to add
+    /// a service factory with migration support.
+    ///
+    /// # Return value
+    ///
+    /// Returns a modified `RustRuntime` object for further chaining.
+    pub fn with_factory<S: ServiceFactory>(mut self, service_factory: S) -> Self {
+        let artifact = service_factory.artifact_id();
+        trace!(
+            "Added available artifact {} without migration support",
+            artifact
+        );
+        let service_factory = WithoutMigrations(service_factory);
+        self.available_artifacts
+            .insert(artifact, Box::new(service_factory));
+        self
+    }
+
+    /// Adds a new service factory with migration support to the runtime.
+    ///
+    /// # Return value
+    ///
+    /// Returns a modified `RustRuntime` object for further chaining.
+    pub fn with_migrating_factory<S>(mut self, service_factory: S) -> Self
+    where
+        S: ServiceFactory + MigrateData,
+    {
+        let artifact = service_factory.artifact_id();
+        trace!(
+            "Added available artifact {} with migration support",
+            artifact
+        );
+        self.available_artifacts
+            .insert(artifact, Box::new(service_factory));
+        self
+    }
+
+    /// Completes the build process, converting the builder into a `RustRuntime`.
+    pub fn build(self, api_notifier: mpsc::Sender<UpdateEndpoints>) -> RustRuntime {
+        RustRuntime {
             blockchain: None,
             api_notifier,
-            available_artifacts: Default::default(),
+            available_artifacts: self.available_artifacts,
             deployed_artifacts: Default::default(),
             started_services: Default::default(),
             started_services_by_name: Default::default(),
@@ -346,20 +424,26 @@ impl RustRuntime {
         }
     }
 
+    /// Builds the Rust runtime without connection to the HTTP API. As the name implies,
+    /// this method should only be used for testing.
+    pub fn build_for_tests(self) -> RustRuntime {
+        self.build(mpsc::channel(1).0)
+    }
+}
+
+impl RustRuntime {
+    /// Rust runtime name.
+    pub const NAME: &'static str = "rust";
+
+    /// Returns a new builder for the runtime.
+    pub fn builder() -> RustRuntimeBuilder {
+        RustRuntimeBuilder::new()
+    }
+
     fn blockchain(&self) -> &Blockchain {
         self.blockchain
             .as_ref()
             .expect("Method called before Rust runtime is initialized")
-    }
-
-    /// Adds a new service factory to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        let service_factory = service_factory.into();
-        let artifact = service_factory.artifact_id();
-        trace!("Added available artifact {}", artifact);
-        self.available_artifacts.insert(artifact, service_factory);
-        self
     }
 
     fn add_started_service(&mut self, instance: Instance) {
