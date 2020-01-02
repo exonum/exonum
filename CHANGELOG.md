@@ -164,6 +164,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
+- It is now possible to iterate over keys of the indexes within a group. (#1662)
+
 #### exonum-supervisor
 
 - `Supervisor` service now can have initial configuration and implements
