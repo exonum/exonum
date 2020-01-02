@@ -21,7 +21,7 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, TemporaryDB},
     runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
+        rust::{DefaultInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory},
         ArtifactId, RuntimeInstance, WellKnownRuntime,
     },
 };
@@ -118,7 +118,7 @@ pub struct TestKitBuilder {
     our_validator_id: Option<ValidatorId>,
     test_network: Option<TestNetwork>,
     logger: bool,
-    rust_runtime: RustRuntime,
+    rust_runtime: RustRuntimeBuilder,
     api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: Vec<RuntimeInstance>,
     instances: Vec<InstanceInitParams>,
@@ -165,8 +165,7 @@ impl TestKitBuilder {
     }
 
     /// Adds a Rust service to the testkit.
-    pub fn with_rust_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        let service = service.into();
+    pub fn with_rust_service(mut self, service: impl ServiceFactory) -> Self {
         self.rust_runtime = self.rust_runtime.with_factory(service);
         self
     }
@@ -245,7 +244,8 @@ impl TestKitBuilder {
             .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
         let genesis = network.genesis_config();
 
-        self.additional_runtimes.push(self.rust_runtime.into());
+        let rust_runtime = self.rust_runtime.build(self.api_notifier_channel.0.clone());
+        self.additional_runtimes.push(rust_runtime.into());
 
         // TODO: Parametrize TestKitBuilder with GenesisConfig on creation to prevent code duplication [ECR-3913].
         // Prepare GenesisConfig.
@@ -290,7 +290,7 @@ impl TestKitBuilder {
             test_network: None,
             our_validator_id: validator_id,
             logger: false,
-            rust_runtime: RustRuntime::new(api_notifier_channel.0.clone()),
+            rust_runtime: RustRuntimeBuilder::new(),
             api_notifier_channel,
             additional_runtimes: vec![],
             instances: vec![],
