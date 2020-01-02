@@ -19,6 +19,7 @@ use futures::{
     future::{self, Either},
     Future,
 };
+use log::{error, info};
 
 use std::{
     collections::{BTreeMap, HashMap},
