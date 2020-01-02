@@ -16,6 +16,7 @@ use exonum_merkledb::BinaryValue;
 use failure::format_err;
 use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
+use serde_json::json;
 use std::panic;
 
 use super::*;

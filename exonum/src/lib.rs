@@ -44,8 +44,6 @@ pub use exonum_merkledb;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate serde_json;
 
 // Test dependencies.
 #[cfg(all(test, feature = "long_benchmarks"))]
