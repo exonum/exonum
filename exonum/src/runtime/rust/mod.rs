@@ -503,10 +503,10 @@ impl RustRuntime {
                     },
                 );
                 instance.as_ref().wire_api(&mut builder);
-                (
-                    ["services/", &instance.name].concat(),
-                    ApiBuilder::from(builder),
-                )
+                let root_path = builder
+                    .take_root_path()
+                    .unwrap_or_else(|| ["services/", &instance.name].concat());
+                (root_path, ApiBuilder::from(builder))
             })
             .chain(self::runtime_api::endpoints(self))
             .collect()

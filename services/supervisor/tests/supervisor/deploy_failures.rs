@@ -294,8 +294,8 @@ fn deploy_success() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
@@ -330,8 +330,8 @@ fn deploy_failure_because_not_confirmed() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
@@ -362,8 +362,8 @@ fn deploy_failure_because_cannot_deploy() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
@@ -408,8 +408,8 @@ fn deploy_failure_check_no_extra_actions() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
@@ -461,8 +461,8 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
@@ -508,8 +508,8 @@ fn deploy_successfully_after_failure() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);
@@ -552,8 +552,8 @@ fn deploy_successfully_after_failure() {
     };
 
     let tx_hash = send_deploy_request(&api, &deploy_request);
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
     let response = get_deploy_status(&api, &deploy_request);

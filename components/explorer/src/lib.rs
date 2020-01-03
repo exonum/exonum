@@ -12,14 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Blockchain explorer module provides API for getting information about blocks and transactions
-//! from the blockchain.
+//! Blockchain explorer allows to get information about blocks and transactions in the blockchain.
+//! It allows to request transactions from a block together with the execution statuses,
+//! iterate over blocks, etc.
 //!
-//! See the `explorer` example in the crate for examples of usage.
+//! This crate is distinct from the [explorer *service*][explorer-service] crate. While this crate
+//! provides Rust language APIs for retrieving info from the blockchain, the explorer service
+//! translates these APIs into REST and WebSocket endpoints. Correspondingly, this crate is
+//! primarily useful for Rust-language client apps. Another use case is testing; the [testkit]
+//! returns [`BlockWithTransactions`] from its `create_block*` methods and re-exports the entire
+//! crate as `explorer`.
+//!
+//! See the examples in the crate for examples of usage.
+//!
+//! [explorer-service]: https://docs.rs/exonum-explorer-service/
+//! [`BlockWithTransactions`]: struct.BlockWithTransactions.html
+//! [testkit]: https://docs.rs/exonum-testkit/latest/exonum_testkit/struct.TestKit.html
 
 use chrono::{DateTime, Utc};
-use exonum_merkledb::{ListProof, MapProof, ObjectHash, Snapshot};
+use exonum::{
+    blockchain::{Block, CallInBlock, Schema, TxLocation},
+    crypto::Hash,
+    helpers::Height,
+    merkledb::{ListProof, MapProof, ObjectHash, Snapshot},
+    messages::{AnyTx, Precommit, Verified},
+    runtime::{execution_error_serde, ExecutionError, ExecutionStatus},
+};
 use serde::{Serialize, Serializer};
+use serde_derive::*;
 
 use std::{
     cell::{Ref, RefCell},
@@ -30,13 +50,7 @@ use std::{
     time::UNIX_EPOCH,
 };
 
-use crate::{
-    blockchain::{Block, CallInBlock, ExecutionError, ExecutionStatus, Schema, TxLocation},
-    crypto::Hash,
-    helpers::Height,
-    messages::{AnyTx, Precommit, Verified},
-    runtime::error::execution_error,
-};
+pub mod api;
 
 /// Ending height of the range (exclusive), given the a priori max height.
 fn end_height(bound: Bound<&Height>, max: Height) -> Height {
@@ -63,9 +77,9 @@ fn end_height(bound: Bound<&Height>, max: Height) -> Height {
 /// | `precommits` | `Vec<`[`Precommit`]`>` | Precommits authorizing the block |
 /// | `txs` | `Vec<`[`Hash`]`>` | Hashes of transactions in the block |
 ///
-/// [`Block`]: ../blockchain/struct.Block.html
-/// [`Precommit`]: ../messages/struct.Precommit.html
-/// [`Hash`]: ../../exonum_crypto/struct.Hash.html
+/// [`Block`]: https://docs.rs/exonum/latest/exonum/blockchain/struct.Block.html
+/// [`Precommit`]: https://docs.rs/exonum/latest/exonum/messages/struct.Precommit.html
+/// [`Hash`]: https://docs.rs/exonum-crypto/latest/exonum_crypto/struct.Hash.html
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
@@ -267,7 +281,7 @@ pub struct ErrorWithLocation {
     /// Location of the error.
     pub location: CallInBlock,
     /// Error data.
-    #[serde(with = "execution_error")]
+    #[serde(with = "execution_error_serde")]
     pub error: ExecutionError,
 }
 
@@ -319,8 +333,23 @@ impl Index<usize> for BlockWithTransactions {
             panic!(
                 "Index exceeds number of transactions in block {}",
                 self.len()
-            )
+            );
         })
+    }
+}
+
+/// Returns a transaction in the block by its hash. Beware that this is a slow operation
+/// (linear w.r.t. the number of transactions in a block).
+impl Index<Hash> for BlockWithTransactions {
+    type Output = CommittedTransaction;
+
+    fn index(&self, index: Hash) -> &CommittedTransaction {
+        self.transactions
+            .iter()
+            .find(|&tx| tx.content.object_hash() == index)
+            .unwrap_or_else(|| {
+                panic!("No transaction with hash {} in the block", index);
+            })
     }
 }
 
@@ -354,29 +383,57 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// { "type": "success" }
 /// ```
 ///
-/// For transactions that return an [`ExecutionError`], `status` contains the error code
-/// and an optional description, i.e., has the following type in the
-/// [`Flow`] / [`TypeScript`] notation:
+/// For transactions that cause an [`ExecutionError`], `status` contains the error code
+/// and an optional description, i.e., has the following type in the [TypeScript] notation:
 ///
-/// ```javascript
-/// { type: 'service_error', code: number, description?: string }
+/// ```typescript
+/// type Error = {
+///   type: 'service_error' | 'dispatcher_error' | 'runtime_error' | 'unexpected_error',
+///   code?: number,
+///   description?: string,
+///   runtime_id: number,
+///   call_site?: CallSite,
+/// };
+///
+/// type CallSite = MethodCallSite | HookCallSite;
+///
+/// type MethodCallSite = {
+///   call_type: 'method',
+///   instance_id: number,
+///   interface?: string,
+///   method_id: number,
+/// };
+///
+/// type HookCallSite = {
+///   call_type: 'constructor' | 'before_transactions' | 'after_transactions',
+///   instance_id: number,
+/// };
 /// ```
 ///
-/// For transactions that have resulted in a panic, `status` contains an optional description
-/// as well:
+/// Explanations:
 ///
-/// ```javascript
-/// { type: 'panic', description?: string }
-/// ```
+/// - `Error.type` determines the component responsible for the error. Usually, errors
+///   are generated by the service code, but they can also be caused by the dispatch logic,
+///   runtime associated with the service, or come from another source (`unexpected_error`s).
+/// - `Error.code` is the error code. For service errors, this code is specific
+///   to the service instance (which can be obtained from `call_site`), and for runtime errors -
+///   to the runtime. For dispatcher errors, the codes are fixed; their meaning can be found
+///   in the [`DispatcherError`] docs. The code is present for all error types except
+///   `unexpected_error`s, in which the code is always absent.
+/// - `Error.description` is an optional human-readable description of the error.
+/// - `Error.runtime_id` is the numeric ID of the runtime in which the error has occurred. Note
+///   that the runtime is defined for all error types, not just `runtime_error`s, since
+///   for any request it's possible to say which runtime is responsible for its processing.
+/// - `Error.call_site` provides most precise known location of the call in which the error
+///   has occurred.
 ///
-/// [`Transaction`]: ../blockchain/trait.Transaction.html
-/// [`TxLocation`]: ../blockchain/struct.TxLocation.html
-/// [`ListProof`]: ../../exonum_merkledb/indexes/proof_list/struct.ListProof.html
-/// [`Hash`]: ../../exonum_crypto/struct.Hash.html
-/// [`ExecutionStatus`]: ../runtime/error/struct.ExecutionStatus.html
-/// [`ExecutionError`]: ../runtime/error/struct.ExecutionError.html
-/// [`Flow`]: https://flow.org/
-/// [`TypeScript`]: https://www.typescriptlang.org/
+/// [`TxLocation`]: https://docs.rs/exonum/latest/exonum/blockchain/struct.TxLocation.html
+/// [`ListProof`]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/indexes/proof_list/struct.ListProof.html
+/// [`Hash`]: https://docs.rs/exonum-crypto/latest/exonum_crypto/struct.Hash.html
+/// [`ExecutionStatus`]: https://docs.rs/exonum/latest/exonum/runtime/struct.ExecutionStatus.html
+/// [`ExecutionError`]: https://docs.rs/exonum/latest/exonum/runtime/struct.ExecutionError.html
+/// [`DispatcherError`]: https://docs.rs/exonum/latest/exonum/runtime/enum.DispatcherError.html
+/// [TypeScript]: https://www.typescriptlang.org/
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
     content: Verified<AnyTx>,
@@ -417,9 +474,6 @@ impl CommittedTransaction {
 ///
 /// Values of this type are returned by the [`transaction()`] method of the `BlockchainExplorer`.
 ///
-/// The type parameter corresponds to some representation of `Box<Transaction>`.
-/// This generalization is needed to deserialize `TransactionInfo`.
-///
 /// [`transaction()`]: struct.BlockchainExplorer.html#method.transaction
 ///
 /// # JSON presentation
@@ -436,45 +490,40 @@ impl CommittedTransaction {
 /// Transactions in pool are represented with a 2-field object:
 ///
 /// - `type` field contains transaction type (`"in-pool"`).
-/// - `content` is JSON serialization of the transaction.
+/// - `content` is the transaction contents serialized to the hexadecimal form.
 ///
 /// # Examples
 ///
-/// Use of the custom type parameter for deserialization:
-///
 /// ```
-/// use exonum::{explorer::TransactionInfo, proto::schema::doc_tests};
-/// use exonum_derive::{BinaryValue, ObjectHash};
-/// use exonum_proto::ProtobufConvert;
-/// use serde_json::json;
+/// use exonum_explorer::TransactionInfo;
+/// use exonum::{crypto::gen_keypair, runtime::InstanceId};
+/// # use exonum_derive::*;
+/// # use serde_derive::*;
+/// # use serde_json::json;
 ///
-/// /// Service transaction content.
-/// #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-/// #[protobuf_convert(source = "doc_tests::CreateWallet")]
-/// pub struct CreateWallet {
-///     pub name: String,
+/// /// Service interface.
+/// #[exonum_interface]
+/// trait ServiceInterface<Ctx> {
+///     type Output;
+///     fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 /// }
 ///
-/// // Other service related code...
-///
 /// # fn main() {
-/// #    let message = "0a180a160a0012120a1054657374207472616e73616374696f6e12220a20\
-/// #                   927d23ecd2a2b31f6693f668b3112acafdf1e954bbeb82d364fb46aa3cd5\
-/// #                   99ed1a420a402c0ce24d15c6407193ac765b6fc74a1504990ae5812ec4e4\
-/// #                   0070c5de66896abf06e2d9c742d232a34c4e5d41a575e91d44292bc8ab00\
-/// #                   c4ce71acb5d8a985c602";
-///
-///     let json = json!({
-///         "type": "in-pool",
-///         "content": message
-///     });
-///
-///     let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
-///     assert!(parsed.is_in_pool());
+/// // Create a signed transaction.
+/// let keypair = gen_keypair();
+/// const SERVICE_ID: InstanceId = 100;
+/// let tx = keypair.create_wallet(SERVICE_ID, "Alice".to_owned());
+/// // This transaction in pool will be represented as follows:
+/// let json = json!({
+///     "type": "in_pool",
+///     "content": tx,
+/// });
+/// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
+/// assert!(parsed.is_in_pool());
 /// # }
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
@@ -528,21 +577,26 @@ impl TransactionInfo {
 /// The explorer wraps a specific [`Snapshot`] of the blockchain state; that is,
 /// all calls to the methods of an explorer instance are guaranteed to be consistent.
 ///
-/// [`Snapshot`]: ../../exonum_merkledb/trait.Snapshot.html
+/// [`Snapshot`]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/trait.Snapshot.html
 #[derive(Debug, Copy, Clone)]
 pub struct BlockchainExplorer<'a> {
     schema: Schema<&'a dyn Snapshot>,
 }
 
 impl<'a> BlockchainExplorer<'a> {
-    /// Create a new `BlockchainExplorer` instance.
+    /// Creates a new `BlockchainExplorer` instance from the provided snapshot.
     pub fn new(snapshot: &'a dyn Snapshot) -> Self {
         BlockchainExplorer {
             schema: Schema::new(snapshot),
         }
     }
 
-    /// Return information about the transaction identified by the hash.
+    /// Creates a new `BlockchainExplorer` instance from the core schema.
+    pub fn from_schema(schema: Schema<&'a dyn Snapshot>) -> Self {
+        BlockchainExplorer { schema }
+    }
+
+    /// Returns information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
         let content = self.transaction_without_proof(tx_hash)?;
         if self.schema.transactions_pool().contains(tx_hash) {
@@ -553,8 +607,13 @@ impl<'a> BlockchainExplorer<'a> {
         Some(TransactionInfo::Committed(tx))
     }
 
-    /// Return status of call in block
-    pub(crate) fn call_status(
+    /// Returns the status of a call in a block.
+    ///
+    /// # Return value
+    ///
+    /// This method will return `Ok(())` both if the call completed successfully, or if
+    /// was not performed at all. The caller is responsible to distinguish these two outcomes.
+    pub fn call_status(
         &self,
         block_height: Height,
         call_location: CallInBlock,

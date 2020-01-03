@@ -145,7 +145,7 @@ pub use self::{
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
-        ExecutionStatus,
+        ExecutionStatus, SerdeExecutionStatus,
     },
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
@@ -153,6 +153,9 @@ pub use self::{
     },
 };
 
+// Re-export for serializing `ExecutionError` via `serde`.
+#[doc(hidden)]
+pub use error::execution_error as execution_error_serde;
 #[macro_use]
 pub mod rust;
 pub mod migrations;
@@ -174,10 +177,6 @@ mod blockchain_data;
 mod dispatcher;
 pub(crate) mod error;
 mod types;
-
-// Re-export for serializing `ExecutionError` via `serde`.
-#[doc(hidden)]
-pub use error::execution_error as execution_error_serde;
 
 /// Persistent identifier of a supervisor service instance.
 ///
