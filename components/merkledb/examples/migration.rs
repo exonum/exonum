@@ -27,6 +27,7 @@
 use failure::Error;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde_derive::*;
+use std::sync::Arc;
 
 use std::borrow::Cow;
 
@@ -35,9 +36,9 @@ use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, Prefixed},
     impl_object_hash_for_binary_value,
-    migration::{flush_migration, Migration},
+    migration::{flush_migration, Migration, MigrationHelper},
     BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
-    ProofListIndex, ProofMapIndex, ReadonlyFork, SystemSchema, TemporaryDB,
+    ProofListIndex, ProofMapIndex, ReadonlyFork, Result as MdbResult, SystemSchema, TemporaryDB,
 };
 
 const USER_COUNT: usize = 10_000;
@@ -181,20 +182,10 @@ mod v2 {
     }
 }
 
-fn create_migration(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
-    println!("\nStarted migration");
+/// Provides migration of wallets with schema.
+fn migrate_wallets_with_schema(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data);
-
-    // Move `ticker` and `divisibility` to `config`.
-    let config = v2::Config {
-        ticker: old_schema.ticker.get().unwrap(),
-        divisibility: old_schema.divisibility.get().unwrap_or(0),
-    };
-    new_schema.config.set(config);
-    // Mark these two indexes for removal.
-    new_data.create_tombstone("ticker");
-    new_data.create_tombstone("divisibility");
 
     // Migrate wallets.
     for (i, (public_key, wallet)) in old_schema.wallets.iter().enumerate() {
@@ -221,24 +212,45 @@ fn create_migration(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>
     }
 }
 
-fn main() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    create_initial_data(&fork);
-    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
-    db.merge(fork.into_patch()).unwrap();
+/// Provides migration of wallets with `MigrationHelper::iter_loop`.
+fn migrate_wallets_with_iter_loop(helper: &mut MigrationHelper) -> MdbResult<()> {
+    helper.iter_loop(|helper, iters| {
+        let wallets = helper
+            .old_data()
+            .get_map::<_, PublicKey, v1::Wallet>("wallets");
+        let mut new_wallets = helper
+            .new_data()
+            .get_proof_map::<_, PublicKey, v2::Wallet>("wallets");
 
-    let fork = db.fork();
-    let new_data = Migration::new("test", &fork);
-    let old_data = Prefixed::new("test", fork.readonly());
-    {
-        let old_schema = v1::Schema::new(old_data.clone());
-        println!("Before migration:");
-        old_schema.print_wallets();
-    }
-    create_migration(new_data, old_data);
-    db.merge(fork.into_patch()).unwrap();
+        for (i, (pub_key, wallet)) in iters.create("wallets", &wallets).enumerate() {
+            if wallet.username == "Eve" {
+                // We don't like Eves 'round these parts. Remove her transaction history
+                // and don't migrate the wallet.
+                helper.new_data().create_tombstone(("histories", &pub_key));
+            } else {
+                // Merkelize the wallet history.
+                let mut history: ProofListIndex<_, Hash> =
+                    helper.new_data().get_group("histories").get(&pub_key);
+                let old_history: ListIndex<_, Hash> =
+                    helper.old_data().get_group("histories").get(&pub_key);
+                history.extend(&old_history);
 
+                let new_wallet = v2::Wallet {
+                    username: wallet.username,
+                    balance: wallet.balance,
+                    history_hash: history.object_hash(),
+                };
+                new_wallets.put(&pub_key, new_wallet);
+            }
+
+            if i % 1_000 == 999 {
+                println!("Processed {} wallets", i + 1);
+            }
+        }
+    })
+}
+
+fn check_and_finalize_migration(db: Arc<dyn Database>) {
     // For now, the old data is still present in the storage.
     let snapshot = db.snapshot();
     let old_schema = v1::Schema::new(Prefixed::new("test", &snapshot));
@@ -289,4 +301,156 @@ fn main() {
         state.keys().collect::<Vec<_>>(),
         vec!["test.config", "test.wallets", "unrelated.list"]
     );
+}
+
+fn create_basic_migration(fork: &Fork) {
+    println!("\nStarted migration");
+
+    {
+        let new_data = Migration::new("test", fork);
+        let old_data = Prefixed::new("test", fork.readonly());
+
+        let old_schema = v1::Schema::new(old_data);
+        let mut new_schema = v2::Schema::new(new_data);
+
+        // Move `ticker` and `divisibility` to `config`.
+        let config = v2::Config {
+            ticker: old_schema.ticker.get().unwrap(),
+            divisibility: old_schema.divisibility.get().unwrap_or(0),
+        };
+        new_schema.config.set(config);
+        // Mark these two indexes for removal.
+        new_data.create_tombstone("ticker");
+        new_data.create_tombstone("divisibility");
+    }
+
+    {
+        let new_data = Migration::new("test", fork);
+        let old_data = Prefixed::new("test", fork.readonly());
+        migrate_wallets_with_schema(new_data, old_data);
+    }
+}
+
+/// Example of migration without `MigrationHelper`.
+fn basic_migration() {
+    println!("\n\nBasic migration.");
+
+    let db: Arc<dyn Database> = Arc::new(TemporaryDB::new());
+    let fork = db.fork();
+    create_initial_data(&fork);
+    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
+    db.merge(fork.into_patch()).unwrap();
+
+    let fork = db.fork();
+    let old_data = Prefixed::new("test", fork.readonly());
+    {
+        let old_schema = v1::Schema::new(old_data.clone());
+        println!("Before migration:");
+        old_schema.print_wallets();
+    }
+    create_basic_migration(&fork);
+    db.merge(fork.into_patch()).unwrap();
+
+    check_and_finalize_migration(db.clone());
+}
+
+fn create_migration_with_helper(
+    helper: &mut MigrationHelper,
+    migrate_wallets_iter_loop: bool,
+) -> MdbResult<()> {
+    println!("\nStarted migration.");
+
+    {
+        let old_data = helper.old_data();
+        let new_data = helper.new_data();
+
+        let old_schema = v1::Schema::new(old_data);
+        let mut new_schema = v2::Schema::new(new_data);
+
+        // Move `ticker` and `divisibility` to `config`.
+        let config = v2::Config {
+            ticker: old_schema.ticker.get().unwrap(),
+            divisibility: old_schema.divisibility.get().unwrap_or(0),
+        };
+        new_schema.config.set(config);
+        // Mark these two indexes for removal.
+        new_data.create_tombstone("ticker");
+        new_data.create_tombstone("divisibility");
+    }
+
+    if migrate_wallets_iter_loop {
+        migrate_wallets_with_iter_loop(helper)?;
+    } else {
+        migrate_wallets_with_schema(helper.new_data(), helper.old_data());
+    }
+
+    Ok(())
+}
+
+/// Example of migration with `MigrationHelper`.
+fn migration_with_helper() {
+    println!("\n\nMigration with MigrationHelper.");
+
+    let db: Arc<dyn Database> = Arc::new(TemporaryDB::new());
+    let fork = db.fork();
+    create_initial_data(&fork);
+    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
+    db.merge(fork.into_patch()).unwrap();
+
+    let mut helper = MigrationHelper::new(db.clone(), "test");
+    {
+        let old_schema = v1::Schema::new(helper.old_data().clone());
+        println!("Before migration:");
+        old_schema.print_wallets();
+    }
+
+    if let Err(err) = create_migration_with_helper(&mut helper, false) {
+        println!("Migration failed: {}", err);
+        return;
+    }
+
+    let new_state = helper.finish();
+    if let Err(err) = new_state {
+        println!("Migration finish failed: {}", err);
+        return;
+    }
+
+    check_and_finalize_migration(db.clone());
+}
+
+/// Example of migration with `MigrationHelper::iter_loop`.
+fn migration_with_helper_iter_loop() {
+    println!("\n\nMigration with MigrationHelper::iter_loop.");
+
+    let db: Arc<dyn Database> = Arc::new(TemporaryDB::new());
+    let fork = db.fork();
+    create_initial_data(&fork);
+    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
+    db.merge(fork.into_patch()).unwrap();
+
+    let mut helper = MigrationHelper::new(db.clone(), "test");
+    {
+        let old_schema = v1::Schema::new(helper.old_data().clone());
+        println!("Before migration:");
+        old_schema.print_wallets();
+    }
+
+    if let Err(err) = create_migration_with_helper(&mut helper, true) {
+        println!("Migration failed: {}", err);
+        return;
+    }
+
+    let new_state = helper.finish();
+    if let Err(err) = new_state {
+        println!("Failed to finish migration: {}", err);
+        return;
+    }
+
+    check_and_finalize_migration(db.clone());
+}
+
+fn main() {
+    basic_migration();
+    migration_with_helper();
+    migration_with_helper_iter_loop();
 }
