@@ -200,11 +200,11 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
 /// use exonum_build::ProtobufGenerator;
 ///
 /// ProtobufGenerator::with_mod_name("example_mod.rs")
-///    .with_input_dir("src/proto")
-///    .with_crypto()
-///    .with_common()
-///    .with_merkledb()
-///    .generate();
+///     .with_input_dir("src/proto")
+///     .with_crypto()
+///     .with_common()
+///     .with_merkledb()
+///     .generate();
 /// ```
 ///
 /// After the successful run, `$OUT_DIR` will contain a module for each Protobuf file in
