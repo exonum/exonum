@@ -18,7 +18,7 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
-    merkledb::{BinaryValue, ObjectHash, TemporaryDB},
+    merkledb::{ObjectHash, TemporaryDB},
     messages::Verified,
     node::ApiSender,
     runtime::{
@@ -29,13 +29,14 @@ use exonum::{
 use exonum_derive::*;
 use serde_derive::*;
 
-use std::{borrow::Cow, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 pub const SERVICE_ID: InstanceId = 118;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ObjectHash)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct CreateWallet {
     pub name: String,
 }
@@ -46,19 +47,10 @@ impl CreateWallet {
     }
 }
 
-impl BinaryValue for CreateWallet {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(Into::into)
-    }
-}
-
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ObjectHash)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct Transfer {
     pub to: PublicKey,
     pub amount: u64,
@@ -74,16 +66,6 @@ impl Transfer {
 pub enum Error {
     /// Not allowed!
     NotAllowed = 0,
-}
-
-impl BinaryValue for Transfer {
-    fn to_bytes(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        bincode::deserialize(bytes.as_ref()).map_err(Into::into)
-    }
 }
 
 #[exonum_interface]
