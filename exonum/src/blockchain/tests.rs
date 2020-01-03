@@ -19,6 +19,7 @@ use exonum_merkledb::{
     BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot, SystemSchema,
 };
 use futures::{Future, IntoFuture};
+use pretty_assertions::assert_eq;
 use semver::Version;
 
 use std::{

@@ -116,6 +116,7 @@ impl InternalPart {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
     use tokio_core::reactor::Core;
 
     use std::thread;
