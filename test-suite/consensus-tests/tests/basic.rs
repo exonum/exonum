@@ -276,7 +276,7 @@ fn test_store_txs_positions() {
     let snapshot = sandbox.blockchain().snapshot();
     let schema = snapshot.for_core();
     let locations = schema.transactions_locations();
-    for (expected_idx, hash) in (0u32..).zip(hashes.iter()) {
+    for (expected_idx, hash) in (0u32..).zip(&hashes) {
         let location = locations.get(hash).unwrap();
         assert_eq!(expected_idx, location.position_in_block());
         assert_eq!(committed_height, location.block_height());

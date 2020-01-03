@@ -307,7 +307,7 @@ impl BlockchainMut {
         }
 
         // Save & execute transactions.
-        for (index, hash) in (0..).zip(tx_hashes.iter()) {
+        for (index, hash) in (0..).zip(tx_hashes) {
             self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
 
