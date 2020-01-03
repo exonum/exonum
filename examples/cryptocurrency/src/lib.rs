@@ -40,12 +40,14 @@ mod tx_tests;
 
 /// Persistent data.
 pub mod schema {
-    use exonum_crypto::PublicKey;
-    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use exonum_merkledb::{
-        access::{Access, FromAccess},
-        MapIndex,
+    use exonum::{
+        crypto::PublicKey,
+        merkledb::{
+            access::{Access, FromAccess},
+            MapIndex,
+        },
     };
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
     use exonum_proto::ProtobufConvert;
 
     use super::proto;
@@ -112,7 +114,7 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
-    use exonum_crypto::PublicKey;
+    use exonum::crypto::PublicKey;
     use exonum_derive::{BinaryValue, ObjectHash};
     use exonum_proto::ProtobufConvert;
 
@@ -194,7 +196,7 @@ pub mod contracts {
         rust::{api::ServiceApiBuilder, CallContext, Service},
         ExecutionError,
     };
-    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_derive::*;
 
     use crate::{
         api::CryptocurrencyApi,

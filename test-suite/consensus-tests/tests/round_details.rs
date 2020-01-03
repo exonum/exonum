@@ -20,20 +20,21 @@
 use bit_vec::BitVec;
 use exonum::{
     blockchain::ProposerId,
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
+    merkledb::ObjectHash,
     messages::{PrevotesRequest, TransactionsRequest, Verified},
     node::constants::{
         PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
     },
 };
-use exonum_consensus_tests::{
-    self, sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder,
-};
-use exonum_crypto::Hash;
-use exonum_merkledb::ObjectHash;
 use log::info;
 
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
+
+use exonum_consensus_tests::{
+    self, sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder,
+};
 
 /// check scenario:
 /// HANDLE FULL PROPOSE

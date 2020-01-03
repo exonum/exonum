@@ -34,6 +34,8 @@ use exonum::{
         NetworkEvent, NetworkRequest, TimeoutRequest,
     },
     helpers::{user_agent, Height, Round, ValidatorId},
+    keys::Keys,
+    merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -47,10 +49,6 @@ use exonum::{
         rust::{DefaultInstance, RustRuntimeBuilder, ServiceFactory},
         ArtifactId, SnapshotExt,
     },
-};
-use exonum_keys::Keys;
-use exonum_merkledb::{
-    BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
 };
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -1266,7 +1264,7 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 
 #[cfg(test)]
 mod tests {
-    use exonum_crypto::gen_keypair;
+    use exonum::crypto::gen_keypair;
 
     use super::*;
 

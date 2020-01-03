@@ -14,6 +14,7 @@
 
 use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
+    merkledb::access::AccessExt,
     messages::Verified,
     runtime::{
         rust::{CallContext, DefaultInstance, Service},
@@ -21,7 +22,6 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::access::AccessExt;
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;

@@ -16,6 +16,7 @@ use exonum::{
     blockchain::ConsensusConfig,
     crypto::{PublicKey, SecretKey},
     helpers::Height,
+    merkledb::BinaryValue,
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service, TxStub},
@@ -23,7 +24,6 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::BinaryValue;
 use serde_derive::*;
 
 #[exonum_interface]

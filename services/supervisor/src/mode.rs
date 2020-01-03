@@ -21,13 +21,11 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
-use serde_derive::{Deserialize, Serialize};
-
-use exonum::helpers::byzantine_quorum;
-use exonum_crypto::Hash;
+use exonum::{crypto::Hash, helpers::byzantine_quorum};
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
 use failure::{self, format_err};
+use serde_derive::*;
 
 use std::str::FromStr;
 

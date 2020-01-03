@@ -9,9 +9,7 @@ publish = false
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-keys = { version = "0.13.0-rc.2", path = "../../components/keys" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 
 bincode = "1.2.1"

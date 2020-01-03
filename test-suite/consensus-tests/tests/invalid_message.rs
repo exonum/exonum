@@ -16,12 +16,13 @@
 //! incorrect messages.
 
 use exonum::{
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
+    merkledb::ObjectHash,
     messages::{Propose, Verified},
 };
+
 use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_crypto::Hash;
-use exonum_merkledb::ObjectHash;
 
 /// HANDLE message
 /// - verify signature

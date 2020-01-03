@@ -14,10 +14,11 @@
 
 use exonum_cli::NodeBuilder;
 
-fn main() -> Result<(), failure::Error> {
+fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
         .with_service(exonum_time::TimeServiceFactory::default())
         .with_service(exonum_timestamping::TimestampingService)
         .run()
+        .unwrap();
 }

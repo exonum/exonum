@@ -12,24 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_derive::{Deserialize, Serialize};
-
 use exonum::{
     blockchain::ConsensusConfig,
-    crypto::Hash,
-    exonum_merkledb::ObjectHash,
+    crypto::{Hash, PublicKey, SecretKey},
     helpers::Height,
+    merkledb::{
+        impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue, ObjectHash,
+    },
     messages::{AnyTx, Verified},
     runtime::{
         rust::TxStub, ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
-use exonum_merkledb::{
-    impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue,
-};
 use exonum_proto::ProtobufConvert;
+use serde_derive::*;
 
 use super::{mode::Mode, proto, transactions::SupervisorInterface};
 

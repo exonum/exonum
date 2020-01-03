@@ -14,10 +14,8 @@
 
 #![allow(bare_trait_objects)]
 
-pub use self::schema::*;
-pub use self::service::*;
+pub use self::{schema::*, service::*};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::schema::*;
-use exonum_crypto::proto::*;
+use exonum::{crypto::proto::*, proto::schema::*};
