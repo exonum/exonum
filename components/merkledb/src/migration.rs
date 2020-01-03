@@ -801,7 +801,7 @@ mod tests {
         scratchpad.get_list("list").extend(vec![2_u32, 3]);
 
         // Check that info persists to `Patch`es and `Snapshot`s.
-        let patch = fork.into_patch();;
+        let patch = fork.into_patch();
         let scratchpad = Scratchpad::new("test", &patch);
         let list = scratchpad.get_list::<_, u32>("list");
         assert_eq!(list.len(), 2);
