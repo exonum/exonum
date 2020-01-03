@@ -97,10 +97,6 @@ impl RocksDB {
         Ok(db)
     }
 
-    pub(super) fn rocksdb(&self) -> Arc<ShardedLock<rocksdb::DB>> {
-        self.db.clone()
-    }
-
     /// Creates checkpoint of this database in the given directory. See [RocksDB docs] for
     /// details.
     ///
@@ -125,7 +121,7 @@ impl RocksDB {
             .map_err(Into::into)
     }
 
-    fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
     }
 

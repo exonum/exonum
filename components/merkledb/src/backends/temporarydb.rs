@@ -55,8 +55,7 @@ impl TemporaryDB {
         // For some reason, using a `WriteBatch` is significantly faster than using `DB::drop_cf`,
         // both in debug and release modes.
         let mut batch = WriteBatch::default();
-        let db = self.inner.rocksdb();
-        let db_reader = db.read().expect("Couldn't get read lock to DB");
+        let db_reader = self.inner.get_lock_guard();
         for name in &names {
             if name != DEFAULT_CF && name != DB_METADATA {
                 let cf_handle = db_reader.cf_handle(name).ok_or_else(|| {
