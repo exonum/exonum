@@ -562,6 +562,7 @@ fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
             supervisor_mode,
         },
         validator_keys: Some(keys),
+        address: Some("127.0.0.1:6333".to_owned()),
     }
 }
 
