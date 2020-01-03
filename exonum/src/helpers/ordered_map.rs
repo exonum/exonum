@@ -25,6 +25,7 @@ use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
 ///
 /// This structure uses on `KeyValueSequence` from `key_value_sequence.proto` as
 /// a backend, but adds the verification logic to it:
+///
 /// - Keys are sorted in a lexicographical order;
 /// - Duplicate keys are forbidden.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd)]

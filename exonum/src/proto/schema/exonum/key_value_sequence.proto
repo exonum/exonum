@@ -26,7 +26,7 @@ message KeyValue {
   bytes value = 2;
 }
 
-// A sequence of repeated key-value pairs.
+// A sequence of key-value pairs.
 message KeyValueSequence {
   repeated KeyValue entry = 1;
 }
