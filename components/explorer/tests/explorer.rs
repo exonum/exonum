@@ -17,7 +17,6 @@
 use exonum::{
     blockchain::TxLocation,
     crypto::{gen_keypair, Hash},
-    explorer::*,
     helpers::Height,
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
@@ -27,7 +26,10 @@ use serde_json::json;
 
 use std::iter;
 
-use crate::blockchain::{
+use exonum_explorer::*;
+
+mod blockchain;
+use self::blockchain::{
     create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
 };
 

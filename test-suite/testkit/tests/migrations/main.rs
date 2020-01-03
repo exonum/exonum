@@ -16,7 +16,6 @@
 
 use exonum::{
     crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
-    merkledb::access::AccessExt,
     runtime::{
         migrations::{
             DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
@@ -243,39 +242,21 @@ fn merkelize_wallets(ctx: &mut MigrationContext) {
 fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) {
     const CHUNK_SIZE: usize = 500;
 
-    loop {
-        {
-            let old_schema = v01::Schema::new(ctx.helper.old_data());
-            let mut new_schema = v02::Schema::new(ctx.helper.new_data());
+    ctx.helper
+        .iter_loop(|helper, iters| {
+            let old_schema = v01::Schema::new(helper.old_data());
+            let mut new_schema = v02::Schema::new(helper.new_data());
 
-            let mut next_key_entry = ctx
-                .helper
-                .new_data()
-                .get_entry::<_, PublicKey>("__next_key");
-            let next_key = next_key_entry.take();
-            let mut iter = if let Some(next_key) = next_key {
-                old_schema.wallets.iter_from(&next_key)
-            } else {
-                old_schema.wallets.iter()
-            };
-
+            let iter = iters.create("wallets", &old_schema.wallets);
             let mut total_balance = 0;
-            for (key, wallet) in iter.by_ref().take(CHUNK_SIZE) {
+            for (key, wallet) in iter.take(CHUNK_SIZE) {
                 total_balance += wallet.balance;
                 new_schema.wallets.put(&key, wallet);
             }
             let prev_balance = new_schema.total_balance.get().unwrap_or(0);
             new_schema.total_balance.set(prev_balance + total_balance);
-
-            if let Some((key, _)) = iter.next() {
-                next_key_entry.set(key);
-            } else {
-                break;
-            }
-        }
-        ctx.helper.merge().unwrap();
-    }
-    // FIXME: Remove "__next_key", introduce persistent iterators (ECR-4078, ECR-4079)
+        })
+        .unwrap();
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.

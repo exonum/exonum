@@ -16,18 +16,5 @@
 
 //! A collection of tests of the Exonum node.
 
-pub mod blockchain;
-pub mod proto;
-
-use exonum::node::ApiSender;
-
-use std::thread::JoinHandle;
-
 #[cfg(test)]
-mod tests;
-
-#[derive(Debug)]
-pub struct RunHandle {
-    pub node_thread: JoinHandle<()>,
-    pub api_tx: ApiSender,
-}
+mod node;

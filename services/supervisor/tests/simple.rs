@@ -27,8 +27,8 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_merkledb::{access::AccessExt, ObjectHash};
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_merkledb::access::AccessExt;
+use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
     supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema, Supervisor,
@@ -260,18 +260,13 @@ fn discard_config_propose_from_auditor() {
         .consensus_config(new_consensus_config.clone())
         .sign_for_supervisor(keys.0, &keys.1);
 
-    let tx_hash = config_propose.object_hash();
-
-    testkit.create_block_with_transaction(config_propose);
-    testkit.create_blocks_until(cfg_change_height);
-
+    let block = testkit.create_block_with_transaction(config_propose);
     // Verify that transaction failed.
-    let api = testkit.api();
-    let system_api = api.exonum_api();
     let expected_err =
         ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
-    system_api.assert_tx_status(tx_hash, Err(&expected_err));
+    assert_eq!(*block[0].status().unwrap_err(), expected_err);
 
+    testkit.create_blocks_until(cfg_change_height);
     // Verify that no changes have been applied.
     let new_validators = testkit.network().validators();
 
@@ -304,17 +299,14 @@ fn test_send_proposal_with_api() {
         ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
 
     // Create proposal
-    let hash = {
-        let hash: Hash = testkit
-            .api()
-            .private(exonum_testkit::ApiKind::Service("supervisor"))
-            .query(&config_propose)
-            .post("propose-config")
-            .unwrap();
-        hash
-    };
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(hash);
+    let hash: Hash = testkit
+        .api()
+        .private(ApiKind::Service("supervisor"))
+        .query(&config_propose)
+        .post("propose-config")
+        .unwrap();
+    let block = testkit.create_block();
+    block[hash].status().unwrap();
 
     // Assert that config is now pending.
     let snapshot = testkit.snapshot();
@@ -353,21 +345,23 @@ fn deploy_service() {
     };
 
     // Create deploy request
-    let hash = testkit
+    let hash: Hash = testkit
         .api()
-        .private(exonum_testkit::ApiKind::Service("supervisor"))
+        .private(ApiKind::Service("supervisor"))
         .query(&deploy_request)
         .post("deploy-artifact")
         .unwrap();
-    testkit.create_blocks_until(deadline_height);
-
+    let block = testkit.create_block();
     // Check that request was executed.
-    let api = testkit.api();
-    let system_api = api.exonum_api();
-    system_api.assert_tx_success(hash);
+    block[hash].status().unwrap();
 
+    testkit.create_blocks_until(deadline_height);
     // Verify that after reaching the deadline height artifact is deployed.
-    assert_eq!(system_api.services().artifacts.contains(&artifact), true);
+    assert!(testkit
+        .api()
+        .dispatcher_info()
+        .artifacts
+        .contains(&artifact));
 }
 
 /// Attempts to change config without `actual_from` height set.

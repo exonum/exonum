@@ -160,6 +160,7 @@ serde
 serializable
 serialize
 serializer
+sharded
 signum
 smallvec
 socketaddr

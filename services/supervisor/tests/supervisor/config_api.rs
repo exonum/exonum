@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{
+    blockchain::ConsensusConfig, crypto::Hash, helpers::ValidatorId,
+    runtime::SUPERVISOR_INSTANCE_ID,
+};
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
-
-use exonum::blockchain::ConsensusConfig;
-use exonum::{crypto::Hash, helpers::ValidatorId, runtime::SUPERVISOR_INSTANCE_ID};
 
 use crate::utils::*;
 use exonum_supervisor::{ConfigProposalWithHash, ConfigPropose, ConfigVote, SupervisorInterface};
@@ -103,8 +104,8 @@ fn test_confirm_proposal_with_api() {
             propose_hash: pending_config.propose_hash,
         },
     );
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(tx_hash);
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
     let consensus_config = actual_consensus_config(&testkit.api());
@@ -121,8 +122,8 @@ fn test_send_proposal_with_api() {
 
     // Create proposal
     let hash = create_proposal(&testkit.api(), config_proposal.clone());
-    testkit.create_block();
-    testkit.api().exonum_api().assert_tx_success(hash);
+    let block = testkit.create_block();
+    block[hash].status().unwrap();
 
     // Get proposal info
     let pending_config =
