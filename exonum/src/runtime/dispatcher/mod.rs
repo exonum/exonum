@@ -19,6 +19,7 @@ use futures::{
     future::{self, Either},
     Future,
 };
+use log::{error, info};
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -128,7 +129,11 @@ impl Dispatcher {
     }
 
     /// Restore the dispatcher from the state which was saved in the specified snapshot.
-    pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) -> Result<(), ExecutionError> {
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the stored state cannot be restored.
+    pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) {
         let schema = Schema::new(snapshot);
         // Restore information about the deployed services.
         for (artifact, state) in schema.artifacts().iter() {
@@ -137,21 +142,27 @@ impl Dispatcher {
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
-            self.deploy_artifact(artifact, state.deploy_spec).wait()?;
+            self.deploy_artifact(artifact.clone(), state.deploy_spec)
+                .wait()
+                .unwrap_or_else(|err| {
+                    panic!(
+                        "BUG: Can't restore state, artifact {:?} has not been deployed now, \
+                         but was deployed previously. Reported error: {}",
+                        artifact, err
+                    );
+                });
         }
         // Restart active service instances.
         for state in schema.instances().values() {
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined state.");
-            self.update_service_status(snapshot, &state.spec, status)?;
+            self.update_service_status(snapshot, &state.spec, status);
         }
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
             runtime.on_resume();
         }
-
-        Ok(())
     }
 
     /// Add a built-in service with the predefined identifier.
@@ -189,8 +200,7 @@ impl Dispatcher {
                 InstanceStatus::Active,
                 "BUG: The built-in service instance must have an active status at startup."
             );
-            self.update_service_status(&patch, &spec, status)
-                .expect("Cannot start service");
+            self.update_service_status(&patch, &spec, status);
         }
         patch
     }
@@ -228,16 +238,18 @@ impl Dispatcher {
     ///
     /// Until the block built on top of `fork` is committed (or if `fork` is discarded in
     /// favor of another block proposal), no blocking is performed.
-    pub(crate) fn commit_artifact(
-        fork: &Fork,
-        artifact: ArtifactId,
-        deploy_spec: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        // TODO: revise dispatcher integrity checks [ECR-3743]
+    ///
+    /// # Panics
+    ///
+    /// This method assumes that `deploy_artifact` was previously called for the corresponding
+    /// `ArtifactId` and deployment was completed successfully.
+    /// If any error happens within `commit_artifact`, it is considered either a bug in the
+    /// `Supervisor` service or `Dispatcher` itself, and as a result, this method will panic.
+    pub(crate) fn commit_artifact(fork: &Fork, artifact: ArtifactId, deploy_spec: Vec<u8>) {
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork)
             .add_pending_artifact(artifact, deploy_spec)
-            .map_err(From::from)
+            .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
     }
 
     /// Initiates stopping of an existing service instance in the blockchain. The stopping
@@ -409,8 +421,7 @@ impl Dispatcher {
         }
         // Notify runtime about changes in service instances.
         for (spec, status) in modified_instances {
-            self.update_service_status(&patch, &spec, status)
-                .expect("Cannot commit service status");
+            self.update_service_status(&patch, &spec, status);
         }
         patch
     }
@@ -491,18 +502,23 @@ impl Dispatcher {
     }
 
     /// Commits service instance status to the corresponding runtime.
-    pub(super) fn update_service_status(
+    ///
+    /// # Panics
+    ///
+    /// This method assumes that it was previously checked if runtime can change the state
+    /// of the service, and will panic if it cannot be done.
+    fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
         instance: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         // Notify the runtime that the service has been committed.
-        let runtime = self
-            .runtimes
-            .get_mut(&instance.artifact.runtime_id)
-            .ok_or(Error::IncorrectRuntime)?;
-        runtime.update_service_status(snapshot, instance, status)?;
+        let runtime = self.runtimes.get_mut(&instance.artifact.runtime_id).expect(
+            "BUG: `update_service_status` was invoked for incorrect runtime, \
+             this should never happen because of preemptive checks.",
+        );
+        runtime.update_service_status(snapshot, instance, status);
 
         info!(
             "Committing service instance {:?} with status {}",
@@ -517,7 +533,6 @@ impl Dispatcher {
                 status,
             },
         );
-        Ok(())
     }
 }
 

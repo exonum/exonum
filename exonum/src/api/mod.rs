@@ -23,7 +23,7 @@ pub mod backends;
 pub mod error;
 pub mod manager;
 pub mod node;
-pub mod websocket;
+//pub mod websocket;
 
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeMap, fmt};
@@ -32,7 +32,7 @@ use self::{
     backends::actix,
     node::{
         private::{NodeInfo, SystemApi as PrivateSystemApi},
-        public::{ExplorerApi, SystemApi},
+        public::SystemApi,
     },
 };
 use crate::{api::node::SharedNodeState, blockchain::Blockchain};
@@ -218,10 +218,6 @@ impl ApiAggregator {
             "system".to_owned(),
             Self::system_api(blockchain.clone(), node_state.clone()),
         );
-        endpoints.insert(
-            "explorer".to_owned(),
-            Self::explorer_api(blockchain, node_state),
-        );
         Self { endpoints }
     }
 
@@ -244,12 +240,6 @@ impl ApiAggregator {
             ApiAccess::Private => backend
                 .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.private_scope))),
         }
-    }
-
-    fn explorer_api(blockchain: Blockchain, shared_node_state: SharedNodeState) -> ApiBuilder {
-        let mut builder = ApiBuilder::new();
-        ExplorerApi::new(blockchain).wire(builder.public_scope(), shared_node_state);
-        builder
     }
 
     fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {

@@ -94,10 +94,11 @@ use exonum::{
     exonum_merkledb::{Database, RocksDB},
     node::Node,
     runtime::{
-        rust::{RustRuntimeBuilder, ServiceFactory},
+        rust::{DefaultInstance, RustRuntimeBuilder, ServiceFactory},
         RuntimeInstance, WellKnownRuntime,
     },
 };
+use exonum_explorer_service::ExplorerFactory;
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
@@ -130,7 +131,9 @@ impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
         Self {
-            rust_runtime: RustRuntimeBuilder::new().with_factory(Supervisor),
+            rust_runtime: RustRuntimeBuilder::new()
+                .with_factory(Supervisor)
+                .with_factory(ExplorerFactory),
             external_runtimes: vec![],
         }
     }
@@ -163,6 +166,8 @@ impl NodeBuilder {
             )
             .with_artifact(Supervisor.artifact_id())
             .with_instance(supervisor)
+            .with_artifact(ExplorerFactory.artifact_id())
+            .with_instance(ExplorerFactory.default_instance())
             .build();
 
             let db_options = &run_config.node_config.private_config.database;

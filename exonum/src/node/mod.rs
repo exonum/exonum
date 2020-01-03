@@ -37,6 +37,7 @@ use exonum_keys::Keys;
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
 use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
+use log::{info, trace};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
@@ -930,12 +931,7 @@ impl Node {
         for runtime in external_runtimes {
             blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
-        let blockchain = blockchain_builder.build().unwrap_or_else(|err| {
-            panic!(
-                "Blockchain initialization failed with the following error: {}",
-                err
-            )
-        });
+        let blockchain = blockchain_builder.build();
 
         Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }
@@ -1076,8 +1072,6 @@ impl Node {
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
 
-        let api_state = self.handler.api_state.clone();
-
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
             self.state().consensus_public_key(),
@@ -1087,8 +1081,6 @@ impl Node {
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-        // Stop ws server.
-        api_state.shutdown_broadcast_server();
         Ok(())
     }
 

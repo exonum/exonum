@@ -20,6 +20,9 @@ mod execution_result;
 #[cfg(test)]
 mod tests;
 
+// This import is used in the blockchain explorer.
+pub use self::execution_result::ExecutionStatus as SerdeExecutionStatus;
+
 use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_merkledb::{BinaryValue, ObjectHash};
@@ -221,16 +224,9 @@ pub trait ExecutionFail {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
 /// use exonum::runtime::{ExecutionError, InstanceId, ErrorMatch};
 /// use exonum_derive::ExecutionFail;
-/// # use exonum::explorer::BlockWithTransactions;
-/// # struct Tx;
-/// # struct TestKit;
-/// # impl TestKit {
-/// #     fn create_block_with_transaction(&mut self, tx: Tx)
-/// #         -> BlockWithTransactions { unimplemented!() }
-/// # }
 ///
 /// #[derive(Debug, ExecutionFail)]
 /// pub enum Error {
@@ -242,15 +238,13 @@ pub trait ExecutionFail {
 /// // Identifier of the service that will cause an error.
 /// const SERVICE_ID: InstanceId = 100;
 ///
-/// let mut testkit: TestKit = // ...
-/// #    TestKit;
-/// let tx = // ...
-/// #    Tx;
-/// let block = testkit.create_block_with_transaction(tx);
-/// let err: &ExecutionError = block[0].status().unwrap_err();
+/// # fn not_run(error: ExecutionError) {
+/// let err: &ExecutionError = // ...
+/// #    &error;
 /// let matcher = ErrorMatch::from_fail(&Error::HashAlreadyExists)
 ///     .for_service(SERVICE_ID);
 /// assert_eq!(*err, matcher);
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct ErrorMatch {
@@ -271,6 +265,18 @@ impl ErrorMatch {
     /// [`ExecutionFail`]: trait.ExecutionFail.html
     pub fn from_fail<F: ExecutionFail + ?Sized>(fail: &F) -> Self {
         Self::new(fail.kind(), fail.description())
+    }
+
+    /// Creates a matcher for `Unexpected` kind of errors.
+    /// By default it will match any description.
+    pub fn any_unexpected() -> Self {
+        Self {
+            kind: ErrorKind::Unexpected,
+            description: StringMatch::Any,
+            runtime_id: None,
+            instance_id: None,
+            call_type: None,
+        }
     }
 
     fn new(kind: ErrorKind, description: String) -> Self {

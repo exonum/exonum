@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     use crate::{
         access::{AccessExt, Prefixed, RawAccessMut},
-        migration::Migration,
+        migration::{Migration, Scratchpad},
         Database, ProofListIndex, TemporaryDB,
     };
 
@@ -260,5 +260,17 @@ mod tests {
         test_key_iter(Migration::new("namespace", &patch));
         db.merge(patch).unwrap();
         test_key_iter(Migration::new("namespace", &db.snapshot()));
+    }
+
+    #[test]
+    fn iterating_over_keys_in_scratchpad() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        prepare_key_iter(Scratchpad::new("namespace", &fork));
+        test_key_iter(Scratchpad::new("namespace", fork.readonly()));
+        let patch = fork.into_patch();
+        test_key_iter(Scratchpad::new("namespace", &patch));
+        db.merge(patch).unwrap();
+        test_key_iter(Scratchpad::new("namespace", &db.snapshot()));
     }
 }

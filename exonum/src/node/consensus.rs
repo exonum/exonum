@@ -14,6 +14,7 @@
 
 use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
 use failure::{bail, format_err};
+use log::{error, info, trace, warn};
 
 use std::{collections::HashSet, convert::TryFrom};
 
@@ -631,8 +632,6 @@ impl NodeHandler {
                 .new_height(&block_hash, self.system_state.current_time());
             (committed_txs, proposer)
         };
-
-        self.api_state.broadcast(&block_hash);
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);

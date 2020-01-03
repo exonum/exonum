@@ -305,7 +305,7 @@ fn master_key_path_current_dir() {
         .unwrap();
 
     let current_dir = std::env::current_dir().unwrap();
-    let expected_path = current_dir.join("master.key.toml");
+    let expected_path = current_dir.join("master.key.toml").canonicalize().unwrap();
 
     let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
     assert_eq!(

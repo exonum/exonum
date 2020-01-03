@@ -41,8 +41,6 @@
 
 pub use exonum_merkledb;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate serde_derive;
 
 // Test dependencies.
@@ -60,7 +58,6 @@ pub mod helpers;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
-pub mod explorer;
 pub mod node;
 #[macro_use]
 pub mod runtime;

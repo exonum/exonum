@@ -6,7 +6,7 @@
 
 # Base URL for demo service endpoints
 $BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency/v1';
-$TRANSACTION_URL = 'http://127.0.0.1:8000/api/explorer/v1/transactions';
+$TRANSACTION_URL = 'http://127.0.0.1:8000/api/services/explorer/v1/transactions';
 # Directory with the current script
 $wd = $myinvocation.mycommand.path | Split-Path;
 
@@ -42,7 +42,7 @@ function Transfer ($jsonFilename) {
 
 # Checks that a `CreateWallet` transaction is committed to the blockchain.
 function Check-CreateTx ($tx) {
-  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$($tx.hash)";
+  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/services/explorer/v1/transactions?hash=$($tx.hash)";
   $error = $False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;

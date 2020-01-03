@@ -18,6 +18,7 @@ use actix::prelude::*;
 use actix_net::server::Server;
 use actix_web::server::{HttpServer, StopServer};
 use futures::{sync::mpsc, Future};
+use log::{error, info, warn};
 
 use std::{collections::HashMap, fmt, io, time::Duration};
 
