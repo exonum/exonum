@@ -86,10 +86,9 @@ impl ObjectHashStruct {
 
         quote! {
             impl exonum_merkledb::ObjectHash for #name {
-                fn object_hash(&self) -> exonum_crypto::Hash {
-                    use exonum_merkledb::BinaryValue;
-                    let v = self.to_bytes();
-                    exonum_crypto::hash(&v)
+                fn object_hash(&self) -> exonum_merkledb::_reexports::Hash {
+                    let bytes = exonum_merkledb::BinaryValue::to_bytes(self);
+                    exonum_merkledb::_reexports::hash(&bytes)
                 }
             }
         }
@@ -113,7 +112,7 @@ impl BinaryValueStruct {
 
                 fn from_bytes(
                     value: std::borrow::Cow<[u8]>,
-                ) -> std::result::Result<Self, failure::Error> {
+                ) -> std::result::Result<Self, exonum_merkledb::_reexports::Error> {
                     use protobuf::Message as _;
 
                     let mut block = <Self as exonum_proto::ProtobufConvert>::ProtoStruct::new();
@@ -129,7 +128,7 @@ impl BinaryValueStruct {
 
         quote! {
             impl exonum_merkledb::BinaryValue for #name {
-                fn to_bytes(&self) -> Vec<u8> {
+                fn to_bytes(&self) -> std::vec::Vec<u8> {
                     bincode::serialize(self).expect(
                         concat!("Failed to serialize `BinaryValue` for ", stringify!(#name))
                     )
@@ -137,8 +136,8 @@ impl BinaryValueStruct {
 
                 fn from_bytes(
                     value: std::borrow::Cow<[u8]>,
-                ) -> std::result::Result<Self, failure::Error> {
-                    bincode::deserialize(value.as_ref()).map_err(failure::Error::from)
+                ) -> std::result::Result<Self, exonum_merkledb::_reexports::Error> {
+                    bincode::deserialize(value.as_ref()).map_err(From::from)
                 }
             }
         }
