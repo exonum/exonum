@@ -12,30 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a regression test for exonum node.
+//! High-level tests for the Exonum node.
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
-    node::{Node, NodeConfig},
+    merkledb::{Database, TemporaryDB},
+    node::{Node, NodeConfig, ShutdownHandle},
     runtime::{
-        rust::{AfterCommitContext, Service, ServiceFactory},
+        rust::{AfterCommitContext, RustRuntime, Service, ServiceFactory},
         RuntimeInstance,
     },
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{Database, TemporaryDB};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
     sync::{Arc, Mutex},
+    thread,
     time::Duration,
 };
 
-use crate::RunHandle;
-use exonum::runtime::rust::RustRuntime;
+#[derive(Debug)]
+struct RunHandle {
+    node_thread: thread::JoinHandle<()>,
+    shutdown_handle: ShutdownHandle,
+}
+
+impl RunHandle {
+    fn new(node: Node) -> Self {
+        let shutdown_handle = node.shutdown_handle();
+        Self {
+            shutdown_handle,
+            node_thread: thread::spawn(|| node.run().unwrap()),
+        }
+    }
+
+    fn join(self) {
+        self.shutdown_handle.shutdown().wait().unwrap();
+        self.node_thread.join().unwrap();
+    }
+}
 
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
 #[service_factory(

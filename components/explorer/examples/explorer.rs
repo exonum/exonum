@@ -17,18 +17,24 @@
 use exonum::{
     blockchain::{BlockchainMut, CallInBlock, ProposerId},
     crypto::gen_keypair,
-    explorer::*,
     helpers::{Height, ValidatorId},
     merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
     runtime::ErrorKind as ExecutionErrorKind,
 };
-use exonum_node_tests::blockchain::{
+use serde_json::json;
+
+use std::{collections::BTreeMap, iter};
+
+use exonum_explorer::*;
+
+#[path = "../tests/blockchain/mod.rs"]
+mod blockchain;
+
+use crate::blockchain::{
     consensus_keys, create_block, create_blockchain, CreateWallet, ExplorerTransactions as _,
     Transfer, SERVICE_ID,
 };
-use serde_json::json;
-use std::{collections::BTreeMap, iter};
 
 /// Creates a transaction for the mempool.
 pub fn mempool_transaction() -> Verified<AnyTx> {
@@ -238,7 +244,7 @@ fn main() {
     assert_eq!(
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({
-            "type": "in-pool",
+            "type": "in_pool",
             "content": serde_json::to_value(tx_in_pool.content()).unwrap(),
         })
     );

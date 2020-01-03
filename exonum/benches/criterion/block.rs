@@ -105,7 +105,6 @@ fn create_blockchain_from_parts(
     BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .build()
-        .unwrap()
 }
 
 fn create_consensus_config_and_blockchain_base(

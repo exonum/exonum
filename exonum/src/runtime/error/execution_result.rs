@@ -28,8 +28,10 @@ enum ExecutionType {
     ServiceError,
 }
 
+/// Version of `ExecutionStatus` suitable for `serde`.
+#[doc(hidden)]
 #[derive(Debug, Serialize, Deserialize)]
-pub(super) struct ExecutionStatus {
+pub struct ExecutionStatus {
     #[serde(rename = "type")]
     typ: ExecutionType,
     #[serde(skip_serializing_if = "String::is_empty", default)]

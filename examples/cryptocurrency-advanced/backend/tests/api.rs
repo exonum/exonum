@@ -18,13 +18,16 @@
 //! about the storage state.
 
 use exonum::{
-    api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
-    runtime::SnapshotExt,
+    runtime::{rust::ServiceFactory, SnapshotExt},
 };
+use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use exonum_testkit::{
+    explorer::api::{TransactionQuery, TransactionResponse},
+    ApiKind, TestKit, TestKitApi, TestKitBuilder,
+};
 use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
@@ -352,8 +355,13 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let mut testkit =
-        TestKit::for_rust_service(CryptocurrencyService, SERVICE_NAME, SERVICE_ID, ());
+    let artifact = CryptocurrencyService.artifact_id();
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(ExplorerFactory)
+        .with_rust_service(CryptocurrencyService)
+        .with_artifact(artifact.clone())
+        .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
+        .create();
     let api = CryptocurrencyApi {
         inner: testkit.api(),
     };

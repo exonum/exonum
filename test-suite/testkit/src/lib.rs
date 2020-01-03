@@ -16,17 +16,16 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
+//!
 //! ```
 //! use exonum::{
+//!     blockchain::{Block, Schema},
+//!     crypto::{gen_keypair, Hash},
+//!     helpers::Height,
 //!     runtime::{
 //!         rust::{ServiceFactory, CallContext, Service},
 //!         BlockchainData, SnapshotExt, ExecutionError,
 //!     },
-//!     blockchain::{Block, Schema},
-//!     crypto::{gen_keypair, Hash},
-//!     explorer::TransactionInfo,
-//!     helpers::Height,
-//!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
 //! };
 //! use serde_derive::*;
 //! use exonum_derive::*;
@@ -62,62 +61,41 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     // Create testkit for network with four validators
-//!     // and add a builtin timestamping service with ID=1.
-//!     let service = TimestampingService;
-//!     let artifact = service.artifact_id();
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_validators(4)
-//!         .with_artifact(artifact.clone())
-//!         .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
-//!         .with_rust_service(service)
-//!         .create();
+//! # fn main() {
+//! // Create testkit for network with four validators
+//! // and add a builtin timestamping service with ID=1.
+//! let service = TimestampingService;
+//! let artifact = service.artifact_id();
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_validators(4)
+//!     .with_artifact(artifact.clone())
+//!     .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
+//!     .with_rust_service(service)
+//!     .create();
 //!
-//!     // Create few transactions.
-//!     let keys = gen_keypair();
-//!     let id = SERVICE_ID;
-//!     let tx1 = keys.timestamp(id, "Down To Earth".into());
-//!     let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
-//!     let tx3 = keys.timestamp(id, "Dropping Like Flies".into());
-//!     // Commit them into blockchain.
-//!     testkit.create_block_with_transactions(vec![
-//!         tx1.clone(), tx2.clone(), tx3.clone()
-//!     ]);
+//! // Create a few transactions.
+//! let keys = gen_keypair();
+//! let id = SERVICE_ID;
+//! let tx1 = keys.timestamp(id, "Down To Earth".into());
+//! let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
+//! let tx3 = keys.timestamp(id, "Dropping Like Flies".into());
+//! // Commit them into blockchain.
+//! testkit.create_block_with_transactions(vec![
+//!     tx1.clone(), tx2.clone(), tx3.clone()
+//! ]);
 //!
-//!     // Add a single transaction.
-//!     let tx4 = keys.timestamp(id, "Barking up the wrong tree".into());
-//!     testkit.create_block_with_transaction(tx4.clone());
+//! // Add a single transaction.
+//! let tx4 = keys.timestamp(id, "Barking up the wrong tree".into());
+//! testkit.create_block_with_transaction(tx4.clone());
 //!
-//!     // Check results with schema.
-//!     let snapshot = testkit.snapshot();
-//!     let schema = snapshot.for_core();
-//!     assert!(schema.transactions().contains(&tx1.object_hash()));
-//!     assert!(schema.transactions().contains(&tx2.object_hash()));
-//!     assert!(schema.transactions().contains(&tx3.object_hash()));
-//!     assert!(schema.transactions().contains(&tx4.object_hash()));
-//!
-//!     // Check results with api.
-//!     let api = testkit.api();
-//!     let response: BlocksRange = api
-//!         .public(ApiKind::Explorer)
-//!         .query(&BlocksQuery {
-//!             count: 10,
-//!             ..Default::default()
-//!         })
-//!         .get("v1/blocks")
-//!         .unwrap();
-//!     let (blocks, range) = (response.blocks, response.range);
-//!     assert_eq!(blocks.len(), 3);
-//!     assert_eq!(range.start, Height(0));
-//!     assert_eq!(range.end, Height(3));
-//!
-//!     let info = api
-//!         .public(ApiKind::Explorer)
-//!         .query(&TransactionQuery::new(tx1.object_hash()))
-//!         .get::<TransactionInfo>("v1/transactions")
-//!         .unwrap();
-//! }
+//! // Check results with schema.
+//! let snapshot = testkit.snapshot();
+//! let schema = snapshot.for_core();
+//! assert!(schema.transactions().contains(&tx1.object_hash()));
+//! assert!(schema.transactions().contains(&tx2.object_hash()));
+//! assert!(schema.transactions().contains(&tx3.object_hash()));
+//! assert!(schema.transactions().contains(&tx4.object_hash()));
+//! # }
 //! ```
 
 #![warn(missing_debug_implementations, missing_docs)]
@@ -129,6 +107,7 @@ pub use crate::{
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
+pub use exonum_explorer as explorer;
 
 use exonum::{
     api::{
@@ -142,7 +121,6 @@ use exonum::{
         Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
-    explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
@@ -152,6 +130,7 @@ use exonum::{
         InstanceId, RuntimeInstance, SnapshotExt,
     },
 };
+use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -247,8 +226,7 @@ impl TestKit {
                 BlockchainBuilder::new(blockchain, genesis_config),
                 |builder, runtime| builder.with_runtime(runtime),
             )
-            .build()
-            .expect("Unable to create blockchain instance");
+            .build();
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
         let api_aggregator =

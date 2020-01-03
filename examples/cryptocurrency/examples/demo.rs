@@ -18,10 +18,12 @@ use exonum::{
     keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
     runtime::{
-        rust::{RustRuntime, ServiceFactory},
+        rust::{DefaultInstance, RustRuntime, ServiceFactory},
         RuntimeInstance,
     },
 };
+use exonum_explorer_service::ExplorerFactory;
+
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
 fn node_config() -> NodeConfig {
@@ -65,11 +67,14 @@ fn node_config() -> NodeConfig {
 fn main() {
     exonum::helpers::init_logger().unwrap();
     let external_runtimes: Vec<RuntimeInstance> = vec![];
-    let service = CryptocurrencyService;
-    let artifact_id = service.artifact_id();
-    let rust_runtime = RustRuntime::builder().with_factory(service);
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(CryptocurrencyService)
+        .with_factory(ExplorerFactory);
     let node_config = node_config();
+    let artifact_id = CryptocurrencyService.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_config.consensus.clone())
+        .with_artifact(ExplorerFactory.artifact_id())
+        .with_instance(ExplorerFactory.default_instance())
         .with_artifact(artifact_id.clone())
         .with_instance(artifact_id.into_default_instance(1, "cryptocurrency"))
         .build();

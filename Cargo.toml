@@ -8,6 +8,7 @@ members = [
     "examples/sample_runtime",
     "examples/timestamping/backend",
 
+    "services/explorer",
     "services/middleware",
     "services/time",
     "services/supervisor",
@@ -20,6 +21,7 @@ members = [
     "components/build",
     "components/crypto",
     "components/derive",
+    "components/explorer",
     "components/keys",
     "components/merkledb",
     "components/proto",

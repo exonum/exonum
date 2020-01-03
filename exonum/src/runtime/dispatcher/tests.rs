@@ -95,10 +95,9 @@ impl Dispatcher {
         fork: &Fork,
         artifact: ArtifactId,
         payload: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        Self::commit_artifact(fork, artifact.clone(), payload.to_bytes())?;
+    ) {
+        Self::commit_artifact(fork, artifact.clone(), payload.to_bytes());
         self.block_until_deployed(artifact, payload.into_bytes());
-        Ok(())
     }
 }
 
@@ -217,7 +216,7 @@ impl Runtime for SampleRuntime {
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         new_status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         if spec.artifact.runtime_id == self.runtime_type {
             let status_changed = if let Some(status) = self.services.get(&spec.id).copied() {
                 status != new_status
@@ -229,9 +228,8 @@ impl Runtime for SampleRuntime {
                 self.services.insert(spec.id, new_status);
                 self.new_services.insert(spec.id, new_status);
             }
-            Ok(())
         } else {
-            Err(DispatcherError::IncorrectRuntime.into())
+            panic!("Incorrect runtime")
         }
     }
 
@@ -339,12 +337,8 @@ fn test_dispatcher_simple() {
 
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
-    dispatcher
-        .commit_artifact_sync(&fork, rust_artifact.clone(), vec![])
-        .unwrap();
-    dispatcher
-        .commit_artifact_sync(&fork, java_artifact.clone(), vec![])
-        .unwrap();
+    dispatcher.commit_artifact_sync(&fork, rust_artifact.clone(), vec![]);
+    dispatcher.commit_artifact_sync(&fork, java_artifact.clone(), vec![]);
 
     // Check if the services are ready for initiation. Note that the artifacts are pending at this
     // point.
@@ -468,7 +462,7 @@ fn test_dispatcher_simple() {
         .with_runtime(runtime_a.runtime_type, runtime_a)
         .with_runtime(runtime_b.runtime_type, runtime_b)
         .finalize(&blockchain);
-    dispatcher.restore_state(&db.snapshot()).unwrap();
+    dispatcher.restore_state(&db.snapshot());
 
     assert_eq!(
         expected_new_services,
@@ -514,8 +508,7 @@ impl Runtime for ShutdownRuntime {
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
         _status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
+    ) {
     }
 
     fn execute(
@@ -697,8 +690,7 @@ impl Runtime for DeploymentRuntime {
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
         _status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
-        Ok(())
+    ) {
     }
 
     fn execute(
@@ -759,7 +751,7 @@ fn delayed_deployment() {
     // Check that we don't require the runtime to deploy the artifact again if we mark it
     // as committed.
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
@@ -785,7 +777,7 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact, spec).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact, spec);
     dispatcher.commit_block_and_notify_runtimes(fork); // << should panic
 }
 
@@ -829,7 +821,7 @@ fn failed_deployment_with_node_restart() {
     LittleEndian::write_u64(&mut spec, 100);
 
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
     dispatcher.activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
@@ -864,7 +856,7 @@ fn recoverable_error_during_deployment() {
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec).unwrap();
+    Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
     dispatcher.commit_block_and_notify_runtimes(fork);
     // The dispatcher should try to deploy the artifact again despite a previous failure.
     assert!(dispatcher.is_artifact_deployed(&artifact));
@@ -906,9 +898,7 @@ fn stopped_service_workflow() {
         name: "first".into(),
         version: Version::new(0, 1, 0),
     };
-    dispatcher
-        .commit_artifact_sync(&fork, artifact.clone(), vec![])
-        .unwrap();
+    dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec {
         artifact: artifact.clone(),
@@ -985,7 +975,7 @@ fn stopped_service_workflow() {
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime.runtime_type, runtime)
         .finalize(&blockchain);
-    dispatcher.restore_state(&db.snapshot()).unwrap();
+    dispatcher.restore_state(&db.snapshot());
 
     // Check expected notifications.
     let expected_notifications = vec![

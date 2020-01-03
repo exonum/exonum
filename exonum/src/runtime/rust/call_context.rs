@@ -88,16 +88,12 @@ impl<'a> CallContext<'a> {
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn start_artifact_registration(
-        &self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
+    pub fn start_artifact_registration(&self, artifact: ArtifactId, spec: Vec<u8>) {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`start_artifact_registration` called within a non-supervisor service");
         }
 
-        Dispatcher::commit_artifact(self.inner.fork, artifact, spec)
+        Dispatcher::commit_artifact(self.inner.fork, artifact, spec);
     }
 
     /// Initiates adding a service instance to the blockchain.
