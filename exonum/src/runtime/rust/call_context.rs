@@ -96,6 +96,21 @@ impl<'a> CallContext<'a> {
         Dispatcher::commit_artifact(self.inner.fork, artifact, spec);
     }
 
+    #[doc(hidden)]
+    pub fn start_migration<'q>(
+        &self,
+        new_artifact: ArtifactId,
+        old_service: impl Into<InstanceQuery<'q>>,
+    ) -> Result<(), ExecutionError> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`start_migration` called within a non-supervisor service");
+        }
+
+        self.inner
+            .dispatcher
+            .start_migration(&self.inner.fork, new_artifact, old_service.into())
+    }
+
     /// Initiates adding a service instance to the blockchain.
     ///
     /// The service is not immediately activated; it activates if / when the block containing

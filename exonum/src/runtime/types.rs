@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{PublicKey, SecretKey};
+use exonum_crypto::{Hash, PublicKey, SecretKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
@@ -30,7 +30,7 @@ use std::{
     str::FromStr,
 };
 
-use super::InstanceDescriptor;
+use super::{ExecutionError, InstanceDescriptor};
 use crate::{
     blockchain::config::InstanceInitParams, helpers::ValidateInput, messages::Verified,
     proto::schema,
@@ -195,6 +195,11 @@ impl ArtifactId {
         };
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    /// Checks if the specified artifact is an upgraded version of another artifact.
+    pub fn is_upgrade_of(&self, other: &Self) -> bool {
+        self.name == other.name && self.version > other.version
     }
 
     /// Converts into `InstanceInitParams` with given id, name and empty constructor.
@@ -520,6 +525,31 @@ pub struct InstanceState {
     /// Pending status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
+    /// The artifact targeted by the service migration.
+    #[protobuf_convert(with = "pb_optional_artifact")]
+    pub migration_target: Option<ArtifactId>,
+}
+
+mod pb_optional_artifact {
+    use super::*;
+
+    pub fn from_pb(pb: schema::runtime::ArtifactId) -> Result<Option<ArtifactId>, failure::Error> {
+        let is_default =
+            pb.get_name().is_empty() && pb.get_version().is_empty() && pb.get_runtime_id() == 0;
+        Ok(if is_default {
+            None
+        } else {
+            Some(ArtifactId::from_pb(pb)?)
+        })
+    }
+
+    pub fn to_pb(value: &Option<ArtifactId>) -> schema::runtime::ArtifactId {
+        if let Some(value) = value.as_ref() {
+            value.to_pb()
+        } else {
+            schema::runtime::ArtifactId::new()
+        }
+    }
 }
 
 impl InstanceState {
@@ -529,6 +559,7 @@ impl InstanceState {
             spec,
             status: Some(status),
             pending_status: None,
+            migration_target: None,
         }
     }
 
@@ -545,6 +576,48 @@ impl InstanceState {
 
         self.status = self.pending_status;
         self.pending_status = None;
+    }
+}
+
+/// Result of execution of a migration script.
+#[derive(Debug, Clone)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::runtime::MigrationScriptResult")]
+pub struct MigrationScriptResult {
+    /// Instance the script was applied to.
+    pub instance: InstanceSpec,
+    /// The end version of data after the script successfully applied.
+    #[protobuf_convert(with = "pb_version")]
+    pub end_version: Version,
+    /// Result of the script execution.
+    #[protobuf_convert(with = "pb_script_result")]
+    pub result: Result<Hash, ExecutionError>,
+}
+
+mod pb_script_result {
+    use super::*;
+
+    pub fn from_pb(
+        mut pb: schema::runtime::MigrationStatus,
+    ) -> Result<Result<Hash, ExecutionError>, failure::Error> {
+        if pb.has_hash() {
+            Ok(Ok(Hash::from_pb(pb.take_hash())?))
+        } else if pb.has_error() {
+            Ok(Err(ExecutionError::from_pb(pb.take_error())?))
+        } else {
+            Err(format_err!(
+                "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"
+            ))
+        }
+    }
+
+    pub fn to_pb(value: &Result<Hash, ExecutionError>) -> schema::runtime::MigrationStatus {
+        let mut pb = schema::runtime::MigrationStatus::new();
+        match value {
+            Ok(hash) => pb.set_hash(hash.to_pb()),
+            Err(e) => pb.set_error(e.to_pb()),
+        }
+        pb
     }
 }
 

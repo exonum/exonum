@@ -607,6 +607,20 @@ impl Runtime for RustRuntime {
         self.changed_services_since_last_block = true;
     }
 
+    fn migrate(
+        &self,
+        new_artifact: &ArtifactId,
+        old_service: &InstanceSpec,
+    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        debug_assert_eq!(new_artifact.name, old_service.artifact.name);
+
+        let artifact = self
+            .available_artifacts
+            .get(&new_artifact)
+            .ok_or_else(|| DataMigrationError::NotSupported)?;
+        artifact.migration_scripts(&old_service.artifact.version)
+    }
+
     fn execute(
         &self,
         context: ExecutionContext<'_>,

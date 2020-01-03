@@ -465,7 +465,7 @@ impl ExecutionError {
     }
 
     /// Creates an execution error from the panic description.
-    fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+    pub(in crate::runtime) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
         let any = any.as_ref();
 
         // Tries to get a meaningful description from the given panic.

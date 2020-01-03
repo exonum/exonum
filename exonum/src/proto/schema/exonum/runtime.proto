@@ -19,6 +19,7 @@ package exonum.runtime;
 option java_package = "com.exonum.core.messages";
 
 import "blockchain.proto";
+import "types.proto";
 import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.
@@ -159,10 +160,29 @@ message InstanceState {
     // The service instance is stopped.
     STOPPED = 2;
   }
+
   // Service instance specification.
   exonum.runtime.InstanceSpec spec = 1;
   // Service instance activity status.
   Status status = 2;
   // Pending status of instance if the value is not `NONE`.
   Status pending_status = 3;
+
+  ArtifactId migration_target = 4;
+}
+
+// Result of a migration.
+message MigrationStatus {
+  oneof result {
+    // Hash of the migrated data.
+    exonum.crypto.Hash hash = 1;
+    // Error that has occurred during migration.
+    ExecutionError error = 2;
+  }
+}
+
+message MigrationScriptResult {
+  InstanceSpec instance = 1;
+  string end_version = 2;
+  MigrationStatus result = 3;
 }

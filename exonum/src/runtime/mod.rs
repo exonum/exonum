@@ -150,6 +150,7 @@ pub use self::{
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
         InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
+        MigrationScriptResult,
     },
 };
 
@@ -161,12 +162,12 @@ pub mod rust;
 pub mod migrations;
 pub mod versioning;
 
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use futures::Future;
 
 use std::fmt;
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-
+use self::migrations::{DataMigrationError, MigrationScript};
 use crate::{
     blockchain::Blockchain,
     crypto::{Hash, PublicKey},
@@ -406,6 +407,13 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         spec: &InstanceSpec,
         status: InstanceStatus,
     );
+
+    /// FIXME
+    fn migrate(
+        &self,
+        new_artifact: &ArtifactId,
+        old_service: &InstanceSpec,
+    ) -> Result<Vec<MigrationScript>, DataMigrationError>;
 
     /// Dispatches payload to the method of a specific service instance.
     ///

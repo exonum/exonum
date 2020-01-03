@@ -53,6 +53,13 @@ pub enum Error {
     MalformedArguments = 12,
     /// Service instance is already transitioning to a new status.
     ServicePending = 13,
+    /// Migrated service is not stopped.
+    ServiceNotStopped = 14,
+    /// Attempt to launch a migration for a service that is already being migrated.
+    ServiceMigrationPending = 15,
+    /// The artifact to migrate the service to is not a newer version of the current
+    /// service artifact.
+    CannotUpgradeService = 16,
 }
 
 impl Error {

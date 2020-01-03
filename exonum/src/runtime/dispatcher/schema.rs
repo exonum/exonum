@@ -22,12 +22,15 @@ use exonum_merkledb::{
 use super::{ArtifactId, Error, InstanceSpec};
 use crate::runtime::{
     ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
+    MigrationScriptResult,
 };
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
 const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
 const INSTANCES: &str = "dispatcher_instances";
 const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
+const STARTED_MIGRATIONS: &str = "dispatcher_started_migrations";
+const COMPLETED_MIGRATIONS: &str = "dispatcher_completed_migrations";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
@@ -71,6 +74,14 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
+    fn started_migrations(&self) -> KeySetIndex<T::Base, String> {
+        self.access.clone().get_key_set(STARTED_MIGRATIONS)
+    }
+
+    fn completed_migrations(&self) -> MapIndex<T::Base, str, MigrationScriptResult> {
+        self.access.clone().get_map(COMPLETED_MIGRATIONS)
+    }
+
     /// Returns the information about a service instance by its identifier.
     pub fn get_instance<'q>(&self, query: impl Into<InstanceQuery<'q>>) -> Option<InstanceState> {
         let instances = self.instances();
@@ -89,12 +100,20 @@ impl<T: Access> Schema<T> {
     pub fn get_artifact(&self, name: &ArtifactId) -> Option<ArtifactState> {
         self.artifacts().get(name)
     }
+
+    /// Returns result of a locally completed migration for the specified service instance.
+    ///
+    /// This result is set once the migration script associated with the service instance completes
+    /// and is cleared by committing the *global* migration result.
+    pub fn completed_migration(&self, service_name: &str) -> Option<MigrationScriptResult> {
+        self.completed_migrations().get(service_name)
+    }
 }
 
 // `AsReadonly` specialization to ensure that we won't leak mutable schema access.
 impl<T: AsReadonly> Schema<T> {
     /// Readonly set of service instances.
-    pub fn service_instances(&self) -> ProofMapIndex<T::Readonly, String, InstanceState> {
+    pub fn service_instances(&self) -> ProofMapIndex<T::Readonly, str, InstanceState> {
         self.access.as_readonly().get_proof_map(INSTANCES)
     }
 }
@@ -121,6 +140,53 @@ impl Schema<&Fork> {
         // Add artifact to pending artifacts queue.
         self.pending_artifacts().insert(artifact);
         Ok(())
+    }
+
+    pub(super) fn add_pending_migration(
+        &mut self,
+        new_artifact: ArtifactId,
+        old_service: &str,
+    ) -> Result<(), Error> {
+        // The service should exist.
+        let mut instance_state = self
+            .instances()
+            .get(old_service)
+            .ok_or(Error::IncorrectInstanceId)?;
+        // The service should be stopped.
+        if instance_state.status != Some(InstanceStatus::Stopped) {
+            return Err(Error::ServiceNotStopped);
+        }
+        // The service should not be in the process of migration already.
+        if instance_state.migration_target.is_some() {
+            return Err(Error::ServiceMigrationPending);
+        }
+
+        // The new artifact should exist.
+        let artifact_state = self
+            .artifacts()
+            .get(&new_artifact)
+            .ok_or(Error::UnknownArtifactId)?;
+        // The new artifact should be deployed.
+        if artifact_state.status != ArtifactStatus::Active {
+            return Err(Error::ArtifactNotDeployed);
+        }
+
+        // The new artifact should refer a newer version of the service artifact.
+        if !new_artifact.is_upgrade_of(&instance_state.spec.artifact) {
+            return Err(Error::CannotUpgradeService);
+        }
+
+        instance_state.migration_target = Some(new_artifact);
+        self.instances().put(old_service, instance_state);
+        self.started_migrations().insert(old_service.to_owned());
+        Ok(())
+    }
+
+    pub(super) fn add_completed_migration(&mut self, result: MigrationScriptResult) {
+        let mut migrations = self.completed_migrations();
+        debug_assert!(migrations.get(&result.instance.name).is_none());
+        let service_name = result.instance.name.clone();
+        migrations.put(&service_name, result);
     }
 
     /// Adds information about a pending service instance to the schema.
@@ -152,6 +218,7 @@ impl Schema<&Fork> {
                 spec,
                 status: None,
                 pending_status: Some(pending_status),
+                migration_target: None,
             },
         );
         self.modified_instances()
@@ -208,6 +275,7 @@ impl Schema<&Fork> {
             state.status = ArtifactStatus::Active;
             artifacts.put(&artifact, state);
         }
+
         // Commit new statuses for pending instances.
         let mut instances = self.instances();
         for (instance, status) in &self.modified_instances() {
@@ -242,6 +310,25 @@ impl Schema<&Fork> {
             .collect();
         index.clear();
         pending_artifacts
+    }
+
+    pub(super) fn take_started_migrations(&mut self) -> Vec<(ArtifactId, InstanceSpec)> {
+        let mut index = self.started_migrations();
+        let instances = self.instances();
+        let started_migrations = index
+            .iter()
+            .map(|instance_name| {
+                let instance_state = instances
+                    .get(&instance_name)
+                    .expect("Started migration is not saved in `instances`");
+                let new_artifact = instance_state
+                    .migration_target
+                    .expect("Migration target is not saved in instance state");
+                (new_artifact, instance_state.spec)
+            })
+            .collect();
+        index.clear();
+        started_migrations
     }
 
     /// Takes modified service instances from queue.

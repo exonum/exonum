@@ -90,6 +90,11 @@ impl Blockchain {
         Self::new(TemporaryDB::new(), gen_keypair(), ApiSender::closed())
     }
 
+    /// Returns a reference to the database enclosed by this `Blockchain`.
+    pub(crate) fn database(&self) -> &Arc<dyn Database> {
+        &self.db
+    }
+
     /// Creates a read-only snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()

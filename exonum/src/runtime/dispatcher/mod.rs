@@ -14,16 +14,19 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{Fork, Patch, Snapshot};
+use exonum_merkledb::{migration::MigrationHelper, Database, Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
 };
 use log::{error, info};
+use semver::Version;
 
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, panic,
+    sync::{mpsc, Arc},
+    thread,
 };
 
 use crate::{
@@ -36,7 +39,8 @@ use crate::{
 
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
-    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    migrations::{MigrationContext, MigrationScript},
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, MigrationScriptResult, Runtime,
 };
 
 mod error;
@@ -102,11 +106,113 @@ impl CommittedServices {
     }
 }
 
+#[derive(Debug)]
+struct MigrationThread {
+    handle: thread::JoinHandle<Result<Hash, ExecutionError>>,
+    signal_rx: mpsc::Receiver<()>,
+    instance: InstanceSpec,
+    end_version: Version,
+}
+
+#[derive(Debug)]
+struct Migrations {
+    db: Arc<dyn Database>,
+    threads: HashMap<String, MigrationThread>,
+}
+
+impl Migrations {
+    fn new(blockchain: &Blockchain) -> Self {
+        Self {
+            db: blockchain.database().to_owned(),
+            threads: HashMap::new(),
+        }
+    }
+
+    fn add_migration(&mut self, instance_spec: InstanceSpec, script: MigrationScript) {
+        let db = Arc::clone(&self.db);
+        let instance = instance_spec.clone();
+        let end_version = script.end_version().to_owned();
+        let (signal_tx, signal_rx) = mpsc::channel();
+
+        let handle = thread::spawn(move || {
+            let script_name = script.name().to_owned();
+            log::info!("Starting migration script {}", script_name);
+
+            let mut context = MigrationContext {
+                helper: MigrationHelper::new(Arc::clone(&db), &instance_spec.name),
+                instance_spec,
+            };
+            script.execute(&mut context);
+            let migration_result = context
+                .helper
+                .finish()
+                .map_err(|e| ExecutionError::new(ErrorKind::Unexpected, e.to_string()));
+            log::info!(
+                "Finished migration script {} with result {:?}",
+                script_name,
+                migration_result
+            );
+
+            // Signal that the thread has completed. Note that `signal_tx` will be dropped on panic,
+            // too.
+            drop(signal_tx);
+            migration_result
+        });
+
+        let prev_thread = self.threads.insert(
+            instance.name.to_owned(),
+            MigrationThread {
+                handle,
+                signal_rx,
+                instance: instance.clone(),
+                end_version,
+            },
+        );
+        debug_assert!(
+            prev_thread.is_none(),
+            "Attempt to run concurrent migrations for service {:?}",
+            instance
+        );
+    }
+
+    fn take_completed(&mut self) -> Vec<MigrationScriptResult> {
+        let completed_names: Vec<_> = self
+            .threads
+            .iter()
+            .filter_map(|(name, thread)| {
+                if thread.signal_rx.try_recv() == Err(mpsc::TryRecvError::Disconnected) {
+                    Some(name.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        completed_names
+            .iter()
+            .map(|name| {
+                let thread = self.threads.remove(name).unwrap();
+                let result = match thread.handle.join() {
+                    Ok(result) => result,
+                    Err(e) => Err(ExecutionError::from_panic(e)),
+                };
+
+                MigrationScriptResult {
+                    instance: thread.instance,
+                    end_version: thread.end_version,
+                    result,
+                }
+            })
+            .collect()
+    }
+}
+
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: CommittedServices,
+    migrations: Migrations,
 }
 
 impl Dispatcher {
@@ -121,6 +227,7 @@ impl Dispatcher {
                 .map(|runtime| (runtime.id, runtime.instance))
                 .collect(),
             service_infos: CommittedServices::default(),
+            migrations: Migrations::new(blockchain),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -250,6 +357,24 @@ impl Dispatcher {
         Schema::new(fork)
             .add_pending_artifact(artifact, deploy_spec)
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
+    }
+
+    pub(crate) fn start_migration<'q>(
+        &self,
+        fork: &Fork,
+        new_artifact: ArtifactId,
+        old_service: InstanceQuery<'q>,
+    ) -> Result<(), ExecutionError> {
+        let service_name = Schema::new(fork)
+            .get_instance(old_service)
+            .ok_or(Error::IncorrectInstanceId)?
+            .spec
+            .name;
+
+        // Store the pending migration in the schema; the integrity checks will be performed there.
+        Schema::new(fork)
+            .add_pending_migration(new_artifact, &service_name)
+            .map_err(From::from)
     }
 
     /// Initiates stopping of an existing service instance in the blockchain. The stopping
@@ -413,6 +538,14 @@ impl Dispatcher {
         let mut schema = Schema::new(&fork);
         let pending_artifacts = schema.take_pending_artifacts();
         let modified_instances = schema.take_modified_instances();
+        let started_migrations = schema.take_started_migrations();
+
+        // Check if any migrations have finished. Record migration results in the DB.
+        let results = self.migrations.take_completed();
+        for result in results {
+            schema.add_completed_migration(result);
+        }
+
         let patch = fork.into_patch();
 
         // Block futures with pending deployments.
@@ -423,6 +556,33 @@ impl Dispatcher {
         for (spec, status) in modified_instances {
             self.update_service_status(&patch, &spec, status);
         }
+
+        // Take the migration scripts from the runtimes and start executing them.
+        for (new_artifact, old_service) in started_migrations {
+            let runtime = self
+                .runtime_by_id(new_artifact.runtime_id)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "BUG: Runtime not found for deployed artifact {:?}",
+                        new_artifact
+                    )
+                });
+            let mut scripts = runtime
+                .migrate(&new_artifact, &old_service)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "RUNTIME BUG: Getting the scripts returned `Ok(..)` \
+                         during block creation, but returned error {} during block commitment",
+                        e
+                    );
+                });
+
+            // FIXME: remove restriction on the number of scripts or revise script retrieval interface
+            assert_eq!(scripts.len(), 1);
+            let script = scripts.pop().unwrap();
+            self.migrations.add_migration(old_service, script);
+        }
+
         patch
     }
 
