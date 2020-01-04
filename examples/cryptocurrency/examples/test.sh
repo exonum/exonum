@@ -8,7 +8,7 @@ set -e
 
 # Base URL for demo service endpoints
 BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
-TRANSACTION_URL=http://127.0.0.1:8000/api/services/explorer/v1/transactions
+TRANSACTION_URL=http://127.0.0.1:8000/api/explorer/v1/transactions
 
 # Directory with the script.
 ROOT_DIR=`dirname $0`
