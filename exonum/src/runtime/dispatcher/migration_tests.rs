@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use exonum_crypto::gen_keypair;
-use exonum_merkledb::{access::AccessExt, migration::Migration, HashTag, ObjectHash, TemporaryDB};
+use exonum_merkledb::{
+    access::AccessExt, migration::Migration, HashTag, ObjectHash, SystemSchema, TemporaryDB,
+};
 use futures::IntoFuture;
 
 use std::time::Duration;
@@ -268,7 +270,7 @@ fn migration_workflow() {
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    let migration = schema.completed_migration(&service.name).unwrap();
+    let migration = schema.local_migration_result(&service.name).unwrap();
     assert_eq!(migration.instance, service);
     assert_eq!(migration.end_version, Version::new(0, 5, 0));
     assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
@@ -382,7 +384,7 @@ fn migration_is_resumed_after_node_restart() {
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    let migration = schema.completed_migration(&service.name).unwrap();
+    let migration = schema.local_migration_result(&service.name).unwrap();
     assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
 }
 
@@ -460,7 +462,7 @@ fn migration_with_panic() {
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    let migration = schema.completed_migration(&service.name).unwrap();
+    let migration = schema.local_migration_result(&service.name).unwrap();
     assert_eq!(
         migration.result.unwrap_err(),
         ErrorMatch::any_unexpected().with_description_containing("This migration is unsuccessful!")
@@ -505,9 +507,9 @@ fn concurrent_migrations_to_same_artifact() {
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    let migration = schema.completed_migration(&service.name).unwrap();
+    let migration = schema.local_migration_result(&service.name).unwrap();
     assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
-    let migration = schema.completed_migration(&other_service.name).unwrap();
+    let migration = schema.local_migration_result(&other_service.name).unwrap();
     assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
 
     let threads = &rig.dispatcher().migrations.threads;
@@ -521,7 +523,9 @@ fn concurrent_migrations_to_same_artifact() {
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    let migration = schema.completed_migration(&another_service.name).unwrap();
+    let migration = schema
+        .local_migration_result(&another_service.name)
+        .unwrap();
     assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
 
     let threads = &rig.dispatcher().migrations.threads;
@@ -556,7 +560,7 @@ fn migration_influencing_state_hash() {
 
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    let migration = schema.completed_migration(&service.name).unwrap();
+    let migration = schema.local_migration_result(&service.name).unwrap();
     let migration_hash = migration.result.unwrap();
 
     let migration = Migration::new(&service.name, &snapshot);
@@ -586,7 +590,7 @@ fn migration_rollback_workflow() {
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    schema.completed_migration(&service.name).unwrap();
+    schema.local_migration_result(&service.name).unwrap();
     let threads = &rig.dispatcher().migrations.threads;
     assert!(threads.is_empty());
 
@@ -598,7 +602,7 @@ fn migration_rollback_workflow() {
     // Check that local migration result is erased.
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    assert!(schema.completed_migration(&service.name).is_none());
+    assert!(schema.local_migration_result(&service.name).is_none());
     let state = schema.get_instance(service.id).unwrap();
     assert!(state.migration_target.is_none());
     assert_eq!(state.status, Some(InstanceStatus::Stopped));
@@ -625,7 +629,7 @@ fn migration_rollback_aborts_migration_script() {
 
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
-    assert!(schema.completed_migration(&service.name).is_none());
+    assert!(schema.local_migration_result(&service.name).is_none());
     let threads = &rig.dispatcher().migrations.threads;
     assert!(threads.is_empty());
     let migration = Migration::new(&service.name, &snapshot);
@@ -665,4 +669,90 @@ fn migration_rollback_erases_migration_data() {
     let snapshot = rig.blockchain.snapshot();
     let migration = Migration::new(&service.name, &snapshot);
     assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
+}
+
+#[test]
+fn migration_commit_workflow() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Wait until the migration is finished locally.
+    thread::sleep(Duration::from_millis(500));
+    rig.create_block(rig.blockchain.fork());
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, HashTag::empty_map_hash()).unwrap();
+    rig.create_block(fork);
+
+    // Check that local migration result is erased.
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let res = schema.local_migration_result(&service.name).unwrap();
+    assert_eq!(res.result.unwrap(), HashTag::empty_map_hash());
+    assert_eq!(res.end_version, Version::new(0, 5, 0));
+    let state = schema.get_instance(service.id).unwrap();
+    assert!(state.migration_ready);
+}
+
+#[test]
+fn migration_commit_without_completing_script_locally() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "test");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Compute migration hash using the knowledge about the end state of migrated data.
+    let migration_hash = {
+        let fork = rig.blockchain.fork();
+        let mut aggregator = fork.get_proof_map::<_, str, Hash>("_aggregator");
+        aggregator.put("test.entry", 9_u32.object_hash());
+        aggregator.object_hash()
+    };
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
+    rig.create_block(fork);
+    // Check that the migration script has finished.
+    assert!(rig.dispatcher().migrations.threads.is_empty());
+
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let state = schema.get_instance(service.id).unwrap();
+    assert!(state.migration_target.is_none());
+    assert_eq!(state.status, Some(InstanceStatus::Stopped));
+
+    // Flush the migration.
+    let mut fork = rig.blockchain.fork();
+    Dispatcher::flush_migration(&mut fork, &service.name).unwrap();
+    let state_hash = rig.create_block(fork).state_hash;
+
+    // The artifact version should be updated.
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let state = schema.get_instance(service.id).unwrap();
+    assert_eq!(state.spec.artifact.version, Version::new(0, 5, 0));
+    // Migration information should be erased.
+    assert!(state.migration_target.is_none());
+    assert!(!state.migration_ready);
+    assert!(schema.local_migration_result(&service.name).is_none());
+
+    // Check that service data has been updated.
+    let entry = snapshot.get_proof_entry::<_, u32>("test.entry");
+    assert_eq!(entry.get(), Some(9));
+    // Check state aggregation.
+    let aggregator = SystemSchema::new(&snapshot).state_aggregator();
+    assert_eq!(aggregator.get("test.entry"), Some(9_u32.object_hash()));
+    assert_eq!(aggregator.object_hash(), state_hash);
 }

@@ -14,6 +14,7 @@
 
 //! Information schema for the runtime dispatcher.
 
+use exonum_crypto::Hash;
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly},
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
@@ -31,8 +32,15 @@ const INSTANCES: &str = "dispatcher_instances";
 const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const STARTED_MIGRATIONS: &str = "dispatcher_started_migrations";
 const MIGRATION_ROLLBACKS: &str = "dispatcher_migration_rollbacks";
-const COMPLETED_MIGRATIONS: &str = "dispatcher_completed_migrations";
+const MIGRATION_COMMITS: &str = "dispatcher_migration_flushes";
+const LOCAL_MIGRATION_RESULTS: &str = "dispatcher_local_migration_results";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
+
+#[derive(Debug, Clone, Copy)]
+enum MigrationState {
+    Rollback,
+    Commit(Hash),
+}
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
@@ -80,13 +88,18 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_key_set(STARTED_MIGRATIONS)
     }
 
-    /// Return the set of service name, migrations for which were rolled back in the current block.
+    /// Returns the set of service names, migrations for which were rolled back in the current block.
     fn migration_rollbacks(&self) -> KeySetIndex<T::Base, String> {
         self.access.clone().get_key_set(MIGRATION_ROLLBACKS)
     }
 
-    fn completed_migrations(&self) -> MapIndex<T::Base, str, MigrationScriptResult> {
-        self.access.clone().get_map(COMPLETED_MIGRATIONS)
+    /// Returns the set of service names, migrations for which were committed in the current block.
+    fn migration_commits(&self) -> MapIndex<T::Base, str, Hash> {
+        self.access.clone().get_map(MIGRATION_COMMITS)
+    }
+
+    fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationScriptResult> {
+        self.access.clone().get_map(LOCAL_MIGRATION_RESULTS)
     }
 
     /// Returns the information about a service instance by its identifier.
@@ -112,8 +125,8 @@ impl<T: Access> Schema<T> {
     ///
     /// This result is set once the migration script associated with the service instance completes
     /// and is cleared by committing the *global* migration result.
-    pub fn completed_migration(&self, service_name: &str) -> Option<MigrationScriptResult> {
-        self.completed_migrations().get(service_name)
+    pub fn local_migration_result(&self, service_name: &str) -> Option<MigrationScriptResult> {
+        self.local_migration_results().get(service_name)
     }
 }
 
@@ -189,22 +202,44 @@ impl Schema<&Fork> {
         Ok(())
     }
 
-    pub(super) fn add_migration_rollback(&mut self, service_name: &str) -> Result<(), Error> {
+    fn add_migration_state(
+        &mut self,
+        service_name: &str,
+        state: MigrationState,
+    ) -> Result<(), Error> {
         let mut instance_state = self
             .instances()
             .get(service_name)
             .ok_or(Error::IncorrectInstanceId)?;
-        instance_state.migration_target.ok_or(Error::NoMigration)?;
         instance_state.migration_target = None;
-        self.instances().put(service_name, instance_state);
 
-        self.completed_migrations().remove(&service_name);
-        self.migration_rollbacks().insert(service_name.to_owned());
+        match state {
+            MigrationState::Rollback => {
+                self.migration_rollbacks().insert(service_name.to_owned());
+            }
+            MigrationState::Commit(hash) => {
+                instance_state.migration_ready = true;
+                self.migration_commits().put(service_name, hash);
+            }
+        }
+        self.instances().put(service_name, instance_state);
         Ok(())
     }
 
+    pub(super) fn add_migration_rollback(&mut self, service_name: &str) -> Result<(), Error> {
+        self.add_migration_state(service_name, MigrationState::Rollback)
+    }
+
+    pub(super) fn add_migration_commit(
+        &mut self,
+        service_name: &str,
+        migration_hash: Hash,
+    ) -> Result<(), Error> {
+        self.add_migration_state(service_name, MigrationState::Commit(migration_hash))
+    }
+
     pub(super) fn add_local_migration_result(&mut self, result: MigrationScriptResult) {
-        let mut migrations = self.completed_migrations();
+        let mut migrations = self.local_migration_results();
         debug_assert!(migrations.get(&result.instance.name).is_none());
         let service_name = result.instance.name.clone();
         migrations.put(&service_name, result);
@@ -240,6 +275,7 @@ impl Schema<&Fork> {
                 status: None,
                 pending_status: Some(pending_status),
                 migration_target: None,
+                migration_ready: false,
             },
         );
         self.modified_instances()
@@ -354,9 +390,30 @@ impl Schema<&Fork> {
 
     pub(super) fn take_migration_rollbacks(&mut self) -> Vec<String> {
         let mut index = self.migration_rollbacks();
-        let namespaces = index.iter().collect();
+        let mut local_results = self.local_migration_results();
+        let namespaces: Vec<_> = index.iter().collect();
+        for namespace in &namespaces {
+            local_results.remove(&namespace);
+        }
         index.clear();
         namespaces
+    }
+
+    pub(super) fn take_migration_commits(
+        &mut self,
+    ) -> Vec<(String, Hash, Option<MigrationScriptResult>)> {
+        let mut index = self.migration_commits();
+        let mut local_results = self.local_migration_results();
+        let commits: Vec<_> = index
+            .iter()
+            .map(|(namespace, global_hash)| {
+                let local_result = local_results.get(&namespace);
+                local_results.remove(&namespace);
+                (namespace, global_hash, local_result)
+            })
+            .collect();
+        index.clear();
+        commits
     }
 
     /// Takes modified service instances from queue.
@@ -376,5 +433,21 @@ impl Schema<&Fork> {
         modified_instances.clear();
 
         output
+    }
+
+    pub(super) fn complete_migration(&mut self, service_name: &str) -> Result<(), Error> {
+        let mut instance_state = self
+            .instances()
+            .get(service_name)
+            .ok_or(Error::IncorrectInstanceId)?;
+        let mut local_results = self.local_migration_results();
+        let state = local_results.get(service_name).ok_or(Error::NoMigration)?;
+        local_results.remove(service_name);
+
+        debug_assert!(instance_state.spec.artifact.version < state.end_version);
+        instance_state.spec.artifact.version = state.end_version;
+        instance_state.migration_ready = false;
+        self.instances().put(service_name, instance_state);
+        Ok(())
     }
 }

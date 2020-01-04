@@ -441,11 +441,11 @@ impl InstanceStatus {
 }
 
 impl Display for InstanceStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InstanceStatus::Active => f.write_str("active"),
-            InstanceStatus::Stopped => f.write_str("stopped"),
-        }
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            InstanceStatus::Active => "active",
+            InstanceStatus::Stopped => "stopped",
+        })
     }
 }
 
@@ -454,20 +454,22 @@ impl InstanceStatus {
     // `protobuf_convert(with)`.
     #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
     fn to_pb(status: &Option<InstanceStatus>) -> schema::runtime::InstanceState_Status {
+        use schema::runtime::InstanceState_Status::*;
         match status {
-            None => schema::runtime::InstanceState_Status::NONE,
-            Some(InstanceStatus::Active) => schema::runtime::InstanceState_Status::ACTIVE,
-            Some(InstanceStatus::Stopped) => schema::runtime::InstanceState_Status::STOPPED,
+            None => NONE,
+            Some(InstanceStatus::Active) => ACTIVE,
+            Some(InstanceStatus::Stopped) => STOPPED,
         }
     }
 
     fn from_pb(
         pb: schema::runtime::InstanceState_Status,
     ) -> Result<Option<InstanceStatus>, failure::Error> {
+        use schema::runtime::InstanceState_Status::*;
         Ok(match pb {
-            schema::runtime::InstanceState_Status::NONE => None,
-            schema::runtime::InstanceState_Status::ACTIVE => Some(InstanceStatus::Active),
-            schema::runtime::InstanceState_Status::STOPPED => Some(InstanceStatus::Stopped),
+            NONE => None,
+            ACTIVE => Some(InstanceStatus::Active),
+            STOPPED => Some(InstanceStatus::Stopped),
         })
     }
 }
@@ -528,6 +530,8 @@ pub struct InstanceState {
     /// The artifact targeted by the service migration.
     #[protobuf_convert(with = "pb_optional_artifact")]
     pub migration_target: Option<ArtifactId>,
+    /// Is the current migration ready?
+    pub migration_ready: bool,
 }
 
 mod pb_optional_artifact {
@@ -560,6 +564,7 @@ impl InstanceState {
             status: Some(status),
             pending_status: None,
             migration_target: None,
+            migration_ready: false,
         }
     }
 

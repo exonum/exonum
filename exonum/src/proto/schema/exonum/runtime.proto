@@ -169,6 +169,7 @@ message InstanceState {
   Status pending_status = 3;
 
   ArtifactId migration_target = 4;
+  bool migration_ready = 5;
 }
 
 // Result of a migration.

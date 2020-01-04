@@ -1,3 +1,4 @@
+use exonum_crypto::Hash;
 use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
 
 use super::{GenericCallMut, MethodDescriptor};
@@ -103,7 +104,7 @@ impl<'a> CallContext<'a> {
         old_service: &str,
     ) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_migration` called within a non-supervisor service");
+            panic!("`initiate_migration` called within a non-supervisor service");
         }
         Dispatcher::initiate_migration(&self.inner.fork, new_artifact, old_service)
     }
@@ -111,9 +112,21 @@ impl<'a> CallContext<'a> {
     #[doc(hidden)]
     pub fn rollback_migration(&self, service_name: &str) -> Result<(), ExecutionError> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_migration` called within a non-supervisor service");
+            panic!("`rollback_migration` called within a non-supervisor service");
         }
         Dispatcher::rollback_migration(&self.inner.fork, service_name)
+    }
+
+    #[doc(hidden)]
+    pub fn commit_migration(
+        &self,
+        service_name: &str,
+        migration_hash: Hash,
+    ) -> Result<(), ExecutionError> {
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`commit_migration` called within a non-supervisor service");
+        }
+        Dispatcher::commit_migration(&self.inner.fork, service_name, migration_hash)
     }
 
     /// Initiates adding a service instance to the blockchain.
