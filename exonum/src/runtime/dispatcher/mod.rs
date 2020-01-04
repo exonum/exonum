@@ -44,6 +44,8 @@ use super::{
 };
 
 mod error;
+#[cfg(test)]
+mod migration_tests;
 mod schema;
 #[cfg(test)]
 mod tests;

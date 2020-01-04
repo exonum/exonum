@@ -289,9 +289,8 @@ impl BlockchainMut {
         );
     }
 
-    /// Executes the given transactions from the pool.
-    /// Then collects the resulting changes from the current storage state and returns them
-    /// with the hash of the resulting block.
+    /// Executes the given transactions from the pool. Collects the resulting changes
+    /// from the current storage state and returns them with the hash of the resulting block.
     pub fn create_patch(
         &self,
         proposer_id: ProposerId,
@@ -299,9 +298,18 @@ impl BlockchainMut {
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) -> (Hash, Patch) {
-        // Create fork
-        let mut fork = self.fork();
+        self.create_patch_inner(self.fork(), proposer_id, height, tx_hashes, tx_cache)
+    }
 
+    /// Version of `create_patch` that supports user-provided fork. Used in tests.
+    pub(crate) fn create_patch_inner(
+        &self,
+        mut fork: Fork,
+        proposer_id: ProposerId,
+        height: Height,
+        tx_hashes: &[Hash],
+        tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
+    ) -> (Hash, Patch) {
         // Skip execution for genesis block.
         if height > Height(0) {
             let errors = self.dispatcher.before_transactions(&mut fork);

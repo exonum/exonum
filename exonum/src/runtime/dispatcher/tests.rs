@@ -14,9 +14,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
-use exonum_merkledb::{
-    BinaryValue, Database, Fork, HashTag, ObjectHash, Patch, Snapshot, TemporaryDB,
-};
+use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{future, sync::mpsc, Future, IntoFuture};
 use pretty_assertions::assert_eq;
 use semver::Version;
@@ -39,7 +37,7 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
-        migrations::{DataMigrationError, MigrationContext, MigrationScript},
+        migrations::{DataMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
         ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceStatus, MethodId, Runtime, RuntimeInstance,
@@ -49,7 +47,7 @@ use crate::{
 /// We guarantee that the genesis block will be committed by the time
 /// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
 /// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
-fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
+pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
     let is_genesis_block = CoreSchema::new(&fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
     dispatcher.activate_pending(&fork);
@@ -114,13 +112,13 @@ pub struct DispatcherBuilder {
 }
 
 impl DispatcherBuilder {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             runtimes: Vec::new(),
         }
     }
 
-    fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
+    pub fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
         self.runtimes.push(RuntimeInstance {
             id,
             instance: runtime.into(),
@@ -128,7 +126,7 @@ impl DispatcherBuilder {
         self
     }
 
-    fn finalize(self, blockchain: &Blockchain) -> Dispatcher {
+    pub fn finalize(self, blockchain: &Blockchain) -> Dispatcher {
         Dispatcher::new(blockchain, self.runtimes)
     }
 }
@@ -713,17 +711,9 @@ impl Runtime for DeploymentRuntime {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        old_service: &InstanceSpec,
+        _old_service: &InstanceSpec,
     ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        if old_service.artifact.name == "good" {
-            let script = |_: &mut MigrationContext| {
-                thread::sleep(Duration::from_millis(200));
-            };
-            let script = MigrationScript::new(script, Version::new(0, 5, 0));
-            Ok(vec![script])
-        } else {
-            Err(DataMigrationError::NotSupported)
-        }
+        Err(DataMigrationError::NotSupported)
     }
 
     fn execute(
@@ -1065,118 +1055,4 @@ fn stopped_service_workflow() {
         actual_err,
         ErrorMatch::from_fail(&DispatcherError::ServiceNotActive)
     );
-}
-
-#[test]
-fn migration_workflow() {
-    const INSTANCE_ID: InstanceId = 100;
-    const INSTANCE_NAME: &str = "good";
-
-    let db = Arc::new(TemporaryDB::new());
-    let blockchain = Blockchain::new(
-        Arc::clone(&db) as Arc<dyn Database>,
-        gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
-    );
-    let runtime = DeploymentRuntime::default();
-    let mut dispatcher = DispatcherBuilder::new()
-        .with_runtime(2, runtime.clone())
-        .finalize(&blockchain);
-
-    let patch = create_genesis_block(&mut dispatcher, db.fork());
-    db.merge_sync(patch).unwrap();
-
-    // Install artifacts and the service instance.
-    let (old_artifact, _) = runtime.deploy_test_artifact("good", "0.3.0", &mut dispatcher, &db);
-    let (new_artifact, _) = runtime.deploy_test_artifact("good", "0.5.2", &mut dispatcher, &db);
-    let fork = db.fork();
-    Dispatcher::commit_artifact(
-        &fork,
-        old_artifact.clone(),
-        DeploymentRuntime::SPEC.to_vec(),
-    )
-    .expect("Cannot commit artifact to the DB");
-    Dispatcher::commit_artifact(
-        &fork,
-        new_artifact.clone(),
-        DeploymentRuntime::SPEC.to_vec(),
-    )
-    .expect("Cannot commit artifact to the DB");
-    dispatcher.activate_pending(&fork);
-    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-    db.merge(patch).unwrap();
-
-    let service = InstanceSpec {
-        artifact: old_artifact.clone(),
-        id: INSTANCE_ID,
-        name: INSTANCE_NAME.into(),
-    };
-    let mut fork = db.fork();
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
-    context
-        .initiate_adding_service(service.clone(), vec![])
-        .expect("`initiate_adding_service` failed");
-    dispatcher.activate_pending(&fork);
-    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-    db.merge(patch).unwrap();
-
-    // Since service is not stopped, the migration should fail.
-    let fork = db.fork();
-    let err = dispatcher
-        .start_migration(&fork, new_artifact.clone(), INSTANCE_NAME.into())
-        .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceNotStopped)
-    );
-
-    // Stop the service.
-    Dispatcher::initiate_stopping_service(&fork, INSTANCE_ID).unwrap();
-    dispatcher.activate_pending(&fork);
-    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-    db.merge(patch).unwrap();
-
-    // Now, the migration start should succeed.
-    let fork = db.fork();
-    dispatcher
-        .start_migration(&fork, new_artifact, INSTANCE_NAME.into())
-        .unwrap();
-    // Migration scripts should not start executing immediately, but only on block commit.
-    assert!(!dispatcher.migrations.threads.contains_key(INSTANCE_NAME));
-
-    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-    db.merge(patch).unwrap();
-    // Check that the migration was initiated.
-    let migration = &dispatcher.migrations.threads[INSTANCE_NAME];
-    assert_eq!(migration.end_version, Version::new(0, 5, 0));
-
-    // Create several more blocks before the migration is complete and check that
-    // we don't spawn multiple migration scripts at once (this check is performed in `Migrations`).
-    for _ in 0..3 {
-        let fork = db.fork();
-        let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-        db.merge(patch).unwrap();
-    }
-
-    // Wait until the migration script is completed and check that its result is recorded.
-    thread::sleep(Duration::from_millis(500));
-
-    let fork = db.fork();
-    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-    let schema = DispatcherSchema::new(&patch);
-    let migration = schema.completed_migration(INSTANCE_NAME).unwrap();
-    assert_eq!(migration.instance, service);
-    assert_eq!(migration.end_version, Version::new(0, 5, 0));
-    assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
-    db.merge(patch).unwrap();
-    assert!(!dispatcher.migrations.threads.contains_key(INSTANCE_NAME));
-
-    // Create couple more blocks to check that the migration script is not launched again,
-    // and the migration result is not overridden (these checks are `debug_assert`s).
-    for _ in 0..3 {
-        let fork = db.fork();
-        let patch = dispatcher.commit_block_and_notify_runtimes(fork);
-        db.merge(patch).unwrap();
-    }
-    assert!(!dispatcher.migrations.threads.contains_key(INSTANCE_NAME));
 }
