@@ -13,19 +13,21 @@
 // limitations under the License.
 
 use exonum_crypto::gen_keypair;
-use exonum_merkledb::{HashTag, TemporaryDB};
+use exonum_merkledb::{access::AccessExt, migration::Migration, HashTag, ObjectHash, TemporaryDB};
 use futures::IntoFuture;
 
 use std::time::Duration;
 
 use super::*;
-use crate::runtime::RuntimeIdentifier;
 use crate::{
     blockchain::{Block, BlockchainMut},
     helpers::ValidatorId,
     node::ApiSender,
     runtime::migrations::DataMigrationError,
-    runtime::{CallInfo, DispatcherError, DispatcherSchema, ErrorMatch, WellKnownRuntime},
+    runtime::{
+        CallInfo, DispatcherError, DispatcherSchema, ErrorMatch, RuntimeIdentifier,
+        WellKnownRuntime,
+    },
 };
 
 #[derive(Debug)]
@@ -67,18 +69,21 @@ impl Runtime for MigrationRuntime {
 
     fn migrate(
         &self,
-        _new_artifact: &ArtifactId,
+        new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
     ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        if old_service.artifact.name == "good" {
-            let script = |_: &mut MigrationContext| {
-                thread::sleep(Duration::from_millis(200));
-            };
-            let script = MigrationScript::new(script, Version::new(0, 5, 0));
-            Ok(vec![script])
-        } else {
-            Err(DataMigrationError::NotSupported)
-        }
+        let script = match old_service.artifact.name.as_str() {
+            "good" => simple_delayed_migration,
+            "bad" => panicking_migration,
+            "with-state" => migration_modifying_state_hash,
+            _ => {
+                return Err(DataMigrationError::NotSupported);
+            }
+        };
+        let mut end_version = new_artifact.version.clone();
+        end_version.patch = 0;
+        let script = MigrationScript::new(script, end_version);
+        Ok(vec![script])
     }
 
     fn execute(
@@ -107,6 +112,23 @@ impl Runtime for MigrationRuntime {
     }
 
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
+}
+
+fn simple_delayed_migration(_ctx: &mut MigrationContext) {
+    thread::sleep(Duration::from_millis(200));
+}
+
+fn panicking_migration(_ctx: &mut MigrationContext) {
+    thread::sleep(Duration::from_millis(100));
+    panic!("This migration is unsuccessful!");
+}
+
+fn migration_modifying_state_hash(ctx: &mut MigrationContext) {
+    for i in 0_u32..10 {
+        ctx.helper.new_data().get_proof_entry("entry").set(i);
+        ctx.helper.merge().unwrap();
+        thread::sleep(Duration::from_millis(15));
+    }
 }
 
 #[derive(Debug)]
@@ -345,15 +367,138 @@ fn migration_is_resumed_after_node_restart() {
 
 #[test]
 fn migration_with_panic() {
-    unimplemented!()
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("bad", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("bad", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "old");
+    rig.stop_service(&service);
+
+    // Start migration.
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .start_migration(&fork, new_artifact, service.id.into())
+        .unwrap();
+    rig.create_block(fork);
+
+    // Wait for the migration script to panic.
+    thread::sleep(Duration::from_millis(500));
+
+    rig.create_block(rig.blockchain.fork());
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let migration = schema.completed_migration(&service.name).unwrap();
+    assert_eq!(
+        migration.result.unwrap_err(),
+        ErrorMatch::any_unexpected().with_description_containing("This migration is unsuccessful!")
+    );
 }
 
 #[test]
-fn concurrent_migrations() {
-    unimplemented!()
+fn concurrent_migrations_to_same_artifact() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "service");
+    rig.stop_service(&service);
+    let other_service = rig.initialize_service(old_artifact.clone(), "other-service");
+    rig.stop_service(&other_service);
+    let another_service = rig.initialize_service(old_artifact.clone(), "another-service");
+    rig.stop_service(&another_service);
+
+    // Place two migration starts in the same block.
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .start_migration(&fork, new_artifact.clone(), service.id.into())
+        .unwrap();
+    rig.dispatcher()
+        .start_migration(&fork, new_artifact.clone(), other_service.id.into())
+        .unwrap();
+    rig.create_block(fork);
+
+    let threads = &rig.dispatcher().migrations.threads;
+    assert!(threads.contains_key(&service.name));
+    assert!(threads.contains_key(&other_service.name));
+    assert!(!threads.contains_key(&another_service.name));
+
+    // ...and one more in the following block.
+    thread::sleep(Duration::from_millis(100));
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .start_migration(&fork, new_artifact.clone(), another_service.id.into())
+        .unwrap();
+    rig.create_block(fork);
+
+    let threads = &rig.dispatcher().migrations.threads;
+    assert_eq!(threads.len(), 3);
+    assert!(threads.contains_key(&another_service.name));
+
+    // Wait for first two migrations to finish.
+    thread::sleep(Duration::from_millis(150));
+    rig.create_block(rig.blockchain.fork());
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let migration = schema.completed_migration(&service.name).unwrap();
+    assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
+    let migration = schema.completed_migration(&other_service.name).unwrap();
+    assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
+
+    let threads = &rig.dispatcher().migrations.threads;
+    assert_eq!(
+        threads.keys().collect::<Vec<_>>(),
+        vec![&another_service.name]
+    );
+
+    // Wait for the third migration to finish.
+    thread::sleep(Duration::from_millis(150));
+    rig.create_block(rig.blockchain.fork());
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let migration = schema.completed_migration(&another_service.name).unwrap();
+    assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
+
+    let threads = &rig.dispatcher().migrations.threads;
+    assert!(threads.is_empty());
 }
 
 #[test]
 fn migration_influencing_state_hash() {
-    unimplemented!()
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "service");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .start_migration(&fork, new_artifact.clone(), service.id.into())
+        .unwrap();
+    let state_hash = rig.create_block(fork).state_hash;
+
+    // Check that the state during migration does not influence the default `state_hash`.
+    for _ in 0..5 {
+        // The sleeping interval is chosen to be larger than the interval of DB merges
+        // in the migration script.
+        thread::sleep(Duration::from_millis(50));
+
+        let new_state_hash = rig.create_block(rig.blockchain.fork()).state_hash;
+        assert_eq!(state_hash, new_state_hash);
+        // Check that the data is written by the migration.
+        let snapshot = rig.blockchain.snapshot();
+        let migration = Migration::new(&service.name, &snapshot);
+        assert!(migration.get_proof_entry::<_, u32>("entry").exists());
+    }
+
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let migration = schema.completed_migration(&service.name).unwrap();
+    let migration_hash = migration.result.unwrap();
+
+    let migration = Migration::new(&service.name, &snapshot);
+    assert_eq!(migration_hash, migration.state_hash());
+    let aggregator = migration.state_aggregator();
+    assert_eq!(
+        aggregator.keys().collect::<Vec<_>>(),
+        vec!["service.entry".to_owned()]
+    );
+    assert_eq!(aggregator.get("service.entry"), Some(9_u32.object_hash()));
 }
