@@ -140,6 +140,7 @@ impl Migrations {
             let script_name = script.name().to_owned();
             log::info!("Starting migration script {}", script_name);
 
+            // FIXME: Modify `MigrationHelper` to support aborts.
             let mut context = MigrationContext {
                 helper: MigrationHelper::new(Arc::clone(&db), &instance_spec.name),
                 instance_spec,
@@ -244,6 +245,7 @@ impl Dispatcher {
     /// This method panics if the stored state cannot be restored.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) {
         let schema = Schema::new(snapshot);
+
         // Restore information about the deployed services.
         for (artifact, state) in schema.artifacts().iter() {
             debug_assert_eq!(
@@ -261,13 +263,22 @@ impl Dispatcher {
                     );
                 });
         }
+
         // Restart active service instances.
         for state in schema.instances().values() {
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined state.");
             self.update_service_status(snapshot, &state.spec, status);
+
+            // Restart migration script if it is not finished locally.
+            if let Some(new_artifact) = state.migration_target {
+                if schema.completed_migration(&state.spec.name).is_none() {
+                    self.start_migration_script(new_artifact, state.spec);
+                }
+            }
         }
+
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
             runtime.on_resume();
@@ -361,7 +372,10 @@ impl Dispatcher {
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
     }
 
-    pub(crate) fn start_migration<'q>(
+    /// Initiates migration of an existing stopped service to a newer artifact.
+    /// The migration script is started only after the the block corresponding to `fork`
+    /// is committed.
+    pub(crate) fn initiate_migration<'q>(
         &self,
         fork: &Fork,
         new_artifact: ArtifactId,
@@ -561,31 +575,35 @@ impl Dispatcher {
 
         // Take the migration scripts from the runtimes and start executing them.
         for (new_artifact, old_service) in started_migrations {
-            let runtime = self
-                .runtime_by_id(new_artifact.runtime_id)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "BUG: Runtime not found for deployed artifact {:?}",
-                        new_artifact
-                    )
-                });
-            let mut scripts = runtime
-                .migrate(&new_artifact, &old_service)
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "RUNTIME BUG: Getting the scripts returned `Ok(..)` \
-                         during block creation, but returned error {} during block commitment",
-                        e
-                    );
-                });
-
-            // FIXME: remove restriction on the number of scripts or revise script retrieval interface
-            assert_eq!(scripts.len(), 1);
-            let script = scripts.pop().unwrap();
-            self.migrations.add_migration(old_service, script);
+            self.start_migration_script(new_artifact, old_service);
         }
 
         patch
+    }
+
+    fn start_migration_script(&mut self, new_artifact: ArtifactId, old_service: InstanceSpec) {
+        let runtime = self
+            .runtime_by_id(new_artifact.runtime_id)
+            .unwrap_or_else(|| {
+                panic!(
+                    "BUG: Runtime not found for deployed artifact {:?}",
+                    new_artifact
+                )
+            });
+        let mut scripts = runtime
+            .migrate(&new_artifact, &old_service)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "RUNTIME BUG: Getting the scripts returned `Ok(..)` \
+                     during block creation, but returned error {} during block commitment",
+                    e
+                );
+            });
+
+        // FIXME: remove restriction on the number of scripts or revise script retrieval interface
+        assert_eq!(scripts.len(), 1);
+        let script = scripts.pop().unwrap();
+        self.migrations.add_migration(old_service, script);
     }
 
     /// Make pending artifacts and instances active.

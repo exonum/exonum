@@ -97,7 +97,7 @@ impl<'a> CallContext<'a> {
     }
 
     #[doc(hidden)]
-    pub fn start_migration<'q>(
+    pub fn initiate_migration<'q>(
         &self,
         new_artifact: ArtifactId,
         old_service: impl Into<InstanceQuery<'q>>,
@@ -108,7 +108,7 @@ impl<'a> CallContext<'a> {
 
         self.inner
             .dispatcher
-            .start_migration(&self.inner.fork, new_artifact, old_service.into())
+            .initiate_migration(&self.inner.fork, new_artifact, old_service.into())
     }
 
     /// Initiates adding a service instance to the blockchain.
