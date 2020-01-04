@@ -123,7 +123,13 @@ pub use self::persistent_iter::{ContinueIterator, PersistentIter, PersistentIter
 
 use exonum_crypto::Hash;
 
-use std::{fmt, mem, sync::Arc};
+use std::{
+    fmt, mem,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use crate::validation::check_index_valid_full_name;
 use crate::views::IndexMetadata;
@@ -368,6 +374,7 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 /// [persistent iterators]: struct.PersistentIter.html
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
+    abort_handle: Arc<AtomicBool>,
     fork: Fork,
     namespace: String,
 }
@@ -384,15 +391,35 @@ impl fmt::Debug for MigrationHelper {
 impl MigrationHelper {
     /// Creates a new helper.
     pub fn new(db: impl Into<Arc<dyn Database>>, namespace: &str) -> Self {
+        let (this, handle) = Self::with_handle(db, namespace);
+        handle.forget();
+        this
+    }
+
+    /// Creates a new helper together with the abort handle. Unlike the `MigrationHelper`,
+    /// the handle may be sent between threads. The handle allows to determine whether the migration
+    /// helper was completed, and allows to abort the migration by preventing further writes
+    /// to the database.
+    pub fn with_handle(db: impl Into<Arc<dyn Database>>, namespace: &str) -> (Self, AbortHandle) {
         assert_valid_name_component(namespace);
 
         let db = db.into();
         let fork = db.fork();
-        Self {
+        let abort_handle = AbortHandle {
+            inner: Arc::new(AtomicBool::default()),
+        };
+        let this = Self {
             db,
+            abort_handle: Arc::clone(&abort_handle.inner),
             fork,
             namespace: namespace.to_owned(),
-        }
+        };
+        (this, abort_handle)
+    }
+
+    /// Checks if the migration has been aborted via `AbortHandle`.
+    pub fn is_aborted(&self) -> bool {
+        self.abort_handle.load(Ordering::SeqCst)
     }
 
     /// Returns full access to the new version of migrated data.
@@ -418,6 +445,10 @@ impl MigrationHelper {
     ///
     /// [`flush_migration`]: fn.flush_migration.html
     pub fn merge(&mut self) -> crate::Result<()> {
+        if self.is_aborted() {
+            return Err(crate::Error::new("Migration has been aborted"));
+        }
+
         let fork = mem::replace(&mut self.fork, self.db.fork());
         self.db.merge(fork.into_patch())?;
         self.fork = self.db.fork();
@@ -451,9 +482,39 @@ impl MigrationHelper {
     ///
     /// [`flush_migration`]: fn.flush_migration.html
     pub fn finish(self) -> crate::Result<Hash> {
+        if self.is_aborted() {
+            return Err(crate::Error::new("Migration has been aborted"));
+        }
+
         let patch = self.fork.into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
         self.db.merge(patch).map(|()| hash)
+    }
+}
+
+/// Handle allowing to signal to `MigrationHelper` that the migration has been aborted.
+/// Signalling is performed on handle drop, unless it is performed with [`forget`](#method.forget)
+/// method.
+#[derive(Debug)]
+pub struct AbortHandle {
+    inner: Arc<AtomicBool>,
+}
+
+impl Drop for AbortHandle {
+    fn drop(&mut self) {
+        self.inner.store(true, Ordering::SeqCst);
+    }
+}
+
+impl AbortHandle {
+    /// Returns `true` if the `MigrationHelper` associated with this handle has been dropped.
+    pub fn is_finished(&self) -> bool {
+        Arc::strong_count(&self.inner) <= 1
+    }
+
+    /// Drops the handle without aborting the migration.
+    pub fn forget(mut self) {
+        self.inner = Arc::new(AtomicBool::default());
     }
 }
 
@@ -489,7 +550,7 @@ mod tests {
         HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
 
-    use std::{collections::HashMap, iter::FromIterator};
+    use std::{collections::HashMap, iter::FromIterator, sync::mpsc, thread, time::Duration};
 
     #[test]
     fn in_memory_migration() {
@@ -940,5 +1001,77 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn aborting_migration() {
+        let db = Arc::new(TemporaryDB::new());
+        let db_ = Arc::clone(&db) as Arc<dyn Database>;
+
+        let (tx, rx) = mpsc::channel();
+        let thread_handle = thread::spawn(move || {
+            let (helper, handle) = MigrationHelper::with_handle(db_, "test");
+            tx.send(handle).unwrap();
+
+            thread::sleep(Duration::from_millis(50));
+            assert!(helper.is_aborted());
+            helper.new_data().get_entry("entry").set(1_u32);
+            helper.finish()
+        });
+
+        let handle = rx.recv().unwrap();
+        drop(handle);
+        let res = thread_handle.join().unwrap();
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("Migration has been aborted"));
+        let snapshot = db.snapshot();
+        let migration = Migration::new("test", &snapshot);
+        assert!(!migration.get_entry::<_, u32>("entry").exists());
+    }
+
+    #[test]
+    fn forgetting_abort_handle() {
+        let db = Arc::new(TemporaryDB::new());
+        let db_ = Arc::clone(&db) as Arc<dyn Database>;
+
+        let (tx, rx) = mpsc::channel();
+        let thread_handle = thread::spawn(move || {
+            let (helper, handle) = MigrationHelper::with_handle(db_, "test");
+            tx.send(handle).unwrap();
+
+            thread::sleep(Duration::from_millis(50));
+            assert!(!helper.is_aborted());
+            helper.new_data().get_entry("entry").set(1_u32);
+            helper.finish()
+        });
+
+        let handle = rx.recv().unwrap();
+        handle.forget();
+        let res = thread_handle.join().unwrap();
+        res.unwrap();
+        let snapshot = db.snapshot();
+        let migration = Migration::new("test", &snapshot);
+        assert_eq!(migration.get_entry::<_, u32>("entry").get(), Some(1));
+    }
+
+    #[test]
+    fn abort_handle_is_finished() {
+        let db = TemporaryDB::new();
+        let (tx, rx) = mpsc::channel();
+        let thread_handle = thread::spawn(move || {
+            let (helper, handle) = MigrationHelper::with_handle(db, "test");
+            tx.send(handle).unwrap();
+
+            thread::sleep(Duration::from_millis(50));
+            helper.new_data().get_entry("entry").set(1_u32);
+            helper.finish().unwrap();
+        });
+
+        let handle = rx.recv().unwrap();
+        assert!(!handle.is_finished());
+        thread_handle.join().unwrap();
+        assert!(handle.is_finished());
     }
 }

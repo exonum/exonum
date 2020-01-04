@@ -14,7 +14,10 @@
 
 pub use self::{error::Error, schema::Schema};
 
-use exonum_merkledb::{migration::MigrationHelper, Database, Fork, Patch, Snapshot};
+use exonum_merkledb::{
+    migration::{AbortHandle, MigrationHelper},
+    Database, Fork, Patch, Snapshot,
+};
 use futures::{
     future::{self, Either},
     Future,
@@ -111,7 +114,7 @@ impl CommittedServices {
 #[derive(Debug)]
 struct MigrationThread {
     handle: thread::JoinHandle<Result<Hash, ExecutionError>>,
-    signal_rx: mpsc::Receiver<()>,
+    abort_handle: AbortHandle,
     instance: InstanceSpec,
     end_version: Version,
 }
@@ -134,17 +137,20 @@ impl Migrations {
         let db = Arc::clone(&self.db);
         let instance = instance_spec.clone();
         let end_version = script.end_version().to_owned();
-        let (signal_tx, signal_rx) = mpsc::channel();
+        let (handle_tx, handle_rx) = mpsc::channel();
 
         let handle = thread::spawn(move || {
             let script_name = script.name().to_owned();
             log::info!("Starting migration script {}", script_name);
 
-            // FIXME: Modify `MigrationHelper` to support aborts.
+            let (helper, abort_handle) =
+                MigrationHelper::with_handle(Arc::clone(&db), &instance_spec.name);
+            handle_tx.send(abort_handle).unwrap();
             let mut context = MigrationContext {
-                helper: MigrationHelper::new(Arc::clone(&db), &instance_spec.name),
+                helper,
                 instance_spec,
             };
+
             script.execute(&mut context);
             let migration_result = context
                 .helper
@@ -156,9 +162,6 @@ impl Migrations {
                 migration_result
             );
 
-            // Signal that the thread has completed. Note that `signal_tx` will be dropped on panic,
-            // too.
-            drop(signal_tx);
             migration_result
         });
 
@@ -166,7 +169,7 @@ impl Migrations {
             instance.name.to_owned(),
             MigrationThread {
                 handle,
-                signal_rx,
+                abort_handle: handle_rx.recv().unwrap(),
                 instance: instance.clone(),
                 end_version,
             },
@@ -183,7 +186,7 @@ impl Migrations {
             .threads
             .iter()
             .filter_map(|(name, thread)| {
-                if thread.signal_rx.try_recv() == Err(mpsc::TryRecvError::Disconnected) {
+                if thread.abort_handle.is_finished() {
                     Some(name.to_owned())
                 } else {
                     None

@@ -151,6 +151,11 @@ impl Rig {
         }
     }
 
+    /// Emulates node stopping.
+    fn stop(self) -> Blockchain {
+        self.blockchain.as_ref().to_owned()
+    }
+
     /// Emulates node restart by recreating the dispatcher.
     fn restart(&mut self) {
         let blockchain = self.blockchain.as_ref().to_owned();
@@ -385,12 +390,10 @@ fn migration_is_resumed_after_node_restart() {
         .unwrap();
     rig.create_block(fork);
 
-    // Emulate node restart. Note that the old migration thread will continue running,
-    // although it will become detached. We don't care since the script actually does not write
-    // any data to storage.
-    // FIXME: update comment after implementing aborts in `MigrationHelper`.
+    // Emulate node restart. Note that the old migration thread will continue running
+    // as a detached thread, but since `Dispatcher.migrations` is dropped, the migration
+    // will be aborted.
     thread::sleep(Duration::from_millis(20));
-
     rig.restart();
     let threads = &rig.dispatcher().migrations.threads;
     assert!(threads.contains_key(&service.name));
@@ -401,6 +404,38 @@ fn migration_is_resumed_after_node_restart() {
     let schema = DispatcherSchema::new(&snapshot);
     let migration = schema.completed_migration(&service.name).unwrap();
     assert_eq!(migration.result, Ok(HashTag::empty_map_hash()));
+}
+
+#[test]
+fn migration_scripts_are_timely_aborted() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact, service.id.into())
+        .unwrap();
+    rig.create_block(fork);
+
+    thread::sleep(Duration::from_millis(50));
+    let blockchain = rig.stop();
+    thread::sleep(Duration::from_millis(50));
+    let snapshot = blockchain.snapshot();
+    let migration = Migration::new(&service.name, &snapshot);
+    // The `migration_modifying_state_hash` script should complete several merges
+    // (approximately `floor(50 / 15) = 3`), but not all of them.
+    let val = migration.get_proof_entry::<_, u32>("entry").get().unwrap();
+    assert!(val < 5);
+
+    // New merges should not be added with time.
+    thread::sleep(Duration::from_millis(50));
+    let snapshot = blockchain.snapshot();
+    let migration = Migration::new(&service.name, &snapshot);
+    let new_val = migration.get_proof_entry::<_, u32>("entry").get().unwrap();
+    assert_eq!(val, new_val);
 }
 
 #[test]
