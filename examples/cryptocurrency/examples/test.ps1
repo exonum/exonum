@@ -10,23 +10,8 @@ $TRANSACTION_URL = 'http://127.0.0.1:8000/api/explorer/v1/transactions';
 # Directory with the current script
 $wd = $myinvocation.mycommand.path | Split-Path;
 
-# Creates a wallet using a transaction stored in the specified file.
-function Create-Wallet ($jsonFilename) {
-  $body = cat $jsonFilename;
-  $resp = Invoke-WebRequest "$TRANSACTION_URL" `
-    -Method POST `
-    -ContentType 'application/json' `
-    -Body $body;
-
-  if ($resp.StatusCode -eq 200) {
-    return ($resp.Content | ConvertFrom-Json).tx_hash;
-  } else {
-    return '';
-  }
-}
-
-# Performs a transfer using a transaction stored in the specified file.
-function Transfer ($jsonFilename) {
+# Sends a transaction stored in the specified file.
+function Send-Tx ($jsonFilename) {
   $body = cat $jsonFilename;
   $resp = Invoke-WebRequest "$TRANSACTION_URL" `
     -Method POST `
@@ -94,7 +79,7 @@ function Main () {
 
   foreach ($tx in $txs) {
     echo "Creating wallet for $($tx.name)";
-    $hash = Create-Wallet $tx.json;
+    $hash = Send-Tx $tx.json;
     if ($hash -eq $tx.hash) {
       echo "OK, got expected transaction hash $($tx.hash)";
     } else {
@@ -112,7 +97,7 @@ function Main () {
 
   echo 'Transferring tokens between Alice and Bob...';
   $transferHash = '6075024770778476b80d4fe880c408f3df4c3df04bff6d2ae81ae1e415449840';
-  $hash = Transfer("$wd/transfer-funds.json");
+  $hash = Send-Tx("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
   }
