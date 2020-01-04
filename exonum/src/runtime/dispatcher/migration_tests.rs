@@ -231,10 +231,8 @@ fn migration_workflow() {
 
     // Since service is not stopped, the migration should fail.
     let fork = rig.blockchain.fork();
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), service.id.into())
-        .unwrap_err();
+    let err =
+        Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap_err();
     assert_eq!(
         err,
         ErrorMatch::from_fail(&DispatcherError::ServiceNotStopped)
@@ -245,9 +243,7 @@ fn migration_workflow() {
 
     // Now, the migration start should succeed.
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact, &service.name).unwrap();
     // Migration scripts should not start executing immediately, but only on block commit.
     assert!(!rig
         .dispatcher()
@@ -309,9 +305,7 @@ fn migration_immediate_errors() {
     let fork = rig.blockchain.fork();
 
     // Attempt to upgrade service to an unrelated artifact.
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, unrelated_artifact.clone(), old_service.id.into())
+    let err = Dispatcher::initiate_migration(&fork, unrelated_artifact.clone(), &old_service.name)
         .unwrap_err();
     assert_eq!(
         err,
@@ -319,30 +313,22 @@ fn migration_immediate_errors() {
     );
 
     // Attempt to downgrade service.
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, old_artifact, new_service.id.into())
-        .unwrap_err();
+    let err = Dispatcher::initiate_migration(&fork, old_artifact, &new_service.name).unwrap_err();
     assert_eq!(
         err,
         ErrorMatch::from_fail(&DispatcherError::CannotUpgradeService)
     );
 
     // Attempt to migrate to the same version.
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), new_service.id.into())
-        .unwrap_err();
+    let err =
+        Dispatcher::initiate_migration(&fork, new_artifact.clone(), &new_service.name).unwrap_err();
     assert_eq!(
         err,
         ErrorMatch::from_fail(&DispatcherError::CannotUpgradeService)
     );
 
     // Attempt to migrate unknown service.
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, new_artifact, "bogus-service".into())
-        .unwrap_err();
+    let err = Dispatcher::initiate_migration(&fork, new_artifact, "bogus-service").unwrap_err();
     assert_eq!(
         err,
         ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
@@ -354,9 +340,7 @@ fn migration_immediate_errors() {
         name: "good".to_owned(),
         version: Version::new(0, 6, 0),
     };
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, unknown_artifact.clone(), old_service.id.into())
+    let err = Dispatcher::initiate_migration(&fork, unknown_artifact.clone(), &old_service.name)
         .unwrap_err();
     assert_eq!(
         err,
@@ -365,10 +349,8 @@ fn migration_immediate_errors() {
 
     // Mark the artifact as pending.
     Dispatcher::commit_artifact(&fork, unknown_artifact.clone(), vec![]);
-    let err = rig
-        .dispatcher()
-        .initiate_migration(&fork, unknown_artifact, old_service.id.into())
-        .unwrap_err();
+    let err =
+        Dispatcher::initiate_migration(&fork, unknown_artifact, &old_service.name).unwrap_err();
     assert_eq!(
         err,
         ErrorMatch::from_fail(&DispatcherError::ArtifactNotDeployed)
@@ -385,9 +367,7 @@ fn migration_is_resumed_after_node_restart() {
 
     // Start migration.
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact, &service.name).unwrap();
     rig.create_block(fork);
 
     // Emulate node restart. Note that the old migration thread will continue running
@@ -415,9 +395,7 @@ fn migration_scripts_are_timely_aborted() {
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact, &service.name).unwrap();
     rig.create_block(fork);
 
     thread::sleep(Duration::from_millis(50));
@@ -448,9 +426,7 @@ fn completed_migration_is_not_resumed_after_node_restart() {
 
     // Start migration.
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact, &service.name).unwrap();
     rig.create_block(fork);
 
     thread::sleep(Duration::from_millis(500));
@@ -475,13 +451,11 @@ fn migration_with_panic() {
 
     // Start migration.
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact, &service.name).unwrap();
     rig.create_block(fork);
 
     // Wait for the migration script to panic.
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(Duration::from_millis(1_000));
 
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
@@ -507,12 +481,8 @@ fn concurrent_migrations_to_same_artifact() {
 
     // Place two migration starts in the same block.
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), service.id.into())
-        .unwrap();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), other_service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &other_service.name).unwrap();
     rig.create_block(fork);
 
     let threads = &rig.dispatcher().migrations.threads;
@@ -523,9 +493,7 @@ fn concurrent_migrations_to_same_artifact() {
     // ...and one more in the following block.
     thread::sleep(Duration::from_millis(100));
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), another_service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &another_service.name).unwrap();
     rig.create_block(fork);
 
     let threads = &rig.dispatcher().migrations.threads;
@@ -569,9 +537,7 @@ fn migration_influencing_state_hash() {
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), service.id.into())
-        .unwrap();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
     let state_hash = rig.create_block(fork).state_hash;
 
     // Check that the state during migration does not influence the default `state_hash`.
@@ -601,4 +567,102 @@ fn migration_influencing_state_hash() {
         vec!["service.entry".to_owned()]
     );
     assert_eq!(aggregator.get("service.entry"), Some(9_u32.object_hash()));
+}
+
+#[test]
+fn migration_rollback_workflow() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Wait until the migration is finished locally.
+    thread::sleep(Duration::from_millis(500));
+    rig.create_block(rig.blockchain.fork());
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    schema.completed_migration(&service.name).unwrap();
+    let threads = &rig.dispatcher().migrations.threads;
+    assert!(threads.is_empty());
+
+    // Signal the rollback.
+    let fork = rig.blockchain.fork();
+    Dispatcher::rollback_migration(&fork, &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Check that local migration result is erased.
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.completed_migration(&service.name).is_none());
+    let state = schema.get_instance(service.id).unwrap();
+    assert!(state.migration_target.is_none());
+    assert_eq!(state.status, Some(InstanceStatus::Stopped));
+    // The artifact version hasn't changed.
+    assert_eq!(state.spec.artifact.version, Version::new(0, 3, 0));
+}
+
+#[test]
+fn migration_rollback_aborts_migration_script() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Rollback the migration without waiting for the migration script to succeed locally.
+    let fork = rig.blockchain.fork();
+    Dispatcher::rollback_migration(&fork, &service.name).unwrap();
+    rig.create_block(fork);
+
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.completed_migration(&service.name).is_none());
+    let threads = &rig.dispatcher().migrations.threads;
+    assert!(threads.is_empty());
+    let migration = Migration::new(&service.name, &snapshot);
+    assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
+
+    // Wait some time to ensure that script doesn't merge changes to the DB.
+    thread::sleep(Duration::from_millis(100));
+    let snapshot = rig.blockchain.snapshot();
+    let migration = Migration::new(&service.name, &snapshot);
+    assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
+}
+
+#[test]
+fn migration_rollback_erases_migration_data() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::initiate_migration(&fork, new_artifact.clone(), &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Wait until the migration is finished locally.
+    thread::sleep(Duration::from_millis(500));
+    rig.create_block(rig.blockchain.fork());
+    let snapshot = rig.blockchain.snapshot();
+    let migration = Migration::new(&service.name, &snapshot);
+    assert_eq!(migration.get_proof_entry::<_, u32>("entry").get(), Some(9));
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::rollback_migration(&fork, &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Migration data should be dropped now.
+    let snapshot = rig.blockchain.snapshot();
+    let migration = Migration::new(&service.name, &snapshot);
+    assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
 }

@@ -15,7 +15,7 @@
 pub use self::{error::Error, schema::Schema};
 
 use exonum_merkledb::{
-    migration::{AbortHandle, MigrationHelper},
+    migration::{rollback_migration, AbortHandle, MigrationHelper},
     Database, Fork, Patch, Snapshot,
 };
 use futures::{
@@ -376,23 +376,26 @@ impl Dispatcher {
     }
 
     /// Initiates migration of an existing stopped service to a newer artifact.
-    /// The migration script is started only after the the block corresponding to `fork`
+    /// The migration script is started once the block corresponding to `fork`
     /// is committed.
-    pub(crate) fn initiate_migration<'q>(
-        &self,
+    pub(crate) fn initiate_migration(
         fork: &Fork,
         new_artifact: ArtifactId,
-        old_service: InstanceQuery<'q>,
+        service_name: &str,
     ) -> Result<(), ExecutionError> {
-        let service_name = Schema::new(fork)
-            .get_instance(old_service)
-            .ok_or(Error::IncorrectInstanceId)?
-            .spec
-            .name;
-
-        // Store the pending migration in the schema; the integrity checks will be performed there.
         Schema::new(fork)
-            .add_pending_migration(new_artifact, &service_name)
+            .add_pending_migration(new_artifact, service_name)
+            .map_err(From::from)
+    }
+
+    /// Initiates migration rollback. The rollback will actually be performed once
+    /// the block corresponding to `fork` is committed.
+    pub(crate) fn rollback_migration(
+        fork: &Fork,
+        service_name: &str,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .add_migration_rollback(service_name)
             .map_err(From::from)
     }
 
@@ -553,16 +556,25 @@ impl Dispatcher {
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
-    pub(crate) fn commit_block(&mut self, fork: Fork) -> Patch {
+    pub(crate) fn commit_block(&mut self, mut fork: Fork) -> Patch {
         let mut schema = Schema::new(&fork);
         let pending_artifacts = schema.take_pending_artifacts();
         let modified_instances = schema.take_modified_instances();
         let started_migrations = schema.take_started_migrations();
+        let migration_rollbacks = schema.take_migration_rollbacks();
 
+        // Rollback migrations.
+        for namespace in &migration_rollbacks {
+            // Remove the thread corresponding to the migration (if any). This will abort
+            // the migration script since its `AbortHandle` is dropped.
+            self.migrations.threads.remove(namespace);
+            rollback_migration(&mut fork, namespace);
+        }
         // Check if any migrations have finished. Record migration results in the DB.
         let results = self.migrations.take_completed();
+        let mut schema = Schema::new(&fork);
         for result in results {
-            schema.add_completed_migration(result);
+            schema.add_local_migration_result(result);
         }
 
         let patch = fork.into_patch();

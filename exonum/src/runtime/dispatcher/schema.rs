@@ -30,6 +30,7 @@ const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
 const INSTANCES: &str = "dispatcher_instances";
 const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const STARTED_MIGRATIONS: &str = "dispatcher_started_migrations";
+const MIGRATION_ROLLBACKS: &str = "dispatcher_migration_rollbacks";
 const COMPLETED_MIGRATIONS: &str = "dispatcher_completed_migrations";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
@@ -74,8 +75,14 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
+    /// Returns the set of service names, migrations for which have started in the current block.
     fn started_migrations(&self) -> KeySetIndex<T::Base, String> {
         self.access.clone().get_key_set(STARTED_MIGRATIONS)
+    }
+
+    /// Return the set of service name, migrations for which were rolled back in the current block.
+    fn migration_rollbacks(&self) -> KeySetIndex<T::Base, String> {
+        self.access.clone().get_key_set(MIGRATION_ROLLBACKS)
     }
 
     fn completed_migrations(&self) -> MapIndex<T::Base, str, MigrationScriptResult> {
@@ -182,7 +189,21 @@ impl Schema<&Fork> {
         Ok(())
     }
 
-    pub(super) fn add_completed_migration(&mut self, result: MigrationScriptResult) {
+    pub(super) fn add_migration_rollback(&mut self, service_name: &str) -> Result<(), Error> {
+        let mut instance_state = self
+            .instances()
+            .get(service_name)
+            .ok_or(Error::IncorrectInstanceId)?;
+        instance_state.migration_target.ok_or(Error::NoMigration)?;
+        instance_state.migration_target = None;
+        self.instances().put(service_name, instance_state);
+
+        self.completed_migrations().remove(&service_name);
+        self.migration_rollbacks().insert(service_name.to_owned());
+        Ok(())
+    }
+
+    pub(super) fn add_local_migration_result(&mut self, result: MigrationScriptResult) {
         let mut migrations = self.completed_migrations();
         debug_assert!(migrations.get(&result.instance.name).is_none());
         let service_name = result.instance.name.clone();
@@ -329,6 +350,13 @@ impl Schema<&Fork> {
             .collect();
         index.clear();
         started_migrations
+    }
+
+    pub(super) fn take_migration_rollbacks(&mut self) -> Vec<String> {
+        let mut index = self.migration_rollbacks();
+        let namespaces = index.iter().collect();
+        index.clear();
+        namespaces
     }
 
     /// Takes modified service instances from queue.

@@ -60,6 +60,8 @@ pub enum Error {
     /// The artifact to migrate the service to is not a newer version of the current
     /// service artifact.
     CannotUpgradeService = 16,
+    /// Attempt to rollback or flush migration for a service which has no pending migration.
+    NoMigration = 17,
 }
 
 impl Error {
