@@ -163,7 +163,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     ) {
         DispatcherSchema::new(snapshot)
             .get_instance(spec.id)
@@ -174,7 +174,11 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.events
             .lock()
             .unwrap()
-            .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
+            .push(RuntimeEvent::CommitService(
+                height,
+                spec.to_owned(),
+                status.to_owned(),
+            ));
         self.inner.update_service_status(snapshot, spec, status);
     }
 

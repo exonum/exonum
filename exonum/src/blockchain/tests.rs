@@ -318,7 +318,7 @@ impl Runtime for RuntimeInspector {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
     }
 

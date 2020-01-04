@@ -405,7 +405,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     );
 
     /// FIXME

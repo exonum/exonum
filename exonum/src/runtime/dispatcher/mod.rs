@@ -88,7 +88,7 @@ impl CommittedServices {
     fn get_instance<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceDescriptor<'_>, InstanceStatus)> {
+    ) -> Option<(InstanceDescriptor<'_>, &InstanceStatus)> {
         let (id, info) = match id.into() {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
@@ -98,7 +98,7 @@ impl CommittedServices {
             }
         };
         let name = info.name.as_str();
-        Some((InstanceDescriptor { id, name }, info.status))
+        Some((InstanceDescriptor { id, name }, &info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -279,12 +279,12 @@ impl Dispatcher {
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined state.");
-            self.update_service_status(snapshot, &state.spec, status);
+            self.update_service_status(snapshot, &state.spec, status.clone());
 
-            // Restart migration script if it is not finished locally.
-            if let Some(new_artifact) = state.migration_target {
+            // Restart a migration script if it is not finished locally.
+            if let InstanceStatus::Migrating { ref target } = status {
                 if schema.local_migration_result(&state.spec.name).is_none() {
-                    self.start_migration_script(new_artifact, state.spec);
+                    self.start_migration_script(target, state.spec);
                 }
             }
         }
@@ -324,13 +324,14 @@ impl Dispatcher {
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
         let patch = fork.into_patch();
-        for (spec, status) in pending_instances {
+        for (state, _) in pending_instances {
+            let status = state.status;
             debug_assert_eq!(
                 status,
-                InstanceStatus::Active,
-                "BUG: The built-in service instance must have an active status at startup."
+                Some(InstanceStatus::Active),
+                "BUG: The built-in service instance must have an active status at startup"
             );
-            self.update_service_status(&patch, &spec, status);
+            self.update_service_status(&patch, &state.spec, status.unwrap());
         }
         patch
     }
@@ -589,19 +590,29 @@ impl Dispatcher {
         let mut schema = Schema::new(&fork);
         let pending_artifacts = schema.take_pending_artifacts();
         let modified_instances = schema.take_modified_instances();
-        let started_migrations = schema.take_started_migrations();
-        let migration_rollbacks = schema.take_migration_rollbacks();
-        let migration_commits = schema.take_migration_commits();
 
         // Blocks until all migrations are completed with the expected outcome.
-        // The node will panic if a local outcomes of a migration is unexpected.
-        for (namespace, global_hash, local_result) in migration_commits {
-            let local_result = self.block_on_migration(&namespace, global_hash, local_result);
-            schema.add_local_migration_result(local_result);
+        // The node will panic if the local outcome of a migration is unexpected.
+        for (state, _) in &modified_instances {
+            if let Some(InstanceStatus::MigrationReady { hash }) = state.status {
+                let namespace = &state.spec.name;
+                let local_result = schema.local_migration_result(&namespace);
+                let local_result = self.block_on_migration(&namespace, hash, local_result);
+                schema.add_local_migration_result(local_result);
+            }
         }
 
         // Rollback migrations.
-        for namespace in &migration_rollbacks {
+        let migration_rollbacks =
+            modified_instances
+                .iter()
+                .filter_map(|(state, prev_status)| match (&state.status, prev_status) {
+                    (Some(InstanceStatus::Stopped), Some(InstanceStatus::Migrating { .. })) => {
+                        Some(&state.spec.name)
+                    }
+                    _ => None,
+                });
+        for namespace in migration_rollbacks {
             // Remove the thread corresponding to the migration (if any). This will abort
             // the migration script since its `AbortHandle` is dropped.
             self.migrations.threads.remove(namespace);
@@ -621,20 +632,22 @@ impl Dispatcher {
         for (artifact, deploy_spec) in pending_artifacts {
             self.block_until_deployed(artifact, deploy_spec);
         }
-        // Notify runtime about changes in service instances.
-        for (spec, status) in modified_instances {
-            self.update_service_status(&patch, &spec, status);
-        }
 
-        // Take the migration scripts from the runtimes and start executing them.
-        for (new_artifact, old_service) in started_migrations {
-            self.start_migration_script(new_artifact, old_service);
+        // Notify runtime about changes in service instances.
+        for (state, _) in modified_instances {
+            let status = state
+                .status
+                .expect("BUG: Service status cannot be changed to `None`");
+            self.update_service_status(&patch, &state.spec, status.clone());
+            if let InstanceStatus::Migrating { ref target } = status {
+                self.start_migration_script(target, state.spec);
+            }
         }
 
         patch
     }
 
-    fn start_migration_script(&mut self, new_artifact: ArtifactId, old_service: InstanceSpec) {
+    fn start_migration_script(&mut self, new_artifact: &ArtifactId, old_service: InstanceSpec) {
         let runtime = self
             .runtime_by_id(new_artifact.runtime_id)
             .unwrap_or_else(|| {
@@ -644,7 +657,7 @@ impl Dispatcher {
                 )
             });
         let mut scripts = runtime
-            .migrate(&new_artifact, &old_service)
+            .migrate(new_artifact, &old_service)
             .unwrap_or_else(|e| {
                 panic!(
                     "RUNTIME BUG: Getting the scripts returned `Ok(..)` \
@@ -795,7 +808,7 @@ impl Dispatcher {
             "BUG: `update_service_status` was invoked for incorrect runtime, \
              this should never happen because of preemptive checks.",
         );
-        runtime.update_service_status(snapshot, instance, status);
+        runtime.update_service_status(snapshot, instance, &status);
 
         info!(
             "Committing service instance {:?} with status {}",

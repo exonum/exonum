@@ -147,10 +147,8 @@ message ArtifactState {
   Status status = 2;
 }
 
-// Current state of service instance in dispatcher.
-message InstanceState {
-  // Status of a service instance.
-  enum Status {
+message InstanceStatus {
+  enum Simple {
     // The service instance has no status, i.e. this value corresponds to
     // `Option::None` on the Rust code level and other corresponds to
     // `Some(...)`.
@@ -161,15 +159,24 @@ message InstanceState {
     STOPPED = 2;
   }
 
+  oneof status {
+    // Service has a status from the `Simple` enum.
+    Simple simple = 1;
+    // Service is migrating towards the specified target.
+    ArtifactId migration_target = 2;
+    // Service has migrated with the specified hash.
+    exonum.crypto.Hash completed_migration_hash = 3;
+  }
+}
+
+// Current state of service instance in dispatcher.
+message InstanceState {
   // Service instance specification.
   exonum.runtime.InstanceSpec spec = 1;
   // Service instance activity status.
-  Status status = 2;
+  InstanceStatus status = 2;
   // Pending status of instance if the value is not `NONE`.
-  Status pending_status = 3;
-
-  ArtifactId migration_target = 4;
-  bool migration_ready = 5;
+  InstanceStatus pending_status = 3;
 }
 
 // Result of a migration.

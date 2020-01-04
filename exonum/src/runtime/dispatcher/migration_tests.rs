@@ -65,7 +65,7 @@ impl Runtime for MigrationRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
     }
 
@@ -604,7 +604,6 @@ fn migration_rollback_workflow() {
     let schema = DispatcherSchema::new(&snapshot);
     assert!(schema.local_migration_result(&service.name).is_none());
     let state = schema.get_instance(service.id).unwrap();
-    assert!(state.migration_target.is_none());
     assert_eq!(state.status, Some(InstanceStatus::Stopped));
     // The artifact version hasn't changed.
     assert_eq!(state.spec.artifact.version, Version::new(0, 3, 0));
@@ -698,7 +697,10 @@ fn migration_commit_workflow() {
     assert_eq!(res.result.unwrap(), HashTag::empty_map_hash());
     assert_eq!(res.end_version, Version::new(0, 5, 0));
     let state = schema.get_instance(service.id).unwrap();
-    assert!(state.migration_ready);
+    let expected_status = InstanceStatus::MigrationReady {
+        hash: HashTag::empty_map_hash(),
+    };
+    assert_eq!(state.status, Some(expected_status));
 }
 
 #[test]
@@ -730,8 +732,10 @@ fn migration_commit_without_completing_script_locally() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     let state = schema.get_instance(service.id).unwrap();
-    assert!(state.migration_target.is_none());
-    assert_eq!(state.status, Some(InstanceStatus::Stopped));
+    let expected_status = InstanceStatus::MigrationReady {
+        hash: migration_hash,
+    };
+    assert_eq!(state.status, Some(expected_status));
 
     // Flush the migration.
     let mut fork = rig.blockchain.fork();
@@ -743,9 +747,7 @@ fn migration_commit_without_completing_script_locally() {
     let schema = DispatcherSchema::new(&snapshot);
     let state = schema.get_instance(service.id).unwrap();
     assert_eq!(state.spec.artifact.version, Version::new(0, 5, 0));
-    // Migration information should be erased.
-    assert!(state.migration_target.is_none());
-    assert!(!state.migration_ready);
+    assert_eq!(state.status, Some(InstanceStatus::Stopped));
     assert!(schema.local_migration_result(&service.name).is_none());
 
     // Check that service data has been updated.

@@ -212,18 +212,18 @@ impl Runtime for SampleRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        new_status: InstanceStatus,
+        new_status: &InstanceStatus,
     ) {
         if spec.artifact.runtime_id == self.runtime_type {
-            let status_changed = if let Some(status) = self.services.get(&spec.id).copied() {
+            let status_changed = if let Some(status) = self.services.get(&spec.id) {
                 status != new_status
             } else {
                 true
             };
 
             if status_changed {
-                self.services.insert(spec.id, new_status);
-                self.new_services.insert(spec.id, new_status);
+                self.services.insert(spec.id, new_status.to_owned());
+                self.new_services.insert(spec.id, new_status.to_owned());
             }
         } else {
             panic!("Incorrect runtime")
@@ -512,7 +512,7 @@ impl Runtime for ShutdownRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
     }
 
@@ -704,7 +704,7 @@ impl Runtime for DeploymentRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
     }
 

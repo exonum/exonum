@@ -422,21 +422,31 @@ impl ProtobufConvert for ArtifactStatus {
     }
 }
 
-// TODO Investigate boilerplate-less approach of enums usage as binary values and keys. [ECR-3941]
-
 /// Status of a service instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(BinaryValue)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum InstanceStatus {
     /// The service instance is active.
-    Active = 1,
+    Active,
     /// The service instance is stopped.
-    Stopped = 2,
+    Stopped,
+    /// The service instance is migrating to the specified artifact.
+    Migrating {
+        /// Artifact providing migration script(s) for the service.
+        target: ArtifactId,
+    },
+    /// The service instance has completed migration.
+    MigrationReady {
+        /// Migration hash.
+        hash: Hash,
+    },
 }
 
 impl InstanceStatus {
     /// Indicates whether the service instance status is active.
-    pub fn is_active(self) -> bool {
-        self == InstanceStatus::Active
+    pub fn is_active(&self) -> bool {
+        *self == InstanceStatus::Active
     }
 }
 
@@ -445,50 +455,69 @@ impl Display for InstanceStatus {
         formatter.write_str(match self {
             InstanceStatus::Active => "active",
             InstanceStatus::Stopped => "stopped",
+            InstanceStatus::Migrating { .. } => "migrating",
+            InstanceStatus::MigrationReady { .. } => "finished migrating",
         })
     }
 }
 
 impl InstanceStatus {
-    // This method must have an exact signature so that is can be used with the
-    // `protobuf_convert(with)`.
-    #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
-    fn to_pb(status: &Option<InstanceStatus>) -> schema::runtime::InstanceState_Status {
-        use schema::runtime::InstanceState_Status::*;
-        match status {
-            None => NONE,
-            Some(InstanceStatus::Active) => ACTIVE,
-            Some(InstanceStatus::Stopped) => STOPPED,
-        }
+    // Used by `InstanceState`.
+    #[allow(clippy::wrong_self_convention)]
+    pub(super) fn to_pb(status: &Option<Self>) -> schema::runtime::InstanceStatus {
+        Self::create_pb(status.as_ref())
     }
 
-    fn from_pb(
-        pb: schema::runtime::InstanceState_Status,
-    ) -> Result<Option<InstanceStatus>, failure::Error> {
-        use schema::runtime::InstanceState_Status::*;
-        Ok(match pb {
-            NONE => None,
-            ACTIVE => Some(InstanceStatus::Active),
-            STOPPED => Some(InstanceStatus::Stopped),
-        })
+    fn create_pb(status: Option<&Self>) -> schema::runtime::InstanceStatus {
+        use schema::runtime::InstanceStatus_Simple::*;
+
+        let mut pb = schema::runtime::InstanceStatus::new();
+        match status {
+            None => pb.set_simple(NONE),
+            Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
+            Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
+            Some(InstanceStatus::Migrating { target }) => pb.set_migration_target(target.to_pb()),
+            Some(InstanceStatus::MigrationReady { hash }) => {
+                pb.set_completed_migration_hash(hash.to_pb())
+            }
+        }
+        pb
+    }
+
+    pub(super) fn from_pb(
+        mut pb: schema::runtime::InstanceStatus,
+    ) -> Result<Option<Self>, failure::Error> {
+        use schema::runtime::InstanceStatus_Simple::*;
+
+        if pb.has_simple() {
+            Ok(match pb.get_simple() {
+                NONE => None,
+                ACTIVE => Some(InstanceStatus::Active),
+                STOPPED => Some(InstanceStatus::Stopped),
+            })
+        } else if pb.has_migration_target() {
+            ArtifactId::from_pb(pb.take_migration_target())
+                .map(|target| Some(InstanceStatus::Migrating { target }))
+        } else if pb.has_completed_migration_hash() {
+            Hash::from_pb(pb.take_completed_migration_hash())
+                .map(|hash| Some(InstanceStatus::MigrationReady { hash }))
+        } else {
+            Err(format_err!("No variant specified for `InstanceStatus`"))
+        }
     }
 }
 
-impl BinaryValue for InstanceStatus {
-    fn to_bytes(&self) -> Vec<u8> {
-        (*self as u32).to_bytes()
+impl ProtobufConvert for InstanceStatus {
+    type ProtoStruct = schema::runtime::InstanceStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        Self::create_pb(Some(self))
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        let code = u32::from_bytes(bytes)?;
-        match code {
-            1 => Ok(InstanceStatus::Active),
-            2 => Ok(InstanceStatus::Stopped),
-            other => Err(format_err!(
-                "Instance status with code {} is unknown.",
-                other
-            )),
-        }
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let maybe_self = Self::from_pb(pb)?;
+        maybe_self
+            .ok_or_else(|| format_err!("Cannot create `InstanceStatus` from `None` serialization"))
     }
 }
 
@@ -514,7 +543,7 @@ impl ArtifactState {
 }
 
 /// Current state of service instance in dispatcher.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::InstanceState")]
@@ -527,33 +556,6 @@ pub struct InstanceState {
     /// Pending status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
-    /// The artifact targeted by the service migration.
-    #[protobuf_convert(with = "pb_optional_artifact")]
-    pub migration_target: Option<ArtifactId>,
-    /// Is the current migration ready?
-    pub migration_ready: bool,
-}
-
-mod pb_optional_artifact {
-    use super::*;
-
-    pub fn from_pb(pb: schema::runtime::ArtifactId) -> Result<Option<ArtifactId>, failure::Error> {
-        let is_default =
-            pb.get_name().is_empty() && pb.get_version().is_empty() && pb.get_runtime_id() == 0;
-        Ok(if is_default {
-            None
-        } else {
-            Some(ArtifactId::from_pb(pb)?)
-        })
-    }
-
-    pub fn to_pb(value: &Option<ArtifactId>) -> schema::runtime::ArtifactId {
-        if let Some(value) = value.as_ref() {
-            value.to_pb()
-        } else {
-            schema::runtime::ArtifactId::new()
-        }
-    }
 }
 
 impl InstanceState {
@@ -563,8 +565,6 @@ impl InstanceState {
             spec,
             status: Some(status),
             pending_status: None,
-            migration_target: None,
-            migration_ready: false,
         }
     }
 
@@ -578,9 +578,7 @@ impl InstanceState {
             self.pending_status.is_some(),
             "Next instance status should not be `None`"
         );
-
-        self.status = self.pending_status;
-        self.pending_status = None;
+        self.status = self.pending_status.take();
     }
 }
 
