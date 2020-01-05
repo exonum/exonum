@@ -21,6 +21,7 @@ use exonum_merkledb::{
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
+use semver::Version;
 
 use super::{ArtifactId, Error, InstanceSpec};
 use crate::{
@@ -219,6 +220,20 @@ impl Schema<&Fork> {
         // has no pending status, we assume that it will be added successfully here.
     }
 
+    /// Fast-forwards data migration by bumping the recorded service version.
+    /// The entire migration workflow is skipped in this case; the service remains
+    /// with the `Stopped` status and no pending status is added.
+    pub(super) fn fast_forward_migration(
+        &mut self,
+        mut instance_state: InstanceState,
+        new_version: Version,
+    ) {
+        debug_assert!(instance_state.spec.artifact.version < new_version);
+        instance_state.spec.artifact.version = new_version;
+        let instance_name = instance_state.spec.name.clone();
+        self.instances().put(&instance_name, instance_state);
+    }
+
     fn add_pending_status(
         &mut self,
         mut instance_state: InstanceState,
@@ -404,7 +419,7 @@ impl Schema<&Fork> {
         output
     }
 
-    /// Marks a service migration as completed. This sets the service status from `MigrationReady`
+    /// Marks a service migration as completed. This sets the service status from `Migrating`
     /// to `Stopped`, bumps its artifact version and removes the local migration result.
     pub(super) fn complete_migration(&mut self, instance_name: &str) -> Result<(), Error> {
         let mut instance_state = self

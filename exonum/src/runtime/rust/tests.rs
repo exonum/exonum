@@ -186,7 +186,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         self.inner.migrate(new_artifact, old_service)
     }
 

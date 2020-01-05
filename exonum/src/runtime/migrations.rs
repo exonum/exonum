@@ -20,16 +20,19 @@ pub use super::types::{InstanceMigration, MigrationStatus};
 
 use exonum_merkledb::migration::MigrationHelper;
 use failure::Fail;
+use semver::Version;
 
 use std::{collections::BTreeMap, fmt};
 
-use crate::runtime::{versioning::Version, InstanceSpec};
+use crate::runtime::{DispatcherError, ExecutionError, ExecutionFail, InstanceSpec};
+
+type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send;
 
 /// Atomic migration script.
 pub struct MigrationScript {
     end_version: Version,
     name: String,
-    logic: Box<dyn FnOnce(&mut MigrationContext) + Send>,
+    logic: Box<MigrationLogic>,
 }
 
 impl fmt::Debug for MigrationScript {
@@ -46,7 +49,7 @@ impl MigrationScript {
     /// Creates a new migration script with the specified end version and implementation.
     pub fn new<F>(logic: F, end_version: Version) -> Self
     where
-        F: FnOnce(&mut MigrationContext) + Send + 'static,
+        F: FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send + 'static,
     {
         Self {
             name: format!("Migration to {}", end_version),
@@ -70,8 +73,8 @@ impl MigrationScript {
     }
 
     /// Executes the script.
-    pub fn execute(self, context: &mut MigrationContext) {
-        (self.logic)(context);
+    pub fn execute(self, context: &mut MigrationContext) -> Result<(), ExecutionError> {
+        (self.logic)(context)
     }
 }
 
@@ -102,12 +105,16 @@ pub trait MigrateData {
     /// be executed successively in the specified order, flushing the migration to the DB
     /// after each script is completed.
     ///
-    /// Scripts are not expected to fail; the failure should be eagerly signalled via an error.
+    /// Inability to migrate data should be eagerly signalled via an error. While a script may
+    /// fail during execution, this should be used as a last resort measure. It is
+    /// perfectly reasonable to return an error from the script if it is aborted, though;
+    /// an error in this case *does not* mean that the migration will be considered failed.
+    ///
+    /// FIXME: link to script abortion
     ///
     /// # Expectations
     ///
-    /// The following constraints are expected from the migration scripts, although are currently
-    /// not checked by the core:
+    /// The following constraints are expected from the migration scripts:
     ///
     /// - Scripts should be ordered by increasing [`end_version()`]
     /// - The `end_version` of the initial script should be greater than `start_version`
@@ -159,6 +166,12 @@ pub enum DataMigrationError {
     /// Data migrations are not supported by the artifact.
     #[fail(display = "Data migrations are not supported by the artifact")]
     NotSupported,
+}
+
+impl From<DataMigrationError> for ExecutionError {
+    fn from(err: DataMigrationError) -> Self {
+        DispatcherError::NoMigration.with_description(err)
+    }
 }
 
 /// Linearly ordered migrations.
@@ -244,7 +257,7 @@ impl LinearMigrations {
     ///   constructor.
     pub fn add_script<F>(mut self, version: Version, script: F) -> Self
     where
-        F: FnOnce(&mut MigrationContext) + Send + 'static,
+        F: FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send + 'static,
     {
         self.check_prerelease(&version);
         assert!(
@@ -258,28 +271,32 @@ impl LinearMigrations {
         self
     }
 
-    /// Selects a list of migration scripts based on the provided start version of the artifact.
-    pub fn select(
-        self,
-        start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    fn check(&self, start_version: &Version) -> Result<(), DataMigrationError> {
         if !self.support_prereleases && start_version.is_prerelease() {
             let msg = "the start version is a prerelease".to_owned();
             return Err(DataMigrationError::UnsupportedStart(msg));
         }
         if *start_version > self.latest_version {
             return Err(DataMigrationError::FutureStartVersion {
-                max_supported_version: self.latest_version,
+                max_supported_version: self.latest_version.clone(),
             });
         }
-        if let Some(min_supported_version) = self.min_start_version {
-            if *start_version < min_supported_version {
+        if let Some(ref min_supported_version) = self.min_start_version {
+            if start_version < min_supported_version {
                 return Err(DataMigrationError::OldStartVersion {
-                    min_supported_version,
+                    min_supported_version: min_supported_version.to_owned(),
                 });
             }
         }
+        Ok(())
+    }
 
+    /// Selects a list of migration scripts based on the provided start version of the artifact.
+    pub fn select(
+        self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        self.check(start_version)?;
         Ok(self
             .scripts
             .into_iter()
@@ -309,7 +326,7 @@ mod tests {
 
     const ARTIFACT_NAME: &str = "service.test.Migration";
 
-    fn migration_02(context: &mut MigrationContext) {
+    fn migration_02(context: &mut MigrationContext) -> Result<(), ExecutionError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
         assert!(context.instance_spec.artifact.version < Version::new(0, 2, 0));
@@ -318,9 +335,10 @@ mod tests {
         assert!(!old_entry.exists());
         let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(1);
+        Ok(())
     }
 
-    fn migration_05(context: &mut MigrationContext) {
+    fn migration_05(context: &mut MigrationContext) -> Result<(), ExecutionError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
         assert!(context.instance_spec.artifact.version >= Version::new(0, 2, 0));
@@ -330,9 +348,10 @@ mod tests {
         assert_eq!(old_entry.get(), Some(1));
         let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(2);
+        Ok(())
     }
 
-    fn migration_06(context: &mut MigrationContext) {
+    fn migration_06(context: &mut MigrationContext) -> Result<(), ExecutionError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
         assert!(context.instance_spec.artifact.version >= Version::new(0, 5, 0));
@@ -342,6 +361,7 @@ mod tests {
         assert_eq!(old_entry.get(), Some(2));
         let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(3);
+        Ok(())
     }
 
     fn create_linear_migrations() -> LinearMigrations {
@@ -383,7 +403,7 @@ mod tests {
             );
             version = next_version;
 
-            script.execute(&mut context);
+            script.execute(&mut context).unwrap();
             let migration_hash = context.helper.finish().unwrap();
             // Since the migration contains `ProofEntry`, its hash should be non-trivial.
             assert_ne!(migration_hash, Hash::zero());
@@ -485,18 +505,21 @@ mod tests {
                 let start_version = &ctx.instance_spec.artifact.version;
                 assert!(*start_version < pre_version_);
                 ctx.helper.new_data().get_proof_entry("v02pre").set(1_u8);
+                Ok(())
             })
             .add_script(Version::new(0, 2, 0), move |ctx| {
                 let start_version = &ctx.instance_spec.artifact.version;
                 assert!(*start_version >= pre_version);
                 assert!(*start_version < Version::new(0, 2, 0));
                 ctx.helper.new_data().get_proof_entry("v02").set(2_u8);
+                Ok(())
             })
             .add_script(Version::new(0, 3, 0), |ctx| {
                 let start_version = &ctx.instance_spec.artifact.version;
                 assert!(*start_version >= Version::new(0, 2, 0));
                 assert!(*start_version < Version::new(0, 3, 0));
                 ctx.helper.new_data().get_proof_entry("v03").set(3_u8);
+                Ok(())
             })
     }
 

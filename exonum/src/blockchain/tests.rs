@@ -326,7 +326,7 @@ impl Runtime for RuntimeInspector {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         Err(DataMigrationError::NotSupported)
     }
 

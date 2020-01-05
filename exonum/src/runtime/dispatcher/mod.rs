@@ -41,7 +41,7 @@ use crate::{
 };
 
 use super::{
-    error::{CallSite, CallType, ErrorKind, ExecutionError, ExecutionFail},
+    error::{CallSite, CallType, ErrorKind, ExecutionError},
     migrations::{InstanceMigration, MigrationContext, MigrationScript, MigrationStatus},
     ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
@@ -149,7 +149,7 @@ impl Migrations {
         let end_version = script.end_version().to_owned();
         let (handle_tx, handle_rx) = mpsc::channel();
 
-        let handle = thread::spawn(move || {
+        let handle = thread::spawn(move || -> Result<Hash, ExecutionError> {
             let script_name = script.name().to_owned();
             log::info!("Starting migration script {}", script_name);
 
@@ -161,18 +161,14 @@ impl Migrations {
                 instance_spec,
             };
 
-            script.execute(&mut context);
-            let migration_result = context
-                .helper
-                .finish()
-                .map_err(|e| ExecutionError::new(ErrorKind::Unexpected, e.to_string()));
+            script.execute(&mut context)?;
+            let migration_hash = context.helper.finish()?;
             log::info!(
-                "Finished migration script {} with result {:?}",
+                "Successfully finished migration script {} with hash {:?}",
                 script_name,
-                migration_result
+                migration_hash
             );
-
-            migration_result
+            Ok(migration_hash)
         });
 
         let prev_thread = self.threads.insert(
@@ -388,9 +384,15 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(fork);
         let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
-        let script = self.get_migration_script(&new_artifact, &instance_state.spec)?;
-        let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
-        schema.add_pending_migration(instance_state, migration);
+        let maybe_script = self.get_migration_script(&new_artifact, &instance_state.spec)?;
+        if let Some(script) = maybe_script {
+            let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
+            schema.add_pending_migration(instance_state, migration);
+        } else {
+            // No migration script means that the service instance may be immediately updated to
+            // the new artifact version.
+            schema.fast_forward_migration(instance_state, new_artifact.version);
+        }
         Ok(())
     }
 
@@ -653,18 +655,13 @@ impl Dispatcher {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<MigrationScript, ExecutionError> {
+    ) -> Result<Option<MigrationScript>, ExecutionError> {
         let runtime = self
             .runtime_by_id(new_artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
-        let mut scripts = runtime
+        runtime
             .migrate(new_artifact, &old_service)
-            .map_err(|e| Error::NoMigration.with_description(e))?;
-
-        // FIXME: remove restriction on the number of scripts or revise script retrieval interface
-        assert_eq!(scripts.len(), 1);
-        let script = scripts.pop().unwrap();
-        Ok(script)
+            .map_err(From::from)
     }
 
     fn start_migration_script(&mut self, new_artifact: &ArtifactId, old_service: InstanceSpec) {
@@ -674,6 +671,13 @@ impl Dispatcher {
                 panic!(
                     "BUG: Cannot obtain migration script for migrating {:?} to new artifact {:?}, {}",
                     old_service, new_artifact, err
+                );
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "BUG: Runtime returned no script for migrating {:?} to new artifact {:?}, \
+                     although it earlier returned a script for the same migration",
+                    old_service, new_artifact
                 );
             });
         self.migrations.add_migration(old_service, script);

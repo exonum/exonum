@@ -73,19 +73,18 @@ impl Runtime for MigrationRuntime {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         let script = match old_service.artifact.name.as_str() {
             "good" => simple_delayed_migration,
             "bad" => panicking_migration,
             "with-state" => migration_modifying_state_hash,
-            _ => {
-                return Err(DataMigrationError::NotSupported);
-            }
+            "none" => return Ok(None),
+            _ => return Err(DataMigrationError::NotSupported),
         };
         let mut end_version = new_artifact.version.clone();
         end_version.patch = 0;
         let script = MigrationScript::new(script, end_version);
-        Ok(vec![script])
+        Ok(Some(script))
     }
 
     fn execute(
@@ -116,21 +115,23 @@ impl Runtime for MigrationRuntime {
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
-fn simple_delayed_migration(_ctx: &mut MigrationContext) {
+fn simple_delayed_migration(_ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
     thread::sleep(Duration::from_millis(200));
+    Ok(())
 }
 
-fn panicking_migration(_ctx: &mut MigrationContext) {
+fn panicking_migration(_ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
     thread::sleep(Duration::from_millis(100));
     panic!("This migration is unsuccessful!");
 }
 
-fn migration_modifying_state_hash(ctx: &mut MigrationContext) {
+fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
     for i in 0_u32..10 {
         ctx.helper.new_data().get_proof_entry("entry").set(i);
-        ctx.helper.merge().unwrap();
         thread::sleep(Duration::from_millis(15));
+        ctx.helper.merge()?;
     }
+    Ok(())
 }
 
 #[derive(Debug)]

@@ -234,7 +234,7 @@ impl Runtime for SampleRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         Err(DataMigrationError::NotSupported)
     }
 
@@ -520,7 +520,7 @@ impl Runtime for ShutdownRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         Err(DataMigrationError::NotSupported)
     }
 
@@ -712,7 +712,7 @@ impl Runtime for DeploymentRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         Err(DataMigrationError::NotSupported)
     }
 

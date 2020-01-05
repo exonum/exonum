@@ -611,14 +611,25 @@ impl Runtime for RustRuntime {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
         debug_assert_eq!(new_artifact.name, old_service.artifact.name);
 
         let artifact = self
             .available_artifacts
             .get(&new_artifact)
-            .ok_or_else(|| DataMigrationError::NotSupported)?;
-        artifact.migration_scripts(&old_service.artifact.version)
+            .unwrap_or_else(|| {
+                panic!(
+                    "BUG: `migrate` call to a non-existing artifact {:?}",
+                    new_artifact
+                );
+            });
+
+        let mut scripts = artifact.migration_scripts(&old_service.artifact.version)?;
+        Ok(if scripts.is_empty() {
+            None
+        } else {
+            Some(scripts.swap_remove(0))
+        })
     }
 
     fn execute(

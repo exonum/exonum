@@ -632,6 +632,12 @@ impl ObjectHash for ExecutionError {
     }
 }
 
+impl From<exonum_merkledb::Error> for ExecutionError {
+    fn from(err: exonum_merkledb::Error) -> ExecutionError {
+        ExecutionError::new(ErrorKind::Unexpected, err.to_string())
+    }
+}
+
 /// Site of a call where an `ExecutionError` may occur.
 ///
 /// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
