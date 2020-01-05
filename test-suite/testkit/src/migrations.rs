@@ -26,7 +26,7 @@ use exonum::{
         migrations::{MigrateData, MigrationContext, MigrationScript},
         rust::ServiceFactory,
         versioning::Version,
-        InstanceSpec,
+        ExecutionError, InstanceSpec,
     },
 };
 
@@ -111,7 +111,7 @@ where
             instance_spec,
         };
         let end_version = script.end_version().to_owned();
-        script.execute(&mut context);
+        script.execute(&mut context).unwrap();
         context.helper.finish().unwrap();
 
         let mut fork = self.db.fork();
@@ -163,7 +163,7 @@ pub trait ScriptExt {
 
 impl<F> ScriptExt for F
 where
-    F: FnOnce(&mut MigrationContext) + Send + 'static,
+    F: FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send + 'static,
 {
     fn with_end_version(self, version: &str) -> MigrationScript {
         MigrationScript::new(self, version.parse().expect("Cannot parse end version"))
@@ -184,12 +184,14 @@ mod tests {
         Arc,
     };
 
-    fn script_1(ctx: &mut MigrationContext) {
+    fn script_1(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
         assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 1, 0));
+        Ok(())
     }
 
-    fn script_2(ctx: &mut MigrationContext) {
+    fn script_2(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
         assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 2, 0));
+        Ok(())
     }
 
     #[derive(Debug, Clone, Default)]
@@ -225,13 +227,15 @@ mod tests {
 
             Ok(vec![
                 (move |ctx: &mut MigrationContext| {
-                    script_1(ctx);
+                    script_1(ctx)?;
                     first_counter.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
                 })
                 .with_end_version("0.2.0"),
                 (move |ctx: &mut MigrationContext| {
-                    script_2(ctx);
+                    script_2(ctx)?;
                     second_counter.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
                 })
                 .with_end_version("0.3.0"),
             ])

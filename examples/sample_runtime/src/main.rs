@@ -25,6 +25,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
+        migrations::{DataMigrationError, MigrationScript},
         rust::{RustRuntime, ServiceFactory},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
@@ -133,7 +134,7 @@ impl Runtime for SampleRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     ) {
         match status {
             InstanceStatus::Active => {
@@ -149,7 +150,19 @@ impl Runtime for SampleRuntime {
                 let instance = self.started_services.remove(&spec.id);
                 println!("Stopping service {}: {:?}", spec, instance);
             }
+
+            InstanceStatus::Migrating(_) => {
+                // We don't migrate service data in this demo.
+            }
         }
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _old_service: &InstanceSpec,
+    ) -> Result<Option<MigrationScript>, DataMigrationError> {
+        Err(DataMigrationError::NotSupported)
     }
 
     fn execute(
