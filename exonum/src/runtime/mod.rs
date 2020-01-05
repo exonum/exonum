@@ -150,7 +150,6 @@ pub use self::{
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
         InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
-        MigrationScriptResult,
     },
 };
 

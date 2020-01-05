@@ -106,7 +106,9 @@ impl<'a> CallContext<'a> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`initiate_migration` called within a non-supervisor service");
         }
-        Dispatcher::initiate_migration(&self.inner.fork, new_artifact, old_service)
+        self.inner
+            .dispatcher
+            .initiate_migration(&self.inner.fork, new_artifact, old_service)
     }
 
     #[doc(hidden)]

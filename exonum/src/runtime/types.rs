@@ -422,6 +422,66 @@ impl ProtobufConvert for ArtifactStatus {
     }
 }
 
+/// Information about a migration of a service instance.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "schema::runtime::InstanceMigration")]
+pub struct InstanceMigration {
+    /// Migration target to obtain migration scripts from. This artifact
+    /// must be deployed on the blockchain.
+    pub target: ArtifactId,
+
+    /// Version of the instance data after the migration is completed.
+    /// Note that it does not necessarily match the version of `target`,
+    /// but should be not greater.
+    #[protobuf_convert(with = "self::pb_version")]
+    pub end_version: Version,
+
+    /// Consensus-wide outcome of the migration, in the form of
+    /// the aggregation hash of the migrated data.
+    /// The lack of value signifies that the migration is not finished yet.
+    #[protobuf_convert(with = "self::pb_optional_hash")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_hash: Option<Hash>,
+}
+
+impl InstanceMigration {
+    pub(super) fn new(target: ArtifactId, end_version: Version) -> Self {
+        Self {
+            target,
+            end_version,
+            completed_hash: None,
+        }
+    }
+
+    /// Checks if the migration is considered completed, i.e., has migration state agreed
+    /// among all nodes in the blockchain network.
+    pub fn is_completed(&self) -> bool {
+        self.completed_hash.is_some()
+    }
+}
+
+mod pb_optional_hash {
+    use super::*;
+    use exonum_crypto::proto::types::Hash as PbHash;
+
+    pub fn from_pb(pb: PbHash) -> Result<Option<Hash>, failure::Error> {
+        if pb.get_data().is_empty() {
+            Ok(None)
+        } else {
+            Hash::from_pb(pb).map(Some)
+        }
+    }
+
+    pub fn to_pb(value: &Option<Hash>) -> PbHash {
+        if let Some(hash) = value {
+            hash.to_pb()
+        } else {
+            PbHash::new()
+        }
+    }
+}
+
 /// Status of a service instance.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(BinaryValue)]
@@ -432,21 +492,33 @@ pub enum InstanceStatus {
     /// The service instance is stopped.
     Stopped,
     /// The service instance is migrating to the specified artifact.
-    Migrating {
-        /// Artifact providing migration script(s) for the service.
-        target: ArtifactId,
-    },
-    /// The service instance has completed migration.
-    MigrationReady {
-        /// Migration hash.
-        hash: Hash,
-    },
+    Migrating(Box<InstanceMigration>),
 }
 
 impl InstanceStatus {
+    pub(super) fn migrating(migration: InstanceMigration) -> Self {
+        InstanceStatus::Migrating(Box::new(migration))
+    }
+
     /// Indicates whether the service instance status is active.
     pub fn is_active(&self) -> bool {
         *self == InstanceStatus::Active
+    }
+
+    pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
+        match self {
+            InstanceStatus::Migrating(migration) if !migration.is_completed() => {
+                Some(&migration.target)
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn completed_migration_hash(&self) -> Option<Hash> {
+        match self {
+            InstanceStatus::Migrating(migration) => migration.completed_hash,
+            _ => None,
+        }
     }
 }
 
@@ -455,8 +527,7 @@ impl Display for InstanceStatus {
         formatter.write_str(match self {
             InstanceStatus::Active => "active",
             InstanceStatus::Stopped => "stopped",
-            InstanceStatus::Migrating { .. } => "migrating",
-            InstanceStatus::MigrationReady { .. } => "finished migrating",
+            InstanceStatus::Migrating(..) => "migrating",
         })
     }
 }
@@ -476,10 +547,7 @@ impl InstanceStatus {
             None => pb.set_simple(NONE),
             Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
             Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
-            Some(InstanceStatus::Migrating { target }) => pb.set_migration_target(target.to_pb()),
-            Some(InstanceStatus::MigrationReady { hash }) => {
-                pb.set_completed_migration_hash(hash.to_pb())
-            }
+            Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
         }
         pb
     }
@@ -495,12 +563,9 @@ impl InstanceStatus {
                 ACTIVE => Some(InstanceStatus::Active),
                 STOPPED => Some(InstanceStatus::Stopped),
             })
-        } else if pb.has_migration_target() {
-            ArtifactId::from_pb(pb.take_migration_target())
-                .map(|target| Some(InstanceStatus::Migrating { target }))
-        } else if pb.has_completed_migration_hash() {
-            Hash::from_pb(pb.take_completed_migration_hash())
-                .map(|hash| Some(InstanceStatus::MigrationReady { hash }))
+        } else if pb.has_migration() {
+            InstanceMigration::from_pb(pb.take_migration())
+                .map(|migration| Some(InstanceStatus::migrating(migration)))
         } else {
             Err(format_err!("No variant specified for `InstanceStatus`"))
         }
@@ -584,43 +649,32 @@ impl InstanceState {
 
 /// Result of execution of a migration script.
 #[derive(Debug, Clone)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::runtime::MigrationScriptResult")]
-pub struct MigrationScriptResult {
-    /// Instance the script was applied to.
-    pub instance: InstanceSpec,
-    /// The end version of data after the script successfully applied.
-    #[protobuf_convert(with = "pb_version")]
-    pub end_version: Version,
-    /// Result of the script execution.
-    #[protobuf_convert(with = "pb_script_result")]
-    pub result: Result<Hash, ExecutionError>,
-}
+#[derive(BinaryValue, ObjectHash)]
+pub struct MigrationStatus(pub Result<Hash, ExecutionError>);
 
-mod pb_script_result {
-    use super::*;
+impl ProtobufConvert for MigrationStatus {
+    type ProtoStruct = schema::runtime::MigrationStatus;
 
-    pub fn from_pb(
-        mut pb: schema::runtime::MigrationStatus,
-    ) -> Result<Result<Hash, ExecutionError>, failure::Error> {
-        if pb.has_hash() {
-            Ok(Ok(Hash::from_pb(pb.take_hash())?))
-        } else if pb.has_error() {
-            Ok(Err(ExecutionError::from_pb(pb.take_error())?))
-        } else {
-            Err(format_err!(
-                "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"
-            ))
-        }
-    }
-
-    pub fn to_pb(value: &Result<Hash, ExecutionError>) -> schema::runtime::MigrationStatus {
-        let mut pb = schema::runtime::MigrationStatus::new();
-        match value {
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        match self.0 {
             Ok(hash) => pb.set_hash(hash.to_pb()),
-            Err(e) => pb.set_error(e.to_pb()),
+            Err(ref e) => pb.set_error(e.to_pb()),
         }
         pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let inner = if pb.has_hash() {
+            Ok(Hash::from_pb(pb.take_hash())?)
+        } else if pb.has_error() {
+            Err(ExecutionError::from_pb(pb.take_error())?)
+        } else {
+            return Err(format_err!(
+                "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"
+            ));
+        };
+        Ok(MigrationStatus(inner))
     }
 }
 

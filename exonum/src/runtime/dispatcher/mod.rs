@@ -15,7 +15,7 @@
 pub use self::{error::Error, schema::Schema};
 
 use exonum_merkledb::{
-    migration::{rollback_migration, AbortHandle, MigrationHelper},
+    migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
     Database, Fork, Patch, Snapshot,
 };
 use futures::{
@@ -41,11 +41,10 @@ use crate::{
 };
 
 use super::{
-    error::{CallSite, CallType, ErrorKind, ExecutionError},
-    migrations::{MigrationContext, MigrationScript},
-    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, MigrationScriptResult, Runtime,
+    error::{CallSite, CallType, ErrorKind, ExecutionError, ExecutionFail},
+    migrations::{InstanceMigration, MigrationContext, MigrationScript, MigrationStatus},
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
-use exonum_merkledb::migration::flush_migration;
 
 mod error;
 #[cfg(test)]
@@ -121,17 +120,12 @@ struct MigrationThread {
 }
 
 impl MigrationThread {
-    fn join(self) -> MigrationScriptResult {
+    fn join(self) -> (String, MigrationStatus) {
         let result = match self.handle.join() {
             Ok(result) => result,
             Err(e) => Err(ExecutionError::from_panic(e)),
         };
-
-        MigrationScriptResult {
-            instance: self.instance,
-            end_version: self.end_version,
-            result,
-        }
+        (self.instance.name, MigrationStatus(result))
     }
 }
 
@@ -197,7 +191,7 @@ impl Migrations {
         );
     }
 
-    fn take_completed(&mut self) -> Vec<MigrationScriptResult> {
+    fn take_completed(&mut self) -> Vec<(String, MigrationStatus)> {
         let completed_names: Vec<_> = self
             .threads
             .iter()
@@ -278,11 +272,11 @@ impl Dispatcher {
         for state in schema.instances().values() {
             let status = state
                 .status
-                .expect("BUG: Stored service instance should have a determined state.");
+                .expect("BUG: Stored service instance should have a determined status.");
             self.update_service_status(snapshot, &state.spec, status.clone());
 
             // Restart a migration script if it is not finished locally.
-            if let InstanceStatus::Migrating { ref target } = status {
+            if let Some(target) = status.ongoing_migration_target() {
                 if schema.local_migration_result(&state.spec.name).is_none() {
                     self.start_migration_script(target, state.spec);
                 }
@@ -387,13 +381,17 @@ impl Dispatcher {
     /// The migration script is started once the block corresponding to `fork`
     /// is committed.
     pub(crate) fn initiate_migration(
+        &self,
         fork: &Fork,
         new_artifact: ArtifactId,
         service_name: &str,
     ) -> Result<(), ExecutionError> {
-        Schema::new(fork)
-            .add_pending_migration(new_artifact, service_name)
-            .map_err(From::from)
+        let mut schema = Schema::new(fork);
+        let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
+        let script = self.get_migration_script(&new_artifact, &instance_state.spec)?;
+        let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
+        schema.add_pending_migration(instance_state, migration);
+        Ok(())
     }
 
     /// Initiates migration rollback. The rollback will actually be performed once
@@ -594,11 +592,15 @@ impl Dispatcher {
         // Blocks until all migrations are completed with the expected outcome.
         // The node will panic if the local outcome of a migration is unexpected.
         for (state, _) in &modified_instances {
-            if let Some(InstanceStatus::MigrationReady { hash }) = state.status {
-                let namespace = &state.spec.name;
-                let local_result = schema.local_migration_result(&namespace);
-                let local_result = self.block_on_migration(&namespace, hash, local_result);
-                schema.add_local_migration_result(local_result);
+            let migration_hash = state
+                .status
+                .as_ref()
+                .and_then(InstanceStatus::completed_migration_hash);
+            if let Some(hash) = migration_hash {
+                let instance_name = &state.spec.name;
+                let local_result = schema.local_migration_result(instance_name);
+                let local_result = self.block_on_migration(instance_name, hash, local_result);
+                schema.add_local_migration_result(instance_name, local_result);
             }
         }
 
@@ -622,8 +624,8 @@ impl Dispatcher {
         // Check if any migrations have finished. Record migration results in the DB.
         let results = self.migrations.take_completed();
         let mut schema = Schema::new(&fork);
-        for result in results {
-            schema.add_local_migration_result(result);
+        for (instance_name, result) in results {
+            schema.add_local_migration_result(&instance_name, result);
         }
 
         let patch = fork.into_patch();
@@ -639,7 +641,7 @@ impl Dispatcher {
                 .status
                 .expect("BUG: Service status cannot be changed to `None`");
             self.update_service_status(&patch, &state.spec, status.clone());
-            if let InstanceStatus::Migrating { ref target } = status {
+            if let Some(target) = status.ongoing_migration_target() {
                 self.start_migration_script(target, state.spec);
             }
         }
@@ -647,28 +649,33 @@ impl Dispatcher {
         patch
     }
 
-    fn start_migration_script(&mut self, new_artifact: &ArtifactId, old_service: InstanceSpec) {
+    fn get_migration_script(
+        &self,
+        new_artifact: &ArtifactId,
+        old_service: &InstanceSpec,
+    ) -> Result<MigrationScript, ExecutionError> {
         let runtime = self
             .runtime_by_id(new_artifact.runtime_id)
-            .unwrap_or_else(|| {
-                panic!(
-                    "BUG: Runtime not found for deployed artifact {:?}",
-                    new_artifact
-                )
-            });
+            .ok_or(Error::IncorrectRuntime)?;
         let mut scripts = runtime
             .migrate(new_artifact, &old_service)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "RUNTIME BUG: Getting the scripts returned `Ok(..)` \
-                     during block creation, but returned error {} during block commitment",
-                    e
-                );
-            });
+            .map_err(|e| Error::NoMigration.with_description(e))?;
 
         // FIXME: remove restriction on the number of scripts or revise script retrieval interface
         assert_eq!(scripts.len(), 1);
         let script = scripts.pop().unwrap();
+        Ok(script)
+    }
+
+    fn start_migration_script(&mut self, new_artifact: &ArtifactId, old_service: InstanceSpec) {
+        let script = self
+            .get_migration_script(new_artifact, &old_service)
+            .unwrap_or_else(|err| {
+                panic!(
+                    "BUG: Cannot obtain migration script for migrating {:?} to new artifact {:?}, {}",
+                    old_service, new_artifact, err
+                );
+            });
         self.migrations.add_migration(old_service, script);
     }
 
@@ -676,11 +683,11 @@ impl Dispatcher {
         &mut self,
         namespace: &str,
         global_hash: Hash,
-        local_result: Option<MigrationScriptResult>,
-    ) -> MigrationScriptResult {
+        local_result: Option<MigrationStatus>,
+    ) -> MigrationStatus {
         let local_result = if let Some(thread) = self.migrations.threads.remove(namespace) {
             // If the migration script hasn't finished locally, wait until it's finished.
-            thread.join()
+            thread.join().1
         } else {
             // If the local script has finished, the result should be recorded in the database.
             local_result.unwrap_or_else(|| {
@@ -694,7 +701,7 @@ impl Dispatcher {
 
         // Check if the local result agrees with the global one. Any deviation is considered
         // a consensus failure.
-        let res = local_result.result.as_ref();
+        let res = local_result.0.as_ref();
         let local_hash = *res.unwrap_or_else(|err| {
             // FIXME: Add a maintenance command for removing local migration result
             // and hint it here.

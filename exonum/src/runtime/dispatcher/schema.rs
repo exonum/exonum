@@ -26,8 +26,8 @@ use super::{ArtifactId, Error, InstanceSpec};
 use crate::{
     proto::schema,
     runtime::{
+        migrations::{InstanceMigration, MigrationStatus},
         ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
-        MigrationScriptResult,
     },
 };
 
@@ -54,6 +54,12 @@ impl ProtobufConvert for ModifiedInstanceInfo {
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         InstanceStatus::from_pb(pb).map(|prev_status| ModifiedInstanceInfo { prev_status })
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MigrationTransition {
+    Rollback,
+    Commit(Hash),
 }
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
@@ -97,7 +103,7 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
-    fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationScriptResult> {
+    fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
         self.access.clone().get_map(LOCAL_MIGRATION_RESULTS)
     }
 
@@ -124,8 +130,8 @@ impl<T: Access> Schema<T> {
     ///
     /// This result is set once the migration script associated with the service instance completes
     /// and is cleared by committing the *global* migration result.
-    pub fn local_migration_result(&self, service_name: &str) -> Option<MigrationScriptResult> {
-        self.local_migration_results().get(service_name)
+    pub fn local_migration_result(&self, instance_name: &str) -> Option<MigrationStatus> {
+        self.local_migration_results().get(instance_name)
     }
 }
 
@@ -161,11 +167,12 @@ impl Schema<&Fork> {
         Ok(())
     }
 
-    pub(super) fn add_pending_migration(
-        &mut self,
-        new_artifact: ArtifactId,
+    /// Checks preconditions for migration initiation.
+    pub(super) fn check_migration_initiation(
+        &self,
+        new_artifact: &ArtifactId,
         old_service: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<InstanceState, Error> {
         // The service should exist.
         let instance_state = self
             .instances()
@@ -174,12 +181,12 @@ impl Schema<&Fork> {
 
         // The service should be stopped. Note that this also checks that
         // the service is not being migrated.
-        let current_status = instance_state
-            .pending_status
-            .as_ref()
-            .or_else(|| instance_state.status.as_ref());
-        if current_status != Some(&InstanceStatus::Stopped) {
+        if instance_state.status != Some(InstanceStatus::Stopped) {
             return Err(Error::ServiceNotStopped);
+        }
+        // There should be no pending status for the service.
+        if instance_state.pending_status.is_some() {
+            return Err(Error::ServicePending);
         }
 
         // The new artifact should exist.
@@ -196,20 +203,30 @@ impl Schema<&Fork> {
         if !new_artifact.is_upgrade_of(&instance_state.spec.artifact) {
             return Err(Error::CannotUpgradeService);
         }
+        Ok(instance_state)
+    }
 
-        let pending_status = InstanceStatus::Migrating {
-            target: new_artifact,
-        };
-        self.add_pending_status(instance_state, pending_status);
-        Ok(())
+    /// Marks the start of data migration for a service. This method does not perform
+    /// consistency checks assuming that this call is preceded by `check_migration_initiation`.
+    pub(super) fn add_pending_migration(
+        &mut self,
+        instance_state: InstanceState,
+        migration: InstanceMigration,
+    ) {
+        let pending_status = InstanceStatus::migrating(migration);
+        self.add_pending_status(instance_state, pending_status).ok();
+        // Since we've checked in `check_migration_initiation` that the service
+        // has no pending status, we assume that it will be added successfully here.
     }
 
     fn add_pending_status(
         &mut self,
         mut instance_state: InstanceState,
         pending_status: InstanceStatus,
-    ) {
-        debug_assert!(instance_state.pending_status.is_none());
+    ) -> Result<(), Error> {
+        if instance_state.pending_status.is_some() {
+            return Err(Error::ServicePending);
+        }
         instance_state.pending_status = Some(pending_status);
         let instance_name = instance_state.spec.name.clone();
         let modified_info = ModifiedInstanceInfo {
@@ -217,39 +234,63 @@ impl Schema<&Fork> {
         };
         self.instances().put(&instance_name, instance_state);
         self.modified_instances().put(&instance_name, modified_info);
+        Ok(())
     }
 
     fn add_migration_state(
         &mut self,
-        service_name: &str,
-        new_status: InstanceStatus,
+        instance_name: &str,
+        transition: MigrationTransition,
     ) -> Result<(), Error> {
         let instance_state = self
             .instances()
-            .get(service_name)
+            .get(instance_name)
             .ok_or(Error::IncorrectInstanceId)?;
-        self.add_pending_status(instance_state, new_status);
+        let migration = match instance_state.status {
+            Some(InstanceStatus::Migrating(ref migration)) if !migration.is_completed() => {
+                migration
+            }
+            _ => return Err(Error::NoMigration),
+        };
+        let new_status = match transition {
+            MigrationTransition::Rollback => InstanceStatus::Stopped,
+            MigrationTransition::Commit(hash) => {
+                let mut migration = migration.to_owned();
+                migration.completed_hash = Some(hash);
+                InstanceStatus::Migrating(migration)
+            }
+        };
+
+        self.add_pending_status(instance_state, new_status)?;
         Ok(())
     }
 
-    pub(super) fn add_migration_rollback(&mut self, service_name: &str) -> Result<(), Error> {
-        self.add_migration_state(service_name, InstanceStatus::Stopped)?;
-        self.local_migration_results().remove(service_name);
+    /// Saves migration rollback to the database. Returns an error if the rollback breaks
+    /// invariants imposed by the migration workflow.
+    pub(super) fn add_migration_rollback(&mut self, instance_name: &str) -> Result<(), Error> {
+        self.add_migration_state(instance_name, MigrationTransition::Rollback)?;
+        self.local_migration_results().remove(instance_name);
         Ok(())
     }
 
+    /// Saves migration commit to the database. Returns an error if the commit breaks
+    /// invariants imposed by the migration workflow. Note that an error is *not* returned
+    /// if the local migration result contradicts the commit (this is only checked on block commit).
     pub(super) fn add_migration_commit(
         &mut self,
-        service_name: &str,
+        instance_name: &str,
         hash: Hash,
     ) -> Result<(), Error> {
-        self.add_migration_state(service_name, InstanceStatus::MigrationReady { hash })
+        self.add_migration_state(instance_name, MigrationTransition::Commit(hash))
     }
 
-    pub(super) fn add_local_migration_result(&mut self, result: MigrationScriptResult) {
-        let mut migrations = self.local_migration_results();
-        let service_name = result.instance.name.clone();
-        migrations.put(&service_name, result);
+    /// Saves local migration result to the database.
+    pub(super) fn add_local_migration_result(
+        &mut self,
+        instance_name: &str,
+        result: MigrationStatus,
+    ) {
+        self.local_migration_results().put(instance_name, result);
     }
 
     /// Adds information about a pending service instance to the schema.
@@ -275,8 +316,7 @@ impl Schema<&Fork> {
             status: None,
             pending_status: None,
         };
-        self.add_pending_status(new_instance, InstanceStatus::Active);
-        Ok(())
+        self.add_pending_status(new_instance, InstanceStatus::Active)
     }
 
     /// Adds information about stopping service instance to the schema.
@@ -298,15 +338,10 @@ impl Schema<&Fork> {
             Some(InstanceStatus::Active) => {}
             _ => return Err(Error::ServiceNotActive),
         }
-
-        if state.pending_status.is_some() {
-            return Err(Error::ServicePending);
-        }
-        self.add_pending_status(state, InstanceStatus::Stopped);
-        Ok(())
+        self.add_pending_status(state, InstanceStatus::Stopped)
     }
 
-    /// Make pending artifacts and instances active.
+    /// Makes pending artifacts and instances active.
     pub(super) fn activate_pending(&mut self) {
         // Activate pending artifacts.
         let mut artifacts = self.artifacts();
@@ -369,18 +404,23 @@ impl Schema<&Fork> {
         output
     }
 
-    pub(super) fn complete_migration(&mut self, service_name: &str) -> Result<(), Error> {
+    /// Marks a service migration as completed. This sets the service status from `MigrationReady`
+    /// to `Stopped`, bumps its artifact version and removes the local migration result.
+    pub(super) fn complete_migration(&mut self, instance_name: &str) -> Result<(), Error> {
         let mut instance_state = self
             .instances()
-            .get(service_name)
+            .get(instance_name)
             .ok_or(Error::IncorrectInstanceId)?;
-        let mut local_results = self.local_migration_results();
-        let state = local_results.get(service_name).ok_or(Error::NoMigration)?;
-        local_results.remove(service_name);
+        let end_version = match instance_state.status {
+            Some(InstanceStatus::Migrating(ref migration)) if migration.is_completed() => {
+                migration.end_version.clone()
+            }
+            _ => return Err(Error::NoMigration),
+        };
 
-        debug_assert!(instance_state.spec.artifact.version < state.end_version);
-        instance_state.spec.artifact.version = state.end_version;
-        self.add_pending_status(instance_state, InstanceStatus::Stopped);
-        Ok(())
+        self.local_migration_results().remove(instance_name);
+        debug_assert!(instance_state.spec.artifact.version < end_version);
+        instance_state.spec.artifact.version = end_version;
+        self.add_pending_status(instance_state, InstanceStatus::Stopped)
     }
 }

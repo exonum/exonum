@@ -599,14 +599,10 @@ impl Runtime for RustRuntime {
                 );
                 self.add_started_service(instance);
             }
-
             InstanceStatus::Stopped => {
                 self.remove_started_service(spec);
             }
-
-            InstanceStatus::Migrating { .. } | InstanceStatus::MigrationReady { .. } => {
-                /* Do nothing. */
-            }
+            InstanceStatus::Migrating(_) => { /* Do nothing. */ }
         }
         self.changed_services_since_last_block = true;
     }

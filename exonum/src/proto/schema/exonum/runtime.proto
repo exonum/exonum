@@ -162,12 +162,25 @@ message InstanceStatus {
   oneof status {
     // Service has a status from the `Simple` enum.
     Simple simple = 1;
-    // Service is migrating towards the specified target.
-    ArtifactId migration_target = 2;
-    // Service has migrated with the specified hash.
-    exonum.crypto.Hash completed_migration_hash = 3;
+    // Service is in process of migration.
+    InstanceMigration migration = 2;
   }
 }
+
+message InstanceMigration {
+  // Migration target to obtain migration scripts from. This artifact
+  // must be deployed on the blockchain.
+  ArtifactId target = 1;
+  // Version of the instance data after the migration is completed.
+  // Note that it does not necessarily match the version of `target`,
+  // but should be not greater.
+  string end_version = 2;
+  // Consensus-wide outcome of the migration, in the form of
+  // the aggregation hash of the migrated data.
+  // The lack of value signifies that the migration is not finished yet.
+  exonum.crypto.Hash completed_hash = 3;
+}
+
 
 // Current state of service instance in dispatcher.
 message InstanceState {
@@ -179,7 +192,7 @@ message InstanceState {
   InstanceStatus pending_status = 3;
 }
 
-// Result of a migration.
+// Local result of a migration.
 message MigrationStatus {
   oneof result {
     // Hash of the migrated data.
@@ -187,10 +200,4 @@ message MigrationStatus {
     // Error that has occurred during migration.
     ExecutionError error = 2;
   }
-}
-
-message MigrationScriptResult {
-  InstanceSpec instance = 1;
-  string end_version = 2;
-  MigrationStatus result = 3;
 }

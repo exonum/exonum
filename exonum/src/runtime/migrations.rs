@@ -16,6 +16,8 @@
 //!
 //! FIXME: more details (ECR-4081)
 
+pub use super::types::{InstanceMigration, MigrationStatus};
+
 use exonum_merkledb::migration::MigrationHelper;
 use failure::Fail;
 
