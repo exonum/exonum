@@ -117,12 +117,10 @@ impl CommittedServices {
 struct MigrationThread {
     handle: thread::JoinHandle<Result<Hash, MigrationError>>,
     abort_handle: AbortHandle,
-    instance: InstanceSpec,
-    end_version: Version,
 }
 
 impl MigrationThread {
-    fn join(self) -> (String, MigrationStatus) {
+    fn join(self) -> MigrationStatus {
         let result = match self.handle.join() {
             Ok(Ok(hash)) => Ok(hash),
             Ok(Err(MigrationError::Custom(description))) => Err(description),
@@ -132,7 +130,7 @@ impl MigrationThread {
             }
             Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
-        (self.instance.name, MigrationStatus(result))
+        MigrationStatus(result)
     }
 }
 
@@ -150,10 +148,14 @@ impl Migrations {
         }
     }
 
-    fn add_migration(&mut self, instance_spec: InstanceSpec, script: MigrationScript) {
+    fn add_migration(
+        &mut self,
+        instance_spec: InstanceSpec,
+        data_version: Version,
+        script: MigrationScript,
+    ) {
         let db = Arc::clone(&self.db);
-        let instance = instance_spec.clone();
-        let end_version = script.end_version().to_owned();
+        let instance_name = instance_spec.name.clone();
         let (handle_tx, handle_rx) = mpsc::channel();
 
         let handle = thread::spawn(move || -> Result<Hash, MigrationError> {
@@ -165,6 +167,7 @@ impl Migrations {
             handle_tx.send(abort_handle).unwrap();
             let mut context = MigrationContext {
                 helper,
+                data_version,
                 instance_spec,
             };
 
@@ -179,18 +182,16 @@ impl Migrations {
         });
 
         let prev_thread = self.threads.insert(
-            instance.name.to_owned(),
+            instance_name.clone(),
             MigrationThread {
                 handle,
                 abort_handle: handle_rx.recv().unwrap(),
-                instance: instance.clone(),
-                end_version,
             },
         );
         debug_assert!(
             prev_thread.is_none(),
-            "Attempt to run concurrent migrations for service {:?}",
-            instance
+            "Attempt to run concurrent migrations for service `{}`",
+            instance_name
         );
     }
 
@@ -208,10 +209,10 @@ impl Migrations {
             .collect();
 
         completed_names
-            .iter()
+            .into_iter()
             .map(|name| {
-                let thread = self.threads.remove(name).unwrap();
-                thread.join()
+                let thread = self.threads.remove(&name).unwrap();
+                (name, thread.join())
             })
             .collect()
     }
@@ -273,6 +274,7 @@ impl Dispatcher {
 
         // Restart active service instances.
         for state in schema.instances().values() {
+            let data_version = state.data_version().to_owned();
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined status.");
@@ -281,7 +283,7 @@ impl Dispatcher {
             // Restart a migration script if it is not finished locally.
             if let Some(target) = status.ongoing_migration_target() {
                 if schema.local_migration_result(&state.spec.name).is_none() {
-                    self.start_migration_script(target, state.spec);
+                    self.start_migration_script(target, state.spec, data_version);
                 }
             }
         }
@@ -646,12 +648,14 @@ impl Dispatcher {
 
         // Notify runtime about changes in service instances.
         for (state, _) in modified_instances {
+            let data_version = state.data_version().to_owned();
             let status = state
                 .status
                 .expect("BUG: Service status cannot be changed to `None`");
+
             self.update_service_status(&patch, &state.spec, status.clone());
             if let Some(target) = status.ongoing_migration_target() {
-                self.start_migration_script(target, state.spec);
+                self.start_migration_script(target, state.spec, data_version);
             }
         }
 
@@ -671,7 +675,12 @@ impl Dispatcher {
             .map_err(From::from)
     }
 
-    fn start_migration_script(&mut self, new_artifact: &ArtifactId, old_service: InstanceSpec) {
+    fn start_migration_script(
+        &mut self,
+        new_artifact: &ArtifactId,
+        old_service: InstanceSpec,
+        data_version: Version,
+    ) {
         let script = self
             .get_migration_script(new_artifact, &old_service)
             .unwrap_or_else(|err| {
@@ -687,7 +696,8 @@ impl Dispatcher {
                     old_service, new_artifact
                 );
             });
-        self.migrations.add_migration(old_service, script);
+        self.migrations
+            .add_migration(old_service, data_version, script);
     }
 
     fn block_on_migration(
@@ -698,7 +708,7 @@ impl Dispatcher {
     ) -> MigrationStatus {
         let local_result = if let Some(thread) = self.migrations.threads.remove(namespace) {
             // If the migration script hasn't finished locally, wait until it's finished.
-            thread.join().1
+            thread.join()
         } else {
             // If the local script has finished, the result should be recorded in the database.
             local_result.unwrap_or_else(|| {

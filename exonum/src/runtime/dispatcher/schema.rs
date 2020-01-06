@@ -228,8 +228,8 @@ impl Schema<&Fork> {
         mut instance_state: InstanceState,
         new_version: Version,
     ) {
-        debug_assert!(instance_state.spec.artifact.version < new_version);
-        instance_state.spec.artifact.version = new_version;
+        debug_assert!(*instance_state.data_version() < new_version);
+        instance_state.data_version = Some(new_version);
         let instance_name = instance_state.spec.name.clone();
         self.instances().put(&instance_name, instance_state);
     }
@@ -328,6 +328,7 @@ impl Schema<&Fork> {
 
         let new_instance = InstanceState {
             spec,
+            data_version: None,
             status: None,
             pending_status: None,
         };
@@ -434,8 +435,8 @@ impl Schema<&Fork> {
         };
 
         self.local_migration_results().remove(instance_name);
-        debug_assert!(instance_state.spec.artifact.version < end_version);
-        instance_state.spec.artifact.version = end_version;
+        debug_assert!(*instance_state.data_version() < end_version);
+        instance_state.data_version = Some(end_version);
         self.add_pending_status(instance_state, InstanceStatus::Stopped)
     }
 }

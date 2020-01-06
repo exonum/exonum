@@ -293,8 +293,11 @@ fn migration_workflow() {
     rig.create_block(fork);
 
     // Check that the migration was initiated.
-    let migration = &rig.dispatcher().migrations.threads[&service.name];
-    assert_eq!(migration.end_version, Version::new(0, 5, 0));
+    assert!(rig
+        .dispatcher()
+        .migrations
+        .threads
+        .contains_key(&service.name));
 
     // Create several more blocks before the migration is complete and check that
     // we don't spawn multiple migration scripts at once (this check is performed in `Migrations`).
@@ -354,7 +357,7 @@ fn fast_forward_migration() {
     let state = schema.get_instance(service.id).unwrap();
     assert_eq!(state.status, Some(InstanceStatus::Stopped));
     assert_eq!(state.pending_status, None);
-    assert_eq!(state.spec.artifact.version, Version::new(0, 5, 2));
+    assert_eq!(state.data_version, Some(Version::new(0, 5, 2)));
 }
 
 /// Tests checks performed by the dispatcher.
@@ -715,7 +718,7 @@ fn migration_rollback_workflow() {
     let state = schema.get_instance(service.id).unwrap();
     assert_eq!(state.status, Some(InstanceStatus::Stopped));
     // The artifact version hasn't changed.
-    assert_eq!(state.spec.artifact.version, Version::new(0, 3, 0));
+    assert_eq!(state.data_version, None);
 }
 
 #[test]
@@ -1045,7 +1048,7 @@ fn migration_commit_without_completing_script_locally() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     let state = schema.get_instance(service.id).unwrap();
-    assert_eq!(state.spec.artifact.version, Version::new(0, 5, 0));
+    assert_eq!(state.data_version, Some(Version::new(0, 5, 0)));
     assert_eq!(state.status, Some(InstanceStatus::Stopped));
     assert!(schema.local_migration_result(&service.name).is_none());
 

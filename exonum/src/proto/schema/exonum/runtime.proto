@@ -190,6 +190,11 @@ message InstanceState {
   InstanceStatus status = 2;
   // Pending status of instance if the value is not `NONE`.
   InstanceStatus pending_status = 3;
+  // Version of the service data. The empty value means that the data version
+  // is the same as the `spec.artifact`. Non-empty value means that one or more
+  // data migrations have been performed on the service, so that the service data
+  // is compatible with a newer artifact.
+  string data_version = 4;
 }
 
 // Local result of a migration.

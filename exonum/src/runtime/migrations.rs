@@ -180,10 +180,11 @@ impl MigrationScript {
         &self.name
     }
 
-    /// Returns the version of the data after this script is applied. This service data version
+    /// Returns the version of the data after this script is applied. This service [`data_version`]
     /// will be set to this value after the migration performed by this script is flushed.
     ///
     /// [`MigrationContext`]: struct.MigrationContext.html
+    /// [`data_version`]: ../struct.InstanceState.html#field.data_version
     pub fn end_version(&self) -> &Version {
         &self.end_version
     }
@@ -201,16 +202,19 @@ pub struct MigrationContext {
     pub helper: MigrationHelper,
 
     /// Specification of the migrated instance.
+    pub instance_spec: InstanceSpec,
+
+    /// Version of the service data.
     ///
     /// Note that the artifact version will change with each executed [`MigrationScript`]
     /// to reflect the latest version of the service data. For example, if a [`MigrateData`]
     /// implementation produces two scripts, which migrate service data to versions
-    /// 0.5.0 and 0.6.0 respectively, then the second script will get the `instance_spec`
-    /// with the version set to 0.5.0, regardless of the original version of the instance artifact.
+    /// 0.5.0 and 0.6.0 respectively, then the second script will get the `data_version`
+    /// set to 0.5.0, regardless of the original version of the instance artifact.
     ///
     /// [`MigrationScript`]: struct.MigrationScript.html
     /// [`MigrateData`]: trait.MigrateData.html
-    pub instance_spec: InstanceSpec,
+    pub data_version: Version,
 }
 
 /// Encapsulates data migration logic.
@@ -445,7 +449,7 @@ mod tests {
     fn migration_02(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
-        assert!(context.instance_spec.artifact.version < Version::new(0, 2, 0));
+        assert!(context.data_version < Version::new(0, 2, 0));
 
         let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
         assert!(!old_entry.exists());
@@ -457,8 +461,8 @@ mod tests {
     fn migration_05(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
-        assert!(context.instance_spec.artifact.version >= Version::new(0, 2, 0));
-        assert!(context.instance_spec.artifact.version < Version::new(0, 5, 0));
+        assert!(context.data_version >= Version::new(0, 2, 0));
+        assert!(context.data_version < Version::new(0, 5, 0));
 
         let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
         assert_eq!(old_entry.get(), Some(1));
@@ -470,8 +474,8 @@ mod tests {
     fn migration_06(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
-        assert!(context.instance_spec.artifact.version >= Version::new(0, 5, 0));
-        assert!(context.instance_spec.artifact.version < Version::new(0, 6, 0));
+        assert!(context.data_version >= Version::new(0, 5, 0));
+        assert!(context.data_version < Version::new(0, 6, 0));
 
         let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
         assert_eq!(old_entry.get(), Some(2));
@@ -493,21 +497,23 @@ mod tests {
         scripts: Vec<MigrationScript>,
     ) -> Box<dyn Snapshot> {
         let db = Arc::new(db);
+        let instance_spec = InstanceSpec {
+            id: 100,
+            name: "test".to_string(),
+            artifact: ArtifactId {
+                runtime_id: RuntimeIdentifier::Rust as _,
+                name: ARTIFACT_NAME.to_owned(),
+                version: start_version.clone(),
+            },
+        };
         let mut version = start_version;
         let mut migration_hashes = HashSet::new();
 
         for script in scripts {
             let mut context = MigrationContext {
                 helper: MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test"),
-                instance_spec: InstanceSpec {
-                    id: 100,
-                    name: "test".to_string(),
-                    artifact: ArtifactId {
-                        runtime_id: RuntimeIdentifier::Rust as _,
-                        name: ARTIFACT_NAME.to_owned(),
-                        version: version.clone(),
-                    },
-                },
+                instance_spec: instance_spec.clone(),
+                data_version: version.clone(),
             };
 
             let next_version = script.end_version().to_owned();
@@ -618,20 +624,20 @@ mod tests {
 
         LinearMigrations::with_prereleases(Version::new(0, 3, 2))
             .add_script(pre_version.clone(), move |ctx| {
-                let start_version = &ctx.instance_spec.artifact.version;
+                let start_version = &ctx.data_version;
                 assert!(*start_version < pre_version_);
                 ctx.helper.new_data().get_proof_entry("v02pre").set(1_u8);
                 Ok(())
             })
             .add_script(Version::new(0, 2, 0), move |ctx| {
-                let start_version = &ctx.instance_spec.artifact.version;
+                let start_version = &ctx.data_version;
                 assert!(*start_version >= pre_version);
                 assert!(*start_version < Version::new(0, 2, 0));
                 ctx.helper.new_data().get_proof_entry("v02").set(2_u8);
                 Ok(())
             })
             .add_script(Version::new(0, 3, 0), |ctx| {
-                let start_version = &ctx.instance_spec.artifact.version;
+                let start_version = &ctx.data_version;
                 assert!(*start_version >= Version::new(0, 2, 0));
                 assert!(*start_version < Version::new(0, 3, 0));
                 ctx.helper.new_data().get_proof_entry("v03").set(3_u8);

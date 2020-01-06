@@ -615,12 +615,44 @@ impl ArtifactState {
 pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
+
+    /// Version of the service data. `None` value means that the data version is the same
+    /// as the `spec.artifact`. `Some(version)` means that one or more [data migrations] have
+    /// been performed on the service, so that the service data is compatible with the `version`
+    /// of the artifact.
+    ///
+    /// [data migrations]: migrations/index.html
+    #[protobuf_convert(with = "self::pb_optional_version")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_version: Option<Version>,
+
     /// Service instance activity status.
     #[protobuf_convert(with = "InstanceStatus")]
     pub status: Option<InstanceStatus>,
+
     /// Pending status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
+}
+
+mod pb_optional_version {
+    use super::*;
+
+    pub fn from_pb(pb: String) -> Result<Option<Version>, failure::Error> {
+        if pb.is_empty() {
+            Ok(None)
+        } else {
+            pb.parse().map(Some).map_err(From::from)
+        }
+    }
+
+    pub fn to_pb(value: &Option<Version>) -> String {
+        if let Some(value) = value.as_ref() {
+            value.to_string()
+        } else {
+            String::new()
+        }
+    }
 }
 
 impl InstanceState {
@@ -628,9 +660,20 @@ impl InstanceState {
     pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
         Self {
             spec,
+            data_version: None,
             status: Some(status),
             pending_status: None,
         }
+    }
+
+    /// Returns the version of the service data. This can match the version of the service artifact,
+    /// or may be greater if [data migrations] have been performed on the service.
+    ///
+    /// [data migrations]: migrations/index.html
+    pub fn data_version(&self) -> &Version {
+        self.data_version
+            .as_ref()
+            .unwrap_or(&self.spec.artifact.version)
     }
 
     /// Sets next status as current and changes next status to `None`

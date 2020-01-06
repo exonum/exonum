@@ -98,17 +98,16 @@ where
     }
 
     fn do_execute_script(&mut self, script: MigrationScript) {
-        let mut artifact = self.service_factory.artifact_id();
-        artifact.version = self.data_version.clone();
         let instance_spec = InstanceSpec {
             id: 100,
             name: Self::SERVICE_NAME.to_owned(),
-            artifact,
+            artifact: self.service_factory.artifact_id(),
         };
 
         let mut context = MigrationContext {
             helper: MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
             instance_spec,
+            data_version: self.data_version.clone(),
         };
         let end_version = script.end_version().to_owned();
         script.execute(&mut context).unwrap();
@@ -186,12 +185,12 @@ mod tests {
     };
 
     fn script_1(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-        assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 1, 0));
+        assert_eq!(ctx.data_version, Version::new(0, 1, 0));
         Ok(())
     }
 
     fn script_2(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-        assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 2, 0));
+        assert_eq!(ctx.data_version, Version::new(0, 2, 0));
         Ok(())
     }
 
