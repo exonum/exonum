@@ -63,11 +63,5 @@ rocksdb_zlib = ["rocksdb/zlib"]
 rocksdb_zstd = ["rocksdb/zstd"]
 rocksdb_bzip2 = ["rocksdb/bzip2"]
 
-[[example]]
-name = "blockchain"
-
-[[example]]
-name = "migration"
-
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../build" }
