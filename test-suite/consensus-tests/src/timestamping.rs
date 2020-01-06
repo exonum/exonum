@@ -21,7 +21,7 @@ use exonum::{
         AnyTx, ExecutionError, InstanceId,
     },
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;

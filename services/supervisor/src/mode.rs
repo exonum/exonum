@@ -25,7 +25,7 @@ use exonum::{crypto::Hash, helpers::byzantine_quorum};
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
 use failure::{self, format_err};
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use std::str::FromStr;
 

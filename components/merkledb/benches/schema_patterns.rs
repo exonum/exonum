@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use criterion::{black_box, Bencher, Benchmark, Criterion, Throughput};
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
 

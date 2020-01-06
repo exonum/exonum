@@ -24,9 +24,9 @@ use exonum::{
         rust::TxStub, ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use super::{mode::Mode, proto, transactions::SupervisorInterface};
 

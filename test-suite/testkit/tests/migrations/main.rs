@@ -83,8 +83,8 @@ mod v01 {
             Fork, MapIndex,
         },
     };
-    use exonum_derive::*;
-    use serde_derive::*;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use serde_derive::{Deserialize, Serialize};
 
     use crate::TestUser;
 
@@ -126,7 +126,7 @@ mod v02 {
         access::{Access, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
-    use exonum_derive::*;
+    use exonum_derive::FromAccess;
 
     use crate::{v01::Wallet, TestUser};
 
@@ -166,8 +166,8 @@ mod v05 {
         access::{Access, AccessExt, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
-    use exonum_derive::*;
-    use serde_derive::*;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use serde_derive::{Deserialize, Serialize};
 
     use crate::TestUser;
 

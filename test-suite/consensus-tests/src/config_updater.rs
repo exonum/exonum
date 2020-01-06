@@ -24,7 +24,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 #[exonum_interface]
 pub trait ConfigUpdater<Ctx> {

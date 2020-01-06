@@ -14,9 +14,9 @@
 
 use criterion::{AxisScale, Bencher, Criterion, PlotConfiguration, Throughput};
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use std::{collections::HashMap, fmt};
 

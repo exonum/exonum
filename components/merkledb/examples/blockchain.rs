@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::{Hash, PublicKey};
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use serde_derive::{Deserialize, Serialize};
 
-use exonum_crypto::{Hash, PublicKey};
-use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Database, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,

@@ -29,7 +29,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_testkit::TestKitBuilder;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use exonum_time::{
     schema::TimeSchema,

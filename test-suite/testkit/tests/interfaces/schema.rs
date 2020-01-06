@@ -19,7 +19,7 @@ use exonum::{
         MapIndex,
     },
 };
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]

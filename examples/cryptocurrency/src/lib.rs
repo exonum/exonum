@@ -196,7 +196,7 @@ pub mod contracts {
         rust::{api::ServiceApiBuilder, CallContext, Service},
         ExecutionError,
     };
-    use exonum_derive::*;
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 
     use crate::{
         api::CryptocurrencyApi,

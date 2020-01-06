@@ -24,11 +24,11 @@
 //! 4. We complete the migration by calling `Fork::flush_migration`. This moves the migrated data
 //!   to its intended place and removes the old data marked for removal.
 
-use rand::{seq::SliceRandom, thread_rng, Rng};
-use serde_derive::*;
-
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+use rand::{seq::SliceRandom, thread_rng, Rng};
+use serde_derive::{Deserialize, Serialize};
+
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, Prefixed},
     migration::{flush_migration, Migration},
