@@ -752,7 +752,7 @@ fn conflicting_service_instances() {
 
     // Fork #1.
     let spec = InstanceSpec {
-        artifact: artifact.clone(),
+        artifact,
         id: SERVICE_INSTANCE_ID,
         name: SERVICE_INSTANCE_NAME.to_owned(),
     };

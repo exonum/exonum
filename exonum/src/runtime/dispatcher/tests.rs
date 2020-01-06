@@ -353,7 +353,7 @@ fn test_dispatcher_simple() {
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service = InstanceSpec {
-        artifact: java_artifact.clone(),
+        artifact: java_artifact,
         id: JAVA_SERVICE_ID,
         name: JAVA_SERVICE_NAME.into(),
     };
@@ -386,7 +386,7 @@ fn test_dispatcher_simple() {
     assert_eq!(err, ErrorMatch::from_fail(&CommonError::ServiceIdExists));
 
     let conflicting_rust_service = InstanceSpec {
-        artifact: rust_artifact.clone(),
+        artifact: rust_artifact,
         id: RUST_SERVICE_ID + 1,
         name: RUST_SERVICE_NAME.to_owned(),
     };
@@ -871,7 +871,7 @@ fn stopped_service_workflow() {
     );
 
     let (changes_tx, changes_rx) = channel();
-    let runtime = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, changes_tx.clone());
+    let runtime = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, changes_tx);
 
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime.runtime_type, runtime.clone())
@@ -895,7 +895,7 @@ fn stopped_service_workflow() {
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec {
-        artifact: artifact.clone(),
+        artifact,
         id: instance_id,
         name: instance_name.into(),
     };

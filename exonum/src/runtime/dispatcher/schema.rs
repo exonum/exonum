@@ -109,7 +109,7 @@ impl Schema<&Fork> {
     ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact) {
-            return Err(CommonError::ArtifactAlreadyDeployed)?;
+            return Err(CommonError::ArtifactAlreadyDeployed.into());
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
@@ -138,12 +138,12 @@ impl Schema<&Fork> {
 
         // Checks that instance name doesn't exist.
         if instances.contains(&spec.name) {
-            return Err(CommonError::ServiceNameExists)?;
+            return Err(CommonError::ServiceNameExists.into());
         }
         // Checks that instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
         if instance_ids.contains(&spec.id) {
-            return Err(CommonError::ServiceIdExists)?;
+            return Err(CommonError::ServiceIdExists.into());
         }
 
         let instance_id = spec.id;
@@ -183,11 +183,11 @@ impl Schema<&Fork> {
 
         match state.status {
             Some(InstanceStatus::Active) => {}
-            _ => return Err(CoreError::ServiceNotActive)?,
+            _ => return Err(CoreError::ServiceNotActive.into()),
         }
 
         if state.pending_status.is_some() {
-            return Err(CoreError::ServicePending)?;
+            return Err(CoreError::ServicePending.into());
         }
 
         // Modify instance status.

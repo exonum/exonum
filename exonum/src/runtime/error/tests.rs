@@ -435,7 +435,7 @@ fn box_error_panic() {
 #[test]
 fn failure_panic() {
     let error = format_err!("Failure panic");
-    let description = error.to_string().to_owned();
+    let description = error.to_string();
     let panic = make_panic(error);
     assert_eq!(ExecutionError::from_panic(panic).description, description);
 }
