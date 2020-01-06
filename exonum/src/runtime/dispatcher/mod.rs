@@ -156,9 +156,10 @@ impl Migrations {
     ) {
         let db = Arc::clone(&self.db);
         let instance_name = instance_spec.name.clone();
+        let script_name = script.name().to_owned();
         let (handle_tx, handle_rx) = mpsc::channel();
 
-        let handle = thread::spawn(move || -> Result<Hash, MigrationError> {
+        let thread_fn = move || -> Result<Hash, MigrationError> {
             let script_name = script.name().to_owned();
             log::info!("Starting migration script {}", script_name);
 
@@ -179,7 +180,12 @@ impl Migrations {
                 migration_hash
             );
             Ok(migration_hash)
-        });
+        };
+
+        let handle = thread::Builder::new()
+            .name(script_name)
+            .spawn(thread_fn)
+            .expect("Cannot spawn thread for migration script");
 
         let prev_thread = self.threads.insert(
             instance_name.clone(),
