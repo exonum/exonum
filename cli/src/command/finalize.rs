@@ -128,7 +128,7 @@ impl Finalize {
             })
             .map(|config| ConnectInfo {
                 public_key: Self::get_consensus_key(config).unwrap(),
-                address: private_config.external_address.clone(),
+                address: config.address.clone().unwrap(),
             })
             .collect();
 
@@ -194,6 +194,7 @@ impl ExonumCommand for Finalize {
             consensus,
             general: common.general,
             validator_keys: None,
+            address: None,
         };
 
         let config = NodeConfig {

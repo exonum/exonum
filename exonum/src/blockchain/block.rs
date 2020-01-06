@@ -21,9 +21,9 @@ use std::{borrow::Cow, fmt};
 
 use crate::{
     crypto::Hash,
-    helpers::{Height, ValidatorId},
+    helpers::{Height, OrderedMap, ValidatorId},
     messages::{Precommit, Verified},
-    proto::{self, OrderedMap},
+    proto,
 };
 
 /// Trait that represents key in block header entry map. Provide
@@ -73,7 +73,19 @@ impl BlockHeaderKey for ProposerId {
 }
 
 /// Expandable set of headers allowed to be added to the block.
-pub type AdditionalHeaders = OrderedMap<String, Vec<u8>>;
+///
+/// In a serialized form, headers are represented as a sequence of
+/// pairs, in which first element is a string (header name), and the
+/// second element is a byte sequence (deserialization format for which
+/// depends on the header name).
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert)]
+#[protobuf_convert(source = "proto::AdditionalHeaders")]
+pub struct AdditionalHeaders {
+    /// Underlying storage for additional headers.
+    headers: OrderedMap<String, Vec<u8>>,
+}
 
 impl AdditionalHeaders {
     /// New instance of `AdditionalHeaders`.
@@ -83,12 +95,12 @@ impl AdditionalHeaders {
 
     /// Insert new header to the map.
     pub fn insert<K: BlockHeaderKey>(&mut self, value: K::Value) {
-        self.0.insert(K::NAME.into(), value.to_bytes());
+        self.headers.0.insert(K::NAME.into(), value.to_bytes());
     }
 
     /// Get header from the map.
     pub fn get<K: BlockHeaderKey>(&self) -> Option<&[u8]> {
-        self.0.get(K::NAME).map(|v| v.as_slice())
+        self.headers.0.get(K::NAME).map(|v| v.as_slice())
     }
 }
 
@@ -100,6 +112,10 @@ impl AdditionalHeaders {
 ///
 /// The header only contains the amount of transactions and the transactions root hash as well as
 /// other information, but not the transactions themselves.
+///
+/// Note that this structure is export-only, meaning that one can rely on the serialization format
+/// provided by corresponding `protobuf` definitions, but cannot expect `exonum` to accept
+/// and process `Block` structure created outside of the `exonum` core.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -355,12 +371,12 @@ mod tests {
 
     #[test]
     fn block_entry_wrong_type() {
-        let mut entries: OrderedMap<String, Vec<u8>> = OrderedMap::default();
+        let mut headers: OrderedMap<String, Vec<u8>> = OrderedMap::default();
 
-        entries
+        headers
             .0
             .insert("active_services".into(), vec![255_u8; 1_024]);
-        let block = create_block(entries);
+        let block = create_block(AdditionalHeaders { headers });
         let services = block.get_header::<ActiveServices>();
         assert!(services.is_err());
     }

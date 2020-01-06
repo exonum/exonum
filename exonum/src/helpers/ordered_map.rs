@@ -21,14 +21,19 @@ use protobuf::Message;
 
 use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
 
-/// Protobuf wrapper type to store small maps of non-scalar keys and values.
-/// Stored keys are ordered and duplicate keys are forbidden.
+/// Protobuf-encodable type to store small maps of non-scalar keys and values.
+///
+/// This structure uses on `KeyValueSequence` from `key_value_sequence.proto` as
+/// a backend, but adds the verification logic to it:
+///
+/// - Keys are sorted in a lexicographical order;
+/// - Duplicate keys are forbidden.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[derive(Serialize, Deserialize)]
-pub struct OrderedMap<K: Ord, V>(pub BTreeMap<K, V>);
+pub(crate) struct OrderedMap<K: Ord, V>(pub BTreeMap<K, V>);
 
 #[derive(ProtobufConvert)]
-#[protobuf_convert(source = "proto::schema::ordered_map::KeyValue")]
+#[protobuf_convert(source = "proto::schema::key_value_sequence::KeyValue")]
 struct KeyValue {
     key: String,
     value: Vec<u8>,
@@ -36,7 +41,7 @@ struct KeyValue {
 
 fn pair_to_key_value_pb<K, V>(
     pair: (&K, &V),
-) -> Result<crate::proto::schema::ordered_map::KeyValue, failure::Error>
+) -> Result<crate::proto::schema::key_value_sequence::KeyValue, failure::Error>
 where
     K: BinaryValue,
     V: BinaryValue,
@@ -49,7 +54,7 @@ where
 }
 
 fn key_value_pb_to_pair<K, V>(
-    pb: crate::proto::schema::ordered_map::KeyValue,
+    pb: crate::proto::schema::key_value_sequence::KeyValue,
 ) -> Result<(K, V), failure::Error>
 where
     K: BinaryValue,
@@ -66,7 +71,7 @@ where
     K: BinaryValue + Ord,
     V: BinaryValue,
 {
-    type ProtoStruct = crate::proto::schema::ordered_map::OrderedMap;
+    type ProtoStruct = crate::proto::schema::key_value_sequence::KeyValueSequence;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut proto_struct = Self::ProtoStruct::new();
@@ -133,13 +138,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use exonum_proto::ProtobufConvert;
     use protobuf::RepeatedField;
 
-    use crate::proto::{
-        schema::ordered_map::{KeyValue, OrderedMap as PbOrderedMap},
-        OrderedMap,
+    use super::OrderedMap;
+    use crate::proto::schema::key_value_sequence::{
+        KeyValue, KeyValueSequence as PbKeyValueSequence,
     };
-    use exonum_proto::ProtobufConvert;
 
     #[test]
     #[should_panic(expected = "Map contains invalid utf-8 key")]
@@ -160,7 +165,7 @@ mod tests {
         kv2.set_key("aaa".to_owned());
 
         // Unordered keys.
-        let mut map = PbOrderedMap::new();
+        let mut map = PbKeyValueSequence::new();
         map.set_entry(RepeatedField::from_vec(vec![kv.clone(), kv2.clone()]));
 
         let res: Result<OrderedMap<String, Vec<u8>>, failure::Error> =
@@ -170,7 +175,7 @@ mod tests {
             .contains("Invalid keys ordering");
 
         // Duplicate keys.
-        let mut map = PbOrderedMap::new();
+        let mut map = PbKeyValueSequence::new();
         map.set_entry(RepeatedField::from_vec(vec![kv2.clone(), kv, kv2]));
 
         let res: Result<OrderedMap<String, Vec<u8>>, failure::Error> =
