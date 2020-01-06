@@ -21,10 +21,10 @@ use std::borrow::Cow;
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess, Prefixed},
+    access::{Access, AccessExt, AsReadonly, FromAccess, Prefixed, RawAccess},
     impl_object_hash_for_binary_value,
     migration::Migration,
-    BinaryValue, Database, Entry, Group, ListIndex, MapIndex, ObjectHash, Patch, ProofEntry,
+    BinaryValue, Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
     ProofListIndex, ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,
 };
 
@@ -201,26 +201,14 @@ pub fn check_data_before_flush(snapshot: &dyn Snapshot) {
     assert_eq!(new_state_hash, migration_view.state_hash());
 }
 
-/// Checks that old data was replaced by new data in the patch
-/// after we called `flush_migration`.
-pub fn check_data_after_flush(patch: &Patch) {
-    // Now, the new indexes have replaced the old ones.
-    let new_schema = v2::Schema::new(Prefixed::new("test", patch));
+/// Checks that old data was replaced by new data in the storage.
+pub fn check_data_after_flush(view: impl RawAccess + AsReadonly + Copy) {
+    let new_schema = v2::Schema::new(Prefixed::new("test", view));
     assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
-    assert!(!patch.get_entry::<_, u8>("test.divisibility").exists());
+    assert!(!view.get_entry::<_, u8>("test.divisibility").exists());
 
     // The indexes are now aggregated in the default namespace.
-    let system_schema = SystemSchema::new(patch);
-    let state = system_schema.state_aggregator();
-    assert_eq!(
-        state.keys().collect::<Vec<_>>(),
-        vec!["test.config", "test.wallets", "unrelated.list"]
-    );
-}
-
-/// Checks that data was updated in the storage after merge.
-pub fn check_data_after_merge(snapshot: &dyn Snapshot) {
-    let system_schema = SystemSchema::new(snapshot);
+    let system_schema = SystemSchema::new(view);
     let state = system_schema.state_aggregator();
     assert_eq!(
         state.keys().collect::<Vec<_>>(),

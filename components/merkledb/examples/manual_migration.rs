@@ -30,10 +30,7 @@ use exonum_merkledb::{
     Database, Fork, ObjectHash, ReadonlyFork,
 };
 
-use migration::{
-    check_data_after_flush, check_data_after_merge, check_data_before_flush, create_initial_data,
-    v1, v2,
-};
+use migration::{check_data_after_flush, check_data_before_flush, create_initial_data, v1, v2};
 
 mod migration;
 
@@ -138,7 +135,7 @@ fn main() {
 
     // Check that data was updated after merge.
     let snapshot = db.snapshot();
-    check_data_after_merge(&snapshot);
+    check_data_after_flush(&snapshot);
 
     // State after migration.
     let schema = v2::Schema::new(Prefixed::new("test", &snapshot));
