@@ -146,12 +146,13 @@ where
 /// # Examples
 ///
 /// ```
-/// # use exonum::runtime::migrations::{MigrationContext, MigrationScript};
+/// # use exonum::runtime::migrations::{MigrationContext, MigrationError, MigrationScript};
 /// # use exonum_derive::*;
 /// use exonum_testkit::migrations::ScriptExt as _;
 ///
-/// fn some_script(ctx: &mut MigrationContext) {
+/// fn some_script(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
 ///     // business logic skipped
+/// #   Ok(())
 /// }
 ///
 /// let script: MigrationScript = some_script.with_end_version("0.2.0");
