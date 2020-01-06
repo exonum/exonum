@@ -219,11 +219,11 @@ pub struct IndexProof {
 
 #[cfg(test)]
 mod tests {
+    use exonum_crypto::hash;
+    use exonum_merkledb::ObjectHash;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
-    use crate::crypto::hash;
-    use crate::merkledb::ObjectHash;
     use crate::runtime::InstanceId;
 
     impl BlockHeaderKey for Hash {
@@ -307,7 +307,7 @@ mod tests {
         pub name: String,
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
     #[derive(BinaryValue)]
     #[binary_value(codec = "bincode")]
     struct ActiveServices {
@@ -322,55 +322,44 @@ mod tests {
     #[test]
     fn block_entry_keys() {
         let mut block = create_block(AdditionalHeaders::new());
-
         assert!(block.get_header::<ActiveServices>().unwrap().is_none());
 
-        let services = ActiveServices {
-            services: Vec::new(),
-        };
-
+        let services = ActiveServices::default();
         block.add_header::<ActiveServices>(services.clone());
-        let services_2 = block
+        let restored_services = block
             .get_header::<ActiveServices>()
             .expect("Active services not found");
-
-        assert_eq!(services, services_2.unwrap());
+        assert_eq!(Some(services), restored_services);
 
         let info = TestServiceInfo {
             runtime_id: 0,
             instance_id: 1,
             name: "test".into(),
         };
-
         let info_2 = TestServiceInfo {
             runtime_id: 2,
             instance_id: 10,
             name: "test service instance".into(),
         };
-
         let services = ActiveServices {
             services: vec![info, info_2],
         };
 
         // Should override previous entry for `ActiveServices`.
         block.add_header::<ActiveServices>(services.clone());
-        let services_2 = block
+        let restored_services = block
             .get_header::<ActiveServices>()
             .expect("Active services not found");
-
-        assert_eq!(services, services_2.unwrap());
+        assert_eq!(Some(services), restored_services);
     }
 
     #[test]
     fn block_entry_wrong_type() {
         let mut entries: OrderedMap<String, Vec<u8>> = OrderedMap::default();
 
-        entries.0.insert("active_services".into(), vec![]);
-        let block = create_block(entries.clone());
-        let services = block.get_header::<ActiveServices>();
-        assert!(services.unwrap().unwrap().services.is_empty());
-
-        entries.0.insert("active_services".into(), vec![0_u8; 1024]);
+        entries
+            .0
+            .insert("active_services".into(), vec![255_u8; 1_024]);
         let block = create_block(entries);
         let services = block.get_header::<ActiveServices>();
         assert!(services.is_err());
