@@ -18,7 +18,7 @@
 
 pub use super::types::{InstanceMigration, MigrationStatus};
 
-use exonum_merkledb::migration::MigrationHelper;
+use exonum_merkledb::migration::{self as db_migration, MigrationHelper};
 use failure::Fail;
 use semver::Version;
 
@@ -26,7 +26,35 @@ use std::{collections::BTreeMap, fmt};
 
 use crate::runtime::{DispatcherError, ExecutionError, ExecutionFail, InstanceSpec};
 
-type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send;
+type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
+
+/// Errors that can occur in a migration script.
+#[derive(Debug, Fail)]
+pub enum MigrationError {
+    /// Error has occurred in the helper code, due to either a database-level failure (e.g.,
+    /// we've run out of disc space) or the migration script getting aborted.
+    ///
+    /// Scripts should not instantiate errors of this kind.
+    #[fail(display = "{}", _0)]
+    Helper(#[fail(cause)] db_migration::MigrationError),
+
+    /// Custom error signalling that the migration cannot be completed.
+    #[fail(display = "{}", _0)]
+    Custom(String),
+}
+
+impl MigrationError {
+    /// Creates a new migration error.
+    pub fn new(cause: impl fmt::Display) -> Self {
+        MigrationError::Custom(cause.to_string())
+    }
+}
+
+impl From<db_migration::MigrationError> for MigrationError {
+    fn from(err: db_migration::MigrationError) -> Self {
+        MigrationError::Helper(err)
+    }
+}
 
 /// Atomic migration script.
 pub struct MigrationScript {
@@ -49,7 +77,7 @@ impl MigrationScript {
     /// Creates a new migration script with the specified end version and implementation.
     pub fn new<F>(logic: F, end_version: Version) -> Self
     where
-        F: FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send + 'static,
+        F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
     {
         Self {
             name: format!("Migration to {}", end_version),
@@ -73,7 +101,7 @@ impl MigrationScript {
     }
 
     /// Executes the script.
-    pub fn execute(self, context: &mut MigrationContext) -> Result<(), ExecutionError> {
+    pub fn execute(self, context: &mut MigrationContext) -> Result<(), MigrationError> {
         (self.logic)(context)
     }
 }
@@ -131,12 +159,13 @@ pub trait MigrateData {
     fn migration_scripts(
         &self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError>;
+    ) -> Result<Vec<MigrationScript>, InitMigrationError>;
 }
 
-/// Errors that can occur during data migrations.
+/// Errors that can occur when initiating a data migration. This error indicates that the migration
+/// cannot be started.
 #[derive(Debug, Fail)]
-pub enum DataMigrationError {
+pub enum InitMigrationError {
     /// The start version is too far in the past.
     #[fail(
         display = "The provided start version is too far in the past; \
@@ -168,8 +197,8 @@ pub enum DataMigrationError {
     NotSupported,
 }
 
-impl From<DataMigrationError> for ExecutionError {
-    fn from(err: DataMigrationError) -> Self {
+impl From<InitMigrationError> for ExecutionError {
+    fn from(err: InitMigrationError) -> Self {
         DispatcherError::NoMigration.with_description(err)
     }
 }
@@ -257,7 +286,7 @@ impl LinearMigrations {
     ///   constructor.
     pub fn add_script<F>(mut self, version: Version, script: F) -> Self
     where
-        F: FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send + 'static,
+        F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
     {
         self.check_prerelease(&version);
         assert!(
@@ -271,19 +300,19 @@ impl LinearMigrations {
         self
     }
 
-    fn check(&self, start_version: &Version) -> Result<(), DataMigrationError> {
+    fn check(&self, start_version: &Version) -> Result<(), InitMigrationError> {
         if !self.support_prereleases && start_version.is_prerelease() {
             let msg = "the start version is a prerelease".to_owned();
-            return Err(DataMigrationError::UnsupportedStart(msg));
+            return Err(InitMigrationError::UnsupportedStart(msg));
         }
         if *start_version > self.latest_version {
-            return Err(DataMigrationError::FutureStartVersion {
+            return Err(InitMigrationError::FutureStartVersion {
                 max_supported_version: self.latest_version.clone(),
             });
         }
         if let Some(ref min_supported_version) = self.min_start_version {
             if start_version < min_supported_version {
-                return Err(DataMigrationError::OldStartVersion {
+                return Err(InitMigrationError::OldStartVersion {
                     min_supported_version: min_supported_version.to_owned(),
                 });
             }
@@ -295,7 +324,7 @@ impl LinearMigrations {
     pub fn select(
         self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         self.check(start_version)?;
         Ok(self
             .scripts
@@ -326,7 +355,7 @@ mod tests {
 
     const ARTIFACT_NAME: &str = "service.test.Migration";
 
-    fn migration_02(context: &mut MigrationContext) -> Result<(), ExecutionError> {
+    fn migration_02(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
         assert!(context.instance_spec.artifact.version < Version::new(0, 2, 0));
@@ -338,7 +367,7 @@ mod tests {
         Ok(())
     }
 
-    fn migration_05(context: &mut MigrationContext) -> Result<(), ExecutionError> {
+    fn migration_05(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
         assert!(context.instance_spec.artifact.version >= Version::new(0, 2, 0));
@@ -351,7 +380,7 @@ mod tests {
         Ok(())
     }
 
-    fn migration_06(context: &mut MigrationContext) -> Result<(), ExecutionError> {
+    fn migration_06(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
         assert!(context.instance_spec.artifact.version >= Version::new(0, 5, 0));
@@ -457,7 +486,7 @@ mod tests {
         let migrations = create_linear_migrations();
         let start_version: Version = "0.2.0-pre.2".parse().unwrap();
         let err = migrations.select(&start_version).unwrap_err();
-        assert_matches!(err, DataMigrationError::UnsupportedStart(_));
+        assert_matches!(err, InitMigrationError::UnsupportedStart(_));
     }
 
     #[test]
@@ -480,7 +509,7 @@ mod tests {
         let err = migrations.select(&start_version).unwrap_err();
         assert_matches!(
             err,
-            DataMigrationError::FutureStartVersion { ref max_supported_version }
+            InitMigrationError::FutureStartVersion { ref max_supported_version }
                 if *max_supported_version == Version::new(0, 6, 3)
         );
 
@@ -491,7 +520,7 @@ mod tests {
         let err = migrations.select(&start_version).unwrap_err();
         assert_matches!(
             err,
-            DataMigrationError::OldStartVersion { ref min_supported_version }
+            InitMigrationError::OldStartVersion { ref min_supported_version }
                 if *min_supported_version == Version::new(0, 4, 0)
         );
     }

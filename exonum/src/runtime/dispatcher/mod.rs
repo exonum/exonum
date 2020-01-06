@@ -42,7 +42,9 @@ use crate::{
 
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
-    migrations::{InstanceMigration, MigrationContext, MigrationScript, MigrationStatus},
+    migrations::{
+        InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
+    },
     ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
@@ -113,7 +115,7 @@ impl CommittedServices {
 
 #[derive(Debug)]
 struct MigrationThread {
-    handle: thread::JoinHandle<Result<Hash, ExecutionError>>,
+    handle: thread::JoinHandle<Result<Hash, MigrationError>>,
     abort_handle: AbortHandle,
     instance: InstanceSpec,
     end_version: Version,
@@ -122,8 +124,13 @@ struct MigrationThread {
 impl MigrationThread {
     fn join(self) -> (String, MigrationStatus) {
         let result = match self.handle.join() {
-            Ok(result) => result,
-            Err(e) => Err(ExecutionError::from_panic(e)),
+            Ok(Ok(hash)) => Ok(hash),
+            Ok(Err(MigrationError::Custom(description))) => Err(description),
+            Ok(Err(MigrationError::Helper(e))) => {
+                // TODO: Is panicking OK here?
+                panic!("Migration terminated with database error: {}", e);
+            }
+            Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
         (self.instance.name, MigrationStatus(result))
     }
@@ -149,7 +156,7 @@ impl Migrations {
         let end_version = script.end_version().to_owned();
         let (handle_tx, handle_rx) = mpsc::channel();
 
-        let handle = thread::spawn(move || -> Result<Hash, ExecutionError> {
+        let handle = thread::spawn(move || -> Result<Hash, MigrationError> {
             let script_name = script.name().to_owned();
             log::info!("Starting migration script {}", script_name);
 

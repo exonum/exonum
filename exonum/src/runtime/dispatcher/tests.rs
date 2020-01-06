@@ -37,7 +37,7 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
-        migrations::{DataMigrationError, MigrationScript},
+        migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
         ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceStatus, MethodId, Runtime, RuntimeInstance,
@@ -234,8 +234,8 @@ impl Runtime for SampleRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
@@ -520,8 +520,8 @@ impl Runtime for ShutdownRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
@@ -712,8 +712,8 @@ impl Runtime for DeploymentRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(

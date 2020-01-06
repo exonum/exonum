@@ -37,7 +37,7 @@ use crate::{
     messages::Verified,
     runtime::{
         catch_panic,
-        migrations::{DataMigrationError, MigrationScript},
+        migrations::{InitMigrationError, MigrationScript},
         AnyTx, ArtifactId, CallInfo, Dispatcher, DispatcherError, DispatcherSchema, ErrorMatch,
         ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec, InstanceStatus,
         Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
@@ -326,8 +326,8 @@ impl Runtime for RuntimeInspector {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(

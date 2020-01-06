@@ -25,7 +25,7 @@ use crate::{
     blockchain::{Block, BlockchainMut},
     helpers::ValidatorId,
     node::ApiSender,
-    runtime::migrations::DataMigrationError,
+    runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
         CallInfo, DispatcherError, DispatcherSchema, ErrorMatch, RuntimeIdentifier,
         WellKnownRuntime,
@@ -73,13 +73,13 @@ impl Runtime for MigrationRuntime {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
         let script = match old_service.artifact.name.as_str() {
             "good" => simple_delayed_migration,
             "bad" => panicking_migration,
             "with-state" => migration_modifying_state_hash,
             "none" => return Ok(None),
-            _ => return Err(DataMigrationError::NotSupported),
+            _ => return Err(InitMigrationError::NotSupported),
         };
         let mut end_version = new_artifact.version.clone();
         end_version.patch = 0;
@@ -115,17 +115,17 @@ impl Runtime for MigrationRuntime {
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
 }
 
-fn simple_delayed_migration(_ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+fn simple_delayed_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     thread::sleep(Duration::from_millis(200));
     Ok(())
 }
 
-fn panicking_migration(_ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+fn panicking_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     thread::sleep(Duration::from_millis(100));
     panic!("This migration is unsuccessful!");
 }
 
-fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     for i in 0_u32..10 {
         ctx.helper.new_data().get_proof_entry("entry").set(i);
         thread::sleep(Duration::from_millis(15));
@@ -299,6 +299,11 @@ fn migration_workflow() {
         .migrations
         .threads
         .contains_key(&service.name));
+}
+
+#[test]
+fn fast_forward_migration() {
+    unimplemented!()
 }
 
 /// Tests checks performed by the dispatcher.
@@ -476,6 +481,11 @@ fn completed_migration_is_not_resumed_after_node_restart() {
 }
 
 #[test]
+fn migration_with_custom_error() {
+    unimplemented!()
+}
+
+#[test]
 fn migration_with_panic() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("bad", "0.3.0".parse().unwrap());
@@ -497,10 +507,10 @@ fn migration_with_panic() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     let res = schema.local_migration_result(&service.name).unwrap();
-    assert_eq!(
-        res.0.unwrap_err(),
-        ErrorMatch::any_unexpected().with_description_containing("This migration is unsuccessful!")
-    );
+    assert!(res
+        .0
+        .unwrap_err()
+        .contains("This migration is unsuccessful!"));
 }
 
 #[test]
@@ -654,6 +664,11 @@ fn migration_rollback_workflow() {
 }
 
 #[test]
+fn migration_rollback_invariants() {
+    unimplemented!()
+}
+
+#[test]
 fn migration_rollback_aborts_migration_script() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
@@ -752,6 +767,11 @@ fn migration_commit_workflow() {
         completed_hash: Some(HashTag::empty_map_hash()),
     });
     assert_eq!(state.status, Some(expected_status));
+}
+
+#[test]
+fn migration_commit_invariants() {
+    unimplemented!()
 }
 
 #[test]

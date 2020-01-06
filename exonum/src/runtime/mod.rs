@@ -166,7 +166,7 @@ use futures::Future;
 
 use std::fmt;
 
-use self::migrations::{DataMigrationError, MigrationScript};
+use self::migrations::{InitMigrationError, MigrationScript};
 use crate::{
     blockchain::Blockchain,
     crypto::{Hash, PublicKey},
@@ -421,15 +421,15 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///   to a newer version.
     /// - `Ok(Some(_))` provides a script to execute against service data. After the script
     ///   is executed, the service will have its version updated to `end_version` from the script.
-    ///   (Note that this version does not need to correspond to the version of `new_artifact`,
-    ///   or to a version of an artifact deployed on the blockchain in general.)
+    ///   Note that this version does not need to correspond to the version of `new_artifact`,
+    ///   or to a version of an artifact deployed on the blockchain in general.
     /// - `Ok(None)` means that the service does not require data migration. The service will
     ///   have its version updated to the version of `new_artifact` immediately.
     fn migrate(
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError>;
+    ) -> Result<Option<MigrationScript>, InitMigrationError>;
 
     /// Dispatches payload to the method of a specific service instance.
     ///

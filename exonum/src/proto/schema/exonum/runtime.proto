@@ -195,9 +195,10 @@ message InstanceState {
 // Local result of a migration.
 message MigrationStatus {
   oneof result {
-    // Hash of the migrated data.
+    // Hash of the successfully migrated data.
     exonum.crypto.Hash hash = 1;
-    // Error that has occurred during migration.
-    ExecutionError error = 2;
+    // Human-readable description of an error that has occurred
+    // during migration.
+    string error = 2;
   }
 }

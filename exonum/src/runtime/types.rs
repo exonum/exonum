@@ -30,7 +30,7 @@ use std::{
     str::FromStr,
 };
 
-use super::{ExecutionError, InstanceDescriptor};
+use super::InstanceDescriptor;
 use crate::{
     blockchain::config::InstanceInitParams, helpers::ValidateInput, messages::Verified,
     proto::schema,
@@ -650,7 +650,7 @@ impl InstanceState {
 /// Result of execution of a migration script.
 #[derive(Debug, Clone)]
 #[derive(BinaryValue, ObjectHash)]
-pub struct MigrationStatus(pub Result<Hash, ExecutionError>);
+pub struct MigrationStatus(pub Result<Hash, String>);
 
 impl ProtobufConvert for MigrationStatus {
     type ProtoStruct = schema::runtime::MigrationStatus;
@@ -659,7 +659,7 @@ impl ProtobufConvert for MigrationStatus {
         let mut pb = Self::ProtoStruct::new();
         match self.0 {
             Ok(hash) => pb.set_hash(hash.to_pb()),
-            Err(ref e) => pb.set_error(e.to_pb()),
+            Err(ref e) => pb.set_error(e.clone()),
         }
         pb
     }
@@ -668,7 +668,7 @@ impl ProtobufConvert for MigrationStatus {
         let inner = if pb.has_hash() {
             Ok(Hash::from_pb(pb.take_hash())?)
         } else if pb.has_error() {
-            Err(ExecutionError::from_pb(pb.take_error())?)
+            Err(pb.take_error())
         } else {
             return Err(format_err!(
                 "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"

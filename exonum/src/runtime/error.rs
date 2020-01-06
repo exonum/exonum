@@ -464,12 +464,11 @@ impl ExecutionError {
         Self::new(ErrorKind::Service { code }, description)
     }
 
-    /// Creates an execution error from the panic description.
-    pub(in crate::runtime) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+    /// Tries to get a meaningful description from the given panic.
+    pub(super) fn description_from_panic(any: impl AsRef<(dyn Any + Send)>) -> String {
         let any = any.as_ref();
 
-        // Tries to get a meaningful description from the given panic.
-        let description = if let Some(s) = any.downcast_ref::<&str>() {
+        if let Some(s) = any.downcast_ref::<&str>() {
             s.to_string()
         } else if let Some(s) = any.downcast_ref::<String>() {
             s.clone()
@@ -480,8 +479,12 @@ impl ExecutionError {
         } else {
             // Unknown error kind; keep its description empty.
             String::new()
-        };
+        }
+    }
 
+    /// Creates an execution error from the panic description.
+    fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+        let description = Self::description_from_panic(any);
         Self::new(ErrorKind::Unexpected, description)
     }
 
@@ -629,12 +632,6 @@ impl ObjectHash for ExecutionError {
             call_site: self.call_site.clone(),
         };
         crypto::hash(&error_with_empty_description.into_bytes())
-    }
-}
-
-impl From<exonum_merkledb::Error> for ExecutionError {
-    fn from(err: exonum_merkledb::Error) -> ExecutionError {
-        ExecutionError::new(ErrorKind::Unexpected, err.to_string())
     }
 }
 

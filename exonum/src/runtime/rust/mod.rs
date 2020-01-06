@@ -276,7 +276,7 @@ use crate::{
     runtime::{
         dispatcher::{self, Mailbox},
         error::{catch_panic, ExecutionError, ExecutionFail},
-        migrations::{DataMigrationError, MigrateData, MigrationScript},
+        migrations::{InitMigrationError, MigrateData, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
@@ -316,8 +316,8 @@ impl<T> MigrateData for WithoutMigrations<T> {
     fn migration_scripts(
         &self,
         _start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 }
 
@@ -611,7 +611,7 @@ impl Runtime for RustRuntime {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
         debug_assert_eq!(new_artifact.name, old_service.artifact.name);
 
         let artifact = self

@@ -33,7 +33,7 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::TestServiceInit,
     runtime::{
-        migrations::{DataMigrationError, MigrationScript},
+        migrations::{InitMigrationError, MigrationScript},
         CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
         Runtime, WellKnownRuntime,
@@ -186,7 +186,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &self,
         new_artifact: &ArtifactId,
         old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
         self.inner.migrate(new_artifact, old_service)
     }
 
