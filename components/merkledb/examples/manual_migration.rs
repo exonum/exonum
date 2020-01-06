@@ -40,33 +40,29 @@ mod migration;
 fn create_migration(fork: &Fork) {
     println!("\nStarted migration");
 
-    {
-        let new_data = Migration::new("test", fork);
-        let old_data = Prefixed::new("test", fork.readonly());
+    let new_data = Migration::new("test", fork);
+    let old_data = Prefixed::new("test", fork.readonly());
 
-        let old_schema = v1::Schema::new(old_data);
-        let mut new_schema = v2::Schema::new(new_data);
+    let old_schema = v1::Schema::new(old_data);
+    let mut new_schema = v2::Schema::new(new_data);
 
-        // Move `ticker` and `divisibility` to `config`.
-        let config = v2::Config {
-            ticker: old_schema.ticker.get().unwrap(),
-            divisibility: old_schema.divisibility.get().unwrap_or(0),
-        };
-        new_schema.config.set(config);
-        // Mark these two indexes for removal.
-        new_data.create_tombstone("ticker");
-        new_data.create_tombstone("divisibility");
-    }
+    // Move `ticker` and `divisibility` to `config`.
+    let config = v2::Config {
+        ticker: old_schema.ticker.get().unwrap(),
+        divisibility: old_schema.divisibility.get().unwrap_or(0),
+    };
+    new_schema.config.set(config);
+    // Mark these two indexes for removal.
+    new_data.create_tombstone("ticker");
+    new_data.create_tombstone("divisibility");
 
-    {
-        // Migrate wallets using schema:
-        // `Wallet::public_key` field will be removed.
-        // `Wallet::history_hash` field will be added.
-        // Wallets and history from username Eve will be removed.
-        let new_data = Migration::new("test", fork);
-        let old_data = Prefixed::new("test", fork.readonly());
-        migrate_wallets(new_data, old_data);
-    }
+    // Migrate wallets using schema:
+    // `Wallet::public_key` field will be removed.
+    // `Wallet::history_hash` field will be added.
+    // Wallets and history from username Eve will be removed.
+    let new_data = Migration::new("test", fork);
+    let old_data = Prefixed::new("test", fork.readonly());
+    migrate_wallets(new_data, old_data);
 }
 
 /// Provides migration of wallets with schema.
