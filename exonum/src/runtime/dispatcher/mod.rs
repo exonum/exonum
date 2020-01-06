@@ -400,7 +400,8 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(fork);
         let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
-        let maybe_script = self.get_migration_script(&new_artifact, &instance_state.spec)?;
+        let maybe_script =
+            self.get_migration_script(&new_artifact, instance_state.data_version())?;
         if let Some(script) = maybe_script {
             let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
             schema.add_pending_migration(instance_state, migration);
@@ -673,13 +674,13 @@ impl Dispatcher {
     fn get_migration_script(
         &self,
         new_artifact: &ArtifactId,
-        old_service: &InstanceSpec,
+        data_version: &Version,
     ) -> Result<Option<MigrationScript>, ExecutionError> {
         let runtime = self
             .runtime_by_id(new_artifact.runtime_id)
             .ok_or(Error::IncorrectRuntime)?;
         runtime
-            .migrate(new_artifact, &old_service)
+            .migrate(new_artifact, data_version)
             .map_err(From::from)
     }
 
@@ -690,7 +691,7 @@ impl Dispatcher {
         data_version: Version,
     ) {
         let maybe_script = self
-            .get_migration_script(new_artifact, &old_service)
+            .get_migration_script(new_artifact, &data_version)
             .unwrap_or_else(|err| {
                 panic!(
                     "BUG: Cannot obtain migration script for migrating {:?} to new artifact {:?}, {}",

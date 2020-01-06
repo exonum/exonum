@@ -233,7 +233,7 @@ impl Runtime for SampleRuntime {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        _old_service: &InstanceSpec,
+        _data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         Err(InitMigrationError::NotSupported)
     }
@@ -519,7 +519,7 @@ impl Runtime for ShutdownRuntime {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        _old_service: &InstanceSpec,
+        _data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         Err(InitMigrationError::NotSupported)
     }
@@ -711,7 +711,7 @@ impl Runtime for DeploymentRuntime {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        _old_service: &InstanceSpec,
+        _data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         Err(InitMigrationError::NotSupported)
     }

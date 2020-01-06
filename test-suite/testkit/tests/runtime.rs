@@ -16,6 +16,7 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
         InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     },
@@ -133,7 +134,7 @@ impl Runtime for TestRuntime {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        _old_service: &InstanceSpec,
+        _data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         Err(InitMigrationError::NotSupported)
     }

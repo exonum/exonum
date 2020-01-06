@@ -325,7 +325,7 @@ impl Runtime for RuntimeInspector {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        _old_service: &InstanceSpec,
+        _data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         Err(InitMigrationError::NotSupported)
     }

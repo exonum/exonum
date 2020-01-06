@@ -18,6 +18,7 @@ use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemSche
 use exonum_proto::ProtobufConvert;
 use futures::Future;
 use pretty_assertions::{assert_eq, assert_ne};
+use semver::Version;
 
 use std::{
     collections::BTreeMap,
@@ -185,9 +186,9 @@ impl<T: Runtime> Runtime for Inspected<T> {
     fn migrate(
         &self,
         new_artifact: &ArtifactId,
-        old_service: &InstanceSpec,
+        data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
-        self.inner.migrate(new_artifact, old_service)
+        self.inner.migrate(new_artifact, data_version)
     }
 
     fn execute(

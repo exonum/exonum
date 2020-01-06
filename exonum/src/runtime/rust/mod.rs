@@ -610,10 +610,8 @@ impl Runtime for RustRuntime {
     fn migrate(
         &self,
         new_artifact: &ArtifactId,
-        old_service: &InstanceSpec,
+        data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
-        debug_assert_eq!(new_artifact.name, old_service.artifact.name);
-
         let artifact = self
             .available_artifacts
             .get(&new_artifact)
@@ -624,7 +622,7 @@ impl Runtime for RustRuntime {
                 );
             });
 
-        let mut scripts = artifact.migration_scripts(&old_service.artifact.version)?;
+        let mut scripts = artifact.migration_scripts(data_version)?;
         Ok(if scripts.is_empty() {
             None
         } else {

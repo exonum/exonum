@@ -169,6 +169,7 @@ pub mod versioning;
 
 use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use futures::Future;
+use semver::Version;
 
 use std::fmt;
 
@@ -416,25 +417,30 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Gets the migration script to migrate the data of the service to the state usable
     /// by a newer version of the artifact.
     ///
+    /// An implementation of this method should be idempotent, i.e., return the same script or error
+    /// for the same input.
+    ///
     /// # Invariants Ensured by the Caller
     ///
     /// - `new_artifact` is deployed in the runtime
-    /// - `old_service` exists and is stopped
+    /// - `data_version < new_artifact.version`
     ///
     /// # Return Value
     ///
     /// - An error signals that the runtime does not know how to migrate the service
     ///   to a newer version.
     /// - `Ok(Some(_))` provides a script to execute against service data. After the script
-    ///   is executed, the service will have its version updated to `end_version` from the script.
-    ///   Note that this version does not need to correspond to the version of `new_artifact`,
+    ///   is executed, [`data_version`] of the service will be updated to `end_version`
+    ///   from the script. `end_version` does not need to correspond to the version of `new_artifact`,
     ///   or to a version of an artifact deployed on the blockchain in general.
-    /// - `Ok(None)` means that the service does not require data migration. The service will
-    ///   have its version updated to the version of `new_artifact` immediately.
+    /// - `Ok(None)` means that the service does not require data migration. `data_version`
+    ///   of the service will be updated to the version of `new_artifact` immediately.
+    ///
+    /// [`data_version`]: struct.InstanceState.html#field.data_version
     fn migrate(
         &self,
         new_artifact: &ArtifactId,
-        old_service: &InstanceSpec,
+        data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError>;
 
     /// Dispatches payload to the method of a specific service instance.

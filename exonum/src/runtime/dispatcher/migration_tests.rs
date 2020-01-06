@@ -72,18 +72,30 @@ impl Runtime for MigrationRuntime {
     fn migrate(
         &self,
         new_artifact: &ArtifactId,
-        old_service: &InstanceSpec,
+        data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
-        let script = match old_service.artifact.name.as_str() {
+        let mut end_version = new_artifact.version.clone();
+        end_version.patch = 0;
+
+        let script = match new_artifact.name.as_str() {
             "good" => simple_delayed_migration,
+            "complex" => {
+                if *data_version < Version::new(0, 2, 0) {
+                    end_version = Version::new(0, 2, 0);
+                    complex_migration_part1
+                } else if *data_version < Version::new(0, 3, 0) {
+                    end_version = Version::new(0, 3, 0);
+                    complex_migration_part2
+                } else {
+                    return Ok(None);
+                }
+            }
             "not-good" => erroneous_migration,
             "bad" => panicking_migration,
             "with-state" => migration_modifying_state_hash,
             "none" => return Ok(None),
             _ => return Err(InitMigrationError::NotSupported),
         };
-        let mut end_version = new_artifact.version.clone();
-        end_version.patch = 0;
         let script = MigrationScript::new(script, end_version);
         Ok(Some(script))
     }
@@ -140,6 +152,18 @@ fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), Migr
     Ok(())
 }
 
+fn complex_migration_part1(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    assert!(ctx.data_version < Version::new(0, 2, 0));
+    ctx.helper.new_data().get_proof_entry("entry").set(1_u32);
+    Ok(())
+}
+
+fn complex_migration_part2(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    assert_eq!(ctx.data_version, Version::new(0, 2, 0));
+    ctx.helper.new_data().get_proof_entry("entry").set(2_u32);
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum LocalResult {
     None,
@@ -168,6 +192,16 @@ impl Rig {
             blockchain,
             next_service_id: 100,
         }
+    }
+
+    /// Computes expected state hash of a migration.
+    fn migration_hash(&self, indexes: &[(&str, Hash)]) -> Hash {
+        let fork = self.blockchain.fork();
+        let mut aggregator = fork.get_proof_map::<_, str, Hash>("_aggregator");
+        for &(index_name, hash) in indexes {
+            aggregator.put(index_name, hash);
+        }
+        aggregator.object_hash()
     }
 
     /// Emulates node stopping.
@@ -1019,12 +1053,7 @@ fn migration_commit_without_completing_script_locally() {
     rig.create_block(fork);
 
     // Compute migration hash using the knowledge about the end state of migrated data.
-    let migration_hash = {
-        let fork = rig.blockchain.fork();
-        let mut aggregator = fork.get_proof_map::<_, str, Hash>("_aggregator");
-        aggregator.put("test.entry", 9_u32.object_hash());
-        aggregator.object_hash()
-    };
+    let migration_hash = rig.migration_hash(&[("test.entry", 9_u32.object_hash())]);
 
     let fork = rig.blockchain.fork();
     Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
@@ -1062,4 +1091,65 @@ fn migration_commit_without_completing_script_locally() {
     let aggregator = SystemSchema::new(&snapshot).state_aggregator();
     assert_eq!(aggregator.get("test.entry"), Some(9_u32.object_hash()));
     assert_eq!(aggregator.object_hash(), state_hash);
+}
+
+#[test]
+fn two_part_migration() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("complex", "0.1.1".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("complex", "0.3.7".parse().unwrap());
+    let service = rig.initialize_service(old_artifact, "test");
+    rig.stop_service(&service);
+
+    // First part of migration.
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .unwrap();
+    rig.create_block(fork);
+
+    let migration_hash = rig.migration_hash(&[("test.entry", 1_u32.object_hash())]);
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
+    rig.create_block(fork);
+
+    let mut fork = rig.blockchain.fork();
+    Dispatcher::flush_migration(&mut fork, &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Check service data and metadata.
+    let snapshot = rig.blockchain.snapshot();
+    assert_eq!(
+        snapshot.get_proof_entry::<_, u32>("test.entry").get(),
+        Some(1)
+    );
+    let schema = DispatcherSchema::new(&snapshot);
+    let instance_state = schema.get_instance(service.id).unwrap();
+    assert_eq!(instance_state.data_version, Some(Version::new(0, 2, 0)));
+
+    // Second part of migration.
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .unwrap();
+    rig.create_block(fork);
+
+    let migration_hash = rig.migration_hash(&[("test.entry", 2_u32.object_hash())]);
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
+    rig.create_block(fork);
+
+    let mut fork = rig.blockchain.fork();
+    Dispatcher::flush_migration(&mut fork, &service.name).unwrap();
+    rig.create_block(fork);
+
+    // Check service data and metadata.
+    let snapshot = rig.blockchain.snapshot();
+    assert_eq!(
+        snapshot.get_proof_entry::<_, u32>("test.entry").get(),
+        Some(2)
+    );
+    let schema = DispatcherSchema::new(&snapshot);
+    let instance_state = schema.get_instance(service.id).unwrap();
+    assert_eq!(instance_state.data_version, Some(Version::new(0, 3, 0)));
 }

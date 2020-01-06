@@ -41,6 +41,7 @@ mod failing_runtime {
 
     use exonum::runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
         InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     };
@@ -143,7 +144,7 @@ mod failing_runtime {
         fn migrate(
             &self,
             _new_artifact: &ArtifactId,
-            _old_service: &InstanceSpec,
+            _data_version: &Version,
         ) -> Result<Option<MigrationScript>, InitMigrationError> {
             unimplemented!("This runtime does not support data migration");
         }

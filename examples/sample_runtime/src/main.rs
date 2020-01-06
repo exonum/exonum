@@ -22,11 +22,11 @@ use exonum::{
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
-    messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         rust::{RustRuntime, ServiceFactory},
+        versioning::Version,
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
         WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
@@ -160,7 +160,7 @@ impl Runtime for SampleRuntime {
     fn migrate(
         &self,
         _new_artifact: &ArtifactId,
-        _old_service: &InstanceSpec,
+        _data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         Err(InitMigrationError::NotSupported)
     }
@@ -360,33 +360,26 @@ fn main() {
         let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender
-            .broadcast_transaction(Verified::from_value(
+            .broadcast_transaction(
                 AnyTx {
-                    call_info: CallInfo {
-                        instance_id,
-                        method_id: 0,
-                    },
+                    call_info: CallInfo::new(instance_id, 0),
                     arguments: 1_000_u64.into_bytes(),
-                },
-                service_keypair.0,
-                &service_keypair.1,
-            ))
+                }
+                .sign(service_keypair.0, &service_keypair.1),
+            )
             .unwrap();
         thread::sleep(Duration::from_secs(2));
         // Send a reset counter transaction.
         api_sender
-            .broadcast_transaction(Verified::from_value(
+            .broadcast_transaction(
                 AnyTx {
-                    call_info: CallInfo {
-                        instance_id,
-                        method_id: 1,
-                    },
+                    call_info: CallInfo::new(instance_id, 1),
                     arguments: Vec::default(),
-                },
-                service_keypair.0,
-                &service_keypair.1,
-            ))
+                }
+                .sign(service_keypair.0, &service_keypair.1),
+            )
             .unwrap();
+
         thread::sleep(Duration::from_secs(2));
         api_sender
             .send_external_message(ExternalMessage::Shutdown)
