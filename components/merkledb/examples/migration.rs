@@ -37,13 +37,14 @@ use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, Prefixed},
     impl_object_hash_for_binary_value,
     migration::{flush_migration, Migration, MigrationHelper},
-    BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
-    ProofListIndex, ProofMapIndex, ReadonlyFork, Result as MdbResult, SystemSchema, TemporaryDB,
+    BinaryValue, Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, Patch, ProofEntry,
+    ProofListIndex, ProofMapIndex, ReadonlyFork, Result as MdbResult, Snapshot, SystemSchema,
+    TemporaryDB,
 };
 
 const USER_COUNT: usize = 10_000;
 
-mod v1 {
+pub mod v1 {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -88,39 +89,49 @@ mod v1 {
     }
 }
 
-fn create_initial_data(fork: &Fork) {
-    const NAMES: &[&str] = &["Alice", "Bob", "Carol", "Dave", "Eve"];
+pub fn create_initial_data() -> Arc<dyn Database> {
+    let db: Arc<dyn Database> = Arc::new(TemporaryDB::new());
+    let fork = db.fork();
 
-    let mut schema = v1::Schema::new(Prefixed::new("test", fork));
-    schema.ticker.set("XNM".to_owned());
-    schema.divisibility.set(8);
+    {
+        const NAMES: &[&str] = &["Alice", "Bob", "Carol", "Dave", "Eve"];
 
-    let mut rng = thread_rng();
-    for _ in 0..USER_COUNT {
-        let mut bytes = [0_u8; PUBLIC_KEY_LENGTH];
-        rng.fill(&mut bytes[..]);
-        let public_key = PublicKey::new(bytes);
-        let username = NAMES.choose(&mut rng).unwrap().to_string();
-        let wallet = v1::Wallet {
-            public_key,
-            username,
-            balance: rng.gen_range(0, 1_000),
-        };
-        schema.wallets.put(&public_key, wallet);
+        let mut schema = v1::Schema::new(Prefixed::new("test", &fork));
+        schema.ticker.set("XNM".to_owned());
+        schema.divisibility.set(8);
 
-        let history_len = rng.gen_range(0, 10);
-        schema
-            .histories
-            .get(&public_key)
-            .extend((0..history_len).map(|_| {
-                let mut bytes = [0_u8; HASH_SIZE];
-                rng.fill(&mut bytes[..]);
-                Hash::new(bytes)
-            }));
+        let mut rng = thread_rng();
+        for _ in 0..USER_COUNT {
+            let mut bytes = [0_u8; PUBLIC_KEY_LENGTH];
+            rng.fill(&mut bytes[..]);
+            let public_key = PublicKey::new(bytes);
+            let username = NAMES.choose(&mut rng).unwrap().to_string();
+            let wallet = v1::Wallet {
+                public_key,
+                username,
+                balance: rng.gen_range(0, 1_000),
+            };
+            schema.wallets.put(&public_key, wallet);
+
+            let history_len = rng.gen_range(0, 10);
+            schema
+                .histories
+                .get(&public_key)
+                .extend((0..history_len).map(|_| {
+                    let mut bytes = [0_u8; HASH_SIZE];
+                    rng.fill(&mut bytes[..]);
+                    Hash::new(bytes)
+                }));
+        }
     }
+
+    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
+    db.merge(fork.into_patch()).unwrap();
+
+    db
 }
 
-mod v2 {
+pub mod v2 {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -183,7 +194,7 @@ mod v2 {
 }
 
 /// Provides migration of wallets with schema.
-fn migrate_wallets_with_schema(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
+pub fn migrate_wallets_with_schema(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data);
 
@@ -248,6 +259,50 @@ fn migrate_wallets_with_iter_loop(helper: &mut MigrationHelper) -> MdbResult<()>
             }
         }
     })
+}
+
+pub fn check_data_before_flush(snapshot: &Box<dyn Snapshot>) {
+    let old_schema = v1::Schema::new(Prefixed::new("test", snapshot));
+    assert_eq!(old_schema.ticker.get().unwrap(), "XNM");
+    // The new data is present, too, in the unmerged form.
+    let new_schema = v2::Schema::new(Migration::new("test", snapshot));
+    assert_eq!(new_schema.config.get().unwrap().ticker, "XNM");
+
+    let system_schema = SystemSchema::new(snapshot);
+    let state = system_schema.state_aggregator();
+    assert_eq!(state.keys().collect::<Vec<_>>(), vec!["unrelated.list"]);
+    let migration_view = Migration::new("test", snapshot);
+    let state = migration_view.state_aggregator();
+    assert_eq!(
+        state.keys().collect::<Vec<_>>(),
+        vec!["test.config", "test.wallets"]
+    );
+    let new_state_hash = state.object_hash();
+    assert_eq!(new_state_hash, migration_view.state_hash());
+}
+
+pub fn check_data_after_flush(patch: &Patch) {
+    // Now, the new indexes have replaced the old ones.
+    let new_schema = v2::Schema::new(Prefixed::new("test", patch));
+    assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
+    assert!(!patch.get_entry::<_, u8>("test.divisibility").exists());
+
+    // The indexes are now aggregated in the default namespace.
+    let system_schema = SystemSchema::new(patch);
+    let state = system_schema.state_aggregator();
+    assert_eq!(
+        state.keys().collect::<Vec<_>>(),
+        vec!["test.config", "test.wallets", "unrelated.list"]
+    );
+}
+
+pub fn check_data_after_merge(snapshot: &Box<dyn Snapshot>) {
+    let system_schema = SystemSchema::new(snapshot);
+    let state = system_schema.state_aggregator();
+    assert_eq!(
+        state.keys().collect::<Vec<_>>(),
+        vec!["test.config", "test.wallets", "unrelated.list"]
+    );
 }
 
 fn check_and_finalize_migration(db: Arc<dyn Database>) {
