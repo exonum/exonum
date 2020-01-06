@@ -178,7 +178,7 @@ fn test_api_cannot_add_same_content_hash() {
                 "instance_id": SERVICE_ID,
                 "method_id": 0,
             },
-            "code": 0,
+            "code": { "custom": 0 },
             "description": "Content hash already exists.",
             "runtime_id": 0,
             "type": "service_error",

@@ -522,7 +522,7 @@ fn test_explorer_add_invalid_transaction() {
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
         .expect_err("Expected transaction send to finish with error.");
-    let error_body = "Execution error with code `dispatcher:7` occurred: Suitable runtime \
+    let error_body = "Execution error with code `dispatcher:custom:7` occurred: Suitable runtime \
                       for the given service instance ID is not found.";
     assert_matches!(
         response,

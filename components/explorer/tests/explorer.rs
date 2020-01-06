@@ -20,7 +20,7 @@ use exonum::{
     helpers::Height,
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
-    runtime::{ErrorKind, SnapshotExt},
+    runtime::{ErrorCode, ErrorKind, SnapshotExt},
 };
 use serde_json::json;
 
@@ -107,7 +107,12 @@ fn test_explorer_basics() {
 
     let tx_info = block.transaction(0).unwrap();
     let err = tx_info.status().unwrap_err();
-    assert_eq!(err.kind(), ErrorKind::Service { code: 0 });
+    assert_eq!(
+        err.kind(),
+        ErrorKind::Service {
+            code: ErrorCode::Custom(0)
+        }
+    );
     assert_eq!(err.description(), "Not allowed!");
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
@@ -120,7 +125,7 @@ fn test_explorer_basics() {
             "location_proof": tx_info.location_proof(), // too complicated to check
             "status": {
                 "type": "service_error",
-                "code": 0,
+                "code": { "custom": 0 },
                 "description": "Not allowed!",
                 "runtime_id": 0,
                 "call_site": {
@@ -196,7 +201,7 @@ fn test_explorer_errors_in_block() {
                         "instance_id": SERVICE_ID,
                         "method_id": 0
                     },
-                    "code": 0,
+                    "code": { "custom": 0 },
                     "description": "Not allowed!",
                     "runtime_id": 0,
                     "type": "service_error"

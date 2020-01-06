@@ -42,6 +42,59 @@ use crate::{
     proto::schema::runtime as runtime_proto,
 };
 
+/// Code of execution error.
+///
+/// Code can be either a well-known code from the list provided by Exonum core, or
+/// a custom code specific to the environment that produced the error.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorCode {
+    /// Common error with the code described in `CommonError` enum. // TODO add link.
+    Common(u8),
+    /// Custom error specific to the core/runtime/service.
+    Custom(u8),
+}
+
+impl ErrorCode {
+    const CUSTOM_ERROR_OFSET: u16 = 256;
+    const CUSTOM_ERROR_MAX: u16 = 512;
+
+    fn into_raw(self) -> u16 {
+        match self {
+            ErrorCode::Common(code) => code as u16,
+            ErrorCode::Custom(code) => (code as u16) + ErrorCode::CUSTOM_ERROR_OFSET,
+        }
+    }
+
+    fn from_raw(raw_code: u16) -> Result<Self, failure::Error> {
+        ensure!(
+            raw_code < ErrorCode::CUSTOM_ERROR_MAX,
+            "Incorrect raw code: {:?}",
+            raw_code
+        );
+
+        let code = if raw_code < ErrorCode::CUSTOM_ERROR_OFSET {
+            let code = u8::try_from(raw_code).unwrap();
+            ErrorCode::Common(code)
+        } else {
+            let code = u8::try_from(raw_code - ErrorCode::CUSTOM_ERROR_OFSET).unwrap();
+            ErrorCode::Custom(code)
+        };
+
+        Ok(code)
+    }
+}
+
+impl Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ErrorCode::Common(code) => write!(f, "common:{}", code),
+            ErrorCode::Custom(code) => write!(f, "custom:{}", code),
+        }
+    }
+}
+
 /// Kind of execution error, indicates the location of the error.
 ///
 /// # Note to Runtime Developers
@@ -108,44 +161,52 @@ pub enum ErrorKind {
         /// Error code. Available values can be found in the [description] of dispatcher errors.
         ///
         /// [description]: enum.DispatcherError.html
-        code: u8,
+        code: ErrorCode,
     },
 
     /// An error in the runtime logic. For example, the runtime could not compile an artifact.
     Runtime {
         /// Runtime-specific error code.
         /// Error codes can have different meanings for different runtimes.
-        code: u8,
+        code: ErrorCode,
     },
 
     /// An error in the service code reported to the blockchain users.
     Service {
         /// User-defined error code.
         /// Error codes can have different meanings for different services.
-        code: u8,
+        code: ErrorCode,
     },
 }
 
 impl ErrorKind {
-    fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
+    fn into_raw(self) -> (runtime_proto::ErrorKind, u16) {
         match self {
             ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
-            ErrorKind::Dispatcher { code } => (runtime_proto::ErrorKind::DISPATCHER, code),
-            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
+            ErrorKind::Dispatcher { code } => {
+                (runtime_proto::ErrorKind::DISPATCHER, code.into_raw())
+            }
+            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code.into_raw()),
+            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code.into_raw()),
         }
     }
 
-    fn from_raw(kind: runtime_proto::ErrorKind, code: u8) -> Result<Self, failure::Error> {
+    fn from_raw(kind: runtime_proto::ErrorKind, code: u16) -> Result<Self, failure::Error> {
         use runtime_proto::ErrorKind::*;
         let kind = match kind {
             UNEXPECTED => {
                 ensure!(code == 0, "Error code for panic should be zero");
                 ErrorKind::Unexpected
             }
-            DISPATCHER => ErrorKind::Dispatcher { code },
-            RUNTIME => ErrorKind::Runtime { code },
-            SERVICE => ErrorKind::Service { code },
+            DISPATCHER => ErrorKind::Dispatcher {
+                code: ErrorCode::from_raw(code)?,
+            },
+            RUNTIME => ErrorKind::Runtime {
+                code: ErrorCode::from_raw(code)?,
+            },
+            SERVICE => ErrorKind::Service {
+                code: ErrorCode::from_raw(code)?,
+            },
         };
         Ok(kind)
     }
@@ -461,7 +522,12 @@ impl ExecutionError {
 
     /// Creates an execution error for use in service code.
     pub fn service(code: u8, description: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Service { code }, description)
+        Self::new(
+            ErrorKind::Service {
+                code: ErrorCode::Custom(code),
+            },
+            description,
+        )
     }
 
     /// Creates an execution error from the panic description.
@@ -570,7 +636,7 @@ impl ProtobufConvert for ExecutionError {
         let mut inner = Self::ProtoStruct::default();
         let (kind, code) = self.kind.into_raw();
         inner.set_kind(kind);
-        inner.set_code(u32::from(code));
+        inner.set_code(code as u32);
         inner.set_description(self.description.clone());
 
         if let Some(runtime_id) = self.runtime_id {
@@ -589,8 +655,9 @@ impl ProtobufConvert for ExecutionError {
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let kind = pb.get_kind();
-        let code = u8::try_from(pb.get_code())?;
-        let kind = ErrorKind::from_raw(kind, code)?;
+        let raw_code = u16::try_from(pb.get_code())?;
+
+        let kind = ErrorKind::from_raw(kind, raw_code)?;
 
         let runtime_id = if pb.has_no_runtime_id() {
             None

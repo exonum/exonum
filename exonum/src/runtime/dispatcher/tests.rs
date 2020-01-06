@@ -37,9 +37,9 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
-        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, MethodId, Runtime,
+        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorCode,
+        ErrorKind, ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
+        InstanceSpec, InstanceStatus, MethodId, Runtime,
     },
 };
 
@@ -242,7 +242,9 @@ impl Runtime for SampleRuntime {
         if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
             Ok(())
         } else {
-            let kind = ErrorKind::Service { code: 15 };
+            let kind = ErrorKind::Service {
+                code: ErrorCode::Custom(15),
+            };
             Err(ExecutionError::new(kind, "oops"))
         }
     }
@@ -624,7 +626,9 @@ impl Runtime for DeploymentRuntime {
         let delay = LittleEndian::read_u64(&spec);
         let delay = Duration::from_millis(delay);
 
-        let error_kind = ErrorKind::Runtime { code: 0 };
+        let error_kind = ErrorKind::Runtime {
+            code: ErrorCode::Custom(0),
+        };
         let result = match artifact.name.as_str() {
             "good" => Ok(()),
             "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),

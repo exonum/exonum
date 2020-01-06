@@ -74,7 +74,7 @@ impl Error {
         );
         ExecutionError::new(
             ErrorKind::Dispatcher {
-                code: Error::StackOverflow as u8,
+                code: Error::StackOverflow.into(),
             },
             description,
         )

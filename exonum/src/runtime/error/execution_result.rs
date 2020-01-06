@@ -16,7 +16,7 @@
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{CallSite, ErrorKind, ExecutionError};
+use super::{CallSite, ErrorCode, ErrorKind, ExecutionError};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -37,7 +37,7 @@ pub struct ExecutionStatus {
     #[serde(skip_serializing_if = "String::is_empty", default)]
     description: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    code: Option<u8>,
+    code: Option<ErrorCode>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     runtime_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none", default)]

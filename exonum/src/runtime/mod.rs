@@ -144,8 +144,8 @@ pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
     error::{
-        catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
-        ExecutionStatus, SerdeExecutionStatus,
+        catch_panic, CallSite, CallType, ErrorCode, ErrorKind, ErrorMatch, ExecutionError,
+        ExecutionFail, ExecutionStatus, SerdeExecutionStatus,
     },
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,

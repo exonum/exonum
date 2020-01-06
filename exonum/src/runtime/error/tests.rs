@@ -30,10 +30,30 @@ fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
 fn execution_error_binary_value_round_trip() {
     let values = vec![
         (ErrorKind::Unexpected, "AAAA"),
-        (ErrorKind::Dispatcher { code: 0 }, ""),
-        (ErrorKind::Dispatcher { code: 0 }, "b"),
-        (ErrorKind::Runtime { code: 1 }, "c"),
-        (ErrorKind::Service { code: 18 }, "ddc"),
+        (
+            ErrorKind::Dispatcher {
+                code: ErrorCode::Custom(0),
+            },
+            "",
+        ),
+        (
+            ErrorKind::Dispatcher {
+                code: ErrorCode::Custom(0),
+            },
+            "b",
+        ),
+        (
+            ErrorKind::Runtime {
+                code: ErrorCode::Custom(1),
+            },
+            "c",
+        ),
+        (
+            ErrorKind::Service {
+                code: ErrorCode::Custom(18),
+            },
+            "ddc",
+        ),
     ];
 
     for (kind, description) in values {
@@ -84,11 +104,26 @@ fn execution_error_binary_value_unexpected_with_code() {
 
 #[test]
 fn execution_error_object_hash_description() {
-    let mut first_err = ExecutionError::new(ErrorKind::Service { code: 5 }, "foo".to_owned());
-    let second_err = ExecutionError::new(ErrorKind::Service { code: 5 }, "foo bar".to_owned());
+    let mut first_err = ExecutionError::new(
+        ErrorKind::Service {
+            code: ErrorCode::Custom(5),
+        },
+        "foo".to_owned(),
+    );
+    let second_err = ExecutionError::new(
+        ErrorKind::Service {
+            code: ErrorCode::Custom(5),
+        },
+        "foo bar".to_owned(),
+    );
     assert_eq!(first_err.object_hash(), second_err.object_hash());
 
-    let second_err = ExecutionError::new(ErrorKind::Service { code: 6 }, "foo".to_owned());
+    let second_err = ExecutionError::new(
+        ErrorKind::Service {
+            code: ErrorCode::Custom(6),
+        },
+        "foo".to_owned(),
+    );
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
     let mut second_err = first_err.clone();
@@ -164,7 +199,9 @@ fn execution_error_object_hash_description() {
 #[test]
 fn execution_error_display() {
     let mut err = ExecutionError {
-        kind: ErrorKind::Service { code: 3 },
+        kind: ErrorKind::Service {
+            code: ErrorCode::Custom(3),
+        },
         description: String::new(),
         runtime_id: Some(1),
         call_site: Some(CallSite {
@@ -173,7 +210,7 @@ fn execution_error_display() {
         }),
     };
     let err_string = err.to_string();
-    assert!(err_string.contains("Execution error with code `service:3`"));
+    assert!(err_string.contains("Execution error with code `service:custom:3`"));
     assert!(err_string.contains("in constructor of service 100"));
     assert!(!err_string.ends_with(": ")); // Empty description should not be output
 
@@ -227,7 +264,9 @@ fn execution_result_serde_presentation() {
     );
 
     let result = ExecutionStatus(Err(ExecutionError {
-        kind: ErrorKind::Service { code: 3 },
+        kind: ErrorKind::Service {
+            code: ErrorCode::Custom(3),
+        },
         description: String::new(),
         runtime_id: Some(1),
         call_site: Some(CallSite {
@@ -239,7 +278,7 @@ fn execution_result_serde_presentation() {
         serde_json::to_value(result).unwrap(),
         json!({
             "type": "service_error",
-            "code": 3,
+            "code": { "custom": 3 },
             "runtime_id": 1,
             "call_site": {
                 "instance_id": 100,
@@ -249,7 +288,9 @@ fn execution_result_serde_presentation() {
     );
 
     let result = ExecutionStatus(Err(ExecutionError {
-        kind: ErrorKind::Dispatcher { code: 8 },
+        kind: ErrorKind::Dispatcher {
+            code: ErrorCode::Custom(8),
+        },
         description: "!".to_owned(),
         runtime_id: Some(0),
         call_site: Some(CallSite {
@@ -265,7 +306,7 @@ fn execution_result_serde_presentation() {
         json!({
             "type": "dispatcher_error",
             "description": "!",
-            "code": 8,
+            "code": { "custom": 8 },
             "runtime_id": 0,
             "call_site": {
                 "instance_id": 100,
@@ -281,10 +322,30 @@ fn execution_result_serde_presentation() {
 fn execution_result_serde_roundtrip() {
     let values = vec![
         Err((ErrorKind::Unexpected, "AAAA")),
-        Err((ErrorKind::Dispatcher { code: 0 }, "")),
-        Err((ErrorKind::Dispatcher { code: 0 }, "b")),
-        Err((ErrorKind::Runtime { code: 1 }, "c")),
-        Err((ErrorKind::Service { code: 18 }, "ddc")),
+        Err((
+            ErrorKind::Dispatcher {
+                code: ErrorCode::Custom(0),
+            },
+            "",
+        )),
+        Err((
+            ErrorKind::Dispatcher {
+                code: ErrorCode::Custom(0),
+            },
+            "b",
+        )),
+        Err((
+            ErrorKind::Runtime {
+                code: ErrorCode::Custom(1),
+            },
+            "c",
+        )),
+        Err((
+            ErrorKind::Service {
+                code: ErrorCode::Custom(18),
+            },
+            "ddc",
+        )),
         Ok(()),
     ];
 
