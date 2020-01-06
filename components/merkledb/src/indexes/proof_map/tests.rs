@@ -1648,6 +1648,10 @@ fn test_tree_with_hashed_key() {
     }
 
     impl BinaryKey for Point {
+        fn size(&self) -> usize {
+            4
+        }
+
         fn write(&self, buffer: &mut [u8]) -> usize {
             LittleEndian::write_u16(&mut buffer[0..2], self.x);
             LittleEndian::write_u16(&mut buffer[2..4], self.y);
@@ -1658,10 +1662,6 @@ fn test_tree_with_hashed_key() {
             let x = LittleEndian::read_u16(&buffer[0..2]);
             let y = LittleEndian::read_u16(&buffer[2..4]);
             Self { x, y }
-        }
-
-        fn size(&self) -> usize {
-            4
         }
     }
 

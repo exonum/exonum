@@ -51,6 +51,8 @@ pub struct NodePublicConfig {
     /// `generate-config` configuration step. The keys are required for the
     /// `finalize` step.
     pub validator_keys: Option<ValidatorKeys>,
+    /// Network address for connections from other nodes.
+    pub address: Option<String>,
 }
 
 /// Private configuration of the node.
