@@ -28,8 +28,10 @@
 use exonum_merkledb::{
     access::Prefixed,
     migration::{flush_migration, MigrationHelper},
-    ObjectHash,
+    Database, ObjectHash,
 };
+
+use std::sync::Arc;
 
 use migration::{
     check_data_after_flush, check_data_after_merge, check_data_before_flush, create_initial_data,
@@ -100,7 +102,7 @@ fn migrate_wallets(helper: &MigrationHelper) {
 
 fn main() {
     // Creating a temporary DB and filling it with some data.
-    let db = create_initial_data();
+    let db: Arc<dyn Database> = Arc::new(create_initial_data());
 
     // Creating helper to perform migration.
     let mut helper = MigrationHelper::new(db.clone(), "test");

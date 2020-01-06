@@ -15,7 +15,6 @@
 use failure::Error;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde_derive::*;
-use std::sync::Arc;
 
 use std::borrow::Cow;
 
@@ -77,8 +76,8 @@ pub mod v1 {
 }
 
 /// Creates initial DB with some random data.
-pub fn create_initial_data() -> Arc<dyn Database> {
-    let db: Arc<dyn Database> = Arc::new(TemporaryDB::new());
+pub fn create_initial_data() -> TemporaryDB {
+    let db = TemporaryDB::new();
     let fork = db.fork();
 
     {

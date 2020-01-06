@@ -27,7 +27,7 @@
 use exonum_merkledb::{
     access::Prefixed,
     migration::{flush_migration, Migration},
-    Fork, ObjectHash, ReadonlyFork,
+    Database, Fork, ObjectHash, ReadonlyFork,
 };
 
 use migration::{
