@@ -103,9 +103,8 @@ impl BinaryValueStruct {
             impl exonum_merkledb::BinaryValue for #name {
                 fn to_bytes(&self) -> Vec<u8> {
                     use protobuf::Message as _;
-
                     // This trait assumes that we work with trusted data so we can unwrap here.
-                    self.to_pb().write_to_bytes().expect(
+                    exonum_proto::ProtobufConvert::to_pb(self).write_to_bytes().expect(
                         concat!("Failed to serialize `BinaryValue` for ", stringify!(#name))
                     )
                 }
