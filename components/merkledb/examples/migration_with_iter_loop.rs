@@ -41,7 +41,9 @@ fn migrate_wallets(helper: &mut MigrationHelper) -> DbResult<()> {
         let old_schema = v1::Schema::new(helper.old_data());
         let mut new_schema = v2::Schema::new(helper.new_data());
 
+        // Size is selected so we can safely store part of the migration in RAM.
         const CHUNK_SIZE: usize = 1_000;
+        let mut count = 0;
         for (public_key, wallet) in iters
             .create("wallets", &old_schema.wallets)
             .take(CHUNK_SIZE)
@@ -64,9 +66,11 @@ fn migrate_wallets(helper: &mut MigrationHelper) -> DbResult<()> {
                 };
                 new_schema.wallets.put(&public_key, new_wallet);
             }
+
+            count += 1;
         }
 
-        println!("Processed chunk of {} wallets", CHUNK_SIZE);
+        println!("Processed chunk of {} wallets", count);
     })
 }
 
