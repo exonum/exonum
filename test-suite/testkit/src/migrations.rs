@@ -23,10 +23,10 @@ use exonum::{
         Database, Fork, Snapshot, TemporaryDB,
     },
     runtime::{
-        migrations::{MigrateData, MigrationContext, MigrationScript},
+        migrations::{MigrateData, MigrationContext, MigrationError, MigrationScript},
         rust::ServiceFactory,
         versioning::Version,
-        ExecutionError, InstanceSpec,
+        InstanceSpec,
     },
 };
 
@@ -163,7 +163,7 @@ pub trait ScriptExt {
 
 impl<F> ScriptExt for F
 where
-    F: FnOnce(&mut MigrationContext) -> Result<(), ExecutionError> + Send + 'static,
+    F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
 {
     fn with_end_version(self, version: &str) -> MigrationScript {
         MigrationScript::new(self, version.parse().expect("Cannot parse end version"))
@@ -175,7 +175,7 @@ mod tests {
     use super::*;
 
     use exonum::runtime::{
-        migrations::DataMigrationError,
+        migrations::InitMigrationError,
         rust::{ArtifactProtobufSpec, Service},
         ArtifactId,
     };
@@ -184,12 +184,12 @@ mod tests {
         Arc,
     };
 
-    fn script_1(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+    fn script_1(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 1, 0));
         Ok(())
     }
 
-    fn script_2(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+    fn script_2(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 2, 0));
         Ok(())
     }
@@ -221,7 +221,7 @@ mod tests {
         fn migration_scripts(
             &self,
             _: &Version,
-        ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        ) -> Result<Vec<MigrationScript>, InitMigrationError> {
             let first_counter = Arc::clone(&self.script_counters[0]);
             let second_counter = Arc::clone(&self.script_counters[1]);
 

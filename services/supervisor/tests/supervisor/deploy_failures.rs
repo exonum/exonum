@@ -40,7 +40,7 @@ mod failing_runtime {
     use std::str::FromStr;
 
     use exonum::runtime::{
-        migrations::{DataMigrationError, MigrationScript},
+        migrations::{InitMigrationError, MigrationScript},
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
         InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     };
@@ -144,7 +144,7 @@ mod failing_runtime {
             &self,
             _new_artifact: &ArtifactId,
             _old_service: &InstanceSpec,
-        ) -> Result<Option<MigrationScript>, DataMigrationError> {
+        ) -> Result<Option<MigrationScript>, InitMigrationError> {
             unimplemented!("This runtime does not support data migration");
         }
 

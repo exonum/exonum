@@ -18,11 +18,11 @@ use exonum::{
     crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
     runtime::{
         migrations::{
-            DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
+            InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
+            MigrationScript,
         },
         rust::{Service, ServiceFactory},
         versioning::Version,
-        ExecutionError,
     },
 };
 use exonum_derive::*;
@@ -227,7 +227,7 @@ mod v05 {
 }
 
 /// First migration script. Merkelizes the wallets table and records the total number of tokens.
-fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v01::Schema::new(ctx.helper.old_data());
     let mut new_schema = v02::Schema::new(ctx.helper.new_data());
 
@@ -241,7 +241,7 @@ fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
 }
 
 /// The alternative version of the previous migration script, which uses database merges.
-fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     const CHUNK_SIZE: usize = 500;
 
     ctx.helper.iter_loop(|helper, iters| {
@@ -261,7 +261,7 @@ fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), Execu
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
-fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), ExecutionError> {
+fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v02::Schema::new(ctx.helper.old_data());
     let mut new_schema = v05::Schema::new(ctx.helper.new_data());
 
@@ -301,7 +301,7 @@ impl MigrateData for MigratedService {
     fn migration_scripts(
         &self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
             .add_script(Version::new(0, 2, 0), merkelize_wallets)
             .add_script(Version::new(0, 5, 0), transform_wallet_type)

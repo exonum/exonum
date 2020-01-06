@@ -25,7 +25,7 @@ use exonum::{
     messages::Verified,
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
-        migrations::{DataMigrationError, MigrationScript},
+        migrations::{InitMigrationError, MigrationScript},
         rust::{RustRuntime, ServiceFactory},
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
@@ -161,8 +161,8 @@ impl Runtime for SampleRuntime {
         &self,
         _new_artifact: &ArtifactId,
         _old_service: &InstanceSpec,
-    ) -> Result<Option<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
