@@ -12,6 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Shows how to migrate database data. The migration follows the following scenario:
+//!
+//! 1. We create and fill database with random data according to schema defined in the
+//!   `migration::v1` module with the `create_initial_data` method.
+//! 2. We perform migration from the `v1` schema to the `v2` schema
+//!   with the help of the `migrate` function.
+//!   The method transforms the data in the old schema to conform to the new schema.
+//!   The old data is **not** removed at this stage; rather, it exists alongside
+//!   the migrated data. This is useful in case the migration needs to be reverted for some reason.
+//! 3. We complete the migration by calling `flush_migration`. This moves the migrated data
+//!   to its intended place and removes the old data marked for removal.
+
 use failure::Error;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde_derive::*;

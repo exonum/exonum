@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Shows how to migrate database data. The migration follows the following scenario:
+//! Shows how to provide database data migration manually.
+//! The main logic of this example described in the `manual_migration` and `migrate_wallets` functions.
+//! The main points of this example are:
+//! - We have to create `Fork` from the DB manually, as well as `Migration` and `Prefixed` access to the data.
+//! - We have to apply `Patch` to the DB manually.
+//! - Data migration is performed by direct access to old and new schemas.
 //!
-//! 1. We create and fill database with random data according to schema defined in the
-//!   `migration::v1` module with the `create_initial_data` method.
-//! 2. We perform migration from the `v1` schema to the `v2` schema
-//!   with the help of the `create_migration` and `migrate_wallets` methods.
-//!   The method transforms the data in the old schema to conform to the new schema.
-//!   The old data is **not** removed at this stage; rather, it exists alongside
-//!   the migrated data. This is useful in case the migration needs to be reverted for some reason.
-//! 3. We complete the migration by calling `flush_migration`. This moves the migrated data
-//!   to its intended place and removes the old data marked for removal.
+//! For the description of the common migration scenario, see the `migration` module docs.
 
 use exonum_merkledb::{
     access::Prefixed, migration::Migration, Database, Fork, ObjectHash, ReadonlyFork,
