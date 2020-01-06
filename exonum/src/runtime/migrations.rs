@@ -127,6 +127,25 @@ impl From<db_migration::MigrationError> for MigrationError {
 }
 
 /// Atomic migration script.
+///
+/// # Design Recommendations
+///
+/// Migration scripts may be aborted; see [`MigrationHelper`] docs for more technical details.
+/// The [migration workflow] aborts the script if the migration is rolled back; also, all running
+/// migration scripts are aborted if the node is shut down for whatever reason. Because of this,
+/// script writers are encouraged to take aborts into account.
+///
+/// A good way to handle abortion is to merge changes to the database with sufficient frequency
+/// (e.g., approximately once per second), and to let merge errors bubble up.
+/// In this case, script abortion will lead to an error during merge, which will terminate
+/// the script timely.
+///
+/// Another reason to merge changes to the database periodically is to avoid out-of-memory errors.
+/// Since data changes are stored in RAM before the merge, *not* merging the changes can consume
+/// significant memory if the amount of migrated data is large.
+///
+/// [`MigrationHelper`]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/migration/struct.MigrationHelper.html
+/// [migration workflow]: index.html#migration-workflow
 pub struct MigrationScript {
     end_version: Version,
     name: String,
@@ -204,10 +223,8 @@ pub trait MigrateData {
     ///
     /// Inability to migrate data should be eagerly signalled via an error. While a script may
     /// fail during execution, this should be used as a last resort measure. It is
-    /// perfectly reasonable to return an error from the script if it is aborted, though;
+    /// perfectly reasonable to return an error from the script if it [is aborted], though;
     /// an error in this case *does not* mean that the migration will be considered failed.
-    ///
-    /// FIXME: link to script abortion
     ///
     /// # Expectations
     ///
@@ -224,6 +241,7 @@ pub trait MigrateData {
     /// from the start version. For example, this may be the case if the service version is too old,
     /// or too new.
     ///
+    /// [is aborted]: struct.MigrationScript.html#design-recommendations
     /// [`end_version()`]: struct.MigrationScript.html#method.end_version
     fn migration_scripts(
         &self,

@@ -59,7 +59,7 @@
 //! # use exonum_merkledb::{access::AccessExt, Database, SystemSchema, TemporaryDB};
 //! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
-//! # fn main() -> exonum_merkledb::Result<()> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let db = Arc::new(TemporaryDB::new());
 //! // Create initial data in the database.
 //! let fork = db.fork();
@@ -334,6 +334,41 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 ///
 /// See the [module docs](index.html) for a basic example of usage.
 ///
+/// ## Aborting migration
+///
+/// `MigrationHelper` offers [`AbortHandle`] to abort migration logic. Once aborted, `MigrationHelper`
+/// does not allow to merge changes to the database; the relevant methods will return
+/// [`MigrationError::Aborted`]. This is important, e.g., to prevent unnecessary writes
+/// to the database.
+///
+/// [`AbortHandle`]: struct.AbortHandle.html
+/// [`MigrationError::Aborted`]: enum.MigrationError.html#variant.Aborted
+///
+/// ```
+/// # use assert_matches::assert_matches;
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
+/// # use exonum_merkledb::migration::{MigrationHelper, MigrationError};
+/// # use std::{sync::mpsc, thread, time::Duration};
+/// let db = TemporaryDB::new();
+/// // Since `MigrationHelper` cannot be sent between threads, we instantiate it
+/// // in a newly spawned thread and move the helper handle to the main thread.
+/// let (tx, rx) = mpsc::channel();
+/// let helper_thread = thread::spawn(move || {
+///     let (mut helper, handle) = MigrationHelper::with_handle(db, "test");
+///     tx.send(handle).unwrap();
+///     // Start migration...
+/// #   thread::sleep(Duration::from_millis(50));
+///     // Attempt to merge changes to DB.
+///     helper.merge()
+/// });
+///
+/// let handle = rx.recv().unwrap();
+/// // Migration is automatically aborted when the handle is dropped.
+/// drop(handle);
+/// let res: Result<(), MigrationError> = helper_thread.join().unwrap();
+/// assert_matches!(res, Err(MigrationError::Aborted));
+/// ```
+///
 /// ## Using persistent iterators
 ///
 /// `MigrationHelper` offers the [`iter_loop`](#method.iter_loop) method, which allows to further
@@ -344,8 +379,8 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 ///
 /// ```
 /// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
-/// # use exonum_merkledb::migration::MigrationHelper;
-/// # fn main() -> exonum_merkledb::Result<()> {
+/// # use exonum_merkledb::migration::{MigrationHelper, MigrationError};
+/// # fn main() -> Result<(), MigrationError> {
 /// /// Number of accounts processed per DB merge.
 /// const CHUNK_SIZE: usize = 100;
 ///
