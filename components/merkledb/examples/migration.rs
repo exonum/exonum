@@ -224,40 +224,39 @@ pub fn migrate_wallets_with_schema(new_data: Migration<&Fork>, old_data: Prefixe
 }
 
 /// Provides migration of wallets with `MigrationHelper::iter_loop`.
-fn migrate_wallets_with_iter_loop(helper: &mut MigrationHelper) -> MdbResult<()> {
+/// `iter_loop` is designed to allow to merge changes to the database from time to time,
+/// so we are migrating wallets in chunks here.
+pub fn migrate_wallets_with_iter_loop(helper: &mut MigrationHelper) -> DbResult<()> {
     helper.iter_loop(|helper, iters| {
-        let wallets = helper
-            .old_data()
-            .get_map::<_, PublicKey, v1::Wallet>("wallets");
-        let mut new_wallets = helper
-            .new_data()
-            .get_proof_map::<_, PublicKey, v2::Wallet>("wallets");
+        let old_schema = v1::Schema::new(helper.old_data());
+        let mut new_schema = v2::Schema::new(helper.new_data());
 
-        for (i, (pub_key, wallet)) in iters.create("wallets", &wallets).enumerate() {
+        const CHUNK_SIZE: usize = 1_000;
+        for (public_key, wallet) in iters
+            .create("wallets", &old_schema.wallets)
+            .take(CHUNK_SIZE)
+        {
             if wallet.username == "Eve" {
                 // We don't like Eves 'round these parts. Remove her transaction history
                 // and don't migrate the wallet.
-                helper.new_data().create_tombstone(("histories", &pub_key));
+                helper
+                    .new_data()
+                    .create_tombstone(("histories", &public_key));
             } else {
                 // Merkelize the wallet history.
-                let mut history: ProofListIndex<_, Hash> =
-                    helper.new_data().get_group("histories").get(&pub_key);
-                let old_history: ListIndex<_, Hash> =
-                    helper.old_data().get_group("histories").get(&pub_key);
-                history.extend(&old_history);
+                let mut history = new_schema.histories.get(&public_key);
+                history.extend(&old_schema.histories.get(&public_key));
 
                 let new_wallet = v2::Wallet {
                     username: wallet.username,
                     balance: wallet.balance,
                     history_hash: history.object_hash(),
                 };
-                new_wallets.put(&pub_key, new_wallet);
-            }
-
-            if i % 1_000 == 999 {
-                println!("Processed {} wallets", i + 1);
+                new_schema.wallets.put(&public_key, new_wallet);
             }
         }
+
+        println!("Processed chunk of {} wallets", CHUNK_SIZE);
     })
 }
 
