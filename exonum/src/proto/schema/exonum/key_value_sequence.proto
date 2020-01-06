@@ -26,6 +26,7 @@ message KeyValue {
   bytes value = 2;
 }
 
-message OrderedMap {
+// A sequence of key-value pairs.
+message KeyValueSequence {
   repeated KeyValue entry = 1;
 }

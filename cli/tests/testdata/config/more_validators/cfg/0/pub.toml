@@ -1,3 +1,5 @@
+address = "127.0.0.1:5400"
+
 [consensus]
 first_round_timeout = 3000
 max_message_len = 1048576
