@@ -148,6 +148,8 @@ enum LocalResult {
     SavedWithNodeRestart,
 }
 
+/// Test rig encapsulating typical tasks for migration tests, such as artifact deployment
+/// and service instantiation.
 #[derive(Debug)]
 struct Rig {
     blockchain: BlockchainMut,
@@ -187,6 +189,7 @@ impl Rig {
         self.blockchain.dispatcher()
     }
 
+    /// Waits for migration scripts to finish according to the specified policy.
     fn wait_migration_scripts(&mut self, local_result: LocalResult) {
         if local_result == LocalResult::None {
             // Don't wait at all.

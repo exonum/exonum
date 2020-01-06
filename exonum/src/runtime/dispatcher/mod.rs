@@ -40,6 +40,7 @@ use crate::{
     runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
+use self::schema::MigrationTransition;
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
     migrations::{
@@ -608,32 +609,30 @@ impl Dispatcher {
 
         // Blocks until all migrations are completed with the expected outcome.
         // The node will panic if the local outcome of a migration is unexpected.
-        for (state, _) in &modified_instances {
+        let committed_migrations = modified_instances.iter().filter(|(_, modified_info)| {
+            modified_info.migration_transition == Some(MigrationTransition::Commit)
+        });
+        for (state, _) in committed_migrations {
             let migration_hash = state
                 .status
                 .as_ref()
-                .and_then(InstanceStatus::completed_migration_hash);
-            if let Some(hash) = migration_hash {
-                let instance_name = &state.spec.name;
-                let local_result = schema.local_migration_result(instance_name);
-                let local_result = self.block_on_migration(instance_name, hash, local_result);
-                schema.add_local_migration_result(instance_name, local_result);
-            }
+                .and_then(InstanceStatus::completed_migration_hash)
+                .expect("BUG: No migration hash saved for committed migration");
+
+            let instance_name = &state.spec.name;
+            let local_result = schema.local_migration_result(instance_name);
+            let local_result = self.block_on_migration(instance_name, migration_hash, local_result);
+            schema.add_local_migration_result(instance_name, local_result);
         }
 
         // Rollback migrations.
-        let migration_rollbacks =
-            modified_instances
-                .iter()
-                .filter_map(|(state, prev_status)| match (&state.status, prev_status) {
-                    (Some(InstanceStatus::Stopped), Some(InstanceStatus::Migrating { .. })) => {
-                        Some(&state.spec.name)
-                    }
-                    _ => None,
-                });
-        for namespace in migration_rollbacks {
+        let migration_rollbacks = modified_instances.iter().filter(|(_, modified_info)| {
+            modified_info.migration_transition == Some(MigrationTransition::Rollback)
+        });
+        for (state, _) in migration_rollbacks {
             // Remove the thread corresponding to the migration (if any). This will abort
             // the migration script since its `AbortHandle` is dropped.
+            let namespace = &state.spec.name;
             self.migrations.threads.remove(namespace);
             rollback_migration(&mut fork, namespace);
         }
@@ -653,14 +652,17 @@ impl Dispatcher {
         }
 
         // Notify runtime about changes in service instances.
-        for (state, _) in modified_instances {
+        for (state, modified_info) in modified_instances {
             let data_version = state.data_version().to_owned();
             let status = state
                 .status
                 .expect("BUG: Service status cannot be changed to `None`");
 
             self.update_service_status(&patch, &state.spec, status.clone());
-            if let Some(target) = status.ongoing_migration_target() {
+            if modified_info.migration_transition == Some(MigrationTransition::Start) {
+                let target = status
+                    .ongoing_migration_target()
+                    .expect("BUG: Migration target is not specified for ongoing migration");
                 self.start_migration_script(target, state.spec, data_version);
             }
         }
@@ -687,21 +689,21 @@ impl Dispatcher {
         old_service: InstanceSpec,
         data_version: Version,
     ) {
-        let script = self
+        let maybe_script = self
             .get_migration_script(new_artifact, &old_service)
             .unwrap_or_else(|err| {
                 panic!(
                     "BUG: Cannot obtain migration script for migrating {:?} to new artifact {:?}, {}",
                     old_service, new_artifact, err
                 );
-            })
-            .unwrap_or_else(|| {
-                panic!(
-                    "BUG: Runtime returned no script for migrating {:?} to new artifact {:?}, \
-                     although it earlier returned a script for the same migration",
-                    old_service, new_artifact
-                );
             });
+        let script = maybe_script.unwrap_or_else(|| {
+            panic!(
+                "BUG: Runtime returned no script for migrating {:?} to new artifact {:?}, \
+                 although it earlier returned a script for the same migration",
+                old_service, new_artifact
+            );
+        });
         self.migrations
             .add_migration(old_service, data_version, script);
     }

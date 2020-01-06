@@ -25,7 +25,9 @@ use semver::Version;
 
 use super::{ArtifactId, Error, InstanceSpec};
 use crate::{
-    proto::schema,
+    proto::schema::{
+        self, runtime::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
+    },
     runtime::{
         migrations::{InstanceMigration, MigrationStatus},
         ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
@@ -39,28 +41,57 @@ const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const LOCAL_MIGRATION_RESULTS: &str = "dispatcher_local_migration_results";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
-#[derive(Debug, Clone)]
-#[derive(BinaryValue)]
-struct ModifiedInstanceInfo {
-    prev_status: Option<InstanceStatus>,
+/// Information about a modified service instance.
+#[derive(Debug, ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "schema::runtime::ModifiedInstanceInfo")]
+pub(super) struct ModifiedInstanceInfo {
+    #[protobuf_convert(with = "MigrationTransition")]
+    pub migration_transition: Option<MigrationTransition>,
 }
 
-impl ProtobufConvert for ModifiedInstanceInfo {
-    type ProtoStruct = schema::runtime::InstanceStatus;
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) enum MigrationTransition {
+    Start,
+    Commit,
+    Rollback,
+}
 
-    fn to_pb(&self) -> Self::ProtoStruct {
-        InstanceStatus::to_pb(&self.prev_status)
+impl MigrationTransition {
+    #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
+    fn to_pb(value: &Option<Self>) -> PbMigrationTransition {
+        use PbMigrationTransition::*;
+        match value {
+            None => NONE,
+            Some(MigrationTransition::Start) => START,
+            Some(MigrationTransition::Commit) => COMMIT,
+            Some(MigrationTransition::Rollback) => ROLLBACK,
+        }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        InstanceStatus::from_pb(pb).map(|prev_status| ModifiedInstanceInfo { prev_status })
+    fn from_pb(pb: PbMigrationTransition) -> Result<Option<Self>, failure::Error> {
+        use PbMigrationTransition::*;
+        Ok(match pb {
+            NONE => None,
+            START => Some(MigrationTransition::Start),
+            COMMIT => Some(MigrationTransition::Commit),
+            ROLLBACK => Some(MigrationTransition::Rollback),
+        })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-enum MigrationTransition {
+enum MigrationOutcome {
     Rollback,
     Commit(Hash),
+}
+
+impl From<MigrationOutcome> for MigrationTransition {
+    fn from(value: MigrationOutcome) -> Self {
+        match value {
+            MigrationOutcome::Rollback => MigrationTransition::Rollback,
+            MigrationOutcome::Commit(_) => MigrationTransition::Commit,
+        }
+    }
 }
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
@@ -215,7 +246,12 @@ impl Schema<&Fork> {
         migration: InstanceMigration,
     ) {
         let pending_status = InstanceStatus::migrating(migration);
-        self.add_pending_status(instance_state, pending_status).ok();
+        self.add_pending_status(
+            instance_state,
+            pending_status,
+            Some(MigrationTransition::Start),
+        )
+        .ok();
         // Since we've checked in `check_migration_initiation` that the service
         // has no pending status, we assume that it will be added successfully here.
     }
@@ -238,6 +274,7 @@ impl Schema<&Fork> {
         &mut self,
         mut instance_state: InstanceState,
         pending_status: InstanceStatus,
+        migration_transition: Option<MigrationTransition>,
     ) -> Result<(), Error> {
         if instance_state.pending_status.is_some() {
             return Err(Error::ServicePending);
@@ -245,17 +282,17 @@ impl Schema<&Fork> {
         instance_state.pending_status = Some(pending_status);
         let instance_name = instance_state.spec.name.clone();
         let modified_info = ModifiedInstanceInfo {
-            prev_status: instance_state.status.clone(),
+            migration_transition,
         };
         self.instances().put(&instance_name, instance_state);
         self.modified_instances().put(&instance_name, modified_info);
         Ok(())
     }
 
-    fn add_migration_state(
+    fn resolve_ongoing_migration(
         &mut self,
         instance_name: &str,
-        transition: MigrationTransition,
+        outcome: MigrationOutcome,
     ) -> Result<(), Error> {
         let instance_state = self
             .instances()
@@ -267,23 +304,23 @@ impl Schema<&Fork> {
             }
             _ => return Err(Error::NoMigration),
         };
-        let new_status = match transition {
-            MigrationTransition::Rollback => InstanceStatus::Stopped,
-            MigrationTransition::Commit(hash) => {
+        let new_status = match outcome {
+            MigrationOutcome::Rollback => InstanceStatus::Stopped,
+            MigrationOutcome::Commit(hash) => {
                 let mut migration = migration.to_owned();
                 migration.completed_hash = Some(hash);
                 InstanceStatus::Migrating(migration)
             }
         };
 
-        self.add_pending_status(instance_state, new_status)?;
+        self.add_pending_status(instance_state, new_status, Some(outcome.into()))?;
         Ok(())
     }
 
     /// Saves migration rollback to the database. Returns an error if the rollback breaks
     /// invariants imposed by the migration workflow.
     pub(super) fn add_migration_rollback(&mut self, instance_name: &str) -> Result<(), Error> {
-        self.add_migration_state(instance_name, MigrationTransition::Rollback)?;
+        self.resolve_ongoing_migration(instance_name, MigrationOutcome::Rollback)?;
         self.local_migration_results().remove(instance_name);
         Ok(())
     }
@@ -296,7 +333,7 @@ impl Schema<&Fork> {
         instance_name: &str,
         hash: Hash,
     ) -> Result<(), Error> {
-        self.add_migration_state(instance_name, MigrationTransition::Commit(hash))
+        self.resolve_ongoing_migration(instance_name, MigrationOutcome::Commit(hash))
     }
 
     /// Saves local migration result to the database.
@@ -332,7 +369,7 @@ impl Schema<&Fork> {
             status: None,
             pending_status: None,
         };
-        self.add_pending_status(new_instance, InstanceStatus::Active)
+        self.add_pending_status(new_instance, InstanceStatus::Active, None)
     }
 
     /// Adds information about stopping service instance to the schema.
@@ -354,7 +391,7 @@ impl Schema<&Fork> {
             Some(InstanceStatus::Active) => {}
             _ => return Err(Error::ServiceNotActive),
         }
-        self.add_pending_status(state, InstanceStatus::Stopped)
+        self.add_pending_status(state, InstanceStatus::Stopped, None)
     }
 
     /// Makes pending artifacts and instances active.
@@ -400,9 +437,7 @@ impl Schema<&Fork> {
 
     /// Takes modified service instances from queue. This method should be called
     /// after new service statuses are committed (e.g., in `commit_block`).
-    pub(super) fn take_modified_instances(
-        &mut self,
-    ) -> Vec<(InstanceState, Option<InstanceStatus>)> {
+    pub(super) fn take_modified_instances(&mut self) -> Vec<(InstanceState, ModifiedInstanceInfo)> {
         let mut modified_instances = self.modified_instances();
         let instances = self.instances();
 
@@ -412,7 +447,7 @@ impl Schema<&Fork> {
                 let state = instances
                     .get(&instance_name)
                     .expect("BUG: Instance marked as modified is not saved in `instances`");
-                (state, info.prev_status)
+                (state, info)
             })
             .collect();
         modified_instances.clear();
@@ -437,6 +472,6 @@ impl Schema<&Fork> {
         self.local_migration_results().remove(instance_name);
         debug_assert!(*instance_state.data_version() < end_version);
         instance_state.data_version = Some(end_version);
-        self.add_pending_status(instance_state, InstanceStatus::Stopped)
+        self.add_pending_status(instance_state, InstanceStatus::Stopped, None)
     }
 }
