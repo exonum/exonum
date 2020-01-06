@@ -17,7 +17,7 @@ use exonum::runtime::{
         api::{self, ServiceApiBuilder},
         CallContext, DefaultInstance, Service,
     },
-    DispatcherError, ExecutionError, InstanceId,
+    CommonError, ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 use exonum_merkledb::{
@@ -133,12 +133,12 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         match params.as_ref() {
             "error" => {
                 let details = "IncService: Configure error request";
-                Err(DispatcherError::malformed_arguments(details))
+                Err(CommonError::malformed_arguments(details))
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -153,7 +153,7 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         Schema::new(context.service_data())
             .params
@@ -162,7 +162,7 @@ impl Configure for IncService {
         match params.as_str() {
             "apply_error" => {
                 let details = "IncService: Configure error request";
-                Err(DispatcherError::malformed_arguments(details))
+                Err(CommonError::malformed_arguments(details))
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),

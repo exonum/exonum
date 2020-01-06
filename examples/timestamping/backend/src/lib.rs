@@ -40,7 +40,7 @@ pub use crate::{
 
 use exonum::runtime::{
     rust::{api::ServiceApiBuilder, CallContext, Service},
-    DispatcherError, ExecutionError,
+    CommonError, ExecutionError,
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::BinaryValue;
@@ -54,8 +54,7 @@ pub struct TimestampingService;
 
 impl Service for TimestampingService {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let config =
-            Config::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let config = Config::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
 
         if context
             .data()

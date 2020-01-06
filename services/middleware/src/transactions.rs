@@ -16,7 +16,7 @@
 
 use exonum::runtime::{
     rust::{CallContext, GenericCall, GenericCallMut, MethodDescriptor, TxStub},
-    AnyTx, DispatcherError, ExecutionError, InstanceId,
+    AnyTx, CoreError, ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -183,7 +183,7 @@ impl MiddlewareInterface<CallContext<'_>> for MiddlewareService {
         let dispatcher_schema = context.data().for_dispatcher();
         let state = dispatcher_schema
             .get_instance(instance_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         let artifact = &state.spec.artifact;
         if arg.artifact_name != artifact.name {

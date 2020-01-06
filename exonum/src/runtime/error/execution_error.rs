@@ -29,7 +29,7 @@ use std::{
     fmt::{self, Display},
 };
 
-use super::{ErrorCode, ErrorKind, ErrorMatch};
+use super::{ErrorKind, ErrorMatch};
 use crate::{
     crypto::{self, Hash},
     proto::schema::runtime as runtime_proto,
@@ -84,12 +84,7 @@ impl ExecutionError {
 
     /// Creates an execution error for use in service code.
     pub fn service(code: u8, description: impl Into<String>) -> Self {
-        Self::new(
-            ErrorKind::Service {
-                code: ErrorCode::Custom(code),
-            },
-            description,
-        )
+        Self::new(ErrorKind::Service { code }, description)
     }
 
     /// Creates an execution error from the panic description.
@@ -129,8 +124,8 @@ impl ExecutionError {
         &self.description
     }
 
-    /// Returns the ID of a runtime in which this error has occurred. If the runtime is not known,
-    /// returns `None`.
+    /// Returns the ID of a runtime in which this error has occurred. If the runtime is not known
+    /// (e.g. error originates in the core code), returns `None`.
     pub fn runtime_id(&self) -> Option<u32> {
         self.runtime_id
     }
@@ -217,9 +212,9 @@ impl ProtobufConvert for ExecutionError {
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let kind = pb.get_kind();
-        let raw_code = u16::try_from(pb.get_code())?;
+        let code = u8::try_from(pb.get_code())?;
 
-        let kind = ErrorKind::from_raw(kind, raw_code)?;
+        let kind = ErrorKind::from_raw(kind, code)?;
 
         let runtime_id = if pb.has_no_runtime_id() {
             None

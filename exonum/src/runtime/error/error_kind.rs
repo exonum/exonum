@@ -16,64 +16,15 @@
 
 use failure::ensure;
 
-use std::{convert::TryFrom, fmt::Display};
+use std::fmt::Display;
 
 use crate::proto::schema::runtime as runtime_proto;
 
-/// Code of execution error.
+/// Kind of execution error, divided into several distinct sub-groups.
 ///
-/// Code can be either a well-known code from the list provided by Exonum core, or
-/// a custom code specific to the environment that produced the error.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ErrorCode {
-    /// Common error with the code described in `CommonError` enum. // TODO add link.
-    Common(u8),
-    /// Custom error specific to the core/runtime/service.
-    Custom(u8),
-}
-
-impl ErrorCode {
-    const CUSTOM_ERROR_OFSET: u16 = 256;
-    const CUSTOM_ERROR_MAX: u16 = 512;
-
-    pub(super) fn into_raw(self) -> u16 {
-        match self {
-            ErrorCode::Common(code) => code as u16,
-            ErrorCode::Custom(code) => (code as u16) + ErrorCode::CUSTOM_ERROR_OFSET,
-        }
-    }
-
-    pub(super) fn from_raw(raw_code: u16) -> Result<Self, failure::Error> {
-        ensure!(
-            raw_code < ErrorCode::CUSTOM_ERROR_MAX,
-            "Incorrect raw code: {:?}",
-            raw_code
-        );
-
-        let code = if raw_code < ErrorCode::CUSTOM_ERROR_OFSET {
-            let code = u8::try_from(raw_code).unwrap();
-            ErrorCode::Common(code)
-        } else {
-            let code = u8::try_from(raw_code - ErrorCode::CUSTOM_ERROR_OFSET).unwrap();
-            ErrorCode::Custom(code)
-        };
-
-        Ok(code)
-    }
-}
-
-impl Display for ErrorCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ErrorCode::Common(code) => write!(f, "common:{}", code),
-            ErrorCode::Custom(code) => write!(f, "custom:{}", code),
-        }
-    }
-}
-
-/// Kind of execution error, indicates the location of the error.
+/// Note that kind of error **does not** specify the source from which error originates.
+/// This kind of information is available from [`ExecutionError`] via `runtime_id` and `call_site`
+/// methods.
 ///
 /// # Note to Runtime Developers
 ///
@@ -104,10 +55,18 @@ impl Display for ErrorCode {
 /// (e.g., by catching exceptions in Java or calling [`catch_unwind`] in Rust),
 /// but whether it makes sense heavily depends on the use case.
 ///
-/// ## `Dispatcher` errors
+/// ## `Core` errors
 ///
-/// Use `Dispatcher` kind if the error has occurred while dispatching the request (i.e., *not*
-/// in the client code). See [`DispatcherError`] for more details.
+/// Use `Core` kind only if you should mimic a core behaviour, e.g. when proxying
+/// requests and the behaviour should be the same as if the action was performed by
+/// core. In most cases you **don't need** to use `Core` type of errors.
+/// See [`CoreError`] for more details.
+///
+/// ## `Common` errors
+///
+/// `Common` errors set provides a various error codes that can occur within `Runtime`
+/// and `Service` lifecycle. They are intended to be used anytime when it makes sense
+/// to use them. See [`CommonError`] for more details.
 ///
 /// ## `Runtime` errors
 ///
@@ -122,8 +81,10 @@ impl Display for ErrorCode {
 /// continuing node operation is impossible. A panic will not be caught and will lead
 /// to the node termination.
 ///
+/// [`ExecutionError`]: struct.ExecutionError.html
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
-/// [`DispatcherError`]: enum.DispatcherError.html
+/// [`CoreError`]: enum.CoreError.html
+/// [`CommonError`]: enum.CommonError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
@@ -133,45 +94,51 @@ pub enum ErrorKind {
     /// they can only use the accompanying error description.
     Unexpected,
 
-    /// An error in the dispatcher code. For example, the method with the specified ID
-    /// was not found in the service instance.
-    Dispatcher {
-        /// Error code. Available values can be found in the [description] of dispatcher errors.
+    /// A common error which can occur in different contexts.
+    Common {
+        /// Well-known error code. Available values can be found in the [description] of core errors
         ///
-        /// [description]: enum.DispatcherError.html
-        code: ErrorCode,
+        /// [description]: (enum.CommonError.html).
+        code: u8,
+    },
+
+    /// An error in the core code. For example, stack overflow caused by recursive service calls.
+    Core {
+        /// Error code. Available values can be found in the [description] of core errors.
+        ///
+        /// [description]: enum.CoreError.html
+        code: u8,
     },
 
     /// An error in the runtime logic. For example, the runtime could not compile an artifact.
     Runtime {
         /// Runtime-specific error code.
         /// Error codes can have different meanings for different runtimes.
-        code: ErrorCode,
+        code: u8,
     },
 
     /// An error in the service code reported to the blockchain users.
     Service {
         /// User-defined error code.
         /// Error codes can have different meanings for different services.
-        code: ErrorCode,
+        code: u8,
     },
 }
 
 impl ErrorKind {
-    pub(super) fn into_raw(self) -> (runtime_proto::ErrorKind, u16) {
+    pub(super) fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
         match self {
             ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
-            ErrorKind::Dispatcher { code } => {
-                (runtime_proto::ErrorKind::DISPATCHER, code.into_raw())
-            }
-            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code.into_raw()),
-            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code.into_raw()),
+            ErrorKind::Common { code } => (runtime_proto::ErrorKind::COMMON, code),
+            ErrorKind::Core { code } => (runtime_proto::ErrorKind::CORE, code),
+            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
+            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
         }
     }
 
     pub(super) fn from_raw(
         kind: runtime_proto::ErrorKind,
-        code: u16,
+        code: u8,
     ) -> Result<Self, failure::Error> {
         use runtime_proto::ErrorKind::*;
         let kind = match kind {
@@ -179,15 +146,10 @@ impl ErrorKind {
                 ensure!(code == 0, "Error code for panic should be zero");
                 ErrorKind::Unexpected
             }
-            DISPATCHER => ErrorKind::Dispatcher {
-                code: ErrorCode::from_raw(code)?,
-            },
-            RUNTIME => ErrorKind::Runtime {
-                code: ErrorCode::from_raw(code)?,
-            },
-            SERVICE => ErrorKind::Service {
-                code: ErrorCode::from_raw(code)?,
-            },
+            COMMON => ErrorKind::Common { code },
+            CORE => ErrorKind::Core { code },
+            RUNTIME => ErrorKind::Runtime { code },
+            SERVICE => ErrorKind::Service { code },
         };
         Ok(kind)
     }
@@ -197,7 +159,8 @@ impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ErrorKind::Unexpected => f.write_str("unexpected"),
-            ErrorKind::Dispatcher { code } => write!(f, "dispatcher:{}", code),
+            ErrorKind::Common { code } => write!(f, "common:{}", code),
+            ErrorKind::Core { code } => write!(f, "core:{}", code),
             ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
             ErrorKind::Service { code } => write!(f, "service:{}", code),
         }

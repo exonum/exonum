@@ -12,50 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The set of errors for the Dispatcher module.
+//! The set of common errors that can occur within runtime/service workflow.
 
 use exonum_derive::ExecutionFail;
 
 use std::fmt::Display;
 
-use crate::runtime::{ErrorKind, ExecutionError, ExecutionFail};
+use crate::runtime::{ExecutionError, ExecutionFail};
 
 /// List of possible dispatcher errors.
+///
+/// Error codes are divided in sub-groups:
+/// - 0-15: Errors related to the runtime logic;
+/// - 16-31: Errors related to the service logic.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
-#[execution_fail(crate = "crate", kind = "dispatcher")]
-pub enum Error {
-    /// Runtime identifier is incorrect in this context.
-    IncorrectRuntime = 0,
-    /// Artifact identifier is unknown.
-    UnknownArtifactId = 1,
+#[execution_fail(crate = "crate", kind = "common")]
+pub enum CommonError {
+    // Error codes 0-15: runtime-related errors.
     /// Artifact with the given identifier is already deployed.
-    ArtifactAlreadyDeployed = 2,
+    ArtifactAlreadyDeployed = 0,
     /// Artifact with the given identifier is not deployed.
-    ArtifactNotDeployed = 3,
+    ArtifactNotDeployed = 1,
     /// Specified service name is already used.
-    ServiceNameExists = 4,
+    ServiceNameExists = 2,
     /// Specified service identifier is already used.
-    ServiceIdExists = 5,
-    /// Specified service is not active.
-    ServiceNotActive = 6,
-    /// Suitable runtime for the given service instance ID is not found.
-    IncorrectInstanceId = 7,
+    ServiceIdExists = 3,
+
+    // Error codes 16-31: service-related errors.
     /// The interface is absent in the service.
-    NoSuchInterface = 8,
-    /// The method is absent in the service interface.
-    NoSuchMethod = 9,
-    /// Maximum depth of the call stack has been reached.
-    StackOverflow = 10,
+    NoSuchInterface = 16,
+    /// The method is absent in the service.
+    NoSuchMethod = 17,
     /// This caller is not authorized to call this method.
-    UnauthorizedCaller = 11,
+    UnauthorizedCaller = 18,
     /// Malformed arguments for calling a service interface method.
-    MalformedArguments = 12,
-    /// Service instance is already transitioning to a new status.
-    ServicePending = 13,
+    MalformedArguments = 19,
 }
 
-impl Error {
+impl CommonError {
     /// Creates a `MalformedArguments` error with the user-provided error cause.
     /// The cause does not need to include the error location; this information is added
     /// by the framework automatically.
@@ -64,19 +59,6 @@ impl Error {
             "Malformed arguments for calling a service interface method: {}",
             cause
         );
-        Error::MalformedArguments.with_description(description)
-    }
-
-    pub(crate) fn stack_overflow(max_depth: usize) -> ExecutionError {
-        let description = format!(
-            "Maximum depth of call stack ({}) has been reached.",
-            max_depth
-        );
-        ExecutionError::new(
-            ErrorKind::Dispatcher {
-                code: Error::StackOverflow.into(),
-            },
-            description,
-        )
+        CommonError::MalformedArguments.with_description(description)
     }
 }

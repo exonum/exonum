@@ -31,6 +31,8 @@
 #[doc(hidden)]
 pub mod execution_error;
 
+mod common_errors;
+mod core_errors;
 mod error_kind;
 mod error_match;
 mod execution_status;
@@ -38,10 +40,8 @@ mod execution_status;
 mod tests;
 
 pub use self::{
-    error_kind::{ErrorCode, ErrorKind},
-    error_match::ErrorMatch,
-    execution_error::ExecutionError,
-    execution_status::ExecutionStatus,
+    common_errors::CommonError, core_errors::CoreError, error_kind::ErrorKind,
+    error_match::ErrorMatch, execution_error::ExecutionError, execution_status::ExecutionStatus,
 };
 
 use exonum_derive::*;

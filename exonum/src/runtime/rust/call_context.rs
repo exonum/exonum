@@ -5,9 +5,9 @@ use crate::{
     blockchain::Schema as CoreSchema,
     helpers::Height,
     runtime::{
-        dispatcher::{Dispatcher, Error as DispatcherError},
-        ArtifactId, BlockchainData, CallInfo, Caller, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceId, InstanceQuery, InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        dispatcher::Dispatcher, ArtifactId, BlockchainData, CallInfo, Caller, CoreError,
+        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
+        InstanceSpec, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -147,7 +147,7 @@ impl<'a> CallContext<'a> {
             .inner
             .dispatcher
             .get_service(called_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         let call_info = CallInfo {
             instance_id: descriptor.id,

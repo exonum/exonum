@@ -17,10 +17,10 @@ use exonum_derive::*;
 /// Common errors emitted by transactions during execution.
 ///
 /// Errors are divided into sub-groups by the corresponding error codes ranges:
-/// - 0 - 31: Common `Supervisor` errors.
-/// - 32 - 63: Errors related to artifacts.
-/// - 64 - 95: Errors related to service instances.
-/// - 96 - 128: Errors related to configuration changes.
+/// - 0 - 15: Common `Supervisor` errors.
+/// - 16 - 31: Errors related to artifacts.
+/// - 32 - 47: Errors related to service instances.
+/// - 48 - 64: Errors related to configuration changes.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 pub enum Error {
@@ -35,40 +35,40 @@ pub enum Error {
     ActualFromIsPast = 2,
 
     // # Artifact-related errors group.
-    // Error codes 32-63.
+    // Error codes 16-31.
     // ------------------
     /// Artifact has been already deployed.
-    AlreadyDeployed = 32,
+    AlreadyDeployed = 16,
     /// Artifact identifier has incorrect format.
-    InvalidArtifactId = 33,
+    InvalidArtifactId = 17,
     /// Deploy request has been already registered.
-    DeployRequestAlreadyRegistered = 34,
+    DeployRequestAlreadyRegistered = 18,
     /// Deploy request has not been registered or accepted.
-    DeployRequestNotRegistered = 35,
+    DeployRequestNotRegistered = 19,
     /// Start request contains unknown artifact.
-    UnknownArtifact = 36,
+    UnknownArtifact = 20,
 
     // # Instance-related errors group.
-    // Error codes 64-95.
+    // Error codes 32-47.
     // ------------------
     /// Instance with the given name already exists.
-    InstanceExists = 64,
+    InstanceExists = 32,
     /// Instance name is incorrect.
-    InvalidInstanceName = 65,
+    InvalidInstanceName = 33,
 
     // # Configuration-related errors group.
-    // Error codes 96-127.
+    // Error codes 48-64.
     // -------------------
     /// Active configuration change proposal already exists.
-    ConfigProposeExists = 96,
+    ConfigProposeExists = 48,
     /// Malformed configuration change proposal.
-    MalformedConfigPropose = 97,
+    MalformedConfigPropose = 49,
     /// This configuration change proposal is not registered.
-    ConfigProposeNotRegistered = 98,
+    ConfigProposeNotRegistered = 50,
     /// Transaction author attempts to vote twice.
-    AttemptToVoteTwice = 99,
+    AttemptToVoteTwice = 51,
     /// Incorrect configuration number.
-    IncorrectConfigurationNumber = 100,
+    IncorrectConfigurationNumber = 52,
     /// Invalid configuration for supervisor.
-    InvalidConfig = 101,
+    InvalidConfig = 53,
 }

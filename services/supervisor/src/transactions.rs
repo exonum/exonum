@@ -16,8 +16,7 @@ use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidateInput},
     runtime::{
-        rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec,
-        InstanceStatus,
+        rust::CallContext, CommonError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus,
     },
 };
 use exonum_derive::*;
@@ -142,7 +141,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         // Verifies that transaction author is validator.
         context
@@ -203,7 +202,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let (_, author) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         // Verify that transaction author is a validator.
         let core_schema = context.data().for_core();
@@ -321,7 +320,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
         core_schema
             .validator_id(author)
             .ok_or(Error::UnknownAuthor)?;

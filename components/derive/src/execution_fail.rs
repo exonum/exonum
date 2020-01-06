@@ -46,13 +46,13 @@ impl TryFrom<&[Attribute]> for ExecutionFailAttrs {
         find_meta_attrs("execution_fail", args)
             .map(|meta| {
                 Self::from_nested_meta(&meta).and_then(|mut attrs| match attrs.kind.as_str() {
-                    "service" | "runtime" | "dispatcher" => {
+                    "service" | "runtime" | "core" | "common" => {
                         attrs.kind[..1].make_ascii_uppercase();
                         Ok(attrs)
                     }
                     _ => {
                         let msg = "ExecutionFail: Unsupported error kind. Use one of \
-                                   \"service\", \"runtime\", or \"dispatcher\"";
+                                   \"service\", \"runtime\", or \"core\"";
                         Err(darling::Error::custom(msg))
                     }
                 })
@@ -204,8 +204,7 @@ impl ExecutionFail {
         let match_arms = self.variants.iter().map(|variant| {
             let ident = &variant.ident;
             let id = &variant.id;
-            let error_code = quote!(#cr::runtime::ErrorCode::Custom(#id));
-            quote!(#name::#ident => #cr::runtime::ErrorKind::#kind { code: #error_code },)
+            quote!(#name::#ident => #cr::runtime::ErrorKind::#kind { code: #id },)
         });
 
         quote! {
@@ -218,21 +217,6 @@ impl ExecutionFail {
 
                 fn description(&self) -> String {
                     self.to_string()
-                }
-            }
-        }
-    }
-
-    fn implement_into_error_code(&self) -> impl ToTokens {
-        let name = &self.name;
-        let cr = &self.attrs.cr;
-        let module = quote!(#cr::runtime);
-
-        quote! {
-            impl From<#name> for #module::ErrorCode {
-                fn from(code: #name) -> Self {
-                    let raw_code = code as u8;
-                    #module::ErrorCode::Custom(raw_code)
                 }
             }
         }
@@ -258,13 +242,11 @@ impl ToTokens for ExecutionFail {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let display_impl = self.implement_display();
         let service_fail_impl = self.implement_service_fail();
-        let from_impl = self.implement_into_error_code();
         let into_execution_error_impl = self.implement_into_execution_error();
 
         tokens.extend(quote! {
             #display_impl
             #service_fail_impl
-            #from_impl
             #into_execution_error_impl
         })
     }

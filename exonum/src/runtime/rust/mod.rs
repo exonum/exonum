@@ -274,8 +274,8 @@ use crate::{
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
-        dispatcher::{self, Mailbox},
-        error::{catch_panic, ExecutionError, ExecutionFail},
+        dispatcher::Mailbox,
+        error::{catch_panic, CommonError, ExecutionError, ExecutionFail},
         migrations::{DataMigrationError, MigrateData, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
@@ -459,7 +459,7 @@ impl RustRuntime {
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
         if self.deployed_artifacts.contains(&artifact) {
-            return Err(dispatcher::Error::ArtifactAlreadyDeployed.into());
+            return Err(CommonError::ArtifactAlreadyDeployed.into());
         }
         if !self.available_artifacts.contains_key(&artifact) {
             let description = format!(
@@ -478,13 +478,13 @@ impl RustRuntime {
 
     fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
         if !self.deployed_artifacts.contains(&spec.artifact) {
-            return Err(dispatcher::Error::ArtifactNotDeployed.into());
+            return Err(CommonError::ArtifactNotDeployed.into());
         }
         if self.started_services.contains_key(&spec.id) {
-            return Err(dispatcher::Error::ServiceIdExists.into());
+            return Err(CommonError::ServiceIdExists.into());
         }
         if self.started_services_by_name.contains_key(&spec.name) {
-            return Err(dispatcher::Error::ServiceNameExists.into());
+            return Err(CommonError::ServiceNameExists.into());
         }
 
         let service = self.available_artifacts[&spec.artifact].create_instance();

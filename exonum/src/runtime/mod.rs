@@ -142,10 +142,10 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
-        catch_panic, CallSite, CallType, ErrorCode, ErrorKind, ErrorMatch, ExecutionError,
-        ExecutionFail, ExecutionStatus,
+        catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
+        ExecutionError, ExecutionFail, ExecutionStatus,
     },
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
@@ -653,14 +653,14 @@ impl<'a> ExecutionContext<'a> {
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
-            let err = DispatcherError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
             return Err(err);
         }
 
         let (runtime_id, runtime) = self
             .dispatcher
             .runtime_for_service(call_info.instance_id)
-            .ok_or(DispatcherError::IncorrectRuntime)?;
+            .ok_or(CoreError::IncorrectRuntime)?;
         let reborrowed = self.reborrow_with_interface(interface_name);
         runtime
             .execute(reborrowed, call_info, arguments)
@@ -691,7 +691,7 @@ impl<'a> ExecutionContext<'a> {
         let runtime = self
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
-            .ok_or(DispatcherError::IncorrectRuntime)?;
+            .ok_or(CoreError::IncorrectRuntime)?;
         runtime
             .initiate_adding_service(self.reborrow(), &spec, constructor.into_bytes())
             .map_err(|mut err| {

@@ -26,9 +26,9 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         rust::{RustRuntime, ServiceFactory},
-        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
-        ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
+        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -71,10 +71,10 @@ impl SampleRuntime {
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
         if !self.deployed_artifacts.contains_key(&spec.artifact) {
-            return Err(DispatcherError::ArtifactNotDeployed.into());
+            return Err(CommonError::ArtifactNotDeployed.into());
         }
         if self.started_services.contains_key(&spec.id) {
-            return Err(DispatcherError::ServiceIdExists.into());
+            return Err(CommonError::ServiceIdExists.into());
         }
 
         Ok(SampleService {
@@ -90,7 +90,7 @@ impl SampleRuntime {
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         match self.deployed_artifacts.entry(artifact) {
-            Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed.into()),
+            Entry::Occupied(_) => Err(CommonError::ArtifactAlreadyDeployed.into()),
             Entry::Vacant(entry) => {
                 println!("Deploying artifact: {}", entry.key());
                 entry.insert(spec);
@@ -121,8 +121,7 @@ impl Runtime for SampleRuntime {
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let service_instance = self.start_service(spec)?;
-        let new_value =
-            u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let new_value = u64::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())

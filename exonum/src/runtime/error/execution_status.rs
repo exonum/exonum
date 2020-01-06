@@ -83,14 +83,15 @@ pub mod serde {
 
     use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-    use crate::runtime::{CallSite, ErrorCode, ErrorKind, ExecutionError};
+    use crate::runtime::{CallSite, ErrorKind, ExecutionError};
 
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(rename_all = "snake_case")]
     enum ExecutionType {
         Success,
         UnexpectedError,
-        DispatcherError,
+        CommonError,
+        CoreError,
         RuntimeError,
         ServiceError,
     }
@@ -104,7 +105,7 @@ pub mod serde {
         #[serde(skip_serializing_if = "String::is_empty", default)]
         description: String,
         #[serde(skip_serializing_if = "Option::is_none", default)]
-        code: Option<ErrorCode>,
+        code: Option<u8>,
         #[serde(skip_serializing_if = "Option::is_none", default)]
         runtime_id: Option<u32>,
         #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -116,7 +117,8 @@ pub mod serde {
             if let Err(err) = inner {
                 let (typ, code) = match err.kind {
                     ErrorKind::Unexpected => (ExecutionType::UnexpectedError, None),
-                    ErrorKind::Dispatcher { code } => (ExecutionType::DispatcherError, Some(code)),
+                    ErrorKind::Common { code } => (ExecutionType::CommonError, Some(code)),
+                    ErrorKind::Core { code } => (ExecutionType::CoreError, Some(code)),
                     ErrorKind::Runtime { code } => (ExecutionType::RuntimeError, Some(code)),
                     ErrorKind::Service { code } => (ExecutionType::ServiceError, Some(code)),
                 };
@@ -154,7 +156,10 @@ pub mod serde {
                         }
                         ErrorKind::Unexpected
                     }
-                    ExecutionType::DispatcherError => ErrorKind::Dispatcher {
+                    ExecutionType::CommonError => ErrorKind::Common {
+                        code: self.code.ok_or("No code specified")?,
+                    },
+                    ExecutionType::CoreError => ErrorKind::Core {
                         code: self.code.ok_or("No code specified")?,
                     },
                     ExecutionType::RuntimeError => ErrorKind::Runtime {

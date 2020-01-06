@@ -23,7 +23,7 @@ use exonum::{
     runtime::{
         rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
         versioning::ArtifactReq as CoreReq,
-        ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
+        ArtifactId, CommonError, ExecutionError, RuntimeIdentifier,
     },
 };
 use exonum_derive::*;
@@ -64,7 +64,7 @@ impl IncInterface<CallContext<'_>> for IncService {
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
         let mut schema = IncSchema::new(context.service_data());
         let count = schema.counts.get(&author).unwrap_or_default();
         schema.counts.put(&author, count + 1);

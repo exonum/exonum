@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::{error::Error, schema::Schema};
+pub use self::schema::Schema;
 
 use exonum_merkledb::{Fork, Patch, Snapshot};
 use futures::{
@@ -31,7 +31,10 @@ use crate::{
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
-    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
+    runtime::{
+        ArtifactStatus, CoreError, InstanceDescriptor, InstanceQuery, InstanceStatus,
+        RuntimeInstance,
+    },
 };
 
 use super::{
@@ -39,7 +42,6 @@ use super::{
     ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
 };
 
-mod error;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -229,7 +231,7 @@ impl Dispatcher {
                 });
             Either::A(future)
         } else {
-            Either::B(future::err(Error::IncorrectRuntime.into()))
+            Either::B(future::err(CoreError::IncorrectRuntime.into()))
         }
     }
 
@@ -290,11 +292,11 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let instance = Schema::new(snapshot)
             .get_instance(call_info.instance_id)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
-            _ => Err(Error::ServiceNotActive.into()),
+            _ => Err(CoreError::ServiceNotActive.into()),
         }
     }
 
@@ -327,7 +329,7 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let (runtime_id, runtime) = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
 
         let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);

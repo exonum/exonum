@@ -37,7 +37,7 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
-        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorCode,
+        ArtifactId, BlockchainData, CallInfo, Caller, CommonError, CoreError, DispatcherSchema,
         ErrorKind, ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, MethodId, Runtime,
     },
@@ -83,7 +83,7 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, arguments)
     }
@@ -193,7 +193,7 @@ impl Runtime for SampleRuntime {
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
-            Err(DispatcherError::IncorrectRuntime.into())
+            Err(CoreError::IncorrectRuntime.into())
         };
         Box::new(res.into_future())
     }
@@ -242,9 +242,7 @@ impl Runtime for SampleRuntime {
         if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
             Ok(())
         } else {
-            let kind = ErrorKind::Service {
-                code: ErrorCode::Custom(15),
-            };
+            let kind = ErrorKind::Service { code: 15 };
             Err(ExecutionError::new(kind, "oops"))
         }
     }
@@ -385,10 +383,7 @@ fn test_dispatcher_simple() {
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceIdExists)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::ServiceIdExists));
 
     let conflicting_rust_service = InstanceSpec {
         artifact: rust_artifact.clone(),
@@ -398,10 +393,7 @@ fn test_dispatcher_simple() {
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceNameExists)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::ServiceNameExists));
 
     // Activate services / artifacts.
     let patch = create_genesis_block(&mut dispatcher, fork);
@@ -626,9 +618,7 @@ impl Runtime for DeploymentRuntime {
         let delay = LittleEndian::read_u64(&spec);
         let delay = Duration::from_millis(delay);
 
-        let error_kind = ErrorKind::Runtime {
-            code: ErrorCode::Custom(0),
-        };
+        let error_kind = ErrorKind::Runtime { code: 0 };
         let result = match artifact.name.as_str() {
             "good" => Ok(()),
             "bad" => Err(ExecutionError::new(error_kind, "bad artifact!")),
@@ -894,7 +884,7 @@ fn stopped_service_workflow() {
         .expect_err("`initiate_stopping_service` should fail");
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
     );
 
     let artifact = ArtifactId {
@@ -928,7 +918,7 @@ fn stopped_service_workflow() {
         .expect_err("`initiate_stopping_service` should fail");
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&DispatcherError::ServicePending)
+        ErrorMatch::from_fail(&CoreError::ServicePending)
     );
 
     // Check if transactions are still ready for execution.
@@ -1032,6 +1022,6 @@ fn stopped_service_workflow() {
         .expect_err("`initiate_stopping_service` should fail");
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceNotActive)
+        ErrorMatch::from_fail(&CoreError::ServiceNotActive)
     );
 }

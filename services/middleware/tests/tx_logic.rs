@@ -19,7 +19,7 @@ use exonum::{
     merkledb::{access::Access, Snapshot},
     runtime::{
         rust::{DefaultInstance, ServiceFactory, TxStub},
-        DispatcherError, ErrorMatch, InstanceId, SnapshotExt,
+        CoreError, ErrorMatch, InstanceId, SnapshotExt,
     },
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -104,10 +104,7 @@ fn checked_call_for_non_existing_service() {
 
     let block = testkit.create_block_with_transaction(checked_call);
     let err = block[0].status().unwrap_err();
-    assert_eq!(
-        *err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(*err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 }
 
 #[test]
@@ -207,10 +204,7 @@ fn batch_with_call_to_non_existing_service() {
     let batch = keypair.batch(MIDDLEWARE_ID, batch);
     let block = testkit.create_block_with_transaction(batch);
     let err = block[0].status().unwrap_err();
-    assert_eq!(
-        *err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(*err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     let snapshot = testkit.snapshot();
     let schema = inc_schema(&snapshot, INC_ID);

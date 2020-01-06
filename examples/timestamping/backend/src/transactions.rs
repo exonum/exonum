@@ -14,7 +14,7 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::{rust::CallContext, DispatcherError, ExecutionError};
+use exonum::runtime::{rust::CallContext, CommonError, ExecutionError};
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_time::schema::TimeSchema;
@@ -58,7 +58,7 @@ impl TimestampingInterface<CallContext<'_>> for TimestampingService {
         let (tx_hash, _) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());
         let config = schema.config.get().expect("Can't read service config");

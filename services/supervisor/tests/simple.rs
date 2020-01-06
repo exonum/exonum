@@ -22,8 +22,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
-        DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
-        SUPERVISOR_INSTANCE_ID,
+        CommonError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -81,10 +80,10 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")),
+            "error" => Err(CommonError::malformed_arguments("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -98,7 +97,7 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         context
             .service_data()
@@ -106,7 +105,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => Err(DispatcherError::malformed_arguments("Error!")),
+            "apply_error" => Err(CommonError::malformed_arguments("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }

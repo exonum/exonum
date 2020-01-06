@@ -388,7 +388,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// ```typescript
 /// type Error = {
-///   type: 'service_error' | 'dispatcher_error' | 'runtime_error' | 'unexpected_error',
+///   type: 'service_error' | 'core_error' | 'common_error' | 'runtime_error' | 'unexpected_error',
 ///   code?: number,
 ///   description?: string,
 ///   runtime_id: number,
@@ -417,9 +417,11 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///   runtime associated with the service, or come from another source (`unexpected_error`s).
 /// - `Error.code` is the error code. For service errors, this code is specific
 ///   to the service instance (which can be obtained from `call_site`), and for runtime errors -
-///   to the runtime. For dispatcher errors, the codes are fixed; their meaning can be found
-///   in the [`DispatcherError`] docs. The code is present for all error types except
+///   to the runtime. For core errors, the codes are fixed; their meaning can be found
+///   in the [`CoreError`] docs. The code is present for all error types except
 ///   `unexpected_error`s, in which the code is always absent.
+///   Besides types listed above, there is also a set of errors that can occur within any context,
+///   which are organized in the [`CommonError`].
 /// - `Error.description` is an optional human-readable description of the error.
 /// - `Error.runtime_id` is the numeric ID of the runtime in which the error has occurred. Note
 ///   that the runtime is defined for all error types, not just `runtime_error`s, since
@@ -432,7 +434,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`Hash`]: https://docs.rs/exonum-crypto/latest/exonum_crypto/struct.Hash.html
 /// [`ExecutionStatus`]: https://docs.rs/exonum/latest/exonum/runtime/struct.ExecutionStatus.html
 /// [`ExecutionError`]: https://docs.rs/exonum/latest/exonum/runtime/struct.ExecutionError.html
-/// [`DispatcherError`]: https://docs.rs/exonum/latest/exonum/runtime/enum.DispatcherError.html
+/// [`CoreError`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CoreError.html
+/// [`CommonError`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CommonError.html
 /// [TypeScript]: https://www.typescriptlang.org/
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {

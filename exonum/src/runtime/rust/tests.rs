@@ -33,9 +33,9 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     proto::schema::tests::TestServiceInit,
     runtime::{
-        CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema, ErrorMatch,
-        ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
-        Runtime, WellKnownRuntime,
+        CallInfo, Caller, CommonError, Dispatcher, DispatcherSchema, ErrorMatch, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        WellKnownRuntime,
     },
 };
 
@@ -295,7 +295,7 @@ impl TestServiceImpl {
 
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         context
             .service_data()
             .get_proof_entry("constructor_entry")
@@ -329,7 +329,7 @@ impl Test<CallContext<'_>> for TestServiceImplV2 {
     type Output = Result<(), ExecutionError>;
 
     fn method_a(&self, _context: CallContext<'_>, _arg: u64) -> Self::Output {
-        Err(DispatcherError::NoSuchMethod.into())
+        Err(CommonError::NoSuchMethod.into())
     }
 
     fn method_b(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
@@ -702,7 +702,7 @@ fn multiple_service_versions() {
         .call(&mut fork, caller, &call_info, &payload)
         .unwrap_err();
     // `method_a` is removed from the newer service version.
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchMethod));
 
     {
         let idx_name = format!("{}.method_a_entry", SERVICE_INSTANCE_NAME);
@@ -824,7 +824,7 @@ pub struct DependentServiceImpl;
 impl Service for DependentServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         assert_eq!(*context.caller(), Caller::Blockchain);
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         if context
             .data()
             .for_dispatcher()
