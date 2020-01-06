@@ -193,7 +193,7 @@ impl ProtobufConvert for ExecutionError {
         let mut inner = Self::ProtoStruct::default();
         let (kind, code) = self.kind.into_raw();
         inner.set_kind(kind);
-        inner.set_code(code as u32);
+        inner.set_code(u32::from(code));
         inner.set_description(self.description.clone());
 
         if let Some(runtime_id) = self.runtime_id {
