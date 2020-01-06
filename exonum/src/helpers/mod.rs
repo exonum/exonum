@@ -16,22 +16,21 @@
 
 pub use self::types::{Height, Round, ValidatorId};
 
-// Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden under `doc(hidden)`.
+// Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden
+// under `doc(hidden)`.
 pub use self::user_agent::user_agent;
 
 // `Milliseconds` is just `u64`, but more readable within context.
-pub(crate) use self::types::Milliseconds;
 pub(crate) use self::ordered_map::OrderedMap;
-
-#[doc(hidden)]
-pub mod config;
+pub(crate) use self::types::Milliseconds;
 
 mod ordered_map;
 
 use env_logger::Builder;
+use exonum_merkledb::Fork;
 use log::SetLoggerError;
 
-use crate::{blockchain::Schema, exonum_merkledb::Fork};
+use crate::blockchain::Schema;
 
 mod types;
 mod user_agent;
