@@ -224,7 +224,6 @@ mod tests {
     use super::*;
     use crate::crypto::hash;
     use crate::merkledb::ObjectHash;
-    use crate::proto::schema;
     use crate::runtime::InstanceId;
 
     impl BlockHeaderKey for Hash {
@@ -299,16 +298,18 @@ mod tests {
         assert_ne!(hash_without_entries, hash_with_entries);
     }
 
-    #[derive(Debug, Clone, ProtobufConvert, BinaryValue, Eq, PartialEq)]
-    #[protobuf_convert(source = "schema::tests::TestServiceInfo")]
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(BinaryValue)]
+    #[binary_value(codec = "bincode")]
     struct TestServiceInfo {
         pub instance_id: InstanceId,
         pub runtime_id: u32,
         pub name: String,
     }
 
-    #[derive(Debug, Clone, ProtobufConvert, BinaryValue, Eq, PartialEq)]
-    #[protobuf_convert(source = "schema::tests::TestActiveServices")]
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(BinaryValue)]
+    #[binary_value(codec = "bincode")]
     struct ActiveServices {
         pub services: Vec<TestServiceInfo>,
     }

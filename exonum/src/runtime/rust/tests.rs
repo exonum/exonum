@@ -15,7 +15,6 @@
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{access::AccessExt, BinaryValue, Fork, Snapshot, SystemSchema};
-use exonum_proto::ProtobufConvert;
 use futures::Future;
 use pretty_assertions::{assert_eq, assert_ne};
 
@@ -31,7 +30,6 @@ use crate::{
         Blockchain, BlockchainMut, Schema as CoreSchema,
     },
     helpers::{generate_testnet_config, Height, ValidatorId},
-    proto::schema::tests::TestServiceInit,
     runtime::{
         CallInfo, Caller, Dispatcher, DispatcherError, DispatcherSchema, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox,
@@ -232,8 +230,8 @@ impl WellKnownRuntime for Inspected<RustRuntime> {
     const ID: u32 = RustRuntime::ID;
 }
 
-#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "TestServiceInit")]
+#[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 pub struct Init {
     msg: String,
 }
