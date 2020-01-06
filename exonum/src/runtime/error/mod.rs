@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The comprehensive set of utilities to work with unsuccesfull execution results
+//! The comprehensive set of utilities to work with unsuccessful execution results
 //! occurred within runtime workflow.
 //!
 //! The most important parts of the module are:
@@ -20,7 +20,7 @@
 //! - [`CallSite`] - struct denoting the location of error;
 //! - [`ExecutionError`] - the representation of occurred error;
 //! - [`ExecutionStatus`] - result of execution, either successful or unsuccessful;
-//! - [`ErrorMatch`] - the utility structure for matching the error agains expected one.
+//! - [`ErrorMatch`] - the utility structure for matching the error against expected one.
 //!
 //! [`ExecutionFail`]: trait.ExecutionFail.html
 //! [`CallSite`]: struct.CallSite.html

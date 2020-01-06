@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module with `ExecutionError`, the essential representation of unsuccessfull runtime execution.
+//! Module with `ExecutionError`, the essential representation of unsuccessful runtime execution.
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 

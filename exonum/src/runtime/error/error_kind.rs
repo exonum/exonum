@@ -57,8 +57,8 @@ use crate::proto::schema::runtime as runtime_proto;
 ///
 /// ## `Core` errors
 ///
-/// Use `Core` kind only if you should mimic a core behaviour, e.g. when proxying
-/// requests and the behaviour should be the same as if the action was performed by
+/// Use `Core` kind only if you should mimic a core behavior, e.g. when proxying
+/// requests and the behavior should be the same as if the action was performed by
 /// core. In most cases you **don't need** to use `Core` type of errors.
 /// See [`CoreError`] for more details.
 ///
@@ -98,7 +98,7 @@ pub enum ErrorKind {
     Common {
         /// Well-known error code. Available values can be found in the [description] of core errors
         ///
-        /// [description]: (enum.CommonError.html).
+        /// [description]: enum.CommonError.html
         code: u8,
     },
 
