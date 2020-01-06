@@ -17,7 +17,8 @@
 //! 1. We create and fill database with random data according to schema defined in the
 //!   `migration::v1` module with the `create_initial_data` method.
 //! 2. We create `MigrationHelper` for this database.
-//! 3. We perform migration from the `v1` schema to the `v2` schema with the help of the `create_migration` method.
+//! 3. We perform migration from the `v1` schema to the `v2` schema
+//!   with the help of the `create_migration` and `migrate_wallets` methods.
 //!   The method transforms the data in the old schema to conform to the new schema.
 //!   The old data is **not** removed at this stage; rather, it exists alongside
 //!   the migrated data. This is useful in case the migration needs to be reverted for some reason.
@@ -27,9 +28,13 @@
 use exonum_merkledb::{
     access::Prefixed,
     migration::{flush_migration, MigrationHelper},
+    ObjectHash,
 };
 
-use migration::*;
+use migration::{
+    check_data_after_flush, check_data_after_merge, check_data_before_flush, create_initial_data,
+    v1, v2,
+};
 
 mod migration;
 
@@ -58,7 +63,39 @@ fn create_migration(helper: &mut MigrationHelper) {
     // `Wallet::public_key` field will be removed.
     // `Wallet::history_hash` field will be added.
     // Wallets and history from username Eve will be removed.
-    migrate_wallets_with_schema(helper.new_data(), helper.old_data());
+    migrate_wallets(&helper);
+}
+
+/// Provides migration of wallets with schema and `MigrationHelper`.
+fn migrate_wallets(helper: &MigrationHelper) {
+    let old_schema = v1::Schema::new(helper.old_data());
+    let mut new_schema = v2::Schema::new(helper.new_data());
+
+    // Migrate wallets.
+    for (i, (public_key, wallet)) in old_schema.wallets.iter().enumerate() {
+        if wallet.username == "Eve" {
+            // We don't like Eves 'round these parts. Remove her transaction history
+            // and don't migrate the wallet.
+            helper
+                .new_data()
+                .create_tombstone(("histories", &public_key));
+        } else {
+            // Merkelize the wallet history.
+            let mut history = new_schema.histories.get(&public_key);
+            history.extend(&old_schema.histories.get(&public_key));
+
+            let new_wallet = v2::Wallet {
+                username: wallet.username,
+                balance: wallet.balance,
+                history_hash: history.object_hash(),
+            };
+            new_schema.wallets.put(&public_key, new_wallet);
+        }
+
+        if i % 1_000 == 999 {
+            println!("Processed {} wallets", i + 1);
+        }
+    }
 }
 
 fn main() {
