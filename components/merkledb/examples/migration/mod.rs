@@ -17,13 +17,14 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde_derive::*;
 
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly, FromAccess, Prefixed, RawAccess},
     impl_object_hash_for_binary_value,
-    migration::Migration,
+    migration::{flush_migration, Migration},
     BinaryValue, Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
     ProofListIndex, ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,
 };
@@ -76,7 +77,7 @@ pub mod v1 {
 }
 
 /// Creates initial DB with some random data.
-pub fn create_initial_data() -> TemporaryDB {
+fn create_initial_data() -> TemporaryDB {
     let db = TemporaryDB::new();
     let fork = db.fork();
 
@@ -181,7 +182,7 @@ pub mod v2 {
 }
 
 /// Checks that we have old and new data in the storage after migration.
-pub fn check_data_before_flush(snapshot: &dyn Snapshot) {
+fn check_data_before_flush(snapshot: &dyn Snapshot) {
     let old_schema = v1::Schema::new(Prefixed::new("test", snapshot));
     assert_eq!(old_schema.ticker.get().unwrap(), "XNM");
     // The new data is present, too, in the unmerged form.
@@ -202,7 +203,7 @@ pub fn check_data_before_flush(snapshot: &dyn Snapshot) {
 }
 
 /// Checks that old data was replaced by new data in the storage.
-pub fn check_data_after_flush(view: impl RawAccess + AsReadonly + Copy) {
+fn check_data_after_flush(view: impl RawAccess + AsReadonly + Copy) {
     let new_schema = v2::Schema::new(Prefixed::new("test", view));
     assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
     assert!(!view.get_entry::<_, u8>("test.divisibility").exists());
@@ -214,4 +215,55 @@ pub fn check_data_after_flush(view: impl RawAccess + AsReadonly + Copy) {
         state.keys().collect::<Vec<_>>(),
         vec!["test.config", "test.wallets", "unrelated.list"]
     );
+}
+
+/// Performs common migration logic.
+pub fn perform_migration<F>(migrate: F)
+where
+    F: FnOnce(Arc<dyn Database>),
+{
+    // Creating a temporary DB and filling it with some data.
+    let db: Arc<dyn Database> = Arc::new(create_initial_data());
+
+    let fork = db.fork();
+    {
+        // State before migration.
+        let old_data = Prefixed::new("test", fork.readonly());
+        let old_schema = v1::Schema::new(old_data.clone());
+        println!("Before migration:");
+        old_schema.print_wallets();
+    }
+
+    // Execute data migration logic.
+    migrate(Arc::clone(&db));
+
+    // At this point the old data and new data are still present in the storage,
+    // but new data is in the unmerged form.
+
+    // Check that DB contains old and new data.
+    let snapshot = db.snapshot();
+    check_data_before_flush(&snapshot);
+
+    // Finalize the migration by calling `flush_migration`.
+    let mut fork = db.fork();
+    flush_migration(&mut fork, "test");
+
+    // At this point the new indexes have replaced the old ones in the fork.
+    // And indexes are aggregated in the default namespace.
+
+    // Check that indexes are updated.
+    let patch = fork.into_patch();
+    check_data_after_flush(&patch);
+
+    // When the patch is merged, the situation remains the same.
+    db.merge(patch).unwrap();
+
+    // Check that data was updated after merge.
+    let snapshot = db.snapshot();
+    check_data_after_flush(&snapshot);
+
+    // State after migration.
+    let schema = v2::Schema::new(Prefixed::new("test", &snapshot));
+    println!("After migration:");
+    schema.print_wallets();
 }
