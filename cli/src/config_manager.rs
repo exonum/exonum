@@ -117,6 +117,7 @@ mod tests {
                     supervisor_mode: Mode::Simple,
                 },
                 validator_keys: None,
+                address: None,
             },
         };
         let tmp_dir = tempdir().unwrap();

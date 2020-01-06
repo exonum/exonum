@@ -49,6 +49,7 @@ impl ExonumCommand for GenerateTemplate {
                 supervisor_mode: self.supervisor_mode,
             },
             validator_keys: None,
+            address: None,
         };
         save_config_file(&config, &self.common_config)?;
         Ok(StandardResult::GenerateTemplate {
