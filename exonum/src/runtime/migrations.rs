@@ -12,9 +12,79 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Migration tools.
+//! Data migration tools.
 //!
-//! FIXME: more details (ECR-4081)
+//! # Migrations Overview
+//!
+//! The goal of a data migration is to prepare data of an Exonum service for use with an updated
+//! version of the service business logic. In this sense, migrations fulfil the same role
+//! as migrations in traditional database management systems.
+//!
+//! Migrations are performed via [`MigrationScript`]s, which are essentially wrappers around
+//! a closure. A script takes data of a service and uses the [database capabilities] to transform
+//! it to a new version. Migration is non-destructive, i.e., does not remove the old versions
+//! of migrated indexes. Instead, new indexes are created in a separate namespace, and atomically
+//! replace the old data when the migration is flushed.
+//! (See [database docs][database capabilities] for more details.)
+//!
+//! The problems solved by the migration workflow are:
+//!
+//! - Allowing for migration to be performed in background, while the node continues to process
+//!   transactions and other requests.
+//! - Ensuring that migrations finish at finite time (i.e., at some blockchain height).
+//! - Allowing concurrent migrations for different services.
+//! - Ensuring that all nodes in the network have arrived at the same data after migration
+//!   is completed.
+//!
+//! Similar to other service lifecycle events, data migrations are managed by the [dispatcher],
+//! but are controlled by the [supervisor service].
+//!
+//! # Migration Workflow
+//!
+//! For a migration to start, the targeted service must be stopped, and a newer version of
+//! the service artifact needs to be deployed across the network and considered active.
+//!
+//! 1. Migration is *initiated* by a call from a supervisor. Once a block with this call is merged,
+//!   all nodes in the network retrieve the migration script via [`Runtime::migrate()`]
+//!   and start executing it in a background thread. The script may execute at varying speed
+//!   on different nodes. Service status changes to [`Migrating`].
+//!
+//! 2. After the script is finished on a node, its result becomes available using
+//!   the [`local_migration_result()`] method of the dispatcher schema. Nodes agree these results
+//!   using supervisor capabilities (e.g., via broadcasting transactions).
+//!
+//! 3. Once the consensus is built up around migration, its result is either *committed* or
+//!   the migration is *rolled back*. Right below, we consider commitment workflow; the rollback
+//!   workflow will be described slightly later.
+//!
+//! 4. Committing a migration works similarly to [artifact commitment]. It means that any node
+//!   in the network starting from a specific blockchain height must have migration completed
+//!   with a specific outcome (i.e., hash of the migrated data). A node that does not have
+//!   migration script completed by this moment will block until the script is completed.
+//!   If the local migration outcome differs from the committed one, the node will be unable
+//!   to continue participating in the network.
+//!
+//! 5. After migration commitment, migration can be *flushed*, which will replace old service data
+//!   with the migrated one. Flushing is a separate call to the dispatcher; it can
+//!   occur at any block after the migration commitment (since at this point, we guarantee that
+//!   the migration data is available and is the same on all nodes).
+//!
+//! 6. After the migration is flushed, the service returns to the [`Stopped`] status. The service
+//!   can then be resumed with the new data, or more migrations could be applied to it.
+//!
+//! If the migration is rolled back on step 3, the migrated data is erased, and the service
+//! returns to the [`Stopped`] status. The local migration result is ignored; if the migration
+//! script has not completed locally, it is aborted.
+//!
+//! [dispatcher]: ../index.html
+//! [supervisor service]: ../index.html#supervisor-service
+//! [`MigrationScript`]: struct.MigrationScript.html
+//! [database capabilities]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/migration/
+//! [`Runtime::migrate()`]: ../trait.Runtime.html#tymethod.migrate
+//! [`Migrating`]: ../enum.InstanceStatus.html#variant.Migrating
+//! [`local_migration_result()`]: ../struct.DispatcherSchema.html#method.local_migration_result
+//! [artifact commitment]: ../index.html#artifact-lifecycle
+//! [`Stopped`]: ../enum.InstanceStatus.html#variant.Stopped
 
 pub use super::types::{InstanceMigration, MigrationStatus};
 
@@ -91,9 +161,8 @@ impl MigrationScript {
         &self.name
     }
 
-    /// Returns the version of the data after this script is applied. This version will be
-    /// as the artifact version in [`MigrationContext`] for the successive migration script
-    /// (if any).
+    /// Returns the version of the data after this script is applied. This service data version
+    /// will be set to this value after the migration performed by this script is flushed.
     ///
     /// [`MigrationContext`]: struct.MigrationContext.html
     pub fn end_version(&self) -> &Version {

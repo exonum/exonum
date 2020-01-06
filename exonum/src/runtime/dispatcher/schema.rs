@@ -130,7 +130,7 @@ impl<T: Access> Schema<T> {
     /// Returns result of a locally completed migration for the specified service instance.
     ///
     /// This result is set once the migration script associated with the service instance completes
-    /// and is cleared by committing the *global* migration result.
+    /// and is cleared after the migration is flushed or rolled back.
     pub fn local_migration_result(&self, instance_name: &str) -> Option<MigrationStatus> {
         self.local_migration_results().get(instance_name)
     }

@@ -112,6 +112,11 @@
 //!
 //! 6. After execution the transaction [execution status] is written into the blockchain.
 //!
+//! # Data Migration Lifecycle
+//!
+//! Service data can be migrated to a newer version of the service artifact.
+//! See [`migrations` module docs] for details.
+//!
 //! # Supervisor Service
 //!
 //! A supervisor service is a service that has additional privileges. This service
@@ -137,6 +142,7 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
+//! [`migrations` module docs]: migrations/index.html
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
 

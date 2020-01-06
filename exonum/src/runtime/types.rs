@@ -437,9 +437,9 @@ pub struct InstanceMigration {
     #[protobuf_convert(with = "self::pb_version")]
     pub end_version: Version,
 
-    /// Consensus-wide outcome of the migration, in the form of
-    /// the aggregation hash of the migrated data.
-    /// The lack of value signifies that the migration is not finished yet.
+    /// Consensus-wide outcome of the migration, in the form of the aggregation hash
+    /// of the migrated data. The lack of value signifies that the network has not yet reached
+    /// consensus about the migration outcome.
     #[protobuf_convert(with = "self::pb_optional_hash")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
