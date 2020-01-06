@@ -122,6 +122,7 @@
 pub use self::persistent_iter::{ContinueIterator, PersistentIter, PersistentIters};
 
 use exonum_crypto::Hash;
+use failure::Fail;
 
 use std::{
     fmt, mem,
@@ -444,13 +445,15 @@ impl MigrationHelper {
     /// Use [`flush_migration`] to flush the migrated data.
     ///
     /// [`flush_migration`]: fn.flush_migration.html
-    pub fn merge(&mut self) -> crate::Result<()> {
+    pub fn merge(&mut self) -> Result<(), MigrationError> {
         if self.is_aborted() {
-            return Err(crate::Error::new("Migration has been aborted"));
+            return Err(MigrationError::Aborted);
         }
 
         let fork = mem::replace(&mut self.fork, self.db.fork());
-        self.db.merge(fork.into_patch())?;
+        self.db
+            .merge(fork.into_patch())
+            .map_err(MigrationError::Merge)?;
         self.fork = self.db.fork();
         Ok(())
     }
@@ -463,7 +466,7 @@ impl MigrationHelper {
     pub fn iter_loop(
         &mut self,
         mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<'_, &Fork>>),
-    ) -> crate::Result<()> {
+    ) -> Result<(), MigrationError> {
         let mut should_break = false;
         while !should_break {
             let mut iterators = PersistentIters::new(self.scratchpad());
@@ -481,15 +484,28 @@ impl MigrationHelper {
     /// Use [`flush_migration`] to flush the migrated data.
     ///
     /// [`flush_migration`]: fn.flush_migration.html
-    pub fn finish(self) -> crate::Result<Hash> {
+    pub fn finish(self) -> Result<Hash, MigrationError> {
         if self.is_aborted() {
-            return Err(crate::Error::new("Migration has been aborted"));
+            return Err(MigrationError::Aborted);
         }
 
         let patch = self.fork.into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
-        self.db.merge(patch).map(|()| hash)
+        self.db.merge(patch).map_err(MigrationError::Merge)?;
+        Ok(hash)
     }
+}
+
+/// Errors emitted by `MigrationHelper` methods.
+#[derive(Debug, Fail)]
+pub enum MigrationError {
+    /// Failed to merge migration changes to database.
+    #[fail(display = "Failed to merge migration changes to database: {}", _0)]
+    Merge(#[fail(cause)] crate::Error),
+
+    /// Migration has been aborted.
+    #[fail(display = "Migration was aborted")]
+    Aborted,
 }
 
 /// Handle allowing to signal to `MigrationHelper` that the migration has been aborted.
@@ -550,6 +566,7 @@ mod tests {
         HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
 
+    use assert_matches::assert_matches;
     use std::{collections::HashMap, iter::FromIterator, sync::mpsc, thread, time::Duration};
 
     #[test]
@@ -963,7 +980,7 @@ mod tests {
     }
 
     #[test]
-    fn loop_iter_simple() -> crate::Result<()> {
+    fn loop_iter_simple() -> Result<(), MigrationError> {
         const CHUNK_SIZE: usize = 2;
         const DATA: &[(&str, u64)] = &[
             ("Alice", 100),
@@ -982,7 +999,7 @@ mod tests {
                 map.put(name, balance);
             }
         }
-        db.merge(fork.into_patch())?;
+        db.merge(fork.into_patch()).unwrap();
 
         let mut helper = MigrationHelper::new(db, "test");
         helper.iter_loop(|helper, iters| {
@@ -1022,10 +1039,7 @@ mod tests {
         let handle = rx.recv().unwrap();
         drop(handle);
         let res = thread_handle.join().unwrap();
-        assert!(res
-            .unwrap_err()
-            .to_string()
-            .contains("Migration has been aborted"));
+        assert_matches!(res.unwrap_err(), MigrationError::Aborted);
         let snapshot = db.snapshot();
         let migration = Migration::new("test", &snapshot);
         assert!(!migration.get_entry::<_, u32>("entry").exists());
