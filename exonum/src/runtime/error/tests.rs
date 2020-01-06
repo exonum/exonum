@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use failure::format_err;
 use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
 use serde_json::json;
 
-use std::panic;
+use std::{any::Any, panic};
 
+use super::error_match::StringMatch;
 use super::*;
 
 fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {

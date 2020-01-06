@@ -36,7 +36,7 @@ use exonum::{
     helpers::Height,
     merkledb::{ListProof, MapProof, ObjectHash, Snapshot},
     messages::{AnyTx, Precommit, Verified},
-    runtime::{execution_error_serde, ExecutionError, ExecutionStatus},
+    runtime::{ExecutionError, ExecutionErrorSerde, ExecutionStatus},
 };
 use serde::{Serialize, Serializer};
 use serde_derive::*;
@@ -281,7 +281,7 @@ pub struct ErrorWithLocation {
     /// Location of the error.
     pub location: CallInBlock,
     /// Error data.
-    #[serde(with = "execution_error_serde")]
+    #[serde(with = "ExecutionErrorSerde")]
     pub error: ExecutionError,
 }
 
