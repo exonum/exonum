@@ -718,7 +718,7 @@ impl Dispatcher {
             // and hint it here.
             panic!(
                 "Migration for service `{}` is committed with migration hash {:?}, \
-                 but locally it has finished with an error {}",
+                 but locally it has finished with an error: {}",
                 namespace, global_hash, err
             );
         });

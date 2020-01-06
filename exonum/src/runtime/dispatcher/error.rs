@@ -55,13 +55,11 @@ pub enum Error {
     ServicePending = 13,
     /// Migrated service is not stopped.
     ServiceNotStopped = 14,
-    /// Attempt to launch a migration for a service that is already being migrated.
-    ServiceMigrationPending = 15,
     /// The artifact to migrate the service to is not a newer version of the current
     /// service artifact.
-    CannotUpgradeService = 16,
+    CannotUpgradeService = 15,
     /// Attempt to rollback or flush migration for a service which has no pending migration.
-    NoMigration = 17,
+    NoMigration = 16,
 }
 
 impl Error {

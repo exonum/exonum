@@ -76,6 +76,7 @@ impl Runtime for MigrationRuntime {
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         let script = match old_service.artifact.name.as_str() {
             "good" => simple_delayed_migration,
+            "not-good" => erroneous_migration,
             "bad" => panicking_migration,
             "with-state" => migration_modifying_state_hash,
             "none" => return Ok(None),
@@ -120,6 +121,11 @@ fn simple_delayed_migration(_ctx: &mut MigrationContext) -> Result<(), Migration
     Ok(())
 }
 
+fn erroneous_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    thread::sleep(Duration::from_millis(100));
+    Err(MigrationError::new("This migration is unsuccessful!"))
+}
+
 fn panicking_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     thread::sleep(Duration::from_millis(100));
     panic!("This migration is unsuccessful!");
@@ -132,6 +138,14 @@ fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), Migr
         ctx.helper.merge()?;
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum LocalResult {
+    None,
+    InMemory,
+    Saved,
+    SavedWithNodeRestart,
 }
 
 #[derive(Debug)]
@@ -171,6 +185,25 @@ impl Rig {
 
     fn dispatcher(&mut self) -> &mut Dispatcher {
         self.blockchain.dispatcher()
+    }
+
+    fn wait_migration_scripts(&mut self, local_result: LocalResult) {
+        if local_result == LocalResult::None {
+            // Don't wait at all.
+        } else {
+            // Wait for the script to finish.
+            thread::sleep(Duration::from_millis(500));
+            if local_result == LocalResult::InMemory {
+                // Keep the local result in memory.
+            } else {
+                self.create_block(self.blockchain.fork());
+                assert!(self.dispatcher().migrations.threads.is_empty());
+
+                if local_result == LocalResult::SavedWithNodeRestart {
+                    self.restart();
+                }
+            }
+        }
     }
 
     fn create_block(&mut self, fork: Fork) -> Block {
@@ -303,7 +336,25 @@ fn migration_workflow() {
 
 #[test]
 fn fast_forward_migration() {
-    unimplemented!()
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("none", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("none", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "service");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact, &service.name)
+        .unwrap();
+    rig.create_block(fork);
+
+    // Service version should be updated when the block is merged.
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let state = schema.get_instance(service.id).unwrap();
+    assert_eq!(state.status, Some(InstanceStatus::Stopped));
+    assert_eq!(state.pending_status, None);
+    assert_eq!(state.spec.artifact.version, Version::new(0, 5, 2));
 }
 
 /// Tests checks performed by the dispatcher.
@@ -480,17 +531,11 @@ fn completed_migration_is_not_resumed_after_node_restart() {
     assert!(threads.is_empty());
 }
 
-#[test]
-fn migration_with_custom_error() {
-    unimplemented!()
-}
-
-#[test]
-fn migration_with_panic() {
+fn test_erroneous_migration(artifact_name: &str) {
     let mut rig = Rig::new();
-    let old_artifact = rig.deploy_artifact("bad", "0.3.0".parse().unwrap());
-    let new_artifact = rig.deploy_artifact("bad", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "old");
+    let old_artifact = rig.deploy_artifact(artifact_name, "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact(artifact_name, "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "service");
     rig.stop_service(&service);
 
     // Start migration.
@@ -500,7 +545,7 @@ fn migration_with_panic() {
         .unwrap();
     rig.create_block(fork);
 
-    // Wait for the migration script to panic.
+    // Wait for the migration script to complete.
     thread::sleep(Duration::from_millis(1_000));
 
     rig.create_block(rig.blockchain.fork());
@@ -511,6 +556,16 @@ fn migration_with_panic() {
         .0
         .unwrap_err()
         .contains("This migration is unsuccessful!"));
+}
+
+#[test]
+fn migration_with_error() {
+    test_erroneous_migration("not-good");
+}
+
+#[test]
+fn migration_with_panic() {
+    test_erroneous_migration("bad");
 }
 
 #[test]
@@ -665,7 +720,47 @@ fn migration_rollback_workflow() {
 
 #[test]
 fn migration_rollback_invariants() {
-    unimplemented!()
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+
+    // Non-existing service.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::rollback_migration(&fork, "bogus").unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
+
+    // Service is not stopped.
+    let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+
+    rig.stop_service(&service);
+
+    // Service is stopped, but there is no migration happening.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+
+    // Start migration and commit its result, thus making the rollback impossible.
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact, &service.name)
+        .unwrap();
+    rig.create_block(fork);
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, HashTag::empty_map_hash()).unwrap();
+
+    // In the same block, we'll get an error because the service already has
+    // a pending status update.
+    let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::ServicePending));
+    rig.create_block(fork);
+    // ...In the next block, we'll get another error.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
 }
 
 #[test]
@@ -771,7 +866,136 @@ fn migration_commit_workflow() {
 
 #[test]
 fn migration_commit_invariants() {
-    unimplemented!()
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "good");
+
+    // Non-existing service.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::commit_migration(&fork, "bogus", Hash::zero()).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+    );
+
+    // Service is not stopped.
+    let err = Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+
+    rig.stop_service(&service);
+
+    // Service is stopped, but there is no migration happening.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+
+    // Start migration and commit its result, making the second commit impossible.
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact, &service.name)
+        .unwrap();
+    rig.create_block(fork);
+    let fork = rig.blockchain.fork();
+    let migration_hash = HashTag::empty_map_hash();
+    Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
+
+    // In the same block, we'll get an error because the service already has
+    // a pending status update.
+    let err = Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::ServicePending));
+    rig.create_block(fork);
+    // ...In the next block, we'll get another error.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+}
+
+fn test_migration_commit_with_local_error(local_result: LocalResult) {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("not-good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("not-good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "service");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact, &service.name)
+        .unwrap();
+    rig.create_block(fork);
+
+    rig.wait_migration_scripts(local_result);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap();
+    rig.create_block(fork); // << should panic
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
+fn migration_commit_with_local_error_blocking() {
+    test_migration_commit_with_local_error(LocalResult::None);
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
+fn migration_commit_with_local_error_in_memory() {
+    test_migration_commit_with_local_error(LocalResult::InMemory);
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
+fn migration_commit_with_local_error_saved() {
+    test_migration_commit_with_local_error(LocalResult::Saved);
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
+fn migration_commit_with_local_error_saved_and_node_restart() {
+    test_migration_commit_with_local_error(LocalResult::SavedWithNodeRestart);
+}
+
+fn test_migration_commit_with_differing_hash(local_result: LocalResult) {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact.clone(), "service");
+    rig.stop_service(&service);
+
+    let fork = rig.blockchain.fork();
+    rig.dispatcher()
+        .initiate_migration(&fork, new_artifact, &service.name)
+        .unwrap();
+    rig.create_block(fork);
+
+    rig.wait_migration_scripts(local_result);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap();
+    rig.create_block(fork); // << should panic
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with another hash")]
+fn migration_commit_with_differing_hash_blocking() {
+    test_migration_commit_with_differing_hash(LocalResult::None);
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with another hash")]
+fn migration_commit_with_differing_hash_in_memory() {
+    test_migration_commit_with_differing_hash(LocalResult::InMemory);
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with another hash")]
+fn migration_commit_with_differing_hash_saved() {
+    test_migration_commit_with_differing_hash(LocalResult::Saved);
+}
+
+#[test]
+#[should_panic(expected = "locally it has finished with another hash")]
+fn migration_commit_with_differing_hash_saved_and_node_restarted() {
+    test_migration_commit_with_differing_hash(LocalResult::SavedWithNodeRestart);
 }
 
 #[test]
