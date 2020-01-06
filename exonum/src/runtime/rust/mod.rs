@@ -43,7 +43,6 @@
 //! };
 //! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
-//! use exonum_proto::ProtobufConvert;
 //! use exonum_crypto::Hash;
 //! use serde_derive::*;
 //!
