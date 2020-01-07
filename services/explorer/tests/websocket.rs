@@ -258,7 +258,7 @@ fn test_transactions_subscribe_with_filter() {
 
     // Create client with filter
     let mut client = create_ws_client(&format!(
-        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?service_id={}&message_id=0",
+        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?instance_id={}&method_id=0",
         SERVICE_ID
     ))
     .expect("Cannot connect to node");
@@ -316,7 +316,7 @@ fn test_transactions_subscribe_with_partial_filter() {
 
     // Create client with filter
     let mut client = create_ws_client(&format!(
-        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?service_id={}",
+        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?instance_id={}",
         SERVICE_ID
     ))
     .expect("Cannot connect to node");
@@ -380,9 +380,9 @@ fn test_transactions_subscribe_with_partial_filter() {
 #[test]
 fn test_transactions_subscribe_with_bad_filter() {
     let node_handler = run_node(6335, 8084);
-    // `service_id` is missing from the filter.
+    // `instance_id` is missing from the filter.
     let mut client =
-        create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?message_id=0")
+        create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?method_id=0")
             .unwrap();
 
     client

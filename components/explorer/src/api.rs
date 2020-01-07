@@ -10,7 +10,7 @@ use exonum::{
     helpers::Height,
     merkledb::{access::Access, ListProof},
     messages::{Precommit, Verified},
-    runtime::{CallInfo, ExecutionStatus, InstanceId},
+    runtime::{CallInfo, ExecutionStatus, InstanceId, MethodId},
 };
 use serde_derive::*;
 
@@ -194,9 +194,9 @@ pub struct CommittedTransactionSummary {
     /// Transaction identifier.
     pub tx_hash: Hash,
     /// ID of service.
-    pub service_id: u16,
-    /// ID of transaction in service.
-    pub message_id: u16,
+    pub instance_id: InstanceId,
+    /// ID of the method within service.
+    pub method_id: MethodId,
     /// Result of transaction execution.
     pub status: ExecutionStatus,
     /// Transaction location in the blockchain.
@@ -211,9 +211,9 @@ impl CommittedTransactionSummary {
     /// Constructs a transaction summary from the core schema.
     pub fn new(schema: &Schema<impl Access>, tx_hash: &Hash) -> Option<Self> {
         let tx = schema.transactions().get(tx_hash)?;
-        let tx = tx.as_ref();
-        let service_id = tx.call_info.instance_id as u16;
-        let tx_id = tx.call_info.method_id as u16;
+        let tx = tx.payload();
+        let instance_id = tx.call_info.instance_id;
+        let method_id = tx.call_info.method_id;
         let location = schema.transactions_locations().get(tx_hash)?;
         let tx_result = schema.transaction_result(location)?;
         let location_proof = schema
@@ -227,8 +227,8 @@ impl CommittedTransactionSummary {
         );
         Some(Self {
             tx_hash: *tx_hash,
-            service_id,
-            message_id: tx_id,
+            instance_id,
+            method_id,
             status: ExecutionStatus(tx_result),
             location,
             location_proof,

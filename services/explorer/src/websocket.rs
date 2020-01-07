@@ -21,19 +21,18 @@ use exonum::{
     crypto::Hash,
     merkledb::ObjectHash,
     messages::SignedMessage,
+    runtime::{InstanceId, MethodId},
 };
 use exonum_explorer::api::{
     CommittedTransactionSummary, Notification, TransactionHex, TransactionResponse,
 };
 use futures::Future;
 use hex::FromHex;
-use rand::{rngs::ThreadRng, Rng};
 use serde_derive::*;
 
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, HashMap},
-    fmt,
+    fmt, mem,
     sync::{Arc, Mutex, Weak},
     time::Duration,
 };
@@ -87,15 +86,11 @@ impl SharedStateRef {
     pub fn ensure_server(&self, blockchain: &Blockchain) -> Option<Addr<Server>> {
         let arc = self.inner.upgrade()?;
         let mut inner = arc.lock().expect("Cannot lock `SharedState`");
-        Some(
-            inner
-                .server_addr
-                .get_or_insert_with(|| {
-                    let blockchain = blockchain.to_owned();
-                    Arbiter::start(|_| Server::new(blockchain))
-                })
-                .clone(),
-        )
+        let addr = inner.server_addr.get_or_insert_with(|| {
+            let blockchain = blockchain.to_owned();
+            Arbiter::start(|_| Server::new(blockchain))
+        });
+        Some(addr.clone())
     }
 }
 
@@ -131,17 +126,17 @@ pub enum SubscriptionType {
 #[derive(Serialize, Deserialize)]
 pub struct TransactionFilter {
     /// ID of service.
-    pub service_id: u16,
+    pub instance_id: InstanceId,
     /// Optional ID of transaction in service (if not set, all transaction of service will be sent).
-    pub message_id: Option<u16>,
+    pub method_id: Option<MethodId>,
 }
 
 impl TransactionFilter {
     /// Create new transaction filter.
-    pub fn new(service_id: u16, message_id: Option<u16>) -> Self {
+    pub fn new(instance_id: InstanceId, method_id: Option<MethodId>) -> Self {
         Self {
-            service_id,
-            message_id,
+            instance_id,
+            method_id,
         }
     }
 }
@@ -168,13 +163,13 @@ struct Subscribe {
 
 #[derive(Message)]
 struct Unsubscribe {
-    pub id: u64,
+    id: u64,
 }
 
 #[derive(Message)]
 struct UpdateSubscriptions {
-    pub id: u64,
-    pub subscriptions: Vec<SubscriptionType>,
+    id: u64,
+    subscriptions: Vec<SubscriptionType>,
 }
 
 #[derive(Message)]
@@ -191,7 +186,7 @@ struct Transaction {
 pub struct Server {
     subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
     blockchain: Blockchain,
-    rng: RefCell<ThreadRng>,
+    next_id: u64,
 }
 
 impl fmt::Debug for Server {
@@ -205,21 +200,21 @@ impl fmt::Debug for Server {
 }
 
 impl Server {
-    /// Wait to merge the block.
+    /// Wait interval to merge the block.
     const MERGE_WAIT: Duration = Duration::from_millis(20);
 
     fn new(blockchain: Blockchain) -> Self {
         Self {
             subscribers: BTreeMap::new(),
             blockchain,
-            rng: RefCell::new(rand::thread_rng()),
+            next_id: 0,
         }
     }
 
     fn remove_subscriber(&mut self, id: u64) {
-        self.subscribers.iter_mut().for_each(|(_, v)| {
-            v.remove(&id);
-        });
+        for subscriber_group in self.subscribers.values_mut() {
+            subscriber_group.remove(&id);
+        }
     }
 
     fn set_subscriptions(
@@ -228,17 +223,18 @@ impl Server {
         addr: Recipient<Message>,
         subscriptions: Vec<SubscriptionType>,
     ) {
-        subscriptions.into_iter().for_each(|sub_type| {
+        for sub_type in subscriptions {
             self.subscribers
                 .entry(sub_type)
                 .or_insert_with(HashMap::new)
                 .insert(id, addr.clone());
-        });
+        }
     }
 
     fn disconnect_all(&mut self) {
-        for subscriber in self.subscribers.values_mut() {
-            for recipient in subscriber.values_mut() {
+        let subscribers = mem::replace(&mut self.subscribers, BTreeMap::new());
+        for (_, subscriber_group) in subscribers {
+            for (_, recipient) in subscriber_group {
                 if let Err(err) = recipient.do_send(Message::Close) {
                     log::warn!(
                         "Can't send `Close` message to a websocket client: {:?}",
@@ -246,9 +242,7 @@ impl Server {
                     );
                 }
             }
-            subscriber.clear();
         }
-        self.subscribers.clear();
     }
 }
 
@@ -264,17 +258,10 @@ impl Actor for Server {
 impl Handler<Subscribe> for Server {
     type Result = u64;
 
-    fn handle(
-        &mut self,
-        Subscribe {
-            address,
-            subscriptions,
-        }: Subscribe,
-        _ctx: &mut Self::Context,
-    ) -> u64 {
-        let id = self.rng.borrow_mut().gen::<u64>();
-        self.set_subscriptions(id, address, subscriptions);
-
+    fn handle(&mut self, message: Subscribe, _ctx: &mut Self::Context) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.set_subscriptions(id, message.address, message.subscriptions);
         id
     }
 }
@@ -282,47 +269,50 @@ impl Handler<Subscribe> for Server {
 impl Handler<Unsubscribe> for Server {
     type Result = ();
 
-    fn handle(&mut self, Unsubscribe { id }: Unsubscribe, _ctx: &mut Self::Context) {
-        self.remove_subscriber(id);
+    fn handle(&mut self, message: Unsubscribe, _ctx: &mut Self::Context) {
+        self.remove_subscriber(message.id);
     }
 }
 
 impl Handler<UpdateSubscriptions> for Server {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        UpdateSubscriptions { id, subscriptions }: UpdateSubscriptions,
-        _ctx: &mut Self::Context,
-    ) {
-        // Find address of subscriber. If id not found, assume that subscriber doesn't exist and return.
-        let addr = if let Some(addr) = self
-            .subscribers
-            .values()
-            .flat_map(HashMap::iter)
-            .find_map(|(k, v)| if k == &id { Some(v.clone()) } else { None })
-        {
+    fn handle(&mut self, message: UpdateSubscriptions, _ctx: &mut Self::Context) {
+        // Find address of subscriber. If id not found, assume that subscriber doesn't exist
+        // and return.
+        let maybe_addr =
+            self.subscribers
+                .values()
+                .flat_map(HashMap::iter)
+                .find_map(|(id, addr)| {
+                    if *id == message.id {
+                        Some(addr.clone())
+                    } else {
+                        None
+                    }
+                });
+        let addr = if let Some(addr) = maybe_addr {
             addr
         } else {
             return;
         };
-        self.remove_subscriber(id);
-        self.set_subscriptions(id, addr, subscriptions);
+        self.remove_subscriber(message.id);
+        self.set_subscriptions(message.id, addr, message.subscriptions);
     }
 }
 
 impl Handler<Broadcast> for Server {
     type Result = ();
 
-    fn handle(&mut self, Broadcast { block_hash }: Broadcast, ctx: &mut Self::Context) {
+    fn handle(&mut self, message: Broadcast, ctx: &mut Self::Context) {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let block = match schema.blocks().get(&block_hash) {
+        let block = match schema.blocks().get(&message.block_hash) {
             Some(block) => block,
             None => {
                 // The block is not yet merged into the database, which can happen since
                 // `after_commit` is called before the merge. Try again with a slight delay.
-                ctx.notify_later(Broadcast { block_hash }, Self::MERGE_WAIT);
+                ctx.notify_later(message, Self::MERGE_WAIT);
                 return;
             }
         };
@@ -334,38 +324,35 @@ impl Handler<Broadcast> for Server {
 
         // Get list of transactions in block and notify about each of them.
         let tx_hashes_table = schema.block_transactions(height);
-        tx_hashes_table
-            .iter()
-            .filter_map(|hash| {
-                let res = CommittedTransactionSummary::new(&schema, &hash);
-                if res.is_none() {
-                    log::error!(
-                        "BUG. Cannot build summary about committed transaction {:?} \
-                         because it doesn't exist in \"transactions\", \
-                         \"transaction_results\" nor \"transactions_locations\" indexes.",
-                        hash
-                    );
-                }
-                res
+        let tx_infos = tx_hashes_table.iter().map(|hash| {
+            CommittedTransactionSummary::new(&schema, &hash).unwrap_or_else(|| {
+                panic!(
+                    "BUG. Cannot build summary about committed transaction {:?} \
+                     because it doesn't exist in \"transactions\", \
+                     \"transaction_results\" nor \"transactions_locations\" indexes.",
+                    hash
+                );
             })
-            .for_each(|tx_info| {
-                let service_id = tx_info.service_id;
-                let tx_id = tx_info.message_id;
-                let data = Notification::Transaction(tx_info);
-                self.broadcast_message(SubscriptionType::Transactions { filter: None }, &data);
-                self.broadcast_message(
-                    SubscriptionType::Transactions {
-                        filter: Some(TransactionFilter::new(service_id, None)),
-                    },
-                    &data,
-                );
-                self.broadcast_message(
-                    SubscriptionType::Transactions {
-                        filter: Some(TransactionFilter::new(service_id, Some(tx_id))),
-                    },
-                    &data,
-                );
-            });
+        });
+
+        for tx_info in tx_infos {
+            let instance_id = tx_info.instance_id;
+            let method_id = tx_info.method_id;
+            let data = Notification::Transaction(tx_info);
+            self.broadcast_message(SubscriptionType::Transactions { filter: None }, &data);
+            self.broadcast_message(
+                SubscriptionType::Transactions {
+                    filter: Some(TransactionFilter::new(instance_id, None)),
+                },
+                &data,
+            );
+            self.broadcast_message(
+                SubscriptionType::Transactions {
+                    filter: Some(TransactionFilter::new(instance_id, Some(method_id))),
+                },
+                &data,
+            );
+        }
     }
 }
 
@@ -373,14 +360,10 @@ impl Handler<Transaction> for Server {
     type Result = Result<TransactionResponse, failure::Error>;
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
-    fn handle(
-        &mut self,
-        Transaction { tx }: Transaction,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let msg = SignedMessage::from_hex(tx)?;
-        let tx_hash = msg.object_hash();
-        let verified = msg.into_verified()?;
+    fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
+        let signed = SignedMessage::from_hex(message.tx)?;
+        let tx_hash = signed.object_hash();
+        let verified = signed.into_verified()?;
         Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
 
         // FIXME Don't ignore message error.
@@ -402,21 +385,22 @@ impl Server {
     where
         T: serde::Serialize,
     {
-        let serialized = serde_json::to_string(data).unwrap();
-        self.subscribers
+        let subscriber_group = self
+            .subscribers
             .entry(sub_type)
-            .or_insert_with(HashMap::new)
-            .iter()
-            .for_each(|(_, addr)| {
-                let _ = addr.do_send(Message::Data(serialized.clone()));
-            });
+            .or_insert_with(HashMap::new);
+
+        let serialized = serde_json::to_string(data).unwrap();
+        for addr in subscriber_group.values() {
+            addr.do_send(Message::Data(serialized.clone())).ok();
+        }
     }
 }
 
 pub(crate) struct Session {
-    pub id: u64,
-    pub subscriptions: Vec<SubscriptionType>,
-    pub server_address: Addr<Server>,
+    id: u64,
+    subscriptions: Vec<SubscriptionType>,
+    server_address: Addr<Server>,
 }
 
 impl Session {
@@ -513,11 +497,11 @@ impl Handler<Message> for Session {
     }
 }
 
-#[serde(tag = "result", rename_all = "kebab-case")]
+#[serde(tag = "result", rename_all = "snake_case")]
 #[derive(Debug, Serialize, Deserialize)]
 enum WsStatus {
     Success {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         response: Option<serde_json::Value>,
     },
     Error {
@@ -532,7 +516,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Session {
             ws::Message::Close(_) => ctx.stop(),
             ws::Message::Text(ref text) => {
                 let res = serde_json::from_str(text)
-                    .map(|m| self.process_incoming_message(m))
+                    .map(|msg| self.process_incoming_message(msg))
                     .unwrap_or_else(|e| WsStatus::Error {
                         description: e.to_string(),
                     });
