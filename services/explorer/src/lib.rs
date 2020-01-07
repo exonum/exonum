@@ -68,7 +68,7 @@ use exonum::{
 };
 use exonum_derive::*;
 
-mod api;
+pub mod api;
 mod websocket;
 
 use crate::{api::ExplorerApi, websocket::SharedState};

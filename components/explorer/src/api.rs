@@ -108,12 +108,12 @@ pub struct BlocksQuery {
     /// If true, then only non-empty blocks are returned. The default value is false.
     #[serde(default)]
     pub skip_empty_blocks: bool,
-    /// If true, then the returned `BlocksRange`'s `times` field will contain median time from the
-    /// corresponding blocks precommits.
+    /// If true, then the `time` field in each returned block will contain the median time from the
+    /// block precommits.
     #[serde(default)]
     pub add_blocks_time: bool,
-    /// If true, then the returned `BlocksRange.precommits` will contain precommits for the
-    /// corresponding returned blocks.
+    /// If true, then the `precommits` field in each returned block will contain precommits for the
+    /// block stored by the node.
     #[serde(default)]
     pub add_precommits: bool,
 }
