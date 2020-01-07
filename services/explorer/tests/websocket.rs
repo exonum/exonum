@@ -16,137 +16,94 @@
 
 // TODO: Test that service terminates WS connections when it's stopped (ECR-4084).
 
-use exonum::{
-    blockchain::config::GenesisConfigBuilder,
-    crypto::gen_keypair,
-    helpers,
-    merkledb::{ObjectHash, TemporaryDB},
-    node::{ApiSender, ExternalMessage, Node},
-    runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        RuntimeInstance,
-    },
-};
+use assert_matches::assert_matches;
+use exonum::{crypto::gen_keypair, helpers::Height, merkledb::ObjectHash};
 use exonum_explorer::api::Notification;
-use serde_json::json;
+use exonum_testkit::{TestKit, TestKitApi, TestKitBuilder};
+use serde::de::DeserializeOwned;
+use serde_json::{json, Value};
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
-    OwnedMessage, WebSocketResult,
+    OwnedMessage,
 };
 
-use std::{
-    net::SocketAddr,
-    thread::{self, sleep},
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 
 use exonum_explorer_service::ExplorerFactory;
 
 mod counter;
 use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
 
-#[derive(Debug)]
-struct RunHandle {
-    node_thread: thread::JoinHandle<()>,
-    api_tx: ApiSender,
+fn create_ws_client(addr: &str) -> Client<TcpStream> {
+    let addr = addr.replace("http://", "ws://");
+    let client = ClientBuilder::new(&addr)
+        .unwrap()
+        .connect_insecure()
+        .expect("Cannot launch WS client");
+    client
+        .stream_ref()
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .expect("Cannot set read timeout for WS client");
+    client
 }
 
-fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
-    let mut node_cfg = helpers::generate_testnet_config(1, listen_port).remove(0);
-    node_cfg.api.public_api_address = Some(
-        format!("127.0.0.1:{}", pub_api_port)
-            .parse::<SocketAddr>()
-            .unwrap(),
-    );
-
-    let external_runtimes: Vec<RuntimeInstance> = vec![];
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-        .with_artifact(ExplorerFactory.artifact_id())
-        .with_instance(ExplorerFactory.default_instance())
-        .with_artifact(CounterService.artifact_id())
-        .with_instance(CounterService.default_instance())
-        .build();
-    let rust_runtime = RustRuntime::builder()
-        .with_factory(ExplorerFactory)
-        .with_factory(CounterService);
-
-    let node = Node::new(
-        TemporaryDB::new(),
-        rust_runtime,
-        external_runtimes,
-        node_cfg,
-        genesis_config,
-        None,
-    );
-
-    let api_tx = node.channel();
-    let handle = RunHandle {
-        node_thread: thread::spawn(move || {
-            node.run().unwrap();
-        }),
-        api_tx,
-    };
-    // Wait until the node has fully started.
-    thread::sleep(Duration::from_secs(1));
-    handle
+fn send_message(client: &mut Client<TcpStream>, message: &serde_json::Value) {
+    let message_str = serde_json::to_string(message).unwrap();
+    client
+        .send_message(&OwnedMessage::Text(message_str))
+        .expect("Cannot send message");
 }
 
-fn create_ws_client(addr: &str) -> WebSocketResult<Client<TcpStream>> {
-    let mut last_err = None;
-    for _ in 0..5 {
-        match ClientBuilder::new(addr).unwrap().connect_insecure() {
-            Err(e) => {
-                sleep(Duration::from_millis(100));
-                last_err = Some(e);
-                continue;
-            }
-            ok => return ok,
-        }
-    }
-    Err(last_err.unwrap())
-}
-
-fn recv_text_msg(client: &mut Client<TcpStream>) -> Option<String> {
+fn receive_message<T: DeserializeOwned>(client: &mut Client<TcpStream>) -> Option<T> {
     if let Ok(response) = client.recv_message() {
         match response {
-            OwnedMessage::Text(text) => return Some(text),
-            other => panic!("Incorrect response: {:?}", other),
+            OwnedMessage::Text(ref text) => return Some(serde_json::from_str(text).unwrap()),
+            other => panic!("Unexpected WS response: {:?}", other),
         }
     }
     None
 }
 
-/// Checks that ws client accepts valid transactions and discards transactions with incorrect instance ID.
+fn assert_no_message(client: &mut Client<TcpStream>) {
+    if let Some(value) = receive_message::<Value>(client) {
+        panic!("Received unexpected message: {:?}", value);
+    }
+}
+
+fn init_testkit() -> (TestKit, TestKitApi) {
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(CounterService)
+        .with_default_rust_service(ExplorerFactory)
+        .create();
+    let api = testkit.api();
+    (testkit, api)
+}
+
+/// Checks that the WS client accepts valid transactions and discards transactions with
+/// an incorrect instance ID.
 #[test]
 fn test_send_transaction() {
-    let node_handler = run_node(6330, 8079);
+    let (_testkit, api) = init_testkit();
+    let url = api.public_url("api/explorer/v1/ws");
+    let mut client = create_ws_client(&url);
 
-    let mut client =
-        create_ws_client("ws://localhost:8079/api/explorer/v1/ws").expect("Cannot connect to node");
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-
-    // Check that no messages on start.
-    assert!(client.recv_message().is_err());
+    // Check that the server sends no messages initially.
+    assert_no_message(&mut client);
 
     // Send transaction.
     let keypair = gen_keypair();
     let tx = keypair.increment(SERVICE_ID, 3);
     let tx_hash = tx.object_hash();
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
-    let tx_json = serde_json::to_string(&tx_body).unwrap();
-    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+    send_message(&mut client, &tx_body);
 
-    // Check response on sent message.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-    let response: serde_json::Value = serde_json::from_str(&resp_text).unwrap();
+    // Check server response.
+    let response: Value = receive_message(&mut client).unwrap();
     assert_eq!(
         response,
         json!({
             "result": "success",
-            "response": { "tx_hash": tx_hash }
+            "response": { "tx_hash": tx_hash },
         })
     );
 
@@ -154,12 +111,10 @@ fn test_send_transaction() {
     let keypair = gen_keypair();
     let tx = keypair.increment(SERVICE_ID + 1, 5);
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
-    let tx_json = serde_json::to_string(&tx_body).unwrap();
-    client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
+    send_message(&mut client, &tx_body);
 
     // Check response on sent message.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-    let response: serde_json::Value = serde_json::from_str(&resp_text).unwrap();
+    let response: Value = receive_message(&mut client).unwrap();
     assert_eq!(
         response,
         json!({
@@ -168,410 +123,217 @@ fn test_send_transaction() {
              for the given service instance ID is not found."
         })
     );
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
 }
 
 #[test]
-fn test_blocks_subscribe() {
-    let node_handler = run_node(6331, 8080);
+fn test_blocks_subscription() {
+    let (mut testkit, api) = init_testkit();
+    let url = api.public_url("api/explorer/v1/blocks/subscribe");
+    let mut client = create_ws_client(&url);
 
-    let mut client = create_ws_client("ws://localhost:8080/api/explorer/v1/blocks/subscribe")
-        .expect("Cannot connect to node");
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(30)))
-        .unwrap();
+    testkit.create_block();
+    // Get the block notification.
+    let notification: Notification = receive_message(&mut client).unwrap();
+    assert_matches!(notification, Notification::Block(ref block) if block.height == Height(1));
 
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-
-    // Try to parse incoming message into Block.
-    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
-    match notification {
-        Notification::Block(_) => (),
-        other => panic!("Incorrect notification type (expected Block): {:?}", other),
-    }
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    // Create one more block.
+    testkit.create_block();
+    let notification: Notification = receive_message(&mut client).unwrap();
+    assert_matches!(notification, Notification::Block(ref block) if block.height == Height(2));
 }
 
 #[test]
-fn test_transactions_subscribe() {
-    let node_handler = run_node(6332, 8081);
+fn test_transactions_subscription() {
+    let (mut testkit, api) = init_testkit();
+    let url = api.public_url("api/explorer/v1/transactions/subscribe");
+    let mut client = create_ws_client(&url);
 
-    let mut client = create_ws_client("ws://localhost:8081/api/explorer/v1/transactions/subscribe")
-        .expect("Cannot connect to node");
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-
-    // Send transaction.
+    // Create a block with a single transaction.
     let keypair = gen_keypair();
     let tx = keypair.increment(SERVICE_ID, 3);
-    let tx_json = json!({ "tx_body": tx });
-    let http_client = reqwest::Client::new();
-    let _res = http_client
-        .post("http://localhost:8081/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
+    testkit.create_block_with_transaction(tx.clone());
 
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-
-    // Try to parse incoming message into Block.
-    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
-    match notification {
-        Notification::Transaction(_) => (),
-        other => panic!(
-            "Incorrect notification type (expected Transaction): {:?}",
-            other
-        ),
+    let notification: Notification = receive_message(&mut client).unwrap();
+    let tx_summary = match notification {
+        Notification::Transaction(summary) => summary,
+        notification => panic!("Unexpected notification: {:?}", notification),
     };
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    assert_eq!(tx_summary.tx_hash, tx.object_hash());
+    assert_eq!(tx_summary.instance_id, SERVICE_ID);
+    tx_summary.status.0.unwrap();
 }
 
 #[test]
-fn test_transactions_subscribe_with_filter() {
-    let node_handler = run_node(6333, 8082);
-
-    // Create client with filter
-    let mut client = create_ws_client(&format!(
-        "ws://localhost:8082/api/explorer/v1/transactions/subscribe?instance_id={}&method_id=0",
+fn test_transactions_subscription_with_filter() {
+    let (mut testkit, api) = init_testkit();
+    let url = format!(
+        "api/explorer/v1/transactions/subscribe?instance_id={}&method_id=0",
         SERVICE_ID
-    ))
-    .expect("Cannot connect to node");
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(10)))
-        .unwrap();
+    );
+    let url = api.public_url(&url);
+    let mut client = create_ws_client(&url);
+
     let alice = gen_keypair();
-    let tx = alice.increment(SERVICE_ID, 3);
-    let tx_json = json!({ "tx_body": tx });
-    let http_client = reqwest::Client::new();
-    let _res = http_client
-        .post("http://localhost:8082/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
+    let reset_tx = alice.reset(SERVICE_ID, ());
+    let inc_tx = alice.increment(SERVICE_ID, 3);
+    testkit.create_block_with_transactions(vec![reset_tx, inc_tx.clone()]);
 
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-
-    // Try to parse incoming message into Block.
-    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
-    match notification {
-        Notification::Transaction(_) => (),
-        other => panic!(
-            "Incorrect notification type (expected Transaction): {:?}",
-            other
-        ),
+    let notification: Notification = receive_message(&mut client).unwrap();
+    let tx_summary = match notification {
+        Notification::Transaction(summary) => summary,
+        notification => panic!("Unexpected notification: {:?}", notification),
     };
+    assert_eq!(tx_summary.tx_hash, inc_tx.object_hash());
+    assert_no_message(&mut client);
 
-    let tx = alice.reset(SERVICE_ID, ());
-    let tx_json = json!({ "tx_body": tx });
-    let _res = http_client
-        .post("http://localhost:8082/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
+    // Create some more transfer transactions and check that they are received.
+    let other_tx = alice.increment(SERVICE_ID, 1);
+    testkit.create_block_with_transaction(other_tx.clone());
 
-    // Try to get a one message and check that it is none in this case,
-    // because `Reset` transaction has another method ID.
-    assert!(recv_text_msg(&mut client).is_none());
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    let notification: Notification = receive_message(&mut client).unwrap();
+    let tx_summary = match notification {
+        Notification::Transaction(summary) => summary,
+        notification => panic!("Unexpected notification: {:?}", notification),
+    };
+    assert_eq!(tx_summary.tx_hash, other_tx.object_hash());
+    assert_no_message(&mut client);
 }
 
 #[test]
 fn test_transactions_subscribe_with_partial_filter() {
-    let node_handler = run_node(6334, 8083);
-
-    // Create client with filter
-    let mut client = create_ws_client(&format!(
-        "ws://localhost:8083/api/explorer/v1/transactions/subscribe?instance_id={}",
+    let (mut testkit, api) = init_testkit();
+    let url = format!(
+        "api/explorer/v1/transactions/subscribe?instance_id={}",
         SERVICE_ID
-    ))
-    .expect("Cannot connect to node");
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
+    );
+    let url = api.public_url(&url);
+    let mut client = create_ws_client(&url);
+
     let alice = gen_keypair();
-    let tx = alice.increment(SERVICE_ID, 3);
-    let tx_json = json!({ "tx_body": tx });
-    let http_client = reqwest::Client::new();
-    let _res = http_client
-        .post("http://localhost:8083/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
+    let reset_tx = alice.reset(SERVICE_ID, ());
+    let inc_tx = alice.increment(SERVICE_ID, 3);
+    testkit.create_block_with_transactions(vec![reset_tx.clone(), inc_tx.clone()]);
+    let other_tx = alice.increment(SERVICE_ID, 5);
+    testkit.create_block_with_transaction(other_tx.clone());
 
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client).unwrap();
+    let summaries = (0..3).map(|_| {
+        let notification: Notification = receive_message(&mut client).unwrap();
+        match notification {
+            Notification::Transaction(summary) => summary,
+            notification => panic!("Unexpected notification: {:?}", notification),
+        }
+    });
 
-    // Try to parse incoming message into Block.
-    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
-    match notification {
-        Notification::Transaction(_) => (),
-        other => panic!(
-            "Incorrect notification type (expected Transaction): {:?}",
-            other
-        ),
-    };
+    let summaries: Vec<_> = summaries
+        .map(|summary| (summary.tx_hash, summary.location.block_height()))
+        .collect();
+    assert_eq!(
+        summaries,
+        vec![
+            (reset_tx.object_hash(), Height(1)),
+            (inc_tx.object_hash(), Height(1)),
+            (other_tx.object_hash(), Height(2)),
+        ]
+    );
 
-    let tx = alice.reset(SERVICE_ID, ());
-    let tx_json = json!({ "tx_body": tx });
-    let _res = http_client
-        .post("http://localhost:8083/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
-
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-
-    // Try to parse incoming message into `Transaction`.
-    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
-    match notification {
-        Notification::Transaction(_) => (),
-        other => panic!(
-            "Incorrect notification type (expected Transaction): {:?}",
-            other
-        ),
-    };
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    assert_no_message(&mut client);
 }
 
 #[test]
 fn test_transactions_subscribe_with_bad_filter() {
-    let node_handler = run_node(6335, 8084);
+    let (mut testkit, api) = init_testkit();
     // `instance_id` is missing from the filter.
-    let mut client =
-        create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?method_id=0")
-            .unwrap();
+    let url = api.public_url("api/explorer/v1/transactions/subscribe?method_id=0");
+    let mut client = create_ws_client(&url);
 
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-    let tx = gen_keypair().increment(SERVICE_ID, 3);
-    let tx_json = json!({ "tx_body": tx });
-    let http_client = reqwest::Client::new();
-    let _res = http_client
-        .post("http://localhost:8084/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
+    let alice = gen_keypair();
+    let reset_tx = alice.reset(SERVICE_ID, ());
+    let inc_tx = alice.increment(SERVICE_ID, 3);
+    testkit.create_block_with_transactions(vec![reset_tx.clone(), inc_tx.clone()]);
 
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client);
-    assert!(resp_text.is_none());
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    assert_no_message(&mut client);
 }
 
 #[test]
-fn test_subscribe() {
-    let node_handler = run_node(6336, 8085);
+fn test_dynamic_subscriptions() {
+    let (mut testkit, api) = init_testkit();
+    let url = api.public_url("api/explorer/v1/ws");
+    let mut client = create_ws_client(&url);
 
-    let mut client =
-        create_ws_client("ws://localhost:8085/api/explorer/v1/ws").expect("Cannot connect to node");
-    client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(10)))
-        .unwrap();
+    testkit.create_block();
+    assert_no_message(&mut client);
+    let alice = gen_keypair();
+    testkit.create_block_with_transaction(alice.increment(SERVICE_ID, 1));
+    assert_no_message(&mut client);
 
-    // Check that no messages on start.
-    assert!(client.recv_message().is_err());
+    let filters = json!({ "type": "set-subscriptions", "payload": [{ "type": "blocks" }]});
+    send_message(&mut client, &filters);
+    // First response is subscription result.
+    let response: Value = receive_message(&mut client).unwrap();
+    assert_eq!(response, json!({ "result": "success" }));
 
-    // Set blocks filter.
-    let filters = serde_json::to_string(
-        &json!({ "type": "set-subscriptions", "payload": [{ "type": "blocks" }]}),
-    )
-    .unwrap();
-    client.send_message(&OwnedMessage::Text(filters)).unwrap();
-
-    // Check response on set message.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-    assert_eq!(
-        serde_json::from_str::<serde_json::Value>(&resp_text).unwrap(),
-        json!({ "result": "success" })
-    );
-
-    // Get one message and check that it is text.
-    let resp_text = recv_text_msg(&mut client).unwrap();
-
-    // Try to parse incoming message into Block.
-    let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
-    match notification {
-        Notification::Block(_) => (),
-        other => panic!("Incorrect notification type (expected Block): {:?}", other),
-    }
-
-    // Shutdown node.
-    client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    let tx = alice.increment(SERVICE_ID, 2);
+    let block = testkit.create_block_with_transaction(tx);
+    let notification: Notification = receive_message(&mut client).unwrap();
+    assert_matches!(notification, Notification::Block(ref b) if b.height == block.height());
+    // Since the client is not subscribed to transactions, it should receive no corresponding
+    // notification.
+    assert_no_message(&mut client);
 }
 
 #[test]
 fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
-    let node_handler = run_node(6337, 8086);
+    let (testkit, api) = init_testkit();
+    let url = api.public_url("api/explorer/v1/ws");
+    let mut clients: Vec<_> = (0..5).map(|_| create_ws_client(&url)).collect();
 
-    let mut clients = (0..8)
-        .map(|_| {
-            let client = create_ws_client("ws://localhost:8086/api/explorer/v1/ws")
-                .expect("Cannot connect to node");
-            client
-                .stream_ref()
-                .set_read_timeout(Some(Duration::from_secs(10)))
-                .unwrap();
-            client
-        })
-        .collect::<Vec<_>>();
+    // Shut down the node.
+    drop(testkit);
 
-    let now = Instant::now();
-
-    // Shutdown node before clients.
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
-
-    assert!(now.elapsed().as_secs() < 15);
-
-    // Each client should receive Close message.
-    let msg = OwnedMessage::from(WsMessage::close_because(1000, "node shutdown"));
-    for client in clients.iter_mut() {
+    // Each client should receive a `Close` message.
+    let msg = OwnedMessage::from(WsMessage::close_because(1_000, "node shutdown"));
+    for client in &mut clients {
         assert_eq!(client.recv_message().unwrap(), msg);
-    }
-
-    for client in clients {
-        // Behavior of TcpStream::shutdown on disconnected stream is platform-specific.
-        let _ = client.shutdown();
+        client.shutdown().ok();
     }
 }
 
 #[test]
-fn test_blocks_and_tx_both_subscribe() {
-    let node_handler = run_node(6338, 8087);
+fn test_blocks_and_tx_subscriptions() {
+    let (mut testkit, api) = init_testkit();
 
-    // Open block ws first
-    let mut block_client = create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
-        .expect("Cannot connect to node");
-    block_client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
+    // Create block WS client first.
+    let block_url = api.public_url("api/explorer/v1/blocks/subscribe");
+    let mut block_client = create_ws_client(&block_url);
 
-    // Get one message and check that it is text.
-    let block_resp_text = recv_text_msg(&mut block_client).unwrap();
-
-    let block_notification = serde_json::from_str::<Notification>(&block_resp_text).unwrap();
-    match block_notification {
-        Notification::Block(_) => (),
-        other => panic!("Incorrect notification type (expected Block): {:?}", other),
+    testkit.create_block();
+    let notification: Notification = receive_message(&mut block_client).unwrap();
+    match notification {
+        Notification::Block(block) => assert_eq!(block.height, Height(1)),
+        other => panic!("Incorrect notification type: {:?}", other),
     }
-    block_client.shutdown().unwrap();
+    block_client.shutdown().ok();
 
-    // Open tx ws and test it
-    let mut tx_client =
-        create_ws_client("ws://localhost:8087/api/explorer/v1/transactions/subscribe")
-            .expect("Cannot connect to node");
-    tx_client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-
+    // Open transaction WS client and test it.
+    let tx_url = api.public_url("api/explorer/v1/transactions/subscribe");
+    let mut tx_client = create_ws_client(&tx_url);
     let alice = gen_keypair();
     let tx = alice.increment(SERVICE_ID, 3);
-    let tx_json = json!({ "tx_body": tx });
-    let http_client = reqwest::Client::new();
-    let _res = http_client
-        .post("http://localhost:8087/api/explorer/v1/transactions")
-        .json(&tx_json)
-        .send()
-        .unwrap();
-
-    let tx_resp_text = recv_text_msg(&mut tx_client).unwrap();
-
-    let tx_notification = serde_json::from_str::<Notification>(&tx_resp_text).unwrap();
-    match tx_notification {
-        Notification::Transaction(_) => (),
-        other => panic!(
-            "Incorrect notification type (expected Transaction): {:?}",
-            other
-        ),
-    };
-    tx_client.shutdown().unwrap();
-
-    // Open block ws and check it receives data again
-    let mut block_again_client =
-        create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
-            .expect("Cannot connect to node");
-    block_again_client
-        .stream_ref()
-        .set_read_timeout(Some(Duration::from_secs(5)))
-        .unwrap();
-
-    let block_again_resp_text = recv_text_msg(&mut block_again_client).unwrap();
-
-    let block_again_notification =
-        serde_json::from_str::<Notification>(&block_again_resp_text).unwrap();
-    match block_again_notification {
-        Notification::Block(_) => (),
-        other => panic!("Incorrect notification type (expected Block): {:?}", other),
+    testkit.create_block_with_transaction(tx.clone());
+    let notification: Notification = receive_message(&mut tx_client).unwrap();
+    match notification {
+        Notification::Transaction(summary) => assert_eq!(summary.tx_hash, tx.object_hash()),
+        other => panic!("Incorrect notification type: {:?}", other),
     }
-    block_again_client.shutdown().unwrap();
+    tx_client.shutdown().ok();
 
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    // Open block WS client again.
+    let mut block_client = create_ws_client(&block_url);
+    testkit.create_block();
+    let notification: Notification = receive_message(&mut block_client).unwrap();
+    match notification {
+        Notification::Block(block) => assert_eq!(block.height, Height(3)),
+        other => panic!("Incorrect notification type: {:?}", other),
+    }
+    block_client.shutdown().ok();
 }

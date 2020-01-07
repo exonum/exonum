@@ -100,6 +100,11 @@ impl TestKitApi {
         }
     }
 
+    /// Returns the resolved URL for the public API.
+    pub fn public_url(&self, url: &str) -> String {
+        self.test_server.url(&format!("public/{}", url))
+    }
+
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
