@@ -487,8 +487,8 @@ impl Handler<Message> for Session {
             Message::Data(x) => ctx.text(x),
             Message::Close => {
                 ctx.close(Some(ws::CloseReason {
-                    code: ws::CloseCode::Normal,
-                    description: Some("node shutdown".into()),
+                    code: ws::CloseCode::Away,
+                    description: Some("Explorer service shut down".into()),
                 }));
                 ctx.stop();
                 ctx.terminate();

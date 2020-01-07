@@ -14,11 +14,19 @@
 
 //! Simplified node emulation for testing websockets.
 
-// TODO: Test that service terminates WS connections when it's stopped (ECR-4084).
-
+use actix_web::ws::CloseCode;
 use assert_matches::assert_matches;
-use exonum::{crypto::gen_keypair, helpers::Height, merkledb::ObjectHash};
+use exonum::{
+    crypto::gen_keypair,
+    helpers::Height,
+    merkledb::ObjectHash,
+    runtime::{
+        rust::{DefaultInstance, ServiceFactory},
+        SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
+    },
+};
 use exonum_explorer::api::Notification;
+use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::{TestKit, TestKitApi, TestKitBuilder};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
@@ -27,7 +35,7 @@ use websocket::{
     OwnedMessage,
 };
 
-use std::time::Duration;
+use std::{thread, time::Duration};
 
 use exonum_explorer_service::ExplorerFactory;
 
@@ -68,6 +76,15 @@ fn assert_no_message(client: &mut Client<TcpStream>) {
     if let Some(value) = receive_message::<Value>(client) {
         panic!("Received unexpected message: {:?}", value);
     }
+}
+
+fn assert_closure(mut client: Client<TcpStream>) {
+    let msg = OwnedMessage::from(WsMessage::close_because(
+        CloseCode::Away.into(),
+        "Explorer service shut down",
+    ));
+    assert_eq!(client.recv_message().unwrap(), msg);
+    client.shutdown().ok();
 }
 
 fn init_testkit() -> (TestKit, TestKitApi) {
@@ -285,16 +302,14 @@ fn test_dynamic_subscriptions() {
 fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
     let (testkit, api) = init_testkit();
     let url = api.public_url("api/explorer/v1/ws");
-    let mut clients: Vec<_> = (0..5).map(|_| create_ws_client(&url)).collect();
+    let clients: Vec<_> = (0..5).map(|_| create_ws_client(&url)).collect();
 
-    // Shut down the node.
+    // Simulate shutting down the node.
     drop(testkit);
 
     // Each client should receive a `Close` message.
-    let msg = OwnedMessage::from(WsMessage::close_because(1_000, "node shutdown"));
-    for client in &mut clients {
-        assert_eq!(client.recv_message().unwrap(), msg);
-        client.shutdown().ok();
+    for client in clients {
+        assert_closure(client);
     }
 }
 
@@ -336,4 +351,42 @@ fn test_blocks_and_tx_subscriptions() {
         other => panic!("Incorrect notification type: {:?}", other),
     }
     block_client.shutdown().ok();
+}
+
+#[test]
+fn connections_shut_down_on_service_stop() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(ExplorerFactory)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_instance(Supervisor::simple())
+        .create();
+
+    let api = testkit.api();
+    let url = api.public_url("api/explorer/v1/blocks/subscribe");
+    let mut client = create_ws_client(&url);
+
+    let deadline = Height(5);
+    let config = ConfigPropose::new(0, deadline).stop_service(ExplorerFactory::INSTANCE_ID);
+    let config_tx = testkit
+        .us()
+        .service_keypair()
+        .propose_config_change(SUPERVISOR_ID, config);
+    let block = testkit.create_block_with_transaction(config_tx);
+    block[0].status().unwrap();
+
+    // Retrieve blocks from the client.
+    for height in block.height().0..deadline.0 {
+        let notification: Notification = receive_message(&mut client).unwrap();
+        match notification {
+            Notification::Block(block) => assert_eq!(block.height, Height(height)),
+            other => panic!("Incorrect notification type: {:?}", other),
+        }
+
+        thread::sleep(Duration::from_millis(50));
+        testkit.create_block();
+    }
+
+    // Service should shut down and send the corresponding message to the client.
+    assert_closure(client);
 }
