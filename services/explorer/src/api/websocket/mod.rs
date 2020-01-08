@@ -12,7 +12,182 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! WebSocket API of the node.
+//! WebSocket API of the explorer service.
+//!
+//! # Overview
+//!
+//! All communication via WebSockets uses JSON encoding.
+//!
+//! The API follows the publisher-subscriber pattern. Clients can subscribe to events. There are
+//! two types of events encapsulated in [`Notification`]:
+//!
+//! - block creation
+//! - commitment of a transaction
+//!
+//! Subscription types are encapsulated in [`SubscriptionType`]. A single client may have
+//! multiple subscriptions.
+//!
+//! Besides pub-sub, clients may send signed transactions wrapped in [`TransactionHex`]. A client
+//! should set subscriptions and send transactions using [`IncomingMessage`] type. The server
+//! responds to each `IncomingMessage` with a [`Response`], which
+//! wraps the response type (`()` for subscriptions, [`TransactionResponse`] for transactions).
+//!
+//! There are three WS endpoints, which differ by the initial subscription for the client:
+//!
+//! - `api/explorer/v1/ws` does not set any subscriptions
+//! - `api/explorer/v1/blocks/subscribe` sets subscription to blocks
+//! - `api/explorer/v1/transactions/subscribe` sets subscription to transactions. The parameters
+//!   of the subscription are encoded in the query as [`TransactionFilter`]
+//!
+//! [`IncomingMessage`]: enum.IncomingMessage.html
+//! [`Response`]: enum.Response.html
+//! [`Notification`]: enum.Notification.html
+//! [`SubscriptionType`]: enum.SubscriptionType.html
+//! [`TransactionHex`]: ../struct.TransactionHex.html
+//! [`TransactionResponse`]: ../struct.TransactionResponse.html
+//! [`TransactionFilter`]: struct.TransactionFilter.html
+//!
+//! # Examples
+//!
+//! Connecting to generic endpoint and setting a subscription:
+//!
+//! ```
+//! # use assert_matches::assert_matches;
+//! # use exonum_explorer_service::ExplorerFactory;
+//! # use exonum_explorer_service::api::websocket::{
+//! #     IncomingMessage, Response, SubscriptionType, Notification,
+//! # };
+//! # use exonum_testkit::TestKitBuilder;
+//! # use std::time::Duration;
+//! use websocket::OwnedMessage;
+//!
+//! fn stringify(data: &impl serde::Serialize) -> OwnedMessage {
+//!     OwnedMessage::Text(serde_json::to_string(data).unwrap())
+//! }
+//!
+//! fn parse<T: serde::de::DeserializeOwned>(data: OwnedMessage) -> T {
+//!     match data {
+//!         OwnedMessage::Text(ref s) => serde_json::from_str(s).unwrap(),
+//!         _ => panic!("Unexpected message"),
+//!     }
+//! }
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_default_rust_service(ExplorerFactory)
+//!     .create();
+//! let api = testkit.api();
+//! let url = api.public_url("api/explorer/v1/ws");
+//! let mut client = websocket::ClientBuilder::new(&url)?.connect_insecure()?;
+//! # client.stream_ref().set_read_timeout(Some(Duration::from_secs(1)))?;
+//!
+//! // Send a subscription message.
+//! let subscription = SubscriptionType::Blocks;
+//! let message = IncomingMessage::SetSubscriptions(vec![subscription]);
+//! client.send_message(&stringify(&message))?;
+//! // The server should respond with an empty response.
+//! let response: Response<()> = parse(client.recv_message()?);
+//! assert_matches!(response, Response::Success { .. });
+//!
+//! // Create a block and check that it is received by the client.
+//! let block = testkit.create_block();
+//! let response = parse::<Notification>(client.recv_message()?);
+//! assert_matches!(
+//!     response,
+//!     Notification::Block(ref header) if *header == block.header
+//! );
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! Sending a transaction and receiving it as a notification:
+//!
+//! ```
+//! # use assert_matches::assert_matches;
+//! # use exonum::{crypto::gen_keypair, runtime::ExecutionError};
+//! # use exonum::runtime::rust::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_derive::*;
+//! # use exonum_explorer_service::ExplorerFactory;
+//! # use exonum_explorer_service::api::{
+//! #     websocket::{IncomingMessage, Response, SubscriptionType, Notification},
+//! #     TransactionHex, TransactionResponse,
+//! # };
+//! # use exonum_testkit::TestKitBuilder;
+//! # use std::time::Duration;
+//! # use websocket::OwnedMessage;
+//! // `stringify` and `parse` functions are defined as in the previous example.
+//! # fn stringify(data: &impl serde::Serialize) -> OwnedMessage {
+//! #     OwnedMessage::Text(serde_json::to_string(data).unwrap())
+//! # }
+//! # fn parse<T: serde::de::DeserializeOwned>(data: OwnedMessage) -> T {
+//! #     match data {
+//! #         OwnedMessage::Text(ref s) => serde_json::from_str(s).unwrap(),
+//! #         _ => panic!("Unexpected message"),
+//! #     }
+//! # }
+//!
+//! #[exonum_interface]
+//! trait ServiceInterface<Ctx> {
+//!     type Output;
+//!     fn do_nothing(&self, ctx: Ctx, _seed: u32) -> Self::Output;
+//! }
+//!
+//! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+//! # #[service_factory(artifact_name = "my-service")]
+//! #[service_dispatcher(implements("ServiceInterface"))]
+//! struct MyService;
+//! // Some implementations skipped for `MyService`...
+//! # impl ServiceInterface<CallContext<'_>> for MyService {
+//! #    type Output = Result<(), ExecutionError>;
+//! #    fn do_nothing(&self, ctx: CallContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
+//! # }
+//! # impl DefaultInstance for MyService {
+//! #     const INSTANCE_ID: u32 = 100;
+//! #     const INSTANCE_NAME: &'static str = "my-service";
+//! # }
+//! # impl Service for MyService {}
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!    .with_default_rust_service(ExplorerFactory)
+//!    .with_default_rust_service(MyService)
+//!    .create();
+//! let api = testkit.api();
+//!
+//! // Signal that we want to receive notifications about `MyService` transactions.
+//! let url = format!(
+//!     "api/explorer/v1/transactions/subscribe?instance_id={}",
+//!     MyService::INSTANCE_ID
+//! );
+//! let mut client = websocket::ClientBuilder::new(&api.public_url(&url))?
+//!     .connect_insecure()?;
+//! # client.stream_ref().set_read_timeout(Some(Duration::from_secs(1)))?;
+//!
+//! // Create a transaction and send it via WS.
+//! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
+//! let tx_hex = TransactionHex::new(&tx);
+//! let message = IncomingMessage::Transaction(tx_hex);
+//! client.send_message(&stringify(&message))?;
+//!
+//! // Receive a notification that the transaction was successfully accepted
+//! // into the memory pool.
+//! let res: Response<TransactionResponse> = parse(client.recv_message()?);
+//! let response = res.into_result().unwrap();
+//! let tx_hash = response.tx_hash;
+//!
+//! // Create a block.
+//! let block = testkit.create_block();
+//! assert_eq!(block.len(), 1); // The block contains the sent transaction.
+//!
+//! // Receive a notification about the committed transaction.
+//! let notification = parse::<Notification>(client.recv_message()?);
+//! assert_matches!(
+//!     notification,
+//!     Notification::Transaction(ref summary) if summary.tx_hash == tx_hash
+//! );
+//! # Ok(())
+//! # }
+//! ```
 
 pub use exonum_explorer::api::websocket::{
     CommittedTransactionSummary, IncomingMessage, Notification, Response, SubscriptionType,

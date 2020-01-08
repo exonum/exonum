@@ -27,9 +27,10 @@
 //! and packages this logic as an Exonum service. Thus, this crate is useful if you want to provide
 //! the way for external apps to query the blockchain info.
 //!
-//! # REST API
+//! # HTTP API
 //!
-//! REST API of the service is documented in the [`api` module](api/index.html).
+//! REST API of the service is documented in the [`api` module](api/index.html), and its
+//! WebSocket API in the [`api::websocket` module](api/websocket/index.html).
 //!
 //! # Examples
 //!
