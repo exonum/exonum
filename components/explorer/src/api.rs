@@ -22,8 +22,9 @@ use exonum::{
     blockchain::Block,
     crypto::Hash,
     helpers::Height,
+    merkledb::BinaryValue,
     messages::{Precommit, Verified},
-    runtime::{CallInfo, ExecutionStatus, InstanceId},
+    runtime::{AnyTx, CallInfo, ExecutionStatus, InstanceId},
 };
 use serde_derive::{Deserialize, Serialize};
 
@@ -152,6 +153,14 @@ impl BlockQuery {
 pub struct TransactionHex {
     /// The hex value of the transaction to be broadcasted.
     pub tx_body: String,
+}
+
+impl TransactionHex {
+    pub fn new(transaction: &Verified<AnyTx>) -> Self {
+        Self {
+            tx_body: hex::encode(transaction.to_bytes()),
+        }
+    }
 }
 
 /// Transaction response.
