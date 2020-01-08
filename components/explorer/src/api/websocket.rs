@@ -79,11 +79,14 @@ impl TransactionFilter {
 #[serde(tag = "result", rename_all = "snake_case")]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum Response<T> {
+    /// Successful response.
     Success {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        response: Option<T>,
+        /// Payload attached to the response.
+        response: T,
     },
+    /// Erroneous response.
     Error {
+        /// Error description.
         description: String,
     },
 }
@@ -91,9 +94,7 @@ pub enum Response<T> {
 impl<T> Response<T> {
     /// Creates a response with the specified value.
     pub fn success(value: T) -> Self {
-        Response::Success {
-            response: Some(value),
-        }
+        Response::Success { response: value }
     }
 
     /// Creates an erroneous response.
@@ -104,7 +105,7 @@ impl<T> Response<T> {
     }
 
     /// Converts response into a `Result`.
-    pub fn into_result(self) -> Result<Option<T>, String> {
+    pub fn into_result(self) -> Result<T, String> {
         match self {
             Response::Success { response } => Ok(response),
             Response::Error { description } => Err(description),
@@ -118,13 +119,6 @@ impl<T> From<Result<T, String>> for Response<T> {
             Ok(value) => Self::success(value),
             Err(description) => Response::Error { description },
         }
-    }
-}
-
-impl Response<()> {
-    /// Creates an empty successful response.
-    pub fn empty() -> Self {
-        Response::Success { response: None }
     }
 }
 

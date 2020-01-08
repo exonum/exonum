@@ -287,7 +287,7 @@ fn test_dynamic_subscriptions() {
     send_message(&mut client, &filters);
     // First response is subscription result.
     let response: Value = receive_message(&mut client).unwrap();
-    assert_eq!(response, json!({ "result": "success" }));
+    assert_eq!(response, json!({ "result": "success", "response": null }));
 
     let tx = alice.increment(SERVICE_ID, 2);
     let block = testkit.create_block_with_transaction(tx);

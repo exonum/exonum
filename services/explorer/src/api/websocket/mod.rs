@@ -392,7 +392,7 @@ impl Session {
                 id: self.id,
                 subscriptions,
             })
-            .map(|_| Response::empty())
+            .map(|_| Response::success(()))
             .unwrap_or_else(Response::error);
         serde_json::to_string(&response).unwrap()
     }
