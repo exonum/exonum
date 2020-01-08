@@ -125,7 +125,7 @@ use exonum_crypto::Hash;
 use failure::Fail;
 
 use std::{
-    fmt, mem,
+    fmt,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -356,8 +356,8 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 /// let helper_thread = thread::spawn(move || {
 ///     let (mut helper, handle) = MigrationHelper::with_handle(db, "test");
 ///     tx.send(handle).unwrap();
-///     // Start migration...
-/// #   thread::sleep(Duration::from_millis(50));
+///     // Emulate some work...
+///     thread::sleep(Duration::from_millis(50));
 ///     // Attempt to merge changes to DB.
 ///     helper.merge()
 /// });
@@ -411,7 +411,8 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
     abort_handle: Arc<AtomicBool>,
-    fork: Fork,
+    // Only equals `None` during merges.
+    fork: Option<Fork>,
     namespace: String,
 }
 
@@ -447,10 +448,15 @@ impl MigrationHelper {
         let this = Self {
             db,
             abort_handle: Arc::clone(&abort_handle.inner),
-            fork,
+            fork: Some(fork),
             namespace: namespace.to_owned(),
         };
         (this, abort_handle)
+    }
+
+    fn fork_ref(&self) -> &Fork {
+        // `unwrap` is safe due to the way we define `fork`
+        self.fork.as_ref().unwrap()
     }
 
     /// Checks if the migration has been aborted via `AbortHandle`.
@@ -460,17 +466,17 @@ impl MigrationHelper {
 
     /// Returns full access to the new version of migrated data.
     pub fn new_data(&self) -> Migration<'_, &Fork> {
-        Migration::new(&self.namespace, &self.fork)
+        Migration::new(&self.namespace, self.fork_ref())
     }
 
     /// Returns the scratchpad for temporary data to use during migration.
     pub fn scratchpad(&self) -> Scratchpad<'_, &Fork> {
-        Scratchpad::new(&self.namespace, &self.fork)
+        Scratchpad::new(&self.namespace, self.fork_ref())
     }
 
     /// Returns readonly access to the old version of migrated data.
     pub fn old_data(&self) -> Prefixed<'_, ReadonlyFork<'_>> {
-        Prefixed::new(&self.namespace, self.fork.readonly())
+        Prefixed::new(&self.namespace, self.fork_ref().readonly())
     }
 
     /// Merges the changes to the migrated data and the scratchpad to the database. Returns an error
@@ -481,16 +487,15 @@ impl MigrationHelper {
     ///
     /// [`flush_migration`]: fn.flush_migration.html
     pub fn merge(&mut self) -> Result<(), MigrationError> {
+        let fork = self.fork.take().unwrap();
+        let patch = fork.into_patch();
         if self.is_aborted() {
-            return Err(MigrationError::Aborted);
+            Err(MigrationError::Aborted)
+        } else {
+            self.db.merge(patch).map_err(MigrationError::Merge)?;
+            self.fork = Some(self.db.fork());
+            Ok(())
         }
-
-        let fork = mem::replace(&mut self.fork, self.db.fork());
-        self.db
-            .merge(fork.into_patch())
-            .map_err(MigrationError::Merge)?;
-        self.fork = self.db.fork();
-        Ok(())
     }
 
     /// Executes the provided closure in a loop until all persistent iterators instantiated
@@ -520,14 +525,14 @@ impl MigrationHelper {
     ///
     /// [`flush_migration`]: fn.flush_migration.html
     pub fn finish(self) -> Result<Hash, MigrationError> {
-        if self.is_aborted() {
-            return Err(MigrationError::Aborted);
-        }
-
-        let patch = self.fork.into_patch();
+        let patch = self.fork.unwrap().into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
-        self.db.merge(patch).map_err(MigrationError::Merge)?;
-        Ok(hash)
+        if self.abort_handle.load(Ordering::SeqCst) {
+            Err(MigrationError::Aborted)
+        } else {
+            self.db.merge(patch).map_err(MigrationError::Merge)?;
+            Ok(hash)
+        }
     }
 }
 
@@ -1055,25 +1060,37 @@ mod tests {
         Ok(())
     }
 
+    struct MigrationRig {
+        thread_handle: thread::JoinHandle<Result<Hash, MigrationError>>,
+        abort_handle: AbortHandle,
+    }
+
+    impl MigrationRig {
+        fn new(db: &Arc<TemporaryDB>) -> Self {
+            let db = Arc::clone(db) as Arc<dyn Database>;
+            let (tx, rx) = mpsc::channel();
+            let thread_handle = thread::spawn(move || {
+                let (helper, handle) = MigrationHelper::with_handle(db, "test");
+                tx.send(handle).unwrap();
+                thread::sleep(Duration::from_millis(50));
+                helper.new_data().get_entry("entry").set(1_u32);
+                helper.finish()
+            });
+
+            Self {
+                thread_handle,
+                abort_handle: rx.recv().unwrap(),
+            }
+        }
+    }
+
     #[test]
     fn aborting_migration() {
         let db = Arc::new(TemporaryDB::new());
-        let db_ = Arc::clone(&db) as Arc<dyn Database>;
+        let rig = MigrationRig::new(&db);
+        drop(rig.abort_handle);
 
-        let (tx, rx) = mpsc::channel();
-        let thread_handle = thread::spawn(move || {
-            let (helper, handle) = MigrationHelper::with_handle(db_, "test");
-            tx.send(handle).unwrap();
-
-            thread::sleep(Duration::from_millis(50));
-            assert!(helper.is_aborted());
-            helper.new_data().get_entry("entry").set(1_u32);
-            helper.finish()
-        });
-
-        let handle = rx.recv().unwrap();
-        drop(handle);
-        let res = thread_handle.join().unwrap();
+        let res = rig.thread_handle.join().unwrap();
         assert_matches!(res.unwrap_err(), MigrationError::Aborted);
         let snapshot = db.snapshot();
         let migration = Migration::new("test", &snapshot);
@@ -1083,22 +1100,10 @@ mod tests {
     #[test]
     fn forgetting_abort_handle() {
         let db = Arc::new(TemporaryDB::new());
-        let db_ = Arc::clone(&db) as Arc<dyn Database>;
+        let rig = MigrationRig::new(&db);
+        rig.abort_handle.forget();
 
-        let (tx, rx) = mpsc::channel();
-        let thread_handle = thread::spawn(move || {
-            let (helper, handle) = MigrationHelper::with_handle(db_, "test");
-            tx.send(handle).unwrap();
-
-            thread::sleep(Duration::from_millis(50));
-            assert!(!helper.is_aborted());
-            helper.new_data().get_entry("entry").set(1_u32);
-            helper.finish()
-        });
-
-        let handle = rx.recv().unwrap();
-        handle.forget();
-        let res = thread_handle.join().unwrap();
+        let res = rig.thread_handle.join().unwrap();
         res.unwrap();
         let snapshot = db.snapshot();
         let migration = Migration::new("test", &snapshot);
@@ -1107,20 +1112,10 @@ mod tests {
 
     #[test]
     fn abort_handle_is_finished() {
-        let db = TemporaryDB::new();
-        let (tx, rx) = mpsc::channel();
-        let thread_handle = thread::spawn(move || {
-            let (helper, handle) = MigrationHelper::with_handle(db, "test");
-            tx.send(handle).unwrap();
-
-            thread::sleep(Duration::from_millis(50));
-            helper.new_data().get_entry("entry").set(1_u32);
-            helper.finish().unwrap();
-        });
-
-        let handle = rx.recv().unwrap();
-        assert!(!handle.is_finished());
-        thread_handle.join().unwrap();
-        assert!(handle.is_finished());
+        let db = Arc::new(TemporaryDB::new());
+        let rig = MigrationRig::new(&db);
+        assert!(!rig.abort_handle.is_finished());
+        rig.thread_handle.join().unwrap().unwrap();
+        assert!(rig.abort_handle.is_finished());
     }
 }
