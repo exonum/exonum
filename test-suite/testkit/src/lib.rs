@@ -22,16 +22,16 @@
 //!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
 //!     helpers::Height,
-//!     runtime::{
-//!         rust::{ServiceFactory, CallContext, Service},
-//!         BlockchainData, SnapshotExt, ExecutionError,
-//!     },
 //! };
 //! use serde_derive::*;
 //! use exonum_derive::*;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! use exonum_rust_runtime::{
+//!     ServiceFactory, CallContext, Service,
+//!     BlockchainData, SnapshotExt, ExecutionError,
+//! };
 //!
 //! // Simple service implementation.
 //!
@@ -312,10 +312,8 @@ impl TestKit {
     /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
-    /// # use exonum::{
-    /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{rust::{CallContext, Service, ServiceFactory}, ExecutionError},
-    /// # };
+    /// # use exonum::crypto::{PublicKey, Hash, SecretKey};
+    /// # use exonum_rust_runtime::{CallContext, Service, ServiceFactory, ExecutionError};
     /// #
     /// // Suppose we test this service interface:
     /// #[exonum_interface]
@@ -688,9 +686,9 @@ impl TestKit {
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
-/// #     runtime::{BlockchainData, rust::{AfterCommitContext, RustRuntime, Service}},
 /// #     helpers::Height,
 /// # };
+/// # use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, BlockchainData};
 /// # use exonum_merkledb::{Fork, Snapshot};
 /// # use exonum_testkit::{StoppedTestKit, TestKit};
 /// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
