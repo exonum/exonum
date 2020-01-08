@@ -32,6 +32,8 @@ use crate::{
     },
 };
 
+const DELAY: Duration = Duration::from_millis(25);
+
 #[derive(Debug)]
 struct MigrationRuntime;
 
@@ -129,24 +131,24 @@ impl Runtime for MigrationRuntime {
 }
 
 fn simple_delayed_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    thread::sleep(Duration::from_millis(200));
+    thread::sleep(DELAY);
     Ok(())
 }
 
 fn erroneous_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(DELAY);
     Err(MigrationError::new("This migration is unsuccessful!"))
 }
 
 fn panicking_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(DELAY);
     panic!("This migration is unsuccessful!");
 }
 
 fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    for i in 0_u32..10 {
+    for i in 1_u32..=2 {
         ctx.helper.new_data().get_proof_entry("entry").set(i);
-        thread::sleep(Duration::from_millis(15));
+        thread::sleep(DELAY / 2);
         ctx.helper.merge()?;
     }
     Ok(())
@@ -229,7 +231,7 @@ impl Rig {
             // Don't wait at all.
         } else {
             // Wait for the script to finish.
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(DELAY * 3);
             if local_result == LocalResult::InMemory {
                 // Keep the local result in memory.
             } else {
@@ -295,6 +297,7 @@ impl Rig {
     }
 }
 
+/// Tests basic workflow of migration initiation.
 #[test]
 fn migration_workflow() {
     let mut rig = Rig::new();
@@ -343,7 +346,7 @@ fn migration_workflow() {
     }
 
     // Wait until the migration script is completed and check that its result is recorded.
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(DELAY * 3);
 
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
@@ -374,6 +377,7 @@ fn migration_workflow() {
         .contains_key(&service.name));
 }
 
+/// Tests fast-forwarding a migration.
 #[test]
 fn fast_forward_migration() {
     let mut rig = Rig::new();
@@ -397,7 +401,7 @@ fn fast_forward_migration() {
     assert_eq!(state.data_version, Some(Version::new(0, 5, 2)));
 }
 
-/// Tests checks performed by the dispatcher.
+/// Tests checks performed by the dispatcher during migration initiation.
 #[test]
 fn migration_immediate_errors() {
     let mut rig = Rig::new();
@@ -478,6 +482,7 @@ fn migration_immediate_errors() {
     );
 }
 
+/// Tests that an unfinished migration script is restarted on node restart.
 #[test]
 fn migration_is_resumed_after_node_restart() {
     let mut rig = Rig::new();
@@ -496,12 +501,11 @@ fn migration_is_resumed_after_node_restart() {
     // Emulate node restart. Note that the old migration thread will continue running
     // as a detached thread, but since `Dispatcher.migrations` is dropped, the migration
     // will be aborted.
-    thread::sleep(Duration::from_millis(20));
     rig.restart();
     let threads = &rig.dispatcher().migrations.threads;
     assert!(threads.contains_key(&service.name));
 
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(DELAY * 3);
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -509,6 +513,7 @@ fn migration_is_resumed_after_node_restart() {
     assert_eq!(res.0, Ok(HashTag::empty_map_hash()));
 }
 
+/// Tests that migration scripts are timely aborted on node stop.
 #[test]
 fn migration_scripts_are_timely_aborted() {
     let mut rig = Rig::new();
@@ -523,27 +528,31 @@ fn migration_scripts_are_timely_aborted() {
         .unwrap();
     rig.create_block(fork);
 
-    thread::sleep(Duration::from_millis(50));
+    thread::sleep(DELAY * 2 / 3);
     let blockchain = rig.stop();
-    thread::sleep(Duration::from_millis(50));
+    thread::sleep(DELAY * 10);
     let snapshot = blockchain.snapshot();
     let migration = Migration::new(&service.name, &snapshot);
-    // The `migration_modifying_state_hash` script should complete several merges
-    // (approximately `floor(50 / 15) = 3`), but not all of them.
+    // The `migration_modifying_state_hash` script should complete the 0 or 1 merge, but not
+    // 2 merges.
     let val = migration
         .get_proof_entry::<_, u32>("entry")
         .get()
         .unwrap_or(0);
-    assert!(val < 5);
+    assert!(val < 2);
 
     // New merges should not be added with time.
-    thread::sleep(Duration::from_millis(50));
+    thread::sleep(DELAY * 2);
     let snapshot = blockchain.snapshot();
     let migration = Migration::new(&service.name, &snapshot);
-    let new_val = migration.get_proof_entry::<_, u32>("entry").get().unwrap();
+    let new_val = migration
+        .get_proof_entry::<_, u32>("entry")
+        .get()
+        .unwrap_or(0);
     assert_eq!(val, new_val);
 }
 
+/// Tests that a completed migration script is not launched again.
 #[test]
 fn completed_migration_is_not_resumed_after_node_restart() {
     let mut rig = Rig::new();
@@ -559,7 +568,7 @@ fn completed_migration_is_not_resumed_after_node_restart() {
         .unwrap();
     rig.create_block(fork);
 
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(DELAY * 3);
     rig.create_block(rig.blockchain.fork());
     // Migration should be completed.
     let threads = &rig.dispatcher().migrations.threads;
@@ -571,6 +580,7 @@ fn completed_migration_is_not_resumed_after_node_restart() {
     assert!(threads.is_empty());
 }
 
+/// Tests that an error in a migration script is reflected in the local migration result.
 fn test_erroneous_migration(artifact_name: &str) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact(artifact_name, "0.3.0".parse().unwrap());
@@ -586,7 +596,7 @@ fn test_erroneous_migration(artifact_name: &str) {
     rig.create_block(fork);
 
     // Wait for the migration script to complete.
-    thread::sleep(Duration::from_millis(1_000));
+    thread::sleep(DELAY * 3);
 
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
@@ -608,6 +618,7 @@ fn migration_with_panic() {
     test_erroneous_migration("bad");
 }
 
+/// Tests that concurrent migrations with the same artifact are independent.
 #[test]
 fn concurrent_migrations_to_same_artifact() {
     let mut rig = Rig::new();
@@ -636,7 +647,7 @@ fn concurrent_migrations_to_same_artifact() {
     assert!(!threads.contains_key(&another_service.name));
 
     // ...and one more in the following block.
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(DELAY * 2 / 3);
     let fork = rig.blockchain.fork();
     rig.dispatcher()
         .initiate_migration(&fork, new_artifact.clone(), &another_service.name)
@@ -648,7 +659,7 @@ fn concurrent_migrations_to_same_artifact() {
     assert!(threads.contains_key(&another_service.name));
 
     // Wait for first two migrations to finish.
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(DELAY / 2);
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -664,7 +675,7 @@ fn concurrent_migrations_to_same_artifact() {
     );
 
     // Wait for the third migration to finish.
-    thread::sleep(Duration::from_millis(150));
+    thread::sleep(DELAY);
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -677,6 +688,7 @@ fn concurrent_migrations_to_same_artifact() {
     assert!(threads.is_empty());
 }
 
+/// Tests that migration workflow changes state hash as expected.
 #[test]
 fn migration_influencing_state_hash() {
     let mut rig = Rig::new();
@@ -692,10 +704,10 @@ fn migration_influencing_state_hash() {
     let state_hash = rig.create_block(fork).state_hash;
 
     // Check that the state during migration does not influence the default `state_hash`.
-    for _ in 0..5 {
+    for _ in 0..2 {
         // The sleeping interval is chosen to be larger than the interval of DB merges
         // in the migration script.
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(DELAY * 2 / 3);
 
         let new_state_hash = rig.create_block(rig.blockchain.fork()).state_hash;
         assert_eq!(state_hash, new_state_hash);
@@ -717,9 +729,10 @@ fn migration_influencing_state_hash() {
         aggregator.keys().collect::<Vec<_>>(),
         vec!["service.entry".to_owned()]
     );
-    assert_eq!(aggregator.get("service.entry"), Some(9_u32.object_hash()));
+    assert_eq!(aggregator.get("service.entry"), Some(2_u32.object_hash()));
 }
 
+/// Tests the basic workflow of migration rollback.
 #[test]
 fn migration_rollback_workflow() {
     let mut rig = Rig::new();
@@ -735,7 +748,7 @@ fn migration_rollback_workflow() {
     rig.create_block(fork);
 
     // Wait until the migration is finished locally.
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(DELAY * 3);
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -758,6 +771,7 @@ fn migration_rollback_workflow() {
     assert_eq!(state.data_version, None);
 }
 
+/// Tests the checks performed by the dispatcher during migration rollback.
 #[test]
 fn migration_rollback_invariants() {
     let mut rig = Rig::new();
@@ -803,6 +817,7 @@ fn migration_rollback_invariants() {
     assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
 }
 
+/// Tests that migration rollback aborts locally executed migration script.
 #[test]
 fn migration_rollback_aborts_migration_script() {
     let mut rig = Rig::new();
@@ -831,12 +846,13 @@ fn migration_rollback_aborts_migration_script() {
     assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
 
     // Wait some time to ensure that script doesn't merge changes to the DB.
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(DELAY);
     let snapshot = rig.blockchain.snapshot();
     let migration = Migration::new(&service.name, &snapshot);
     assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
 }
 
+/// Tests that migration rollback erases data created by the migration script.
 #[test]
 fn migration_rollback_erases_migration_data() {
     let mut rig = Rig::new();
@@ -852,11 +868,11 @@ fn migration_rollback_erases_migration_data() {
     rig.create_block(fork);
 
     // Wait until the migration is finished locally.
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(DELAY * 10);
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let migration = Migration::new(&service.name, &snapshot);
-    assert_eq!(migration.get_proof_entry::<_, u32>("entry").get(), Some(9));
+    assert_eq!(migration.get_proof_entry::<_, u32>("entry").get(), Some(2));
 
     let fork = rig.blockchain.fork();
     Dispatcher::rollback_migration(&fork, &service.name).unwrap();
@@ -868,6 +884,7 @@ fn migration_rollback_erases_migration_data() {
     assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
 }
 
+/// Tests basic migration commit workflow.
 #[test]
 fn migration_commit_workflow() {
     let mut rig = Rig::new();
@@ -883,7 +900,7 @@ fn migration_commit_workflow() {
     rig.create_block(fork);
 
     // Wait until the migration is finished locally.
-    thread::sleep(Duration::from_millis(500));
+    thread::sleep(DELAY * 3);
     rig.create_block(rig.blockchain.fork());
 
     let fork = rig.blockchain.fork();
@@ -904,6 +921,7 @@ fn migration_commit_workflow() {
     assert_eq!(state.status, Some(expected_status));
 }
 
+/// Tests checks performed by the dispatcher during migration commit.
 #[test]
 fn migration_commit_invariants() {
     let mut rig = Rig::new();
@@ -950,6 +968,8 @@ fn migration_commit_invariants() {
     assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
 }
 
+/// Tests that a migration commit after the migration script finished locally with an error
+/// leads to node stopping.
 fn test_migration_commit_with_local_error(local_result: LocalResult) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("not-good", "0.3.0".parse().unwrap());
@@ -994,6 +1014,8 @@ fn migration_commit_with_local_error_saved_and_node_restart() {
     test_migration_commit_with_local_error(LocalResult::SavedWithNodeRestart);
 }
 
+/// Tests that a migration commit after the migration script finished locally with another hash
+/// leads to node stopping.
 fn test_migration_commit_with_differing_hash(local_result: LocalResult) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
@@ -1038,6 +1060,8 @@ fn migration_commit_with_differing_hash_saved_and_node_restarted() {
     test_migration_commit_with_differing_hash(LocalResult::SavedWithNodeRestart);
 }
 
+/// Tests that committing a migration with a locally running migration script leads to the node
+/// waiting until the script is completed.
 #[test]
 fn migration_commit_without_completing_script_locally() {
     let mut rig = Rig::new();
@@ -1053,7 +1077,7 @@ fn migration_commit_without_completing_script_locally() {
     rig.create_block(fork);
 
     // Compute migration hash using the knowledge about the end state of migrated data.
-    let migration_hash = rig.migration_hash(&[("test.entry", 9_u32.object_hash())]);
+    let migration_hash = rig.migration_hash(&[("test.entry", 2_u32.object_hash())]);
 
     let fork = rig.blockchain.fork();
     Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
@@ -1086,13 +1110,14 @@ fn migration_commit_without_completing_script_locally() {
 
     // Check that service data has been updated.
     let entry = snapshot.get_proof_entry::<_, u32>("test.entry");
-    assert_eq!(entry.get(), Some(9));
+    assert_eq!(entry.get(), Some(2));
     // Check state aggregation.
     let aggregator = SystemSchema::new(&snapshot).state_aggregator();
-    assert_eq!(aggregator.get("test.entry"), Some(9_u32.object_hash()));
+    assert_eq!(aggregator.get("test.entry"), Some(2_u32.object_hash()));
     assert_eq!(aggregator.object_hash(), state_hash);
 }
 
+/// Tests that the migration workflow is applicable to a migration spanning multiple scripts.
 #[test]
 fn two_part_migration() {
     let mut rig = Rig::new();
