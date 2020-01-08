@@ -40,13 +40,13 @@ use crate::{
     runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
 };
 
-use self::schema::MigrationTransition;
+use self::schema::{MigrationTransition, ModifiedInstanceInfo};
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
     migrations::{
         InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
     },
-    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
 };
 
 mod error;
@@ -608,37 +608,11 @@ impl Dispatcher {
         let pending_artifacts = schema.take_pending_artifacts();
         let modified_instances = schema.take_modified_instances();
 
-        // Blocks until all migrations are completed with the expected outcome.
-        // The node will panic if the local outcome of a migration is unexpected.
-        let committed_migrations = modified_instances.iter().filter(|(_, modified_info)| {
-            modified_info.migration_transition == Some(MigrationTransition::Commit)
-        });
-        for (state, _) in committed_migrations {
-            let migration_hash = state
-                .status
-                .as_ref()
-                .and_then(InstanceStatus::completed_migration_hash)
-                .expect("BUG: No migration hash saved for committed migration");
+        // Process migration commits and rollbacks.
+        self.block_on_migrations(&modified_instances, &mut schema);
+        self.rollback_migrations(&modified_instances, &mut fork);
 
-            let instance_name = &state.spec.name;
-            let local_result = schema.local_migration_result(instance_name);
-            let local_result = self.block_on_migration(instance_name, migration_hash, local_result);
-            schema.add_local_migration_result(instance_name, local_result);
-        }
-
-        // Rollback migrations.
-        let migration_rollbacks = modified_instances.iter().filter(|(_, modified_info)| {
-            modified_info.migration_transition == Some(MigrationTransition::Rollback)
-        });
-        for (state, _) in migration_rollbacks {
-            // Remove the thread corresponding to the migration (if any). This will abort
-            // the migration script since its `AbortHandle` is dropped.
-            let namespace = &state.spec.name;
-            self.migrations.threads.remove(namespace);
-            rollback_migration(&mut fork, namespace);
-        }
-
-        // Check if any migrations have finished. Record migration results in the DB.
+        // Check if any migration scripts have completed locally. Record migration results in the DB.
         let results = self.migrations.take_completed();
         let mut schema = Schema::new(&fork);
         for (instance_name, result) in results {
@@ -709,6 +683,30 @@ impl Dispatcher {
             .add_migration(old_service, data_version, script);
     }
 
+    /// Blocks until all committed migrations are completed with the expected outcome.
+    /// The node will panic if the local outcome of a migration is unexpected.
+    fn block_on_migrations(
+        &mut self,
+        modified_instances: &[(InstanceState, ModifiedInstanceInfo)],
+        schema: &mut Schema<&Fork>,
+    ) {
+        let committed_migrations = modified_instances.iter().filter(|(_, modified_info)| {
+            modified_info.migration_transition == Some(MigrationTransition::Commit)
+        });
+        for (state, _) in committed_migrations {
+            let migration_hash = state
+                .status
+                .as_ref()
+                .and_then(InstanceStatus::completed_migration_hash)
+                .expect("BUG: No migration hash saved for committed migration");
+
+            let instance_name = &state.spec.name;
+            let local_result = schema.local_migration_result(instance_name);
+            let local_result = self.block_on_migration(instance_name, migration_hash, local_result);
+            schema.add_local_migration_result(instance_name, local_result);
+        }
+    }
+
     fn block_on_migration(
         &mut self,
         namespace: &str,
@@ -733,8 +731,7 @@ impl Dispatcher {
         // a consensus failure.
         let res = local_result.0.as_ref();
         let local_hash = *res.unwrap_or_else(|err| {
-            // FIXME: Add a maintenance command for removing local migration result
-            // and hint it here.
+            // FIXME: Add a maintenance command for removing local migration result (ECR-4095).
             panic!(
                 "Migration for service `{}` is committed with migration hash {:?}, \
                  but locally it has finished with an error: {}",
@@ -751,6 +748,23 @@ impl Dispatcher {
         );
 
         local_result
+    }
+
+    fn rollback_migrations(
+        &mut self,
+        modified_instances: &[(InstanceState, ModifiedInstanceInfo)],
+        fork: &mut Fork,
+    ) {
+        let migration_rollbacks = modified_instances.iter().filter(|(_, modified_info)| {
+            modified_info.migration_transition == Some(MigrationTransition::Rollback)
+        });
+        for (state, _) in migration_rollbacks {
+            // Remove the thread corresponding to the migration (if any). This will abort
+            // the migration script since its `AbortHandle` is dropped.
+            let namespace = &state.spec.name;
+            self.migrations.threads.remove(namespace);
+            rollback_migration(fork, namespace);
+        }
     }
 
     /// Make pending artifacts and instances active.

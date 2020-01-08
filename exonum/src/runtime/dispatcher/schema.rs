@@ -251,7 +251,7 @@ impl Schema<&Fork> {
             pending_status,
             Some(MigrationTransition::Start),
         )
-        .ok();
+        .expect("BUG: Cannot add pending service status during migration initialization");
         // Since we've checked in `check_migration_initiation` that the service
         // has no pending status, we assume that it will be added successfully here.
     }
