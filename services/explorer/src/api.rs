@@ -385,12 +385,8 @@ pub use exonum_explorer::{
     TransactionInfo,
 };
 
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse, Query};
 use exonum::{
-    api::{
-        backends::actix::{self as actix_backend, HttpRequest, RawHandler, RequestHandler},
-        ApiBackend, Error as ApiError, FutureResult,
-    },
+    api::{Error as ApiError, FutureResult},
     blockchain::{Blockchain, CallInBlock, Schema},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
@@ -403,9 +399,9 @@ use futures::{Future, IntoFuture, Sink};
 use hex::FromHex;
 use serde_json::json;
 
-use std::{ops::Bound, sync::Arc};
+use std::ops::Bound;
 
-use crate::websocket::{Session, SharedStateRef};
+pub mod websocket;
 
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
@@ -419,10 +415,7 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    pub fn blocks(
-        schema: Schema<&dyn Snapshot>,
-        query: BlocksQuery,
-    ) -> Result<BlocksRange, ApiError> {
+    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
         let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
@@ -485,7 +478,7 @@ impl ExplorerApi {
         })
     }
 
-    pub fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> Result<BlockInfo, ApiError> {
+    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> Result<BlockInfo, ApiError> {
         let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             ApiError::NotFound(format!(
@@ -496,7 +489,7 @@ impl ExplorerApi {
         })
     }
 
-    pub fn transaction_info(
+    fn transaction_info(
         schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> Result<TransactionInfo, ApiError> {
@@ -508,7 +501,7 @@ impl ExplorerApi {
             })
     }
 
-    pub fn transaction_status(
+    fn transaction_status(
         schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> Result<CallStatusResponse, ApiError> {
@@ -537,7 +530,7 @@ impl ExplorerApi {
     }
 
     /// Returns call status of `before_transactions` hook.
-    pub fn before_transactions_status(
+    fn before_transactions_status(
         schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
@@ -548,7 +541,7 @@ impl ExplorerApi {
     }
 
     /// Returns call status of `after_transactions` hook.
-    pub fn after_transactions_status(
+    fn after_transactions_status(
         schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
     ) -> Result<CallStatusResponse, ApiError> {
@@ -558,7 +551,7 @@ impl ExplorerApi {
         Ok(CallStatusResponse { status })
     }
 
-    pub fn add_transaction(
+    fn add_transaction(
         snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
@@ -589,72 +582,8 @@ impl ExplorerApi {
         )
     }
 
-    /// Subscribes to events.
-    pub fn handle_ws<Q>(
-        name: &str,
-        backend: &mut actix_backend::ApiBuilder,
-        blockchain: Blockchain,
-        shared_state: SharedStateRef,
-        extract_query: Q,
-    ) where
-        Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
-    {
-        let index = move |request: HttpRequest| -> Result<HttpResponse, ActixError> {
-            let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
-                let msg = "Server shut down".to_owned();
-                ApiError::NotFound(msg)
-            })?;
-            let query = extract_query(&request)?;
-            ws::start(&request, Session::new(address, vec![query]))
-        };
-        let index = move |req| index(req).into_future().responder();
-
-        backend.raw_handler(RequestHandler {
-            name: name.to_owned(),
-            method: http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
-        });
-    }
-
     /// Adds explorer API endpoints to the corresponding scope.
-    pub fn wire(self, shared_state: SharedStateRef, api_scope: &mut ServiceApiScope) {
-        // Default subscription for blocks.
-        Self::handle_ws(
-            "v1/blocks/subscribe",
-            api_scope.web_backend(),
-            self.blockchain.clone(),
-            shared_state.clone(),
-            |_| Ok(SubscriptionType::Blocks),
-        );
-        // Default subscription for transactions.
-        Self::handle_ws(
-            "v1/transactions/subscribe",
-            api_scope.web_backend(),
-            self.blockchain.clone(),
-            shared_state.clone(),
-            |request| {
-                if request.query().is_empty() {
-                    return Ok(SubscriptionType::Transactions { filter: None });
-                }
-
-                Query::from_request(request, &Default::default())
-                    .map(|query: Query<TransactionFilter>| {
-                        Ok(SubscriptionType::Transactions {
-                            filter: Some(query.into_inner()),
-                        })
-                    })
-                    .unwrap_or(Ok(SubscriptionType::None))
-            },
-        );
-        // Default websocket connection.
-        Self::handle_ws(
-            "v1/ws",
-            api_scope.web_backend(),
-            self.blockchain.clone(),
-            shared_state,
-            |_| Ok(SubscriptionType::None),
-        );
-
+    pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
             .endpoint("v1/blocks", |state, query| {
                 Self::blocks(state.data().for_core(), query)
@@ -679,5 +608,6 @@ impl ExplorerApi {
         api_scope.endpoint_mut("v1/transactions", move |state, query| {
             Self::add_transaction(state.snapshot(), &tx_sender, query)
         });
+        self
     }
 }

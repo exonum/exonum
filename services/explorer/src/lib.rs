@@ -71,9 +71,8 @@ use exonum::{
 use exonum_derive::*;
 
 pub mod api;
-mod websocket;
 
-use crate::{api::ExplorerApi, websocket::SharedState};
+use crate::api::{websocket::SharedState, ExplorerApi};
 
 /// Errors that can occur during explorer service operation.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
@@ -114,7 +113,9 @@ impl Service for ExplorerService {
         let scope = builder
             .with_root_path(ExplorerFactory::INSTANCE_NAME)
             .public_scope();
-        ExplorerApi::new(blockchain).wire(self.shared_state.get_ref(), scope);
+        ExplorerApi::new(blockchain)
+            .wire_rest(scope)
+            .wire_ws(self.shared_state.get_ref(), scope);
     }
 }
 

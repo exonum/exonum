@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! WebSocket API.
+//! WebSocket API of the node.
+
+pub use exonum_explorer::api::websocket::{
+    CommittedTransactionSummary, IncomingMessage, Notification, Response, SubscriptionType,
+    TransactionFilter,
+};
 
 use actix::*;
 use actix_web::ws;
@@ -22,13 +27,7 @@ use exonum::{
     merkledb::ObjectHash,
     messages::SignedMessage,
 };
-use exonum_explorer::api::{
-    websocket::{
-        CommittedTransactionSummary, IncomingMessage, Notification, Response, SubscriptionType,
-        TransactionFilter,
-    },
-    TransactionHex, TransactionResponse,
-};
+use exonum_explorer::api::{TransactionHex, TransactionResponse};
 use futures::Future;
 use hex::FromHex;
 
@@ -39,8 +38,10 @@ use std::{
     time::Duration,
 };
 
+mod glue;
+
 #[derive(Debug, Default)]
-pub struct SharedState {
+pub(crate) struct SharedState {
     inner: Arc<Mutex<SharedStateInner>>,
 }
 
@@ -59,7 +60,7 @@ impl Drop for SharedState {
 }
 
 #[derive(Debug, Clone)]
-pub struct SharedStateRef {
+pub(crate) struct SharedStateRef {
     inner: Weak<Mutex<SharedStateInner>>,
 }
 
@@ -106,7 +107,7 @@ enum Message {
 }
 
 /// This message will terminate server.
-#[derive(Message)]
+#[derive(Debug, Message)]
 struct Terminate;
 
 #[derive(Message)]
@@ -116,29 +117,38 @@ struct Subscribe {
     subscriptions: Vec<SubscriptionType>,
 }
 
-#[derive(Message)]
+impl fmt::Debug for Subscribe {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Subscribe")
+            .field("subscriptions", &self.subscriptions)
+            .finish()
+    }
+}
+
+#[derive(Debug, Message)]
 struct Unsubscribe {
     id: u64,
 }
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 struct UpdateSubscriptions {
     id: u64,
     subscriptions: Vec<SubscriptionType>,
 }
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 struct Broadcast {
     block_hash: Hash,
 }
 
-#[derive(Message)]
+#[derive(Debug, Message)]
 #[rtype("Result<TransactionResponse, failure::Error>")]
 struct Transaction {
     tx: TransactionHex,
 }
 
-pub struct Server {
+pub(crate) struct Server {
     subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
     blockchain: Blockchain,
     next_id: u64,
