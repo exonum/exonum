@@ -102,7 +102,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `DeployConfirmation` structure was renamed to `DeployResult` and extended with
   `success` field. (#1648)
 
-- Error code values were changed. (#1680)
+- Error code values were changed and split into several enum
+  representing sub-groups. (#1680)
 
 #### exonum-merkledb
 
