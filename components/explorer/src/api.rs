@@ -1,3 +1,17 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Types used in the explorer API.
 //!
 //! The types are bundled together with the explorer (rather than the explorer service)
@@ -5,18 +19,19 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::{Block, Schema, TxLocation},
+    blockchain::Block,
     crypto::Hash,
     helpers::Height,
-    merkledb::{access::Access, ListProof},
     messages::{Precommit, Verified},
-    runtime::{CallInfo, ExecutionStatus, InstanceId, MethodId},
+    runtime::{CallInfo, ExecutionStatus, InstanceId},
 };
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use std::ops::Range;
 
 use crate::median_precommits_time;
+
+pub mod websocket;
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -186,64 +201,4 @@ pub struct CallStatusQuery {
     pub height: Height,
     /// Numerical service identifier.
     pub service_id: InstanceId,
-}
-
-/// Summary about a particular transaction in the blockchain (without transaction content).
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommittedTransactionSummary {
-    /// Transaction identifier.
-    pub tx_hash: Hash,
-    /// ID of service.
-    pub instance_id: InstanceId,
-    /// ID of the method within service.
-    pub method_id: MethodId,
-    /// Result of transaction execution.
-    pub status: ExecutionStatus,
-    /// Transaction location in the blockchain.
-    pub location: TxLocation,
-    /// Proof of existence.
-    pub location_proof: ListProof<Hash>,
-    /// Approximate finalization time.
-    pub time: DateTime<Utc>,
-}
-
-impl CommittedTransactionSummary {
-    /// Constructs a transaction summary from the core schema.
-    pub fn new(schema: &Schema<impl Access>, tx_hash: &Hash) -> Option<Self> {
-        let tx = schema.transactions().get(tx_hash)?;
-        let tx = tx.payload();
-        let instance_id = tx.call_info.instance_id;
-        let method_id = tx.call_info.method_id;
-        let location = schema.transactions_locations().get(tx_hash)?;
-        let tx_result = schema.transaction_result(location)?;
-        let location_proof = schema
-            .block_transactions(location.block_height())
-            .get_proof(location.position_in_block().into());
-        let time = median_precommits_time(
-            &schema
-                .block_and_precommits(location.block_height())
-                .unwrap()
-                .precommits,
-        );
-        Some(Self {
-            tx_hash: *tx_hash,
-            instance_id,
-            method_id,
-            status: ExecutionStatus(tx_result),
-            location,
-            location_proof,
-            time,
-        })
-    }
-}
-
-/// Websocket notification message. This enum describes data which is sent
-/// to a WebSocket listener.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Notification {
-    /// Notification about new block.
-    Block(Block),
-    /// Notification about new transaction.
-    Transaction(CommittedTransactionSummary),
 }

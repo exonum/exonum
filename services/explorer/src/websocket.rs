@@ -21,14 +21,16 @@ use exonum::{
     crypto::Hash,
     merkledb::ObjectHash,
     messages::SignedMessage,
-    runtime::{InstanceId, MethodId},
 };
 use exonum_explorer::api::{
-    CommittedTransactionSummary, Notification, TransactionHex, TransactionResponse,
+    websocket::{
+        CommittedTransactionSummary, IncomingMessage, Notification, Response, SubscriptionType,
+        TransactionFilter,
+    },
+    TransactionHex, TransactionResponse,
 };
 use futures::Future;
 use hex::FromHex;
-use serde_derive::*;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -91,53 +93,6 @@ impl SharedStateRef {
             Arbiter::start(|_| Server::new(blockchain))
         });
         Some(addr.clone())
-    }
-}
-
-/// Message coming from a websocket connection.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-#[serde(tag = "type", content = "payload", rename_all = "kebab-case")]
-enum IncomingMessage {
-    /// Set subscription for websocket connection.
-    SetSubscriptions(Vec<SubscriptionType>),
-    /// Send transaction to blockchain.
-    Transaction(TransactionHex),
-}
-
-/// Subscription type (new blocks or committed transactions).
-#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
-pub enum SubscriptionType {
-    /// Subscription to nothing.
-    None,
-    /// Subscription on new blocks.
-    Blocks,
-    /// Subscription on committed transactions.
-    Transactions {
-        /// Optional filter for subscription.
-        filter: Option<TransactionFilter>,
-    },
-}
-
-/// Describe filter for transactions by ID of service and (optionally)
-/// transaction type in service.
-#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
-#[derive(Serialize, Deserialize)]
-pub struct TransactionFilter {
-    /// ID of service.
-    pub instance_id: InstanceId,
-    /// Optional ID of transaction in service (if not set, all transaction of service will be sent).
-    pub method_id: Option<MethodId>,
-}
-
-impl TransactionFilter {
-    /// Create new transaction filter.
-    pub fn new(instance_id: InstanceId, method_id: Option<MethodId>) -> Self {
-        Self {
-            instance_id,
-            method_id,
-        }
     }
 }
 
@@ -412,41 +367,37 @@ impl Session {
         }
     }
 
-    fn process_incoming_message(&mut self, msg: IncomingMessage) -> WsStatus {
+    fn process_incoming_message(&mut self, msg: IncomingMessage) -> String {
         match msg {
             IncomingMessage::SetSubscriptions(subs) => self.set_subscriptions(subs),
             IncomingMessage::Transaction(tx) => self.send_transaction(tx),
         }
     }
 
-    fn set_subscriptions(&mut self, subscriptions: Vec<SubscriptionType>) -> WsStatus {
+    fn set_subscriptions(&mut self, subscriptions: Vec<SubscriptionType>) -> String {
         self.subscriptions = subscriptions.clone();
-        self.server_address
+        let response = self
+            .server_address
             .try_send(UpdateSubscriptions {
                 id: self.id,
                 subscriptions,
             })
-            .map(|_| WsStatus::Success { response: None })
-            .unwrap_or_else(|e| WsStatus::Error {
-                description: e.to_string(),
-            })
+            .map(|_| Response::empty())
+            .unwrap_or_else(Response::error);
+        serde_json::to_string(&response).unwrap()
     }
 
-    fn send_transaction(&mut self, tx: TransactionHex) -> WsStatus {
-        self.server_address
+    fn send_transaction(&mut self, tx: TransactionHex) -> String {
+        let response = self
+            .server_address
             .send(Transaction { tx })
             .wait()
-            .map(|x| match x {
-                Ok(r) => WsStatus::Success {
-                    response: Some(serde_json::to_value(&r).unwrap()),
-                },
-                Err(e) => WsStatus::Error {
-                    description: e.to_string(),
-                },
+            .map(|res| {
+                let res = res.map_err(|e| e.to_string());
+                Response::from(res)
             })
-            .unwrap_or_else(|e| WsStatus::Error {
-                description: e.to_string(),
-            })
+            .unwrap_or_else(Response::error);
+        serde_json::to_string(&response).unwrap()
     }
 }
 
@@ -497,30 +448,19 @@ impl Handler<Message> for Session {
     }
 }
 
-#[serde(tag = "result", rename_all = "snake_case")]
-#[derive(Debug, Serialize, Deserialize)]
-enum WsStatus {
-    Success {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        response: Option<serde_json::Value>,
-    },
-    Error {
-        description: String,
-    },
-}
-
 impl StreamHandler<ws::Message, ws::ProtocolError> for Session {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Ping(msg) => ctx.pong(&msg),
             ws::Message::Close(_) => ctx.stop(),
             ws::Message::Text(ref text) => {
-                let res = serde_json::from_str(text)
+                let response = serde_json::from_str(text)
                     .map(|msg| self.process_incoming_message(msg))
-                    .unwrap_or_else(|e| WsStatus::Error {
-                        description: e.to_string(),
+                    .unwrap_or_else(|err| {
+                        let err = Response::<()>::error(err);
+                        serde_json::to_string(&err).unwrap()
                     });
-                ctx.text(serde_json::to_string(&res).unwrap());
+                ctx.text(response);
             }
             _ => {}
         }

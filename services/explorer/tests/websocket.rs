@@ -25,7 +25,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
     },
 };
-use exonum_explorer::api::Notification;
+use exonum_explorer::api::websocket::Notification;
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::{TestKit, TestKitApi, TestKitBuilder};
 use serde::de::DeserializeOwned;
@@ -283,7 +283,7 @@ fn test_dynamic_subscriptions() {
     testkit.create_block_with_transaction(alice.increment(SERVICE_ID, 1));
     assert_no_message(&mut client);
 
-    let filters = json!({ "type": "set-subscriptions", "payload": [{ "type": "blocks" }]});
+    let filters = json!({ "type": "set_subscriptions", "payload": [{ "type": "blocks" }]});
     send_message(&mut client, &filters);
     // First response is subscription result.
     let response: Value = receive_message(&mut client).unwrap();

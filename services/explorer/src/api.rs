@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -374,7 +374,16 @@
 //! # }
 //! ```
 
-pub use exonum_explorer::{api::*, TransactionInfo};
+pub use exonum_explorer::{
+    api::websocket::{
+        CommittedTransactionSummary, Notification, SubscriptionType, TransactionFilter,
+    },
+    api::{
+        BlockInfo, BlockQuery, BlocksQuery, BlocksRange, CallStatusQuery, CallStatusResponse,
+        TransactionHex, TransactionQuery, TransactionResponse, MAX_BLOCKS_PER_REQUEST,
+    },
+    TransactionInfo,
+};
 
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse, Query};
 use exonum::{
@@ -396,7 +405,7 @@ use serde_json::json;
 
 use std::{ops::Bound, sync::Arc};
 
-use crate::websocket::{Session, SharedStateRef, SubscriptionType, TransactionFilter};
+use crate::websocket::{Session, SharedStateRef};
 
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
