@@ -71,7 +71,7 @@ pub use self::{
     api::{DeployInfoQuery, DeployResponse},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
     deploy_state::DeployState,
-    errors::Error,
+    errors::{ArtifactError, CommonError, ConfigurationError, ServiceError},
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
         DeployResult, ServiceConfig, StartService, StopService, SupervisorConfig,
@@ -280,8 +280,8 @@ impl Service for Supervisor {
         // Load configuration from bytes and store it.
         // Since `Supervisor` is expected to be created at the start of the blockchain, invalid config
         // will cause genesis block creation to fail, and thus blockchain won't start.
-        let config =
-            SupervisorConfig::from_bytes(Cow::from(&params)).map_err(|_| Error::InvalidConfig)?;
+        let config = SupervisorConfig::from_bytes(Cow::from(&params))
+            .map_err(|_| ConfigurationError::InvalidConfig)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         schema.public.configuration.set(config);

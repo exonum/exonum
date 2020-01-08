@@ -37,9 +37,9 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
-        ArtifactId, BlockchainData, CallInfo, Caller, CommonError, CoreError, DispatcherSchema,
-        ErrorKind, ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId,
-        InstanceSpec, InstanceStatus, MethodId, Runtime,
+        ArtifactId, BlockchainData, CallInfo, Caller, CoreError, DispatcherSchema, ErrorKind,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        InstanceStatus, MethodId, Runtime,
     },
 };
 
@@ -383,7 +383,7 @@ fn test_dispatcher_simple() {
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CommonError::ServiceIdExists));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
     let conflicting_rust_service = InstanceSpec {
         artifact: rust_artifact,
@@ -393,7 +393,7 @@ fn test_dispatcher_simple() {
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CommonError::ServiceNameExists));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNameExists));
 
     // Activate services / artifacts.
     let patch = create_genesis_block(&mut dispatcher, fork);

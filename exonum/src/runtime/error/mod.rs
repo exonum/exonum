@@ -41,12 +41,14 @@ mod tests;
 
 pub use self::{
     common_errors::CommonError, core_errors::CoreError, error_kind::ErrorKind,
-    error_match::ErrorMatch, execution_error::ExecutionError, execution_status::ExecutionStatus,
+    execution_status::ExecutionStatus,
 };
 
 use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_proto::ProtobufConvert;
+
+use failure::Fail;
 
 use std::{
     fmt::{self, Display},
@@ -55,6 +57,8 @@ use std::{
 
 use super::{InstanceId, MethodId};
 use crate::proto::schema::runtime as runtime_proto;
+
+use self::error_match::StringMatch;
 
 /// Trait representing an error type defined in the service or runtime code.
 ///
@@ -111,6 +115,71 @@ pub trait ExecutionFail {
     fn with_description(&self, description: impl Display) -> ExecutionError {
         ExecutionError::new(self.kind(), description.to_string())
     }
+}
+
+/// Result of unsuccessful runtime execution.
+///
+/// An execution error consists of:
+///
+/// - an [error kind][`ErrorKind`]
+/// - call information (runtime ID and, if appropriate, [`CallSite`] where the error has occurred)
+/// - an optional description
+///
+/// Call information is added by the core automatically; it is impossible to add from the service
+/// code. It *is* possible to inspect the call info for an error that was returned by a service
+/// though.
+///
+/// The error kind and call info affect the blockchain state hash, while the description does not.
+/// Therefore descriptions are mostly used for developer purposes, not for interaction of
+/// the system with users.
+///
+/// [`ErrorKind`]: enum.ErrorKind.html
+/// [`CallSite`]: struct.CallSite.html
+#[derive(Clone, Debug, Fail, BinaryValue)]
+#[cfg_attr(test, derive(PartialEq))]
+// ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
+// by the caller. It is useful for roundtrip tests, though.
+pub struct ExecutionError {
+    kind: ErrorKind,
+    description: String,
+    runtime_id: Option<u32>,
+    call_site: Option<CallSite>,
+}
+
+/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
+/// an `ExceptionError`, e.g., in tests. The unspecified fields will match any value in the error.
+///
+/// # Examples
+///
+/// ```
+/// use exonum::runtime::{ExecutionError, InstanceId, ErrorMatch};
+/// use exonum_derive::ExecutionFail;
+///
+/// #[derive(Debug, ExecutionFail)]
+/// pub enum Error {
+///     /// Content hash already exists.
+///     HashAlreadyExists = 0,
+///     // other variants...
+/// }
+///
+/// // Identifier of the service that will cause an error.
+/// const SERVICE_ID: InstanceId = 100;
+///
+/// # fn not_run(error: ExecutionError) {
+/// let err: &ExecutionError = // ...
+/// #    &error;
+/// let matcher = ErrorMatch::from_fail(&Error::HashAlreadyExists)
+///     .for_service(SERVICE_ID);
+/// assert_eq!(*err, matcher);
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct ErrorMatch {
+    kind: ErrorKind,
+    description: StringMatch,
+    runtime_id: Option<u32>,
+    instance_id: Option<InstanceId>,
+    call_type: Option<CallType>,
 }
 
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.

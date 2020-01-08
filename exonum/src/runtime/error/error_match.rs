@@ -12,47 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Implementation of `ErrorMatch` methods.
+
 use std::fmt;
 
-use super::{CallType, ErrorKind, ExecutionFail};
+use super::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail};
 
 use crate::runtime::InstanceId;
-
-/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
-/// an `ExceptionError`, e.g., in tests. The unspecified fields will match any value in the error.
-///
-/// # Examples
-///
-/// ```
-/// use exonum::runtime::{ExecutionError, InstanceId, ErrorMatch};
-/// use exonum_derive::ExecutionFail;
-///
-/// #[derive(Debug, ExecutionFail)]
-/// pub enum Error {
-///     /// Content hash already exists.
-///     HashAlreadyExists = 0,
-///     // other variants...
-/// }
-///
-/// // Identifier of the service that will cause an error.
-/// const SERVICE_ID: InstanceId = 100;
-///
-/// # fn not_run(error: ExecutionError) {
-/// let err: &ExecutionError = // ...
-/// #    &error;
-/// let matcher = ErrorMatch::from_fail(&Error::HashAlreadyExists)
-///     .for_service(SERVICE_ID);
-/// assert_eq!(*err, matcher);
-/// # }
-/// ```
-#[derive(Debug)]
-pub struct ErrorMatch {
-    pub(super) kind: ErrorKind,
-    pub(super) description: StringMatch,
-    pub(super) runtime_id: Option<u32>,
-    pub(super) instance_id: Option<InstanceId>,
-    pub(super) call_type: Option<CallType>,
-}
 
 impl ErrorMatch {
     /// Creates a matcher from the provided error.
@@ -125,6 +91,38 @@ impl ErrorMatch {
     pub fn in_call(mut self, call_type: CallType) -> Self {
         self.call_type = Some(call_type);
         self
+    }
+}
+
+impl PartialEq<ErrorMatch> for ExecutionError {
+    fn eq(&self, error_match: &ErrorMatch) -> bool {
+        let kind_matches = self.kind == error_match.kind;
+        let runtime_matches = match (error_match.runtime_id, self.runtime_id) {
+            (None, _) => true,
+            (Some(match_id), Some(id)) => match_id == id,
+            _ => false,
+        };
+        let instance_matches = match (error_match.instance_id, &self.call_site) {
+            (None, _) => true,
+            (Some(match_id), Some(CallSite { instance_id, .. })) => match_id == *instance_id,
+            _ => false,
+        };
+        let call_type_matches = match (&error_match.call_type, &self.call_site) {
+            (None, _) => true,
+            (Some(match_type), Some(CallSite { call_type, .. })) => match_type == call_type,
+            _ => false,
+        };
+        kind_matches
+            && runtime_matches
+            && instance_matches
+            && call_type_matches
+            && error_match.description.matches(&self.description)
+    }
+}
+
+impl PartialEq<ExecutionError> for ErrorMatch {
+    fn eq(&self, other: &ExecutionError) -> bool {
+        other.eq(self)
     }
 }
 

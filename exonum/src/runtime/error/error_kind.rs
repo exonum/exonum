@@ -64,9 +64,9 @@ use crate::proto::schema::runtime as runtime_proto;
 ///
 /// ## `Common` errors
 ///
-/// `Common` errors set provides a various error codes that can occur within `Runtime`
-/// and `Service` lifecycle. They are intended to be used anytime when it makes sense
-/// to use them. See [`CommonError`] for more details.
+/// `Common` errors set provides various error codes that can occur within `Runtime`
+/// and `Service` lifecycle. They are intended to be reused in the service and runtime code instead
+/// of defining new error codes with the same effect. See [`CommonError`] for more details.
 ///
 /// ## `Runtime` errors
 ///

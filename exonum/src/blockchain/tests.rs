@@ -287,10 +287,7 @@ impl Runtime for RuntimeInspector {
         _deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         assert!(self.available.contains(&artifact));
-        if self.deployed.contains(&artifact) {
-            let error = Err(CommonError::ArtifactAlreadyDeployed.into());
-            return Box::new(error.into_future());
-        }
+        assert!(!self.deployed.contains(&artifact));
 
         self.deployed.push(artifact);
         Box::new(Ok(()).into_future())

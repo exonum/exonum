@@ -31,14 +31,22 @@ pub enum CoreError {
     IncorrectRuntime = 0,
     /// Artifact identifier is unknown.
     UnknownArtifactId = 1,
+    /// Artifact with the given identifier is already deployed.
+    ArtifactAlreadyDeployed = 2,
+    /// Artifact with the given identifier is not deployed.
+    ArtifactNotDeployed = 3,
+    /// Specified service name is already used.
+    ServiceNameExists = 4,
+    /// Specified service identifier is already used.
+    ServiceIdExists = 5,
     /// Specified service is not active.
-    ServiceNotActive = 2,
+    ServiceNotActive = 6,
     /// Suitable runtime for the given service instance ID is not found.
-    IncorrectInstanceId = 3,
+    IncorrectInstanceId = 7,
     /// Maximum depth of the call stack has been reached.
-    StackOverflow = 4,
+    StackOverflow = 8,
     /// Service instance is already transitioning to a new status.
-    ServicePending = 5,
+    ServicePending = 9,
 }
 
 impl CoreError {

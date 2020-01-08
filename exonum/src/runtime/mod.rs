@@ -298,6 +298,10 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - For newly added artifacts, the method is called as the supervisor service decides to deploy
     ///   the artifact.
     /// - After the node restart, the method is called for all the previously deployed artifacts.
+    ///
+    /// Core guarantees that there will be no request to deploy an artifact which is already deployed,
+    /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
+    /// a bug in core.
     // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
     fn deploy_artifact(
         &mut self,
@@ -349,6 +353,10 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Thus, verifying prerequisites
     /// for instantiation and reporting corresponding failures should be performed at this stage
     /// rather than in `update_service_status`.
+    ///
+    /// Core guarantees that there will be no request to start a service instance which is already running,
+    /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
+    /// a bug in core.
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,

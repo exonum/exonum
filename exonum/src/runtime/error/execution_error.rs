@@ -16,12 +16,9 @@
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::execution_status::serde::ExecutionStatus;
-
-use exonum_derive::*;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use failure::{bail, Fail};
+use failure::bail;
 
 use std::{
     any::Any,
@@ -29,41 +26,12 @@ use std::{
     fmt::{self, Display},
 };
 
-use super::{ErrorKind, ErrorMatch};
+use super::{execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError};
 use crate::{
     crypto::{self, Hash},
     proto::schema::runtime as runtime_proto,
     runtime::{CallSite, RuntimeIdentifier},
 };
-
-/// Result of unsuccessful runtime execution.
-///
-/// An execution error consists of:
-///
-/// - an [error kind][`ErrorKind`]
-/// - call information (runtime ID and, if appropriate, [`CallSite`] where the error has occurred)
-/// - an optional description
-///
-/// Call information is added by the core automatically; it is impossible to add from the service
-/// code. It *is* possible to inspect the call info for an error that was returned by a service
-/// though.
-///
-/// The error kind and call info affect the blockchain state hash, while the description does not.
-/// Therefore descriptions are mostly used for developer purposes, not for interaction of
-/// the system with users.
-///
-/// [`ErrorKind`]: enum.ErrorKind.html
-/// [`CallSite`]: struct.CallSite.html
-#[derive(Clone, Debug, Fail, BinaryValue)]
-#[cfg_attr(test, derive(PartialEq))]
-// ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
-// by the caller. It is useful for roundtrip tests, though.
-pub struct ExecutionError {
-    pub(super) kind: ErrorKind,
-    pub(super) description: String,
-    pub(super) runtime_id: Option<u32>,
-    pub(super) call_site: Option<CallSite>,
-}
 
 /// Custom `serde` implementation for `ExecutionError`.
 #[doc(hidden)]
@@ -253,38 +221,6 @@ impl ObjectHash for ExecutionError {
             call_site: self.call_site.clone(),
         };
         crypto::hash(&error_with_empty_description.into_bytes())
-    }
-}
-
-impl PartialEq<ErrorMatch> for ExecutionError {
-    fn eq(&self, error_match: &ErrorMatch) -> bool {
-        let kind_matches = self.kind == error_match.kind;
-        let runtime_matches = match (error_match.runtime_id, self.runtime_id) {
-            (None, _) => true,
-            (Some(match_id), Some(id)) => match_id == id,
-            _ => false,
-        };
-        let instance_matches = match (error_match.instance_id, &self.call_site) {
-            (None, _) => true,
-            (Some(match_id), Some(CallSite { instance_id, .. })) => match_id == *instance_id,
-            _ => false,
-        };
-        let call_type_matches = match (&error_match.call_type, &self.call_site) {
-            (None, _) => true,
-            (Some(match_type), Some(CallSite { call_type, .. })) => match_type == call_type,
-            _ => false,
-        };
-        kind_matches
-            && runtime_matches
-            && instance_matches
-            && call_type_matches
-            && error_match.description.matches(&self.description)
-    }
-}
-
-impl PartialEq<ExecutionError> for ErrorMatch {
-    fn eq(&self, other: &ExecutionError) -> bool {
-        other.eq(self)
     }
 }
 

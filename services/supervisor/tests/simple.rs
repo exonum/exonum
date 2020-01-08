@@ -30,7 +30,8 @@ use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema, Supervisor,
+    supervisor_name, CommonError as TxError, ConfigPropose, Configure, DeployRequest, Schema,
+    Supervisor,
 };
 
 pub fn sign_config_propose_transaction(

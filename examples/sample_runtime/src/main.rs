@@ -35,12 +35,7 @@ use exonum_derive::*;
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 use futures::{Future, IntoFuture};
 
-use std::{
-    cell::Cell,
-    collections::btree_map::{BTreeMap, Entry},
-    thread,
-    time::Duration,
-};
+use std::{cell::Cell, collections::btree_map::BTreeMap, thread, time::Duration};
 
 /// Service instance with a counter.
 #[derive(Debug, Default)]
@@ -70,12 +65,9 @@ enum SampleRuntimeError {
 impl SampleRuntime {
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
-        if !self.deployed_artifacts.contains_key(&spec.artifact) {
-            return Err(CommonError::ArtifactNotDeployed.into());
-        }
-        if self.started_services.contains_key(&spec.id) {
-            return Err(CommonError::ServiceIdExists.into());
-        }
+        // Invariants guaranteed by the core.
+        assert!(self.deployed_artifacts.contains_key(&spec.artifact));
+        assert!(!self.started_services.contains_key(&spec.id));
 
         Ok(SampleService {
             name: spec.name.clone(),
@@ -89,14 +81,13 @@ impl SampleRuntime {
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        match self.deployed_artifacts.entry(artifact) {
-            Entry::Occupied(_) => Err(CommonError::ArtifactAlreadyDeployed.into()),
-            Entry::Vacant(entry) => {
-                println!("Deploying artifact: {}", entry.key());
-                entry.insert(spec);
-                Ok(())
-            }
-        }
+        // Invariant guaranteed by the core
+        assert!(!self.deployed_artifacts.contains_key(&artifact));
+
+        println!("Deploying artifact: {}", &artifact);
+        self.deployed_artifacts.insert(artifact, spec);
+
+        Ok(())
     }
 }
 

@@ -19,10 +19,9 @@ use exonum_merkledb::{
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 
-use super::{ArtifactId, CoreError, InstanceSpec};
 use crate::runtime::{
-    ArtifactState, ArtifactStatus, CommonError, ExecutionError, InstanceId, InstanceQuery,
-    InstanceState, InstanceStatus,
+    ArtifactId, ArtifactState, ArtifactStatus, CoreError, ExecutionError, InstanceId,
+    InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
 };
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
@@ -109,7 +108,7 @@ impl Schema<&Fork> {
     ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact) {
-            return Err(CommonError::ArtifactAlreadyDeployed.into());
+            return Err(CoreError::ArtifactAlreadyDeployed.into());
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
@@ -131,19 +130,19 @@ impl Schema<&Fork> {
     ) -> Result<(), ExecutionError> {
         self.artifacts()
             .get(&spec.artifact)
-            .ok_or(CommonError::ArtifactNotDeployed)?;
+            .ok_or(CoreError::ArtifactNotDeployed)?;
 
         let mut instances = self.instances();
         let mut instance_ids = self.instance_ids();
 
         // Checks that instance name doesn't exist.
         if instances.contains(&spec.name) {
-            return Err(CommonError::ServiceNameExists.into());
+            return Err(CoreError::ServiceNameExists.into());
         }
         // Checks that instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
         if instance_ids.contains(&spec.id) {
-            return Err(CommonError::ServiceIdExists.into());
+            return Err(CoreError::ServiceIdExists.into());
         }
 
         let instance_id = spec.id;

@@ -21,33 +21,18 @@ use std::fmt::Display;
 use crate::runtime::{ExecutionError, ExecutionFail};
 
 /// List of possible dispatcher errors.
-///
-/// Error codes are divided in sub-groups:
-/// - 0-15: Errors related to the runtime logic;
-/// - 16-31: Errors related to the service logic.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "common")]
 pub enum CommonError {
-    // Error codes 0-15: runtime-related errors.
-    /// Artifact with the given identifier is already deployed.
-    ArtifactAlreadyDeployed = 0,
-    /// Artifact with the given identifier is not deployed.
-    ArtifactNotDeployed = 1,
-    /// Specified service name is already used.
-    ServiceNameExists = 2,
-    /// Specified service identifier is already used.
-    ServiceIdExists = 3,
-
-    // Error codes 16-31: service-related errors.
     /// The interface is absent in the service.
-    NoSuchInterface = 16,
+    NoSuchInterface = 0,
     /// The method is absent in the service.
-    NoSuchMethod = 17,
+    NoSuchMethod = 1,
     /// This caller is not authorized to call this method.
-    UnauthorizedCaller = 18,
+    UnauthorizedCaller = 2,
     /// Malformed arguments for calling a service interface method.
-    MalformedArguments = 19,
+    MalformedArguments = 3,
 }
 
 impl CommonError {

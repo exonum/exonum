@@ -14,29 +14,24 @@
 
 use exonum_derive::*;
 
-/// Common errors emitted by transactions during execution.
-///
-/// Errors are divided into sub-groups by the corresponding error codes ranges:
-/// - 0 - 15: Common `Supervisor` errors.
-/// - 16 - 31: Errors related to artifacts.
-/// - 32 - 47: Errors related to service instances.
-/// - 48 - 64: Errors related to configuration changes.
+/// General errors that can occur within supervisor interaction.
+/// Error codes 0-15.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
-pub enum Error {
-    // # General errors that can occur within supervisor interaction.
-    // Error codes 0-31.
-    // ------------------
+pub enum CommonError {
     /// Transaction author is not a validator.
     UnknownAuthor = 0,
     /// Deadline exceeded for the current transaction.
     DeadlineExceeded = 1,
     /// Actual height for transaction is in the past.
     ActualFromIsPast = 2,
+}
 
-    // # Artifact-related errors group.
-    // Error codes 16-31.
-    // ------------------
+/// Artifact-related errors group.
+/// Error codes 16-31.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum ArtifactError {
     /// Artifact has been already deployed.
     AlreadyDeployed = 16,
     /// Artifact identifier has incorrect format.
@@ -47,18 +42,24 @@ pub enum Error {
     DeployRequestNotRegistered = 19,
     /// Start request contains unknown artifact.
     UnknownArtifact = 20,
+}
 
-    // # Instance-related errors group.
-    // Error codes 32-47.
-    // ------------------
+/// Instance-related errors group.
+/// Error codes 32-47.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum ServiceError {
     /// Instance with the given name already exists.
     InstanceExists = 32,
     /// Instance name is incorrect.
     InvalidInstanceName = 33,
+}
 
-    // # Configuration-related errors group.
-    // Error codes 48-64.
-    // -------------------
+/// Configuration-related errors group.
+/// Error codes 48-64.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum ConfigurationError {
     /// Active configuration change proposal already exists.
     ConfigProposeExists = 48,
     /// Malformed configuration change proposal.

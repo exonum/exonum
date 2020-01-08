@@ -25,9 +25,9 @@ use exonum_merkledb::ObjectHash;
 use std::collections::HashSet;
 
 use super::{
-    configure::ConfigureMut, ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote,
-    DeployRequest, DeployResult, DeployState, Error, SchemaImpl, StartService, StopService,
-    Supervisor,
+    configure::ConfigureMut, ArtifactError, CommonError as SupervisorCommonError, ConfigChange,
+    ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigurationError, DeployRequest,
+    DeployResult, DeployState, SchemaImpl, ServiceError, StartService, StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -76,9 +76,9 @@ impl StartService {
     fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
             .validate()
-            .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
+            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
         InstanceSpec::is_valid_name(&self.name)
-            .map_err(|e| Error::InvalidInstanceName.with_description(e))?;
+            .map_err(|e| ServiceError::InvalidInstanceName.with_description(e))?;
 
         let dispatcher_data = context.data().for_dispatcher();
 
@@ -90,7 +90,7 @@ impl StartService {
                 &self.artifact.name,
             );
 
-            let err = Error::UnknownArtifact.with_description(format!(
+            let err = ArtifactError::UnknownArtifact.with_description(format!(
                 "Discarded start of service {} from the unknown artifact {}.",
                 &self.name, &self.artifact.name,
             ));
@@ -99,7 +99,7 @@ impl StartService {
 
         // Check that there is no instance with the same name.
         if dispatcher_data.get_instance(self.name.as_str()).is_some() {
-            return Err(Error::InstanceExists.with_description(format!(
+            return Err(ServiceError::InstanceExists.with_description(format!(
                 "Discarded an attempt to start of the already started instance {}.",
                 &self.name
             )));
@@ -116,16 +116,18 @@ impl StopService {
             .for_dispatcher()
             .get_instance(self.instance_id)
             .ok_or_else(|| {
-                Error::MalformedConfigPropose
+                ConfigurationError::MalformedConfigPropose
                     .with_description("Instance with the specified ID is absent.")
             })?;
 
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
-            _ => Err(Error::MalformedConfigPropose.with_description(format!(
-                "Discarded an attempt to stop the already stopped service instance: {}",
-                instance.spec.name
-            ))),
+            _ => Err(
+                ConfigurationError::MalformedConfigPropose.with_description(format!(
+                    "Discarded an attempt to stop the already stopped service instance: {}",
+                    instance.spec.name
+                )),
+            ),
         }
     }
 }
@@ -148,7 +150,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .data()
             .for_core()
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or(SupervisorCommonError::UnknownAuthor)?;
 
         let current_height = context.data().for_core().height();
 
@@ -158,7 +160,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         }
         // Otherwise verify that the `actual_from` height is in the future.
         else if current_height >= propose.actual_from {
-            return Err(Error::ActualFromIsPast.into());
+            return Err(SupervisorCommonError::ActualFromIsPast.into());
         }
 
         let mut schema = SchemaImpl::new(context.service_data());
@@ -167,7 +169,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         if let Some(proposal) = schema.public.pending_proposal.get() {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
-                return Err(Error::ConfigProposeExists.into());
+                return Err(ConfigurationError::ConfigProposeExists.into());
             } else {
                 // Proposal is outdated but was not removed (e.g. because of the panic
                 // during config applying), clean it.
@@ -182,7 +184,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
         // After all the checks verify that configuration number is expected one.
         if propose.configuration_number != schema.get_configuration_number() {
-            return Err(Error::IncorrectConfigurationNumber.into());
+            return Err(ConfigurationError::IncorrectConfigurationNumber.into());
         }
         schema.increase_configuration_number();
 
@@ -208,30 +210,30 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or(SupervisorCommonError::UnknownAuthor)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         let entry = schema
             .public
             .pending_proposal
             .get()
-            .ok_or(Error::ConfigProposeNotRegistered)?;
+            .ok_or(ConfigurationError::ConfigProposeNotRegistered)?;
 
         // Verifies that this config proposal is registered.
         if entry.propose_hash != vote.propose_hash {
-            return Err(Error::ConfigProposeNotRegistered.into());
+            return Err(ConfigurationError::ConfigProposeNotRegistered.into());
         }
 
         let config_propose = entry.config_propose;
         // Verifies that we didn't reach the deadline height.
         if config_propose.actual_from <= core_schema.height() {
-            return Err(Error::DeadlineExceeded.into());
+            return Err(SupervisorCommonError::DeadlineExceeded.into());
         }
         if schema
             .config_confirms
             .confirmed_by(&entry.propose_hash, &author)
         {
-            return Err(Error::AttemptToVoteTwice.into());
+            return Err(ConfigurationError::AttemptToVoteTwice.into());
         }
 
         schema.config_confirms.confirm(&vote.propose_hash, author);
@@ -252,21 +254,24 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         deploy
             .artifact
             .validate()
-            .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
+            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
 
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
         // Verifies that we doesn't reach deadline height.
         if deploy.deadline_height < core_schema.height() {
-            return Err(Error::ActualFromIsPast.into());
+            return Err(SupervisorCommonError::ActualFromIsPast.into());
         }
         let mut schema = SchemaImpl::new(context.service_data());
 
         // Verifies that transaction author is validator.
-        let author = context.caller().author().ok_or(Error::UnknownAuthor)?;
+        let author = context
+            .caller()
+            .author()
+            .ok_or(SupervisorCommonError::UnknownAuthor)?;
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or(SupervisorCommonError::UnknownAuthor)?;
 
         // Verifies that the artifact is not deployed yet.
         if context
@@ -275,7 +280,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .get_artifact(&deploy.artifact)
             .is_some()
         {
-            return Err(Error::AlreadyDeployed.into());
+            return Err(ArtifactError::AlreadyDeployed.into());
         }
 
         // If deployment is already registered, check whether request is initiated
@@ -288,7 +293,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             } else {
                 // Author already confirmed deployment of this artifact,
                 // so it's a duplicate.
-                return Err(Error::DeployRequestAlreadyRegistered.into());
+                return Err(ArtifactError::DeployRequestAlreadyRegistered.into());
             }
         }
 
@@ -312,7 +317,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .request
             .artifact
             .validate()
-            .map_err(|e| Error::InvalidArtifactId.with_description(e))?;
+            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
 
         let core_schema = context.data().for_core();
 
@@ -323,7 +328,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .ok_or(CommonError::UnauthorizedCaller)?;
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownAuthor)?;
+            .ok_or(SupervisorCommonError::UnknownAuthor)?;
         let current_height = core_schema.height();
 
         let schema = SchemaImpl::new(context.service_data());
@@ -344,17 +349,17 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let deploy_request = schema
             .pending_deployments
             .get(&deploy_result.request.artifact)
-            .ok_or(Error::DeployRequestNotRegistered)?;
+            .ok_or(ArtifactError::DeployRequestNotRegistered)?;
 
         // Check that pending deployment is the same as in confirmation.
         if deploy_request != deploy_result.request {
-            let error = ExecutionError::from(Error::DeployRequestNotRegistered);
+            let error = ExecutionError::from(ArtifactError::DeployRequestNotRegistered);
             return Err(error);
         }
 
         // Verify that we didn't reach deadline height.
         if deploy_request.deadline_height < current_height {
-            return Err(Error::DeadlineExceeded.into());
+            return Err(SupervisorCommonError::DeadlineExceeded.into());
         }
 
         drop(schema);
@@ -385,19 +390,19 @@ impl Supervisor {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
-                        return Err(Error::MalformedConfigPropose.with_description(
+                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
                             "Discarded multiple consensus change proposals in one request.",
                         ));
                     }
                     consensus_propose_added = true;
-                    config
-                        .validate()
-                        .map_err(|e| Error::MalformedConfigPropose.with_description(e))?;
+                    config.validate().map_err(|e| {
+                        ConfigurationError::MalformedConfigPropose.with_description(e)
+                    })?;
                 }
 
                 ConfigChange::Service(config) => {
                     if !modified_instances.insert(config.instance_id) {
-                        return Err(Error::MalformedConfigPropose.with_description(
+                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
                             "Discarded multiple service change proposals in one request.",
                         ));
                     }
@@ -407,7 +412,7 @@ impl Supervisor {
 
                 ConfigChange::StartService(start_service) => {
                     if !services_to_start.insert(start_service.name.clone()) {
-                        return Err(Error::MalformedConfigPropose.with_description(
+                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
                             "Discarded multiple instances with the same name in one request.",
                         ));
                     }
@@ -416,7 +421,7 @@ impl Supervisor {
 
                 ConfigChange::StopService(stop_service) => {
                     if !modified_instances.insert(stop_service.instance_id) {
-                        return Err(Error::MalformedConfigPropose.with_description(
+                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
                             "Discarded multiple instances with the same name in one request.",
                         ));
                     }

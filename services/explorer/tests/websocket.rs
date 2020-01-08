@@ -24,7 +24,7 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node},
     runtime::{
         rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        RuntimeInstance,
+        CoreError, ExecutionError, RuntimeInstance,
     },
 };
 use exonum_explorer::api::Notification;
@@ -164,8 +164,7 @@ fn test_send_transaction() {
         response,
         json!({
             "result": "error",
-            "description": "Execution error with code `core:3` occurred: Suitable runtime \
-             for the given service instance ID is not found."
+            "description": ExecutionError::from(CoreError::IncorrectInstanceId).to_string(),
         })
     );
 

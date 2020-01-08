@@ -275,7 +275,7 @@ use crate::{
     helpers::Height,
     runtime::{
         dispatcher::Mailbox,
-        error::{catch_panic, CommonError, ExecutionError, ExecutionFail},
+        error::{catch_panic, ExecutionError, ExecutionFail},
         migrations::{DataMigrationError, MigrateData, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
         InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
@@ -459,7 +459,10 @@ impl RustRuntime {
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
         if self.deployed_artifacts.contains(&artifact) {
-            return Err(CommonError::ArtifactAlreadyDeployed.into());
+            panic!(
+                "BUG: Core requested deploy of already deployed artifact {:?}",
+                artifact
+            );
         }
         if !self.available_artifacts.contains_key(&artifact) {
             let description = format!(
@@ -478,13 +481,22 @@ impl RustRuntime {
 
     fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
         if !self.deployed_artifacts.contains(&spec.artifact) {
-            return Err(CommonError::ArtifactNotDeployed.into());
+            panic!(
+                "BUG: Core requested service instance start ({:?}) of not deployed artifact {:?}",
+                spec.name, spec.artifact
+            );
         }
         if self.started_services.contains_key(&spec.id) {
-            return Err(CommonError::ServiceIdExists.into());
+            panic!(
+                "BUG: Core requested service service instance start ({:?}) with already taken ID",
+                spec
+            );
         }
         if self.started_services_by_name.contains_key(&spec.name) {
-            return Err(CommonError::ServiceNameExists.into());
+            panic!(
+                "BUG: Core requested service service instance start ({:?}) with already taken name",
+                spec
+            );
         }
 
         let service = self.available_artifacts[&spec.artifact].create_instance();

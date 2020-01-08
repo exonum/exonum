@@ -19,7 +19,7 @@ use exonum::{
     crypto::{gen_keypair, Hash},
     helpers::{Height, ValidatorId},
     merkledb::{BinaryValue, HashTag, ObjectHash},
-    runtime::{ErrorKind, ExecutionError},
+    runtime::{CoreError, ErrorKind, ExecutionError},
 };
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
@@ -522,11 +522,10 @@ fn test_explorer_add_invalid_transaction() {
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
         .expect_err("Expected transaction send to finish with error.");
-    let error_body = "Execution error with code `core:3` occurred: Suitable runtime \
-                      for the given service instance ID is not found.";
+    let error_body = ExecutionError::from(CoreError::IncorrectInstanceId).to_string();
     assert_matches!(
         response,
-        ApiError::BadRequest(ref body) if body == error_body
+        ApiError::BadRequest(ref body) if body == &error_body
     );
 }
 

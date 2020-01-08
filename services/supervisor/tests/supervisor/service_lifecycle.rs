@@ -23,7 +23,7 @@ use exonum::{
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
-use exonum_supervisor::{ConfigPropose, Error, Supervisor};
+use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor};
 
 use crate::inc::IncService;
 
@@ -117,7 +117,7 @@ fn stop_non_existent_service() {
 
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing("Instance with the specified ID is absent.")
     )
@@ -141,7 +141,7 @@ fn duplicate_stop_service_request() {
 
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
                 "Discarded multiple instances with the same name in one request."
@@ -174,7 +174,7 @@ fn stop_already_stopped_service() {
 
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&Error::MalformedConfigPropose)
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
                 "Discarded an attempt to stop the already stopped service instance"
