@@ -104,7 +104,7 @@ use exonum_supervisor::{Supervisor, SupervisorConfig};
 use std::sync::Arc;
 
 use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
-use crate::config_manager::DefaultConfigManager;
+pub use crate::config_manager::DefaultConfigManager;
 
 pub mod command;
 pub mod config;
