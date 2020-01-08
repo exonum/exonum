@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-const DELAY: Duration = Duration::from_millis(25);
+const DELAY: Duration = Duration::from_millis(40);
 
 #[derive(Debug)]
 struct MigrationRuntime;
@@ -225,8 +225,17 @@ impl Rig {
         self.blockchain.dispatcher()
     }
 
+    fn migration_threads(&mut self) -> &HashMap<String, MigrationThread> {
+        &self.dispatcher().migrations.threads
+    }
+
+    /// Asserts that no migration scripts are currently being executed.
+    fn assert_no_migration_threads(&mut self) {
+        assert!(self.migration_threads().is_empty());
+    }
+
     /// Waits for migration scripts to finish according to the specified policy.
-    fn wait_migration_scripts(&mut self, local_result: LocalResult) {
+    fn wait_migration_threads(&mut self, local_result: LocalResult) {
         if local_result == LocalResult::None {
             // Don't wait at all.
         } else {
@@ -502,8 +511,7 @@ fn migration_is_resumed_after_node_restart() {
     // as a detached thread, but since `Dispatcher.migrations` is dropped, the migration
     // will be aborted.
     rig.restart();
-    let threads = &rig.dispatcher().migrations.threads;
-    assert!(threads.contains_key(&service.name));
+    assert!(rig.migration_threads().contains_key(&service.name));
 
     thread::sleep(DELAY * 3);
     rig.create_block(rig.blockchain.fork());
@@ -515,7 +523,7 @@ fn migration_is_resumed_after_node_restart() {
 
 /// Tests that migration scripts are timely aborted on node stop.
 #[test]
-fn migration_scripts_are_timely_aborted() {
+fn migration_threads_are_timely_aborted() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
@@ -571,13 +579,15 @@ fn completed_migration_is_not_resumed_after_node_restart() {
     thread::sleep(DELAY * 3);
     rig.create_block(rig.blockchain.fork());
     // Migration should be completed.
-    let threads = &rig.dispatcher().migrations.threads;
-    assert!(threads.is_empty());
+    rig.assert_no_migration_threads();
+    // Check that the local migration result is persisted.
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.local_migration_result(&service.name).is_some());
 
     // Therefore, the script should not resume after blockchain restart.
     rig.restart();
-    let threads = &rig.dispatcher().migrations.threads;
-    assert!(threads.is_empty());
+    rig.assert_no_migration_threads();
 }
 
 /// Tests that an error in a migration script is reflected in the local migration result.
@@ -641,7 +651,7 @@ fn concurrent_migrations_to_same_artifact() {
         .unwrap();
     rig.create_block(fork);
 
-    let threads = &rig.dispatcher().migrations.threads;
+    let threads = rig.migration_threads();
     assert!(threads.contains_key(&service.name));
     assert!(threads.contains_key(&other_service.name));
     assert!(!threads.contains_key(&another_service.name));
@@ -654,7 +664,7 @@ fn concurrent_migrations_to_same_artifact() {
         .unwrap();
     rig.create_block(fork);
 
-    let threads = &rig.dispatcher().migrations.threads;
+    let threads = rig.migration_threads();
     assert_eq!(threads.len(), 3);
     assert!(threads.contains_key(&another_service.name));
 
@@ -668,9 +678,8 @@ fn concurrent_migrations_to_same_artifact() {
     let res = schema.local_migration_result(&other_service.name).unwrap();
     assert_eq!(res.0, Ok(HashTag::empty_map_hash()));
 
-    let threads = &rig.dispatcher().migrations.threads;
     assert_eq!(
-        threads.keys().collect::<Vec<_>>(),
+        rig.migration_threads().keys().collect::<Vec<_>>(),
         vec![&another_service.name]
     );
 
@@ -684,8 +693,7 @@ fn concurrent_migrations_to_same_artifact() {
         .unwrap();
     assert_eq!(res.0, Ok(HashTag::empty_map_hash()));
 
-    let threads = &rig.dispatcher().migrations.threads;
-    assert!(threads.is_empty());
+    rig.assert_no_migration_threads();
 }
 
 /// Tests that migration workflow changes state hash as expected.
@@ -753,8 +761,7 @@ fn migration_rollback_workflow() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     schema.local_migration_result(&service.name).unwrap();
-    let threads = &rig.dispatcher().migrations.threads;
-    assert!(threads.is_empty());
+    rig.assert_no_migration_threads();
 
     // Signal the rollback.
     let fork = rig.blockchain.fork();
@@ -840,8 +847,7 @@ fn migration_rollback_aborts_migration_script() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert!(schema.local_migration_result(&service.name).is_none());
-    let threads = &rig.dispatcher().migrations.threads;
-    assert!(threads.is_empty());
+    rig.assert_no_migration_threads();
     let migration = Migration::new(&service.name, &snapshot);
     assert!(!migration.get_proof_entry::<_, u32>("entry").exists());
 
@@ -983,7 +989,7 @@ fn test_migration_commit_with_local_error(local_result: LocalResult) {
         .unwrap();
     rig.create_block(fork);
 
-    rig.wait_migration_scripts(local_result);
+    rig.wait_migration_threads(local_result);
 
     let fork = rig.blockchain.fork();
     Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap();
@@ -1029,7 +1035,7 @@ fn test_migration_commit_with_differing_hash(local_result: LocalResult) {
         .unwrap();
     rig.create_block(fork);
 
-    rig.wait_migration_scripts(local_result);
+    rig.wait_migration_threads(local_result);
 
     let fork = rig.blockchain.fork();
     Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap();
@@ -1083,7 +1089,7 @@ fn migration_commit_without_completing_script_locally() {
     Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap();
     rig.create_block(fork);
     // Check that the migration script has finished.
-    assert!(rig.dispatcher().migrations.threads.is_empty());
+    rig.assert_no_migration_threads();
 
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
