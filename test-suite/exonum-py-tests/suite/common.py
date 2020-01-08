@@ -9,6 +9,8 @@ from exonum_client import ExonumClient
 from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 from requests.exceptions import ConnectionError
 
+RETRIES_AMOUNT = 20
+
 
 def run_dev_node(application: str) -> ExonumNetwork:
     """Starts a single node in the run-dev mode and returns
@@ -103,9 +105,8 @@ def wait_for_block(network: ExonumNetwork, height: int = 1) -> None:
     for validator_id in range(network.validators_count()):
         host, public_port, private_port = network.api_address(validator_id)
         client = ExonumClient(host, public_port, private_port)
-        end = time.time() + 20
-        while client.public_api.get_block(height).status_code != 200:
-            if time.time() > end:
+        for _ in range(RETRIES_AMOUNT):
+            if client.public_api.get_block(height).status_code == 200:
                 break
             time.sleep(0.5)
 
@@ -115,11 +116,8 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
     for validator_id in range(network.validators_count()):
         host, public_port, private_port = network.api_address(validator_id)
         client = ExonumClient(host, public_port, private_port)
-        end = time.time() + 20
-        while True:
+        for _ in range(RETRIES_AMOUNT):
             try:
-                if time.time() > end:
-                    break
                 client.public_api.health_info()
                 break
             except ConnectionError:
