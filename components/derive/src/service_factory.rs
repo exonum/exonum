@@ -22,7 +22,7 @@ use super::CratePath;
 
 fn is_allowed_artifact_name_char(c: u8) -> bool {
     match c {
-        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-'..=b'.' | b'_' | b':' => true,
+        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'.' | b'_' | b'/' => true,
         _ => false,
     }
 }
@@ -31,7 +31,7 @@ fn is_allowed_artifact_name_char(c: u8) -> bool {
 ///
 /// Only these combination of symbols are allowed:
 ///
-/// `[0..9]`, `[a-z]`, `[A-Z]`, `_`, `-`, `.`, ':'
+/// `[0..9]`, `[a-z]`, `[A-Z]`, `/`, `_`, `-`, `.`.
 fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
     name.as_ref()
         .iter()
@@ -62,7 +62,9 @@ impl ServiceFactory {
         if let Some(ref artifact_name) = self.artifact_name {
             // Check that artifact name contains only allowed characters and is not empty.
             if !check_artifact_name(artifact_name) {
-                panic!("Wrong characters using in artifact name. Use: a-zA-Z0-9 and one of _-.:")
+                panic!(
+                    "Wrong characters used in artifact name. Use only: a-zA-Z0-9 and one of /_.-"
+                )
             }
 
             quote! { #artifact_name }
