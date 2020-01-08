@@ -27,6 +27,10 @@
 //! and packages this logic as an Exonum service. Thus, this crate is useful if you want to provide
 //! the way for external apps to query the blockchain info.
 //!
+//! # REST API
+//!
+//! REST API of the service is documented in the [`api` module](api/index.html).
+//!
 //! # Examples
 //!
 //! ## Use with Testkit
