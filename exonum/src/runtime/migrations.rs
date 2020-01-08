@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@
 //! # Migration Workflow
 //!
 //! For a migration to start, the targeted service must be stopped, and a newer version of
-//! the service artifact needs to be deployed across the network and considered active.
+//! the service artifact needs to be deployed across the network.
 //!
 //! 1. Migration is *initiated* by a call from a supervisor. Once a block with this call is merged,
 //!   all nodes in the network retrieve the migration script via [`Runtime::migrate()`]
@@ -50,8 +50,8 @@
 //!   on different nodes. Service status changes to [`Migrating`].
 //!
 //! 2. After the script is finished on a node, its result becomes available using
-//!   the [`local_migration_result()`] method of the dispatcher schema. Nodes agree these results
-//!   using supervisor capabilities (e.g., via broadcasting transactions).
+//!   the [`local_migration_result()`] method of the dispatcher schema. Nodes synchronize
+//!   these results using supervisor capabilities (e.g., via broadcasting transactions).
 //!
 //! 3. Once the consensus is built up around migration, its result is either *committed* or
 //!   the migration is *rolled back*. Right below, we consider commitment workflow; the rollback
@@ -75,6 +75,11 @@
 //! If the migration is rolled back on step 3, the migrated data is erased, and the service
 //! returns to the [`Stopped`] status. The local migration result is ignored; if the migration
 //! script has not completed locally, it is aborted.
+//!
+//! Deciding when it is appropriate to commit or roll back a migration is the responsibility
+//! of the supervisor service. For example, it may commit the migration once all validators have
+//! submitted identical migration results, and roll back a migration if at least one validator
+//! has reported an error during migration or there is divergence among reported migration results.
 //!
 //! [dispatcher]: ../index.html
 //! [supervisor service]: ../index.html#supervisor-service
@@ -128,6 +133,18 @@ impl From<db_migration::MigrationError> for MigrationError {
 
 /// Atomic migration script.
 ///
+/// # Return Value
+///
+/// A script returns a `Result`. If the script returns [`MigrationError`] constructed
+/// by the script, or if the script panics, then the local outcome of a migration will be set
+/// to an error. This should be considered a last resort measure; migration logic should
+/// prefer to signal inability to perform migration via [`InitMigrationError`] when the migration
+/// script is instantiated.
+///
+/// On the other hand, it is perfectly reasonable to return an error from the script
+/// if it is aborted; i.e., to bubble up errors occurring in [`MigrationHelper`].
+/// An error in this case *does not* set the local migration result.
+///
 /// # Design Recommendations
 ///
 /// Migration scripts may be aborted; see [`MigrationHelper`] docs for more technical details.
@@ -144,6 +161,8 @@ impl From<db_migration::MigrationError> for MigrationError {
 /// Since data changes are stored in RAM before the merge, *not* merging the changes can consume
 /// significant memory if the amount of migrated data is large.
 ///
+/// [`MigrationError`]: enum.MigrationError.html
+/// [`InitMigrationError`]: enum.InitMigrationError.html
 /// [`MigrationHelper`]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/migration/struct.MigrationHelper.html
 /// [migration workflow]: index.html#migration-workflow
 pub struct MigrationScript {
@@ -225,10 +244,9 @@ pub trait MigrateData {
     /// be executed successively in the specified order, flushing the migration to the DB
     /// after each script is completed.
     ///
-    /// Inability to migrate data should be eagerly signalled via an error. While a script may
-    /// fail during execution, this should be used as a last resort measure. It is
-    /// perfectly reasonable to return an error from the script if it [is aborted], though;
-    /// an error in this case *does not* mean that the migration will be considered failed.
+    /// Inability to migrate data should be eagerly signalled via an [`InitMigrationError`]
+    /// returned from this method whenever this is possible. In other words, it should not
+    /// be signalled via an error *within* the script.
     ///
     /// # Expectations
     ///
@@ -245,8 +263,8 @@ pub trait MigrateData {
     /// from the start version. For example, this may be the case if the service version is too old,
     /// or too new.
     ///
-    /// [is aborted]: struct.MigrationScript.html#design-recommendations
     /// [`end_version()`]: struct.MigrationScript.html#method.end_version
+    /// [`InitMigrationError`]: enum.InitMigrationError.html
     fn migration_scripts(
         &self,
         start_version: &Version,
