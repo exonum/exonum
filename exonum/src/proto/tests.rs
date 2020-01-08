@@ -16,6 +16,7 @@ use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
+use pretty_assertions::assert_eq;
 
 use std::{borrow::Cow, collections::HashMap};
 

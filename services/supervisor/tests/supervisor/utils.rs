@@ -32,7 +32,7 @@ use exonum_supervisor::{
     SupervisorInterface,
 };
 
-pub const CFG_CHANGE_HEIGHT: Height = Height(2);
+pub const CFG_CHANGE_HEIGHT: Height = Height(3);
 
 pub const SECOND_SERVICE_ID: InstanceId = 119;
 pub const SECOND_SERVICE_NAME: &str = "change-service";

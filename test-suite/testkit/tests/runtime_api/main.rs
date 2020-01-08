@@ -47,7 +47,7 @@ fn test_exonum_core_protos(api: &TestKitApi) {
         .collect();
 
     let expected_files: HashSet<String> = vec![
-        "ordered_map.proto",
+        "key_value_sequence.proto",
         "blockchain.proto",
         "consensus.proto",
         "doc_tests.proto",

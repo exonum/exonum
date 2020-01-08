@@ -18,8 +18,10 @@ use exonum::{
     keys::Keys,
     node::{Node, NodeApiConfig, NodeConfig},
 };
+use exonum_explorer_service::ExplorerFactory;
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
+
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
-use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
@@ -64,16 +66,22 @@ fn node_config() -> NodeConfig {
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
-
-    let service = CryptocurrencyService;
-    let artifact_id = service.artifact_id();
     let node_config = node_config();
+    let artifact_id = CryptocurrencyService.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_config.consensus.clone())
+        .with_artifact(ExplorerFactory.artifact_id())
+        .with_instance(ExplorerFactory.default_instance())
         .with_artifact(artifact_id.clone())
         .with_instance(artifact_id.into_default_instance(1, "cryptocurrency"))
         .build();
 
-    let with_runtimes = |notifier| vec![RustRuntime::new(notifier).with_factory(service).into()];
+    let with_runtimes = |notifier| {
+        vec![RustRuntime::builder()
+            .with_factory(CryptocurrencyService)
+            .with_factory(ExplorerFactory)
+            .build(notifier)
+            .into()]
+    };
 
     println!("Creating database in temporary dir...");
     let node = Node::new(

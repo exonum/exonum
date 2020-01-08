@@ -13,7 +13,8 @@
 // limitations under the License.
 
 #![no_main]
-#[macro_use] extern crate libfuzzer_sys;
+#[macro_use]
+extern crate libfuzzer_sys;
 extern crate exonum;
 
 use exonum::messages::RawMessage;

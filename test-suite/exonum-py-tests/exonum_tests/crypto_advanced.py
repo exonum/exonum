@@ -152,7 +152,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
         # it should contain 4 txs for wallet creation plus 6 services txs
-        self.assertEqual(client.stats().json()["tx_count"], 10)
+        self.assertEqual(client.public_api.stats().json()["tx_count"], 10)
 
     def test_create_wallet_unique_for_key_pair(self):
         """Tests the transaction with the same keys for different wallets is failed"""
@@ -169,7 +169,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
-                tx_status = client.get_tx_info(tx_response.json()["tx_hash"]).json()["status"]["type"]
+                tx_status = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()["status"]["type"]
                 self.assertEqual(tx_status, "success")
                 # create the wallet with the same keys again
                 tx_same_keys = crypto_client.create_wallet(
@@ -177,7 +177,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 )
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
-                tx_status = client.get_tx_info(tx_same_keys.json()["tx_hash"]).json()["status"]["type"]
+                tx_status = client.public_api.get_tx_info(tx_same_keys.json()["tx_hash"]).json()["status"]["type"]
                 self.assertEqual(tx_status, "service_error")
 
     def test_transfer_funds_insufficient(self):
@@ -197,7 +197,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                         110, alice_keys, bob_keys.public_key.value
                     )
                     subscriber.wait_for_new_event()
-                    tx_info = client.get_tx_info(tx_response.json()["tx_hash"]).json()
+                    tx_info = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()
                     tx_status = tx_info["status"]["type"]
                     self.assertEqual(tx_status, "service_error")
                     alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
@@ -231,7 +231,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     # TODO: Sometimes it fails without time.sleep() [ECR-3876]
                     time.sleep(2)
-                    tx_info = client.get_tx_info(tx_response.json()["tx_hash"]).json()
+                    tx_info = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()
                     tx_status = tx_info["status"]["type"]
                     self.assertEqual(tx_status, "service_error")
 

@@ -144,10 +144,10 @@ impl ops::Not for ChildKind {
 ///
 /// # Binary representation
 ///
-/// | Position in bytes     | Description                   	                    |
+/// | Position in bytes     | Description                                           |
 /// |-------------------    |----------------------------------------------         |
-/// | 0               	    | `ProofPath` kind: (0 is branch, 1 is leaf)            |
-/// | 1..33                 | `Hash` bytes.    	                                    |
+/// | 0                     | `ProofPath` kind: (0 is branch, 1 is leaf)            |
+/// | 1..33                 | `Hash` bytes.                                         |
 /// | 33                    | Total length in bits of `Hash` for branches.          |
 ///
 /// # JSON serialization

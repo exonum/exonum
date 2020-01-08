@@ -39,20 +39,9 @@
 //     clippy::default_trait_access,
 // )]
 
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
 pub use exonum_merkledb;
-#[cfg(feature = "sodiumoxide-crypto")]
-extern crate exonum_sodiumoxide as sodiumoxide;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate serde_json;
 
 // Test dependencies.
 #[cfg(all(test, feature = "long_benchmarks"))]
@@ -69,7 +58,6 @@ pub mod helpers;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
-pub mod explorer;
 pub mod node;
 #[macro_use]
 pub mod runtime;

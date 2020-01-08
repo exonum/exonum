@@ -12,6 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod explorer;
-mod node;
-mod websocket;
+// Storage with keys and values represented as bytes arrays.
+
+syntax = "proto3";
+
+package exonum;
+
+option java_package = "com.exonum.core.messages";
+
+// Some non-scalar key-value pair.
+message KeyValue {
+  string key = 1;
+  bytes value = 2;
+}
+
+// A sequence of key-value pairs.
+message KeyValueSequence {
+  repeated KeyValue entry = 1;
+}

@@ -23,7 +23,7 @@
 //! to add new artifacts.
 //!
 //! The Rust runtime does not provide any level of service isolation from the operation system.
-//! Therefore, the security audit of the deployed artifacts is up to the node administrators.
+//! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
 //!
 //! The artifact interface in the Rust runtime is represented by the
 //! [`ServiceFactory`] trait. The trait creates service instances and provides
@@ -244,10 +244,11 @@
 //! ```
 
 pub use exonum::runtime::{
-    versioning, AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, Caller, DispatcherError,
-    DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail, InstanceDescriptor,
-    InstanceId, InstanceSpec, InstanceStatus, MethodId, RuntimeIdentifier, SnapshotExt,
-    WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    migrations, versioning, AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, CallType,
+    Caller, DispatcherError, DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError,
+    ExecutionFail, ExecutionStatus, InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus,
+    MethodId, RuntimeIdentifier, RuntimeInstance, SnapshotExt, WellKnownRuntime,
+    SUPERVISOR_INSTANCE_ID,
 };
 
 pub use self::{
@@ -268,11 +269,16 @@ use exonum::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
-    runtime::{catch_panic, ExecutionContext, Mailbox, Runtime},
+    runtime::{
+        catch_panic,
+        migrations::{DataMigrationError, MigrateData, MigrationScript},
+        ExecutionContext, Mailbox, Runtime,
+    },
 };
 use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
+use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -283,6 +289,37 @@ mod runtime_api;
 mod service;
 mod stubs;
 
+trait FactoryWithMigrations: ServiceFactory + MigrateData {}
+
+impl<T: ServiceFactory + MigrateData> FactoryWithMigrations for T {}
+
+/// Wrapper around a service factory that does not support migrations.
+#[derive(Debug)]
+struct WithoutMigrations<T>(T);
+
+impl<T: ServiceFactory> ServiceFactory for WithoutMigrations<T> {
+    fn artifact_id(&self) -> ArtifactId {
+        self.0.artifact_id()
+    }
+
+    fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {
+        self.0.artifact_protobuf_spec()
+    }
+
+    fn create_instance(&self) -> Box<dyn Service> {
+        self.0.create_instance()
+    }
+}
+
+impl<T> MigrateData for WithoutMigrations<T> {
+    fn migration_scripts(
+        &self,
+        _start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        Err(DataMigrationError::NotSupported)
+    }
+}
+
 /// Rust runtime entity.
 ///
 /// [Detailed description of the Rust runtime](index.html).
@@ -290,11 +327,17 @@ mod stubs;
 pub struct RustRuntime {
     blockchain: Option<Blockchain>,
     api_notifier: mpsc::Sender<UpdateEndpoints>,
-    available_artifacts: HashMap<ArtifactId, Box<dyn ServiceFactory>>,
+    available_artifacts: HashMap<ArtifactId, Box<dyn FactoryWithMigrations>>,
     deployed_artifacts: HashSet<ArtifactId>,
     started_services: BTreeMap<InstanceId, Instance>,
     started_services_by_name: HashMap<String, InstanceId>,
     changed_services_since_last_block: bool,
+}
+
+/// Builder of the `RustRuntime`.
+#[derive(Debug, Default)]
+pub struct RustRuntimeBuilder {
+    available_artifacts: HashMap<ArtifactId, Box<dyn FactoryWithMigrations>>,
 }
 
 #[derive(Debug)]
@@ -317,22 +360,62 @@ impl Instance {
     }
 }
 
-impl AsRef<dyn Service + 'static> for Instance {
-    fn as_ref(&self) -> &(dyn Service + 'static) {
+impl AsRef<dyn Service> for Instance {
+    fn as_ref(&self) -> &dyn Service {
         self.service.as_ref()
     }
 }
 
-impl RustRuntime {
-    /// Rust runtime name.
-    pub const NAME: &'static str = "rust";
+impl RustRuntimeBuilder {
+    /// Creates a new builder instance.
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    /// Creates a new Rust runtime instance.
-    pub fn new(api_notifier: mpsc::Sender<UpdateEndpoints>) -> Self {
-        Self {
+    /// Adds a new service factory to the runtime. The service factory does not support data
+    /// migrations. Use [`with_migrating_factory`](#method.with_migrating_factory) to add
+    /// a service factory with migration support.
+    ///
+    /// # Return value
+    ///
+    /// Returns a modified `RustRuntime` object for further chaining.
+    pub fn with_factory<S: ServiceFactory>(mut self, service_factory: S) -> Self {
+        let artifact = service_factory.artifact_id();
+        trace!(
+            "Added available artifact {} without migration support",
+            artifact
+        );
+        let service_factory = WithoutMigrations(service_factory);
+        self.available_artifacts
+            .insert(artifact, Box::new(service_factory));
+        self
+    }
+
+    /// Adds a new service factory with migration support to the runtime.
+    ///
+    /// # Return value
+    ///
+    /// Returns a modified `RustRuntime` object for further chaining.
+    pub fn with_migrating_factory<S>(mut self, service_factory: S) -> Self
+    where
+        S: ServiceFactory + MigrateData,
+    {
+        let artifact = service_factory.artifact_id();
+        trace!(
+            "Added available artifact {} with migration support",
+            artifact
+        );
+        self.available_artifacts
+            .insert(artifact, Box::new(service_factory));
+        self
+    }
+
+    /// Completes the build process, converting the builder into a `RustRuntime`.
+    pub fn build(self, api_notifier: mpsc::Sender<UpdateEndpoints>) -> RustRuntime {
+        RustRuntime {
             blockchain: None,
             api_notifier,
-            available_artifacts: Default::default(),
+            available_artifacts: self.available_artifacts,
             deployed_artifacts: Default::default(),
             started_services: Default::default(),
             started_services_by_name: Default::default(),
@@ -340,20 +423,26 @@ impl RustRuntime {
         }
     }
 
+    /// Builds the Rust runtime without connection to the HTTP API. As the name implies,
+    /// this method should only be used for testing.
+    pub fn build_for_tests(self) -> RustRuntime {
+        self.build(mpsc::channel(1).0)
+    }
+}
+
+impl RustRuntime {
+    /// Rust runtime name.
+    pub const NAME: &'static str = "rust";
+
+    /// Returns a new builder for the runtime.
+    pub fn builder() -> RustRuntimeBuilder {
+        RustRuntimeBuilder::new()
+    }
+
     fn blockchain(&self) -> &Blockchain {
         self.blockchain
             .as_ref()
             .expect("Method called before Rust runtime is initialized")
-    }
-
-    /// Adds a new service factory to the runtime and returns
-    /// a modified `RustRuntime` object for further chaining.
-    pub fn with_factory(mut self, service_factory: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        let service_factory = service_factory.into();
-        let artifact = service_factory.artifact_id();
-        trace!("Added available artifact {}", artifact);
-        self.available_artifacts.insert(artifact, service_factory);
-        self
     }
 
     fn add_started_service(&mut self, instance: Instance) {
@@ -413,10 +502,10 @@ impl RustRuntime {
                     },
                 );
                 instance.as_ref().wire_api(&mut builder);
-                (
-                    ["services/", &instance.name].concat(),
-                    ApiBuilder::from(builder),
-                )
+                let root_path = builder
+                    .take_root_path()
+                    .unwrap_or_else(|| ["services/", &instance.name].concat());
+                (root_path, ApiBuilder::from(builder))
             })
             .chain(self::runtime_api::endpoints(self))
             .collect()
@@ -499,10 +588,14 @@ impl Runtime for RustRuntime {
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         match status {
             InstanceStatus::Active => {
-                let instance = self.new_service(spec)?;
+                let instance = self.new_service(spec).expect(
+                    "BUG: Attempt to create a new service instance failed; \
+                     within `instantiate_adding_service` we were able to create a new instance, \
+                     but now we are not.",
+                );
                 self.add_started_service(instance);
             }
 
@@ -511,7 +604,6 @@ impl Runtime for RustRuntime {
             }
         }
         self.changed_services_since_last_block = true;
-        Ok(())
     }
 
     fn execute(

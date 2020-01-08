@@ -93,15 +93,19 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::{RuntimeInstance, WellKnownRuntime},
 };
-use exonum_rust_runtime::{RustRuntime, ServiceFactory};
+use exonum_explorer_service::ExplorerFactory;
+use exonum_rust_runtime::{
+    DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
+};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
 
-use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
-use crate::config_manager::DefaultConfigManager;
+use crate::{
+    command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult},
+    config_manager::DefaultConfigManager,
+};
 
 pub mod command;
 pub mod config;
@@ -112,21 +116,32 @@ mod config_manager;
 
 /// Rust-specific node builder used for constructing a node with a list
 /// of provided services.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct NodeBuilder {
-    services: Vec<Box<dyn ServiceFactory>>,
+    rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
+}
+
+impl Default for NodeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NodeBuilder {
     /// Creates new builder.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            rust_runtime: RustRuntimeBuilder::new()
+                .with_factory(Supervisor)
+                .with_factory(ExplorerFactory),
+            external_runtimes: vec![],
+        }
     }
 
     /// Adds new Rust service to the list of available services.
-    pub fn with_service(mut self, service: impl Into<Box<dyn ServiceFactory>>) -> Self {
-        self.services.push(service.into());
+    pub fn with_service<S: ServiceFactory>(mut self, service: S) -> Self {
+        self.rust_runtime = self.rust_runtime.with_factory(service);
         self
     }
 
@@ -152,10 +167,9 @@ impl NodeBuilder {
             )
             .with_artifact(Supervisor.artifact_id())
             .with_instance(supervisor)
+            .with_artifact(ExplorerFactory.artifact_id())
+            .with_instance(ExplorerFactory.default_instance())
             .build();
-
-            let mut services: Vec<Box<dyn ServiceFactory>> = vec![Supervisor.into()];
-            services.extend(self.services);
 
             let db_options = &run_config.node_config.private_config.database;
             let database: Arc<dyn Database> =
@@ -165,11 +179,9 @@ impl NodeBuilder {
             let config_manager = Box::new(DefaultConfigManager::new(node_config_path));
 
             let with_runtimes = |notifier| {
-                let mut runtime = RustRuntime::new(notifier);
-                for service in services {
-                    runtime = runtime.with_factory(service)
-                }
-                vec![runtime.into()]
+                let mut runtimes = self.external_runtimes;
+                runtimes.push(self.rust_runtime.build(notifier).into());
+                runtimes
             };
 
             let node = Node::new(

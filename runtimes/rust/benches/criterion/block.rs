@@ -55,7 +55,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     node::ApiSender,
 };
-use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory, SnapshotExt};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, SnapshotExt};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -83,8 +83,10 @@ fn create_blockchain(
 ) -> BlockchainMut {
     let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
-    let factory: Box<dyn ServiceFactory> = service.clone().into();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+    let factory = service.clone();
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(factory)
+        .build_for_tests();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(service.artifact_id())
         .with_instance(service.default_instance())
@@ -101,7 +103,6 @@ fn create_blockchain_from_parts(
     BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .build()
-        .unwrap()
 }
 
 fn create_consensus_config_and_blockchain_base(
@@ -353,7 +354,6 @@ mod foreign_interface_call {
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory as _};
-    use futures::sync::mpsc;
     use rand::rngs::StdRng;
     use tempfile::TempDir;
 
@@ -451,8 +451,9 @@ mod foreign_interface_call {
         let db = create_rocksdb(&tempdir);
         let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
-        let factory: Box<_> = Timestamping.into();
-        let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(factory);
+        let rust_runtime = RustRuntime::builder()
+            .with_factory(Timestamping)
+            .build_for_tests();
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
             .with_artifact(Timestamping.artifact_id())
             .with_instance(default_instance(SELF_INTERFACE_SERVICE_ID, "timestamping"))

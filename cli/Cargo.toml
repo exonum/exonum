@@ -13,6 +13,7 @@ description = "Helper crate for secure and convenient configuration of the Exonu
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../exonum" }
+exonum-explorer-service = { version = "0.13.0-rc.2", path = "../services/explorer" }
 exonum-supervisor = { version = "0.13.0-rc.2", path = "../services/supervisor" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../runtimes/rust" }
 structopt = "0.3"

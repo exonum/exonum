@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::services::*;
+//! Module of the rust-protobuf generated files.
 
-include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+// For protobuf generated files.
+#![allow(bare_trait_objects)]
+#![allow(renamed_and_removed_lints)]
 
-use exonum_crypto::proto::*;
+pub use self::migrations::*;
+
+include!(concat!(env!("OUT_DIR"), "/migrations_protobuf_mod.rs"));

@@ -16,25 +16,29 @@ use exonum::{
     api, crypto,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::{RustRuntime, ServiceFactory};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
-
-use exonum_supervisor::{
-    ConfigPropose, DeployConfirmation, DeployRequest, Error as TxError, Supervisor,
-    SupervisorInterface,
+use exonum_rust_runtime::{
+    ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, RustRuntimeBuilder, ServiceFactory,
+    SUPERVISOR_INSTANCE_ID,
 };
+use exonum_supervisor::{
+    ConfigPropose, DeployRequest, DeployResult, Error as TxError, Supervisor, SupervisorInterface,
+};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use crate::{
     inc::{IncInterface, IncService, SERVICE_ID, SERVICE_NAME},
-    utils::build_confirmation_transactions,
+    utils::{build_confirmation_transactions, CFG_CHANGE_HEIGHT},
 };
+
+const DEPLOY_HEIGHT: Height = CFG_CHANGE_HEIGHT;
+const START_HEIGHT: Height = Height(DEPLOY_HEIGHT.0 * 2 + 1);
 
 mod config;
 mod config_api;
 mod consensus_config;
+mod deploy_failures;
 mod inc;
 mod proto;
 mod service_lifecycle;
@@ -60,17 +64,17 @@ fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
 }
 
 fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
-    let artifacts = &api.exonum_api().services().artifacts;
+    let artifacts = &api.dispatcher_info().artifacts;
     artifacts.iter().any(|a| a.name == name)
 }
 
 fn service_instance_exists(api: &TestKitApi, name: &str) -> bool {
-    let services = &api.exonum_api().services().services;
+    let services = &api.dispatcher_info().services;
     services.iter().any(|s| s.spec.name == name)
 }
 
 fn find_instance_id(api: &TestKitApi, instance_name: &str) -> InstanceId {
-    let services = &api.exonum_api().services().services;
+    let services = &api.dispatcher_info().services;
     services
         .iter()
         .find(|service| service.spec.name == instance_name)
@@ -131,7 +135,7 @@ fn deploy_confirmation(
     request: &DeployRequest,
     validator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let confirmation = request.to_owned().into();
+    let confirmation = DeployResult::ok(request.to_owned());
     testkit
         .validator(validator_id)
         .service_keypair()
@@ -173,17 +177,15 @@ fn deploy_default(testkit: &mut TestKit) {
 
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request = deploy_request(artifact.clone(), testkit.height().next());
+    let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(testkit, &request);
     let hash = deploy_artifact(&api, request);
-    testkit.create_block();
-
-    api.exonum_api().assert_tx_success(hash);
+    let block = testkit.create_block();
+    block[hash].status().unwrap();
 
     // Confirmation is ready.
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_hash));
-
-    testkit.create_block();
+    testkit.create_blocks_until(DEPLOY_HEIGHT);
 
     // Confirmation is gone now.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
@@ -195,10 +197,12 @@ fn deploy_default(testkit: &mut TestKit) {
 fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
     let api = testkit.api();
     assert!(!service_instance_exists(&api, instance_name));
-    let request = start_service_request(default_artifact(), instance_name, testkit.height().next());
+
+    let request = start_service_request(default_artifact(), instance_name, START_HEIGHT);
     let hash = start_service(&api, request);
-    testkit.create_block();
-    api.exonum_api().assert_tx_success(hash);
+    let block = testkit.create_block();
+    block[hash].status().unwrap();
+    testkit.create_blocks_until(START_HEIGHT);
 
     let api = testkit.api(); // Update the API
     assert!(service_instance_exists(&api, instance_name));
@@ -251,8 +255,10 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
         .create()
 }
 
-fn add_available_services(runtime: RustRuntime) -> RustRuntime {
-    runtime.with_factory(IncService).with_factory(Supervisor)
+fn available_services() -> RustRuntimeBuilder {
+    RustRuntimeBuilder::new()
+        .with_factory(IncService)
+        .with_factory(Supervisor)
 }
 
 /// Just test that the Inc service works as intended.
@@ -309,16 +315,15 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     let request = deploy_request(artifact.clone(), bad_deadline_height);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
-    testkit.create_block();
+    let block = testkit.create_block();
 
     assert!(!artifact_exists(&api, &artifact.name));
-
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
-    let system_api = api.exonum_api();
+
     let expected_err =
         ErrorMatch::from_fail(&TxError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID);
-    system_api.assert_tx_status(hash, Err(&expected_err));
+    assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
 #[test]
@@ -332,12 +337,11 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     let bad_deadline_height = testkit.height().previous();
     let request = start_service_request(artifact, instance_name, bad_deadline_height);
     let hash = start_service(&api, request);
-    testkit.create_block();
+    let block = testkit.create_block();
 
-    let system_api = api.exonum_api();
     let expected_err =
         ErrorMatch::from_fail(&TxError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID);
-    system_api.assert_tx_status(hash, Err(&expected_err));
+    assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
 #[test]
@@ -350,13 +354,12 @@ fn test_try_run_unregistered_service_instance() {
     let instance_name = "wont_run";
     let request = start_service_request(default_artifact(), instance_name.to_owned(), Height(1000));
     let hash = start_service(&api, request);
-    testkit.create_block();
+    let block = testkit.create_block();
 
-    let system_api = api.exonum_api();
     let expected_err = ErrorMatch::from_fail(&TxError::UnknownArtifact)
         .for_service(SUPERVISOR_INSTANCE_ID)
         .with_any_description();
-    system_api.assert_tx_status(hash, Err(&expected_err));
+    assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
 #[test]
@@ -369,19 +372,19 @@ fn test_bad_artifact_name() {
         name: "does-not-exist".to_owned(),
         version: "1.0.0".parse().unwrap(),
     };
-    let request = deploy_request(bad_artifact.clone(), testkit.height().next());
+    let request = deploy_request(bad_artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
 
-    testkit.create_block();
+    let block = testkit.create_block();
     // The deploy request transaction was executed...
-    api.exonum_api().assert_tx_success(hash);
+    block[hash].status().unwrap();
     // ... but no confirmation was generated ...
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
     testkit.create_block();
 
-    let api = testkit.api(); // update the API
-                             // .. and no artifact was deployed.
+    let api = testkit.api();
+    // ...and no artifact was deployed.
     assert!(!artifact_exists(&api, &bad_artifact.name));
 }
 
@@ -395,19 +398,19 @@ fn test_bad_runtime_id() {
         runtime_id: bad_runtime_id,
         ..IncService.artifact_id()
     };
-    let request = deploy_request(artifact.clone(), testkit.height().next());
+    let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
-    testkit.create_block();
+    let block = testkit.create_block();
 
     // The deploy request transaction was executed...
-    api.exonum_api().assert_tx_success(hash);
+    block[hash].status().unwrap();
     // ... but no confirmation was generated ...
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
     testkit.create_block();
-    let api = testkit.api(); // update the API
-                             // ...and no artifact was deployed.
+    let api = testkit.api();
+    // ...and no artifact was deployed.
     assert!(!artifact_exists(&api, &artifact.name));
 }
 
@@ -422,13 +425,12 @@ fn test_empty_service_instance_name() {
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, empty_instance_name, deadline_height);
     let hash = start_service(&api, request);
-    testkit.create_block();
+    let block = testkit.create_block();
 
-    let system_api = api.exonum_api();
     let expected_err = ErrorMatch::from_fail(&TxError::InvalidInstanceName)
         .with_description_containing("Service instance name should not be empty")
         .for_service(SUPERVISOR_INSTANCE_ID);
-    system_api.assert_tx_status(hash, Err(&expected_err));
+    assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
 #[test]
@@ -439,18 +441,18 @@ fn test_bad_service_instance_name() {
     let api = testkit.api();
     let artifact = default_artifact();
     let bad_instance_name = "\u{2764}";
+
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, bad_instance_name, deadline_height);
     let hash = start_service(&api, request);
-    testkit.create_block();
+    let block = testkit.create_block();
 
-    let system_api = api.exonum_api();
     let expected_description =
         "Service instance name (\u{2764}) contains illegal character, use only: a-zA-Z0-9 and one of _-";
     let expected_err = ErrorMatch::from_fail(&TxError::InvalidInstanceName)
         .with_description_containing(expected_description)
         .for_service(SUPERVISOR_INSTANCE_ID);
-    system_api.assert_tx_status(hash, Err(&expected_err));
+    assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
 #[test]
@@ -467,9 +469,8 @@ fn test_start_service_instance_twice() {
         let deadline = testkit.height().next();
         let request = start_service_request(default_artifact(), instance_name, deadline);
         let hash = start_service(&api, request);
-        testkit.create_block();
-
-        api.exonum_api().assert_tx_success(hash);
+        let block = testkit.create_block();
+        block[hash].status().unwrap();
 
         let api = testkit.api(); // Update the API
         assert!(service_instance_exists(&api, instance_name));
@@ -482,13 +483,12 @@ fn test_start_service_instance_twice() {
         let deadline = testkit.height().next();
         let request = start_service_request(default_artifact(), instance_name, deadline);
         let hash = start_service(&api, request);
-        testkit.create_block();
+        let block = testkit.create_block();
 
-        let system_api = api.exonum_api();
         let expected_err = ErrorMatch::from_fail(&TxError::InstanceExists)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_any_description();
-        system_api.assert_tx_status(hash, Err(&expected_err));
+        assert_eq!(*block[hash].status().unwrap_err(), expected_err);
     }
 }
 
@@ -512,9 +512,8 @@ fn test_start_two_services_in_one_request() {
         .start_service(artifact.clone(), instance_name_2, Vec::default());
 
     let hash = start_service(&api, request);
-    testkit.create_block();
-
-    api.exonum_api().assert_tx_success(hash);
+    let block = testkit.create_block();
+    block[hash].status().unwrap();
 
     let api = testkit.api(); // Update the API
     assert!(service_instance_exists(&api, instance_name_1));
@@ -535,8 +534,7 @@ fn test_restart_node_and_start_service_instance() {
     // Stop the node.
     let stopped_testkit = testkit.stop();
     // ...and start it again with the same service factory.
-    let runtime = add_available_services(stopped_testkit.rust_runtime());
-    let mut testkit = stopped_testkit.resume(vec![runtime]);
+    let mut testkit = stopped_testkit.resume(available_services());
     let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
@@ -564,8 +562,7 @@ fn test_restart_node_and_start_service_instance() {
 
     // Restart the node again.
     let stopped_testkit = testkit.stop();
-    let runtime = add_available_services(stopped_testkit.rust_runtime());
-    let mut testkit = stopped_testkit.resume(vec![runtime]);
+    let mut testkit = stopped_testkit.resume(available_services());
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
@@ -587,19 +584,17 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT.next());
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
     // Send an artifact deploy request from this validator.
-    let deploy_artifact_0_tx_hash = deploy_artifact(&api, request_deploy.clone());
+    deploy_artifact(&api, request_deploy.clone());
     // Emulate an artifact deploy request from the second validator.
-    let deploy_artifact_1_tx_hash =
-        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
+    deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
 
-    testkit.create_block();
-    api.exonum_api()
-        .assert_txs_success(&[deploy_artifact_0_tx_hash, deploy_artifact_1_tx_hash]);
+    let block = testkit.create_block();
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Confirmation is ready.
     assert!(testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
@@ -607,8 +602,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
 
     // Restart the node again after the first block was created.
     let testkit = testkit.stop();
-    let runtime = add_available_services(testkit.rust_runtime());
-    let mut testkit = testkit.resume(vec![runtime]);
+    let mut testkit = testkit.resume(available_services());
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
@@ -630,20 +624,16 @@ fn test_two_validators() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
     // Send an artifact deploy request from this validator.
-    let deploy_artifact_0_tx_hash = deploy_artifact(&api, request_deploy.clone());
-
+    deploy_artifact(&api, request_deploy.clone());
     // Emulate an artifact deploy request from the second validator.
-    let deploy_artifact_1_tx_hash =
-        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
-
-    testkit.create_block();
-    api.exonum_api()
-        .assert_txs_success(&[deploy_artifact_0_tx_hash, deploy_artifact_1_tx_hash]);
+    deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
+    let block = testkit.create_block();
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Emulate a confirmation from the second validator.
     testkit.add_tx(deploy_confirmation_1.clone());
@@ -665,7 +655,7 @@ fn test_two_validators() {
     {
         assert!(!service_instance_exists(&api, instance_name));
         // Add two heights to the deadline: one for block with config proposal and one for confirmation.
-        let deadline = testkit.height().next().next();
+        let deadline = DEPLOY_HEIGHT.next();
         let request_start = start_service_request(default_artifact(), instance_name, deadline);
         let propose_hash = request_start.object_hash();
 
@@ -710,16 +700,14 @@ fn test_multiple_validators_no_confirmation() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
 
     // Send an artifact deploy request from this validator.
-    let deploy_artifact_0_tx_hash = deploy_artifact(&api, request_deploy.clone());
-
+    deploy_artifact(&api, request_deploy.clone());
     // Deliberately not sending an artifact deploy request from the second validator.
-    testkit.create_block();
-    api.exonum_api()
-        .assert_tx_success(deploy_artifact_0_tx_hash);
+    let block = testkit.create_block();
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Deliberately not sending a confirmation from the second validator.
 
@@ -740,12 +728,12 @@ fn test_auditor_cant_send_requests() {
 
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
         // Manually signing the tx with auditor's keypair.
-        let confirmation: DeployConfirmation = request_deploy.clone().into();
+        let confirmation = DeployResult::ok(request_deploy.clone());
         testkit
             .us()
             .service_keypair()
@@ -757,20 +745,20 @@ fn test_auditor_cant_send_requests() {
     let deploy_artifact_validator_tx_hash =
         deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(0));
 
-    testkit.create_block();
-
-    let system_api = api.exonum_api();
-
-    // Emulated request executed as fine...
-    system_api.assert_tx_success(deploy_artifact_validator_tx_hash);
-
-    // ... but the auditor's request is failed as expected.
-    let expected_err =
-        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
-    system_api.assert_tx_status(
-        deploy_request_from_auditor.object_hash(),
-        Err(&expected_err),
-    );
+    let block = testkit.create_block();
+    for tx in &block {
+        if tx.content().object_hash() == deploy_artifact_validator_tx_hash {
+            // Emulated request executed as fine...
+            tx.status().unwrap();
+        } else if *tx.content() == deploy_request_from_auditor {
+            // ... but the auditor's request is failed as expected.
+            let expected_err =
+                ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+            assert_eq!(*tx.status().unwrap_err(), expected_err);
+        } else {
+            panic!("Unexpected transaction in block: {:?}", tx);
+        }
+    }
 }
 
 /// This test emulates a normal workflow with a validator and an auditor.
@@ -781,14 +769,13 @@ fn test_auditor_normal_workflow() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
 
     // Emulate an artifact deploy request from the validator.
-    let deploy_artifact_tx_hash =
-        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(0));
-    testkit.create_block();
-    api.exonum_api().assert_tx_success(deploy_artifact_tx_hash);
+    deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(0));
+    let block = testkit.create_block();
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Emulate a confirmation from the validator.
     testkit.add_tx(deploy_confirmation.clone());
@@ -806,14 +793,13 @@ fn test_auditor_normal_workflow() {
     {
         let api = testkit.api();
         assert!(!service_instance_exists(&api, instance_name));
-        let deadline = testkit.height().next();
+        let deadline = DEPLOY_HEIGHT;
         let request_start = start_service_request(default_artifact(), instance_name, deadline);
 
         // Emulate a start instance request from the validator.
-        let start_service_tx_hash =
-            start_service_manually(&mut testkit, &request_start, ValidatorId(0));
-        testkit.create_block();
-        api.exonum_api().assert_tx_success(start_service_tx_hash);
+        start_service_manually(&mut testkit, &request_start, ValidatorId(0));
+        let block = testkit.create_block();
+        block.iter().for_each(|tx| tx.status().unwrap());
         let api = testkit.api(); // Update the API
         assert!(service_instance_exists(&api, instance_name));
     }
@@ -844,17 +830,18 @@ fn test_multiple_validators_deploy_confirm() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
     // Send deploy requests by every validator.
-    let deploy_tx_hashes: Vec<exonum_crypto::Hash> = (0..validators_count)
-        .map(|i| deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i)))
-        .collect();
+    for i in 0..validators_count {
+        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i));
+    }
 
     // Verify that every transaction succeeded (even for confirmations
     // sent after the quorum was achieved).
-    testkit.create_block();
-    api.exonum_api().assert_txs_success(&deploy_tx_hashes);
+    let block = testkit.create_block();
+    assert_eq!(block.len(), validators_count as usize);
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Send deploy confirmations by every validator.
     let deploy_confirmations: Vec<Verified<AnyTx>> = (0..validators_count)
@@ -880,21 +867,20 @@ fn test_multiple_validators_deploy_confirm_byzantine_majority() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
     // Send deploy requests by byzantine majority of validators.
-    let deploy_tx_hashes: Vec<exonum_crypto::Hash> = (0..byzantine_majority)
-        .map(|i| deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i)))
-        .collect();
-
-    testkit.create_block();
-    api.exonum_api().assert_txs_success(&deploy_tx_hashes);
+    for i in 0..byzantine_majority {
+        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i));
+    }
+    let block = testkit.create_block();
+    assert_eq!(block.len(), byzantine_majority as usize);
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Send deploy confirmations by every validator.
     let deploy_confirmations: Vec<Verified<AnyTx>> = (0..validators_count)
         .map(|i| deploy_confirmation(&testkit, &request_deploy, ValidatorId(i)))
         .collect();
-
     testkit.create_block_with_transactions(deploy_confirmations);
 
     // Check that artifact is deployed now.
@@ -914,25 +900,23 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     let api = testkit.api();
     assert!(!artifact_exists(&api, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), testkit.height().next());
+    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
     // Send deploy requests by byzantine majority of validators.
-    let deploy_tx_hashes: Vec<_> = (0..byzantine_minority)
-        .map(|i| deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i)))
-        .collect();
-    testkit.create_block();
-    api.exonum_api().assert_txs_success(&deploy_tx_hashes);
+    for i in 0..byzantine_minority {
+        deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(i));
+    }
+    let block = testkit.create_block();
+    assert_eq!(block.len(), byzantine_minority as usize);
+    block.iter().for_each(|tx| tx.status().unwrap());
 
     // Try to send confirmation. It should fail, since deploy was not approved
     // and thus not registered.
     let confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
-    testkit.add_tx(confirmation.clone());
-    testkit.create_block();
-
+    let block = testkit.create_block_with_transaction(confirmation);
     let expected_err = ErrorMatch::from_fail(&TxError::DeployRequestNotRegistered)
         .for_service(SUPERVISOR_INSTANCE_ID);
-    api.exonum_api()
-        .assert_tx_status(confirmation.object_hash(), Err(&expected_err));
+    assert_eq!(*block[0].status().unwrap_err(), expected_err);
 }
 
 /// Checks that service IDs are assigned sequentially starting from the

@@ -147,6 +147,7 @@ impl ExonumCommand for GenerateConfig {
         };
         let public_config = NodePublicConfig {
             validator_keys: Some(validator_keys),
+            address: Some(self.peer_address.to_string()),
             ..common_config
         };
         // Save public config separately.

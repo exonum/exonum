@@ -29,6 +29,7 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
+#[cfg(feature = "with-protobuf")]
 pub use self::proto::*;
 
 #[cfg(feature = "with-protobuf")]

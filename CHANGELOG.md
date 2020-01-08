@@ -79,6 +79,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Rust runtime module was moved from the `exonum` crate into the separate
   `exonum-rust-runtime` crate. (#1641)  
+- `update_service_status` now does not return a value. (#1659)
+
+- `BlockchainBuilder::build` now returns `BlockchainMut` instead of `Result`. (#1659)
+- A type for transaction position in block has been changed for `u32`. (#1668)
+- A type for a position of transaction in the block has been changed for `u32`. (#1668)
 
 #### exonum-cli
 
@@ -88,6 +93,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
+
+- `DeployConfirmation` structure was renamed to `DeployResult` and extended with
+  `success` field. (#1648)
 
 #### exonum-merkledb
 
@@ -168,6 +176,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Rust runtime module was moved from the `exonum` crate into the separate
   `exonum-rust-runtime` crate. (#1641)
+- It is now possible to iterate over keys of the indexes within a group. (#1662)
 
 #### exonum-supervisor
 
@@ -175,7 +184,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   `Configure` interface. (#1587)
   
 - `ConfigChange::StopService` has been added to make requests to stop the service
-  instance. (#1605)  
+  instance. (#1605)
+
+- New private endpoint `deploy-status` was added. (#1648)
 
 #### exonum-middleware-service
 

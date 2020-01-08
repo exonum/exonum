@@ -14,16 +14,17 @@
 
 //! Simplified node emulation for testing websockets.
 
+// TODO: Test that service terminates WS connections when it's stopped (ECR-4084).
+
 use exonum::{
-    api::websocket::Notification,
     blockchain::config::GenesisConfigBuilder,
+    crypto::gen_keypair,
     helpers,
-    node::{ExternalMessage, Node},
+    merkledb::{ObjectHash, TemporaryDB},
+    node::{ApiSender, ExternalMessage, Node},
 };
-use exonum_crypto::gen_keypair;
-use exonum_merkledb::{ObjectHash, TemporaryDB};
-use exonum_rust_runtime::{RustRuntime, ServiceFactory};
-use reqwest;
+use exonum_explorer::api::Notification;
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
 use serde_json::json;
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
@@ -36,10 +37,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{
-    blockchain::{CreateWallet, ExplorerTransactions, MyService, Transfer, SERVICE_ID},
-    RunHandle,
-};
+use exonum_explorer_service::ExplorerFactory;
+
+mod counter;
+use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
+
+#[derive(Debug)]
+struct RunHandle {
+    node_thread: thread::JoinHandle<()>,
+    api_tx: ApiSender,
+}
 
 fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
     let mut node_cfg = helpers::generate_testnet_config(1, listen_port).remove(0);
@@ -49,14 +56,20 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let service = MyService;
-    let artifact = service.artifact_id();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(SERVICE_ID, "my-service"))
+        .with_artifact(ExplorerFactory.artifact_id())
+        .with_instance(ExplorerFactory.default_instance())
+        .with_artifact(CounterService.artifact_id())
+        .with_instance(CounterService.default_instance())
         .build();
 
-    let with_runtimes = |notifier| vec![RustRuntime::new(notifier).with_factory(service).into()];
+    let with_runtimes = |notifier| {
+        vec![RustRuntime::builder()
+            .with_factory(ExplorerFactory)
+            .with_factory(CounterService)
+            .build(notifier)
+            .into()]
+    };
 
     let node = Node::new(
         TemporaryDB::new(),
@@ -120,7 +133,7 @@ fn test_send_transaction() {
 
     // Send transaction.
     let keypair = gen_keypair();
-    let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx = keypair.increment(SERVICE_ID, 3);
     let tx_hash = tx.object_hash();
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
     let tx_json = serde_json::to_string(&tx_body).unwrap();
@@ -139,7 +152,7 @@ fn test_send_transaction() {
 
     // Send invalid transaction.
     let keypair = gen_keypair();
-    let tx = keypair.create_wallet(SERVICE_ID + 1, CreateWallet::new("Bob"));
+    let tx = keypair.increment(SERVICE_ID + 1, 5);
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
     let tx_json = serde_json::to_string(&tx_body).unwrap();
     client.send_message(&OwnedMessage::Text(tx_json)).unwrap();
@@ -208,7 +221,7 @@ fn test_transactions_subscribe() {
 
     // Send transaction.
     let keypair = gen_keypair();
-    let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx = keypair.increment(SERVICE_ID, 3);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -254,7 +267,7 @@ fn test_transactions_subscribe_with_filter() {
         .set_read_timeout(Some(Duration::from_secs(10)))
         .unwrap();
     let alice = gen_keypair();
-    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx = alice.increment(SERVICE_ID, 3);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -276,8 +289,7 @@ fn test_transactions_subscribe_with_filter() {
         ),
     };
 
-    let (to, _) = gen_keypair();
-    let tx = alice.transfer(SERVICE_ID, Transfer::new(to, 10));
+    let tx = alice.reset(SERVICE_ID, ());
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8082/api/explorer/v1/transactions")
@@ -285,8 +297,8 @@ fn test_transactions_subscribe_with_filter() {
         .send()
         .unwrap();
 
-    // Try to get a one message and check that it is none in this case.
-    // Cause Transfer transaction has another message id.
+    // Try to get a one message and check that it is none in this case,
+    // because `Reset` transaction has another method ID.
     assert!(recv_text_msg(&mut client).is_none());
 
     // Shutdown node.
@@ -313,7 +325,7 @@ fn test_transactions_subscribe_with_partial_filter() {
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
     let alice = gen_keypair();
-    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx = alice.increment(SERVICE_ID, 3);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -335,8 +347,7 @@ fn test_transactions_subscribe_with_partial_filter() {
         ),
     };
 
-    let (to, _) = gen_keypair();
-    let tx = alice.transfer(SERVICE_ID, Transfer::new(to, 10));
+    let tx = alice.reset(SERVICE_ID, ());
     let tx_json = json!({ "tx_body": tx });
     let _res = http_client
         .post("http://localhost:8083/api/explorer/v1/transactions")
@@ -347,7 +358,7 @@ fn test_transactions_subscribe_with_partial_filter() {
     // Get one message and check that it is text.
     let resp_text = recv_text_msg(&mut client).unwrap();
 
-    // Try to parse incoming message into Block.
+    // Try to parse incoming message into `Transaction`.
     let notification = serde_json::from_str::<Notification>(&resp_text).unwrap();
     match notification {
         Notification::Transaction(_) => (),
@@ -369,7 +380,7 @@ fn test_transactions_subscribe_with_partial_filter() {
 #[test]
 fn test_transactions_subscribe_with_bad_filter() {
     let node_handler = run_node(6335, 8084);
-    // A service id is missing in filter !!!
+    // `service_id` is missing from the filter.
     let mut client =
         create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?message_id=0")
             .unwrap();
@@ -378,7 +389,7 @@ fn test_transactions_subscribe_with_bad_filter() {
         .stream_ref()
         .set_read_timeout(Some(Duration::from_secs(5)))
         .unwrap();
-    let tx = gen_keypair().create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
+    let tx = gen_keypair().increment(SERVICE_ID, 3);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client
@@ -518,7 +529,7 @@ fn test_blocks_and_tx_both_subscribe() {
         .unwrap();
 
     let alice = gen_keypair();
-    let tx = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx = alice.increment(SERVICE_ID, 3);
     let tx_json = json!({ "tx_body": tx });
     let http_client = reqwest::Client::new();
     let _res = http_client

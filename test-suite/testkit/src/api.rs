@@ -31,15 +31,9 @@ use std::{
 };
 
 use exonum::{
-    api::{
-        self,
-        node::public::{explorer::TransactionQuery, system::DispatcherInfo},
-        ApiAggregator,
-    },
-    crypto::Hash,
+    api::{self, node::public::system::DispatcherInfo, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::{ErrorMatch, ExecutionStatus},
 };
 
 use crate::TestKit;
@@ -53,7 +47,7 @@ use crate::TestKit;
 pub enum ApiKind {
     /// `api/system` endpoints of the built-in Exonum REST API.
     System,
-    /// `api/explorer` endpoints of the built-in Exonum REST API.
+    /// Endpoints of the REST API of the explorer service.
     Explorer,
     /// `api/runtimes/rust` endpoints corresponding to Rust runtime of the Exonum REST API.
     RustRuntime,
@@ -62,12 +56,12 @@ pub enum ApiKind {
 }
 
 impl fmt::Display for ApiKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApiKind::System => write!(f, "api/system"),
-            ApiKind::Explorer => write!(f, "api/explorer"),
-            ApiKind::RustRuntime => write!(f, "api/runtimes/rust"),
-            ApiKind::Service(name) => write!(f, "api/services/{}", name),
+            ApiKind::System => write!(formatter, "api/system"),
+            ApiKind::Explorer => write!(formatter, "api/explorer"),
+            ApiKind::RustRuntime => write!(formatter, "api/runtimes/rust"),
+            ApiKind::Service(name) => write!(formatter, "api/services/{}", name),
         }
     }
 }
@@ -136,9 +130,9 @@ impl TestKitApi {
         )
     }
 
-    /// Creates a wrapper over Exonum node API.
-    pub fn exonum_api(&self) -> ExonumNodeApi<'_> {
-        ExonumNodeApi::new(self)
+    /// Performs a GET request to the "/services" system endpoint.
+    pub fn dispatcher_info(&self) -> DispatcherInfo {
+        self.public(ApiKind::System).get("v1/services").unwrap()
     }
 }
 
@@ -383,6 +377,8 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     server
 }
 
+// FIXME: move to explorer service
+/*
 /// A convenience wrapper for Exonum node API to reduce the boilerplate code.
 #[derive(Debug)]
 pub struct ExonumNodeApi<'a> {
@@ -425,12 +421,5 @@ impl<'a> ExonumNodeApi<'a> {
             self.assert_tx_success(tx_hash);
         }
     }
-
-    /// Performs a GET request to the "/services" system endpoint.
-    pub fn services(&self) -> DispatcherInfo {
-        self.inner
-            .public(ApiKind::System)
-            .get("v1/services")
-            .unwrap()
-    }
 }
+*/

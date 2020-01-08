@@ -1,3 +1,17 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::{borrow::Cow, num::NonZeroU64};
 
 use crate::BinaryKey;
@@ -150,7 +164,7 @@ impl IndexAddress {
     }
 
     /// Full address with a separator between `name` and `bytes` represented as byte array.
-    pub(super) fn fully_qualified_name(&self) -> Vec<u8> {
+    pub(crate) fn fully_qualified_name(&self) -> Vec<u8> {
         /// Separator between the name and the additional bytes in family indexes.
         const INDEX_NAME_SEPARATOR: &[u8] = &[SEPARATOR_CHAR];
         const MIGRATION_PREFIX: &[u8] = &[MIGRATION_CHAR];
@@ -163,6 +177,15 @@ impl IndexAddress {
             (true, None) => concat_keys!(MIGRATION_PREFIX, self.name()),
             (false, None) => self.name.as_bytes().to_vec(),
         }
+    }
+
+    /// Returns the common prefix of fully qualified names for the child indexes.
+    pub(crate) fn qualified_prefix(&self) -> Vec<u8> {
+        let mut prefix = self.fully_qualified_name();
+        if self.id_in_group.is_none() {
+            prefix.push(SEPARATOR_CHAR);
+        }
+        prefix
     }
 
     /// Infers the name part of the fully qualified name that was obtained with

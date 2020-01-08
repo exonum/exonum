@@ -113,29 +113,6 @@ impl Runtime for SampleRuntime {
         self.deployed_artifacts.contains_key(id)
     }
 
-    /// Commits status for the `SampleService` instance with the specified ID.
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
-        match status {
-            InstanceStatus::Active => {
-                let instance = self.start_service(spec)?;
-                println!("Starting service {}: {:?}", spec, instance);
-                self.started_services.insert(spec.id, instance);
-            }
-
-            InstanceStatus::Stopped => {
-                let instance = self.started_services.remove(&spec.id);
-                println!("Stopping service {}: {:?}", spec, instance);
-            }
-        }
-
-        Ok(())
-    }
-
     /// Initiates adding a new service and sets the counter value for this.
     fn initiate_adding_service(
         &self,
@@ -149,6 +126,30 @@ impl Runtime for SampleRuntime {
         service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())
+    }
+
+    /// Commits status for the `SampleService` instance with the specified ID.
+    fn update_service_status(
+        &mut self,
+        _snapshot: &dyn Snapshot,
+        spec: &InstanceSpec,
+        status: InstanceStatus,
+    ) {
+        match status {
+            InstanceStatus::Active => {
+                // Unwrap here is safe, since by invocation of this method
+                // `exonum` guarantees that `initiate_adding_service` was invoked
+                // before and it returned `Ok(..)`.
+                let instance = self.start_service(spec).unwrap();
+                println!("Starting service {}: {:?}", spec, instance);
+                self.started_services.insert(spec.id, instance);
+            }
+
+            InstanceStatus::Stopped => {
+                let instance = self.started_services.remove(&spec.id);
+                println!("Stopping service {}: {:?}", spec, instance);
+            }
+        }
     }
 
     fn execute(
@@ -292,12 +293,13 @@ fn main() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .build();
-    let rust_runtime = RustRuntime::new(channel.endpoints.0.clone()).with_factory(Supervisor);
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(Supervisor)
+        .build_for_tests();
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())
-        .build()
-        .unwrap();
+        .build();
 
     let blockchain_ref = blockchain.as_ref().to_owned();
     let node = Node::with_blockchain(blockchain, channel, node_cfg, None);

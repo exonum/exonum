@@ -10,13 +10,16 @@ set -e
 BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
 TRANSACTION_URL=http://127.0.0.1:8000/api/explorer/v1/transactions
 
+# Directory with the script.
+ROOT_DIR=`dirname $0`
+
 # Exit status
 STATUS=0
 
 # Launches the cryptocurrency demo and waits until it starts listening
 # on the TCP port 8000.
 function launch-server {
-    cargo run --example demo &
+    cargo run -p exonum-cryptocurrency --example demo &
     CTR=0
     MAXCTR=60
     while [[ ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
@@ -122,17 +125,17 @@ kill-server
 launch-server
 
 echo "Creating a wallet for Alice..."
-create-wallet create-wallet-1.json
+create-wallet "$ROOT_DIR/create-wallet-1.json"
 check-transaction de7283a8
 
 echo "Creating a wallet for Bob..."
-create-wallet create-wallet-2.json
+create-wallet "$ROOT_DIR/create-wallet-2.json"
 check-transaction 34f33f36
 
 sleep 5
 
 echo "Transferring funds from Alice to Bob"
-transfer transfer-funds.json
+transfer "$ROOT_DIR/transfer-funds.json"
 check-transaction 60750247
 
 echo "Waiting until transactions are committed..."
@@ -152,14 +155,14 @@ check-request "Alice" 95 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
 TXID=de7283a8c2a49c476ec91681e795181d9846a5bbce6488d4313a8300b34b4d48
-RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
-EXP=`cat create-wallet-1.json | jq ".tx_body"`
+RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
+EXP=`cat "$ROOT_DIR/create-wallet-1.json" | jq ".tx_body"`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
 TXID=6075024770778476b80d4fe880c408f3df4c3df04bff6d2ae81ae1e415449840
-RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
-EXP=`cat transfer-funds.json | jq ".tx_body"`
+RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
+EXP=`cat "$ROOT_DIR/transfer-funds.json" | jq ".tx_body"`
 check-transfer-tx "$EXP" "$RESP"
 
 kill-server

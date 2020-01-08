@@ -17,9 +17,9 @@ use exonum::{
     api::{self, ApiAggregator, ApiBuilder, FutureResult},
     blockchain::ConsensusConfig,
     crypto::Hash,
-    explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::Height,
 };
+use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
 
@@ -177,12 +177,12 @@ mod tests {
     use exonum::{
         api,
         crypto::{gen_keypair, Hash},
-        explorer::BlockWithTransactions,
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::ExecutionError,
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
     use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 

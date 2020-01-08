@@ -359,7 +359,7 @@ impl SupervisorExtensions<'_> {
         &mut self,
         artifact: ArtifactId,
         spec: impl BinaryValue,
-        and_then: impl FnOnce() -> F + 'static + Send,
+        then: impl FnOnce(Result<(), ExecutionError>) -> F + 'static + Send,
     ) where
         F: IntoFuture<Item = (), Error = ExecutionError>,
         F::Future: 'static + Send,
@@ -367,7 +367,7 @@ impl SupervisorExtensions<'_> {
         let action = DispatcherAction::StartDeploy {
             artifact,
             spec: spec.into_bytes(),
-            and_then: Box::new(|| Box::new(and_then().into_future())),
+            then: Box::new(|res| Box::new(then(res).into_future())),
         };
         self.mailbox.push(action);
     }

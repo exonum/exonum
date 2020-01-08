@@ -27,8 +27,8 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     versioning::{ArtifactReq, ArtifactReqError, RequireArtifact},
-    BlockchainData, DefaultInstance, InstanceDescriptor, RustRuntime, Service, ServiceFactory,
-    SnapshotExt,
+    BlockchainData, DefaultInstance, InstanceDescriptor, RustRuntimeBuilder, Service,
+    ServiceFactory, SnapshotExt,
 };
 
 use futures::sync::mpsc;
@@ -97,15 +97,15 @@ fn create_blockchain() -> BlockchainMut {
         .with_instance(OtherService.default_instance())
         .build();
 
-    let runtime = RustRuntime::new(mpsc::channel(1).0)
+    let runtime = RustRuntimeBuilder::new()
         .with_factory(TokenService)
         .with_factory(OldService)
-        .with_factory(OtherService);
+        .with_factory(OtherService)
+        .build(mpsc::channel(1).0);
 
     BlockchainBuilder::new(Blockchain::build_for_tests(), genesis_config)
         .with_runtime(runtime)
         .build()
-        .unwrap()
 }
 
 fn setup_blockchain_for_index_proofs() -> Box<dyn Snapshot> {

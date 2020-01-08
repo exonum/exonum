@@ -20,7 +20,6 @@ use exonum::{
     exonum_merkledb::ObjectHash,
     helpers::Height,
     messages::{AnyTx, Verified},
-    runtime::{ArtifactId, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_crypto::{PublicKey, SecretKey};
 use exonum_derive::*;
@@ -28,7 +27,9 @@ use exonum_merkledb::{
     impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::TxStub;
+use exonum_rust_runtime::{
+    ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, TxStub, SUPERVISOR_INSTANCE_ID,
+};
 
 use super::{mode::Mode, proto, transactions::SupervisorInterface};
 
@@ -56,17 +57,19 @@ pub struct DeployRequest {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::DeployConfirmation")]
-pub struct DeployConfirmation {
+#[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
+#[protobuf_convert(source = "proto::DeployResult")]
+pub struct DeployResult {
     /// Artifact identifier.
-    pub artifact: ArtifactId,
+    pub request: DeployRequest,
+    /// Result of deployment.
+    pub result: ExecutionStatus,
 }
 
 /// Request for the start service instance.
-#[protobuf_convert(source = "proto::StartService")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::StartService")]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -77,9 +80,9 @@ pub struct StartService {
 }
 
 /// Request for the stop existing service instance.
-#[protobuf_convert(source = "proto::StopService")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::StopService")]
 pub struct StopService {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -227,23 +230,33 @@ pub struct ConfigProposalWithHash {
 }
 
 impl_binary_key_for_binary_value! { DeployRequest }
-impl_binary_key_for_binary_value! { DeployConfirmation }
+impl_binary_key_for_binary_value! { DeployResult }
 impl_binary_key_for_binary_value! { StartService }
 impl_binary_key_for_binary_value! { StopService }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
 
 impl_serde_hex_for_binary_value! { DeployRequest }
-impl_serde_hex_for_binary_value! { DeployConfirmation }
+impl_serde_hex_for_binary_value! { DeployResult }
 impl_serde_hex_for_binary_value! { StartService }
 impl_serde_hex_for_binary_value! { StopService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 
-impl From<DeployRequest> for DeployConfirmation {
-    fn from(v: DeployRequest) -> Self {
+impl DeployResult {
+    /// Creates a new `DeployRequest` object with a positive result.
+    pub fn ok(request: DeployRequest) -> Self {
         Self {
-            artifact: v.artifact,
+            request,
+            result: Ok(()).into(),
+        }
+    }
+
+    /// Creates a new `DeployRequest` object.
+    pub fn new<R: Into<ExecutionStatus>>(request: DeployRequest, result: R) -> Self {
+        Self {
+            request,
+            result: result.into(),
         }
     }
 }

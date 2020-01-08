@@ -19,6 +19,7 @@ use futures::{
     sync::{mpsc, mpsc::Sender},
     Future, Sink, Stream,
 };
+use pretty_assertions::assert_eq;
 use snow::{types::Dh, Builder};
 use tokio_core::{
     net::{TcpListener, TcpStream},

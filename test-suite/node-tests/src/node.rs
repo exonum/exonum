@@ -12,28 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a regression test for exonum node.
+//! High-level tests for the Exonum node.
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
-    node::{ExternalMessage, Node, NodeConfig},
-    runtime::RuntimeInstance,
+    merkledb::{Database, TemporaryDB},
+    node::{ApiSender, ExternalMessage, Node, NodeConfig},
 };
-use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{Database, TemporaryDB};
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
+
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
 
 use std::{
     sync::{Arc, Mutex},
-    thread::{self},
+    thread,
     time::Duration,
 };
 
-use crate::RunHandle;
+#[derive(Debug)]
+struct RunHandle {
+    node_thread: thread::JoinHandle<()>,
+    api_tx: ApiSender,
+}
 
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
 #[service_factory(
@@ -91,8 +95,11 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
                 .with_instance(artifact.into_default_instance(2, "commit-watcher"))
                 .build();
 
-        let with_runtimes = |notifier| -> Vec<RuntimeInstance> {
-            vec![RustRuntime::new(notifier).with_factory(service).into()]
+        let with_runtimes = |notifier| {
+            vec![RustRuntime::builder()
+                .with_factory(service)
+                .build(notifier)
+                .into()]
         };
 
         let node = Node::new(
@@ -146,8 +153,11 @@ fn test_node_restart_regression() {
                 .with_instance(artifact.into_default_instance(4, "startup-checker"))
                 .build();
 
-        let with_runtimes = |notifier| -> Vec<RuntimeInstance> {
-            vec![RustRuntime::new(notifier).with_factory(service).into()]
+        let with_runtimes = |notifier| {
+            vec![RustRuntime::builder()
+                .with_factory(service)
+                .build(notifier)
+                .into()]
         };
 
         let node = Node::new(db, with_runtimes, node_cfg, genesis_config, None);

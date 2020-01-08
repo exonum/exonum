@@ -12,31 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Simplified blockchain emulation for the Exonum node tests.
+//! Simplified blockchain emulation for the explorer tests.
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
     crypto::{self, PublicKey, SecretKey},
     helpers::generate_testnet_config,
+    merkledb::{BinaryValue, ObjectHash, TemporaryDB},
     messages::Verified,
     node::ApiSender,
-    runtime::{AnyTx, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_merkledb::{ObjectHash, TemporaryDB};
-use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory};
-use futures::sync::mpsc;
+use exonum_rust_runtime::{
+    AnyTx, CallContext, ExecutionError, InstanceId, RustRuntime, Service, ServiceFactory,
+};
 use serde_derive::*;
 
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 pub const SERVICE_ID: InstanceId = 118;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "crate::proto::CreateWallet")]
+#[derive(ObjectHash)]
 pub struct CreateWallet {
     pub name: String,
 }
@@ -47,10 +45,19 @@ impl CreateWallet {
     }
 }
 
+impl BinaryValue for CreateWallet {
+    fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        bincode::deserialize(bytes.as_ref()).map_err(Into::into)
+    }
+}
+
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "crate::proto::Transfer")]
+#[derive(ObjectHash)]
 pub struct Transfer {
     pub to: PublicKey,
     pub amount: u64,
@@ -68,6 +75,16 @@ pub enum Error {
     NotAllowed = 0,
 }
 
+impl BinaryValue for Transfer {
+    fn to_bytes(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        bincode::deserialize(bytes.as_ref()).map_err(Into::into)
+    }
+}
+
 #[exonum_interface]
 pub trait ExplorerTransactions<Ctx> {
     type Output;
@@ -77,11 +94,7 @@ pub trait ExplorerTransactions<Ctx> {
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "my-service",
-    artifact_version = "1.0.1",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "my-service", artifact_version = "1.0.1")]
 #[service_dispatcher(implements("ExplorerTransactions"))]
 pub struct MyService;
 
@@ -125,11 +138,12 @@ pub fn create_blockchain() -> BlockchainMut {
         .with_artifact(my_service_artifact.clone())
         .with_instance(my_service_artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();
-    let rust_runtime = RustRuntime::new(mpsc::channel(1).0).with_factory(my_service);
+    let rust_runtime = RustRuntime::builder()
+        .with_factory(my_service)
+        .build_for_tests();
     BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(rust_runtime)
         .build()
-        .unwrap()
 }
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*

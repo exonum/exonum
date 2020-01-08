@@ -35,8 +35,9 @@ pub(crate) use self::state::SharedConnectList;
 
 use exonum_keys::Keys;
 use exonum_merkledb::{Database, DbOptions, ObjectHash};
-use failure::Error;
+use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
+use log::{info, trace};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 use toml::Value;
@@ -934,12 +935,7 @@ impl Node {
         for runtime in with_runtimes(channel.endpoints.0.clone()) {
             blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
-        let blockchain = blockchain_builder.build().unwrap_or_else(|err| {
-            panic!(
-                "Blockchain initialization failed with the following error: {}",
-                err
-            )
-        });
+        let blockchain = blockchain_builder.build();
 
         Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }
@@ -1080,25 +1076,21 @@ impl Node {
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
 
-        let api_state = self.handler.api_state.clone();
-
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
             self.state().consensus_public_key(),
             self.state().consensus_secret_key().clone(),
-            self.state().connect_list(),
+            self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
         self.run_handler(&handshake_params)?;
-        // Stop ws server.
-        api_state.shutdown_broadcast_server();
         Ok(())
     }
 
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
-        let connect_list = self.state().connect_list();
+        let connect_list = self.state().connect_list().clone();
 
         self.api_runtime_config
             .start(self.channel.endpoints.1)
@@ -1202,7 +1194,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_internal_events_capacity_too_large() {
-        let accidental_large_value = 0_usize.overflowing_sub(1).0;
+        let accidental_large_value = usize::max_value();
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
@@ -1218,7 +1210,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_network_requests_capacity_too_large() {
-        let accidental_large_value = 0_usize.overflowing_sub(1).0;
+        let accidental_large_value = usize::max_value();
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();

@@ -118,13 +118,6 @@ pub mod transactions {
 
     use super::proto;
 
-    /// Service configuration parameters.
-    #[derive(Clone, Debug)]
-    #[derive(Serialize, Deserialize)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Config")]
-    pub struct Config;
-
     /// Transaction type for creating a new wallet.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how

@@ -9,26 +9,8 @@ publish = false
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-keys = { version = "0.13.0-rc.2", path = "../../components/keys" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
-failure = "0.1.5"
+exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 futures = "0.1.25"
-lazy_static = "1.4.0"
-log = "0.4.0"
-protobuf = { version = "2.8.1", features = ["with-serde"] }
-serde = "1.0.104"
-serde_derive = "1.0.104"
-serde_json = "1.0.44"
 tokio = "0.1.14"
 tokio-core = "0.1.17"
-
-[dev-dependencies]
-websocket = "0.24"
-reqwest = "0.9"
-
-[build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }

@@ -13,15 +13,17 @@
 // limitations under the License.
 
 use exonum::{
-    api::node::public::explorer::{TransactionQuery, TransactionResponse},
     crypto::{gen_keypair, hash, Hash},
     helpers::Height,
+    merkledb::ObjectHash,
     messages::Verified,
-    runtime::{AnyTx, InstanceId},
 };
-use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::ServiceFactory;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_explorer_service::ExplorerFactory;
+use exonum_rust_runtime::{AnyTx, InstanceId, ServiceFactory};
+use exonum_testkit::{
+    explorer::api::{TransactionQuery, TransactionResponse},
+    ApiKind, TestKit, TestKitApi, TestKitBuilder,
+};
 use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
 use serde_json::json;
 
@@ -31,10 +33,10 @@ use exonum_timestamping::{
     Config, Timestamp, TimestampEntry, TimestampQuery, TimestampingInterface, TimestampingService,
 };
 
-const TIME_SERVICE_ID: InstanceId = 2;
-const TIME_SERVICE_NAME: &str = "my-time";
-const SERVICE_ID: InstanceId = 3;
-const SERVICE_NAME: &str = "my-timestamping";
+const TIME_SERVICE_ID: InstanceId = 102;
+const TIME_SERVICE_NAME: &str = "time";
+const SERVICE_ID: InstanceId = 103;
+const SERVICE_NAME: &str = "timestamping";
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
@@ -42,12 +44,15 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
     let time_service_artifact = time_service.artifact_id();
     let timestamping = TimestampingService;
     let timestamping_artifact = timestamping.artifact_id();
+
     let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(ExplorerFactory)
+        .with_rust_service(time_service)
+        .with_rust_service(timestamping)
         .with_artifact(time_service_artifact.clone())
         .with_instance(
             time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
         )
-        .with_rust_service(time_service)
         .with_artifact(timestamping_artifact.clone())
         .with_instance(
             timestamping_artifact
@@ -56,9 +61,8 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
                     time_service_name: TIME_SERVICE_NAME.to_owned(),
                 }),
         )
-        .with_rust_service(timestamping)
         .create();
-    testkit.create_blocks_until(Height(2)); // TimeService is None if no blocks were forged
+    testkit.create_blocks_until(Height(2)); // Ensure that time is set
     (testkit, mock_provider)
 }
 
@@ -150,7 +154,7 @@ fn test_api_get_timestamp_entry() {
 }
 
 #[test]
-fn test_api_can_not_add_same_content_hash() {
+fn test_api_cannot_add_same_content_hash() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();
     let keypair = gen_keypair();
@@ -171,13 +175,13 @@ fn test_api_can_not_add_same_content_hash() {
             "type": "service_error",
             "call_site": {
                 "call_type": "method",
-                "instance_id": 3,
-                "method_id": 0
+                "instance_id": SERVICE_ID,
+                "method_id": 0,
             },
             "code": 0,
             "description": "Content hash already exists.",
             "runtime_id": 0,
-            "type": "service_error"
+            "type": "service_error",
         }),
     );
 }

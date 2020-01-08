@@ -23,14 +23,14 @@ pub use self::{
 
 pub mod config;
 
-pub(crate) use crate::runtime::{ExecutionError, ExecutionStatus};
+pub(crate) use crate::runtime::ExecutionError;
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemSchema, TemporaryDB,
 };
-use failure::{ensure, Error};
+use failure::Error;
 use futures::Future;
 
 use std::{
@@ -203,8 +203,15 @@ impl BlockchainMut {
     }
 
     /// Creates and commits the genesis block with the given genesis configuration.
-    fn create_genesis_block(&mut self, genesis_config: GenesisConfig) -> Result<(), Error> {
-        genesis_config.consensus_config.validate()?;
+    ///
+    /// # Panics
+    ///
+    /// Panics if the genesis block cannot be created.
+    fn create_genesis_block(&mut self, genesis_config: GenesisConfig) {
+        genesis_config
+            .consensus_config
+            .validate()
+            .expect("Invalid consensus config");
         let mut fork = self.fork();
         // Write genesis configuration to the blockchain.
         Schema::new(&fork)
@@ -212,19 +219,23 @@ impl BlockchainMut {
             .set(genesis_config.consensus_config);
 
         for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
-            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone())?;
-            self.dispatcher.deploy_artifact(artifact, payload).wait()?
+            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone());
+            self.dispatcher
+                .deploy_artifact(artifact, payload)
+                .wait()
+                .expect("Cannot deploy an artifact");
         }
         // Add service instances.
         // Note that `before_transactions` will not be invoked for services, since
         // they are added within block (and don't appear from nowhere).
         for inst in genesis_config.builtin_instances {
             self.dispatcher
-                .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)?;
+                .add_builtin_service(&mut fork, inst.instance_spec, inst.constructor)
+                .expect("Unable to add a builtin service");
         }
         // Activate services and persist changes.
         let patch = self.dispatcher.start_builtin_instances(fork);
-        self.merge(patch)?;
+        self.merge(patch).unwrap();
 
         // Create a new fork to collect the changes from `after_transactions` hook.
         let mut fork = self.fork();
@@ -237,14 +248,14 @@ impl BlockchainMut {
 
         // If there was at least one error during the genesis block creation, the block shouldn't be
         // created at all.
-        ensure!(
+        assert!(
             errors.is_empty(),
             "`after_transactions` failed for at least one service, errors: {:?}",
             &errors
         );
 
         let patch = self.dispatcher.commit_block(fork);
-        self.merge(patch)?;
+        self.merge(patch).unwrap();
 
         let (_, patch) = self.create_patch(
             ValidatorId::zero().into(),
@@ -255,13 +266,12 @@ impl BlockchainMut {
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
-        self.merge(patch)?;
+        self.merge(patch).unwrap();
 
         log::info!(
             "GENESIS_BLOCK ====== hash={}",
             self.inner.last_hash().to_hex()
         );
-        Ok(())
     }
 
     /// Executes the given transactions from the pool.
@@ -287,7 +297,7 @@ impl BlockchainMut {
         }
 
         // Save & execute transactions.
-        for (index, hash) in tx_hashes.iter().enumerate() {
+        for (index, hash) in (0..).zip(tx_hashes) {
             self.execute_transaction(*hash, height, index, &mut fork, tx_cache);
         }
 
@@ -348,7 +358,7 @@ impl BlockchainMut {
         &self,
         tx_hash: Hash,
         height: Height,
-        index: usize,
+        index: u32,
         fork: &mut Fork,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) {
@@ -357,19 +367,17 @@ impl BlockchainMut {
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
-        let tx_result = self
-            .dispatcher
-            .execute(fork, tx_hash, index as u64, &transaction);
+        let tx_result = self.dispatcher.execute(fork, tx_hash, index, &transaction);
         let mut schema = Schema::new(&*fork);
 
         if let Err(e) = tx_result {
             schema
                 .call_errors(height)
-                .put(&CallInBlock::transaction(index as u64), e);
+                .put(&CallInBlock::transaction(index), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
-        let location = TxLocation::new(height, index as u64);
+        let location = TxLocation::new(height, index);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
     }

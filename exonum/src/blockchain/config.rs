@@ -23,6 +23,8 @@
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::{bail, ensure};
+use log::warn;
 
 use std::collections::{HashMap, HashSet};
 
@@ -410,6 +412,8 @@ impl GenesisConfigBuilder {
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use std::fmt::Display;
 
     use super::*;

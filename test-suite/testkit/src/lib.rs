@@ -16,20 +16,22 @@
 //! and in the same process as the testkit.
 //!
 //! # Example
+//!
 //! ```
 //! use exonum::{
 //!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
-//!     explorer::TransactionInfo,
 //!     helpers::Height,
-//!     api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
+//!     runtime::{
+//!         rust::{ServiceFactory, CallContext, Service},
+//!         BlockchainData, SnapshotExt, ExecutionError,
+//!     },
 //! };
-//! use exonum_rust_runtime::{ServiceFactory, CallContext, Service, BlockchainData, SnapshotExt, ExecutionError};
+//! use serde_derive::*;
 //! use exonum_derive::*;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
-//! use serde_derive::*;
 //!
 //! // Simple service implementation.
 //!
@@ -59,62 +61,41 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     // Create testkit for network with four validators
-//!     // and add a builtin timestamping service with ID=1.
-//!     let service = TimestampingService;
-//!     let artifact = service.artifact_id();
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_validators(4)
-//!         .with_artifact(artifact.clone())
-//!         .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
-//!         .with_rust_service(service)
-//!         .create();
+//! # fn main() {
+//! // Create testkit for network with four validators
+//! // and add a builtin timestamping service with ID=1.
+//! let service = TimestampingService;
+//! let artifact = service.artifact_id();
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_validators(4)
+//!     .with_artifact(artifact.clone())
+//!     .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
+//!     .with_rust_service(service)
+//!     .create();
 //!
-//!     // Create few transactions.
-//!     let keys = gen_keypair();
-//!     let id = SERVICE_ID;
-//!     let tx1 = keys.timestamp(id, "Down To Earth".into());
-//!     let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
-//!     let tx3 = keys.timestamp(id, "Dropping Like Flies".into());
-//!     // Commit them into blockchain.
-//!     testkit.create_block_with_transactions(vec![
-//!         tx1.clone(), tx2.clone(), tx3.clone()
-//!     ]);
+//! // Create a few transactions.
+//! let keys = gen_keypair();
+//! let id = SERVICE_ID;
+//! let tx1 = keys.timestamp(id, "Down To Earth".into());
+//! let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
+//! let tx3 = keys.timestamp(id, "Dropping Like Flies".into());
+//! // Commit them into blockchain.
+//! testkit.create_block_with_transactions(vec![
+//!     tx1.clone(), tx2.clone(), tx3.clone()
+//! ]);
 //!
-//!     // Add a single transaction.
-//!     let tx4 = keys.timestamp(id, "Barking up the wrong tree".into());
-//!     testkit.create_block_with_transaction(tx4.clone());
+//! // Add a single transaction.
+//! let tx4 = keys.timestamp(id, "Barking up the wrong tree".into());
+//! testkit.create_block_with_transaction(tx4.clone());
 //!
-//!     // Check results with schema.
-//!     let snapshot = testkit.snapshot();
-//!     let schema = snapshot.for_core();
-//!     assert!(schema.transactions().contains(&tx1.object_hash()));
-//!     assert!(schema.transactions().contains(&tx2.object_hash()));
-//!     assert!(schema.transactions().contains(&tx3.object_hash()));
-//!     assert!(schema.transactions().contains(&tx4.object_hash()));
-//!
-//!     // Check results with api.
-//!     let api = testkit.api();
-//!     let response: BlocksRange = api
-//!         .public(ApiKind::Explorer)
-//!         .query(&BlocksQuery {
-//!             count: 10,
-//!             ..Default::default()
-//!         })
-//!         .get("v1/blocks")
-//!         .unwrap();
-//!     let (blocks, range) = (response.blocks, response.range);
-//!     assert_eq!(blocks.len(), 3);
-//!     assert_eq!(range.start, Height(0));
-//!     assert_eq!(range.end, Height(3));
-//!
-//!     let info = api
-//!         .public(ApiKind::Explorer)
-//!         .query(&TransactionQuery::new(tx1.object_hash()))
-//!         .get::<TransactionInfo>("v1/transactions")
-//!         .unwrap();
-//! }
+//! // Check results with schema.
+//! let snapshot = testkit.snapshot();
+//! let schema = snapshot.for_core();
+//! assert!(schema.transactions().contains(&tx1.object_hash()));
+//! assert!(schema.transactions().contains(&tx2.object_hash()));
+//! assert!(schema.transactions().contains(&tx3.object_hash()));
+//! assert!(schema.transactions().contains(&tx4.object_hash()));
+//! # }
 //! ```
 
 #![warn(missing_debug_implementations, missing_docs)]
@@ -126,6 +107,7 @@ pub use crate::{
     network::{TestNetwork, TestNode},
     server::TestKitStatus,
 };
+pub use exonum_explorer as explorer;
 
 use exonum::{
     api::{
@@ -139,14 +121,15 @@ use exonum::{
         Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
-    explorer::{BlockWithTransactions, BlockchainExplorer},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{InstanceId, RuntimeInstance, SnapshotExt},
 };
-use exonum_rust_runtime::{RustRuntime, ServiceFactory};
+use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
+use exonum_rust_runtime::{
+    InstanceId, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
+};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -166,6 +149,7 @@ use crate::{
 mod api;
 mod builder;
 mod checkpoint_db;
+pub mod migrations;
 mod network;
 mod poll_events;
 mod server;
@@ -200,12 +184,11 @@ impl fmt::Debug for TestKit {
 impl TestKit {
     /// Creates a new `TestKit` with a single validator with the given Rust service.
     pub fn for_rust_service(
-        service_factory: impl Into<Box<dyn ServiceFactory>>,
+        service_factory: impl ServiceFactory,
         name: impl Into<String>,
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let service_factory = service_factory.into();
         let artifact = service_factory.artifact_id();
         TestKitBuilder::validator()
             .with_artifact(artifact.clone())
@@ -242,8 +225,7 @@ impl TestKit {
                 BlockchainBuilder::new(blockchain, genesis_config),
                 |builder, runtime| builder.with_runtime(runtime),
             )
-            .build()
-            .expect("Unable to create blockchain instance");
+            .build();
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
         let api_aggregator =
@@ -330,8 +312,10 @@ impl TestKit {
     /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
-    /// # use exonum_rust_runtime::{CallContext, Service, ServiceFactory, ExecutionError};
-    /// # use exonum_crypto::{PublicKey, Hash, SecretKey};
+    /// # use exonum::{
+    /// #     crypto::{PublicKey, Hash, SecretKey},
+    /// #     runtime::{rust::{CallContext, Service, ServiceFactory}, ExecutionError},
+    /// # };
     /// #
     /// // Suppose we test this service interface:
     /// #[exonum_interface]
@@ -702,9 +686,9 @@ impl TestKit {
 ///
 /// ```
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
-/// # use exonum_rust_runtime::{BlockchainData, AfterCommitContext, RustRuntime, Service};
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
+/// #     runtime::{BlockchainData, rust::{AfterCommitContext, RustRuntime, Service}},
 /// #     helpers::Height,
 /// # };
 /// # use exonum_merkledb::{Fork, Snapshot};
@@ -752,11 +736,9 @@ impl TestKit {
 /// assert_eq!(stopped.height(), Height(5));
 ///
 /// // Resume with the same single service with a fresh state.
-/// let runtime = stopped.rust_runtime();
 /// let service = AfterCommitService::new();
-/// let mut testkit = stopped.resume(vec![
-///     runtime.with_factory(service.clone())
-/// ]);
+/// let rust_runtime = RustRuntime::builder().with_factory(service.clone());
+/// let mut testkit = stopped.resume(rust_runtime);
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
 /// ```
@@ -783,25 +765,29 @@ impl StoppedTestKit {
         &self.network
     }
 
-    /// Creates an empty Rust runtime.
-    pub fn rust_runtime(&self) -> RustRuntime {
-        RustRuntime::new(self.api_notifier_channel.0.clone())
+    /// Resume the operation of the testkit with the Rust runtime.
+    ///
+    /// Note that services in the Rust runtime may differ from the initially passed to the `TestKit`
+    /// (which is also what may happen with real Exonum apps).
+    pub fn resume(self, rust_runtime: RustRuntimeBuilder) -> TestKit {
+        self.resume_with_runtimes(rust_runtime, Vec::new())
     }
 
-    /// Resume the operation of the testkit.
-    ///
-    /// Note that `runtimes` may differ from the initially passed to the `TestKit`
-    /// (which is also what may happen with real Exonum apps).
-    ///
-    /// This method will not add the default Rust runtime, so you must do this explicitly.
-    pub fn resume(self, runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>) -> TestKit {
+    /// Resume the operation fo the testkit with the specified runtimes.
+    pub fn resume_with_runtimes(
+        self,
+        rust_runtime: RustRuntimeBuilder,
+        external_runtimes: Vec<RuntimeInstance>,
+    ) -> TestKit {
+        let rust_runtime = rust_runtime.build(self.api_notifier_channel.0.clone());
+        let mut runtimes = external_runtimes;
+        runtimes.push(rust_runtime.into());
         TestKit::assemble(
             self.db,
             self.network,
             // TODO make consensus config optional [ECR-3222]
             GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
-            runtimes.into_iter().map(|x| x.into()),
-            // In this context, it is not possible to add new service instances.
+            runtimes,
             self.api_notifier_channel,
         )
     }

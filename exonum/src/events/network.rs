@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use failure::{bail, ensure, format_err};
 use futures::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
     sync::mpsc,
     unsync, Future, IntoFuture, Sink, Stream,
 };
+use log::{error, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
 use tokio_core::reactor::Handle;

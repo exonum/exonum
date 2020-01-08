@@ -14,11 +14,8 @@
 
 //! Module that contains Protobuf messages used by Exonum.
 
-use failure::Error;
-
-pub use self::ordered_map::OrderedMap;
 pub use self::schema::{
-    blockchain::{Block, CallInBlock, TxLocation},
+    blockchain::{AdditionalHeaders, Block, CallInBlock, TxLocation},
     consensus::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
         PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
@@ -28,10 +25,11 @@ pub use self::schema::{
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 
-use crate::helpers::{Height, Round, ValidatorId};
 use exonum_proto::ProtobufConvert;
+use failure::{ensure, Error};
 
-mod ordered_map;
+use crate::helpers::{Height, Round, ValidatorId};
+
 pub mod schema;
 
 #[cfg(test)]

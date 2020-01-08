@@ -33,7 +33,8 @@ use exonum_derive::*;
 use exonum_merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema};
 use exonum_rust_runtime::{
     ArtifactId, CallContext, Caller, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError,
-    InstanceId, RustRuntime, Service, ServiceFactory, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+    InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
+    SUPERVISOR_INSTANCE_ID,
 };
 use futures::{sync::mpsc, Future};
 use serde_derive::*;
@@ -205,7 +206,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
         status: InstanceStatus,
-    ) -> Result<(), ExecutionError> {
+    ) {
         snapshot
             .for_dispatcher()
             .get_instance(spec.id)
@@ -310,7 +311,8 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
     ) -> Self::Output {
         context
             .supervisor_extensions()
-            .start_artifact_registration(request.test_service_artifact, request.spec)
+            .start_artifact_registration(request.test_service_artifact, request.spec);
+        Ok(())
     }
 
     fn start_service(&self, mut context: CallContext<'_>, request: StartService) -> Self::Output {
@@ -509,20 +511,21 @@ fn create_genesis_config_with_supervisor() -> GenesisConfig {
 fn create_runtime(
     blockchain: Blockchain,
     genesis_config: GenesisConfig,
-) -> Result<(BlockchainMut, EventsHandle), failure::Error> {
+) -> (BlockchainMut, EventsHandle) {
     let inspected = Inspected::new(
-        RustRuntime::new(mpsc::channel(1).0)
+        RustRuntimeBuilder::new()
             .with_factory(TestServiceImpl)
             .with_factory(TestServiceImplV2)
             .with_factory(ToySupervisorService)
-            .with_factory(DependentServiceImpl),
+            .with_factory(DependentServiceImpl)
+            .build(mpsc::channel(1).0),
     );
     let events_handle = inspected.events.clone();
 
-    BlockchainBuilder::new(blockchain, genesis_config)
+    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
         .with_runtime(inspected)
-        .build()
-        .map(|blockchain| (blockchain, events_handle))
+        .build();
+    (blockchain, events_handle)
 }
 
 /// In this test, we manually instruct the dispatcher to deploy artifacts / create / stop services
@@ -534,8 +537,7 @@ fn basic_runtime_workflow() {
     let (mut blockchain, events_handle) = create_runtime(
         Blockchain::build_for_tests(),
         create_genesis_config_with_supervisor(),
-    )
-    .unwrap();
+    );
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // The dispatcher should initialize the runtime and call `after_commit` for
@@ -714,14 +716,12 @@ fn basic_runtime_workflow() {
 
 /// In this test, we try to create Rust runtime artifact with the non-empty spec.
 #[test]
+#[should_panic(expected = "specified artifact has non-empty spec")]
 fn create_runtime_non_empty_spec() {
     let genesis_config = create_genesis_config_builder()
         .with_parametric_artifact(TestServiceImpl.artifact_id(), vec![1, 2, 3, 4])
         .build();
-    let err = create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap_err();
-    assert!(err
-        .to_string()
-        .contains("specified artifact has non-empty spec"));
+    create_runtime(Blockchain::build_for_tests(), genesis_config);
 }
 
 /// In this test, we simulate blockchain restart and check events from inspector.
@@ -730,7 +730,7 @@ fn runtime_restart() {
     // Create a runtime and a service test_service_artifact.
     let genesis_config = create_genesis_config_with_supervisor();
     let (mut blockchain, events_handle) =
-        create_runtime(Blockchain::build_for_tests(), genesis_config.clone()).unwrap();
+        create_runtime(Blockchain::build_for_tests(), genesis_config.clone());
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // The dispatcher should initialize the runtime and call `after_commit` for
@@ -778,7 +778,7 @@ fn runtime_restart() {
 
     // Emulate node restart.
     let (mut blockchain, events_handle) =
-        create_runtime(blockchain.as_ref().clone(), genesis_config).unwrap();
+        create_runtime(blockchain.as_ref().clone(), genesis_config);
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     assert_eq!(
@@ -820,7 +820,7 @@ fn state_aggregation() {
         .with_artifact(TestServiceImpl.artifact_id())
         .with_instance(TestServiceImpl.default_instance())
         .build();
-    let (blockchain, _) = create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap();
+    let (blockchain, _) = create_runtime(Blockchain::build_for_tests(), genesis_config);
 
     // The constructor entry has been written to; `method_*` `ProofEntry`s are empty.
     let snapshot = blockchain.snapshot();
@@ -848,8 +848,7 @@ fn multiple_service_versions() {
         .with_instance(TestServiceImpl.default_instance())
         .with_instance(TestServiceImplV2.default_instance())
         .build();
-    let (mut blockchain, _) =
-        create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap();
+    let (mut blockchain, _) = create_runtime(Blockchain::build_for_tests(), genesis_config);
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // Check that both test_service_artifact versions are present in the dispatcher schema.
@@ -925,8 +924,7 @@ fn conflicting_service_instances() {
     let (mut blockchain, events_handle) = create_runtime(
         Blockchain::build_for_tests(),
         create_genesis_config_with_supervisor(),
-    )
-    .unwrap();
+    );
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // Deploy service test_service_artifact.
@@ -1043,7 +1041,7 @@ fn dependent_builtin_service() {
         .with_instance(dep_service.default_instance())
         .build();
 
-    let (blockchain, _) = create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap();
+    let (blockchain, _) = create_runtime(Blockchain::build_for_tests(), genesis_config);
 
     let snapshot = blockchain.snapshot();
     let schema = snapshot.for_dispatcher();
@@ -1066,6 +1064,7 @@ fn dependent_builtin_service() {
 }
 
 #[test]
+#[should_panic(expected = "no dependency")]
 fn dependent_builtin_service_with_incorrect_order() {
     let main_service = TestServiceImpl;
     let dep_service = DependentServiceImpl;
@@ -1078,8 +1077,7 @@ fn dependent_builtin_service_with_incorrect_order() {
         .with_instance(main_service.default_instance())
         .build();
 
-    let err = create_runtime(Blockchain::build_for_tests(), genesis_config).unwrap_err();
-    assert!(err.to_string().contains("no dependency"));
+    create_runtime(Blockchain::build_for_tests(), genesis_config);
 }
 
 #[test]
@@ -1087,8 +1085,7 @@ fn dependent_service_with_no_dependency() {
     let (mut blockchain, _) = create_runtime(
         Blockchain::build_for_tests(),
         create_genesis_config_with_supervisor(),
-    )
-    .unwrap();
+    );
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // Deploy dependent service test_service_artifact.
@@ -1132,8 +1129,7 @@ fn dependent_service_in_same_block() {
     let (mut blockchain, _) = create_runtime(
         Blockchain::build_for_tests(),
         create_genesis_config_with_supervisor(),
-    )
-    .unwrap();
+    );
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // Artifacts need to be deployed in a separate block due to checks in `RustRuntime`.
@@ -1209,8 +1205,7 @@ fn dependent_service_in_successive_block() {
             .with_artifact(TestServiceImpl.artifact_id())
             .with_instance(TestServiceImpl.default_instance())
             .build(),
-    )
-    .unwrap();
+    );
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     let dep_service = DependentServiceImpl.default_instance();

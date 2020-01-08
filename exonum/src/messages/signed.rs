@@ -14,7 +14,7 @@
 
 use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use failure::Error;
+use failure::{ensure, Error};
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
@@ -222,6 +222,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
     use crate::{
         crypto::{self, Hash},

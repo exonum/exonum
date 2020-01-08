@@ -83,6 +83,7 @@ memorydb
 mempool
 Merkelize
 Merkelized
+Merkelizes
 Merkle
 merkledb
 metadada
@@ -115,6 +116,7 @@ precommit
 precommits
 precommitters
 prepend
+prereleases
 prevote
 prevoters
 prevotes
@@ -145,6 +147,7 @@ roughtime
 roundtrip
 rpassword
 rposition
+rsplitn
 rtype
 runtimes
 rustfmt
@@ -157,6 +160,7 @@ serde
 serializable
 serialize
 serializer
+sharded
 signum
 smallvec
 socketaddr
