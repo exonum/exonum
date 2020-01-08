@@ -11,6 +11,7 @@ from suite import (
     assert_processes_exited_successfully,
     launcher_networks,
     run_4_nodes,
+    wait_network_to_start,
     ExonumCryptoAdvancedClient,
 )
 
@@ -20,7 +21,7 @@ class CryptoAdvancedTest(unittest.TestCase):
 
     def setUp(self):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-        time.sleep(3)
+        wait_network_to_start(self.network)
         cryptocurrency_advanced_config_dict = {
             "networks": launcher_networks(self.network),
             "deadline_height": 10000,
