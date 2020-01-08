@@ -13,9 +13,13 @@
 // limitations under the License.
 
 //! Shows how to provide database data migration manually.
-//! The main logic of this example described in the `manual_migration` and `migrate_wallets` functions.
+//!
+//! The main logic of this example is described in the `manual_migration`
+//! and `migrate_wallets` functions.
+//!
 //! The main points of this example are:
-//! - We have to create `Fork` from the DB manually, as well as `Migration` and `Prefixed` access to the data.
+//! - We have to create `Fork` from the DB manually,
+//!  as well as `Migration` and `Prefixed` access to the data.
 //! - We have to apply `Patch` to the DB manually.
 //! - Data migration is performed by direct access to old and new schemas.
 //!
@@ -32,6 +36,10 @@ use migration::{perform_migration, v1, v2};
 mod migration;
 
 /// Provides migration of wallets with schema.
+///
+/// `Wallet::public_key` field will be removed.
+/// `Wallet::history_hash` field will be added.
+/// Wallets and history from username Eve will be removed.
 fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data);

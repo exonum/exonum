@@ -13,11 +13,15 @@
 // limitations under the License.
 
 //! Shows how to provide database data migration with the `MigrationHelper::iter_loop`.
-//! `MigrationHelper` provides methods to get access to the old and new versions of the data, and to merge changes,
-//! so we don't need to do it manually.
-//! The main logic of this example described in the `migration_with_iter_loop` and `migrate_wallets` functions.
+//! `MigrationHelper` provides methods to get access to the old
+//! and new versions of the data, and to merge changes, so we don't need to do it manually.
+//!
+//! The main logic of this example is described in the `migration_with_iter_loop`
+//! and `migrate_wallets` functions.
+//!
 //! The main points of this example are:
-//! - We are creating `MigrationHelper` for the DB that allows us to get access to the old and new data.
+//! - We are creating `MigrationHelper` for the DB
+//!  that allows us to get access to the old and new data.
 //! - We are using `MigrationHelper::finish` to merge the changes to the database.
 //! - `MigrationHelper::iter_loop` allows us to perform data migration in chunks.
 //!  After each iteration changes are merged to the DB.
@@ -36,12 +40,16 @@ mod migration;
 /// Provides migration of wallets with `MigrationHelper::iter_loop`.
 /// `iter_loop` is designed to allow to merge changes to the database from time to time,
 /// so we are migrating wallets in chunks here.
+///
+/// `Wallet::public_key` field will be removed.
+/// `Wallet::history_hash` field will be added.
+/// Wallets and history from username Eve will be removed.
 fn migrate_wallets(helper: &mut MigrationHelper) -> DbResult<()> {
     helper.iter_loop(|helper, iters| {
         let old_schema = v1::Schema::new(helper.old_data());
         let mut new_schema = v2::Schema::new(helper.new_data());
 
-        // Size is selected so we can safely store part of the migration in RAM.
+        // Size is selected so that we can safely store part of the migration in RAM.
         const CHUNK_SIZE: usize = 1_000;
         let mut count = 0;
         for (public_key, wallet) in iters
@@ -96,10 +104,7 @@ fn migration_with_iter_loop(db: Arc<dyn Database>) {
         new_data.create_tombstone("divisibility");
     }
 
-    // Migrate wallets using schema:
-    // `Wallet::public_key` field will be removed.
-    // `Wallet::history_hash` field will be added.
-    // Wallets and history from username Eve will be removed.
+    // Migrate wallets using schema.
     migrate_wallets(&mut helper).expect("Wallet migration failed.");
 
     // Call `MigrationHelper::finish` to merge changes to the database.

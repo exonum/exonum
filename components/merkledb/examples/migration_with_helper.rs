@@ -13,11 +13,15 @@
 // limitations under the License.
 
 //! Shows how to provide database data migration with the `MigrationHelper`.
-//! `MigrationHelper` provides methods to get access to the old and new versions of the data, and to merge changes,
-//! so we don't need to do it manually.
-//! The main logic of this example described in the `migration_with_helper` and `migrate_wallets` functions.
+//! `MigrationHelper` provides methods to get access to the old
+//! and new versions of the data, and to merge changes, so we don't need to do it manually.
+//!
+//! The main logic of this example is described in the `migration_with_helper`
+//! and `migrate_wallets` functions.
+//!
 //! The main points of this example are:
-//! - We are creating `MigrationHelper` for the DB that allows us to get access to the old and new data.
+//! - We are creating `MigrationHelper` for the DB
+//!  that allows us to get access to the old and new data.
 //! - We are using `MigrationHelper::finish` to merge the changes to the database.
 //! - Data migration is performed by direct access to old and new schemas.
 //!
@@ -32,6 +36,10 @@ use migration::{perform_migration, v1, v2};
 mod migration;
 
 /// Provides migration of wallets with schema and `MigrationHelper`.
+///
+/// `Wallet::public_key` field will be removed.
+/// `Wallet::history_hash` field will be added.
+/// Wallets and history from username Eve will be removed.
 fn migrate_wallets(helper: &MigrationHelper) {
     let old_schema = v1::Schema::new(helper.old_data());
     let mut new_schema = v2::Schema::new(helper.new_data());
