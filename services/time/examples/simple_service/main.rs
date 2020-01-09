@@ -22,13 +22,12 @@ use exonum::{
         access::{Access, FromAccess},
         ProofMapIndex,
     },
-    runtime::{
-        rust::{CallContext, Service, ServiceFactory},
-        ExecutionError, InstanceId, SnapshotExt,
-    },
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{
+    CallContext, ExecutionError, InstanceId, Service, ServiceFactory, SnapshotExt,
+};
 use exonum_testkit::TestKitBuilder;
 use serde_derive::*;
 

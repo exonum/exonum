@@ -1,15 +1,28 @@
-use exonum_merkledb::{access::Prefixed, BinaryValue, Fork};
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-use super::{GenericCallMut, MethodDescriptor};
-use crate::{
-    blockchain::Schema as CoreSchema,
+use exonum::{
     helpers::Height,
     runtime::{
-        dispatcher::Dispatcher, ArtifactId, BlockchainData, CallInfo, Caller, CoreError,
-        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, CallInfo, Caller, CoreError, ExecutionContext, ExecutionContextUnstable,
+        ExecutionError, InstanceDescriptor, InstanceQuery, SupervisorExtensions,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_merkledb::{access::Prefixed, Fork};
+
+use super::{GenericCallMut, MethodDescriptor};
 
 /// Context for the executed call.
 ///
@@ -68,72 +81,16 @@ impl<'a> CallContext<'a> {
         })
     }
 
-    /// Provides writeable access to core schema.
+    /// Returns extensions required for the Supervisor service implementation.
     ///
     /// This method can only be called by the supervisor; the call will panic otherwise.
     #[doc(hidden)]
-    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
+    pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`writeable_core_schema` called within a non-supervisor service");
-        }
-        CoreSchema::new(self.inner.fork)
-    }
-
-    /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
-    ///
-    /// If / when a block with this instruction is accepted, artifact deployment becomes
-    /// a requirement for all nodes in the network. A node that did not successfully
-    /// deploy the artifact previously blocks until the artifact is deployed successfully.
-    /// If a node cannot deploy the artifact, it panics.
-    ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    pub fn start_artifact_registration(&self, artifact: ArtifactId, spec: Vec<u8>) {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`start_artifact_registration` called within a non-supervisor service");
+            panic!("`supervisor_extensions` called within a non-supervisor service");
         }
 
-        Dispatcher::commit_artifact(self.inner.fork, artifact, spec);
-    }
-
-    /// Initiates adding a service instance to the blockchain.
-    ///
-    /// The service is not immediately activated; it activates if / when the block containing
-    /// the activation transaction is committed.
-    ///
-    /// # Panics
-    ///
-    /// - This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    pub fn initiate_adding_service(
-        &mut self,
-        instance_spec: InstanceSpec,
-        constructor: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`initiate_adding_service` called within a non-supervisor service");
-        }
-
-        self.inner
-            .child_context(Some(self.instance.id))
-            .initiate_adding_service(instance_spec, constructor)
-    }
-
-    /// Initiates stopping an active service instance in the blockchain.
-    ///
-    /// The service is not immediately stopped; it stops if / when the block containing
-    /// the stopping transaction is committed.
-    ///
-    /// # Panics
-    ///
-    /// - This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`initiate_stopping_service` called within a non-supervisor service");
-        }
-
-        Dispatcher::initiate_stopping_service(self.inner.fork, instance_id)
+        self.inner.supervisor_extensions()
     }
 
     fn make_child_call<'q>(
@@ -145,7 +102,6 @@ impl<'a> CallContext<'a> {
     ) -> Result<(), ExecutionError> {
         let descriptor = self
             .inner
-            .dispatcher
             .get_service(called_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
@@ -159,9 +115,9 @@ impl<'a> CallContext<'a> {
         } else {
             Some(self.instance.id)
         };
+
         self.inner
-            .child_context(caller)
-            .call(method.interface_name, &call_info, &args)
+            .make_child_call(method.interface_name, &call_info, &args, caller)
     }
 }
 

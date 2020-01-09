@@ -20,10 +20,10 @@
 use exonum::{
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
-    runtime::{rust::ServiceFactory, SnapshotExt},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::{ServiceFactory, SnapshotExt};
 use exonum_testkit::{
     explorer::api::{TransactionQuery, TransactionResponse},
     ApiKind, TestKit, TestKitApi, TestKitBuilder,

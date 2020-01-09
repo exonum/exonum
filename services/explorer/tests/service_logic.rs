@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    blockchain::CallInBlock,
-    helpers::Height,
-    runtime::{
-        rust::ServiceFactory, CallType, ErrorMatch, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
-    },
+use exonum::{blockchain::CallInBlock, helpers::Height};
+use exonum_rust_runtime::{
+    CallType, ErrorMatch, ServiceFactory, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
 };
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::TestKitBuilder;

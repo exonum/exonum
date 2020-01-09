@@ -77,6 +77,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   To get the sources of an artifact, use query `type=artifact&name=$name&version=$version`,
   where `$name` and `$version` are replaced with appropriate values. (#1590)
 
+- Rust runtime module was moved from the `exonum` crate into the separate
+  `exonum-rust-runtime` crate. (#1641)
+
 - `update_service_status` now does not return a value. (#1659)
 
 - `BlockchainBuilder::build` now returns `BlockchainMut` instead of `Result`. (#1659)
@@ -160,6 +163,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Added `ProtobufConvert` for `Verified`, `BlockProof` and `IndexProof`. (#1643)
 
+- Slash (`/`) is now allowed to be a part of artifact/instance name. (#1681)
+
 #### exonum-merkledb
 
 - MerkleDB now performs automated state aggregation allowing to construct proofs
@@ -180,6 +185,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
+#### exonum-rust-runtime
+
+- Rust runtime module was moved from the `exonum` crate into the separate
+  `exonum-rust-runtime` crate. (#1641)
 - It is now possible to iterate over keys of the indexes within a group. (#1662)
 
 #### exonum-supervisor

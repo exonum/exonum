@@ -36,13 +36,8 @@
 //! ## Minimal complete example
 //!
 //! ```
-//! use exonum::{
-//!     proto::schema::doc_tests,
-//!     runtime::{
-//!         rust::{CallContext, Service},
-//!         BlockchainData, ExecutionError,
-//!     },
-//! };
+//! use exonum::proto::schema::doc_tests;
+//! use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
 //! use exonum_derive::*;
 //! use exonum_merkledb::Snapshot;
 //! use exonum_proto::ProtobufConvert;
@@ -112,7 +107,7 @@
 //! prototyping.
 //!
 //! ```
-//! # use exonum::runtime::{rust::{CallContext, Service}, BlockchainData, ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
 //! # use exonum_crypto::Hash;
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! # use exonum_merkledb::Snapshot;
@@ -198,7 +193,7 @@
 //! ## Interface usage
 //!
 //! ```
-//! # use exonum::runtime::{rust::CallContext, ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, ExecutionError};
 //! # use exonum_crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;
@@ -248,6 +243,13 @@
 //! # }
 //! ```
 
+pub use exonum::runtime::{
+    migrations, versioning, AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, CallType,
+    Caller, CommonError, DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
+    ExecutionStatus, InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, MethodId,
+    RuntimeIdentifier, RuntimeInstance, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+};
+
 pub use self::{
     call_context::CallContext,
     error::Error,
@@ -262,6 +264,16 @@ pub use self::{
 pub mod api;
 pub mod error;
 
+use exonum::{
+    api::{manager::UpdateEndpoints, ApiBuilder},
+    blockchain::{Blockchain, Schema as CoreSchema},
+    helpers::Height,
+    runtime::{
+        catch_panic,
+        migrations::{DataMigrationError, MigrateData, MigrationScript},
+        ExecutionContext, Mailbox, Runtime,
+    },
+};
 use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
@@ -269,29 +281,15 @@ use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::{
-    api::{manager::UpdateEndpoints, ApiBuilder},
-    blockchain::{Blockchain, Schema as CoreSchema},
-    helpers::Height,
-    runtime::{
-        dispatcher::Mailbox,
-        error::{catch_panic, ExecutionError, ExecutionFail},
-        migrations::{DataMigrationError, MigrateData, MigrationScript},
-        ArtifactId, BlockchainData, CallInfo, ExecutionContext, InstanceDescriptor, InstanceId,
-        InstanceSpec, InstanceStatus, Runtime, RuntimeIdentifier, WellKnownRuntime,
-    },
-};
-
 use self::api::ServiceApiBuilder;
 
 mod call_context;
 mod runtime_api;
 mod service;
 mod stubs;
-#[cfg(test)]
-mod tests;
 
 trait FactoryWithMigrations: ServiceFactory + MigrateData {}
+
 impl<T: ServiceFactory + MigrateData> FactoryWithMigrations for T {}
 
 /// Wrapper around a service factory that does not support migrations.

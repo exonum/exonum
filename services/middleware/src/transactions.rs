@@ -14,12 +14,13 @@
 
 //! Transaction logic for `MiddlewareService`.
 
-use exonum::runtime::{
-    rust::{CallContext, GenericCall, GenericCallMut, MethodDescriptor, TxStub},
-    AnyTx, CoreError, ExecutionError, InstanceId,
-};
+use exonum::runtime::CoreError;
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{
+    AnyTx, CallContext, ExecutionError, GenericCall, GenericCallMut, InstanceId, MethodDescriptor,
+    TxStub,
+};
 use semver::VersionReq;
 use serde_derive::*;
 
@@ -96,7 +97,7 @@ impl GenericCall<InstanceId> for ArtifactReq {
 ///     }
 /// }
 ///
-/// # use exonum::runtime::{rust::DefaultInstance, InstanceId};
+/// # use exonum_rust_runtime::{DefaultInstance, InstanceId};
 /// use exonum_middleware_service::{
 ///     ArtifactReq, Batch, MiddlewareInterfaceMut, MiddlewareService,
 /// };

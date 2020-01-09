@@ -179,14 +179,12 @@ mod tests {
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::{
-            rust::{CallContext, Service, ServiceFactory},
-            ExecutionError,
-        },
+        runtime::ExecutionError,
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
+    use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 
     use std::time::Duration;
 

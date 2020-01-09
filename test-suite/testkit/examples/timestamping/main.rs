@@ -14,13 +14,9 @@
 
 //! Simple timestamping service implementation.
 
-use exonum::{
-    crypto::gen_keypair,
-    runtime::{
-        rust::{CallContext, Service, ServiceFactory},
-        ExecutionError, SnapshotExt,
-    },
-};
+use exonum::crypto::gen_keypair;
+use exonum_rust_runtime::{CallContext, ExecutionError, Service, ServiceFactory, SnapshotExt};
+
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::TestKitBuilder;

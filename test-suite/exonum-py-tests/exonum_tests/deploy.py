@@ -12,6 +12,7 @@ from suite import (
     assert_processes_exited_successfully,
     launcher_networks,
     run_4_nodes,
+    wait_network_to_start,
 )
 
 
@@ -20,7 +21,7 @@ class RegularDeployTest(unittest.TestCase):
 
     def setUp(self):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-        time.sleep(3)
+        wait_network_to_start(self.network)
 
     def test_deploy_regular(self):
         """Tests the deploy mechanism in regular mode."""
@@ -196,7 +197,7 @@ class DevDeployTest(unittest.TestCase):
 
     def setUp(self):
         self.network = run_dev_node("exonum-cryptocurrency-advanced")
-        time.sleep(3)
+        wait_network_to_start(self.network)
 
     def test_deploy_run_dev(self):
         """Tests the deploy mechanism in run-dev mode."""

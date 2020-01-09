@@ -19,14 +19,12 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     helpers::Height,
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{CallContext, DefaultInstance, Service, TxStub},
-        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_proto::{impl_binary_value_for_pb_message, ProtobufConvert};
+use exonum_rust_runtime::{CallContext, DefaultInstance, Service, TxStub};
 
 #[exonum_interface]
 pub trait ConfigUpdater<Ctx> {
@@ -46,8 +44,9 @@ pub struct ConfigUpdaterService;
 impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
     type Output = Result<(), ExecutionError>;
 
-    fn update_config(&self, ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
-        ctx.writeable_core_schema()
+    fn update_config(&self, mut ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
+        ctx.supervisor_extensions()
+            .writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())

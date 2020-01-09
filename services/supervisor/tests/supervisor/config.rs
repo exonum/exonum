@@ -19,11 +19,9 @@ use exonum::{
     blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{
-        rust::ServiceFactory, CommonError, ErrorMatch, InstanceId, SnapshotExt,
-        SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
+use exonum_rust_runtime::{CommonError, ServiceFactory};
 
 use crate::{utils::*, IncService as ConfigChangeService};
 use exonum_supervisor::{

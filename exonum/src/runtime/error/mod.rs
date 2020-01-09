@@ -67,7 +67,7 @@ use crate::proto::schema::runtime as runtime_proto;
 ///
 /// ```
 /// use exonum_derive::*;
-/// # use exonum::runtime::{rust::CallContext, ExecutionError};
+/// # use exonum::runtime::{ExecutionError};
 ///
 /// /// Error codes emitted by wallet transactions during execution:
 /// #[derive(Debug, ExecutionFail)]
@@ -79,27 +79,6 @@ use crate::proto::schema::runtime as runtime_proto;
 ///     /// Time service with the specified name does not exist.
 ///     TimeServiceNotFound = 2,
 /// }
-///
-/// // Using errors in the service code:
-/// # struct Arg { field: String }
-/// # struct MyService;
-/// # trait MyInterface {
-/// #     fn do_something(&self, context: CallContext<'_>, arg: Arg) -> Result<(), ExecutionError>;
-/// # }
-/// impl MyInterface for MyService {
-///     fn do_something(
-///         &self,
-///         context: CallContext<'_>,
-///         arg: Arg,
-///     ) -> Result<(), ExecutionError> {
-///         if arg.field.is_empty() {
-///             return Err(Error::ConfigParseError.into());
-///         }
-///         // do other stuff...
-/// #       Ok(())
-///     }
-/// }
-/// ```
 pub trait ExecutionFail {
     /// Extracts the error kind.
     fn kind(&self) -> ErrorKind;

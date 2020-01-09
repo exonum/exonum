@@ -17,7 +17,7 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{DeriveInput, Generics, Ident, Lit, Meta, NestedMeta, Path};
 
-use super::CratePath;
+use super::RustRuntimeCratePath;
 
 #[derive(Debug)]
 struct ServiceInterface {
@@ -81,7 +81,7 @@ impl FromMeta for ServiceInterfaces {
 struct ServiceDispatcher {
     ident: Ident,
     #[darling(rename = "crate", default)]
-    cr: CratePath,
+    cr: RustRuntimeCratePath,
     #[darling(default)]
     implements: ServiceInterfaces,
     #[darling(default)]
@@ -93,8 +93,8 @@ impl ToTokens for ServiceDispatcher {
         let service_name = &self.ident;
         let cr = &self.cr;
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
-        let ctx = quote!(#cr::runtime::rust::CallContext<'_>);
-        let res = quote!(std::result::Result<(), #cr::runtime::ExecutionError>);
+        let ctx = quote!(#cr::CallContext<'_>);
+        let res = quote!(std::result::Result<(), #cr::ExecutionError>);
 
         let match_arms = self.implements.0.iter().map(|interface| {
             let trait_name = &interface.path;
@@ -103,7 +103,7 @@ impl ToTokens for ServiceDispatcher {
             } else {
                 quote!(dyn #trait_name<#ctx, Output = #res>)
             };
-            let interface_trait = quote!(<#interface_trait as #cr::runtime::rust::Interface>);
+            let interface_trait = quote!(<#interface_trait as #cr::Interface>);
 
             quote! {
                 #interface_trait::INTERFACE_NAME => {
@@ -113,17 +113,17 @@ impl ToTokens for ServiceDispatcher {
         });
 
         let expanded = quote! {
-            impl #impl_generics #cr::runtime::rust::ServiceDispatcher for #service_name #ty_generics #where_clause  {
+            impl #impl_generics #cr::ServiceDispatcher for #service_name #ty_generics #where_clause  {
                 fn call(
                     &self,
                     interface_name: &str,
-                    method: #cr::runtime::MethodId,
+                    method: #cr::MethodId,
                     ctx: #ctx,
                     payload: &[u8],
-                ) -> Result<(), #cr::runtime::ExecutionError> {
+                ) -> Result<(), #cr::ExecutionError> {
                     match interface_name {
                         #( #match_arms )*
-                        other => Err(#cr::runtime::CommonError::NoSuchInterface.into()),
+                        other => Err(#cr::CommonError::NoSuchInterface.into()),
                     }
                 }
             }

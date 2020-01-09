@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::{
-    rust::{
-        api::{self, ServiceApiBuilder},
-        CallContext, DefaultInstance, Service,
-    },
-    CommonError, ExecutionError, InstanceId,
-};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Entry,
+};
+use exonum_rust_runtime::{
+    api::{self, ServiceApiBuilder},
+    CallContext, CommonError, DefaultInstance, ExecutionError, InstanceId, Service,
 };
 
 use crate::proto;

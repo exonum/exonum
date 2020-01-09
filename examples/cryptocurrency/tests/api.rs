@@ -23,10 +23,10 @@ use exonum::{
     api,
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
-    runtime::rust::ServiceFactory,
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{
     explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi, TestKitBuilder,
 };
