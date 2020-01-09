@@ -107,11 +107,8 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
 
             launcher.deploy_all()
-            try:
+            with self.assertRaises(ExecutionFailError):
                 launcher.wait_for_deploy()
-            except Exception as error:
-                print(error)
-                self.assertRaises(ExecutionFailError)
 
             # artifact should not be deployed because of exceeded deadline height
             for artifact in launcher.launch_state.completed_deployments():
@@ -176,11 +173,8 @@ class RegularDeployTest(unittest.TestCase):
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
-            try:
+            with self.assertRaises(ExecutionFailError):
                 launcher.wait_for_start()
-            except Exception as error:
-                print(error)
-                self.assertRaises(ExecutionFailError)
 
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
