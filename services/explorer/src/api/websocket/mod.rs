@@ -200,10 +200,10 @@ use exonum::{
     blockchain::{Blockchain, Schema},
     crypto::Hash,
     merkledb::ObjectHash,
-    messages::SignedMessage,
+    messages::{AnyTx, SignedMessage, Verified},
 };
 use exonum_explorer::api::{TransactionHex, TransactionResponse};
-use futures::Future;
+use futures::{Future, IntoFuture};
 use hex::FromHex;
 
 use std::{
@@ -382,6 +382,29 @@ impl Server {
             }
         }
     }
+
+    fn check_transaction(&self, message: Transaction) -> Result<Verified<AnyTx>, failure::Error> {
+        let signed = SignedMessage::from_hex(message.0.tx_body.as_bytes())?;
+        let verified = signed.into_verified()?;
+        Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
+        Ok(verified)
+    }
+
+    fn handle_transaction(
+        &self,
+        message: Transaction,
+    ) -> impl Future<Item = TransactionResponse, Error = failure::Error> {
+        let sender = self.blockchain.sender().to_owned();
+        self.check_transaction(message)
+            .into_future()
+            .and_then(move |verified| {
+                let tx_hash = verified.object_hash();
+                sender
+                    .broadcast_transaction(verified)
+                    .map(move |()| TransactionResponse { tx_hash })
+                    .from_err()
+            })
+    }
 }
 
 impl Actor for Server {
@@ -495,18 +518,11 @@ impl Handler<Broadcast> for Server {
 }
 
 impl Handler<Transaction> for Server {
-    type Result = Result<TransactionResponse, failure::Error>;
+    type Result = Box<dyn Future<Item = TransactionResponse, Error = failure::Error>>;
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
-        let signed = SignedMessage::from_hex(message.0.tx_body.as_bytes())?;
-        let tx_hash = signed.object_hash();
-        let verified = signed.into_verified()?;
-        Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
-
-        // FIXME Don't ignore message error.
-        let _ = self.blockchain.sender().broadcast_transaction(verified);
-        Ok(TransactionResponse { tx_hash })
+        Box::new(self.handle_transaction(message))
     }
 }
 

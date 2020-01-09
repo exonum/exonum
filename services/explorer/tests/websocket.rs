@@ -96,7 +96,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 /// an incorrect instance ID.
 #[test]
 fn test_send_transaction() {
-    let (_testkit, api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
     let url = api.public_url("api/explorer/v1/ws");
     let mut client = create_ws_client(&url);
 
@@ -119,6 +119,10 @@ fn test_send_transaction() {
             "response": { "tx_hash": tx_hash },
         })
     );
+
+    // Check that the transaction is in the mempool.
+    testkit.poll_events();
+    assert!(testkit.is_tx_in_pool(&tx_hash));
 
     // Send invalid transaction.
     let keypair = gen_keypair();
