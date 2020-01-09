@@ -33,7 +33,7 @@ use std::{
 use exonum::{
     crypto,
     events::InternalRequest,
-    events::{Event, EventHandler, HandlerPart, InternalEvent, InternalPart, NetworkEvent},
+    events::{Event, EventHandler, HandlerPart, InternalPart, NetworkEvent},
     messages::{Message, Verified},
     node::{EventsPoolCapacity, ExternalMessage, NodeChannel},
     runtime::{AnyTx, CallInfo},
@@ -65,17 +65,19 @@ impl MessagesHandler {
 
 impl EventHandler for MessagesHandler {
     fn handle_event(&mut self, event: Event) {
-        if let Event::Internal(InternalEvent::MessageVerified(_)) = event {
-            assert!(!self.is_finished(), "unexpected `MessageVerified`");
+        if let Event::Internal(event) = event {
+            if event.is_message_verified() {
+                assert!(!self.is_finished(), "unexpected `MessageVerified`");
 
-            self.txs_count += 1;
+                self.txs_count += 1;
 
-            if self.txs_count == self.expected_count {
-                self.finish_signal
-                    .take()
-                    .unwrap()
-                    .send(())
-                    .expect("cannot send finish signal");
+                if self.txs_count == self.expected_count {
+                    self.finish_signal
+                        .take()
+                        .unwrap()
+                        .send(())
+                        .expect("cannot send finish signal");
+                }
             }
         }
     }

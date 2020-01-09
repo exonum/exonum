@@ -15,7 +15,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
-use futures::{future, sync::mpsc, Future, IntoFuture};
+use futures::{future, Future, IntoFuture};
 use pretty_assertions::assert_eq;
 use semver::Version;
 
@@ -307,7 +307,7 @@ fn test_dispatcher_simple() {
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
+        ApiSender::closed(),
     );
 
     let (changes_tx, changes_rx) = channel();
@@ -754,7 +754,7 @@ fn delayed_deployment() {
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
+        ApiSender::closed(),
     );
     let runtime = DeploymentRuntime::default();
     let mut dispatcher = DispatcherBuilder::new()
@@ -784,7 +784,7 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
+        ApiSender::closed(),
     );
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(2, runtime.clone())
@@ -835,7 +835,7 @@ fn failed_deployment_with_node_restart() {
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
+        ApiSender::closed(),
     );
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(2, runtime)
@@ -864,7 +864,7 @@ fn recoverable_error_during_deployment() {
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
+        ApiSender::closed(),
     );
     let runtime = DeploymentRuntime::default();
     let mut dispatcher = DispatcherBuilder::new()
@@ -898,7 +898,7 @@ fn stopped_service_workflow() {
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
-        ApiSender(mpsc::channel(1).0),
+        ApiSender::closed(),
     );
 
     let (changes_tx, changes_rx) = channel();

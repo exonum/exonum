@@ -16,23 +16,21 @@
 
 pub use self::types::{Height, Round, ValidatorId};
 
-// Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden under `doc(hidden)`.
+// Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden
+// under `doc(hidden)`.
 pub use self::user_agent::user_agent;
 
 // `Milliseconds` is just `u64`, but more readable within context.
-pub(crate) use self::types::Milliseconds;
-
 pub(crate) use self::ordered_map::OrderedMap;
-
-#[doc(hidden)]
-pub mod config;
+pub(crate) use self::types::Milliseconds;
 
 mod ordered_map;
 
 use env_logger::Builder;
+use exonum_merkledb::Fork;
 use log::SetLoggerError;
 
-use crate::{blockchain::Schema, exonum_merkledb::Fork};
+use crate::blockchain::Schema;
 
 mod types;
 mod user_agent;
@@ -83,10 +81,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<crate::node::
             connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
             api: Default::default(),
             mempool: Default::default(),
-            services_configs: Default::default(),
-            database: Default::default(),
             thread_pool_size: Default::default(),
-            master_key_path: "master.key.toml".into(),
             keys,
         })
         .collect::<Vec<_>>()

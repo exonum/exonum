@@ -16,15 +16,14 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
-    node::ApiSender,
+    node::{ApiSender, SendError},
     runtime::{
         ArtifactId, DispatcherAction, ExecutionError, InstanceDescriptor, InstanceId, Mailbox,
         MethodId,
     },
 };
 use exonum_merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot};
-use failure::Error;
-use futures::IntoFuture;
+use futures::{Future, IntoFuture};
 
 use std::{
     borrow::Cow,
@@ -335,14 +334,17 @@ impl<'a> Broadcaster<'a> {
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
 impl GenericCall<()> for Broadcaster<'_> {
-    type Output = Result<Hash, Error>;
+    type Output = Result<Hash, SendError>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
         let msg = self
             .service_keypair
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
-        self.tx_sender.broadcast_transaction(msg).map(|()| tx_hash)
+        self.tx_sender
+            .broadcast_transaction(msg)
+            .wait()
+            .map(|()| tx_hash)
     }
 }
 

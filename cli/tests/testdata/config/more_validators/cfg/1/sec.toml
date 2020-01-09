@@ -4,6 +4,9 @@ master_key_path = "master.key.toml"
 
 [api]
 state_update_timeout = 10000
+[api.server_restart]
+max_retries = 20
+retry_timeout = 500
 
 [connect_list]
 peers = []
