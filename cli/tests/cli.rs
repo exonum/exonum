@@ -285,7 +285,10 @@ fn test_generate_config_key_files() {
         .unwrap();
 
     let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
-    assert_eq!(private_cfg["master_key_path"], "master.key.toml".into());
+    assert_eq!(
+        private_cfg["master_key_path"].as_str().unwrap(),
+        "master.key.toml"
+    );
 }
 
 #[test]
@@ -308,10 +311,8 @@ fn master_key_path_current_dir() {
     let expected_path = current_dir.join("master.key.toml").canonicalize().unwrap();
 
     let private_cfg: toml::Value = load_config_file(&env.output_private_config(0)).unwrap();
-    assert_eq!(
-        private_cfg["master_key_path"],
-        expected_path.to_str().unwrap().into()
-    );
+    let path_from_cfg = PathBuf::from(private_cfg["master_key_path"].as_str().unwrap());
+    assert_eq!(path_from_cfg, expected_path);
 }
 
 #[test]
