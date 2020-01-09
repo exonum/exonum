@@ -21,7 +21,7 @@ use exonum::{
     crypto::gen_keypair,
     helpers,
     merkledb::{ObjectHash, TemporaryDB},
-    node::{Node, ShutdownHandle},
+    node::{Node, NodeBuilder, ShutdownHandle},
 };
 use exonum_explorer::api::Notification;
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
@@ -79,21 +79,14 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
         .with_instance(CounterService.default_instance())
         .build();
 
-    let with_runtimes = |notifier| {
-        vec![RustRuntime::builder()
-            .with_factory(ExplorerFactory)
-            .with_factory(CounterService)
-            .build(notifier)
-            .into()]
-    };
-
-    let node = Node::new(
-        TemporaryDB::new(),
-        with_runtimes,
-        node_cfg,
-        genesis_config,
-        None,
-    );
+    let node = NodeBuilder::new(TemporaryDB::new(), node_cfg, genesis_config)
+        .with_runtime_fn(|channel| {
+            RustRuntime::builder()
+                .with_factory(ExplorerFactory)
+                .with_factory(CounterService)
+                .build(channel.endpoints_sender())
+        })
+        .build();
 
     let handle = RunHandle::new(node);
     // Wait until the node has fully started.

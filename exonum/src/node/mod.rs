@@ -984,40 +984,92 @@ impl NodeChannel {
     }
 }
 
-impl Node {
-    /// Creates node for the given services and node configuration.
-    ///
-    /// Due to the API is part of Node, it is hard to pass API restart notifier to the runtime
-    /// instances. `with_runtimes` closure takes restart notifiers and returns list of runtime
-    /// instances.
-    ///
-    /// TODO [ECR-3949]
-    #[doc(hidden)]
+/// Builder for `Node`.
+pub struct NodeBuilder {
+    channel: NodeChannel,
+    blockchain_builder: BlockchainBuilder,
+    node_config: NodeConfig,
+    config_manager: Option<Box<dyn ConfigManager>>,
+}
+
+impl fmt::Debug for NodeBuilder {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NodeBuilder")
+            .field("channel", &self.channel)
+            .field("blockchain_builder", &self.blockchain_builder)
+            .field("node_config", &self.node_config)
+            .finish()
+    }
+}
+
+impl NodeBuilder {
+    /// Instantiates a builder.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        with_runtimes: impl FnOnce(mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance>,
-        node_cfg: NodeConfig,
+        node_config: NodeConfig,
         genesis_config: GenesisConfig,
-        config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
-        node_cfg
+        node_config
             .validate()
             .expect("Node configuration is inconsistent");
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let blockchain =
-            Blockchain::new(database, node_cfg.service_keypair(), channel.api_sender());
+        let channel = NodeChannel::new(&node_config.mempool.events_pool_capacity);
+        let blockchain = Blockchain::new(
+            database,
+            node_config.service_keypair(),
+            channel.api_sender(),
+        );
+        let blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
 
-        let mut blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
-        for runtime in with_runtimes(channel.endpoints.0.clone()) {
-            blockchain_builder = blockchain_builder.with_runtime(runtime);
+        Self {
+            channel,
+            blockchain_builder,
+            node_config,
+            config_manager: None,
         }
-        let blockchain = blockchain_builder.build();
-
-        Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }
 
+    /// Adds a runtime to the blockchain.
+    pub fn with_runtime<T>(mut self, runtime: T) -> Self
+    where
+        T: Into<RuntimeInstance>,
+    {
+        self.blockchain_builder = self.blockchain_builder.with_runtime(runtime);
+        self
+    }
+
+    /// Adds a runtime which depends on a `NodeChannel` (e.g., to update HTTP API of the node).
+    pub fn with_runtime_fn<T, F>(mut self, runtime_fn: F) -> Self
+    where
+        T: Into<RuntimeInstance>,
+        F: FnOnce(&NodeChannel) -> T,
+    {
+        let runtime = runtime_fn(&self.channel);
+        self.blockchain_builder = self.blockchain_builder.with_runtime(runtime);
+        self
+    }
+
+    /// Adds the configuration manager.
+    pub fn with_config_manager<T: ConfigManager + 'static>(mut self, manager: T) -> Self {
+        self.config_manager = Some(Box::new(manager));
+        self
+    }
+
+    /// Converts this builder into a `Node`.
+    pub fn build(self) -> Node {
+        let blockchain = self.blockchain_builder.build();
+        Node::with_blockchain(
+            blockchain,
+            self.channel,
+            self.node_config,
+            self.config_manager,
+        )
+    }
+}
+
+impl Node {
     /// Creates a node for the given blockchain and node configuration.
-    pub fn with_blockchain(
+    fn with_blockchain(
         blockchain: BlockchainMut,
         channel: NodeChannel,
         node_cfg: NodeConfig,
@@ -1188,6 +1240,12 @@ impl Node {
         self.handler.state()
     }
 
+    /// Returns the blockchain handle, which can be used to read blockchain state and send
+    /// transactions to the node.
+    pub fn blockchain(&self) -> &Blockchain {
+        self.handler.blockchain.as_ref()
+    }
+
     /// Returns a shutdown handle for the node. It is possible to instantiate multiple handles
     /// using this method; only the first call to shutdown the node is guaranteed to succeed
     /// (but this single call is enough to stop the node).
@@ -1203,25 +1261,21 @@ mod tests {
     use exonum_merkledb::TemporaryDB;
 
     use super::*;
-    use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
-
-    fn with_runtimes(_: mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance> {
-        Vec::new()
-    }
+    use crate::{blockchain::config::GenesisConfigBuilder, helpers};
 
     #[test]
     fn test_good_internal_events_config() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1229,13 +1283,13 @@ mod tests {
             .internal_events_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1243,14 +1297,14 @@ mod tests {
             .network_requests_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_internal_events_capacity_too_large() {
         let accidental_large_value = usize::max_value();
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1259,14 +1313,14 @@ mod tests {
             .internal_events_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_network_requests_capacity_too_large() {
         let accidental_large_value = usize::max_value();
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1275,6 +1329,6 @@ mod tests {
             .network_requests_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 }

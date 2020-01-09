@@ -92,16 +92,14 @@ pub use structopt;
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
-    exonum_merkledb::{Database, RocksDB},
-    node::Node,
+    exonum_merkledb::RocksDB,
+    node::NodeBuilder as CoreNodeBuilder,
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_rust_runtime::{
     DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
 };
 use exonum_supervisor::{Supervisor, SupervisorConfig};
-
-use std::sync::Arc;
 
 use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
 
@@ -170,27 +168,20 @@ impl NodeBuilder {
             .build();
 
             let db_options = &run_config.node_config.private_config.database;
-            let database: Arc<dyn Database> =
-                Arc::new(RocksDB::open(run_config.db_path, db_options)?);
+            let database = RocksDB::open(run_config.db_path, db_options)?;
 
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
-            let config_manager = Box::new(DefaultConfigManager::new(node_config_path));
+            let config_manager = DefaultConfigManager::new(node_config_path);
+            let rust_runtime = self.rust_runtime;
 
-            let with_runtimes = |notifier| {
-                let mut runtimes = self.external_runtimes;
-                runtimes.push(self.rust_runtime.build(notifier).into());
-                runtimes
-            };
-
-            let node = Node::new(
-                database,
-                with_runtimes,
-                run_config.node_config.into(),
-                genesis_config,
-                Some(config_manager),
-            );
-
-            node.run()
+            let mut node_builder =
+                CoreNodeBuilder::new(database, run_config.node_config.into(), genesis_config)
+                    .with_config_manager(config_manager)
+                    .with_runtime_fn(|channel| rust_runtime.build(channel.endpoints_sender()));
+            for runtime in self.external_runtimes {
+                node_builder = node_builder.with_runtime(runtime);
+            }
+            node_builder.build().run()
         } else {
             Ok(())
         }
