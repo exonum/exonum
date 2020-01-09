@@ -18,6 +18,7 @@ pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
 use failure::format_err;
+use futures::Future;
 use log::{info, trace};
 use reqwest::{
     header, Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response,
@@ -107,6 +108,7 @@ impl TestKitApi {
     {
         self.api_sender
             .broadcast_transaction(transaction.into())
+            .wait()
             .expect("Cannot broadcast transaction");
     }
 

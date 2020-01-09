@@ -14,7 +14,7 @@
 
 //! Updating node configuration on the fly.
 
-use exonum::{helpers::config::ConfigManager, node::ConnectListConfig};
+use exonum::node::{ConfigManager, ConnectListConfig};
 use failure;
 use log::error;
 

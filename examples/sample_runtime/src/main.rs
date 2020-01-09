@@ -23,7 +23,7 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     messages::Verified,
-    node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
+    node::{Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
@@ -266,10 +266,7 @@ fn node_config() -> NodeConfig {
         connect_list: Default::default(),
         api: api_cfg,
         mempool: Default::default(),
-        services_configs: Default::default(),
-        database: Default::default(),
         thread_pool_size: Default::default(),
-        master_key_path: Default::default(),
         keys,
     }
 }
@@ -283,8 +280,8 @@ fn main() {
     let node_cfg = node_config();
     let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
-    let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-    let api_sender = ApiSender::new(channel.api_requests.0.clone());
+    let channel = NodeChannel::default();
+    let api_sender = channel.api_sender();
 
     println!("Creating blockchain with additional runtime...");
     // Create a blockchain with the Rust runtime and our additional runtime.
@@ -295,7 +292,7 @@ fn main() {
         .build();
     let rust_runtime = RustRuntime::builder()
         .with_factory(Supervisor)
-        .build_for_tests();
+        .build(channel.endpoints_sender());
     let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
         .with_runtime(rust_runtime)
         .with_runtime(SampleRuntime::default())
@@ -303,6 +300,7 @@ fn main() {
 
     let blockchain_ref = blockchain.as_ref().to_owned();
     let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
+    let shutdown_handle = node.shutdown_handle();
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");
 
@@ -315,7 +313,7 @@ fn main() {
             spec: Vec::default(),
         };
         let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
-        api_sender.broadcast_transaction(tx).unwrap();
+        api_sender.broadcast_transaction(tx).wait().unwrap();
 
         // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
@@ -333,6 +331,7 @@ fn main() {
                     )
                     .sign_for_supervisor(service_keypair.0, &service_keypair.1),
             )
+            .wait()
             .unwrap();
         // Wait until instance identifier is assigned.
         thread::sleep(Duration::from_secs(1));
@@ -358,6 +357,7 @@ fn main() {
                 service_keypair.0,
                 &service_keypair.1,
             ))
+            .wait()
             .unwrap();
         thread::sleep(Duration::from_secs(2));
         // Send a reset counter transaction.
@@ -373,11 +373,11 @@ fn main() {
                 service_keypair.0,
                 &service_keypair.1,
             ))
+            .wait()
             .unwrap();
+
         thread::sleep(Duration::from_secs(2));
-        api_sender
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        shutdown_handle.shutdown().wait().unwrap();
     });
 
     node.run().unwrap();

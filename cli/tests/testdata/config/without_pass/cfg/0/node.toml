@@ -5,6 +5,10 @@ master_key_path = "master.key.toml"
 
 [private_config.api]
 state_update_timeout = 10000
+[private_config.api.server_restart]
+max_retries = 20
+retry_timeout = 500
+
 [[private_config.connect_list.peers]]
 address = "127.0.0.1:5400"
 public_key = "11e1b1902690aa22c8c976cb74a27f167b3899141c1c6ce8e19bafef32715d40"
@@ -24,6 +28,7 @@ public_key = "6f3f614692d678b664be7eaafbe280d14e2d4191299ae146874eec389c93ece7"
 [private_config.database]
 compression_type = "none"
 create_if_missing = true
+
 [private_config.mempool.events_pool_capacity]
 api_requests_capacity = 1024
 internal_events_capacity = 128
@@ -36,10 +41,6 @@ max_outgoing_connections = 128
 tcp_connect_max_retries = 10
 tcp_connect_retry_timeout = 15000
 tcp_nodelay = true
-
-[private_config.network.http_backend_config]
-server_restart_max_retries = 20
-server_restart_retry_timeout = 500
 
 [public_config.consensus]
 first_round_timeout = 3000
