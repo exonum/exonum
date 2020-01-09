@@ -14,6 +14,8 @@
 
 //! Exonum node API implementation.
 
+use exonum_api::{ApiAggregator, ApiBuilder};
+
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -22,7 +24,7 @@ use std::{
 };
 
 use crate::{
-    blockchain::ValidatorKeys,
+    blockchain::{Blockchain, ValidatorKeys},
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
@@ -30,6 +32,8 @@ use crate::{
 
 pub mod private;
 pub mod public;
+
+use self::{private::SystemApi as PrivateSystemApi, public::SystemApi};
 
 #[derive(Default)]
 struct ApiNodeState {
@@ -229,4 +233,19 @@ impl SharedNodeState {
         let state = self.node.read().expect("Expected read lock");
         state.tx_cache_len
     }
+}
+
+#[doc(hidden)]
+pub fn create_api_aggregator(blockchain: Blockchain, node_state: SharedNodeState) -> ApiAggregator {
+    let mut aggregator = ApiAggregator::new();
+    aggregator.insert("system", system_api(blockchain, node_state));
+    aggregator
+}
+
+fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
+    let mut builder = ApiBuilder::new();
+    let sender = blockchain.sender().clone();
+    PrivateSystemApi::new(sender, shared_api_state.clone()).wire(builder.private_scope());
+    SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
+    builder
 }

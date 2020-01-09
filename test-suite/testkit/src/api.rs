@@ -32,9 +32,10 @@ use std::{
 };
 
 use exonum::{
-    api::{self, node::public::system::DispatcherInfo, ApiAggregator},
+    api::{self, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
+    node_api::public::system::DispatcherInfo,
 };
 
 use crate::TestKit;

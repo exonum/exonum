@@ -26,7 +26,6 @@ use actix_web::{
 };
 use failure::{bail, ensure, format_err, Error};
 use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
-use log::trace;
 use serde::{
     de::{self, DeserializeOwned},
     ser, Serialize,
@@ -41,11 +40,10 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::api::{
-    self,
+use crate::{
     manager::{ApiManager, UpdateEndpoints},
     Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
-    ExtendApiBackend, FutureResult, NamedWith,
+    Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -124,21 +122,21 @@ impl ExtendApiBackend for actix_web::Scope<()> {
     }
 }
 
-impl ResponseError for api::Error {
+impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            api::Error::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
-            api::Error::InternalError(err) => {
+            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
+            ApiError::InternalError(err) => {
                 HttpResponse::InternalServerError().body(err.to_string())
             }
-            api::Error::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            api::Error::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            api::Error::Gone => HttpResponse::Gone().finish(),
-            api::Error::MovedPermanently(new_location) => HttpResponse::MovedPermanently()
+            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::Gone => HttpResponse::Gone().finish(),
+            ApiError::MovedPermanently(new_location) => HttpResponse::MovedPermanently()
                 .header(header::LOCATION, new_location.clone())
                 .finish(),
-            api::Error::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
-            api::Error::Unauthorized => HttpResponse::Unauthorized().finish(),
+            ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
+            ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
         }
     }
 }
@@ -205,16 +203,16 @@ impl From<EndpointMutability> for actix_web::http::Method {
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, api::Result<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, crate::Result<I>, F>> for RequestHandler
 where
-    F: Fn(Q) -> api::Result<I> + 'static + Send + Sync + Clone,
+    F: Fn(Q) -> crate::Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, api::Result<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, crate::Result<I>, F>) -> Self {
         // Convert handler that returns a `Result` into handler that will return `FutureResult`.
         let handler = f.inner.handler;
-        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = api::Error>> {
+        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = ApiError>> {
             let future = handler(query).into_future();
             Box::new(future)
         };
@@ -360,7 +358,7 @@ impl SystemRuntimeConfig {
 
             // Starts actix-web runtime.
             let code = system.run();
-            trace!("Actix runtime finished with code {}", code);
+            log::trace!("Actix runtime finished with code {}", code);
             ensure!(
                 code == 0,
                 "Actix runtime finished with the non zero error code: {}",

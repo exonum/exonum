@@ -13,32 +13,24 @@
 // limitations under the License.
 
 //! API and corresponding utilities.
+//! FIXME: expand.
 
 pub use self::{
-    error::Error,
+    error::{Error, MovedPermanentlyError},
     manager::UpdateEndpoints,
     with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 
 pub mod backends;
-pub mod error;
-pub mod manager;
-pub mod node;
-//pub mod websocket;
+mod error;
+mod manager;
+mod with;
 
 use serde::{de::DeserializeOwned, Serialize};
+
 use std::{collections::BTreeMap, fmt};
 
-use self::{
-    backends::actix,
-    node::{
-        private::{NodeInfo, SystemApi as PrivateSystemApi},
-        public::SystemApi,
-    },
-};
-use crate::{api::node::SharedNodeState, blockchain::Blockchain};
-
-mod with;
+use crate::backends::actix;
 
 /// Mutability of the endpoint. Used for auto-generated endpoints, e.g.
 /// in `moved_permanently` method.
@@ -208,20 +200,15 @@ pub trait ExtendApiBackend {
 
 /// Exonum node API aggregator. This structure enables several API backends to
 /// operate simultaneously. Currently, only HTTP v1 backend is available.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ApiAggregator {
     endpoints: BTreeMap<String, ApiBuilder>,
 }
 
 impl ApiAggregator {
-    /// Creates an API aggregator for the given blockchain and node state.
-    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
-        let mut endpoints = BTreeMap::new();
-        endpoints.insert(
-            "system".to_owned(),
-            Self::system_api(blockchain.clone(), node_state.clone()),
-        );
-        Self { endpoints }
+    /// Creates an empty API aggregator.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Inserts a handler for a set of endpoints with the given mount point.
@@ -243,14 +230,5 @@ impl ApiAggregator {
             ApiAccess::Private => backend
                 .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.private_scope))),
         }
-    }
-
-    fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
-        let mut builder = ApiBuilder::new();
-        let sender = blockchain.sender().clone();
-        PrivateSystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
-            .wire(builder.private_scope());
-        SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
-        builder
     }
 }

@@ -14,12 +14,13 @@
 
 //! Public system API.
 
+use exonum_api::ApiScope;
 use exonum_merkledb::access::Access;
 
 use crate::{
-    api::{node::SharedNodeState, ApiScope},
     blockchain::{Blockchain, Schema},
     helpers::user_agent,
+    node_api::SharedNodeState,
     runtime::{ArtifactId, DispatcherSchema, InstanceState, SnapshotExt},
 };
 

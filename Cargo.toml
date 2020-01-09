@@ -20,6 +20,7 @@ members = [
 
     "runtimes/rust",
 
+    "components/api",
     "components/build",
     "components/crypto",
     "components/derive",

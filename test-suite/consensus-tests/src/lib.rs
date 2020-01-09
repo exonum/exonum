@@ -22,7 +22,6 @@ mod guarded_queue;
 
 use bit_vec::BitVec;
 use exonum::{
-    api::node::SharedNodeState,
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         contains_transaction, Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut,
@@ -45,6 +44,7 @@ use exonum::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
     },
+    node_api::SharedNodeState,
 };
 use exonum_rust_runtime::{
     ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,

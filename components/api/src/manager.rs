@@ -18,11 +18,10 @@ use actix::prelude::*;
 use actix_net::server::Server;
 use actix_web::server::{HttpServer, StopServer};
 use futures::{sync::mpsc, Future};
-use log::{error, info, warn};
 
 use std::{collections::HashMap, fmt, io, time::Duration};
 
-use crate::api::{
+use crate::{
     backends::actix::{create_app, ApiRuntimeConfig, SystemRuntimeConfig},
     ApiBuilder,
 };
@@ -76,7 +75,7 @@ impl ApiManager {
     fn start_server(&self, runtime_config: ApiRuntimeConfig) -> io::Result<Addr<Server>> {
         let access = runtime_config.access;
         let listen_address = runtime_config.listen_address;
-        info!("Starting {} web api on {}", access, listen_address);
+        log::info!("Starting {} web api on {}", access, listen_address);
 
         let mut aggregator = self.runtime_config.api_aggregator.clone();
         aggregator.extend(self.user_endpoints.clone());
@@ -87,13 +86,13 @@ impl ApiManager {
     }
 
     fn initiate_restart(&mut self, manager: Addr<Self>) {
-        info!("Restarting servers.");
+        log::info!("Restarting servers.");
         for (addr, config) in self.api_runtime_addresses.drain() {
             let manager = manager.clone();
             Arbiter::spawn(
                 addr.send(StopServer { graceful: true })
                     .then(move |_| manager.send(StartServer { config, attempt: 0 }))
-                    .map_err(|e| error!("Error while restarting API server: {}", e)),
+                    .map_err(|e| log::error!("Error while restarting API server: {}", e)),
             );
         }
     }
@@ -126,7 +125,7 @@ impl Handler<StartServer> for ApiManager {
     type Result = ();
 
     fn handle(&mut self, mut msg: StartServer, ctx: &mut Context<Self>) -> Self::Result {
-        info!(
+        log::info!(
             "Handling server start: {:?} (attempt #{})",
             msg.config,
             msg.attempt + 1
@@ -134,9 +133,9 @@ impl Handler<StartServer> for ApiManager {
         let addr = match self.start_server(msg.config.clone()) {
             Ok(addr) => addr,
             Err(e) => {
-                warn!("Error handling service start {:?}: {}", msg.config, e);
+                log::warn!("Error handling service start {:?}: {}", msg.config, e);
                 if msg.attempt == self.runtime_config.server_restart_max_retries {
-                    error!("Cannot spawn server with config {:?}", msg.config);
+                    log::error!("Cannot spawn server with config {:?}", msg.config);
                     ctx.terminate();
                 } else {
                     msg.attempt += 1;
@@ -166,7 +165,7 @@ impl Message for UpdateEndpoints {
 
 impl StreamHandler<UpdateEndpoints, ()> for ApiManager {
     fn handle(&mut self, msg: UpdateEndpoints, ctx: &mut Context<Self>) {
-        info!("Server restart requested");
+        log::info!("Server restart requested");
         self.user_endpoints = msg.user_endpoints;
         self.initiate_restart(ctx.address());
     }

@@ -261,7 +261,7 @@ pub mod api;
 pub mod error;
 
 use exonum::{
-    api::{manager::UpdateEndpoints, ApiBuilder},
+    api::{ApiBuilder, UpdateEndpoints},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     merkledb::Snapshot,

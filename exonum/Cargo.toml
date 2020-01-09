@@ -18,8 +18,7 @@ links = "exonum_protobuf"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "0.7.9"
-actix-net = "0.2.6"
+# FIXME: revise
 actix-web = { version = "0.7.18", default-features = false }
 log = "0.4.6"
 byteorder = { version = "1.2.7", features = [ "i128" ] }
@@ -56,6 +55,7 @@ rpassword = "4.0.1"
 semver = { version = "0.9.0", features = ["serde"] }
 
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
+exonum-api = { version = "0.13.0-rc.2", path = "../components/api" }
 exonum-crypto = { version = "0.13.0-rc.2", path = "../components/crypto" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../components/derive" }
 exonum-keys = { version = "0.13.0-rc.2", path = "../components/keys" }

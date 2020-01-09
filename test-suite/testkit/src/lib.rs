@@ -111,9 +111,7 @@ pub use exonum_explorer as explorer;
 use exonum::{
     api::{
         backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
-        manager::UpdateEndpoints,
-        node::SharedNodeState,
-        ApiAccess, ApiAggregator,
+        ApiAccess, ApiAggregator, UpdateEndpoints,
     },
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
@@ -124,6 +122,7 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
+    node_api::{create_api_aggregator, SharedNodeState},
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{
@@ -228,7 +227,7 @@ impl TestKit {
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
         let api_aggregator =
-            ApiAggregator::new(blockchain.immutable_view(), SharedNodeState::new(10_000));
+            create_api_aggregator(blockchain.immutable_view(), SharedNodeState::new(10_000));
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -262,7 +261,7 @@ impl TestKit {
     /// Updates API aggregator for the testkit and caches it for further use.
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
-            let mut aggregator = ApiAggregator::new(
+            let mut aggregator = create_api_aggregator(
                 self.blockchain.immutable_view(),
                 SharedNodeState::new(10_000),
             );

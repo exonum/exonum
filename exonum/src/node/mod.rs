@@ -81,9 +81,7 @@ use crate::{
         backends::actix::{
             AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig,
         },
-        manager::UpdateEndpoints,
-        node::SharedNodeState,
-        ApiAccess, ApiAggregator,
+        ApiAccess, UpdateEndpoints,
     },
     blockchain::{
         config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
@@ -98,6 +96,7 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
+    node_api::{create_api_aggregator, SharedNodeState},
     runtime::RuntimeInstance,
 };
 
@@ -851,6 +850,13 @@ impl fmt::Debug for ApiSender {
 #[fail(display = "Failed to send API request to the node: the node is being shut down")]
 pub struct SendError(());
 
+/// Converts the provided error into an internal server error.
+impl From<SendError> for exonum_api::Error {
+    fn from(e: SendError) -> Self {
+        exonum_api::Error::InternalError(e.into())
+    }
+}
+
 /// Handle allowing to shut down the node.
 #[derive(Debug, Clone)]
 pub struct ShutdownHandle {
@@ -1029,6 +1035,7 @@ impl Node {
         };
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
+        let api_aggregator = create_api_aggregator(blockchain.immutable_view(), api_state.clone());
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
 
@@ -1064,7 +1071,7 @@ impl Node {
                     .chain(private_api_handler)
                     .collect::<Vec<_>>()
             },
-            api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
+            api_aggregator,
             server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
             server_restart_max_retries: node_cfg.api.server_restart.max_retries,
         };

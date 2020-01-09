@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use exonum::{
-    api::node::{
+    helpers::user_agent,
+    node_api::{
         private::NodeInfo,
         public::system::{ConsensusStatus, HealthCheckInfo, StatsInfo},
     },
-    helpers::user_agent,
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};
 use pretty_assertions::assert_eq;

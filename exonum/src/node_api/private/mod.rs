@@ -17,14 +17,15 @@
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. view the list of services on the current node.
 
+use exonum_api::{ApiBackend, ApiScope, Error as ApiError, FutureResult};
+use exonum_crypto::PublicKey;
 use futures::Future;
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use crate::{
-    api::{node::SharedNodeState, ApiBackend, ApiScope, Error as ApiError, FutureResult},
-    crypto::PublicKey,
     node::{ApiSender, ConnectInfo, ExternalMessage},
+    node_api::SharedNodeState,
     runtime::InstanceId,
 };
 
@@ -103,10 +104,10 @@ pub struct SystemApi {
 
 impl SystemApi {
     /// Create a new `private::SystemApi` instance.
-    pub fn new(sender: ApiSender, info: NodeInfo, shared_api_state: SharedNodeState) -> Self {
+    pub fn new(sender: ApiSender, shared_api_state: SharedNodeState) -> Self {
         Self {
             sender,
-            info,
+            info: NodeInfo::new(),
             shared_api_state,
         }
     }
@@ -193,8 +194,8 @@ impl SystemApi {
         // These backend-dependent uses are needed to provide realization of the support of empty
         // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
-        use crate::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
         use actix_web::{HttpRequest, HttpResponse};
+        use exonum_api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
 
         let sender = self.sender.clone();
         let index = move |_: HttpRequest| -> FutureResponse {

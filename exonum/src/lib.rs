@@ -47,6 +47,7 @@ extern crate serde_derive;
 #[cfg(all(test, feature = "long_benchmarks"))]
 extern crate test;
 
+pub use exonum_api as api;
 pub use exonum_crypto as crypto;
 pub use exonum_keys as keys;
 pub use exonum_merkledb as merkledb;
@@ -55,11 +56,9 @@ pub use exonum_merkledb as merkledb;
 pub mod messages;
 #[macro_use]
 pub mod helpers;
-#[macro_use]
 pub mod blockchain;
-pub mod api;
 pub mod node;
-#[macro_use]
+pub mod node_api;
 pub mod runtime;
 
 #[macro_use]
