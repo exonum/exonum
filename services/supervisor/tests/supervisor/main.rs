@@ -16,17 +16,16 @@ use exonum::{
     api, crypto,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{RustRuntimeBuilder, ServiceFactory},
-        ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
-    },
 };
 use exonum_merkledb::ObjectHash;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
-
+use exonum_rust_runtime::{
+    ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, RustRuntimeBuilder, ServiceFactory,
+    SUPERVISOR_INSTANCE_ID,
+};
 use exonum_supervisor::{
     ConfigPropose, DeployRequest, DeployResult, Error as TxError, Supervisor, SupervisorInterface,
 };
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use crate::{
     inc::{IncInterface, IncService, SERVICE_ID, SERVICE_NAME},

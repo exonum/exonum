@@ -170,8 +170,7 @@ impl Display for ErrorKind {
 /// # Examples
 ///
 /// ```
-/// use exonum_derive::*;
-/// # use exonum::runtime::{rust::CallContext, ExecutionError};
+/// use exonum_derive::ExecutionFail;
 ///
 /// /// Error codes emitted by wallet transactions during execution:
 /// #[derive(Debug, ExecutionFail)]
@@ -182,26 +181,6 @@ impl Display for ErrorKind {
 ///     ConfigParseError = 1,
 ///     /// Time service with the specified name does not exist.
 ///     TimeServiceNotFound = 2,
-/// }
-///
-/// // Using errors in the service code:
-/// # struct Arg { field: String }
-/// # struct MyService;
-/// # trait MyInterface {
-/// #     fn do_something(&self, context: CallContext<'_>, arg: Arg) -> Result<(), ExecutionError>;
-/// # }
-/// impl MyInterface for MyService {
-///     fn do_something(
-///         &self,
-///         context: CallContext<'_>,
-///         arg: Arg,
-///     ) -> Result<(), ExecutionError> {
-///         if arg.field.is_empty() {
-///             return Err(Error::ConfigParseError.into());
-///         }
-///         // do other stuff...
-/// #       Ok(())
-///     }
 /// }
 /// ```
 pub trait ExecutionFail {

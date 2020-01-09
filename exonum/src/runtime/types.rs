@@ -16,7 +16,7 @@ use exonum_crypto::{Hash, PublicKey, SecretKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
-    validation::{is_valid_identifier, is_valid_index_name_component},
+    validation::{is_allowed_index_name_char, is_valid_index_name_component},
     BinaryValue,
 };
 use exonum_proto::ProtobufConvert;
@@ -217,10 +217,18 @@ impl ValidateInput for ArtifactId {
 
     /// Checks that the artifact name contains only allowed characters and is not empty.
     fn validate(&self) -> Result<(), Self::Error> {
+        // This function is similar to `is_valid_identifier` from `merkledb`, but also
+        // allows `/` to be a part of artifact name.
+        fn is_valid_identifier(name: &str) -> bool {
+            name.as_bytes()
+                .iter()
+                .all(|&c| is_allowed_index_name_char(c) || c == b'.' || c == b'/')
+        }
+
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             is_valid_identifier(&self.name),
-            "Artifact name ({}) contains an illegal character, use only: `a-zA-Z0-9` and `_.-`",
+            "Artifact name ({}) contains an illegal character, use only: `a-zA-Z0-9` and `/_.-`",
             &self.name,
         );
         Ok(())
@@ -743,6 +751,13 @@ mod tests {
         assert_eq!(artifact_id.version.major, 3);
         assert_eq!(artifact_id.version.minor, 1);
         assert_eq!(artifact_id.version.patch, 5);
+
+        let artifact_id = "0:my-service/additional:1.0.0"
+            .parse::<ArtifactId>()
+            .unwrap();
+        assert_eq!(artifact_id.runtime_id, 0);
+        assert_eq!(artifact_id.name, "my-service/additional");
+        assert_eq!(artifact_id.version, Version::new(1, 0, 0));
     }
 
     #[test]
@@ -771,26 +786,26 @@ mod tests {
     #[test]
     fn parse_artifact_id_incorrect_layout() {
         let artifacts = [
-        ("15", "Wrong `ArtifactId` format"),
-        ("0::3.1.0", "Artifact name should not be empty"),
-        (":test:1.0.0", "cannot parse integer from empty string"),
-        ("-1:test:1.0.0", "invalid digit found in string"),
-        ("ava:test:0.0.1", "invalid digit found in string"),
-        (
-            "123:I am a service!:1.0.0",
-            "Artifact name (I am a service!) contains an illegal character",
-        ),
-        (
-            "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}:1.0.0",
-            "Artifact name (\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}) contains an illegal character",
-        ),
-        ("1:test:1", "Expected dot"),
-        ("1:test:3.141593", "Expected dot"),
-        ("1:test:what_are_versions", "Error parsing major identifier"),
-        ("1:test:1.x.0", "Error parsing minor identifier"),
-        ("1:test:1.0.x", "Error parsing patch identifier"),
-        ("1:test:1.0.0:garbage", "Extra junk after valid version"),
-    ];
+            ("15", "Wrong `ArtifactId` format"),
+            ("0::3.1.0", "Artifact name should not be empty"),
+            (":test:1.0.0", "cannot parse integer from empty string"),
+            ("-1:test:1.0.0", "invalid digit found in string"),
+            ("ava:test:0.0.1", "invalid digit found in string"),
+            (
+                "123:I am a service!:1.0.0",
+                "Artifact name (I am a service!) contains an illegal character",
+            ),
+            (
+                "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}:1.0.0",
+                "Artifact name (\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}) contains an illegal character",
+            ),
+            ("1:test:1", "Expected dot"),
+            ("1:test:3.141593", "Expected dot"),
+            ("1:test:what_are_versions", "Error parsing major identifier"),
+            ("1:test:1.x.0", "Error parsing minor identifier"),
+            ("1:test:1.0.x", "Error parsing patch identifier"),
+            ("1:test:1.0.0:garbage", "Extra junk after valid version"),
+        ];
 
         for (artifact, expected_err) in &artifacts {
             let actual_err = artifact.parse::<ArtifactId>().unwrap_err().to_string();

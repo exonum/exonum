@@ -20,13 +20,12 @@ use exonum::{
         access::{Access, FromAccess},
         MapIndex,
     },
-    runtime::{
-        rust::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory},
-        versioning::ArtifactReq as CoreReq,
-        ArtifactId, DispatcherError, ExecutionError, RuntimeIdentifier,
-    },
 };
 use exonum_derive::*;
+use exonum_rust_runtime::{
+    versioning::ArtifactReq as CoreReq, ArtifactId, ArtifactProtobufSpec, CallContext,
+    DispatcherError, ExecutionError, RuntimeIdentifier, Service, ServiceFactory,
+};
 use semver::Version;
 
 use exonum_middleware_service::ArtifactReq;

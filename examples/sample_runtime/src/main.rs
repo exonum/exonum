@@ -25,7 +25,6 @@ use exonum::{
     node::{ApiSender, ExternalMessage, Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
-        rust::{RustRuntime, ServiceFactory},
         versioning::Version,
         AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
         ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
@@ -33,6 +32,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 use futures::{Future, IntoFuture};
 

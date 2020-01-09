@@ -17,12 +17,13 @@
 //! See the module-level docs for the Rust runtime for an explanation how to use stubs,
 //! and the `explanation` module below for an explanation how stubs work.
 
+use exonum::{
+    messages::Verified,
+    runtime::{AnyTx, CallInfo, ExecutionError, InstanceId, MethodId},
+};
 use exonum_crypto::{PublicKey, SecretKey};
 
-use crate::{
-    messages::Verified,
-    runtime::{rust::CallContext, AnyTx, CallInfo, ExecutionError, InstanceId, MethodId},
-};
+use crate::CallContext;
 
 /// Descriptor of a method declared as a part of the service interface.
 #[derive(Debug, Clone, Copy)]

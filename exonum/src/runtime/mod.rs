@@ -148,7 +148,10 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{Dispatcher, Error as DispatcherError, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{
+        Action as DispatcherAction, Dispatcher, Error as DispatcherError, Mailbox,
+        Schema as DispatcherSchema,
+    },
     error::{
         catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
         ExecutionStatus, SerdeExecutionStatus,
@@ -162,8 +165,6 @@ pub use self::{
 // Re-export for serializing `ExecutionError` via `serde`.
 #[doc(hidden)]
 pub use error::execution_error as execution_error_serde;
-#[macro_use]
-pub mod rust;
 pub mod migrations;
 pub mod versioning;
 
@@ -175,7 +176,7 @@ use std::fmt;
 
 use self::migrations::{InitMigrationError, MigrationScript};
 use crate::{
-    blockchain::Blockchain,
+    blockchain::{Blockchain, Schema as CoreSchema},
     crypto::{Hash, PublicKey},
     helpers::ValidateInput,
 };
@@ -666,6 +667,17 @@ impl<'a> ExecutionContext<'a> {
         }
     }
 
+    /// Returns extensions required for the Supervisor service implementation.
+    ///
+    /// Make sure that this method invoked by the instance with the [`SUPERVISOR_INSTANCE_ID`]
+    /// identifier.
+    ///
+    /// [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
+    #[doc(hidden)]
+    pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
+        SupervisorExtensions(self.reborrow())
+    }
+
     pub(crate) fn child_context(
         &mut self,
         caller_service_id: Option<InstanceId>,
@@ -743,20 +755,6 @@ impl<'a> ExecutionContext<'a> {
             .initiate_adding_service(spec)
             .map_err(From::from)
     }
-
-    fn reborrow(&mut self) -> ExecutionContext<'_> {
-        self.reborrow_with_interface(self.interface_name)
-    }
-
-    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
-        ExecutionContext {
-            fork: &mut *self.fork,
-            caller: self.caller,
-            interface_name,
-            dispatcher: self.dispatcher,
-            call_stack_depth: self.call_stack_depth,
-        }
-    }
 }
 
 /// Instance descriptor contains information to access the running service instance.
@@ -785,5 +783,130 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
 impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
     fn from((id, name): (InstanceId, &'a str)) -> Self {
         InstanceDescriptor { id, name }
+    }
+}
+
+/// Execution context extensions required for the Supervisor service implementation.
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct SupervisorExtensions<'a>(ExecutionContext<'a>);
+
+impl<'a> SupervisorExtensions<'a> {
+    /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
+    ///
+    /// If / when a block with this instruction is accepted, artifact deployment becomes
+    /// a requirement for all nodes in the network. A node that did not successfully
+    /// deploy the artifact previously blocks until the artifact is deployed successfully.
+    /// If a node cannot deploy the artifact, it panics.
+    pub fn start_artifact_registration(&self, artifact: ArtifactId, spec: Vec<u8>) {
+        Dispatcher::commit_artifact(self.0.fork, artifact, spec);
+    }
+
+    /// Initiates adding a service instance to the blockchain.
+    ///
+    /// The service is not immediately activated; it activates if / when the block containing
+    /// the activation transaction is committed.
+    pub fn initiate_adding_service(
+        &mut self,
+        instance_spec: InstanceSpec,
+        constructor: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        self.0
+            .child_context(Some(SUPERVISOR_INSTANCE_ID))
+            .initiate_adding_service(instance_spec, constructor)
+    }
+
+    /// Initiates stopping an active service instance in the blockchain.
+    ///
+    /// The service is not immediately stopped; it stops if / when the block containing
+    /// the stopping transaction is committed.
+    pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
+        Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
+    }
+
+    /// Provides writeable access to core schema.
+    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
+        CoreSchema::new(self.0.fork)
+    }
+
+    /// Initiates data migration.
+    pub fn initiate_migration(
+        &self,
+        new_artifact: ArtifactId,
+        old_service: &str,
+    ) -> Result<(), ExecutionError> {
+        self.0
+            .dispatcher
+            .initiate_migration(self.0.fork, new_artifact, old_service)
+    }
+
+    /// Rolls back previously initiated migration.
+    pub fn rollback_migration(&self, service_name: &str) -> Result<(), ExecutionError> {
+        Dispatcher::rollback_migration(self.0.fork, service_name)
+    }
+
+    /// Commits the result of a previously initiated migration.
+    pub fn commit_migration(
+        &self,
+        service_name: &str,
+        migration_hash: Hash,
+    ) -> Result<(), ExecutionError> {
+        Dispatcher::commit_migration(self.0.fork, service_name, migration_hash)
+    }
+
+    /// Flushes a committed migration.
+    pub fn flush_migration(&mut self, service_name: &str) -> Result<(), ExecutionError> {
+        Dispatcher::flush_migration(self.0.fork, service_name)
+    }
+}
+
+/// Collection of unstable execution context features.
+#[doc(hidden)]
+pub trait ExecutionContextUnstable {
+    /// Re-borrows an execution context with the same interface name.
+    fn reborrow(&mut self) -> ExecutionContext<'_>;
+    /// Re-borrows an execution context with the specified interface name.
+    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s>;
+    /// Returns the service matching the specified query.
+    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
+    /// Invokes the interface method of the instance with the specified ID.
+    /// You may override the instance ID of the one who calls this method by the given one.
+    fn make_child_call(
+        &mut self,
+        interface_name: &str,
+        call_info: &CallInfo,
+        arguments: &[u8],
+        caller: Option<InstanceId>,
+    ) -> Result<(), ExecutionError>;
+}
+
+impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
+    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
+        ExecutionContext {
+            fork: &mut *self.fork,
+            caller: self.caller,
+            interface_name,
+            dispatcher: self.dispatcher,
+            call_stack_depth: self.call_stack_depth,
+        }
+    }
+
+    fn reborrow(&mut self) -> ExecutionContext<'_> {
+        self.reborrow_with_interface(self.interface_name)
+    }
+
+    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
+        self.dispatcher.get_service(id)
+    }
+
+    fn make_child_call(
+        &mut self,
+        interface_name: &str,
+        call_info: &CallInfo,
+        arguments: &[u8],
+        caller: Option<InstanceId>,
+    ) -> Result<(), ExecutionError> {
+        self.child_context(caller)
+            .call(interface_name, call_info, arguments)
     }
 }

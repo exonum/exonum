@@ -185,19 +185,15 @@ impl AsRef<Blockchain> for BlockchainMut {
 }
 
 impl BlockchainMut {
-    #[cfg(test)]
-    pub(crate) fn inner(&mut self) -> &mut Blockchain {
-        &mut self.inner
-    }
-
-    #[cfg(test)]
-    pub(crate) fn dispatcher(&mut self) -> &mut Dispatcher {
-        &mut self.dispatcher
-    }
-
     /// Returns a copy of immutable blockchain view.
     pub fn immutable_view(&self) -> Blockchain {
         self.inner.clone()
+    }
+
+    /// Returns a mutable reference to dispatcher.
+    #[cfg(test)]
+    pub(crate) fn dispatcher(&mut self) -> &mut Dispatcher {
+        &mut self.dispatcher
     }
 
     /// Creates a read-only snapshot of the current storage state.

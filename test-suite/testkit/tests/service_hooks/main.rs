@@ -15,9 +15,10 @@
 // HACK: Silent "dead_code" warning.
 pub use crate::hooks::{AfterCommitInterface, AfterCommitService, SERVICE_ID, SERVICE_NAME};
 
-use exonum::{helpers::Height, runtime::rust::RustRuntime};
+use exonum::helpers::Height;
 use exonum_explorer::BlockchainExplorer;
 use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_rust_runtime::RustRuntime;
 use exonum_testkit::TestKitBuilder;
 use pretty_assertions::assert_eq;
 

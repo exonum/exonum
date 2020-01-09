@@ -208,7 +208,7 @@ impl Rig {
 
     /// Emulates node stopping.
     fn stop(self) -> Blockchain {
-        self.blockchain.as_ref().to_owned()
+        self.blockchain.immutable_view()
     }
 
     /// Emulates node restart by recreating the dispatcher.

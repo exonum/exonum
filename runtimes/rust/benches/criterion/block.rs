@@ -41,7 +41,7 @@ use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
 use futures::sync::mpsc;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 use std::{collections::BTreeMap, iter, sync::Arc};
 
@@ -54,11 +54,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    runtime::{
-        rust::{DefaultInstance, RustRuntime},
-        SnapshotExt,
-    },
 };
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, SnapshotExt};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -137,16 +134,10 @@ fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash
 }
 
 mod timestamping {
-    use exonum::{
-        crypto::Hash,
-        messages::Verified,
-        runtime::{
-            rust::{CallContext, DefaultInstance, Service},
-            AnyTx, ExecutionError, InstanceId,
-        },
-    };
+    use exonum::{crypto::Hash, messages::Verified, runtime::AnyTx};
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_merkledb::ObjectHash;
+    use exonum_rust_runtime::{CallContext, DefaultInstance, ExecutionError, InstanceId, Service};
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -201,17 +192,16 @@ mod cryptocurrency {
     use exonum::{
         crypto::PublicKey,
         messages::Verified,
-        runtime::{
-            rust::{CallContext, DefaultInstance, Service},
-            AnyTx, ErrorKind, ExecutionError, InstanceId,
-        },
+        runtime::{AnyTx, ErrorKind, ExecutionError, InstanceId},
     };
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
     };
     use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
+    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
     use rand::{rngs::StdRng, seq::SliceRandom};
+    use serde_derive::{Deserialize, Serialize};
 
     use super::gen_keypair_from_rng;
     use crate::proto;
@@ -360,14 +350,12 @@ mod foreign_interface_call {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        runtime::{
-            rust::{CallContext, RustRuntime, Service, ServiceFactory as _},
-            AnyTx, ExecutionError, InstanceId,
-        },
+        runtime::{AnyTx, ExecutionError, InstanceId},
     };
-    use exonum_derive::*;
+    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory as _};
     use rand::rngs::StdRng;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     use super::{
         create_blockchain_from_parts, create_consensus_config_and_blockchain_base, create_rocksdb,
@@ -459,7 +447,7 @@ mod foreign_interface_call {
     }
 
     pub fn build_blockchain() -> BlockchainMut {
-        let tempdir = TempDir::new("exonum").unwrap();
+        let tempdir = TempDir::new().unwrap();
         let db = create_rocksdb(&tempdir);
         let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
@@ -544,7 +532,7 @@ fn execute_block_rocksdb(
     service: impl DefaultInstance + Clone,
     tx_generator: impl Iterator<Item = Verified<AnyTx>>,
 ) {
-    let tempdir = TempDir::new("exonum").unwrap();
+    let tempdir = TempDir::new().unwrap();
     let db = create_rocksdb(&tempdir);
     let blockchain = create_blockchain(db, service);
 

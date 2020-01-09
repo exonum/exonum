@@ -23,7 +23,7 @@ use syn::{
 
 use std::convert::TryFrom;
 
-use super::{find_meta_attrs, CratePath};
+use super::{find_meta_attrs, RustRuntimeCratePath};
 
 #[derive(Debug)]
 struct ServiceMethodDescriptor {
@@ -141,14 +141,14 @@ impl ServiceMethodDescriptor {
 #[darling(default)]
 struct ExonumServiceAttrs {
     #[darling(rename = "crate")]
-    cr: CratePath,
+    cr: RustRuntimeCratePath,
     interface: Option<String>,
 }
 
 impl Default for ExonumServiceAttrs {
     fn default() -> Self {
         Self {
-            cr: CratePath::default(),
+            cr: RustRuntimeCratePath::default(),
             interface: None,
         }
     }
@@ -255,29 +255,29 @@ impl ExonumService {
 
             quote! {
                 #id => {
-                    let arg: #arg_type = #cr::merkledb::BinaryValue::from_bytes(payload.into())
-                        .map_err(#cr::runtime::DispatcherError::malformed_arguments)?;
+                    let arg: #arg_type = exonum::merkledb::BinaryValue::from_bytes(payload.into())
+                        .map_err(exonum::runtime::DispatcherError::malformed_arguments)?;
                     self.#name(context, arg)
                 }
             }
         };
         let match_arms = self.methods.iter().map(impl_match_arm);
 
-        let ctx = quote!(#cr::runtime::rust::CallContext<'a>);
-        let res = quote!(std::result::Result<(), #cr::runtime::ExecutionError>);
+        let ctx = quote!(#cr::CallContext<'a>);
+        let res = quote!(std::result::Result<(), exonum::runtime::ExecutionError>);
         quote! {
-            impl<'a> #cr::runtime::rust::Interface<'a> for dyn #trait_name<#ctx, Output = #res> {
+            impl<'a> #cr::Interface<'a> for dyn #trait_name<#ctx, Output = #res> {
                 const INTERFACE_NAME: &'static str = #interface_name;
 
                 fn dispatch(
                     &self,
-                    context: #cr::runtime::rust::CallContext<'a>,
-                    method: #cr::runtime::MethodId,
+                    context: #cr::CallContext<'a>,
+                    method: exonum::runtime::MethodId,
                     payload: &[u8],
                 ) -> #res {
                     match method {
                         #( #match_arms )*
-                        _ => Err(#cr::runtime::DispatcherError::NoSuchMethod.into()),
+                        _ => Err(exonum::runtime::DispatcherError::NoSuchMethod.into()),
                     }
                 }
             }
@@ -297,7 +297,7 @@ impl ExonumService {
             let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
             let name_string = name.to_string();
             let descriptor = quote! {
-                #cr::runtime::rust::MethodDescriptor::new(
+                #cr::MethodDescriptor::new(
                     #interface_name,
                     #name_string,
                     #id,
@@ -306,21 +306,21 @@ impl ExonumService {
 
             let method = quote! {
                 fn #name(&self, context: Ctx, arg: #arg_type) -> Self::Output {
-                    #cr::runtime::rust::GenericCall::generic_call(
+                    #cr::GenericCall::generic_call(
                         self,
                         context,
                         #descriptor,
-                        #cr::merkledb::BinaryValue::into_bytes(arg),
+                        exonum::merkledb::BinaryValue::into_bytes(arg),
                     )
                 }
             };
             let mut_method = quote! {
                 fn #name(&mut self, context: Ctx, arg: #arg_type) -> Self::Output {
-                    #cr::runtime::rust::GenericCallMut::generic_call_mut(
+                    #cr::GenericCallMut::generic_call_mut(
                         self,
                         context,
                         #descriptor,
-                        #cr::merkledb::BinaryValue::into_bytes(arg),
+                        exonum::merkledb::BinaryValue::into_bytes(arg),
                     )
                 }
             };
@@ -331,13 +331,13 @@ impl ExonumService {
         // Since `Ctx` type param is defined by our code, it doesn't have to correspond to the name
         // chosen by the user.
         quote! {
-            impl<Ctx, T: #cr::runtime::rust::GenericCall<Ctx>> #trait_name<Ctx> for T {
-                type Output = <T as #cr::runtime::rust::GenericCall<Ctx>>::Output;
+            impl<Ctx, T: #cr::GenericCall<Ctx>> #trait_name<Ctx> for T {
+                type Output = <T as #cr::GenericCall<Ctx>>::Output;
                 #( #methods )*
             }
 
-            impl<Ctx, T: #cr::runtime::rust::GenericCallMut<Ctx>> #mut_trait_name<Ctx> for T {
-                type Output = <T as #cr::runtime::rust::GenericCallMut<Ctx>>::Output;
+            impl<Ctx, T: #cr::GenericCallMut<Ctx>> #mut_trait_name<Ctx> for T {
+                type Output = <T as #cr::GenericCallMut<Ctx>>::Output;
                 #( #mut_methods )*
             }
         }
