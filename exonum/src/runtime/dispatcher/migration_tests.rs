@@ -606,12 +606,16 @@ fn test_erroneous_migration(artifact_name: &str) {
     rig.create_block(fork);
 
     // Wait for the migration script to complete.
-    thread::sleep(DELAY * 3);
+    let res = loop {
+        thread::sleep(DELAY * 3);
 
-    rig.create_block(rig.blockchain.fork());
-    let snapshot = rig.blockchain.snapshot();
-    let schema = DispatcherSchema::new(&snapshot);
-    let res = schema.local_migration_result(&service.name).unwrap();
+        rig.create_block(rig.blockchain.fork());
+        let snapshot = rig.blockchain.snapshot();
+        let schema = DispatcherSchema::new(&snapshot);
+        if let Some(res) = schema.local_migration_result(&service.name) {
+            break res;
+        }
+    };
     assert!(res
         .0
         .unwrap_err()
@@ -664,9 +668,7 @@ fn concurrent_migrations_to_same_artifact() {
         .unwrap();
     rig.create_block(fork);
 
-    let threads = rig.migration_threads();
-    assert_eq!(threads.len(), 3);
-    assert!(threads.contains_key(&another_service.name));
+    assert!(rig.migration_threads().contains_key(&another_service.name));
 
     // Wait for first two migrations to finish.
     thread::sleep(DELAY / 2);
@@ -677,11 +679,6 @@ fn concurrent_migrations_to_same_artifact() {
     assert_eq!(res.0, Ok(HashTag::empty_map_hash()));
     let res = schema.local_migration_result(&other_service.name).unwrap();
     assert_eq!(res.0, Ok(HashTag::empty_map_hash()));
-
-    assert_eq!(
-        rig.migration_threads().keys().collect::<Vec<_>>(),
-        vec![&another_service.name]
-    );
 
     // Wait for the third migration to finish.
     thread::sleep(DELAY);
