@@ -12,24 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate serde_derive; // Required for Protobuf.
-
 use criterion::{criterion_group, criterion_main};
 
-use crate::block::bench_block;
-use crate::crypto::bench_crypto;
-use crate::transactions::bench_verify_transactions;
+use crate::{crypto::bench_crypto, transactions::bench_verify_transactions};
 
-mod block;
 mod crypto;
-mod proto;
 mod transactions;
 
-criterion_group!(
-    benches,
-    bench_crypto,
-    bench_block,
-    bench_verify_transactions
-);
+criterion_group!(benches, bench_crypto, bench_verify_transactions);
 criterion_main!(benches);

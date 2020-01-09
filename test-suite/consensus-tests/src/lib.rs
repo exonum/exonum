@@ -44,14 +44,13 @@ use exonum::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
     },
-    runtime::{
-        rust::{DefaultInstance, RustRuntimeBuilder, ServiceFactory},
-        ArtifactId, SnapshotExt,
-    },
 };
 use exonum_keys::Keys;
 use exonum_merkledb::{
     BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
+};
+use exonum_rust_runtime::{
+    ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
 };
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 

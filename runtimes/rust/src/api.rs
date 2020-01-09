@@ -14,20 +14,20 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use crate::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
+pub use exonum::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
 
 use futures::IntoFuture;
 use serde::{de::DeserializeOwned, Serialize};
 
+use exonum::{
+    api::{backends::actix, error::MovedPermanentlyError, ApiBuilder, ApiScope},
+    blockchain::{Blockchain, Schema as CoreSchema},
+    runtime::{BlockchainData, InstanceDescriptor, InstanceId},
+};
 use exonum_crypto::PublicKey;
 use exonum_merkledb::{access::Prefixed, Snapshot};
 
 use super::Broadcaster;
-use crate::{
-    api::{error::MovedPermanentlyError, ApiBuilder, ApiScope},
-    blockchain::{Blockchain, Schema as CoreSchema},
-    runtime::{BlockchainData, InstanceDescriptor, InstanceId},
-};
 
 /// Provide the current blockchain state snapshot to API handlers.
 ///
@@ -145,7 +145,6 @@ impl ServiceApiScope {
     /// Adds a readonly endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `GET` requests.
-    /// [Read more.](../../../api/struct.ApiScope.html#endpoint)
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -168,7 +167,6 @@ impl ServiceApiScope {
     /// Adds an endpoint handler to the service API scope.
     ///
     /// In HTTP backends this type of endpoint corresponds to `POST` requests.
-    /// [Read more.](../../../api/struct.ApiScope.html#endpoint_mut)
     pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -247,7 +245,7 @@ impl ServiceApiScope {
     }
 
     /// Return a mutable reference to the underlying web backend.
-    pub fn web_backend(&mut self) -> &mut crate::api::backends::actix::ApiBuilder {
+    pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
         self.inner.web_backend()
     }
 }
@@ -261,11 +259,8 @@ impl ServiceApiScope {
 /// ```
 /// use serde_derive::{Deserialize, Serialize};
 ///
-/// use exonum::{
-///     blockchain::Schema,
-///     crypto::{self, Hash},
-///     runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
-/// };
+/// use exonum::{blockchain::Schema, crypto::{self, Hash}};
+/// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 /// use exonum_merkledb::ObjectHash;
 ///
 /// // Declare a type which describes an API specification and implementation.
@@ -327,6 +322,7 @@ impl ServiceApiScope {
 ///         .endpoint("v1/ping", MyApi::ping);
 ///     builder
 /// }
+/// #
 /// # fn main() {
 /// #     use exonum::{blockchain::Blockchain, node::ApiSender, runtime::InstanceDescriptor};
 /// #     use exonum_merkledb::TemporaryDB;

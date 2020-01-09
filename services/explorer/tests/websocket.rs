@@ -22,12 +22,9 @@ use exonum::{
     helpers,
     merkledb::{ObjectHash, TemporaryDB},
     node::{Node, ShutdownHandle},
-    runtime::{
-        rust::{DefaultInstance, RustRuntime, ServiceFactory},
-        RuntimeInstance,
-    },
 };
 use exonum_explorer::api::Notification;
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
 use futures::Future;
 use serde_json::json;
 use websocket::{
@@ -75,21 +72,24 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
             .unwrap(),
     );
 
-    let external_runtimes: Vec<RuntimeInstance> = vec![];
     let genesis_config = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
         .with_artifact(ExplorerFactory.artifact_id())
         .with_instance(ExplorerFactory.default_instance())
         .with_artifact(CounterService.artifact_id())
         .with_instance(CounterService.default_instance())
         .build();
-    let rust_runtime = RustRuntime::builder()
-        .with_factory(ExplorerFactory)
-        .with_factory(CounterService);
+
+    let with_runtimes = |notifier| {
+        vec![RustRuntime::builder()
+            .with_factory(ExplorerFactory)
+            .with_factory(CounterService)
+            .build(notifier)
+            .into()]
+    };
 
     let node = Node::new(
         TemporaryDB::new(),
-        rust_runtime,
-        external_runtimes,
+        with_runtimes,
         node_cfg,
         genesis_config,
         None,

@@ -12,18 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The set of specific for the Rust runtime implementation errors.
+pub use self::bench_transactions::CurrencyTx;
 
-use exonum_derive::ExecutionFail;
+include!(concat!(env!("OUT_DIR"), "/benches_proto_mod.rs"));
 
-/// List of possible Rust runtime errors.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[derive(ExecutionFail)]
-#[execution_fail(crate = "crate", kind = "runtime")]
-pub enum Error {
-    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
-    IncorrectArtifactId = 0,
-    /// Unable to deploy artifact with the specified identifier, it is not listed
-    /// among available artifacts.
-    UnableToDeploy = 1,
-}
+use exonum::crypto::proto::*;

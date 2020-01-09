@@ -27,9 +27,9 @@ use exonum::{
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
     node::ApiSender,
-    runtime::{rust::api::ServiceApiScope, ExecutionStatus},
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
+use exonum_rust_runtime::{api::ServiceApiScope, ExecutionStatus};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;

@@ -19,6 +19,7 @@ exonum-merkledb = { version = "0.13.0-rc.2", path = "../../../components/merkled
 exonum-cli = { version = "0.13.0-rc.2", path = "../../../cli" }
 exonum-time = { version = "0.13.0-rc.2", path = "../../../services/time" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../../components/proto" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../../runtimes/rust" }
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"

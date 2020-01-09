@@ -82,16 +82,14 @@ pub use self::{
 
 use exonum::{
     blockchain::config::InstanceInitParams,
-    runtime::{
-        rust::{
-            api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
-            ServiceFactory as _,
-        },
-        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
+use exonum_rust_runtime::{
+    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
+    ServiceFactory as _,
+};
 
 use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};
 
@@ -128,6 +126,7 @@ fn update_configs(
                 log::trace!("Updating consensus configuration {:?}", config);
 
                 context
+                    .supervisor_extensions()
                     .writeable_core_schema()
                     .consensus_config_entry()
                     .set(config);
@@ -163,6 +162,7 @@ fn update_configs(
                 let (instance_spec, config) = start_service.into_parts(id);
 
                 context
+                    .supervisor_extensions()
                     .initiate_adding_service(instance_spec, config)
                     .map_err(|err| {
                         log::error!("Service start request failed. {}", err);
@@ -185,7 +185,9 @@ fn update_configs(
                     instance.spec.artifact
                 );
 
-                context.initiate_stopping_service(stop_service.instance_id)?;
+                context
+                    .supervisor_extensions()
+                    .initiate_stopping_service(stop_service.instance_id)?;
             }
         }
     }

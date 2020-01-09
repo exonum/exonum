@@ -37,8 +37,8 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum::runtime::rust::{api::ServiceApiBuilder, AfterCommitContext, Service};
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, Service};
 
 use std::sync::Arc;
 

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::rust::ServiceFactory;
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::TestKitBuilder;
 
 fn main() {

@@ -19,11 +19,9 @@ use exonum::{
     helpers,
     merkledb::{Database, TemporaryDB},
     node::{Node, NodeConfig, ShutdownHandle},
-    runtime::{
-        rust::{AfterCommitContext, RustRuntime, Service, ServiceFactory},
-        RuntimeInstance,
-    },
 };
+use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
+
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
@@ -104,7 +102,6 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = mpsc::unbounded();
 
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let service = CommitWatcherService(commit_tx);
         let artifact = service.artifact_id();
         let genesis_config =
@@ -112,12 +109,17 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
                 .with_artifact(artifact.clone())
                 .with_instance(artifact.into_default_instance(2, "commit-watcher"))
                 .build();
-        let rust_runtime = RustRuntime::builder().with_factory(service);
+
+        let with_runtimes = |notifier| {
+            vec![RustRuntime::builder()
+                .with_factory(service)
+                .build(notifier)
+                .into()]
+        };
 
         let node = Node::new(
             TemporaryDB::new(),
-            rust_runtime,
-            external_runtimes,
+            with_runtimes,
             node_cfg,
             genesis_config,
             None,
@@ -148,7 +150,6 @@ fn test_node_run() {
 #[test]
 fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, db, start_times| {
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let service = StartCheckerServiceFactory(start_times);
         let artifact = service.artifact_id();
         let genesis_config =
@@ -156,16 +157,14 @@ fn test_node_restart_regression() {
                 .with_artifact(artifact.clone())
                 .with_instance(artifact.into_default_instance(4, "startup-checker"))
                 .build();
-        let rust_runtime = RustRuntime::builder().with_factory(service);
 
-        let node = Node::new(
-            db,
-            rust_runtime,
-            external_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let with_runtimes = |notifier| {
+            vec![RustRuntime::builder()
+                .with_factory(service)
+                .build(notifier)
+                .into()]
+        };
+        let node = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
         RunHandle::new(node).join();
     };
 

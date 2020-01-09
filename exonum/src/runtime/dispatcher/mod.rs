@@ -54,7 +54,7 @@ struct ServiceInfo {
 /// Lookup table for the committed service instances.
 #[derive(Debug, Default)]
 struct CommittedServices {
-    instances: HashMap<InstanceId, ServiceInfo>,
+    instances: BTreeMap<InstanceId, ServiceInfo>,
     instance_names: HashMap<String, InstanceId>,
 }
 
@@ -551,10 +551,16 @@ impl Mailbox {
 
 type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError> + Send>;
 
+/// Action to be performed by the dispatcher.
 pub enum Action {
+    /// Start artifact deployment.
     StartDeploy {
+        /// Information uniquely identifying the artifact.
         artifact: ArtifactId,
+        /// Runtime-specific artifact payload.
         spec: Vec<u8>,
+        /// The actions that will be performed after the deployment is finished.
+        /// For example, this closure may create a transaction with the deployment confirmation.
         then: Box<dyn FnOnce(Result<(), ExecutionError>) -> ExecutionFuture + Send>,
     },
 }

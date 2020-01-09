@@ -17,9 +17,9 @@ use exonum::{
     helpers::Height,
     merkledb::ObjectHash,
     messages::Verified,
-    runtime::{rust::ServiceFactory, AnyTx, InstanceId},
 };
 use exonum_explorer_service::ExplorerFactory;
+use exonum_rust_runtime::{AnyTx, InstanceId, ServiceFactory};
 use exonum_testkit::{
     explorer::api::{TransactionQuery, TransactionResponse},
     ApiKind, TestKit, TestKitApi, TestKitBuilder,

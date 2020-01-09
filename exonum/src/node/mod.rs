@@ -98,7 +98,7 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
-    runtime::{rust::RustRuntimeBuilder, RuntimeInstance},
+    runtime::RuntimeInstance,
 };
 
 mod basic;
@@ -980,10 +980,16 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
+    ///
+    /// Due to the API is part of Node, it is hard to pass API restart notifier to the runtime
+    /// instances. `with_runtimes` closure takes restart notifiers and returns list of runtime
+    /// instances.
+    ///
+    /// TODO [ECR-3949]
+    #[doc(hidden)]
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        rust_runtime: RustRuntimeBuilder,
-        external_runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
+        with_runtimes: impl FnOnce(mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance>,
         node_cfg: NodeConfig,
         genesis_config: GenesisConfig,
         config_manager: Option<Box<dyn ConfigManager>>,
@@ -994,11 +1000,9 @@ impl Node {
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let blockchain =
             Blockchain::new(database, node_cfg.service_keypair(), channel.api_sender());
-        let rust_runtime = rust_runtime.build(channel.endpoints.0.clone());
 
-        let mut blockchain_builder =
-            BlockchainBuilder::new(blockchain, genesis_config).with_runtime(rust_runtime);
-        for runtime in external_runtimes {
+        let mut blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
+        for runtime in with_runtimes(channel.endpoints.0.clone()) {
             blockchain_builder = blockchain_builder.with_runtime(runtime);
         }
         let blockchain = blockchain_builder.build();
@@ -1194,28 +1198,23 @@ mod tests {
     use super::*;
     use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
 
+    fn with_runtimes(_: mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance> {
+        Vec::new()
+    }
+
     #[test]
     fn test_good_internal_events_config() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(
-            db,
-            RustRuntimeBuilder::new(),
-            external_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1223,21 +1222,13 @@ mod tests {
             .internal_events_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(
-            db,
-            RustRuntimeBuilder::new(),
-            external_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1245,14 +1236,7 @@ mod tests {
             .network_requests_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(
-            db,
-            RustRuntimeBuilder::new(),
-            external_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
@@ -1260,7 +1244,6 @@ mod tests {
     fn test_bad_internal_events_capacity_too_large() {
         let accidental_large_value = usize::max_value();
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1269,14 +1252,7 @@ mod tests {
             .internal_events_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(
-            db,
-            RustRuntimeBuilder::new(),
-            external_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 
     #[test]
@@ -1285,8 +1261,6 @@ mod tests {
         let accidental_large_value = usize::max_value();
         let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
 
-        let external_runtimes: Vec<RuntimeInstance> = vec![];
-
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1294,13 +1268,6 @@ mod tests {
             .network_requests_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(
-            db,
-            RustRuntimeBuilder::new(),
-            external_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
     }
 }
