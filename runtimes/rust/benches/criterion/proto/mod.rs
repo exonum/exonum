@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Config manager interface.
+pub use self::bench_transactions::CurrencyTx;
 
-use crate::node::ConnectListConfig;
+include!(concat!(env!("OUT_DIR"), "/benches_proto_mod.rs"));
 
-/// Interface of the Config Manager usable for updating node configuration on
-/// the fly.
-pub trait ConfigManager: Send {
-    /// Update connect list in the node configuration.
-    fn store_connect_list(&mut self, connect_list: ConnectListConfig);
-}
+use exonum::crypto::proto::*;

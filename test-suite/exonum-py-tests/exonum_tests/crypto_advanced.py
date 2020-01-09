@@ -1,6 +1,5 @@
 """Tests for cryptocurrency-advanced service"""
 import unittest
-import time
 
 from exonum_client import ExonumClient
 from exonum_client.crypto import KeyPair
@@ -11,6 +10,7 @@ from suite import (
     assert_processes_exited_successfully,
     launcher_networks,
     run_4_nodes,
+    wait_network_to_start,
     ExonumCryptoAdvancedClient,
 )
 
@@ -19,38 +19,45 @@ class CryptoAdvancedTest(unittest.TestCase):
     """Tests for Cryptocurrency Advanced"""
 
     def setUp(self):
-        self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-        time.sleep(3)
-        cryptocurrency_advanced_config_dict = {
-            "networks": launcher_networks(self.network),
-            "deadline_height": 10000,
-            "artifacts": {
-                "cryptocurrency": {
-                    "runtime": "rust",
-                    "name": "exonum-cryptocurrency-advanced",
-                    "version": "0.13.0-rc.2",
-                }
-            },
-            "instances": {"crypto": {"artifact": "cryptocurrency"}},
-        }
+        try:
+            self.network = run_4_nodes("exonum-cryptocurrency-advanced")
+            wait_network_to_start(self.network)
+            cryptocurrency_advanced_config_dict = {
+                "networks": launcher_networks(self.network),
+                "deadline_height": 10000,
+                "artifacts": {
+                    "cryptocurrency": {
+                        "runtime": "rust",
+                        "name": "exonum-cryptocurrency-advanced",
+                        "version": "0.13.0-rc.2",
+                    }
+                },
+                "instances": {"crypto": {"artifact": "cryptocurrency", "action": "start"}},
+            }
 
-        cryptocurrency_advanced_config = Configuration(
-            cryptocurrency_advanced_config_dict
-        )
-        with Launcher(cryptocurrency_advanced_config) as launcher:
-            explorer = launcher.explorer()
+            cryptocurrency_advanced_config = Configuration(
+                cryptocurrency_advanced_config_dict
+            )
+            with Launcher(cryptocurrency_advanced_config) as launcher:
+                explorer = launcher.explorer()
 
-            launcher.deploy_all()
-            launcher.wait_for_deploy()
-            launcher.start_all()
-            launcher.wait_for_start()
+                launcher.deploy_all()
+                launcher.wait_for_deploy()
+                launcher.start_all()
+                launcher.wait_for_start()
 
-            for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
-                self.assertEqual(deployed, True)
+                for artifact in launcher.launch_state.completed_deployments():
+                    deployed = explorer.check_deployed(artifact)
+                    self.assertEqual(deployed, True)
 
-            for instance in launcher.launch_state.completed_initializations():
-                explorer.wait_for_start(instance)
+                # Launcher checks that config is applied, no need to check it again.
+        except Exception as error:
+            # If exception is raise in `setUp`, `tearDown` won't be called,
+            # thus here we ensure that network is stopped and temporary data is removed.
+            # Then we re-raise exception, since the test should fail.
+            self.network.stop()
+            self.network.deinitialize()
+            raise error
 
     def test_create_wallet(self):
         """Tests the wallet creation"""
@@ -225,3 +232,4 @@ class CryptoAdvancedTest(unittest.TestCase):
     def tearDown(self):
         outputs = self.network.stop()
         assert_processes_exited_successfully(self, outputs)
+        self.network.deinitialize()

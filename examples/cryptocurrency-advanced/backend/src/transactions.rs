@@ -16,10 +16,11 @@
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{rust::CallContext, DispatcherError, ExecutionError},
+    runtime::{DispatcherError, ExecutionError},
 };
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::CallContext;
 
 use super::{proto, schema::SchemaImpl, CryptocurrencyService};
 

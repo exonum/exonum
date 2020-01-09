@@ -124,7 +124,7 @@
 //! # use exonum::{
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash, runtime::ExecutionError,
 //! # };
-//! # use exonum::runtime::rust::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionQuery, TransactionInfo}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -188,7 +188,7 @@
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
 //! #     runtime::{ExecutionError, ExecutionFail},
 //! # };
-//! # use exonum::runtime::rust::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionQuery, CallStatusResponse}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -256,7 +256,7 @@
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
 //! #     runtime::{ExecutionError, ExecutionFail},
 //! # };
-//! # use exonum::runtime::rust::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{CallStatusQuery, CallStatusResponse}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -329,7 +329,7 @@
 //! #     crypto::gen_keypair, helpers::Height, merkledb::{BinaryValue, ObjectHash},
 //! #     runtime::ExecutionError,
 //! # };
-//! # use exonum::runtime::rust::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionHex, TransactionResponse}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -391,11 +391,11 @@ use exonum::{
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
-    node::{ApiSender, ExternalMessage},
-    runtime::{rust::api::ServiceApiScope, ExecutionStatus},
+    node::ApiSender,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use futures::{Future, IntoFuture, Sink};
+use exonum_rust_runtime::{api::ServiceApiScope, ExecutionStatus};
+use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;
 
@@ -567,11 +567,9 @@ impl ExplorerApi {
         let sender = sender.clone();
         let send_transaction = move |(verified, tx_hash)| {
             sender
-                .clone()
-                .0
-                .send(ExternalMessage::Transaction(verified))
+                .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| ApiError::InternalError(e.into()))
+                .map_err(ApiError::from)
         };
 
         Box::new(

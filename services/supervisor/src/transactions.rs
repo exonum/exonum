@@ -15,13 +15,12 @@
 use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidateInput},
-    runtime::{
-        rust::CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec,
-        InstanceStatus,
-    },
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
+use exonum_rust_runtime::{
+    CallContext, DispatcherError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus,
+};
 
 use std::collections::HashSet;
 
@@ -432,7 +431,7 @@ impl Supervisor {
     /// if all the confirmations are collected. If so, starts the artifact registration.
     fn confirm_deploy(
         &self,
-        context: CallContext<'_>,
+        mut context: CallContext<'_>,
         deploy_request: DeployRequest,
         author: PublicKey,
     ) -> Result<(), ExecutionError> {
@@ -453,9 +452,12 @@ impl Supervisor {
             schema
                 .deploy_states
                 .put(&deploy_request, DeployState::Succeed);
+            drop(schema);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
-            context.start_artifact_registration(deploy_request.artifact, deploy_request.spec);
+            context
+                .supervisor_extensions()
+                .start_artifact_registration(deploy_request.artifact, deploy_request.spec);
         }
         Ok(())
     }

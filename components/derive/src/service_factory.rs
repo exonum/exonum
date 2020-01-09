@@ -18,7 +18,7 @@ use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Generics, Ident, Path};
 
-use super::CratePath;
+use super::RustRuntimeCratePath;
 
 fn is_allowed_artifact_name_char(c: u8) -> bool {
     match c {
@@ -44,7 +44,7 @@ fn check_artifact_name(name: impl AsRef<[u8]>) -> bool {
 struct ServiceFactory {
     ident: Ident,
     #[darling(rename = "crate", default)]
-    cr: CratePath,
+    cr: RustRuntimeCratePath,
     #[darling(default)]
     artifact_name: Option<String>,
     #[darling(default)]
@@ -95,14 +95,14 @@ impl ServiceFactory {
         let cr = &self.cr;
         if let Some(ref proto_sources_mod) = self.proto_sources {
             quote! {
-                #cr::runtime::rust::ArtifactProtobufSpec::new(
+                #cr::ArtifactProtobufSpec::new(
                     #proto_sources_mod::PROTO_SOURCES.as_ref(),
                     #proto_sources_mod::INCLUDES.as_ref()
                 )
             }
         } else {
             quote! {
-                #cr::runtime::rust::ArtifactProtobufSpec {
+                #cr::ArtifactProtobufSpec {
                     sources: vec![],
                     includes: vec![],
                 }
@@ -122,20 +122,20 @@ impl ToTokens for ServiceFactory {
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
 
         let expanded = quote! {
-            impl #impl_generics #cr::runtime::rust::ServiceFactory for #name #ty_generics #where_clause {
-                fn artifact_id(&self) -> #cr::runtime::ArtifactId {
-                    #cr::runtime::ArtifactId {
-                        runtime_id: #cr::runtime::RuntimeIdentifier::Rust as _,
+            impl #impl_generics #cr::ServiceFactory for #name #ty_generics #where_clause {
+                fn artifact_id(&self) -> #cr::ArtifactId {
+                    #cr::ArtifactId {
+                        runtime_id: #cr::RuntimeIdentifier::Rust as _,
                         name: #artifact_name.to_string(),
                         version: #artifact_version.parse().expect("Cannot parse artifact version"),
                     }
                 }
 
-                fn artifact_protobuf_spec(&self) -> #cr::runtime::rust::ArtifactProtobufSpec {
+                fn artifact_protobuf_spec(&self) -> #cr::ArtifactProtobufSpec {
                     #artifact_protobuf_spec
                 }
 
-                fn create_instance(&self) -> Box<dyn #cr::runtime::rust::Service> {
+                fn create_instance(&self) -> Box<dyn #cr::Service> {
                     #service_constructor
                 }
             }

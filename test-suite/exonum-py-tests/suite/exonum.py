@@ -30,8 +30,7 @@ class ExonumNetwork:
         return self
 
     def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object]) -> None:
-        # Cleanup after use.
-        self._app_dir.remove()
+        self.deinitialize()
 
     def generate_template(self, validators_count: int, supervisor_mode: str = "simple") -> None:
         """Runs `generate-template` command."""
@@ -153,6 +152,10 @@ class ExonumNetwork:
             return host, int(public_port), int(private_port)
 
         raise RuntimeError(f"Incorrect node ID, expected >= 0 and < {self._validators_count}, got {validator_id}")
+
+    def deinitialize(self) -> None:
+        # Cleanup after use.
+        self._app_dir.remove()
 
     def _common_config(self) -> str:
         return os.path.join(self._app_dir.path(), "common.toml")

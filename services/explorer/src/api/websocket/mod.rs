@@ -105,7 +105,7 @@
 //! ```
 //! # use assert_matches::assert_matches;
 //! # use exonum::{crypto::gen_keypair, runtime::ExecutionError};
-//! # use exonum::runtime::rust::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::ExplorerFactory;
 //! # use exonum_explorer_service::api::{

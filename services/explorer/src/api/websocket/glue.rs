@@ -21,8 +21,8 @@ use exonum::{
         ApiBackend, Error as ApiError,
     },
     blockchain::Blockchain,
-    runtime::rust::api::ServiceApiScope,
 };
+use exonum_rust_runtime::api::ServiceApiScope;
 use futures::IntoFuture;
 
 use std::sync::Arc;

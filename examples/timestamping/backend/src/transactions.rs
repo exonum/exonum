@@ -14,9 +14,9 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::{rust::CallContext, DispatcherError, ExecutionError};
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{CallContext, DispatcherError, ExecutionError};
 use exonum_time::schema::TimeSchema;
 use log::trace;
 

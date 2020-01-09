@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Simplified node emulation for testing websockets.
+//! WebSocket API tests.
 
 use actix_web::ws::CloseCode;
 use assert_matches::assert_matches;
 use exonum::{
-    crypto::gen_keypair,
-    helpers::Height,
-    merkledb::ObjectHash,
-    runtime::{
-        rust::{DefaultInstance, ServiceFactory},
-        SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
-    },
+    crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
+    runtime::SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
 };
 use exonum_explorer::api::websocket::Notification;
+use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::{TestKit, TestKitApi, TestKitBuilder};
 use serde::de::DeserializeOwned;

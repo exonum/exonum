@@ -5,15 +5,19 @@ import time
 
 from exonum_client import ExonumClient
 
-from suite import run_4_nodes, assert_processes_exited_successfully
-
+from suite import (
+    run_4_nodes,
+    assert_processes_exited_successfully,
+    wait_network_to_start,
+    wait_for_block,
+)
 
 class ApiTest(unittest.TestCase):
     """Tests for Exonum API."""
 
     def setUp(self):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-        time.sleep(5)
+        wait_network_to_start(self.network)
 
     def test_health_check(self):
         """Tests the `healthcheck` endpoint."""
@@ -73,7 +77,7 @@ class ApiTest(unittest.TestCase):
         """Tests the `blocks` endpoint. Check response for last N blocks"""
 
         number_of_blocks = 5
-        time.sleep(5)
+        wait_for_block(self.network, 5)
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
@@ -94,7 +98,6 @@ class ApiTest(unittest.TestCase):
     def test_get_blocks_with_precommits(self):
         """Tests the `blocks` endpoint. Check response for blocks with precommits"""
 
-        time.sleep(2)
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
@@ -107,7 +110,7 @@ class ApiTest(unittest.TestCase):
 
         latest = 5
         number_of_blocks = 15
-        time.sleep(5)
+        wait_for_block(self.network, 5)
         for validator_id in range(self.network.validators_count()):
             height_counter = latest
             host, public_port, private_port = self.network.api_address(validator_id)
@@ -134,7 +137,7 @@ class ApiTest(unittest.TestCase):
 
         earliest = 20
         number_of_blocks = 15
-        time.sleep(5)
+        wait_for_block(self.network, 20)
         for validator_id in range(self.network.validators_count()):
             height_counter = earliest
             host, public_port, private_port = self.network.api_address(validator_id)
@@ -153,7 +156,7 @@ class ApiTest(unittest.TestCase):
         latest = 10
         earliest = 5
         number_of_blocks = 15
-        time.sleep(5)
+        wait_for_block(self.network, 10)
         for validator_id in range(self.network.validators_count()):
             height_counter = latest
             host, public_port, private_port = self.network.api_address(validator_id)

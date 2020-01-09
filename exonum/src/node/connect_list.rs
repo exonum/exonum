@@ -12,45 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Mapping between peers public keys and IP-addresses.
+//! Mapping between peers public keys and IP addresses / domain names.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
+use super::SharedConnectList;
 use crate::{
+    blockchain::ValidatorKeys,
     crypto::PublicKey,
     messages::{Connect, Verified},
-    node::{ConnectInfo, ConnectListConfig},
 };
 
-/// Network address of the peer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PeerAddress {
-    /// External address of the peer hostname:port.
+/// Data needed to connect to a peer node.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ConnectInfo {
+    /// Peer address.
     pub address: String,
+    /// Peer public key.
+    pub public_key: PublicKey,
 }
 
-impl PeerAddress {
-    /// New unresolved address.
-    pub fn new(address: String) -> Self {
-        PeerAddress { address }
+impl fmt::Display for ConnectInfo {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.address)
     }
 }
 
-/// `ConnectList` stores mapping between IP-addresses and public keys.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// Stores mapping between IP addresses / domain names and public keys.
+#[derive(Debug, Clone, Default)]
+#[doc(hidden)]
+// ^-- Unlike `ConnectListConfig`, this type is considered an implementation detail
+// since it's used exclusively by `NodeHandler`.
 pub struct ConnectList {
     /// Peers to which we can connect.
-    #[serde(default)]
-    pub peers: BTreeMap<PublicKey, PeerAddress>,
+    pub(super) peers: BTreeMap<PublicKey, String>,
 }
 
 impl ConnectList {
     /// Creates `ConnectList` from config.
     pub fn from_config(config: ConnectListConfig) -> Self {
-        let peers: BTreeMap<PublicKey, PeerAddress> = config
+        let peers: BTreeMap<_, _> = config
             .peers
             .into_iter()
-            .map(|peer| (peer.public_key, PeerAddress::new(peer.address)))
+            .map(|peer| (peer.public_key, peer.address))
             .collect();
 
         ConnectList { peers }
@@ -61,37 +65,65 @@ impl ConnectList {
         Self {
             peers: peers
                 .into_iter()
-                .map(|(public_key, connect)| {
-                    (public_key, PeerAddress::new(connect.payload().host.clone()))
-                })
+                .map(|(public_key, connect)| (public_key, connect.payload().host.clone()))
                 .collect(),
         }
     }
 
     /// Returns `true` if a peer with the given public key can connect.
-    pub fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
+    pub(super) fn is_peer_allowed(&self, peer: &PublicKey) -> bool {
         self.peers.contains_key(peer)
     }
 
-    /// Check if we allow to connect to `address`.
-    pub fn is_address_allowed(&self, address: &str) -> bool {
-        self.peers.values().any(|a| a.address == address)
+    /// Gets address of a peer with the specified public key.
+    pub(super) fn find_address_by_pubkey(&self, key: &PublicKey) -> Option<&str> {
+        self.peers.get(key).map(String::as_str)
     }
 
-    /// Get peer address with public key.
-    pub fn find_address_by_pubkey(&self, key: &PublicKey) -> Option<&PeerAddress> {
-        self.peers.get(key)
+    /// Adds peer to the `ConnectList`.
+    pub(crate) fn add(&mut self, peer: ConnectInfo) {
+        self.peers.insert(peer.public_key, peer.address);
     }
 
-    /// Adds peer to the ConnectList.
-    pub fn add(&mut self, peer: ConnectInfo) {
-        self.peers
-            .insert(peer.public_key, PeerAddress::new(peer.address));
+    /// Updates peer address.
+    pub(super) fn update_peer(&mut self, public_key: &PublicKey, address: String) {
+        self.peers.insert(*public_key, address);
+    }
+}
+
+/// Stores mapping between IP addresses / domain names and public keys.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ConnectListConfig {
+    /// Peers to which the node knows how to connect.
+    pub peers: Vec<ConnectInfo>,
+}
+
+impl ConnectListConfig {
+    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses
+    /// or domain names.
+    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
+        let peers = peers
+            .iter()
+            .zip(validators_keys)
+            .map(|(address, keys)| ConnectInfo {
+                address: address.to_owned(),
+                public_key: keys.consensus_key,
+            })
+            .collect();
+
+        ConnectListConfig { peers }
     }
 
-    /// Update peer address.
-    pub fn update_peer(&mut self, public_key: &PublicKey, address: String) {
-        self.peers.insert(*public_key, PeerAddress::new(address));
+    /// Creates a `ConnectListConfig` from `ConnectList`.
+    pub(super) fn from_connect_list(connect_list: &SharedConnectList) -> Self {
+        ConnectListConfig {
+            peers: connect_list.peers(),
+        }
+    }
+
+    /// Returns peer addresses.
+    pub(super) fn addresses(&self) -> Vec<String> {
+        self.peers.iter().map(|p| p.address.clone()).collect()
     }
 }
 
@@ -201,12 +233,18 @@ mod test {
         let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();
-        assert!(!connect_list.is_address_allowed(&address));
+        assert!(connect_list
+            .peers
+            .values()
+            .all(|peer_addr| *peer_addr != address));
 
         connect_list.add(ConnectInfo {
             public_key,
             address: address.clone(),
         });
-        assert!(connect_list.is_address_allowed(&address));
+        assert!(connect_list
+            .peers
+            .values()
+            .any(|peer_addr| *peer_addr == address));
     }
 }

@@ -22,16 +22,16 @@
 //!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
 //!     helpers::Height,
-//!     runtime::{
-//!         rust::{ServiceFactory, CallContext, Service},
-//!         BlockchainData, SnapshotExt, ExecutionError,
-//!     },
 //! };
 //! use serde_derive::*;
 //! use exonum_derive::*;
 //! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! use exonum_rust_runtime::{
+//!     ServiceFactory, CallContext, Service,
+//!     BlockchainData, SnapshotExt, ExecutionError,
+//! };
 //!
 //! // Simple service implementation.
 //!
@@ -125,12 +125,11 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage},
-    runtime::{
-        rust::{RustRuntimeBuilder, ServiceFactory},
-        InstanceId, RuntimeInstance, SnapshotExt,
-    },
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
+use exonum_rust_runtime::{
+    InstanceId, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
+};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -238,13 +237,8 @@ impl TestKit {
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
             Box::new(api_channel.1.and_then(move |event| {
                 let _guard = processing_lock_.lock().unwrap();
-                match event {
-                    ExternalMessage::Transaction(tx) => {
-                        BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(tx));
-                    }
-                    ExternalMessage::PeerAdd(_)
-                    | ExternalMessage::Enable(_)
-                    | ExternalMessage::Shutdown => { /* Ignored */ }
+                if let ExternalMessage::Transaction(tx) = event {
+                    BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(tx));
                 }
                 Ok(())
             }));
@@ -313,10 +307,8 @@ impl TestKit {
     /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
-    /// # use exonum::{
-    /// #     crypto::{PublicKey, Hash, SecretKey},
-    /// #     runtime::{rust::{CallContext, Service, ServiceFactory}, ExecutionError},
-    /// # };
+    /// # use exonum::crypto::{PublicKey, Hash, SecretKey};
+    /// # use exonum_rust_runtime::{CallContext, Service, ServiceFactory, ExecutionError};
     /// #
     /// // Suppose we test this service interface:
     /// #[exonum_interface]
@@ -689,9 +681,9 @@ impl TestKit {
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
-/// #     runtime::{BlockchainData, rust::{AfterCommitContext, RustRuntime, Service}},
 /// #     helpers::Height,
 /// # };
+/// # use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, BlockchainData};
 /// # use exonum_merkledb::{Fork, Snapshot};
 /// # use exonum_testkit::{StoppedTestKit, TestKit};
 /// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};

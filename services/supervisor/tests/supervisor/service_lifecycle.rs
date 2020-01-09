@@ -14,12 +14,10 @@
 
 //! Tests for the phases of the service life cycle, including starting and stopping service instances.
 
-use exonum::{
-    messages::{AnyTx, Verified},
-    runtime::{
-        rust::{DefaultInstance, ServiceFactory},
-        ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
-    },
+use exonum::messages::{AnyTx, Verified};
+use exonum_rust_runtime::{
+    DefaultInstance, ErrorMatch, ExecutionError, InstanceId, ServiceFactory, SnapshotExt,
+    SUPERVISOR_INSTANCE_ID,
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 

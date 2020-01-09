@@ -31,8 +31,8 @@ use exonum::{
     },
     crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
     events::{
-        network::NetworkConfiguration, Event, EventHandler, InternalEvent, InternalRequest,
-        NetworkEvent, NetworkRequest, TimeoutRequest,
+        Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
+        TimeoutRequest,
     },
     helpers::{user_agent, Height, Round, ValidatorId},
     messages::{
@@ -42,16 +42,15 @@ use exonum::{
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-        ListenerConfig, NodeHandler, NodeSender, ServiceConfig, State, SystemStateProvider,
-    },
-    runtime::{
-        rust::{DefaultInstance, RustRuntimeBuilder, ServiceFactory},
-        ArtifactId, SnapshotExt,
+        NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
     },
 };
 use exonum_keys::Keys;
 use exonum_merkledb::{
     BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
+};
+use exonum_rust_runtime::{
+    ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
 };
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
@@ -144,7 +143,7 @@ impl SandboxInner {
 
                     InternalRequest::JumpToRound(height, round) => self
                         .handler
-                        .handle_event(InternalEvent::JumpToRound(height, round).into()),
+                        .handle_event(InternalEvent::jump_to_round(height, round).into()),
 
                     InternalRequest::VerifyMessage(raw) => {
                         let msg = SignedMessage::from_bytes(raw.into())
@@ -153,7 +152,7 @@ impl SandboxInner {
                             .unwrap();
 
                         self.handler
-                            .handle_event(InternalEvent::MessageVerified(Box::new(msg)).into())
+                            .handle_event(InternalEvent::message_verified(msg).into())
                     }
 
                     InternalRequest::Shutdown => unreachable!(),
@@ -633,12 +632,12 @@ impl Sandbox {
         loop {
             let timeout = {
                 let timers = &mut self.inner.borrow_mut().timers;
-                if let Some(TimeoutRequest(time, timeout)) = timers.pop() {
-                    if time > now {
-                        timers.push(TimeoutRequest(time, timeout));
+                if let Some(request) = timers.pop() {
+                    if request.time() > now {
+                        timers.push(request);
                         break;
                     } else {
-                        timeout
+                        request.event()
                     }
                 } else {
                     break;
@@ -882,31 +881,17 @@ impl Sandbox {
             internal_requests: internal_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
-        let connect_list = ConnectList::from_peers(
-            inner
-                .handler
-                .state
-                .peers()
-                .iter()
-                .map(|(public_key, connect)| (*public_key, connect.clone())),
-        );
-
-        let keys = Keys::from_keys(
-            inner.handler.state.consensus_public_key(),
-            inner.handler.state.consensus_secret_key().clone(),
-            inner.handler.state.service_public_key(),
-            inner.handler.state.service_secret_key().clone(),
-        );
+        let peers = inner
+            .handler
+            .state()
+            .peers()
+            .iter()
+            .map(|(pk, connect)| (*pk, connect.to_owned()));
+        let connect_list = ConnectList::from_peers(peers);
+        let keys = inner.handler.state().keys().to_owned();
 
         let config = Configuration {
-            listener: ListenerConfig {
-                address,
-                connect_list,
-            },
-            service: ServiceConfig {
-                service_public_key: inner.handler.state.service_public_key(),
-                service_secret_key: inner.handler.state.service_secret_key().clone(),
-            },
+            connect_list,
             network: NetworkConfiguration::default(),
             peer_discovery: Vec::new(),
             mempool: Default::default(),
@@ -952,11 +937,11 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        self.node_state().consensus_public_key()
+        self.node_state().keys().consensus_pk()
     }
 
     fn node_secret_key(&self) -> SecretKey {
-        self.node_state().consensus_secret_key().clone()
+        self.node_state().keys().consensus_sk().to_owned()
     }
 }
 
@@ -1178,7 +1163,7 @@ fn sandbox_with_services_uninitialized(
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
         service_keys[0].clone(),
-        ApiSender(api_channel.0.clone()),
+        ApiSender::new(api_channel.0.clone()),
     );
 
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
@@ -1188,14 +1173,7 @@ fn sandbox_with_services_uninitialized(
         .build();
 
     let config = Configuration {
-        listener: ListenerConfig {
-            address: addresses[0],
-            connect_list: ConnectList::from_config(connect_list_config),
-        },
-        service: ServiceConfig {
-            service_public_key: service_keys[0].0,
-            service_secret_key: service_keys[0].1.clone(),
-        },
+        connect_list: ConnectList::from_config(connect_list_config),
         network: NetworkConfiguration::default(),
         peer_discovery: Vec::new(),
         mempool: Default::default(),
@@ -1276,7 +1254,7 @@ mod tests {
             let public_key = validator_keys.consensus_key;
             let config = {
                 let inner = &self.inner.borrow_mut();
-                let state = &inner.handler.state;
+                let state = inner.handler.state();
                 let mut config = state.config().clone();
                 config.validator_keys.push(validator_keys);
                 config
@@ -1286,7 +1264,7 @@ mod tests {
             self.inner
                 .borrow_mut()
                 .handler
-                .state
+                .state_mut()
                 .add_peer_to_connect_list(ConnectInfo {
                     address: addr.to_string(),
                     public_key,
@@ -1294,7 +1272,11 @@ mod tests {
         }
 
         fn update_config(&self, config: ConsensusConfig) {
-            self.inner.borrow_mut().handler.state.update_config(config);
+            self.inner
+                .borrow_mut()
+                .handler
+                .state_mut()
+                .update_config(config);
         }
     }
 

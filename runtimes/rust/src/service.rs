@@ -12,29 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{
+    blockchain::config::InstanceInitParams,
+    crypto::{Hash, PublicKey, SecretKey},
+    helpers::{Height, ValidatorId},
+    node::{ApiSender, SendError},
+    runtime::{
+        ArtifactId, DispatcherAction, ExecutionError, InstanceDescriptor, InstanceId, Mailbox,
+        MethodId,
+    },
+};
 use exonum_merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot};
-use failure::Error;
-use futures::IntoFuture;
+use futures::{Future, IntoFuture};
 
 use std::{
     borrow::Cow,
     fmt::{self, Debug},
 };
 
-use crate::{
-    blockchain::config::InstanceInitParams,
-    crypto::{Hash, PublicKey, SecretKey},
-    helpers::{Height, ValidatorId},
-    node::ApiSender,
-    runtime::{
-        dispatcher::{Action, Mailbox},
-        rust::GenericCall,
-        ArtifactId, ExecutionError, InstanceDescriptor, InstanceId, MethodId,
-    },
-};
-
 use super::{
-    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, MethodDescriptor,
+    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, GenericCall,
+    MethodDescriptor,
 };
 
 /// Describes how the service instance should dispatch specific method calls
@@ -97,15 +95,14 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// If you aren't interested in the processing of for the genesis block, you can use
     /// [`CallContext::in_genesis_block`] method and exit early if `true` is returned.
     ///
-    /// Also note that invocation of [`blockchain::Schema::height`] will **panic** if invoked within
-    /// `after_transactions` of the genesis block. If you are going to process the genesis
-    /// block and need to know current height, use [`blockchain::Schema::next_height`] to infer the
-    /// current blockchain height.
+    /// Invocation of `exonum::blockchain::Schema::height` will **panic**
+    /// if invoked within `after_transactions` of the genesis block. If you are going
+    /// to process the genesis block and need to know current height, use
+    /// `exonum::blockchain::Schema::next_height` to infer the current blockchain height.
     ///
-    /// Services should not rely on a particular ordering of `Service::after_transactions` invocations.
+    /// Services should not rely on a particular ordering of `Service::after_transactions`
+    /// invocations.
     ///
-    /// [`blockchain::Schema::height`]: ../../blockchain/schema/struct.Schema.html#method.height
-    /// [`blockchain::Schema::height`]: ../../blockchain/schema/struct.Schema.html#method.next_height
     /// [`CallContext::in_genesis_block`]: struct.CallContext.html#method.in_genesis_block
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
@@ -280,14 +277,12 @@ impl CowInstanceDescriptor<'_> {
 /// Transaction broadcast allows a service to create transactions in the `after_commit`
 /// handler or the HTTP API handlers and broadcast them to the connected Exonum nodes.
 /// The transactions are addressed to the executing service instance and are signed
-/// by the [service keypair] of the node.
+/// by the service keypair of the node.
 ///
 /// Broadcasting functionality is primarily useful for services that receive information
 /// from outside the blockchain and need to translate it to transactions. As an example,
 /// a time oracle service may broadcast local node time and build the blockchain-wide time
 /// by processing corresponding transactions.
-///
-/// [service keypair]: ../../blockchain/config/struct.ValidatorKeys.html#structfield.service_key
 #[derive(Debug, Clone)]
 pub struct Broadcaster<'a> {
     instance: CowInstanceDescriptor<'a>,
@@ -339,14 +334,17 @@ impl<'a> Broadcaster<'a> {
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
 impl GenericCall<()> for Broadcaster<'_> {
-    type Output = Result<Hash, Error>;
+    type Output = Result<Hash, SendError>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
         let msg = self
             .service_keypair
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
-        self.tx_sender.broadcast_transaction(msg).map(|()| tx_hash)
+        self.tx_sender
+            .broadcast_transaction(msg)
+            .wait()
+            .map(|()| tx_hash)
     }
 }
 
@@ -368,7 +366,7 @@ impl SupervisorExtensions<'_> {
         F: IntoFuture<Item = (), Error = ExecutionError>,
         F::Future: 'static + Send,
     {
-        let action = Action::StartDeploy {
+        let action = DispatcherAction::StartDeploy {
             artifact,
             spec: spec.into_bytes(),
             then: Box::new(|res| Box::new(then(res).into_future())),
@@ -386,5 +384,5 @@ impl Debug for AfterCommitContext<'_> {
 }
 
 fn is_supervisor(instance_id: InstanceId) -> bool {
-    instance_id == crate::runtime::SUPERVISOR_INSTANCE_ID
+    instance_id == exonum::runtime::SUPERVISOR_INSTANCE_ID
 }
