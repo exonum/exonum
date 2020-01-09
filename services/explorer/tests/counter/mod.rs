@@ -13,17 +13,12 @@
 // limitations under the License.
 
 //! Sample counter service.
-use exonum::{
-    merkledb::{
-        access::{Access, FromAccess, RawAccessMut},
-        ProofEntry,
-    },
-    runtime::{
-        rust::{CallContext, DefaultInstance, Service},
-        ExecutionError, InstanceId,
-    },
+use exonum::merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    ProofEntry,
 };
 use exonum_derive::*;
+use exonum_rust_runtime::{CallContext, DefaultInstance, ExecutionError, InstanceId, Service};
 
 pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 100;

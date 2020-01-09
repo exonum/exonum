@@ -18,12 +18,10 @@ use exonum::{
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{CallContext, DefaultInstance, Service, TxStub},
-        ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
+use exonum_rust_runtime::{CallContext, DefaultInstance, Service, TxStub};
 use serde_derive::{Deserialize, Serialize};
 
 #[exonum_interface]
@@ -40,8 +38,9 @@ pub struct ConfigUpdaterService;
 impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
     type Output = Result<(), ExecutionError>;
 
-    fn update_config(&self, ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
-        ctx.writeable_core_schema()
+    fn update_config(&self, mut ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
+        ctx.supervisor_extensions()
+            .writeable_core_schema()
             .consensus_config_entry()
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())

@@ -20,12 +20,12 @@ use exonum::{
         impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue, ObjectHash,
     },
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::TxStub, ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID,
-    },
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{
+    ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, TxStub, SUPERVISOR_INSTANCE_ID,
+};
 use serde_derive::{Deserialize, Serialize};
 
 use super::{mode::Mode, proto, transactions::SupervisorInterface};

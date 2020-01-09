@@ -17,6 +17,7 @@ exonum-cli = { version = "0.13.0-rc.2", path = "../../../cli" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../../components/derive" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../../components/proto" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../../runtimes/rust" }
 exonum-time = { version = "0.13.0-rc.2", path = "../../../services/time" }
 
 chrono = { version = "0.4.6", features = ["serde"] }

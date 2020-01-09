@@ -18,7 +18,7 @@ use proc_macro2::Ident;
 use quote::{quote, ToTokens};
 use semver::VersionReq;
 
-use crate::{find_meta_attrs, CratePath};
+use crate::{find_meta_attrs, MainCratePath};
 
 #[derive(Debug)]
 struct RequireArtifact<'a> {
@@ -30,7 +30,7 @@ struct RequireArtifact<'a> {
 #[derive(Debug, Default, FromMeta)]
 struct RequireArtifactAttrs {
     #[darling(rename = "crate", default)]
-    cr: CratePath,
+    cr: MainCratePath,
     #[darling(default)]
     name: Option<String>,
     #[darling(default)]

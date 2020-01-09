@@ -15,18 +15,16 @@
 use exonum::{
     crypto::PublicKey,
     helpers::Height,
-    runtime::{
-        rust::{
-            api::{self, ServiceApiBuilder},
-            CallContext, DefaultInstance, Service,
-        },
-        ExecutionError, InstanceId,
-    },
+    runtime::{ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess},
     MapIndex,
+};
+use exonum_rust_runtime::{
+    api::{self, ServiceApiBuilder},
+    CallContext, DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
 

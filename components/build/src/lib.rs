@@ -73,7 +73,7 @@ impl<'a> ProtoSources<'a> {
             ProtoSources::Common => get_exonum_protobuf_common_files_path(),
             ProtoSources::Crypto => get_exonum_protobuf_crypto_files_path(),
             ProtoSources::Merkledb => get_exonum_protobuf_merkledb_files_path(),
-            ProtoSources::Path(path) => path.to_string(),
+            ProtoSources::Path(path) => (*path).to_string(),
         }
     }
 }

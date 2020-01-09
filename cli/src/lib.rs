@@ -87,24 +87,23 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
+pub use crate::config_manager::DefaultConfigManager;
 pub use structopt;
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
-    runtime::{
-        rust::{DefaultInstance, RustRuntimeBuilder, ServiceFactory},
-        RuntimeInstance, WellKnownRuntime,
-    },
 };
 use exonum_explorer_service::ExplorerFactory;
+use exonum_rust_runtime::{
+    DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
+};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
 
 use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
-use crate::config_manager::DefaultConfigManager;
 
 pub mod command;
 pub mod config;
@@ -177,10 +176,15 @@ impl NodeBuilder {
             let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
             let config_manager = Box::new(DefaultConfigManager::new(node_config_path));
 
+            let with_runtimes = |notifier| {
+                let mut runtimes = self.external_runtimes;
+                runtimes.push(self.rust_runtime.build(notifier).into());
+                runtimes
+            };
+
             let node = Node::new(
                 database,
-                self.rust_runtime,
-                self.external_runtimes,
+                with_runtimes,
                 run_config.node_config.into(),
                 genesis_config,
                 Some(config_manager),

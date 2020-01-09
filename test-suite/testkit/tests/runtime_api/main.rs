@@ -13,10 +13,8 @@
 // limitations under the License.
 
 use assert_matches::assert_matches;
-use exonum::{
-    api::Error as ApiError,
-    runtime::rust::{ProtoSourceFile, ProtoSourcesQuery},
-};
+use exonum::api::Error as ApiError;
+use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;

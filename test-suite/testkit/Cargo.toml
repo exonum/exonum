@@ -23,6 +23,7 @@ exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-explorer = { version = "0.13.0-rc.2", path = "../../components/explorer" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }

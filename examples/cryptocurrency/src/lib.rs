@@ -192,11 +192,8 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::runtime::{
-        rust::{api::ServiceApiBuilder, CallContext, Service},
-        ExecutionError,
-    };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, ExecutionError, Service};
 
     use crate::{
         api::CryptocurrencyApi,
@@ -282,10 +279,8 @@ pub mod contracts {
 
 /// Cryptocurrency API implementation.
 pub mod api {
-    use exonum::{
-        crypto::PublicKey,
-        runtime::rust::api::{self, ServiceApiBuilder, ServiceApiState},
-    };
+    use exonum::crypto::PublicKey;
+    use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
     use crate::schema::{CurrencySchema, Wallet};
 

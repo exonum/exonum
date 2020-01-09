@@ -47,11 +47,8 @@ pub use self::transactions::{
 pub mod proto;
 mod transactions;
 
-use exonum::runtime::{
-    rust::{DefaultInstance, Service},
-    versioning, InstanceId,
-};
 use exonum_derive::*;
+use exonum_rust_runtime::{versioning, DefaultInstance, InstanceId, Service};
 
 use std::{fmt, str::FromStr};
 
@@ -78,7 +75,7 @@ impl DefaultInstance for MiddlewareService {
 /// # Examples
 ///
 /// ```
-/// # use exonum::runtime::InstanceId;
+/// # use exonum_rust_runtime::InstanceId;
 /// # use exonum_derive::*;
 /// # use exonum_middleware_service::{ArtifactReq, CheckedCall};
 /// let req: ArtifactReq = "some.Service@^1.3.0".parse().unwrap();

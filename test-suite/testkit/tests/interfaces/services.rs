@@ -18,13 +18,13 @@ pub use crate::interface::Issue;
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{
-        rust::{CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service},
-        AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt,
-    },
+    runtime::{AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
 use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
+use exonum_rust_runtime::{
+    CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service,
+};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::{

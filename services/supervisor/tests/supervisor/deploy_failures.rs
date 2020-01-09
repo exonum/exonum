@@ -25,8 +25,8 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{rust::ServiceFactory, ExecutionError, SUPERVISOR_INSTANCE_ID},
 };
+use exonum_rust_runtime::{ExecutionError, ServiceFactory, SUPERVISOR_INSTANCE_ID};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
