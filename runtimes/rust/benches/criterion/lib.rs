@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+use criterion::{criterion_group, criterion_main};
 
-pub use self::bench_transactions::CurrencyTx;
+use crate::block::bench_block;
 
-include!(concat!(env!("OUT_DIR"), "/exonum_benches_proto_mod.rs"));
+mod block;
+mod proto;
 
-use exonum::crypto::proto::*;
+criterion_group!(benches, bench_block);
+criterion_main!(benches);

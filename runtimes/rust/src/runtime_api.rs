@@ -14,15 +14,15 @@
 
 //! Rust runtime specific API endpoints.
 
-use semver::Version;
-
-use std::collections::HashMap;
-
-use crate::{
+use exonum::{
     api::{self, ApiBuilder},
     proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
     runtime::{ArtifactId, RuntimeIdentifier},
 };
+use semver::Version;
+use serde_derive::{Deserialize, Serialize};
+
+use std::collections::HashMap;
 
 use super::RustRuntime;
 
