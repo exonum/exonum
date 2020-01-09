@@ -12,18 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum node that performs consensus algorithm.
+//! Exonum node that handles consensus algorithm, interaction with other nodes and external clients.
 //!
-//! For details about consensus message handling see messages module documentation.
+//! # Overview
+//!
+//! This module contains the following APIs:
+//!
+//! - [`Node`] encapsulates a full-fledged Exonum node
+//! - [`ApiSender`], [`NodeChannel`] and [`ShutdownHandle`] allow to interact with the node
+//!   (mind that `NodeChannel` is relatively low-level)
+//! - Configuration types, "rooted" in [`NodeConfig`], allow to configure aspects
+//!   of the `Node` behavior
+//!
+//! There are also some types / methods excluded from the docs, but they are hidden for a reason:
+//! such APIs are considered an implementation detail and are exempt from semantic versioning.
+//! (In other words, these APIs may change or be removed in any release without prior warning.)
+//!
+//! [`Node`]: struct.Node.html
+//! [`ApiSender`]: struct.ApiSender.html
+//! [`NodeChannel`]: struct.NodeChannel.html
+//! [`ShutdownHandle`]: struct.ShutdownHandle.html
+//! [`NodeConfig`]: struct.NodeConfig.html
+
 // spell-checker:ignore cors
 
 pub use self::{
-    connect_list::{ConnectList, PeerAddress},
-    state::{RequestData, State, ValidatorState},
+    connect_list::{ConnectInfo, ConnectList, ConnectListConfig},
+    state::State,
 };
 
-// TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 /// Node timeout constants.
+///
+/// # Stability
+///
+/// The constants of this module is considered an implementation detail of the Exonum node and are
+/// thus exempt from semantic versioning.
+#[doc(hidden)]
 pub mod constants {
     pub use super::state::{
         BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
@@ -34,25 +58,24 @@ pub mod constants {
 pub(crate) use self::state::SharedConnectList;
 
 use exonum_keys::Keys;
-use exonum_merkledb::{Database, DbOptions, ObjectHash};
-use failure::{ensure, format_err, Error};
+use exonum_merkledb::{Database, ObjectHash};
+use failure::{ensure, format_err, Error, Fail};
 use futures::{sync::mpsc, Future, Sink};
 use log::{info, trace};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
-use toml::Value;
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     convert::TryFrom,
     fmt,
     net::SocketAddr,
-    path::PathBuf,
     sync::Arc,
     thread,
     time::{Duration, SystemTime},
 };
 
+use self::state::RequestData;
 use crate::{
     api::{
         backends::actix::{
@@ -64,19 +87,16 @@ use crate::{
     },
     blockchain::{
         config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        Schema, ValidatorKeys,
+        Schema,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     events::{
         error::{into_failure, LogError},
         noise::HandshakeParams,
-        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest,
-        NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
-        TimeoutRequest,
+        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
+        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
-    helpers::{
-        config::ConfigManager, user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId,
-    },
+    helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
     runtime::RuntimeInstance,
 };
@@ -88,7 +108,13 @@ mod events;
 mod requests;
 mod state;
 
-/// External messages.
+/// External messages sent to the node via `ApiSender`.
+///
+/// # Stability
+///
+/// This type and its methods are considered an implementation detail of the Exonum node and are
+/// thus exempt from semantic versioning.
+#[doc(hidden)]
 #[derive(Debug)]
 pub enum ExternalMessage {
     /// Add a new connection.
@@ -103,7 +129,7 @@ pub enum ExternalMessage {
 
 /// Node timeout types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum NodeTimeout {
+pub(crate) enum NodeTimeout {
     /// Status timeout with the current height.
     Status(Height),
     /// Round timeout.
@@ -120,7 +146,8 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
+#[doc(hidden)]
+pub trait SystemStateProvider: fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -129,22 +156,28 @@ pub trait SystemStateProvider: std::fmt::Debug + Send + 'static {
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
+pub struct ApiSender(mpsc::Sender<ExternalMessage>);
 
-/// Handler that that performs consensus algorithm.
+/// Handler responsible for the consensus algorithm.
+///
+/// # Stability
+///
+/// This type and its methods are considered an implementation detail of the Exonum node and are
+/// thus exempt from semantic versioning.
+#[doc(hidden)]
 pub struct NodeHandler {
-    /// State of the `NodeHandler`.
-    pub state: State,
-    /// Shared api state.
+    /// Shared API state.
     pub api_state: SharedNodeState,
-    /// System state.
-    pub system_state: Box<dyn SystemStateProvider>,
-    /// Channel for messages and timeouts.
-    pub channel: NodeSender,
     /// Blockchain.
     pub blockchain: BlockchainMut,
+    /// State of the `NodeHandler`.
+    state: State,
+    /// System state.
+    system_state: Box<dyn SystemStateProvider>,
+    /// Channel for messages and timeouts.
+    channel: NodeSender,
     /// Known peer addresses.
-    pub peer_discovery: Vec<String>,
+    peer_discovery: Vec<String>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Node role.
@@ -155,32 +188,14 @@ pub struct NodeHandler {
     allow_expedited_propose: bool,
 }
 
-/// Service configuration.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ServiceConfig {
-    /// Service public key.
-    pub service_public_key: PublicKey,
-    /// Service secret key.
-    pub service_secret_key: SecretKey,
-}
-
-/// Listener config.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ListenerConfig {
-    /// ConnectList.
-    pub connect_list: ConnectList,
-    /// Socket address.
-    pub address: SocketAddr,
-}
-
-/// An api configuration options.
+/// HTTP API configuration options.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct NodeApiConfig {
-    /// Timeout to update api state.
+    /// Timeout to update API state.
     pub state_update_timeout: usize,
-    /// Listen address for public api endpoints.
+    /// Listen address for public API endpoints.
     pub public_api_address: Option<SocketAddr>,
-    /// Listen address for private api endpoints.
+    /// Listen address for private API endpoints.
     pub private_api_address: Option<SocketAddr>,
     /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
     /// by public API handlers.
@@ -192,6 +207,10 @@ pub struct NodeApiConfig {
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     pub private_allow_origin: Option<AllowOrigin>,
+    /// HTTP server restart policy. The server is restarted each time the list of endpoints
+    /// is updated (e.g., due to a new service initialization).
+    #[serde(default)]
+    pub server_restart: ServerRestartPolicy,
 }
 
 impl Default for NodeApiConfig {
@@ -202,6 +221,58 @@ impl Default for NodeApiConfig {
             private_api_address: None,
             public_allow_origin: None,
             private_allow_origin: None,
+            server_restart: Default::default(),
+        }
+    }
+}
+
+/// HTTP server restart policy.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct ServerRestartPolicy {
+    /// The number of attempts to restart the HTTP server.
+    pub max_retries: u16,
+    /// The interval in milliseconds between attempts of restarting the HTTP server.
+    pub retry_timeout: u64,
+}
+
+impl Default for ServerRestartPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: 20,
+            retry_timeout: 500,
+        }
+    }
+}
+
+/// P2P network configuration of an Exonum node.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct NetworkConfiguration {
+    /// Maximum number of incoming connections established with peers at any given time.
+    pub max_incoming_connections: usize,
+    /// Maximum number of outgoing connections established with peers at any given time.
+    pub max_outgoing_connections: usize,
+    /// Switches on [`TCP_NODELAY`] option.
+    ///
+    /// [`TCP_NODELAY`]: https://doc.rust-lang.org/std/net/struct.TcpStream.html#method.set_nodelay
+    pub tcp_nodelay: bool,
+    /// Allows to set interval between keep-alive TCP probes. If set to `None`, keep-alive probes
+    /// will be disabled.
+    pub tcp_keep_alive: Option<u64>,
+    /// Retry timeout if an outgoing connection to a peer fails.
+    pub tcp_connect_retry_timeout: Milliseconds,
+    /// Maximum number of retries when connecting to a peer.
+    pub tcp_connect_max_retries: u64,
+}
+
+impl Default for NetworkConfiguration {
+    fn default() -> Self {
+        Self {
+            max_incoming_connections: 128,
+            max_outgoing_connections: 128,
+            tcp_keep_alive: None,
+            tcp_nodelay: true,
+            tcp_connect_retry_timeout: 15_000,
+            tcp_connect_max_retries: 10,
         }
     }
 }
@@ -210,13 +281,13 @@ impl Default for NodeApiConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EventsPoolCapacity {
     /// Maximum number of queued outgoing network messages.
-    pub network_requests_capacity: usize,
+    network_requests_capacity: usize,
     /// Maximum number of queued incoming network messages.
-    pub network_events_capacity: usize,
+    network_events_capacity: usize,
     /// Maximum number of queued internal events.
-    pub internal_events_capacity: usize,
+    internal_events_capacity: usize,
     /// Maximum number of queued requests from api.
-    pub api_requests_capacity: usize,
+    api_requests_capacity: usize,
 }
 
 impl Default for EventsPoolCapacity {
@@ -231,19 +302,14 @@ impl Default for EventsPoolCapacity {
 }
 
 /// Memory pool configuration parameters.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+///
+/// The internal structure of this type is an implementation detail. For most applications,
+/// you should use the value returned by `Default::default()`.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    pub events_pool_capacity: EventsPoolCapacity,
-}
-
-impl Default for MemoryPoolConfig {
-    fn default() -> Self {
-        Self {
-            events_pool_capacity: EventsPoolCapacity::default(),
-        }
-    }
+    events_pool_capacity: EventsPoolCapacity,
 }
 
 /// Configuration for the `Node`.
@@ -255,24 +321,16 @@ pub struct NodeConfig {
     pub listen_address: SocketAddr,
     /// Remote Network address used by this node.
     pub external_address: String,
-    /// Network configuration.
+    /// P2P network configuration.
     pub network: NetworkConfiguration,
-    /// Api configuration.
+    /// HTTP API configuration.
     pub api: NodeApiConfig,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
-    /// Additional config, usable for services.
-    #[serde(default)]
-    pub services_configs: BTreeMap<String, Value>,
-    /// Optional database configuration.
-    #[serde(default)]
-    pub database: DbOptions,
-    /// Node's ConnectList.
+    /// List of peers the node will connect to on start.
     pub connect_list: ConnectListConfig,
-    /// Transaction Verification Thread Pool size.
+    /// Number of threads allocated for transaction verification.
     pub thread_pool_size: Option<u8>,
-    /// Path to the master key file.
-    pub master_key_path: PathBuf,
     /// Validator keys.
     #[serde(skip)]
     pub keys: Keys,
@@ -301,16 +359,14 @@ impl ValidateInput for NodeConfig {
             capacity.network_requests_capacity
         );
 
-        let backend_config = &self.network.http_backend_config;
+        let restart_policy = &self.api.server_restart;
         ensure!(
-            backend_config.server_restart_max_retries > 0,
-            "server_restart_max_retries({}) must be strictly larger than 0",
-            backend_config.server_restart_max_retries
+            restart_policy.max_retries > 0,
+            "`server_restart.max_retries` must be strictly larger than 0"
         );
         ensure!(
-            backend_config.server_restart_retry_timeout > 0,
-            "server_restart_retry_timeout({}) must be strictly larger than 0",
-            backend_config.server_restart_retry_timeout
+            restart_policy.retry_timeout > 0,
+            "`server_restart.retry_timeout` must be strictly larger than 0"
         );
 
         // Sanity checks for cases of accidental negative overflows.
@@ -332,12 +388,14 @@ impl ValidateInput for NodeConfig {
 }
 
 /// Configuration for the `NodeHandler`.
+///
+/// This type is considered an implementation detail of the node handler; it is exempt from
+/// semantic versioning.
 #[derive(Debug, Clone)]
+#[doc(hidden)]
 pub struct Configuration {
-    /// Current node socket address, public and secret keys.
-    pub listener: ListenerConfig,
-    /// Service configuration.
-    pub service: ServiceConfig,
+    /// Connection list.
+    pub connect_list: ConnectList,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Known peer addresses.
@@ -348,8 +406,9 @@ pub struct Configuration {
     pub keys: Keys,
 }
 
-/// Channel for messages, timeouts and api requests.
+/// Channel for messages, timeouts and api requests. Consumed by the `NodeHandler` constructor.
 #[derive(Debug)]
+#[doc(hidden)]
 pub struct NodeSender {
     /// Internal requests sender.
     pub internal_requests: SyncSender<InternalRequest>,
@@ -361,7 +420,7 @@ pub struct NodeSender {
 
 /// Node role.
 #[derive(Debug, Clone, Copy)]
-pub enum NodeRole {
+pub(crate) enum NodeRole {
     /// Validator node.
     Validator(ValidatorId),
     /// Auditor node.
@@ -389,49 +448,6 @@ impl NodeRole {
             NodeRole::Validator(_) => true,
             _ => false,
         }
-    }
-
-    /// Checks if node is auditor.
-    pub fn is_auditor(self) -> bool {
-        match self {
-            NodeRole::Auditor => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-/// ConnectList representation in node's config file.
-pub struct ConnectListConfig {
-    /// Peers to which we can connect.
-    pub peers: Vec<ConnectInfo>,
-}
-
-impl ConnectListConfig {
-    /// Creates `ConnectListConfig` from validators keys and corresponding IP addresses.
-    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[String]) -> Self {
-        let peers = peers
-            .iter()
-            .zip(validators_keys.iter())
-            .map(|(a, v)| ConnectInfo {
-                address: a.clone(),
-                public_key: v.consensus_key,
-            })
-            .collect();
-
-        ConnectListConfig { peers }
-    }
-
-    /// Creates `ConnectListConfig` from `ConnectList`.
-    pub fn from_connect_list(connect_list: &SharedConnectList) -> Self {
-        ConnectListConfig {
-            peers: connect_list.peers(),
-        }
-    }
-
-    /// `ConnectListConfig` peers addresses.
-    pub fn addresses(&self) -> Vec<String> {
-        self.peers.iter().map(|p| p.address.clone()).collect()
     }
 }
 
@@ -471,7 +487,7 @@ impl NodeHandler {
             &config.keys.consensus_sk(),
         );
 
-        let connect_list = config.listener.connect_list;
+        let connect_list = config.connect_list;
         let state = State::new(
             validator_id,
             connect_list,
@@ -508,61 +524,68 @@ impl NodeHandler {
     {
         Verified::from_value(
             message,
-            self.state.consensus_public_key(),
-            self.state.consensus_secret_key(),
+            self.state.keys().consensus_pk(),
+            self.state.keys().consensus_sk(),
         )
     }
 
     /// Return internal `SharedNodeState`
-    pub fn api_state(&self) -> &SharedNodeState {
+    fn api_state(&self) -> &SharedNodeState {
         &self.api_state
     }
 
     /// Returns value of the `first_round_timeout` field from the current `ConsensusConfig`.
-    pub fn first_round_timeout(&self) -> Milliseconds {
+    fn first_round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().first_round_timeout
     }
 
     /// Returns value of the `round_timeout_increase` field from the current `ConsensusConfig`.
-    pub fn round_timeout_increase(&self) -> Milliseconds {
+    fn round_timeout_increase(&self) -> Milliseconds {
         (self.state().consensus_config().first_round_timeout
             * ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT)
             / 100
     }
 
     /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
-    pub fn status_timeout(&self) -> Milliseconds {
+    fn status_timeout(&self) -> Milliseconds {
         self.state().consensus_config().status_timeout
     }
 
     /// Returns value of the `peers_timeout` field from the current `ConsensusConfig`.
-    pub fn peers_timeout(&self) -> Milliseconds {
+    fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
     }
 
     /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
-    pub fn txs_block_limit(&self) -> u32 {
+    fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
     }
 
     /// Returns value of the minimal propose timeout.
-    pub fn min_propose_timeout(&self) -> Milliseconds {
+    fn min_propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().min_propose_timeout
     }
 
     /// Returns value of the maximal propose timeout.
-    pub fn max_propose_timeout(&self) -> Milliseconds {
+    fn max_propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().max_propose_timeout
     }
 
     /// Returns threshold starting from which the minimal propose timeout value is used.
-    pub fn propose_timeout_threshold(&self) -> u32 {
+    fn propose_timeout_threshold(&self) -> u32 {
         self.state().consensus_config().propose_timeout_threshold
     }
 
     /// Returns `State` of the node.
+    #[doc(hidden)]
     pub fn state(&self) -> &State {
         &self.state
+    }
+
+    /// Returns a mutable reference to the `State` of the node.
+    #[doc(hidden)]
+    pub fn state_mut(&mut self) -> &mut State {
+        &mut self.state
     }
 
     /// Performs node initialization, so it starts consensus process from the first round.
@@ -614,14 +637,14 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
+    fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
         let message = message.into();
         let request = NetworkRequest::SendMessage(public_key, message);
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
-    pub(crate) fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
+    fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
         let peers: Vec<PublicKey> = self
             .state
             .peers()
@@ -641,13 +664,13 @@ impl NodeHandler {
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&mut self, key: PublicKey) {
+    fn connect(&mut self, key: PublicKey) {
         let connect = self.state.our_connect_message().clone();
         self.send_to_peer(key, connect);
     }
 
-    /// Add timeout request.
-    pub fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
+    /// Adds a timeout request.
+    fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
         self.channel
             .internal_requests
@@ -656,7 +679,7 @@ impl NodeHandler {
     }
 
     /// Adds request timeout if it isn't already requested.
-    pub fn request(&mut self, data: RequestData, peer: PublicKey) {
+    fn request(&mut self, data: RequestData, peer: PublicKey) {
         let is_new = self.state.request(data.clone(), peer);
         if is_new {
             self.add_request_timeout(data, None);
@@ -664,7 +687,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
-    pub fn add_round_timeout(&mut self) {
+    fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round().next());
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
@@ -677,7 +700,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
-    pub fn add_propose_timeout(&mut self) {
+    fn add_propose_timeout(&mut self) {
         let timeout = if self.need_faster_propose() {
             self.min_propose_timeout()
         } else {
@@ -712,45 +735,45 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
-    pub fn add_status_timeout(&mut self) {
+    fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
         let height = self.state.height();
         self.add_timeout(NodeTimeout::Status(height), time);
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
-    pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+    fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
         self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
-    pub fn add_peer_exchange_timeout(&mut self) {
+    fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
-    pub fn add_update_api_state_timeout(&mut self) {
+    fn add_update_api_state_timeout(&mut self) {
         let time = self.system_state.current_time()
             + Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
     /// Returns hash of the last block.
-    pub fn last_block_hash(&self) -> Hash {
+    fn last_block_hash(&self) -> Hash {
         self.blockchain.as_ref().last_block().object_hash()
     }
 
     /// Returns the number of uncommitted transactions.
-    pub fn uncommitted_txs_count(&self) -> u64 {
+    fn uncommitted_txs_count(&self) -> u64 {
         self.blockchain.as_ref().pool_size() + self.state.tx_cache_len() as u64
     }
 
     /// Returns start time of the requested round.
-    pub fn round_start_time(&self, round: Round) -> SystemTime {
+    fn round_start_time(&self, round: Round) -> SystemTime {
         // Round start time = H + (r - 1) * t0 + (r-1)(r-2)/2 * dt
         // Where:
         // H - height start time
@@ -765,112 +788,146 @@ impl NodeHandler {
 }
 
 impl fmt::Debug for NodeHandler {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
-            self.blockchain, self.peer_discovery
-        )
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NodeHandler")
+            .field("channel", &self.channel)
+            .field("blockchain", &self.blockchain)
+            .field("peer_discovery", &self.peer_discovery)
+            .finish()
     }
 }
 
 impl ApiSender {
     /// Creates new `ApiSender` with given channel.
+    #[doc(hidden)]
     pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
         ApiSender(inner)
     }
 
-    /// Creates a dummy sender which cannot send messages.
+    /// Creates a dummy sender which is not connected to the node and thus cannot send messages.
     pub fn closed() -> Self {
         ApiSender(mpsc::channel(0).0)
     }
 
-    /// Add peer to peer list
-    pub fn peer_add(&self, addr: ConnectInfo) -> Result<(), Error> {
-        let msg = ExternalMessage::PeerAdd(addr);
-        self.send_external_message(msg)
-    }
-
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub(crate) fn send_external_message(
+        &self,
+        message: ExternalMessage,
+    ) -> impl Future<Item = (), Error = SendError> {
         self.0
             .clone()
             .send(message)
-            .wait()
             .map(drop)
-            .map_err(into_failure)
+            .map_err(|_| SendError(()))
     }
 
-    /// Broadcast transaction to other nodes in the blockchain network.
-    pub fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), Error> {
-        let msg = ExternalMessage::Transaction(tx);
-        self.send_external_message(msg)
+    /// Broadcasts transaction to other nodes in the blockchain network. This is an asynchronous
+    /// operation that can take some time if the node is overloaded with requests.
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub fn broadcast_transaction(
+        &self,
+        tx: Verified<AnyTx>,
+    ) -> impl Future<Item = (), Error = SendError> {
+        self.send_external_message(ExternalMessage::Transaction(tx))
     }
 }
 
 impl fmt::Debug for ApiSender {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiSender").finish()
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_tuple("ApiSender").field(&"..").finish()
     }
 }
 
-/// Data needed to add peer into `ConnectList`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ConnectInfo {
-    /// Peer address.
-    pub address: String,
-    /// Peer public key.
-    pub public_key: PublicKey,
+/// Errors that can occur during sending a message to the node via `ApiSender` or `ShutdownHandle`.
+#[derive(Debug, Fail)]
+#[fail(display = "Failed to send API request to the node: the node is being shut down")]
+pub struct SendError(());
+
+/// Handle allowing to shut down the node.
+#[derive(Debug, Clone)]
+pub struct ShutdownHandle {
+    inner: ApiSender,
 }
 
-impl fmt::Display for ConnectInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.address)
+impl ShutdownHandle {
+    /// Shuts down the node.
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is already being shut down.
+    pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
+        self.inner.send_external_message(ExternalMessage::Shutdown)
     }
 }
 
-/// Default system state provider implementation which just uses `SystemTime::now`
-/// to get current time.
+/// Default system state provider implementation which uses `SystemTime::now`
+/// to get the current time.
 #[derive(Debug)]
-pub struct DefaultSystemState(pub SocketAddr);
+struct DefaultSystemState(SocketAddr);
 
 impl SystemStateProvider for DefaultSystemState {
     fn listen_address(&self) -> SocketAddr {
         self.0
     }
+
     fn current_time(&self) -> SystemTime {
         SystemTime::now()
     }
 }
 
-/// Channel between the `NodeHandler` and events source.
+/// Channel between the node and external event producers / consumers.
 #[derive(Debug)]
 pub struct NodeChannel {
     /// Channel for network requests.
-    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    pub(crate) network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+
     /// Channel for timeout requests.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub internal_requests: (
         mpsc::Sender<InternalRequest>,
         mpsc::Receiver<InternalRequest>,
     ),
+
     /// Channel for transferring API endpoints from producers (e.g., Rust runtime) to the
     /// `ApiManager`.
-    pub endpoints: (
+    endpoints: (
         mpsc::Sender<UpdateEndpoints>,
         mpsc::Receiver<UpdateEndpoints>,
     ),
+
     /// Channel for API requests.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub api_requests: (
         mpsc::Sender<ExternalMessage>,
         mpsc::Receiver<ExternalMessage>,
     ),
+
     /// Channel for network events.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
+
     /// Channel for internal events.
+    #[doc(hidden)] // public because of the `transactions` benchmark
     pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
-/// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
+/// Interface of the configuration manager usable for updating node configuration on
+/// the fly.
+pub trait ConfigManager: Send {
+    /// Update connect list in the node configuration.
+    fn store_connect_list(&mut self, connect_list: ConnectListConfig);
+}
+
+/// Node capable of processing requests from external clients and participating in the consensus
+/// algorithm.
 #[derive(Debug)]
 pub struct Node {
     api_runtime_config: SystemRuntimeConfig,
@@ -880,6 +937,12 @@ pub struct Node {
     channel: NodeChannel,
     max_message_len: u32,
     thread_pool_size: Option<u8>,
+}
+
+impl Default for NodeChannel {
+    fn default() -> Self {
+        Self::new(&EventsPoolCapacity::default())
+    }
 }
 
 impl NodeChannel {
@@ -895,8 +958,18 @@ impl NodeChannel {
         }
     }
 
-    /// Returns the channel for sending timeouts, networks and api requests.
-    pub fn node_sender(&self) -> NodeSender {
+    /// Returns the sender for API requests.
+    pub fn api_sender(&self) -> ApiSender {
+        ApiSender(self.api_requests.0.clone())
+    }
+
+    /// Returns the sender for HTTP endpoints.
+    pub fn endpoints_sender(&self) -> mpsc::Sender<UpdateEndpoints> {
+        self.endpoints.0.clone()
+    }
+
+    /// Returns the channel for sending timeouts, networks and API requests.
+    fn node_sender(&self) -> NodeSender {
         NodeSender {
             internal_requests: self.internal_requests.0.clone().wait(),
             network_requests: self.network_requests.0.clone().wait(),
@@ -925,11 +998,8 @@ impl Node {
             .validate()
             .expect("Node configuration is inconsistent");
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let blockchain = Blockchain::new(
-            database,
-            node_cfg.service_keypair(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        );
+        let blockchain =
+            Blockchain::new(database, node_cfg.service_keypair(), channel.api_sender());
 
         let mut blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
         for runtime in with_runtimes(channel.endpoints.0.clone()) {
@@ -951,14 +1021,7 @@ impl Node {
 
         let peers = node_cfg.connect_list.addresses();
         let config = Configuration {
-            listener: ListenerConfig {
-                connect_list: ConnectList::from_config(node_cfg.connect_list),
-                address: node_cfg.listen_address,
-            },
-            service: ServiceConfig {
-                service_public_key: node_cfg.keys.service_pk(),
-                service_secret_key: node_cfg.keys.service_sk().clone(),
-            },
+            connect_list: ConnectList::from_config(node_cfg.connect_list),
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,
@@ -1002,14 +1065,8 @@ impl Node {
                     .collect::<Vec<_>>()
             },
             api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
-            server_restart_retry_timeout: node_cfg
-                .network
-                .http_backend_config
-                .server_restart_retry_timeout,
-            server_restart_max_retries: node_cfg
-                .network
-                .http_backend_config
-                .server_restart_max_retries,
+            server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
+            server_restart_max_retries: node_cfg.api.server_restart.max_retries,
         };
 
         let handler = NodeHandler::new(
@@ -1035,7 +1092,7 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
+    fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
         let pool_size = self.thread_pool_size;
@@ -1068,18 +1125,15 @@ impl Node {
         network_thread.join().unwrap()
     }
 
-    /// A generic implementation that launches `Node` and optionally creates threads
-    /// for public and private api handlers.
-    /// Explorer api prefix is `/api/explorer`
-    /// Public api prefix is `/api/services/{service_name}`
-    /// Private api prefix is `/api/services/{service_name}`
+    /// Launches a `Node` and optionally creates threads for public and private API handlers,
+    /// depending on the provided `NodeConfig`.
     pub fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            self.state().consensus_public_key(),
-            self.state().consensus_secret_key().clone(),
+            self.state().keys().consensus_pk(),
+            self.state().keys().consensus_sk().to_owned(),
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,
@@ -1122,24 +1176,18 @@ impl Node {
         (handler_part, network_part, internal_part)
     }
 
-    /// Returns `Blockchain` instance.
-    pub fn blockchain(&self) -> Blockchain {
-        self.handler.blockchain.as_ref().clone()
-    }
-
-    /// Returns `State`.
-    pub fn state(&self) -> &State {
+    /// Returns `State` of the node.
+    fn state(&self) -> &State {
         self.handler.state()
     }
 
-    /// Returns `NodeHandler`.
-    pub fn handler(&self) -> &NodeHandler {
-        &self.handler
-    }
-
-    /// Returns channel.
-    pub fn channel(&self) -> ApiSender {
-        ApiSender::new(self.channel.api_requests.0.clone())
+    /// Returns a shutdown handle for the node. It is possible to instantiate multiple handles
+    /// using this method; only the first call to shutdown the node is guaranteed to succeed
+    /// (but this single call is enough to stop the node).
+    pub fn shutdown_handle(&self) -> ShutdownHandle {
+        ShutdownHandle {
+            inner: ApiSender::new(self.channel.api_requests.0.clone()),
+        }
     }
 }
 

@@ -16,10 +16,12 @@
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
-    events::NetworkConfiguration,
     exonum_merkledb::DbOptions,
     keys::{read_keys_from_file, Keys},
-    node::{ConnectListConfig, MemoryPoolConfig, NodeApiConfig, NodeConfig as CoreNodeConfig},
+    node::{
+        ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig,
+        NodeConfig as CoreNodeConfig,
+    },
 };
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::{Deserialize, Serialize};
@@ -100,11 +102,8 @@ impl Into<CoreNodeConfig> for NodeConfig {
             network: self.private_config.network,
             api: self.private_config.api,
             mempool: self.private_config.mempool,
-            services_configs: Default::default(),
-            database: self.private_config.database,
             connect_list: self.private_config.connect_list,
             thread_pool_size: self.private_config.thread_pool_size,
-            master_key_path: self.private_config.master_key_path,
             keys: self.private_config.keys,
         }
     }

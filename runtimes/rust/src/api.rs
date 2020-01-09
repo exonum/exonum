@@ -259,11 +259,7 @@ impl ServiceApiScope {
 /// ```
 /// use serde_derive::{Deserialize, Serialize};
 ///
-/// use exonum::{
-///     blockchain::Schema,
-///     crypto::{self, Hash},
-///     node::ExternalMessage,
-/// };
+/// use exonum::{blockchain::Schema, crypto::{self, Hash}};
 /// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 /// use exonum_merkledb::ObjectHash;
 ///
@@ -335,7 +331,7 @@ impl ServiceApiScope {
 /// #     let blockchain = Blockchain::new(
 /// #         TemporaryDB::new(),
 /// #         crypto::gen_keypair(),
-/// #         ApiSender::new(mpsc::channel(0).0),
+/// #         ApiSender::closed(),
 /// #     );
 /// #     let mut builder = ServiceApiBuilder::new(
 /// #         blockchain,

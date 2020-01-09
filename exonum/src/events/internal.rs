@@ -58,7 +58,7 @@ impl InternalPart {
         })
         .map_err(drop)
         .and_then(|msg| {
-            let event = future::ok(InternalEvent::MessageVerified(Box::new(msg)));
+            let event = future::ok(InternalEvent::message_verified(msg));
             Self::send_event(event, internal_tx)
         })
     }
@@ -90,19 +90,19 @@ impl InternalPart {
 
                         let fut = Timeout::new(duration, &handle)
                             .expect("Unable to create timeout")
-                            .map(|()| InternalEvent::Timeout(timeout))
+                            .map(|()| InternalEvent::timeout(timeout))
                             .map_err(|e| panic!("Cannot execute timeout: {:?}", e));
 
                         Either::A(fut)
                     }
 
                     InternalRequest::JumpToRound(height, round) => {
-                        let event = InternalEvent::JumpToRound(height, round);
+                        let event = InternalEvent::jump_to_round(height, round);
                         Either::B(future::ok(event))
                     }
 
                     InternalRequest::Shutdown => {
-                        let event = InternalEvent::Shutdown;
+                        let event = InternalEvent::shutdown();
                         Either::B(future::ok(event))
                     }
                 };
@@ -166,7 +166,7 @@ mod tests {
         let tx = get_signed_message();
 
         let expected_event =
-            InternalEvent::MessageVerified(Box::new(Message::from_signed(tx.clone()).unwrap()));
+            InternalEvent::message_verified(Message::from_signed(tx.clone()).unwrap());
         let event = verify_message(tx.into_bytes());
         assert_eq!(event, Some(expected_event));
     }

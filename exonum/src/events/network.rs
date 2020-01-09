@@ -39,9 +39,8 @@ use crate::{
         error::into_failure,
         noise::{Handshake, HandshakeParams, NoiseHandshake},
     },
-    helpers::Milliseconds,
     messages::{Connect, Message, Service, SignedMessage, Verified},
-    node::SharedConnectList,
+    node::{NetworkConfiguration, SharedConnectList},
 };
 use exonum_crypto::x25519::into_x25519_public_key;
 
@@ -76,51 +75,6 @@ pub enum NetworkRequest {
     SendMessage(PublicKey, SignedMessage),
     DisconnectWithPeer(PublicKey),
     Shutdown,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
-pub struct HttpBackendConfig {
-    /// The interval in milliseconds between attempts of restarting HTTP-server in case
-    /// the server failed to restart
-    pub server_restart_max_retries: u16,
-    /// The attempts counts of restarting HTTP-server in case the server failed to restart
-    pub server_restart_retry_timeout: u64,
-}
-
-impl Default for HttpBackendConfig {
-    fn default() -> Self {
-        Self {
-            server_restart_max_retries: 20,
-            server_restart_retry_timeout: 500,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
-pub struct NetworkConfiguration {
-    // TODO: Think more about config parameters. (ECR-162)
-    pub max_incoming_connections: usize,
-    pub max_outgoing_connections: usize,
-    pub tcp_nodelay: bool,
-    pub tcp_keep_alive: Option<u64>,
-    pub tcp_connect_retry_timeout: Milliseconds,
-    pub tcp_connect_max_retries: u64,
-    #[serde(default)]
-    pub http_backend_config: HttpBackendConfig,
-}
-
-impl Default for NetworkConfiguration {
-    fn default() -> Self {
-        Self {
-            max_incoming_connections: 128,
-            max_outgoing_connections: 128,
-            tcp_keep_alive: None,
-            tcp_nodelay: true,
-            tcp_connect_retry_timeout: 15_000,
-            tcp_connect_max_retries: 10,
-            http_backend_config: Default::default(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -388,10 +342,7 @@ impl NetworkHandler {
             .map(jitter)
             .take(max_tries);
 
-        let unresolved_address = self
-            .connect_list
-            .find_address_by_key(&key)
-            .map(|a| a.address.clone());
+        let unresolved_address = self.connect_list.find_address_by_key(&key);
 
         if let Some(unresolved_address) = unresolved_address {
             let action = {

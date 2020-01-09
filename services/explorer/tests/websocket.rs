@@ -21,10 +21,11 @@ use exonum::{
     crypto::gen_keypair,
     helpers,
     merkledb::{ObjectHash, TemporaryDB},
-    node::{ApiSender, ExternalMessage, Node},
+    node::{Node, ShutdownHandle},
 };
 use exonum_explorer::api::Notification;
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
+use futures::Future;
 use serde_json::json;
 use websocket::{
     client::sync::Client, stream::sync::TcpStream, ClientBuilder, Message as WsMessage,
@@ -45,7 +46,22 @@ use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
 #[derive(Debug)]
 struct RunHandle {
     node_thread: thread::JoinHandle<()>,
-    api_tx: ApiSender,
+    shutdown_handle: ShutdownHandle,
+}
+
+impl RunHandle {
+    fn new(node: Node) -> Self {
+        let shutdown_handle = node.shutdown_handle();
+        Self {
+            shutdown_handle,
+            node_thread: thread::spawn(|| node.run().unwrap()),
+        }
+    }
+
+    fn join(self) {
+        self.shutdown_handle.shutdown().wait().unwrap();
+        self.node_thread.join().unwrap();
+    }
 }
 
 fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
@@ -79,13 +95,7 @@ fn run_node(listen_port: u16, pub_api_port: u16) -> RunHandle {
         None,
     );
 
-    let api_tx = node.channel();
-    let handle = RunHandle {
-        node_thread: thread::spawn(move || {
-            node.run().unwrap();
-        }),
-        api_tx,
-    };
+    let handle = RunHandle::new(node);
     // Wait until the node has fully started.
     thread::sleep(Duration::from_secs(1));
     handle
@@ -119,7 +129,7 @@ fn recv_text_msg(client: &mut Client<TcpStream>) -> Option<String> {
 /// Checks that ws client accepts valid transactions and discards transactions with incorrect instance ID.
 #[test]
 fn test_send_transaction() {
-    let node_handler = run_node(6330, 8079);
+    let node_handle = run_node(6330, 8079);
 
     let mut client =
         create_ws_client("ws://localhost:8079/api/explorer/v1/ws").expect("Cannot connect to node");
@@ -171,16 +181,12 @@ fn test_send_transaction() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_blocks_subscribe() {
-    let node_handler = run_node(6331, 8080);
+    let node_handle = run_node(6331, 8080);
 
     let mut client = create_ws_client("ws://localhost:8080/api/explorer/v1/blocks/subscribe")
         .expect("Cannot connect to node");
@@ -201,16 +207,12 @@ fn test_blocks_subscribe() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_transactions_subscribe() {
-    let node_handler = run_node(6332, 8081);
+    let node_handle = run_node(6332, 8081);
 
     let mut client = create_ws_client("ws://localhost:8081/api/explorer/v1/transactions/subscribe")
         .expect("Cannot connect to node");
@@ -245,16 +247,12 @@ fn test_transactions_subscribe() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_transactions_subscribe_with_filter() {
-    let node_handler = run_node(6333, 8082);
+    let node_handle = run_node(6333, 8082);
 
     // Create client with filter
     let mut client = create_ws_client(&format!(
@@ -303,16 +301,12 @@ fn test_transactions_subscribe_with_filter() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_transactions_subscribe_with_partial_filter() {
-    let node_handler = run_node(6334, 8083);
+    let node_handle = run_node(6334, 8083);
 
     // Create client with filter
     let mut client = create_ws_client(&format!(
@@ -370,16 +364,12 @@ fn test_transactions_subscribe_with_partial_filter() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_transactions_subscribe_with_bad_filter() {
-    let node_handler = run_node(6335, 8084);
+    let node_handle = run_node(6335, 8084);
     // `service_id` is missing from the filter.
     let mut client =
         create_ws_client("ws://localhost:8084/api/explorer/v1/transactions/subscribe?message_id=0")
@@ -404,16 +394,12 @@ fn test_transactions_subscribe_with_bad_filter() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_subscribe() {
-    let node_handler = run_node(6336, 8085);
+    let node_handle = run_node(6336, 8085);
 
     let mut client =
         create_ws_client("ws://localhost:8085/api/explorer/v1/ws").expect("Cannot connect to node");
@@ -451,16 +437,12 @@ fn test_subscribe() {
 
     // Shutdown node.
     client.shutdown().unwrap();
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
 
 #[test]
 fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
-    let node_handler = run_node(6337, 8086);
+    let node_handle = run_node(6337, 8086);
 
     let mut clients = (0..8)
         .map(|_| {
@@ -477,11 +459,7 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
     let now = Instant::now();
 
     // Shutdown node before clients.
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 
     assert!(now.elapsed().as_secs() < 15);
 
@@ -499,7 +477,7 @@ fn test_node_shutdown_with_active_ws_client_should_not_wait_for_timeout() {
 
 #[test]
 fn test_blocks_and_tx_both_subscribe() {
-    let node_handler = run_node(6338, 8087);
+    let node_handle = run_node(6338, 8087);
 
     // Open block ws first
     let mut block_client = create_ws_client("ws://localhost:8087/api/explorer/v1/blocks/subscribe")
@@ -569,9 +547,5 @@ fn test_blocks_and_tx_both_subscribe() {
     }
     block_again_client.shutdown().unwrap();
 
-    node_handler
-        .api_tx
-        .send_external_message(ExternalMessage::Shutdown)
-        .unwrap();
-    node_handler.node_thread.join().unwrap();
+    node_handle.join();
 }
