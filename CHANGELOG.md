@@ -47,7 +47,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   (to generate signed transactions), to `CallContext` (to call another service)
   and some other types. See Rust runtime docs for more details. (#1606)
 
-- The following public APIs were removed/made private: (#1629)
+- The following public APIs were removed/made private: (#1629, #1671)
+
   - `blockchain::{error reexports}` (available from `runtime::`);
   - `blockchain::FatalError` public re-export;
   - `blockchain::InstanceCollection` structure;
@@ -61,8 +62,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     and `helpers::clear_consensus_messages_cache` functions;
   - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
   - `messages::BinaryValue` public re-export;
-  - `node::state` module (constants from `node::state` are now accessible in
-    `node::constants` module);
+  - `node` module types / methods logically related to the consensus
+    algorithm implementation (i.e., `NodeHandler` and types used by it);
   - `proto` module;
   - `runtime::error` module (`catch_panic` was added to the list of public
     re-exports from `runtime::error`).

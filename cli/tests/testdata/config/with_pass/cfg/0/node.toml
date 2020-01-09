@@ -5,6 +5,10 @@ master_key_path = "master.key.toml"
 
 [private_config.api]
 state_update_timeout = 10000
+[private_config.api.server_restart]
+max_retries = 20
+retry_timeout = 500
+
 [[private_config.connect_list.peers]]
 address = "127.0.0.1:5400"
 public_key = "12285e9b9d6440ffe0e0dc8e8d381cf6a071c38d053d9f1273c7b794175529fc"
@@ -25,9 +29,6 @@ tcp_connect_max_retries = 10
 tcp_connect_retry_timeout = 15000
 tcp_nodelay = true
 
-[private_config.network.http_backend_config]
-server_restart_max_retries = 20
-server_restart_retry_timeout = 500
 [public_config.consensus]
 first_round_timeout = 3000
 max_message_len = 1048576

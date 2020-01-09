@@ -258,13 +258,7 @@ impl ServiceApiScope {
 ///
 /// ```
 /// use serde_derive::{Deserialize, Serialize};
-///
-/// use exonum::{
-///     blockchain::Schema,
-///     crypto::{self, Hash},
-///     merkledb::ObjectHash,
-///     node::ExternalMessage,
-/// };
+/// use exonum::{blockchain::Schema, crypto::Hash, merkledb::ObjectHash};
 /// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 ///
 /// // Declare a type which describes an API specification and implementation.
@@ -326,15 +320,16 @@ impl ServiceApiScope {
 ///         .endpoint("v1/ping", MyApi::ping);
 ///     builder
 /// }
-/// #
+/// # use exonum::{
+/// #     blockchain::Blockchain, merkledb::TemporaryDB, node::ApiSender,
+/// #     runtime::InstanceDescriptor,
+/// # };
+/// # use futures::sync::mpsc;
 /// # fn main() {
-/// #     use exonum::{blockchain::Blockchain, merkledb::TemporaryDB, node::ApiSender, runtime::InstanceDescriptor};
-/// #     use futures::sync::mpsc;
-/// #
 /// #     let blockchain = Blockchain::new(
 /// #         TemporaryDB::new(),
-/// #         crypto::gen_keypair(),
-/// #         ApiSender::new(mpsc::channel(0).0),
+/// #         exonum::crypto::gen_keypair(),
+/// #         ApiSender::closed(),
 /// #     );
 /// #     let mut builder = ServiceApiBuilder::new(
 /// #         blockchain,

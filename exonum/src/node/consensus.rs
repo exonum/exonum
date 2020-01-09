@@ -29,7 +29,7 @@ use crate::{
         Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
         TransactionsRequest, TransactionsResponse, Verified,
     },
-    node::{NodeHandler, RequestData},
+    node::{state::RequestData, NodeHandler},
 };
 
 // Shortcut to get verified messages from bytes.
@@ -168,7 +168,7 @@ impl NodeHandler {
     }
 
     fn validate_block_response(&self, msg: &Verified<BlockResponse>) -> Result<(), failure::Error> {
-        if msg.payload().to != self.state.consensus_public_key() {
+        if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
                 msg.payload().to().to_hex(),
@@ -745,7 +745,7 @@ impl NodeHandler {
         &mut self,
         msg: &Verified<TransactionsResponse>,
     ) -> Result<(), failure::Error> {
-        if msg.payload().to != self.state.consensus_public_key() {
+        if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received response intended for another peer, to={}, from={}",
                 msg.payload().to().to_hex(),

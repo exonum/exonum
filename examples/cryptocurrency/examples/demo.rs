@@ -51,10 +51,7 @@ fn node_config() -> NodeConfig {
         connect_list: Default::default(),
         api: api_cfg,
         mempool: Default::default(),
-        services_configs: Default::default(),
-        database: Default::default(),
         thread_pool_size: Default::default(),
-        master_key_path: Default::default(),
         keys: Keys::from_keys(
             consensus_public_key,
             consensus_secret_key,

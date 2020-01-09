@@ -26,11 +26,11 @@ use exonum::{
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
-    node::{ApiSender, ExternalMessage},
+    node::ApiSender,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
 use exonum_rust_runtime::{api::ServiceApiScope, ExecutionStatus};
-use futures::{Future, IntoFuture, Sink};
+use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;
 
@@ -215,11 +215,9 @@ impl ExplorerApi {
         let sender = sender.clone();
         let send_transaction = move |(verified, tx_hash)| {
             sender
-                .clone()
-                .0
-                .send(ExternalMessage::Transaction(verified))
+                .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| ApiError::InternalError(e.into()))
+                .map_err(ApiError::from)
         };
 
         Box::new(
