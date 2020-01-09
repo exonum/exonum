@@ -16,13 +16,13 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
+    merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     node::ApiSender,
     runtime::{
         ArtifactId, DispatcherAction, ExecutionError, InstanceDescriptor, InstanceId, Mailbox,
         MethodId,
     },
 };
-use exonum_merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot};
 use failure::Error;
 use futures::IntoFuture;
 

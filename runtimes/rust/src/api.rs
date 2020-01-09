@@ -22,10 +22,10 @@ use serde::{de::DeserializeOwned, Serialize};
 use exonum::{
     api::{backends::actix, error::MovedPermanentlyError, ApiBuilder, ApiScope},
     blockchain::{Blockchain, Schema as CoreSchema},
+    crypto::PublicKey,
+    merkledb::{access::Prefixed, Snapshot},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
-use exonum_crypto::PublicKey;
-use exonum_merkledb::{access::Prefixed, Snapshot};
 
 use super::Broadcaster;
 
@@ -262,10 +262,10 @@ impl ServiceApiScope {
 /// use exonum::{
 ///     blockchain::Schema,
 ///     crypto::{self, Hash},
+///     merkledb::ObjectHash,
 ///     node::ExternalMessage,
 /// };
 /// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
-/// use exonum_merkledb::ObjectHash;
 ///
 /// // Declare a type which describes an API specification and implementation.
 /// pub struct MyApi;
@@ -328,8 +328,7 @@ impl ServiceApiScope {
 /// }
 /// #
 /// # fn main() {
-/// #     use exonum::{blockchain::Blockchain, node::ApiSender, runtime::InstanceDescriptor};
-/// #     use exonum_merkledb::TemporaryDB;
+/// #     use exonum::{blockchain::Blockchain, merkledb::TemporaryDB, node::ApiSender, runtime::InstanceDescriptor};
 /// #     use futures::sync::mpsc;
 /// #
 /// #     let blockchain = Blockchain::new(

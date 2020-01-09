@@ -39,8 +39,6 @@
 //! ```
 //! use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
 //! use exonum_derive::*;
-//! use exonum_merkledb::Snapshot;
-//! use exonum_crypto::Hash;
 //! use serde_derive::*;
 //!
 //! // Determine the types of data that will be used in service transactions.
@@ -108,9 +106,7 @@
 //!
 //! ```
 //! # use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
-//! # use exonum_crypto::Hash;
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-//! # use exonum_merkledb::Snapshot;
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //! #   type Output;
@@ -193,7 +189,7 @@
 //!
 //! ```
 //! # use exonum_rust_runtime::{CallContext, ExecutionError};
-//! # use exonum_crypto::gen_keypair;
+//! # use exonum::crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;
 //! # type Transfer = String;
@@ -268,16 +264,16 @@ use exonum::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
+    merkledb::Snapshot,
     runtime::{
         catch_panic,
         migrations::{DataMigrationError, MigrateData, MigrationScript},
+        versioning::Version,
         ExecutionContext, Mailbox, Runtime,
     },
 };
-use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
-use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
