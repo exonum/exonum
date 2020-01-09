@@ -20,14 +20,13 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
-    runtime::{
-        rust::{CallContext, DefaultInstance, Service, ServiceFactory as _},
-        DispatcherError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
-        SUPERVISOR_INSTANCE_ID,
-    },
 };
 use exonum_derive::*;
 use exonum_merkledb::access::AccessExt;
+use exonum_rust_runtime::{
+    CallContext, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError, InstanceId, Service,
+    ServiceFactory as _, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{

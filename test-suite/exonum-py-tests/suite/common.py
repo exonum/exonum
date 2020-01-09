@@ -4,7 +4,12 @@ for writing tests with less boiler-plate."""
 from typing import List, Dict, Any
 import unittest
 
+import time
+from exonum_client import ExonumClient
 from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
+from requests.exceptions import ConnectionError
+
+RETRIES_AMOUNT = 20
 
 
 def run_dev_node(application: str) -> ExonumNetwork:
@@ -87,3 +92,33 @@ def launcher_networks(network: ExonumNetwork) -> List[Dict[str, Any]]:
         networks.append(node_network)
 
     return networks
+
+
+def wait_network_to_start(network: ExonumNetwork) -> None:
+    """Wait for network starting"""
+    wait_api_to_start(network)
+    wait_for_block(network, 1)
+
+
+def wait_for_block(network: ExonumNetwork, height: int = 1) -> None:
+    """Wait for block at specific height"""
+    for validator_id in range(network.validators_count()):
+        host, public_port, private_port = network.api_address(validator_id)
+        client = ExonumClient(host, public_port, private_port)
+        for _ in range(RETRIES_AMOUNT):
+            if client.public_api.get_block(height).status_code == 200:
+                break
+            time.sleep(0.5)
+
+
+def wait_api_to_start(network: ExonumNetwork) -> None:
+    """Wait for api starting"""
+    for validator_id in range(network.validators_count()):
+        host, public_port, private_port = network.api_address(validator_id)
+        client = ExonumClient(host, public_port, private_port)
+        for _ in range(RETRIES_AMOUNT):
+            try:
+                client.public_api.health_info()
+                break
+            except ConnectionError:
+                time.sleep(0.5)

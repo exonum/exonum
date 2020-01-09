@@ -15,13 +15,11 @@
 use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     messages::Verified,
-    runtime::{
-        rust::{CallContext, DefaultInstance, Service},
-        AnyTx, ExecutionError, InstanceId,
-    },
+    runtime::{AnyTx, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::access::AccessExt;
+use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;

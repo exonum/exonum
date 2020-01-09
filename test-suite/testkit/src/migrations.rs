@@ -24,11 +24,11 @@ use exonum::{
     },
     runtime::{
         migrations::{MigrateData, MigrationContext, MigrationScript},
-        rust::ServiceFactory,
         versioning::Version,
         InstanceSpec,
     },
 };
+use exonum_rust_runtime::ServiceFactory;
 
 use std::sync::Arc;
 
@@ -174,11 +174,9 @@ where
 mod tests {
     use super::*;
 
-    use exonum::runtime::{
-        migrations::DataMigrationError,
-        rust::{ArtifactProtobufSpec, Service},
-        ArtifactId,
-    };
+    use exonum::runtime::{migrations::DataMigrationError, ArtifactId};
+    use exonum_rust_runtime::{ArtifactProtobufSpec, Service};
+
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,

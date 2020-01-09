@@ -59,14 +59,12 @@
     missing_debug_implementations
 )]
 
-use exonum::{
-    merkledb::ObjectHash,
-    runtime::{
-        rust::{api::ServiceApiBuilder, AfterCommitContext, CallContext, DefaultInstance, Service},
-        ExecutionError, ExecutionFail,
-    },
-};
+use exonum::merkledb::ObjectHash;
 use exonum_derive::*;
+use exonum_rust_runtime::{
+    api::ServiceApiBuilder, AfterCommitContext, CallContext, DefaultInstance, ExecutionError,
+    ExecutionFail, Service,
+};
 
 mod api;
 mod websocket;

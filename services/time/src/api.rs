@@ -15,7 +15,8 @@
 //! Exonum-time API.
 
 use chrono::{DateTime, Utc};
-use exonum::{crypto::PublicKey, runtime::rust::api};
+use exonum::crypto::PublicKey;
+use exonum_rust_runtime::api;
 use serde::{Deserialize, Serialize};
 
 use crate::TimeSchema;

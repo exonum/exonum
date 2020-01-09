@@ -20,3 +20,4 @@ travis-ci = { repository = "exonum/exonum" }
 exonum = { version = "0.13.0-rc.2", path = "../../../exonum" }
 exonum-testkit = { version = "0.13.0-rc.2", path = ".." }
 exonum-cryptocurrency = { version = "0.0.0", path = "../../../examples/cryptocurrency" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../../runtimes/rust" }

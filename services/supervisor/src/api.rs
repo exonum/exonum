@@ -12,17 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    blockchain::ConsensusConfig,
-    crypto::Hash,
-    helpers::Height,
-    runtime::{
-        rust::{
-            api::{self, ServiceApiBuilder, ServiceApiState},
-            Broadcaster,
-        },
-        ArtifactId,
-    },
+use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
+use exonum_rust_runtime::{
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    ArtifactId, Broadcaster,
 };
 use failure::Fail;
 use serde_derive::{Deserialize, Serialize};
