@@ -60,33 +60,14 @@ impl Default for NodeInfo {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-struct ReconnectInfo {
-    delay: u64,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "type")]
-enum IncomingConnectionState {
-    Active,
-    Reconnect(ReconnectInfo),
-}
-
-impl Default for IncomingConnectionState {
-    fn default() -> Self {
-        IncomingConnectionState::Active
-    }
-}
-
-#[derive(Serialize, Deserialize, Default)]
-struct IncomingConnection {
+struct OutgoingConnection {
     public_key: Option<PublicKey>,
-    state: IncomingConnectionState,
 }
 
 #[derive(Serialize, Deserialize)]
 struct PeersInfo {
     incoming_connections: Vec<ConnectInfo>,
-    outgoing_connections: HashMap<SocketAddr, IncomingConnection>,
+    outgoing_connections: HashMap<SocketAddr, OutgoingConnection>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -126,23 +107,15 @@ impl SystemApi {
     fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
         api_scope.endpoint(name, move |_query: ()| {
-            let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
+            let mut outgoing_connections: HashMap<SocketAddr, OutgoingConnection> = HashMap::new();
 
             for connect_info in shared_api_state.outgoing_connections() {
                 outgoing_connections.insert(
                     connect_info.address.parse().unwrap(),
-                    IncomingConnection {
+                    OutgoingConnection {
                         public_key: Some(connect_info.public_key),
-                        state: Default::default(),
                     },
                 );
-            }
-
-            for (s, delay) in shared_api_state.reconnects_timeout() {
-                outgoing_connections
-                    .entry(s)
-                    .or_insert_with(Default::default)
-                    .state = IncomingConnectionState::Reconnect(ReconnectInfo { delay });
             }
 
             Ok(PeersInfo {

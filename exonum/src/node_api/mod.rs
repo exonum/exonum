@@ -17,8 +17,7 @@
 use exonum_api::{ApiAggregator, ApiBuilder};
 
 use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
+    collections::HashSet,
     sync::{Arc, RwLock},
 };
 
@@ -39,7 +38,6 @@ struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     incoming_connections: HashSet<ConnectInfo>,
     outgoing_connections: HashSet<ConnectInfo>,
-    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     is_enabled: bool,
     node_role: NodeRole,
     majority_count: usize,
@@ -63,8 +61,7 @@ impl ApiNodeState {
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     node: Arc<RwLock<ApiNodeState>>,
-    /// Timeout to update API state.
-    pub state_update_timeout: Milliseconds,
+    state_update_timeout: Milliseconds,
 }
 
 impl SharedNodeState {
@@ -95,19 +92,6 @@ impl SharedNodeState {
             .outgoing_connections
             .iter()
             .cloned()
-            .collect()
-    }
-
-    /// Returns a list of other nodes to which the connection has failed
-    /// and a reconnect attempt is required. The method also indicates the time
-    /// after which a new connection attempt is performed.
-    pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
-        self.node
-            .read()
-            .expect("Expected read lock.")
-            .reconnects_timeout
-            .iter()
-            .map(|(c, e)| (*c, *e))
             .collect()
     }
 
@@ -154,19 +138,19 @@ impl SharedNodeState {
         lock.validators = state.validators().to_vec();
         lock.tx_cache_len = state.tx_cache_len();
 
-        for (p, a) in state.connections() {
-            match a {
+        for (public_key, addr) in state.connections() {
+            match addr {
                 ConnectedPeerAddr::In(addr) => {
                     let conn_info = ConnectInfo {
                         address: addr.to_string(),
-                        public_key: *p,
+                        public_key: *public_key,
                     };
                     lock.incoming_connections.insert(conn_info);
                 }
                 ConnectedPeerAddr::Out(_, addr) => {
                     let conn_info = ConnectInfo {
                         address: addr.to_string(),
-                        public_key: *p,
+                        public_key: *public_key,
                     };
                     lock.outgoing_connections.insert(conn_info);
                 }
@@ -189,28 +173,6 @@ impl SharedNodeState {
     /// Returns the value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout
-    }
-
-    /// Adds a reconnect timeout.
-    pub fn add_reconnect_timeout(
-        &self,
-        addr: SocketAddr,
-        timeout: Milliseconds,
-    ) -> Option<Milliseconds> {
-        self.node
-            .write()
-            .expect("Expected write lock")
-            .reconnects_timeout
-            .insert(addr, timeout)
-    }
-
-    /// Removes the reconnect timeout and returns the previous value.
-    pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
-        self.node
-            .write()
-            .expect("Expected write lock")
-            .reconnects_timeout
-            .remove(addr)
     }
 
     pub(crate) fn tx_cache_size(&self) -> usize {
