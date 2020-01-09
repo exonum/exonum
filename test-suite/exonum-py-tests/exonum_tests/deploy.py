@@ -1,11 +1,10 @@
 """Tests for Exonum service deploy mechanism based on `exonum-launcher` tool."""
 
 import unittest
-import time
 
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
-from exonum_launcher.action_result import ActionResult
+from exonum_launcher.explorer import ExecutionFailError
 
 from suite import (
     run_dev_node,
@@ -108,7 +107,8 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
 
             launcher.deploy_all()
-            launcher.wait_for_deploy()
+            with self.assertRaises(ExecutionFailError):
+                launcher.wait_for_deploy()
 
             # artifact should not be deployed because of exceeded deadline height
             for artifact in launcher.launch_state.completed_deployments():
@@ -146,11 +146,7 @@ class RegularDeployTest(unittest.TestCase):
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
 
-            self.assertEqual(len(launcher.launch_state.completed_initializations()), 1)
-            for instance in launcher.launch_state.completed_initializations():
-                self.assertEqual(
-                    explorer.wait_for_start(instance), ActionResult.Success
-                )
+            self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
     def test_deploy_regular_with_invalid_instance(self):
         """Tests the deploy mechanism in regular mode with invalid instance."""
@@ -177,15 +173,12 @@ class RegularDeployTest(unittest.TestCase):
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
-            launcher.wait_for_start()
+            with self.assertRaises(ExecutionFailError):
+                launcher.wait_for_start()
 
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
-
-            self.assertEqual(len(launcher.launch_state.completed_initializations()), 1)
-            for instance in launcher.launch_state.completed_initializations():
-                self.assertEqual(explorer.wait_for_start(instance), ActionResult.Fail)
 
     def tearDown(self):
         outputs = self.network.stop()
@@ -260,11 +253,7 @@ class DevDeployTest(unittest.TestCase):
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
 
-            self.assertEqual(len(launcher.launch_state.completed_initializations()), 1)
-            for instance in launcher.launch_state.completed_initializations():
-                self.assertEqual(
-                    explorer.wait_for_start(instance), ActionResult.Success
-                )
+            self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
     def tearDown(self):
         outputs = self.network.stop()

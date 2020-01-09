@@ -91,7 +91,8 @@ def launcher_networks(network: ExonumNetwork) -> List[Dict[str, Any]]:
         node_network = {"host": host, "ssl": False, "public-api-port": public_port, "private-api-port": private_port}
         networks.append(node_network)
 
-    return networks
+    # Temporary workaround: supervisor works in simple mode and we need only one node.
+    return networks[:1]
 
 
 def wait_network_to_start(network: ExonumNetwork) -> None:
