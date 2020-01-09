@@ -155,6 +155,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Added `ProtobufConvert` for `Verified`, `BlockProof` and `IndexProof`. (#1643)
 
+- Slash (`/`) is now allowed to be a part of artifact/instance name. (#1681)
+
 #### exonum-merkledb
 
 - MerkleDB now performs automated state aggregation allowing to construct proofs

@@ -87,6 +87,7 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
+pub use crate::config_manager::DefaultConfigManager;
 pub use structopt;
 
 use exonum::{
@@ -102,10 +103,7 @@ use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;
 
-use crate::{
-    command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult},
-    config_manager::DefaultConfigManager,
-};
+use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
 
 pub mod command;
 pub mod config;
