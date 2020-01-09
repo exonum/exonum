@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Public system API.
+//! Public part of the node REST API.
+//!
+//! Public API includes universally available endpoints, e.g., allowing to view
+//! the list of services on the current node.
 
 use exonum_api::ApiScope;
 use exonum_merkledb::access::Access;
@@ -76,17 +79,9 @@ impl DispatcherInfo {
     }
 }
 
-/// Protobuf sources query parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProtoSourcesQuery {
-    /// Artifact identifier, if specified, query returns the source files of the artifact,
-    /// otherwise it returns source files of `exonum` itself.
-    pub artifact: Option<String>,
-}
-
 /// Public system API.
 #[derive(Clone, Debug)]
-pub struct SystemApi {
+pub(super) struct SystemApi {
     blockchain: Blockchain,
     node_state: SharedNodeState,
 }

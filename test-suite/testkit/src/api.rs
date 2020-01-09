@@ -35,7 +35,7 @@ use exonum::{
     api::{self, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    node_api::public::system::DispatcherInfo,
+    node_api::public::DispatcherInfo,
 };
 
 use crate::TestKit;

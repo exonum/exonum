@@ -16,7 +16,7 @@ use exonum::{
     helpers::user_agent,
     node_api::{
         private::NodeInfo,
-        public::system::{ConsensusStatus, HealthCheckInfo, StatsInfo},
+        public::{ConsensusStatus, HealthCheckInfo, StatsInfo},
     },
 };
 use exonum_testkit::{ApiKind, TestKitBuilder};

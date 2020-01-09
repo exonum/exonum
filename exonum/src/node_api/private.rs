@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Private part of the Exonum REST API.
+//! Private part of the node REST API.
 //!
 //! Private API includes requests that are available only to the blockchain
-//! administrators, e.g. view the list of services on the current node.
+//! administrators, e.g. shutting down the node.
 
 use exonum_api::{ApiBackend, ApiScope, Error as ApiError, FutureResult};
 use exonum_crypto::PublicKey;
@@ -96,7 +96,7 @@ struct ConsensusEnabledQuery {
 
 /// Private system API.
 #[derive(Debug)]
-pub struct SystemApi {
+pub(super) struct SystemApi {
     info: NodeInfo,
     shared_api_state: SharedNodeState,
     sender: ApiSender,

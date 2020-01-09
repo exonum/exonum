@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum node API implementation.
+//! Implementation of the built-in REST API of an exonum node.
 
 use exonum_api::{ApiAggregator, ApiBuilder};
 
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
@@ -35,7 +34,7 @@ pub mod public;
 
 use self::{private::SystemApi as PrivateSystemApi, public::SystemApi};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     incoming_connections: HashSet<ConnectInfo>,
@@ -46,21 +45,6 @@ struct ApiNodeState {
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
     tx_cache_len: usize,
-}
-
-impl fmt::Debug for ApiNodeState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiNodeState")
-            .field("incoming_connections", &self.incoming_connections)
-            .field("outgoing_connections", &self.outgoing_connections)
-            .field("reconnects_timeout", &self.reconnects_timeout)
-            .field("is_enabled", &self.is_enabled)
-            .field("node_role", &self.node_role)
-            .field("majority_count", &self.majority_count)
-            .field("validators", &self.validators)
-            .field("tx_cache_len", &self.tx_cache_len)
-            .finish()
-    }
 }
 
 impl ApiNodeState {
@@ -235,6 +219,7 @@ impl SharedNodeState {
     }
 }
 
+/// Creates `ApiAggregator` with built-in APIs for a node.
 #[doc(hidden)]
 pub fn create_api_aggregator(blockchain: Blockchain, node_state: SharedNodeState) -> ApiAggregator {
     let mut aggregator = ApiAggregator::new();
@@ -244,7 +229,7 @@ pub fn create_api_aggregator(blockchain: Blockchain, node_state: SharedNodeState
 
 fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
     let mut builder = ApiBuilder::new();
-    let sender = blockchain.sender().clone();
+    let sender = blockchain.sender().to_owned();
     PrivateSystemApi::new(sender, shared_api_state.clone()).wire(builder.private_scope());
     SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
     builder
