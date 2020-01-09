@@ -14,14 +14,14 @@
 
 //! Shows how to migrate database data. The migration follows the following scenario:
 //!
-//! 1. We define the old data schema in the `v1` module and fill the database with some
-//!   random data.
-//! 2. We define the new data schema in the `v2` module.
-//! 3. We perform migration of the old data with the help of the `create_migration` method.
+//! 1. We create and fill database with random data according to schema defined in the
+//!   `migration::v1` module with the `create_initial_data` method.
+//! 2. We perform migration from the `v1` schema to the `v2` schema
+//!   with the help of the `migrate` function.
 //!   The method transforms the data in the old schema to conform to the new schema.
 //!   The old data is **not** removed at this stage; rather, it exists alongside
 //!   the migrated data. This is useful in case the migration needs to be reverted for some reason.
-//! 4. We complete the migration by calling `Fork::flush_migration`. This moves the migrated data
+//! 3. We complete the migration by calling `flush_migration`. This moves the migrated data
 //!   to its intended place and removes the old data marked for removal.
 
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
@@ -29,16 +29,18 @@ use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
 
+use std::sync::Arc;
+
 use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess, Prefixed},
+    access::{Access, AccessExt, AsReadonly, FromAccess, Prefixed, RawAccess},
     migration::{flush_migration, Migration},
-    Database, Entry, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex,
-    ProofMapIndex, ReadonlyFork, SystemSchema, TemporaryDB,
+    Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex,
+    ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,
 };
 
 const USER_COUNT: usize = 10_000;
 
-mod v1 {
+pub mod v1 {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize, BinaryValue)]
@@ -74,39 +76,50 @@ mod v1 {
     }
 }
 
-fn create_initial_data(fork: &Fork) {
-    const NAMES: &[&str] = &["Alice", "Bob", "Carol", "Dave", "Eve"];
+/// Creates initial DB with some random data.
+fn create_initial_data() -> TemporaryDB {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
 
-    let mut schema = v1::Schema::new(Prefixed::new("test", fork));
-    schema.ticker.set("XNM".to_owned());
-    schema.divisibility.set(8);
+    {
+        const NAMES: &[&str] = &["Alice", "Bob", "Carol", "Dave", "Eve"];
 
-    let mut rng = thread_rng();
-    for _ in 0..USER_COUNT {
-        let mut bytes = [0_u8; PUBLIC_KEY_LENGTH];
-        rng.fill(&mut bytes[..]);
-        let public_key = PublicKey::new(bytes);
-        let username = NAMES.choose(&mut rng).unwrap().to_string();
-        let wallet = v1::Wallet {
-            public_key,
-            username,
-            balance: rng.gen_range(0, 1_000),
-        };
-        schema.wallets.put(&public_key, wallet);
+        let mut schema = v1::Schema::new(Prefixed::new("test", &fork));
+        schema.ticker.set("XNM".to_owned());
+        schema.divisibility.set(8);
 
-        let history_len = rng.gen_range(0, 10);
-        schema
-            .histories
-            .get(&public_key)
-            .extend((0..history_len).map(|_| {
-                let mut bytes = [0_u8; HASH_SIZE];
-                rng.fill(&mut bytes[..]);
-                Hash::new(bytes)
-            }));
+        let mut rng = thread_rng();
+        for _ in 0..USER_COUNT {
+            let mut bytes = [0_u8; PUBLIC_KEY_LENGTH];
+            rng.fill(&mut bytes[..]);
+            let public_key = PublicKey::new(bytes);
+            let username = NAMES.choose(&mut rng).unwrap().to_string();
+            let wallet = v1::Wallet {
+                public_key,
+                username,
+                balance: rng.gen_range(0, 1_000),
+            };
+            schema.wallets.put(&public_key, wallet);
+
+            let history_len = rng.gen_range(0, 10);
+            schema
+                .histories
+                .get(&public_key)
+                .extend((0..history_len).map(|_| {
+                    let mut bytes = [0_u8; HASH_SIZE];
+                    rng.fill(&mut bytes[..]);
+                    Hash::new(bytes)
+                }));
+        }
     }
+
+    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
+    db.merge(fork.into_patch()).unwrap();
+
+    db
 }
 
-mod v2 {
+pub mod v2 {
     use super::*;
 
     #[derive(Debug, Serialize, Deserialize, BinaryValue, ObjectHash)]
@@ -148,76 +161,18 @@ mod v2 {
     }
 }
 
-fn create_migration(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
-    println!("\nStarted migration");
-    let old_schema = v1::Schema::new(old_data);
-    let mut new_schema = v2::Schema::new(new_data);
-
-    // Move `ticker` and `divisibility` to `config`.
-    let config = v2::Config {
-        ticker: old_schema.ticker.get().unwrap(),
-        divisibility: old_schema.divisibility.get().unwrap_or(0),
-    };
-    new_schema.config.set(config);
-    // Mark these two indexes for removal.
-    new_data.create_tombstone("ticker");
-    new_data.create_tombstone("divisibility");
-
-    // Migrate wallets.
-    for (i, (public_key, wallet)) in old_schema.wallets.iter().enumerate() {
-        if wallet.username == "Eve" {
-            // We don't like Eves 'round these parts. Remove her transaction history
-            // and don't migrate the wallet.
-            new_data.create_tombstone(("histories", &public_key));
-        } else {
-            // Merkelize the wallet history.
-            let mut history = new_schema.histories.get(&public_key);
-            history.extend(&old_schema.histories.get(&public_key));
-
-            let new_wallet = v2::Wallet {
-                username: wallet.username,
-                balance: wallet.balance,
-                history_hash: history.object_hash(),
-            };
-            new_schema.wallets.put(&public_key, new_wallet);
-        }
-
-        if i % 1_000 == 999 {
-            println!("Processed {} wallets", i + 1);
-        }
-    }
-}
-
-fn main() {
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-    create_initial_data(&fork);
-    fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
-    db.merge(fork.into_patch()).unwrap();
-
-    let fork = db.fork();
-    let new_data = Migration::new("test", &fork);
-    let old_data = Prefixed::new("test", fork.readonly());
-    {
-        let old_schema = v1::Schema::new(old_data.clone());
-        println!("Before migration:");
-        old_schema.print_wallets();
-    }
-    create_migration(new_data, old_data);
-    db.merge(fork.into_patch()).unwrap();
-
-    // For now, the old data is still present in the storage.
-    let snapshot = db.snapshot();
-    let old_schema = v1::Schema::new(Prefixed::new("test", &snapshot));
+/// Checks that we have old and new data in the storage after migration.
+fn check_data_before_flush(snapshot: &dyn Snapshot) {
+    let old_schema = v1::Schema::new(Prefixed::new("test", snapshot));
     assert_eq!(old_schema.ticker.get().unwrap(), "XNM");
     // The new data is present, too, in the unmerged form.
-    let new_schema = v2::Schema::new(Migration::new("test", &snapshot));
+    let new_schema = v2::Schema::new(Migration::new("test", snapshot));
     assert_eq!(new_schema.config.get().unwrap().ticker, "XNM");
 
-    let system_schema = SystemSchema::new(&snapshot);
+    let system_schema = SystemSchema::new(snapshot);
     let state = system_schema.state_aggregator();
     assert_eq!(state.keys().collect::<Vec<_>>(), vec!["unrelated.list"]);
-    let migration_view = Migration::new("test", &snapshot);
+    let migration_view = Migration::new("test", snapshot);
     let state = migration_view.state_aggregator();
     assert_eq!(
         state.keys().collect::<Vec<_>>(),
@@ -225,35 +180,70 @@ fn main() {
     );
     let new_state_hash = state.object_hash();
     assert_eq!(new_state_hash, migration_view.state_hash());
+}
 
-    let mut fork = db.fork();
-    flush_migration(&mut fork, "test");
-    let patch = fork.into_patch();
-
-    // Now, the new indexes have replaced the old ones.
-    let new_schema = v2::Schema::new(Prefixed::new("test", &patch));
+/// Checks that old data was replaced by new data in the storage.
+fn check_data_after_flush(view: impl RawAccess + AsReadonly + Copy) {
+    let new_schema = v2::Schema::new(Prefixed::new("test", view));
     assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
-    assert!(!patch.get_entry::<_, u8>("test.divisibility").exists());
+    assert!(!view.get_entry::<_, u8>("test.divisibility").exists());
 
     // The indexes are now aggregated in the default namespace.
-    let system_schema = SystemSchema::new(&patch);
+    let system_schema = SystemSchema::new(view);
     let state = system_schema.state_aggregator();
     assert_eq!(
         state.keys().collect::<Vec<_>>(),
         vec!["test.config", "test.wallets", "unrelated.list"]
     );
+}
+
+/// Performs common migration logic.
+pub fn perform_migration<F>(migrate: F)
+where
+    F: FnOnce(Arc<dyn Database>),
+{
+    // Creating a temporary DB and filling it with some data.
+    let db: Arc<dyn Database> = Arc::new(create_initial_data());
+
+    let fork = db.fork();
+    {
+        // State before migration.
+        let old_data = Prefixed::new("test", fork.readonly());
+        let old_schema = v1::Schema::new(old_data.clone());
+        println!("Before migration:");
+        old_schema.print_wallets();
+    }
+
+    // Execute data migration logic.
+    migrate(Arc::clone(&db));
+
+    // At this point the old data and new data are still present in the storage,
+    // but new data is in the unmerged form.
+
+    // Check that DB contains old and new data.
+    let snapshot = db.snapshot();
+    check_data_before_flush(&snapshot);
+
+    // Finalize the migration by calling `flush_migration`.
+    let mut fork = db.fork();
+    flush_migration(&mut fork, "test");
+
+    // At this point the new indexes have replaced the old ones in the fork.
+    // And indexes are aggregated in the default namespace.
+
+    // Check that indexes are updated.
+    let patch = fork.into_patch();
+    check_data_after_flush(&patch);
 
     // When the patch is merged, the situation remains the same.
     db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
-    let schema = v2::Schema::new(Prefixed::new("test", &snapshot));
-    println!("\nAfter migration:");
-    schema.print_wallets();
 
-    let system_schema = SystemSchema::new(&snapshot);
-    let state = system_schema.state_aggregator();
-    assert_eq!(
-        state.keys().collect::<Vec<_>>(),
-        vec!["test.config", "test.wallets", "unrelated.list"]
-    );
+    // Check that data was updated after merge.
+    let snapshot = db.snapshot();
+    check_data_after_flush(&snapshot);
+
+    // State after migration.
+    let schema = v2::Schema::new(Prefixed::new("test", &snapshot));
+    println!("After migration:");
+    schema.print_wallets();
 }
