@@ -14,12 +14,11 @@
 
 //! Transaction logic for `MiddlewareService`.
 
-use exonum::runtime::CoreError;
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{
-    AnyTx, CallContext, ExecutionError, GenericCall, GenericCallMut, InstanceId, MethodDescriptor,
-    TxStub,
+    AnyTx, CallContext, CoreError, ExecutionError, GenericCall, GenericCallMut, InstanceId,
+    MethodDescriptor, TxStub,
 };
 use semver::VersionReq;
 use serde_derive::*;

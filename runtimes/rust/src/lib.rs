@@ -245,9 +245,10 @@
 
 pub use exonum::runtime::{
     migrations, versioning, AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, CallType,
-    Caller, CommonError, DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
-    ExecutionStatus, InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, MethodId,
-    RuntimeIdentifier, RuntimeInstance, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    Caller, CommonError, CoreError, DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError,
+    ExecutionFail, ExecutionStatus, InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus,
+    MethodId, RuntimeIdentifier, RuntimeInstance, SnapshotExt, WellKnownRuntime,
+    SUPERVISOR_INSTANCE_ID,
 };
 
 pub use self::{
