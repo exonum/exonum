@@ -98,7 +98,6 @@ impl ExecutionError {
         self.runtime_id
     }
 
-    #[inline]
     pub(crate) fn set_runtime_id(&mut self, runtime_id: u32) -> &mut Self {
         if self.runtime_id.is_none() {
             self.runtime_id = Some(runtime_id);
@@ -111,7 +110,6 @@ impl ExecutionError {
         self.call_site.as_ref()
     }
 
-    #[inline]
     pub(crate) fn set_call_site(&mut self, call_site: impl FnOnce() -> CallSite) -> &mut Self {
         if self.call_site.is_none() {
             self.call_site = Some(call_site());

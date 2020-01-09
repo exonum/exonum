@@ -20,7 +20,7 @@ use std::fmt::Display;
 
 use crate::runtime::{ExecutionError, ExecutionFail};
 
-/// List of possible dispatcher errors.
+/// List of possible common errors.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "common")]
