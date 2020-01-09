@@ -132,6 +132,23 @@ impl StopService {
     }
 }
 
+/// Checks if method was called by transaction, and transaction author is a validator.
+fn get_validator(context: &CallContext<'_>) -> Result<PublicKey, ExecutionError> {
+    let author = context
+        .caller()
+        .author()
+        .ok_or(CommonError::UnauthorizedCaller)?;
+
+    // Verifies that transaction author is validator.
+    context
+        .data()
+        .for_core()
+        .validator_id(author)
+        .ok_or(CommonError::UnauthorizedCaller)?;
+
+    Ok(author)
+}
+
 impl SupervisorInterface<CallContext<'_>> for Supervisor {
     type Output = Result<(), ExecutionError>;
 
@@ -140,17 +157,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         mut context: CallContext<'_>,
         mut propose: ConfigPropose,
     ) -> Self::Output {
-        let author = context
-            .caller()
-            .author()
-            .ok_or(CommonError::UnauthorizedCaller)?;
-
-        // Verifies that transaction author is validator.
-        context
-            .data()
-            .for_core()
-            .validator_id(author)
-            .ok_or(CommonError::UnauthorizedCaller)?;
+        let author = get_validator(&context)?;
 
         let current_height = context.data().for_core().height();
 
@@ -201,17 +208,9 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
     }
 
     fn confirm_config_change(&self, context: CallContext<'_>, vote: ConfigVote) -> Self::Output {
-        let (_, author) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
+        let author = get_validator(&context)?;
 
-        // Verify that transaction author is a validator.
         let core_schema = context.data().for_core();
-        core_schema
-            .validator_id(author)
-            .ok_or(CommonError::UnauthorizedCaller)?;
-
         let mut schema = SchemaImpl::new(context.service_data());
         let entry = schema
             .public
@@ -251,6 +250,9 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         context: CallContext<'_>,
         deploy: DeployRequest,
     ) -> Self::Output {
+        // Verifies that transaction author is validator.
+        let author = get_validator(&context)?;
+
         deploy
             .artifact
             .validate()
@@ -263,15 +265,6 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             return Err(SupervisorCommonError::ActualFromIsPast.into());
         }
         let mut schema = SchemaImpl::new(context.service_data());
-
-        // Verifies that transaction author is validator.
-        let author = context
-            .caller()
-            .author()
-            .ok_or(CommonError::UnauthorizedCaller)?;
-        core_schema
-            .validator_id(author)
-            .ok_or(CommonError::UnauthorizedCaller)?;
 
         // Verifies that the artifact is not deployed yet.
         if context
@@ -313,6 +306,9 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         context: CallContext<'_>,
         deploy_result: DeployResult,
     ) -> Self::Output {
+        // Verifies that transaction author is validator.
+        let author = get_validator(&context)?;
+
         deploy_result
             .request
             .artifact
@@ -320,15 +316,6 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
 
         let core_schema = context.data().for_core();
-
-        // Verify that transaction author is validator.
-        let author = context
-            .caller()
-            .author()
-            .ok_or(CommonError::UnauthorizedCaller)?;
-        core_schema
-            .validator_id(author)
-            .ok_or(CommonError::UnauthorizedCaller)?;
         let current_height = core_schema.height();
 
         let schema = SchemaImpl::new(context.service_data());
