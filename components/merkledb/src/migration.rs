@@ -410,7 +410,7 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 /// [persistent iterators]: struct.PersistentIter.html
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
-    abort_handle: Arc<AtomicBool>,
+    abort_handle: AbortHandle,
     // Only equals `None` during merges.
     fork: Option<Fork>,
     namespace: String,
@@ -447,7 +447,7 @@ impl MigrationHelper {
         };
         let this = Self {
             db,
-            abort_handle: Arc::clone(&abort_handle.inner),
+            abort_handle: abort_handle.clone_inner(),
             fork: Some(fork),
             namespace: namespace.to_owned(),
         };
@@ -461,7 +461,7 @@ impl MigrationHelper {
 
     /// Checks if the migration has been aborted via `AbortHandle`.
     pub fn is_aborted(&self) -> bool {
-        self.abort_handle.load(Ordering::SeqCst)
+        self.abort_handle.inner.load(Ordering::SeqCst)
     }
 
     /// Returns full access to the new version of migrated data.
@@ -527,7 +527,7 @@ impl MigrationHelper {
     pub fn finish(self) -> Result<Hash, MigrationError> {
         let patch = self.fork.unwrap().into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
-        if self.abort_handle.load(Ordering::SeqCst) {
+        if self.abort_handle.inner.load(Ordering::SeqCst) {
             Err(MigrationError::Aborted)
         } else {
             self.db.merge(patch).map_err(MigrationError::Merge)?;
@@ -563,6 +563,12 @@ impl Drop for AbortHandle {
 }
 
 impl AbortHandle {
+    fn clone_inner(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+
     /// Returns `true` if the `MigrationHelper` associated with this handle has been dropped.
     pub fn is_finished(&self) -> bool {
         Arc::strong_count(&self.inner) <= 1
