@@ -19,12 +19,16 @@ use exonum::{
     blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{rust::ServiceFactory, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        rust::ServiceFactory, CommonError, ErrorMatch, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
+    },
 };
 
 use crate::{utils::*, IncService as ConfigChangeService};
 use exonum_supervisor::{
-    CommonError, ConfigVote, ConfigurationError, Supervisor, SupervisorInterface,
+    CommonError as SupervisorCommonError, ConfigVote, ConfigurationError, Supervisor,
+    SupervisorInterface,
 };
 
 #[test]
@@ -271,7 +275,7 @@ fn test_propose_config_change_by_incorrect_validator() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&CommonError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -308,7 +312,7 @@ fn test_confirm_config_by_incorrect_validator() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&CommonError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -434,7 +438,8 @@ fn test_incorrect_actual_from_field() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&CommonError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID)
+        ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
+            .for_service(SUPERVISOR_INSTANCE_ID)
     );
 }
 
@@ -517,7 +522,7 @@ fn test_service_config_discard_fake_supervisor() {
     let err = block.transactions[0].status().unwrap_err();
     assert_eq!(
         *err,
-        ErrorMatch::from_fail(&CommonError::UnknownAuthor).for_service(FAKE_SUPERVISOR_ID)
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(FAKE_SUPERVISOR_ID)
     );
 }
 

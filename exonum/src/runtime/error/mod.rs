@@ -41,7 +41,7 @@ mod tests;
 
 pub use self::{
     common_errors::CommonError, core_errors::CoreError, error_kind::ErrorKind,
-    execution_status::ExecutionStatus,
+    error_match::ErrorMatch, execution_status::ExecutionStatus,
 };
 
 use exonum_derive::*;
@@ -57,8 +57,6 @@ use std::{
 
 use super::{InstanceId, MethodId};
 use crate::proto::schema::runtime as runtime_proto;
-
-use self::error_match::StringMatch;
 
 /// Trait representing an error type defined in the service or runtime code.
 ///
@@ -144,42 +142,6 @@ pub struct ExecutionError {
     description: String,
     runtime_id: Option<u32>,
     call_site: Option<CallSite>,
-}
-
-/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
-/// an `ExceptionError`, e.g., in tests. The unspecified fields will match any value in the error.
-///
-/// # Examples
-///
-/// ```
-/// use exonum::runtime::{ExecutionError, InstanceId, ErrorMatch};
-/// use exonum_derive::ExecutionFail;
-///
-/// #[derive(Debug, ExecutionFail)]
-/// pub enum Error {
-///     /// Content hash already exists.
-///     HashAlreadyExists = 0,
-///     // other variants...
-/// }
-///
-/// // Identifier of the service that will cause an error.
-/// const SERVICE_ID: InstanceId = 100;
-///
-/// # fn not_run(error: ExecutionError) {
-/// let err: &ExecutionError = // ...
-/// #    &error;
-/// let matcher = ErrorMatch::from_fail(&Error::HashAlreadyExists)
-///     .for_service(SERVICE_ID);
-/// assert_eq!(*err, matcher);
-/// # }
-/// ```
-#[derive(Debug)]
-pub struct ErrorMatch {
-    kind: ErrorKind,
-    description: StringMatch,
-    runtime_id: Option<u32>,
-    instance_id: Option<InstanceId>,
-    call_type: Option<CallType>,
 }
 
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.

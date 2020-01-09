@@ -18,15 +18,15 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         rust::{RustRuntimeBuilder, ServiceFactory},
-        ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_merkledb::ObjectHash;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    ArtifactError, CommonError, ConfigPropose, DeployRequest, DeployResult, ServiceError,
-    Supervisor, SupervisorInterface,
+    ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
+    DeployResult, ServiceError, Supervisor, SupervisorInterface,
 };
 
 use crate::{
@@ -323,8 +323,8 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
-    let expected_err =
-        ErrorMatch::from_fail(&CommonError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID);
+    let expected_err = ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
+        .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
@@ -341,8 +341,8 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     let hash = start_service(&api, request);
     let block = testkit.create_block();
 
-    let expected_err =
-        ErrorMatch::from_fail(&CommonError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID);
+    let expected_err = ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
+        .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
@@ -754,7 +754,7 @@ fn test_auditor_cant_send_requests() {
             tx.status().unwrap();
         } else if *tx.content() == deploy_request_from_auditor {
             // ... but the auditor's request is failed as expected.
-            let expected_err = ErrorMatch::from_fail(&CommonError::UnknownAuthor)
+            let expected_err = ErrorMatch::from_fail(&CommonError::UnauthorizedCaller)
                 .for_service(SUPERVISOR_INSTANCE_ID);
             assert_eq!(*tx.status().unwrap_err(), expected_err);
         } else {

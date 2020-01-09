@@ -12,13 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Implementation of `ErrorMatch` methods.
+//! Implementation of matcher for `ExecutionError`.
 
 use std::fmt;
 
-use super::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail};
+use super::{CallSite, CallType, ErrorKind, ExecutionError, ExecutionFail};
 
 use crate::runtime::InstanceId;
+
+/// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
+/// an `ExceptionError`, e.g., in tests. The unspecified fields will match any value in the error.
+///
+/// # Examples
+///
+/// ```
+/// use exonum::runtime::{ExecutionError, InstanceId, ErrorMatch};
+/// use exonum_derive::ExecutionFail;
+///
+/// #[derive(Debug, ExecutionFail)]
+/// pub enum Error {
+///     /// Content hash already exists.
+///     HashAlreadyExists = 0,
+///     // other variants...
+/// }
+///
+/// // Identifier of the service that will cause an error.
+/// const SERVICE_ID: InstanceId = 100;
+///
+/// # fn not_run(error: ExecutionError) {
+/// let err: &ExecutionError = // ...
+/// #    &error;
+/// let matcher = ErrorMatch::from_fail(&Error::HashAlreadyExists)
+///     .for_service(SERVICE_ID);
+/// assert_eq!(*err, matcher);
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct ErrorMatch {
+    kind: ErrorKind,
+    description: StringMatch,
+    runtime_id: Option<u32>,
+    instance_id: Option<InstanceId>,
+    call_type: Option<CallType>,
+}
 
 impl ErrorMatch {
     /// Creates a matcher from the provided error.
@@ -126,7 +162,7 @@ impl PartialEq<ExecutionError> for ErrorMatch {
     }
 }
 
-pub(super) enum StringMatch {
+enum StringMatch {
     Any,
     Exact(String),
     Contains(String),
@@ -152,5 +188,91 @@ impl StringMatch {
             StringMatch::Contains(needle) => s.contains(needle),
             StringMatch::Generic(match_fn) => match_fn(s),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::cognitive_complexity)] // More test code is fine
+    fn execution_error_matching() {
+        let mut error = ExecutionError {
+            kind: ErrorKind::Unexpected,
+            description: "Panic!".to_string(),
+            runtime_id: None,
+            call_site: None,
+        };
+        let mut matcher = ErrorMatch {
+            kind: ErrorKind::Unexpected,
+            description: StringMatch::Any,
+            runtime_id: None,
+            instance_id: None,
+            call_type: None,
+        };
+        assert_eq!(error, matcher);
+
+        // Check various description types.
+        matcher.description = StringMatch::Exact("Panic!".to_owned());
+        assert_eq!(error, matcher);
+        matcher.description = StringMatch::Exact("Panic".to_owned());
+        assert_ne!(error, matcher);
+        matcher.description = StringMatch::Contains("nic!".to_owned());
+        assert_eq!(error, matcher);
+        matcher.description = StringMatch::Contains("nic?".to_owned());
+        assert_ne!(error, matcher);
+        matcher.description = StringMatch::Generic(Box::new(|s| s.eq_ignore_ascii_case("panic!")));
+        assert_eq!(error, matcher);
+
+        // Check `runtime_id` matching.
+        error.runtime_id = Some(1);
+        assert_eq!(error, matcher);
+        matcher.runtime_id = Some(0);
+        assert_ne!(error, matcher);
+        matcher.runtime_id = Some(1);
+        assert_eq!(error, matcher);
+
+        // Check `instance_id` matching.
+        error.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Constructor,
+        });
+        assert_eq!(error, matcher);
+        matcher.instance_id = Some(99);
+        assert_ne!(error, matcher);
+        matcher.instance_id = Some(100);
+        assert_eq!(error, matcher);
+
+        // Check `call_type` matching.
+        matcher.call_type = Some(CallType::AfterTransactions);
+        assert_ne!(error, matcher);
+        matcher.call_type = Some(CallType::Constructor);
+        assert_eq!(error, matcher);
+
+        error.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Method {
+                interface: "exonum.Configure".to_owned(),
+                id: 1,
+            },
+        });
+        matcher.call_type = None;
+        assert_eq!(error, matcher);
+        matcher.call_type = Some(CallType::Method {
+            interface: "exonum.Configure".to_owned(),
+            id: 0,
+        });
+        assert_ne!(error, matcher);
+        matcher.call_type = Some(CallType::Method {
+            interface: "exonum.v2.Configure".to_owned(),
+            id: 1,
+        });
+        assert_ne!(error, matcher);
+        matcher.call_type = Some(CallType::Method {
+            interface: "exonum.Configure".to_owned(),
+            id: 1,
+        });
+        assert_eq!(error, matcher);
     }
 }

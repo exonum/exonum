@@ -19,12 +19,10 @@ use exonum_derive::*;
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 pub enum CommonError {
-    /// Transaction author is not a validator.
-    UnknownAuthor = 0,
     /// Deadline exceeded for the current transaction.
-    DeadlineExceeded = 1,
+    DeadlineExceeded = 0,
     /// Actual height for transaction is in the past.
-    ActualFromIsPast = 2,
+    ActualFromIsPast = 1,
 }
 
 /// Artifact-related errors group.

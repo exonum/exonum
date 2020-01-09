@@ -30,8 +30,7 @@ use exonum_merkledb::access::AccessExt;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, CommonError as TxError, ConfigPropose, Configure, DeployRequest, Schema,
-    Supervisor,
+    supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, Supervisor,
 };
 
 pub fn sign_config_propose_transaction(
@@ -263,7 +262,7 @@ fn discard_config_propose_from_auditor() {
     let block = testkit.create_block_with_transaction(config_propose);
     // Verify that transaction failed.
     let expected_err =
-        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[0].status().unwrap_err(), expected_err);
 
     testkit.create_blocks_until(cfg_change_height);

@@ -20,7 +20,6 @@ use serde_json::json;
 
 use std::{any::Any, panic};
 
-use super::error_match::StringMatch;
 use super::*;
 
 fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
@@ -327,87 +326,6 @@ fn execution_result_serde_roundtrip() {
             assert_eq!(res, res2);
         }
     }
-}
-
-#[test]
-#[allow(clippy::cognitive_complexity)] // More test code is fine
-fn execution_error_matching() {
-    let mut error = ExecutionError {
-        kind: ErrorKind::Unexpected,
-        description: "Panic!".to_string(),
-        runtime_id: None,
-        call_site: None,
-    };
-    let mut matcher = ErrorMatch {
-        kind: ErrorKind::Unexpected,
-        description: StringMatch::Any,
-        runtime_id: None,
-        instance_id: None,
-        call_type: None,
-    };
-    assert_eq!(error, matcher);
-
-    // Check various description types.
-    matcher.description = StringMatch::Exact("Panic!".to_owned());
-    assert_eq!(error, matcher);
-    matcher.description = StringMatch::Exact("Panic".to_owned());
-    assert_ne!(error, matcher);
-    matcher.description = StringMatch::Contains("nic!".to_owned());
-    assert_eq!(error, matcher);
-    matcher.description = StringMatch::Contains("nic?".to_owned());
-    assert_ne!(error, matcher);
-    matcher.description = StringMatch::Generic(Box::new(|s| s.eq_ignore_ascii_case("panic!")));
-    assert_eq!(error, matcher);
-
-    // Check `runtime_id` matching.
-    error.runtime_id = Some(1);
-    assert_eq!(error, matcher);
-    matcher.runtime_id = Some(0);
-    assert_ne!(error, matcher);
-    matcher.runtime_id = Some(1);
-    assert_eq!(error, matcher);
-
-    // Check `instance_id` matching.
-    error.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Constructor,
-    });
-    assert_eq!(error, matcher);
-    matcher.instance_id = Some(99);
-    assert_ne!(error, matcher);
-    matcher.instance_id = Some(100);
-    assert_eq!(error, matcher);
-
-    // Check `call_type` matching.
-    matcher.call_type = Some(CallType::AfterTransactions);
-    assert_ne!(error, matcher);
-    matcher.call_type = Some(CallType::Constructor);
-    assert_eq!(error, matcher);
-
-    error.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Method {
-            interface: "exonum.Configure".to_owned(),
-            id: 1,
-        },
-    });
-    matcher.call_type = None;
-    assert_eq!(error, matcher);
-    matcher.call_type = Some(CallType::Method {
-        interface: "exonum.Configure".to_owned(),
-        id: 0,
-    });
-    assert_ne!(error, matcher);
-    matcher.call_type = Some(CallType::Method {
-        interface: "exonum.v2.Configure".to_owned(),
-        id: 1,
-    });
-    assert_ne!(error, matcher);
-    matcher.call_type = Some(CallType::Method {
-        interface: "exonum.Configure".to_owned(),
-        id: 1,
-    });
-    assert_eq!(error, matcher);
 }
 
 #[test]

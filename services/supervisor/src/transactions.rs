@@ -150,7 +150,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .data()
             .for_core()
             .validator_id(author)
-            .ok_or(SupervisorCommonError::UnknownAuthor)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let current_height = context.data().for_core().height();
 
@@ -210,7 +210,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
-            .ok_or(SupervisorCommonError::UnknownAuthor)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         let entry = schema
@@ -268,10 +268,10 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         let author = context
             .caller()
             .author()
-            .ok_or(SupervisorCommonError::UnknownAuthor)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
         core_schema
             .validator_id(author)
-            .ok_or(SupervisorCommonError::UnknownAuthor)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         // Verifies that the artifact is not deployed yet.
         if context
@@ -328,7 +328,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .ok_or(CommonError::UnauthorizedCaller)?;
         core_schema
             .validator_id(author)
-            .ok_or(SupervisorCommonError::UnknownAuthor)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
         let current_height = core_schema.height();
 
         let schema = SchemaImpl::new(context.service_data());

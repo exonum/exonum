@@ -525,7 +525,7 @@ fn test_explorer_add_invalid_transaction() {
     let error_body = ExecutionError::from(CoreError::IncorrectInstanceId).to_string();
     assert_matches!(
         response,
-        ApiError::BadRequest(ref body) if body == &error_body
+        ApiError::BadRequest(body) if body == error_body
     );
 }
 
