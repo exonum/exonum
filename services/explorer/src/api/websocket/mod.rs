@@ -319,9 +319,7 @@ struct Broadcast {
 
 #[derive(Debug, Message)]
 #[rtype("Result<TransactionResponse, failure::Error>")]
-struct Transaction {
-    tx: TransactionHex,
-}
+struct Transaction(TransactionHex);
 
 pub(crate) struct Server {
     subscribers: BTreeMap<SubscriptionType, HashMap<u64, Recipient<Message>>>,
@@ -501,7 +499,7 @@ impl Handler<Transaction> for Server {
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
-        let signed = SignedMessage::from_hex(message.tx)?;
+        let signed = SignedMessage::from_hex(message.0.tx_body.as_bytes())?;
         let tx_hash = signed.object_hash();
         let verified = signed.into_verified()?;
         Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
@@ -575,7 +573,7 @@ impl Session {
     fn send_transaction(&mut self, tx: TransactionHex) -> String {
         let response = self
             .server_address
-            .send(Transaction { tx })
+            .send(Transaction(tx))
             .wait()
             .map(|res| {
                 let res = res.map_err(|e| e.to_string());

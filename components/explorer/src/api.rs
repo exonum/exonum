@@ -163,10 +163,10 @@ impl TransactionHex {
     }
 }
 
-/// Transaction response.
+/// Response to a request to broadcast a transaction over the blockchain network.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct TransactionResponse {
-    /// The hex value of the transaction to be broadcasted.
+    /// The hash digest of the transaction.
     pub tx_hash: Hash,
 }
 
@@ -184,30 +184,19 @@ impl TransactionQuery {
     }
 }
 
-impl AsRef<str> for TransactionHex {
-    fn as_ref(&self) -> &str {
-        self.tx_body.as_ref()
-    }
-}
-
-impl AsRef<[u8]> for TransactionHex {
-    fn as_ref(&self) -> &[u8] {
-        self.tx_body.as_ref()
-    }
-}
-
-/// Call status response.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CallStatusResponse {
-    /// Call status
-    pub status: ExecutionStatus,
-}
-
-/// Call status query parameters to check `before_transactions` or `after_transactions` call.
+/// Query parameters to check the execution status of a `before_transactions` or
+/// `after_transactions` call.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CallStatusQuery {
     /// Height of a block.
     pub height: Height,
     /// Numerical service identifier.
     pub service_id: InstanceId,
+}
+
+/// Call status response.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CallStatusResponse {
+    /// Execution status of a call.
+    pub status: ExecutionStatus,
 }
