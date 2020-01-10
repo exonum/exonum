@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::BinaryValue;
+use exonum_merkledb::{BinaryValue, ObjectHash};
 use failure::format_err;
 use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
 use serde_json::json;
 
-use std::panic;
+use std::{any::Any, panic};
 
 use super::*;
 
@@ -30,8 +30,8 @@ fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
 fn execution_error_binary_value_round_trip() {
     let values = vec![
         (ErrorKind::Unexpected, "AAAA"),
-        (ErrorKind::Dispatcher { code: 0 }, ""),
-        (ErrorKind::Dispatcher { code: 0 }, "b"),
+        (ErrorKind::Core { code: 0 }, ""),
+        (ErrorKind::Core { code: 0 }, "b"),
         (ErrorKind::Runtime { code: 1 }, "c"),
         (ErrorKind::Service { code: 18 }, "ddc"),
     ];
@@ -249,7 +249,7 @@ fn execution_result_serde_presentation() {
     );
 
     let result = ExecutionStatus(Err(ExecutionError {
-        kind: ErrorKind::Dispatcher { code: 8 },
+        kind: ErrorKind::Core { code: 8 },
         description: "!".to_owned(),
         runtime_id: Some(0),
         call_site: Some(CallSite {
@@ -263,7 +263,7 @@ fn execution_result_serde_presentation() {
     assert_eq!(
         serde_json::to_value(result).unwrap(),
         json!({
-            "type": "dispatcher_error",
+            "type": "core_error",
             "description": "!",
             "code": 8,
             "runtime_id": 0,
@@ -281,8 +281,8 @@ fn execution_result_serde_presentation() {
 fn execution_result_serde_roundtrip() {
     let values = vec![
         Err((ErrorKind::Unexpected, "AAAA")),
-        Err((ErrorKind::Dispatcher { code: 0 }, "")),
-        Err((ErrorKind::Dispatcher { code: 0 }, "b")),
+        Err((ErrorKind::Core { code: 0 }, "")),
+        Err((ErrorKind::Core { code: 0 }, "b")),
         Err((ErrorKind::Runtime { code: 1 }, "c")),
         Err((ErrorKind::Service { code: 18 }, "ddc")),
         Ok(()),
@@ -329,87 +329,6 @@ fn execution_result_serde_roundtrip() {
 }
 
 #[test]
-#[allow(clippy::cognitive_complexity)] // More test code is fine
-fn execution_error_matching() {
-    let mut error = ExecutionError {
-        kind: ErrorKind::Unexpected,
-        description: "Panic!".to_string(),
-        runtime_id: None,
-        call_site: None,
-    };
-    let mut matcher = ErrorMatch {
-        kind: ErrorKind::Unexpected,
-        description: StringMatch::Any,
-        runtime_id: None,
-        instance_id: None,
-        call_type: None,
-    };
-    assert_eq!(error, matcher);
-
-    // Check various description types.
-    matcher.description = StringMatch::Exact("Panic!".to_owned());
-    assert_eq!(error, matcher);
-    matcher.description = StringMatch::Exact("Panic".to_owned());
-    assert_ne!(error, matcher);
-    matcher.description = StringMatch::Contains("nic!".to_owned());
-    assert_eq!(error, matcher);
-    matcher.description = StringMatch::Contains("nic?".to_owned());
-    assert_ne!(error, matcher);
-    matcher.description = StringMatch::Generic(Box::new(|s| s.eq_ignore_ascii_case("panic!")));
-    assert_eq!(error, matcher);
-
-    // Check `runtime_id` matching.
-    error.runtime_id = Some(1);
-    assert_eq!(error, matcher);
-    matcher.runtime_id = Some(0);
-    assert_ne!(error, matcher);
-    matcher.runtime_id = Some(1);
-    assert_eq!(error, matcher);
-
-    // Check `instance_id` matching.
-    error.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Constructor,
-    });
-    assert_eq!(error, matcher);
-    matcher.instance_id = Some(99);
-    assert_ne!(error, matcher);
-    matcher.instance_id = Some(100);
-    assert_eq!(error, matcher);
-
-    // Check `call_type` matching.
-    matcher.call_type = Some(CallType::AfterTransactions);
-    assert_ne!(error, matcher);
-    matcher.call_type = Some(CallType::Constructor);
-    assert_eq!(error, matcher);
-
-    error.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Method {
-            interface: "exonum.Configure".to_owned(),
-            id: 1,
-        },
-    });
-    matcher.call_type = None;
-    assert_eq!(error, matcher);
-    matcher.call_type = Some(CallType::Method {
-        interface: "exonum.Configure".to_owned(),
-        id: 0,
-    });
-    assert_ne!(error, matcher);
-    matcher.call_type = Some(CallType::Method {
-        interface: "exonum.v2.Configure".to_owned(),
-        id: 1,
-    });
-    assert_ne!(error, matcher);
-    matcher.call_type = Some(CallType::Method {
-        interface: "exonum.Configure".to_owned(),
-        id: 1,
-    });
-    assert_eq!(error, matcher);
-}
-
-#[test]
 fn str_panic() {
     let static_str = "Static string (&str)";
     let panic = make_panic(static_str);
@@ -434,7 +353,7 @@ fn box_error_panic() {
 #[test]
 fn failure_panic() {
     let error = format_err!("Failure panic");
-    let description = error.to_string().to_owned();
+    let description = error.to_string();
     let panic = make_panic(error);
     assert_eq!(ExecutionError::from_panic(panic).description, description);
 }

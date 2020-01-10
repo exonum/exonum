@@ -36,9 +36,10 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     runtime::{
-        catch_panic, AnyTx, ArtifactId, CallInfo, Dispatcher, DispatcherError, DispatcherSchema,
-        ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        catch_panic, AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher,
+        DispatcherSchema, ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId,
+        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -269,10 +270,7 @@ impl Runtime for RuntimeInspector {
         _deploy_spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
         assert!(self.available.contains(&artifact));
-        if self.deployed.contains(&artifact) {
-            let error = Err(DispatcherError::ArtifactAlreadyDeployed.into());
-            return Box::new(error.into_future());
-        }
+        assert!(!self.deployed.contains(&artifact));
 
         self.deployed.push(artifact);
         Box::new(Ok(()).into_future())
@@ -290,7 +288,7 @@ impl Runtime for RuntimeInspector {
     ) -> Result<(), ExecutionError> {
         catch_panic(|| {
             InitAction::from_bytes(parameters.into())
-                .map_err(|e| DispatcherError::MalformedArguments.with_description(e))?
+                .map_err(|e| CommonError::MalformedArguments.with_description(e))?
                 .execute(context)
         })
     }
@@ -311,7 +309,7 @@ impl Runtime for RuntimeInspector {
     ) -> Result<(), ExecutionError> {
         catch_panic(|| {
             Transaction::from_bytes(arguments.into())
-                .map_err(|e| DispatcherError::MalformedArguments.with_description(e))?
+                .map_err(|e| CommonError::MalformedArguments.with_description(e))?
                 .execute(context)
         })
     }
@@ -644,7 +642,7 @@ fn test_check_tx() {
     let incorrect_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID + 1, pk, &sk);
     assert_eq!(
         Blockchain::check_tx(&snapshot, &incorrect_tx).expect_err("Incorrect transaction"),
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
     );
 
     // Stop service instance to make correct_tx incorrect.
@@ -658,7 +656,7 @@ fn test_check_tx() {
     let snapshot = blockchain.snapshot();
     assert_eq!(
         Blockchain::check_tx(&snapshot, &correct_tx).unwrap_err(),
-        ErrorMatch::from_fail(&DispatcherError::ServiceNotActive)
+        ErrorMatch::from_fail(&CoreError::ServiceNotActive)
     );
 }
 

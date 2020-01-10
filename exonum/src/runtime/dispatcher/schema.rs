@@ -19,9 +19,9 @@ use exonum_merkledb::{
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 
-use super::{ArtifactId, Error, InstanceSpec};
 use crate::runtime::{
-    ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
+    ArtifactId, ArtifactState, ArtifactStatus, CoreError, ExecutionError, InstanceId,
+    InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
 };
 
 const ARTIFACTS: &str = "dispatcher_artifacts";
@@ -105,10 +105,10 @@ impl Schema<&Fork> {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact) {
-            return Err(Error::ArtifactAlreadyDeployed);
+            return Err(CoreError::ArtifactAlreadyDeployed.into());
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
@@ -124,22 +124,25 @@ impl Schema<&Fork> {
     }
 
     /// Adds information about a pending service instance to the schema.
-    pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
+    pub(crate) fn initiate_adding_service(
+        &mut self,
+        spec: InstanceSpec,
+    ) -> Result<(), ExecutionError> {
         self.artifacts()
             .get(&spec.artifact)
-            .ok_or(Error::ArtifactNotDeployed)?;
+            .ok_or(CoreError::ArtifactNotDeployed)?;
 
         let mut instances = self.instances();
         let mut instance_ids = self.instance_ids();
 
         // Checks that instance name doesn't exist.
         if instances.contains(&spec.name) {
-            return Err(Error::ServiceNameExists);
+            return Err(CoreError::ServiceNameExists.into());
         }
         // Checks that instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
         if instance_ids.contains(&spec.id) {
-            return Err(Error::ServiceIdExists);
+            return Err(CoreError::ServiceIdExists.into());
         }
 
         let instance_id = spec.id;
@@ -164,14 +167,14 @@ impl Schema<&Fork> {
     pub(crate) fn initiate_stopping_service(
         &mut self,
         instance_id: InstanceId,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ExecutionError> {
         let mut instances = self.instances();
         let mut modified_instances = self.modified_instances();
 
         let instance_name = self
             .instance_ids()
             .get(&instance_id)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         let mut state = instances
             .get(&instance_name)
@@ -179,11 +182,11 @@ impl Schema<&Fork> {
 
         match state.status {
             Some(InstanceStatus::Active) => {}
-            _ => return Err(Error::ServiceNotActive),
+            _ => return Err(CoreError::ServiceNotActive.into()),
         }
 
         if state.pending_status.is_some() {
-            return Err(Error::ServicePending);
+            return Err(CoreError::ServicePending.into());
         }
 
         // Modify instance status.
