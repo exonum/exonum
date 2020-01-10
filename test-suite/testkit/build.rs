@@ -12,44 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_build::{ProtoSources, ProtobufGenerator};
+use exonum_build::ProtobufGenerator;
 
 fn main() {
-    let protobuf_gen_data = [
-        (
-            "tests/inflating_currency/proto",
-            vec![
-                "tests/inflating_currency/proto".into(),
-                ProtoSources::Exonum,
-                ProtoSources::Crypto,
-            ],
-            "currency_example_protobuf_mod.rs",
-        ),
-        (
-            "tests/migrations/proto",
-            vec!["tests/migrations/proto".into()],
-            "migrations_protobuf_mod.rs",
-        ),
-        (
-            "tests/runtime_api/proto",
-            vec!["tests/runtime_api/proto".into()],
-            "test_runtime_api_protobuf_mod.rs",
-        ),
-        (
-            "tests/interfaces/proto",
-            vec![
-                "tests/interfaces/proto".into(),
-                ProtoSources::Exonum,
-                ProtoSources::Crypto,
-            ],
-            "interfaces_protobuf_mod.rs",
-        ),
-    ];
-
-    for (input_dir, includes, mod_file_name) in protobuf_gen_data.into_iter() {
-        ProtobufGenerator::with_mod_name(mod_file_name)
-            .with_input_dir(input_dir)
-            .with_includes(includes)
-            .generate();
-    }
+    ProtobufGenerator::with_mod_name("test_runtime_api_protobuf_mod.rs")
+        .with_input_dir("tests/runtime_api/proto")
+        .with_includes(&["tests/runtime_api/proto".into()])
+        .generate();
 }

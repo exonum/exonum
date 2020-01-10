@@ -23,7 +23,6 @@ use exonum_rust_runtime::{
     CallContext, DefaultInstance, Service,
 };
 
-use crate::proto;
 use exonum_supervisor::Configure;
 
 pub const SERVICE_ID: InstanceId = 512;
@@ -68,14 +67,10 @@ pub trait IncInterface<Ctx> {
 }
 
 /// Very simple test service that has one tx and one endpoint.
-/// Basically, it just counts how many time the tx was received.
+/// Basically, it just counts how many time a transaction was received.
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("IncInterface", raw = "Configure<Params = String>"))]
-#[service_factory(
-    artifact_name = "inc",
-    artifact_version = "1.0.0",
-    proto_sources = "proto"
-)]
+#[service_factory(artifact_name = "inc", artifact_version = "1.0.0")]
 pub struct IncService;
 
 impl IncInterface<CallContext<'_>> for IncService {

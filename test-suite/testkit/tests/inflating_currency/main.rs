@@ -29,7 +29,6 @@ use crate::inflating_cryptocurrency::{
 };
 
 mod inflating_cryptocurrency;
-mod proto;
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()

@@ -39,14 +39,14 @@ use failing_runtime::{FailingRuntime, FailingRuntimeError};
 mod failing_runtime {
     use std::str::FromStr;
 
+    use exonum::merkledb::Snapshot;
     use exonum::runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
         InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     };
-    use exonum_derive::*;
-    use exonum_merkledb::Snapshot;
+    use exonum_derive::ExecutionFail;
     use futures::{Future, IntoFuture};
 
     /// Runtime which can fail within deployment.
