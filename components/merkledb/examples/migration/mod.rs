@@ -24,21 +24,18 @@
 //! 3. We complete the migration by calling `flush_migration`. This moves the migrated data
 //!   to its intended place and removes the old data marked for removal.
 
-use failure::Error;
+use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
-use std::borrow::Cow;
 use std::sync::Arc;
 
-use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
-use exonum_derive::FromAccess;
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly, FromAccess, Prefixed, RawAccess},
-    impl_object_hash_for_binary_value,
     migration::{flush_migration, Migration},
-    BinaryValue, Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry,
-    ProofListIndex, ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,
+    Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex,
+    ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,
 };
 
 const USER_COUNT: usize = 10_000;
@@ -46,21 +43,12 @@ const USER_COUNT: usize = 10_000;
 pub mod v1 {
     use super::*;
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, BinaryValue)]
+    #[binary_value(codec = "bincode")]
     pub struct Wallet {
         pub public_key: PublicKey, // << removed in `v2`
         pub username: String,
         pub balance: u32,
-    }
-
-    impl BinaryValue for Wallet {
-        fn to_bytes(&self) -> Vec<u8> {
-            bincode::serialize(self).unwrap()
-        }
-
-        fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-            bincode::deserialize(bytes.as_ref()).map_err(From::from)
-        }
     }
 
     #[derive(Debug, FromAccess)]
@@ -134,40 +122,20 @@ fn create_initial_data() -> TemporaryDB {
 pub mod v2 {
     use super::*;
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Wallet {
         pub username: String,
         pub balance: u32,
         pub history_hash: Hash, // << new field
     }
 
-    impl BinaryValue for Wallet {
-        fn to_bytes(&self) -> Vec<u8> {
-            bincode::serialize(self).unwrap()
-        }
-
-        fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-            bincode::deserialize(bytes.as_ref()).map_err(From::from)
-        }
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Config {
         pub ticker: String,
         pub divisibility: u8,
     }
-
-    impl BinaryValue for Config {
-        fn to_bytes(&self) -> Vec<u8> {
-            bincode::serialize(self).unwrap()
-        }
-
-        fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-            bincode::deserialize(bytes.as_ref()).map_err(From::from)
-        }
-    }
-
-    impl_object_hash_for_binary_value! { Wallet, Config }
 
     #[derive(Debug, FromAccess)]
     pub struct Schema<T: Access> {

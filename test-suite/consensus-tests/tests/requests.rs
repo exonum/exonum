@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// use exonum::messages::{Signed, Propose, Prevote, Precommit};
-
-// use sandbox::timestamping_sandbox;
-
 // =======================
 
 // HANDLE REQUEST
@@ -55,11 +51,15 @@
 // - send different proposes
 // - not send proposes
 // - update lock
+
+use exonum::{
+    crypto::Hash,
+    helpers::{Height, ValidatorId},
+};
+
 use std::time::Duration;
 
-use exonum::helpers::{Height, ValidatorId};
 use exonum_consensus_tests::{sandbox_tests_helper::gen_timestamping_tx, timestamping_sandbox};
-use exonum_crypto::Hash;
 
 // Receive status with pool_size = 1
 // Send pool transactions request

@@ -23,7 +23,8 @@
 //! to add new artifacts.
 //!
 //! The Rust runtime does not provide any level of service isolation from the operation system.
-//! Therefore, the security audit of the artifacts that should be deployed is up to the node administrators.
+//! Therefore, the security audit of the artifacts that should be deployed is
+//! up to the node administrators.
 //!
 //! The artifact interface in the Rust runtime is represented by the
 //! [`ServiceFactory`] trait. The trait creates service instances and provides
@@ -36,17 +37,14 @@
 //! ## Minimal complete example
 //!
 //! ```
-//! use exonum::proto::schema::doc_tests;
 //! use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
 //! use exonum_derive::*;
-//! use exonum_merkledb::Snapshot;
-//! use exonum_proto::ProtobufConvert;
-//! use exonum_crypto::Hash;
+//! use serde_derive::*;
 //!
 //! // Determine the types of data that will be used in service transactions.
 //!
-//! #[derive(Debug, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
-//! #[protobuf_convert(source = "doc_tests::CreateWallet")]
+//! #[derive(Debug, PartialEq, Serialize, Deserialize, BinaryValue)]
+//! #[binary_value(codec = "bincode")]
 //! pub struct CreateWallet {
 //!     pub name: String,
 //! }
@@ -81,24 +79,24 @@
 //! // for this service factory. You should only provide a path to the generated
 //! // Protobuf schema.
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
-//! pub struct PointService;
+//! pub struct WalletService;
 //!
 //! // Do not forget to implement the `Transactions` and `Service` traits
 //! // for the service.
-//! impl Transactions<CallContext<'_>> for PointService {
+//! impl Transactions<CallContext<'_>> for WalletService {
 //!     type Output = Result<(), ExecutionError>;
 //!
 //!     fn create_wallet(
 //!         &self,
-//!         _context: CallContext<'_>,
-//!         _arg: CreateWallet,
+//!         context: CallContext<'_>,
+//!         arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
-//! #       Ok(())
+//!         Ok(())
 //!     }
 //! }
 //!
-//! impl Service for PointService {}
+//! impl Service for WalletService {}
 //! ```
 //!
 //! ## Stateful Service Definition
@@ -108,9 +106,7 @@
 //!
 //! ```
 //! # use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
-//! # use exonum_crypto::Hash;
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-//! # use exonum_merkledb::Snapshot;
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //! #   type Output;
@@ -143,7 +139,6 @@
 //!         Box::new(StatefulService::default())
 //!     }
 //! }
-//!
 //! # impl Transactions<CallContext<'_>> for StatefulService {
 //! #     type Output = Result<(), ExecutionError>;
 //! # }
@@ -194,7 +189,7 @@
 //!
 //! ```
 //! # use exonum_rust_runtime::{CallContext, ExecutionError};
-//! # use exonum_crypto::gen_keypair;
+//! # use exonum::crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;
 //! # type Transfer = String;
@@ -269,16 +264,16 @@ use exonum::{
     api::{manager::UpdateEndpoints, ApiBuilder},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
+    merkledb::Snapshot,
     runtime::{
         catch_panic,
         migrations::{DataMigrationError, MigrateData, MigrationScript},
+        versioning::Version,
         ExecutionContext, Mailbox, Runtime,
     },
 };
-use exonum_merkledb::Snapshot;
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
-use semver::Version;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 

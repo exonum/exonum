@@ -24,12 +24,11 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{
     CallContext, ExecutionError, InstanceId, Service, ServiceFactory, SnapshotExt,
 };
 use exonum_testkit::TestKitBuilder;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use exonum_time::{
     schema::TimeSchema,
@@ -38,13 +37,11 @@ use exonum_time::{
 };
 use std::sync::Arc;
 
-mod proto;
-
 /// The argument of the `MarkerInterface::mark` method.
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxMarker")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct TxMarker {
     mark: i32,
     time: DateTime<Utc>,
@@ -61,16 +58,12 @@ impl TxMarker {
 pub trait MarkerTransactions<Ctx> {
     /// Output returned by the interface methods.
     type Output;
-    /// Transaction, which must be executed no later than the specified time (field `time`).
+    /// Transaction which must be executed no later than the specified time (field `time`).
     fn mark(&self, context: Ctx, arg: TxMarker) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "marker",
-    artifact_version = "0.1.0",
-    proto_sources = "proto"
-)]
+#[service_factory(artifact_name = "marker", artifact_version = "0.1.0")]
 #[service_dispatcher(implements("MarkerTransactions"))]
 struct MarkerService;
 

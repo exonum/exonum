@@ -29,8 +29,6 @@ use std::borrow::Cow;
 
 use exonum_testkit::migrations::{MigrationTest, ScriptExt};
 
-mod proto;
-
 #[derive(Debug, Clone)]
 struct TestUser {
     full_name: Cow<'static, str>,
@@ -83,14 +81,14 @@ mod v01 {
             Fork, MapIndex,
         },
     };
-    use exonum_derive::*;
-    use exonum_proto::ProtobufConvert;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use serde_derive::{Deserialize, Serialize};
 
-    use crate::{proto, TestUser};
+    use crate::TestUser;
 
-    #[derive(Debug)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Wallet")]
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Wallet {
         pub username: String,
         pub balance: u64,
@@ -121,12 +119,12 @@ mod v01 {
 }
 
 mod v02 {
-    use exonum_crypto::PublicKey;
-    use exonum_derive::*;
-    use exonum_merkledb::{
+    use exonum::crypto::PublicKey;
+    use exonum::merkledb::{
         access::{Access, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
+    use exonum_derive::FromAccess;
 
     use crate::{v01::Wallet, TestUser};
 
@@ -161,28 +159,28 @@ mod v02 {
 }
 
 mod v05 {
-    use exonum_crypto::PublicKey;
-    use exonum_derive::*;
-    use exonum_merkledb::{
+    use exonum::crypto::PublicKey;
+    use exonum::merkledb::{
         access::{Access, AccessExt, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
-    use exonum_proto::ProtobufConvert;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use serde_derive::{Deserialize, Serialize};
 
-    use crate::{proto, TestUser};
+    use crate::TestUser;
 
-    #[derive(Debug)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Wallet_v2")]
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Wallet {
         pub first_name: String,
         pub last_name: String,
         pub balance: u64,
     }
 
-    #[derive(Debug)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Summary")]
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Summary {
         pub ticker: String,
         pub total_balance: u64,

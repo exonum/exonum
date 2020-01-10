@@ -17,14 +17,15 @@
 
 use exonum::{
     blockchain::ProposerId,
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
+    merkledb::ObjectHash,
 };
-use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_crypto::Hash;
-use exonum_merkledb::ObjectHash;
 use log::info;
 
 use std::time::Duration;
+
+use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
 
 #[test]
 fn test_queue_message_from_future_round() {

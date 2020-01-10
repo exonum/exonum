@@ -8,20 +8,17 @@ description = "A collection of tests of the Exonum consensus algorithm."
 publish = false
 
 [dependencies]
+exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
+exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+
+bincode = "1.2.1"
 bit-vec = "0.6.0"
 chrono = { version = "0.4.6", features = ["serde"] }
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-keys = { version = "0.13.0-rc.2", path = "../../components/keys" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 failure = "0.1.5"
 futures = "0.1.25"
 log = "0.4.0"
-protobuf = { version = "2.8.1", features = ["with-serde"] }
 rand = "0.7"
-
-[build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
+serde = "1.0"
+serde_derive = "1.0"

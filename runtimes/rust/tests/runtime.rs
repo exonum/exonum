@@ -12,31 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate pretty_assertions;
-
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainBuilder, BlockchainMut, Schema as CoreSchema,
     },
+    crypto::Hash,
     helpers::{generate_testnet_config, Height, ValidatorId},
+    merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema},
     messages::{AnyTx, Verified},
     runtime::{
         CallInfo, CoreError, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
         WellKnownRuntime,
     },
 };
-use exonum_crypto::Hash;
-use exonum_derive::exonum_interface;
-use exonum_derive::*;
-use exonum_merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema};
-use exonum_rust_runtime::{
-    ArtifactId, CallContext, Caller, CommonError, DefaultInstance, ErrorMatch, ExecutionError,
-    InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
-    SUPERVISOR_INSTANCE_ID,
-};
+use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use futures::{sync::mpsc, Future};
+use pretty_assertions::assert_eq;
 use serde_derive::*;
 
 use std::{
@@ -44,20 +36,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-macro_rules! impl_binary_value_for_bincode {
-    ($( $type:ty ),*) => {
-        $(
-            impl BinaryValue for $type {
-                fn to_bytes(&self) -> Vec<u8> {
-                    bincode::serialize(self).expect("Error while serializing value")
-                }
-                fn from_bytes(bytes: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-                    bincode::deserialize(bytes.as_ref()).map_err(From::from)
-                }
-            }
-        )*
-    };
-}
+use exonum_rust_runtime::{
+    ArtifactId, CallContext, Caller, DefaultInstance, CommonError, ErrorMatch, ExecutionError,
+    InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
+    SUPERVISOR_INSTANCE_ID,
+};
 
 fn add_transactions_into_pool(
     blockchain: &mut BlockchainMut,
@@ -268,24 +251,25 @@ impl WellKnownRuntime for Inspected<RustRuntime> {
     const ID: u32 = RustRuntime::ID;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 struct DeployArtifact {
     test_service_artifact: ArtifactId,
     spec: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 struct StartService {
     spec: InstanceSpec,
     constructor: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 struct StopService {
     instance_id: InstanceId,
 }
-
-impl_binary_value_for_bincode! { DeployArtifact, StartService, StopService }
 
 #[exonum_interface]
 trait ToySupervisor<Ctx> {
@@ -341,12 +325,11 @@ impl DefaultInstance for ToySupervisorService {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 pub struct Init {
     msg: String,
 }
-
-impl_binary_value_for_bincode! { Init }
 
 impl Default for Init {
     fn default() -> Self {

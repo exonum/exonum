@@ -20,23 +20,23 @@ travis-ci = { repository = "exonum/exonum" }
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-keys = { version = "0.13.0-rc.2", path = "../../components/keys" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+
 failure = "0.1.5"
+protobuf = "2.8.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-protobuf = "2.8.0"
 
 [dev-dependencies]
 exonum-explorer-service = { version = "0.13.0-rc.2", path = "../../services/explorer" }
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
 
-rand = "0.7"
-pretty_assertions = "0.6.1"
 assert_matches = "1.2.0"
+pretty_assertions = "0.6.1"
+rand = "0.7"
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
