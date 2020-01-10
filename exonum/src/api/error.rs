@@ -16,9 +16,93 @@
 
 use failure::Fail;
 use serde::Serialize;
+
+use std::collections::HashMap;
 use std::io;
 
 use crate::node::SendError;
+
+#[derive(Debug, Serialize)]
+pub enum HttpCode {
+    Unexpected,
+    BadRequest,
+    NotFound,
+}
+
+#[derive(Fail, Debug, Serialize)]
+pub struct ApiError {
+    pub http_code: HttpCode,
+    pub error_type: String,
+    pub title: String,
+    pub detail: String,
+    pub params: HashMap<String, String>,
+    pub source: String,
+    pub error_code: i8,
+}
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&serde_json::to_string(self).unwrap())
+    }
+}
+
+impl ApiError {
+    fn default() -> Self {
+        Self {
+            http_code: HttpCode::Unexpected,
+            error_type: String::new(),
+            title: String::new(),
+            detail: String::new(),
+            params: HashMap::new(),
+            source: String::new(),
+            error_code: 0,
+        }
+    }
+
+    pub fn BadRequest() -> Self {
+        Self {
+            http_code: HttpCode::BadRequest,
+            ..Self::default()
+        }
+    }
+
+    pub fn NotFound() -> Self {
+        Self {
+            http_code: HttpCode::NotFound,
+            ..Self::default()
+        }
+    }
+
+    pub fn error_type(mut self, error_type: String) -> Self {
+        self.error_type = error_type;
+        self
+    }
+
+    pub fn title(mut self, title: String) -> Self {
+        self.title = title;
+        self
+    }
+
+    pub fn detail(mut self, detail: String) -> Self {
+        self.detail = detail;
+        self
+    }
+
+    pub fn param(mut self, key: String, value: String) -> Self {
+        self.params.insert(key, value);
+        self
+    }
+
+    pub fn source(mut self, source: String) -> Self {
+        self.source = source;
+        self
+    }
+
+    pub fn error_code(mut self, error_code: i8) -> Self {
+        self.error_code = error_code;
+        self
+    }
+}
 
 /// List of possible API errors.
 #[derive(Fail, Debug)]
