@@ -211,7 +211,7 @@ impl ApiBuilder {
 }
 
 /// Exonum API access level, either private or public.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApiAccess {
     /// Public API for end users.
     Public,

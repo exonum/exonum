@@ -28,18 +28,15 @@ use crate::{backends::actix::create_app, AllowOrigin, ApiAccess, ApiAggregator, 
 pub struct WebServerConfig {
     /// The socket address to bind.
     pub listen_address: SocketAddr,
-    /// API access level.
-    pub access: ApiAccess,
     /// Optional CORS settings.
     pub allow_origin: Option<AllowOrigin>,
 }
 
 impl WebServerConfig {
-    /// Creates a web server configuration for the given listen address and access level.
-    pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
+    /// Creates a web server configuration for the given listen address.
+    pub fn new(listen_address: SocketAddr) -> Self {
         Self {
             listen_address,
-            access,
             allow_origin: None,
         }
     }
@@ -49,8 +46,9 @@ impl WebServerConfig {
 #[derive(Debug, Clone)]
 pub struct ApiManagerConfig {
     /// Active API runtimes.
-    pub api_runtimes: Vec<WebServerConfig>,
-    /// API aggregator.
+    pub servers: HashMap<ApiAccess, WebServerConfig>,
+    /// API aggregator with initial endpoint builders. The initial endpoints will not be
+    /// affected by `UpdateEndpoints` messages.
     pub api_aggregator: ApiAggregator,
     /// The interval in milliseconds between attempts of restarting HTTP-server in case
     /// the server failed to restart
@@ -61,16 +59,17 @@ pub struct ApiManagerConfig {
 
 /// Actor responsible for API management.
 pub struct ApiManager {
-    runtime_config: ApiManagerConfig,
-    api_runtime_addresses: HashMap<Addr<Server>, WebServerConfig>,
-    user_endpoints: Vec<(String, ApiBuilder)>,
+    config: ApiManagerConfig,
+    server_addresses: HashMap<ApiAccess, Addr<Server>>,
+    variable_endpoints: Vec<(String, ApiBuilder)>,
     endpoints_rx: Option<mpsc::Receiver<UpdateEndpoints>>,
 }
 
 impl fmt::Debug for ApiManager {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiManager")
-            .field("runtime_config", &self.runtime_config)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ApiManager")
+            .field("config", &self.config)
             .finish()
     }
 }
@@ -78,41 +77,40 @@ impl fmt::Debug for ApiManager {
 impl ApiManager {
     /// Creates a new API manager instance with the specified runtime configuration and
     /// the receiver of the `UpdateEndpoints` events.
-    pub fn new(
-        runtime_config: ApiManagerConfig,
-        endpoints_rx: mpsc::Receiver<UpdateEndpoints>,
-    ) -> Self {
+    pub fn new(config: ApiManagerConfig, endpoints_rx: mpsc::Receiver<UpdateEndpoints>) -> Self {
         Self {
-            runtime_config,
-            api_runtime_addresses: HashMap::new(),
-            user_endpoints: vec![],
+            config,
+            server_addresses: HashMap::new(),
+            variable_endpoints: vec![],
             endpoints_rx: Some(endpoints_rx),
         }
     }
 
     fn start_api_servers(&mut self) {
-        self.api_runtime_addresses = self
-            .runtime_config
-            .api_runtimes
+        self.server_addresses = self
+            .config
+            .servers
             .iter()
-            .cloned()
-            .map(|runtime_config| {
+            .map(|(&access, server_config)| {
                 let server_address = self
-                    .start_server(runtime_config.clone())
+                    .start_server(access, server_config.to_owned())
                     .expect("Failed to start API server");
-                (server_address, runtime_config)
+                (access, server_address)
             })
             .collect();
     }
 
-    fn start_server(&self, runtime_config: WebServerConfig) -> io::Result<Addr<Server>> {
-        let access = runtime_config.access;
-        let listen_address = runtime_config.listen_address;
+    fn start_server(
+        &self,
+        access: ApiAccess,
+        server_config: WebServerConfig,
+    ) -> io::Result<Addr<Server>> {
+        let listen_address = server_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
 
-        let mut aggregator = self.runtime_config.api_aggregator.clone();
-        aggregator.extend(self.user_endpoints.clone());
-        HttpServer::new(move || create_app(&aggregator, runtime_config.clone()))
+        let mut aggregator = self.config.api_aggregator.clone();
+        aggregator.extend(self.variable_endpoints.clone());
+        HttpServer::new(move || create_app(&aggregator, access, &server_config))
             .disable_signals()
             .bind(listen_address)
             .map(HttpServer::start)
@@ -120,11 +118,11 @@ impl ApiManager {
 
     fn initiate_restart(&mut self, manager: Addr<Self>) {
         log::info!("Restarting servers.");
-        for (addr, config) in self.api_runtime_addresses.drain() {
+        for (access, addr) in self.server_addresses.drain() {
             let manager = manager.clone();
             Arbiter::spawn(
                 addr.send(StopServer { graceful: true })
-                    .then(move |_| manager.send(StartServer { config, attempt: 0 }))
+                    .then(move |_| manager.send(StartServer { access, attempt: 0 }))
                     .map_err(|e| log::error!("Error while restarting API server: {}", e)),
             );
         }
@@ -146,7 +144,7 @@ impl Actor for ApiManager {
 
 #[derive(Debug)]
 struct StartServer {
-    config: WebServerConfig,
+    access: ApiAccess,
     attempt: u16,
 }
 
@@ -160,27 +158,29 @@ impl Handler<StartServer> for ApiManager {
     fn handle(&mut self, mut msg: StartServer, ctx: &mut Context<Self>) -> Self::Result {
         log::info!(
             "Handling server start: {:?} (attempt #{})",
-            msg.config,
+            msg.access,
             msg.attempt + 1
         );
-        let addr = match self.start_server(msg.config.clone()) {
+
+        let server_config = self.config.servers[&msg.access].clone();
+        let addr = match self.start_server(msg.access, server_config) {
             Ok(addr) => addr,
             Err(e) => {
-                log::warn!("Error handling service start {:?}: {}", msg.config, e);
-                if msg.attempt == self.runtime_config.server_restart_max_retries {
-                    log::error!("Cannot spawn server with config {:?}", msg.config);
+                log::warn!("Error handling {} server start: {}", msg.access, e);
+                if msg.attempt == self.config.server_restart_max_retries {
+                    log::error!("Cannot spawn {} server", msg.access);
                     ctx.terminate();
                 } else {
                     msg.attempt += 1;
                     ctx.notify_later(
                         msg,
-                        Duration::from_millis(self.runtime_config.server_restart_retry_timeout),
+                        Duration::from_millis(self.config.server_restart_retry_timeout),
                     );
                 }
                 return;
             }
         };
-        self.api_runtime_addresses.insert(addr, msg.config);
+        self.server_addresses.insert(msg.access, addr);
     }
 }
 
@@ -199,7 +199,7 @@ impl Message for UpdateEndpoints {
 impl StreamHandler<UpdateEndpoints, ()> for ApiManager {
     fn handle(&mut self, msg: UpdateEndpoints, ctx: &mut Context<Self>) {
         log::info!("Server restart requested");
-        self.user_endpoints = msg.user_endpoints;
+        self.variable_endpoints = msg.user_endpoints;
         self.initiate_restart(ctx.address());
     }
 }

@@ -131,7 +131,7 @@ use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fmt, iter, mem,
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -615,11 +615,14 @@ impl TestKit {
         let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
 
         let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
+        let mut servers = HashMap::new();
+        servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
+        servers.insert(
+            ApiAccess::Private,
+            WebServerConfig::new(private_api_address),
+        );
         let api_manager_config = ApiManagerConfig {
-            api_runtimes: vec![
-                WebServerConfig::new(public_api_address, ApiAccess::Public),
-                WebServerConfig::new(private_api_address, ApiAccess::Private),
-            ],
+            servers,
             api_aggregator,
             server_restart_max_retries: 5,
             server_restart_retry_timeout: 500,

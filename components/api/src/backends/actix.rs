@@ -36,7 +36,7 @@ use std::{
 
 use crate::{
     manager::{ApiManager, WebServerConfig},
-    Actuality, AllowOrigin, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
+    Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
     Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
 };
 
@@ -272,11 +272,14 @@ where
 }
 
 /// Creates `actix_web::App` for the given aggregator and runtime configuration.
-pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: WebServerConfig) -> App {
-    let access = runtime_config.access;
+pub(crate) fn create_app(
+    aggregator: &ApiAggregator,
+    access: ApiAccess,
+    runtime_config: &WebServerConfig,
+) -> App {
     let mut app = App::new();
     app = app.scope("api", |scope| aggregator.extend_backend(access, scope));
-    if let Some(allow_origin) = runtime_config.allow_origin {
+    if let Some(ref allow_origin) = runtime_config.allow_origin {
         let cors = Cors::from(allow_origin);
         app = app.middleware(cors);
     }

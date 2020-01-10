@@ -68,7 +68,7 @@ use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt,
     net::SocketAddr,
@@ -1114,31 +1114,26 @@ impl Node {
 
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
-
         let api_cfg = node_cfg.api.clone();
+
+        let mut servers = HashMap::new();
+        if let Some(listen_address) = api_cfg.public_api_address {
+            let server_config = WebServerConfig {
+                listen_address,
+                allow_origin: api_cfg.public_allow_origin.clone(),
+            };
+            servers.insert(ApiAccess::Public, server_config);
+        }
+        if let Some(listen_address) = api_cfg.private_api_address {
+            let server_config = WebServerConfig {
+                listen_address,
+                allow_origin: api_cfg.private_allow_origin.clone(),
+            };
+            servers.insert(ApiAccess::Private, server_config);
+        }
+
         let api_runtime_config = ApiManagerConfig {
-            api_runtimes: {
-                let public_api_handler = api_cfg
-                    .public_api_address
-                    .map(|listen_address| WebServerConfig {
-                        listen_address,
-                        access: ApiAccess::Public,
-                        allow_origin: api_cfg.public_allow_origin.clone(),
-                    })
-                    .into_iter();
-                let private_api_handler = api_cfg
-                    .private_api_address
-                    .map(|listen_address| WebServerConfig {
-                        listen_address,
-                        access: ApiAccess::Private,
-                        allow_origin: api_cfg.private_allow_origin.clone(),
-                    })
-                    .into_iter();
-                // Collects API handlers.
-                public_api_handler
-                    .chain(private_api_handler)
-                    .collect::<Vec<_>>()
-            },
+            servers,
             api_aggregator,
             server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
             server_restart_max_retries: node_cfg.api.server_restart.max_retries,
