@@ -89,7 +89,6 @@ impl<'a> CallContext<'a> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`supervisor_extensions` called within a non-supervisor service");
         }
-
         self.inner.supervisor_extensions()
     }
 

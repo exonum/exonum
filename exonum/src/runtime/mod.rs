@@ -112,6 +112,11 @@
 //!
 //! 6. After execution the transaction [execution status] is written into the blockchain.
 //!
+//! # Data Migration Lifecycle
+//!
+//! Service data can be migrated to a newer version of the service artifact.
+//! See [`migrations` module docs] for details.
+//!
 //! # Supervisor Service
 //!
 //! A supervisor service is a service that has additional privileges. This service
@@ -137,6 +142,7 @@
 //! [execution]: trait.Runtime.html#execute
 //! [execution status]: struct.ExecutionStatus.html
 //! [artifacts]: struct.ArtifactId.html
+//! [`migrations` module docs]: migrations/index.html
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
 
@@ -160,12 +166,13 @@ pub use error::execution_error::ExecutionErrorSerde;
 pub mod migrations;
 pub mod versioning;
 
+use exonum_merkledb::{BinaryValue, Fork, Snapshot};
 use futures::Future;
+use semver::Version;
 
 use std::fmt;
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
-
+use self::migrations::{InitMigrationError, MigrationScript};
 use crate::{
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::{Hash, PublicKey},
@@ -411,8 +418,37 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     );
+
+    /// Gets the migration script to migrate the data of the service to the state usable
+    /// by a newer version of the artifact.
+    ///
+    /// An implementation of this method should be idempotent, i.e., return the same script or error
+    /// for the same input.
+    ///
+    /// # Invariants Ensured by the Caller
+    ///
+    /// - `new_artifact` is deployed in the runtime
+    /// - `data_version < new_artifact.version`
+    ///
+    /// # Return Value
+    ///
+    /// - An error signals that the runtime does not know how to migrate the service
+    ///   to a newer version.
+    /// - `Ok(Some(_))` provides a script to execute against service data. After the script
+    ///   is executed, [`data_version`] of the service will be updated to `end_version`
+    ///   from the script. `end_version` does not need to correspond to the version of `new_artifact`,
+    ///   or to a version of an artifact deployed on the blockchain in general.
+    /// - `Ok(None)` means that the service does not require data migration. `data_version`
+    ///   of the service will be updated to the version of `new_artifact` immediately.
+    ///
+    /// [`data_version`]: struct.InstanceState.html#field.data_version
+    fn migrate(
+        &self,
+        new_artifact: &ArtifactId,
+        data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError>;
 
     /// Dispatches payload to the method of a specific service instance.
     ///
@@ -775,7 +811,7 @@ impl<'a> SupervisorExtensions<'a> {
     /// Initiates adding a service instance to the blockchain.
     ///
     /// The service is not immediately activated; it activates if / when the block containing
-    /// the activation transaction is committed.    
+    /// the activation transaction is committed.
     pub fn initiate_adding_service(
         &mut self,
         instance_spec: InstanceSpec,
@@ -797,6 +833,36 @@ impl<'a> SupervisorExtensions<'a> {
     /// Provides writeable access to core schema.
     pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
         CoreSchema::new(self.0.fork)
+    }
+
+    /// Initiates data migration.
+    pub fn initiate_migration(
+        &self,
+        new_artifact: ArtifactId,
+        old_service: &str,
+    ) -> Result<(), ExecutionError> {
+        self.0
+            .dispatcher
+            .initiate_migration(self.0.fork, new_artifact, old_service)
+    }
+
+    /// Rolls back previously initiated migration.
+    pub fn rollback_migration(&self, service_name: &str) -> Result<(), ExecutionError> {
+        Dispatcher::rollback_migration(self.0.fork, service_name)
+    }
+
+    /// Commits the result of a previously initiated migration.
+    pub fn commit_migration(
+        &self,
+        service_name: &str,
+        migration_hash: Hash,
+    ) -> Result<(), ExecutionError> {
+        Dispatcher::commit_migration(self.0.fork, service_name, migration_hash)
+    }
+
+    /// Flushes a committed migration.
+    pub fn flush_migration(&mut self, service_name: &str) -> Result<(), ExecutionError> {
+        Dispatcher::flush_migration(self.0.fork, service_name)
     }
 }
 

@@ -29,22 +29,25 @@
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
-use exonum_merkledb::{migration::MigrationHelper, Database, ObjectHash, Result as DbResult};
+use exonum_merkledb::{
+    migration::{MigrationError, MigrationHelper},
+    Database, ObjectHash,
+};
 
 use std::sync::Arc;
 
-use migration::{perform_migration, v1, v2};
-
 mod migration;
+use crate::migration::{perform_migration, v1, v2};
 
 /// Provides migration of wallets with `MigrationHelper::iter_loop`.
+///
 /// `iter_loop` is designed to allow to merge changes to the database from time to time,
 /// so we are migrating wallets in chunks here.
 ///
-/// `Wallet::public_key` field will be removed.
-/// `Wallet::history_hash` field will be added.
-/// Wallets and history from username Eve will be removed.
-fn migrate_wallets(helper: &mut MigrationHelper) -> DbResult<()> {
+/// - `Wallet::public_key` field will be removed.
+/// - `Wallet::history_hash` field will be added.
+/// - Wallets and history from username Eve will be removed.
+fn migrate_wallets(helper: &mut MigrationHelper) -> Result<(), MigrationError> {
     helper.iter_loop(|helper, iters| {
         let old_schema = v1::Schema::new(helper.old_data());
         let mut new_schema = v2::Schema::new(helper.new_data());

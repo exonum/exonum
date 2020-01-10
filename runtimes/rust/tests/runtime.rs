@@ -22,6 +22,8 @@ use exonum::{
     merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema},
     messages::{AnyTx, Verified},
     runtime::{
+        migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
         CallInfo, CoreError, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
         WellKnownRuntime,
     },
@@ -188,7 +190,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     ) {
         snapshot
             .for_dispatcher()
@@ -198,9 +200,20 @@ impl<T: Runtime> Runtime for Inspected<T> {
         let core_schema = CoreSchema::new(snapshot);
         let height = core_schema.next_height();
 
-        self.events
-            .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
+        self.events.push(RuntimeEvent::CommitService(
+            height,
+            spec.to_owned(),
+            status.to_owned(),
+        ));
         self.runtime.update_service_status(snapshot, spec, status)
+    }
+
+    fn migrate(
+        &self,
+        new_artifact: &ArtifactId,
+        data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        self.runtime.migrate(new_artifact, data_version)
     }
 
     fn execute(

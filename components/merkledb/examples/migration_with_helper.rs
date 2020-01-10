@@ -20,8 +20,9 @@
 //! and `migrate_wallets` functions.
 //!
 //! The main points of this example are:
-//! - We are creating `MigrationHelper` for the DB
-//!  that allows us to get access to the old and new data.
+//!
+//! - We are creating `MigrationHelper` for the DB that allows us to get access
+//!   to the old and new data.
 //! - We are using `MigrationHelper::finish` to merge the changes to the database.
 //! - Data migration is performed by direct access to old and new schemas.
 //!

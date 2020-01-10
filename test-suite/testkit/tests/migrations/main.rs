@@ -18,7 +18,8 @@ use exonum::crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed};
 use exonum_derive::*;
 use exonum_rust_runtime::{
     migrations::{
-        DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
+        InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
+        MigrationScript,
     },
     versioning::Version,
     Service, ServiceFactory,
@@ -222,7 +223,7 @@ mod v05 {
 }
 
 /// First migration script. Merkelizes the wallets table and records the total number of tokens.
-fn merkelize_wallets(ctx: &mut MigrationContext) {
+fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v01::Schema::new(ctx.helper.old_data());
     let mut new_schema = v02::Schema::new(ctx.helper.new_data());
 
@@ -232,31 +233,31 @@ fn merkelize_wallets(ctx: &mut MigrationContext) {
         new_schema.wallets.put(&key, wallet);
     }
     new_schema.total_balance.set(total_balance);
+    Ok(())
 }
 
 /// The alternative version of the previous migration script, which uses database merges.
-fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) {
+fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     const CHUNK_SIZE: usize = 500;
 
-    ctx.helper
-        .iter_loop(|helper, iters| {
-            let old_schema = v01::Schema::new(helper.old_data());
-            let mut new_schema = v02::Schema::new(helper.new_data());
+    ctx.helper.iter_loop(|helper, iters| {
+        let old_schema = v01::Schema::new(helper.old_data());
+        let mut new_schema = v02::Schema::new(helper.new_data());
 
-            let iter = iters.create("wallets", &old_schema.wallets);
-            let mut total_balance = 0;
-            for (key, wallet) in iter.take(CHUNK_SIZE) {
-                total_balance += wallet.balance;
-                new_schema.wallets.put(&key, wallet);
-            }
-            let prev_balance = new_schema.total_balance.get().unwrap_or(0);
-            new_schema.total_balance.set(prev_balance + total_balance);
-        })
-        .unwrap();
+        let iter = iters.create("wallets", &old_schema.wallets);
+        let mut total_balance = 0;
+        for (key, wallet) in iter.take(CHUNK_SIZE) {
+            total_balance += wallet.balance;
+            new_schema.wallets.put(&key, wallet);
+        }
+        let prev_balance = new_schema.total_balance.get().unwrap_or(0);
+        new_schema.total_balance.set(prev_balance + total_balance);
+    })?;
+    Ok(())
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
-fn transform_wallet_type(ctx: &mut MigrationContext) {
+fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v02::Schema::new(ctx.helper.old_data());
     let mut new_schema = v05::Schema::new(ctx.helper.new_data());
 
@@ -281,6 +282,7 @@ fn transform_wallet_type(ctx: &mut MigrationContext) {
         };
         new_schema.wallets.put(&key, new_wallet);
     }
+    Ok(())
 }
 
 // FIXME: add incorrect migration with DB merges and test it (ECR-4080)
@@ -295,7 +297,7 @@ impl MigrateData for MigratedService {
     fn migration_scripts(
         &self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
             .add_script(Version::new(0, 2, 0), merkelize_wallets)
             .add_script(Version::new(0, 5, 0), transform_wallet_type)

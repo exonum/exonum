@@ -36,10 +36,11 @@ use crate::{
     helpers::{generate_testnet_config, Height, ValidatorId},
     messages::Verified,
     runtime::{
-        catch_panic, AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher,
-        DispatcherSchema, ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId,
-        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
-        SUPERVISOR_INSTANCE_ID,
+        catch_panic,
+        migrations::{InitMigrationError, MigrationScript},
+        AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
+        ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -297,8 +298,16 @@ impl Runtime for RuntimeInspector {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(

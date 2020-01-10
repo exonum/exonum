@@ -37,16 +37,17 @@ use crate::{
     node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
+        migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, Caller, CoreError, DispatcherSchema, ErrorKind,
         ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, MethodId, Runtime,
+        InstanceStatus, MethodId, Runtime, RuntimeInstance,
     },
 };
 
 /// We guarantee that the genesis block will be committed by the time
 /// `Runtime::after_commit()` is called. Thus, we need to perform this commitment
 /// manually here, emulating the relevant part of `BlockchainMut::create_genesis_block()`.
-fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
+pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
     let is_genesis_block = CoreSchema::new(&fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
     dispatcher.activate_pending(&fork);
@@ -73,7 +74,6 @@ fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
 
 impl Dispatcher {
     /// Similar to `Dispatcher::execute()`, but accepts universal `caller` and `call_info`.
-    #[cfg(test)]
     pub(crate) fn call(
         &self,
         fork: &mut Fork,
@@ -108,29 +108,26 @@ enum SampleRuntimes {
 
 #[derive(Debug)]
 pub struct DispatcherBuilder {
-    dispatcher: Dispatcher,
+    runtimes: Vec<RuntimeInstance>,
 }
 
 impl DispatcherBuilder {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            dispatcher: Dispatcher {
-                runtimes: Default::default(),
-                service_infos: Default::default(),
-            },
+            runtimes: Vec::new(),
         }
     }
 
-    fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
-        self.dispatcher.runtimes.insert(id, runtime.into());
+    pub fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
+        self.runtimes.push(RuntimeInstance {
+            id,
+            instance: runtime.into(),
+        });
         self
     }
 
-    fn finalize(mut self, blockchain: &Blockchain) -> Dispatcher {
-        for runtime in self.dispatcher.runtimes.values_mut() {
-            runtime.initialize(blockchain);
-        }
-        self.dispatcher
+    pub fn finalize(self, blockchain: &Blockchain) -> Dispatcher {
+        Dispatcher::new(blockchain, self.runtimes)
     }
 }
 
@@ -215,22 +212,30 @@ impl Runtime for SampleRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        new_status: InstanceStatus,
+        new_status: &InstanceStatus,
     ) {
         if spec.artifact.runtime_id == self.runtime_type {
-            let status_changed = if let Some(status) = self.services.get(&spec.id).copied() {
+            let status_changed = if let Some(status) = self.services.get(&spec.id) {
                 status != new_status
             } else {
                 true
             };
 
             if status_changed {
-                self.services.insert(spec.id, new_status);
-                self.new_services.insert(spec.id, new_status);
+                self.services.insert(spec.id, new_status.to_owned());
+                self.new_services.insert(spec.id, new_status.to_owned());
             }
         } else {
             panic!("Incorrect runtime")
         }
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
@@ -501,8 +506,16 @@ impl Runtime for ShutdownRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
@@ -585,13 +598,14 @@ impl DeploymentRuntime {
     fn deploy_test_artifact(
         &self,
         name: &str,
+        version: &str,
         dispatcher: &mut Dispatcher,
         db: &Arc<TemporaryDB>,
     ) -> (ArtifactId, Vec<u8>) {
         let artifact = ArtifactId {
             runtime_id: 2,
             name: name.to_owned(),
-            version: Version::new(1, 0, 0),
+            version: version.parse().unwrap(),
         };
         self.mailbox_actions
             .lock()
@@ -601,6 +615,7 @@ impl DeploymentRuntime {
                 spec: Self::SPEC.to_vec(),
                 then: Box::new(|_| Box::new(Ok(()).into_future())),
             });
+
         let fork = db.fork();
         dispatcher.activate_pending(&fork);
         let patch = dispatcher.commit_block_and_notify_runtimes(fork);
@@ -683,8 +698,16 @@ impl Runtime for DeploymentRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
@@ -736,7 +759,7 @@ fn delayed_deployment() {
     db.merge_sync(patch).unwrap();
 
     // Queue an artifact for deployment.
-    let (artifact, spec) = runtime.deploy_test_artifact("good", &mut dispatcher, &db);
+    let (artifact, spec) = runtime.deploy_test_artifact("good", "1.0.0", &mut dispatcher, &db);
     // Note that deployment via `Mailbox` is currently blocking, so after the method completion
     // the artifact should be immediately marked as deployed.
     assert!(dispatcher.is_artifact_deployed(&artifact));
@@ -765,7 +788,8 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
     db.merge_sync(patch).unwrap();
 
     // Queue an artifact for deployment.
-    let (artifact, spec) = runtime.deploy_test_artifact(artifact_name, &mut dispatcher, &db);
+    let (artifact, spec) =
+        runtime.deploy_test_artifact(artifact_name, "1.0.0", &mut dispatcher, &db);
     // We should not panic during async deployment.
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
@@ -845,7 +869,8 @@ fn recoverable_error_during_deployment() {
     db.merge_sync(patch).unwrap();
 
     // Queue an artifact for deployment.
-    let (artifact, spec) = runtime.deploy_test_artifact("recoverable", &mut dispatcher, &db);
+    let (artifact, spec) =
+        runtime.deploy_test_artifact("recoverable", "1.0.0", &mut dispatcher, &db);
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,22 +12,163 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Migration tools.
+//! Data migration tools.
 //!
-//! FIXME: more details (ECR-4081)
+//! # Migrations Overview
+//!
+//! The goal of a data migration is to prepare data of an Exonum service for use with an updated
+//! version of the service business logic. In this sense, migrations fulfil the same role
+//! as migrations in traditional database management systems.
+//!
+//! Migrations are performed via [`MigrationScript`]s, which are essentially wrappers around
+//! a closure. A script takes data of a service and uses the [database capabilities] to transform
+//! it to a new version. Migration is non-destructive, i.e., does not remove the old versions
+//! of migrated indexes. Instead, new indexes are created in a separate namespace, and atomically
+//! replace the old data when the migration is flushed.
+//! (See [database docs][database capabilities] for more details.)
+//!
+//! The problems solved by the migration workflow are:
+//!
+//! - Allowing for migration to be performed in background, while the node continues to process
+//!   transactions and other requests.
+//! - Ensuring that migrations finish at finite time (i.e., at some blockchain height).
+//! - Allowing concurrent migrations for different services.
+//! - Ensuring that all nodes in the network have arrived at the same data after migration
+//!   is completed.
+//!
+//! Similar to other service lifecycle events, data migrations are managed by the [dispatcher],
+//! but are controlled by the [supervisor service].
+//!
+//! # Migration Workflow
+//!
+//! For a migration to start, the targeted service must be stopped, and a newer version of
+//! the service artifact needs to be deployed across the network.
+//!
+//! 1. Migration is *initiated* by a call from a supervisor. Once a block with this call is merged,
+//!   all nodes in the network retrieve the migration script via [`Runtime::migrate()`]
+//!   and start executing it in a background thread. The script may execute at varying speed
+//!   on different nodes. Service status changes to [`Migrating`].
+//!
+//! 2. After the script is finished on a node, its result becomes available using
+//!   the [`local_migration_result()`] method of the dispatcher schema. Nodes synchronize
+//!   these results using supervisor capabilities (e.g., via broadcasting transactions).
+//!
+//! 3. Once the consensus is built up around migration, its result is either *committed* or
+//!   the migration is *rolled back*. Right below, we consider commitment workflow; the rollback
+//!   workflow will be described slightly later.
+//!
+//! 4. Committing a migration works similarly to [artifact commitment]. It means that any node
+//!   in the network starting from a specific blockchain height must have migration completed
+//!   with a specific outcome (i.e., hash of the migrated data). A node that does not have
+//!   migration script completed by this moment will block until the script is completed.
+//!   If the local migration outcome differs from the committed one, the node will be unable
+//!   to continue participating in the network.
+//!
+//! 5. After migration commitment, migration can be *flushed*, which will replace old service data
+//!   with the migrated one. Flushing is a separate call to the dispatcher; it can
+//!   occur at any block after the migration commitment (since at this point, we guarantee that
+//!   the migration data is available and is the same on all nodes).
+//!
+//! 6. After the migration is flushed, the service returns to the [`Stopped`] status. The service
+//!   can then be resumed with the new data, or more migrations could be applied to it.
+//!
+//! If the migration is rolled back on step 3, the migrated data is erased, and the service
+//! returns to the [`Stopped`] status. The local migration result is ignored; if the migration
+//! script has not completed locally, it is aborted.
+//!
+//! Deciding when it is appropriate to commit or roll back a migration is the responsibility
+//! of the supervisor service. For example, it may commit the migration once all validators have
+//! submitted identical migration results, and roll back a migration if at least one validator
+//! has reported an error during migration or there is divergence among reported migration results.
+//!
+//! [dispatcher]: ../index.html
+//! [supervisor service]: ../index.html#supervisor-service
+//! [`MigrationScript`]: struct.MigrationScript.html
+//! [database capabilities]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/migration/
+//! [`Runtime::migrate()`]: ../trait.Runtime.html#tymethod.migrate
+//! [`Migrating`]: ../enum.InstanceStatus.html#variant.Migrating
+//! [`local_migration_result()`]: ../struct.DispatcherSchema.html#method.local_migration_result
+//! [artifact commitment]: ../index.html#artifact-lifecycle
+//! [`Stopped`]: ../enum.InstanceStatus.html#variant.Stopped
 
-use exonum_merkledb::migration::MigrationHelper;
+pub use super::types::{InstanceMigration, MigrationStatus};
+
+use exonum_merkledb::migration::{self as db_migration, MigrationHelper};
 use failure::Fail;
+use semver::Version;
 
 use std::{collections::BTreeMap, fmt};
 
-use crate::runtime::{versioning::Version, InstanceSpec};
+use crate::runtime::{CoreError, ExecutionError, ExecutionFail, InstanceSpec};
+
+type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
+
+/// Errors that can occur in a migration script.
+#[derive(Debug, Fail)]
+pub enum MigrationError {
+    /// Error has occurred in the helper code, due to either a database-level failure (e.g.,
+    /// we've run out of disc space) or the migration script getting aborted.
+    ///
+    /// Scripts should not instantiate errors of this kind.
+    #[fail(display = "{}", _0)]
+    Helper(#[fail(cause)] db_migration::MigrationError),
+
+    /// Custom error signalling that the migration cannot be completed.
+    #[fail(display = "{}", _0)]
+    Custom(String),
+}
+
+impl MigrationError {
+    /// Creates a new migration error.
+    pub fn new(cause: impl fmt::Display) -> Self {
+        MigrationError::Custom(cause.to_string())
+    }
+}
+
+impl From<db_migration::MigrationError> for MigrationError {
+    fn from(err: db_migration::MigrationError) -> Self {
+        MigrationError::Helper(err)
+    }
+}
 
 /// Atomic migration script.
+///
+/// # Return Value
+///
+/// A script returns a `Result`. If the script returns [`MigrationError`] constructed
+/// by the script, or if the script panics, then the local outcome of a migration will be set
+/// to an error. This should be considered a last resort measure; migration logic should
+/// prefer to signal inability to perform migration via [`InitMigrationError`] when the migration
+/// script is instantiated.
+///
+/// On the other hand, it is perfectly reasonable to return an error from the script
+/// if it is aborted; i.e., to bubble up errors occurring in [`MigrationHelper`].
+/// An error in this case *does not* set the local migration result.
+///
+/// # Design Recommendations
+///
+/// Migration scripts may be aborted; see [`MigrationHelper`] docs for more technical details.
+/// The [migration workflow] aborts the script if the migration is rolled back; also, all running
+/// migration scripts are aborted if the node is shut down for whatever reason. Because of this,
+/// script writers are encouraged to take aborts into account.
+///
+/// A good way to handle abortion is to merge changes to the database with sufficient frequency
+/// (e.g., approximately once per second), and to let merge errors bubble up.
+/// In this case, script abortion will lead to an error during merge, which will terminate
+/// the script timely.
+///
+/// Another reason to merge changes to the database periodically is to avoid out-of-memory errors.
+/// Since data changes are stored in RAM before the merge, *not* merging the changes can consume
+/// significant memory if the amount of migrated data is large.
+///
+/// [`MigrationError`]: enum.MigrationError.html
+/// [`InitMigrationError`]: enum.InitMigrationError.html
+/// [`MigrationHelper`]: https://docs.rs/exonum-merkledb/latest/exonum_merkledb/migration/struct.MigrationHelper.html
+/// [migration workflow]: index.html#migration-workflow
 pub struct MigrationScript {
     end_version: Version,
     name: String,
-    logic: Box<dyn FnOnce(&mut MigrationContext) + Send>,
+    logic: Box<MigrationLogic>,
 }
 
 impl fmt::Debug for MigrationScript {
@@ -44,7 +185,7 @@ impl MigrationScript {
     /// Creates a new migration script with the specified end version and implementation.
     pub fn new<F>(logic: F, end_version: Version) -> Self
     where
-        F: FnOnce(&mut MigrationContext) + Send + 'static,
+        F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
     {
         Self {
             name: format!("Migration to {}", end_version),
@@ -58,18 +199,18 @@ impl MigrationScript {
         &self.name
     }
 
-    /// Returns the version of the data after this script is applied. This version will be
-    /// as the artifact version in [`MigrationContext`] for the successive migration script
-    /// (if any).
+    /// Returns the version of the data after this script is applied. This service [`data_version`]
+    /// will be set to this value after the migration performed by this script is flushed.
     ///
     /// [`MigrationContext`]: struct.MigrationContext.html
+    /// [`data_version`]: ../struct.InstanceState.html#field.data_version
     pub fn end_version(&self) -> &Version {
         &self.end_version
     }
 
     /// Executes the script.
-    pub fn execute(self, context: &mut MigrationContext) {
-        (self.logic)(context);
+    pub fn execute(self, context: &mut MigrationContext) -> Result<(), MigrationError> {
+        (self.logic)(context)
     }
 }
 
@@ -80,16 +221,19 @@ pub struct MigrationContext {
     pub helper: MigrationHelper,
 
     /// Specification of the migrated instance.
+    pub instance_spec: InstanceSpec,
+
+    /// Version of the service data.
     ///
     /// Note that the artifact version will change with each executed [`MigrationScript`]
     /// to reflect the latest version of the service data. For example, if a [`MigrateData`]
     /// implementation produces two scripts, which migrate service data to versions
-    /// 0.5.0 and 0.6.0 respectively, then the second script will get the `instance_spec`
-    /// with the version set to 0.5.0, regardless of the original version of the instance artifact.
+    /// 0.5.0 and 0.6.0 respectively, then the second script will get the `data_version`
+    /// set to 0.5.0, regardless of the original version of the instance artifact.
     ///
     /// [`MigrationScript`]: struct.MigrationScript.html
     /// [`MigrateData`]: trait.MigrateData.html
-    pub instance_spec: InstanceSpec,
+    pub data_version: Version,
 }
 
 /// Encapsulates data migration logic.
@@ -100,12 +244,13 @@ pub trait MigrateData {
     /// be executed successively in the specified order, flushing the migration to the DB
     /// after each script is completed.
     ///
-    /// Scripts are not expected to fail; the failure should be eagerly signalled via an error.
+    /// Inability to migrate data should be eagerly signalled via an [`InitMigrationError`]
+    /// returned from this method whenever this is possible. In other words, it should not
+    /// be signalled via an error *within* the script.
     ///
     /// # Expectations
     ///
-    /// The following constraints are expected from the migration scripts, although are currently
-    /// not checked by the core:
+    /// The following constraints are expected from the migration scripts:
     ///
     /// - Scripts should be ordered by increasing [`end_version()`]
     /// - The `end_version` of the initial script should be greater than `start_version`
@@ -119,15 +264,17 @@ pub trait MigrateData {
     /// or too new.
     ///
     /// [`end_version()`]: struct.MigrationScript.html#method.end_version
+    /// [`InitMigrationError`]: enum.InitMigrationError.html
     fn migration_scripts(
         &self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError>;
+    ) -> Result<Vec<MigrationScript>, InitMigrationError>;
 }
 
-/// Errors that can occur during data migrations.
+/// Errors that can occur when initiating a data migration. This error indicates that the migration
+/// cannot be started.
 #[derive(Debug, Fail)]
-pub enum DataMigrationError {
+pub enum InitMigrationError {
     /// The start version is too far in the past.
     #[fail(
         display = "The provided start version is too far in the past; \
@@ -157,6 +304,12 @@ pub enum DataMigrationError {
     /// Data migrations are not supported by the artifact.
     #[fail(display = "Data migrations are not supported by the artifact")]
     NotSupported,
+}
+
+impl From<InitMigrationError> for ExecutionError {
+    fn from(err: InitMigrationError) -> Self {
+        CoreError::NoMigration.with_description(err)
+    }
 }
 
 /// Linearly ordered migrations.
@@ -242,7 +395,7 @@ impl LinearMigrations {
     ///   constructor.
     pub fn add_script<F>(mut self, version: Version, script: F) -> Self
     where
-        F: FnOnce(&mut MigrationContext) + Send + 'static,
+        F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
     {
         self.check_prerelease(&version);
         assert!(
@@ -256,28 +409,32 @@ impl LinearMigrations {
         self
     }
 
+    fn check(&self, start_version: &Version) -> Result<(), InitMigrationError> {
+        if !self.support_prereleases && start_version.is_prerelease() {
+            let msg = "the start version is a prerelease".to_owned();
+            return Err(InitMigrationError::UnsupportedStart(msg));
+        }
+        if *start_version > self.latest_version {
+            return Err(InitMigrationError::FutureStartVersion {
+                max_supported_version: self.latest_version.clone(),
+            });
+        }
+        if let Some(ref min_supported_version) = self.min_start_version {
+            if start_version < min_supported_version {
+                return Err(InitMigrationError::OldStartVersion {
+                    min_supported_version: min_supported_version.to_owned(),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Selects a list of migration scripts based on the provided start version of the artifact.
     pub fn select(
         self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        if !self.support_prereleases && start_version.is_prerelease() {
-            let msg = "the start version is a prerelease".to_owned();
-            return Err(DataMigrationError::UnsupportedStart(msg));
-        }
-        if *start_version > self.latest_version {
-            return Err(DataMigrationError::FutureStartVersion {
-                max_supported_version: self.latest_version,
-            });
-        }
-        if let Some(min_supported_version) = self.min_start_version {
-            if *start_version < min_supported_version {
-                return Err(DataMigrationError::OldStartVersion {
-                    min_supported_version,
-                });
-            }
-        }
-
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        self.check(start_version)?;
         Ok(self
             .scripts
             .into_iter()
@@ -307,39 +464,42 @@ mod tests {
 
     const ARTIFACT_NAME: &str = "service.test.Migration";
 
-    fn migration_02(context: &mut MigrationContext) {
+    fn migration_02(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
-        assert!(context.instance_spec.artifact.version < Version::new(0, 2, 0));
+        assert!(context.data_version < Version::new(0, 2, 0));
 
         let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
         assert!(!old_entry.exists());
         let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(1);
+        Ok(())
     }
 
-    fn migration_05(context: &mut MigrationContext) {
+    fn migration_05(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
-        assert!(context.instance_spec.artifact.version >= Version::new(0, 2, 0));
-        assert!(context.instance_spec.artifact.version < Version::new(0, 5, 0));
+        assert!(context.data_version >= Version::new(0, 2, 0));
+        assert!(context.data_version < Version::new(0, 5, 0));
 
         let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
         assert_eq!(old_entry.get(), Some(1));
         let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(2);
+        Ok(())
     }
 
-    fn migration_06(context: &mut MigrationContext) {
+    fn migration_06(context: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(context.instance_spec.name, "test");
         assert_eq!(context.instance_spec.artifact.name, ARTIFACT_NAME);
-        assert!(context.instance_spec.artifact.version >= Version::new(0, 5, 0));
-        assert!(context.instance_spec.artifact.version < Version::new(0, 6, 0));
+        assert!(context.data_version >= Version::new(0, 5, 0));
+        assert!(context.data_version < Version::new(0, 6, 0));
 
         let old_entry = context.helper.old_data().get_proof_entry::<_, u32>("entry");
         assert_eq!(old_entry.get(), Some(2));
         let mut new_entry = context.helper.new_data().get_proof_entry::<_, u32>("entry");
         new_entry.set(3);
+        Ok(())
     }
 
     fn create_linear_migrations() -> LinearMigrations {
@@ -355,21 +515,23 @@ mod tests {
         scripts: Vec<MigrationScript>,
     ) -> Box<dyn Snapshot> {
         let db = Arc::new(db);
+        let instance_spec = InstanceSpec {
+            id: 100,
+            name: "test".to_string(),
+            artifact: ArtifactId {
+                runtime_id: RuntimeIdentifier::Rust as _,
+                name: ARTIFACT_NAME.to_owned(),
+                version: start_version.clone(),
+            },
+        };
         let mut version = start_version;
         let mut migration_hashes = HashSet::new();
 
         for script in scripts {
             let mut context = MigrationContext {
                 helper: MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test"),
-                instance_spec: InstanceSpec {
-                    id: 100,
-                    name: "test".to_string(),
-                    artifact: ArtifactId {
-                        runtime_id: RuntimeIdentifier::Rust as _,
-                        name: ARTIFACT_NAME.to_owned(),
-                        version: version.clone(),
-                    },
-                },
+                instance_spec: instance_spec.clone(),
+                data_version: version.clone(),
             };
 
             let next_version = script.end_version().to_owned();
@@ -381,7 +543,7 @@ mod tests {
             );
             version = next_version;
 
-            script.execute(&mut context);
+            script.execute(&mut context).unwrap();
             let migration_hash = context.helper.finish().unwrap();
             // Since the migration contains `ProofEntry`, its hash should be non-trivial.
             assert_ne!(migration_hash, Hash::zero());
@@ -435,7 +597,7 @@ mod tests {
         let migrations = create_linear_migrations();
         let start_version: Version = "0.2.0-pre.2".parse().unwrap();
         let err = migrations.select(&start_version).unwrap_err();
-        assert_matches!(err, DataMigrationError::UnsupportedStart(_));
+        assert_matches!(err, InitMigrationError::UnsupportedStart(_));
     }
 
     #[test]
@@ -458,7 +620,7 @@ mod tests {
         let err = migrations.select(&start_version).unwrap_err();
         assert_matches!(
             err,
-            DataMigrationError::FutureStartVersion { ref max_supported_version }
+            InitMigrationError::FutureStartVersion { ref max_supported_version }
                 if *max_supported_version == Version::new(0, 6, 3)
         );
 
@@ -469,7 +631,7 @@ mod tests {
         let err = migrations.select(&start_version).unwrap_err();
         assert_matches!(
             err,
-            DataMigrationError::OldStartVersion { ref min_supported_version }
+            InitMigrationError::OldStartVersion { ref min_supported_version }
                 if *min_supported_version == Version::new(0, 4, 0)
         );
     }
@@ -480,21 +642,24 @@ mod tests {
 
         LinearMigrations::with_prereleases(Version::new(0, 3, 2))
             .add_script(pre_version.clone(), move |ctx| {
-                let start_version = &ctx.instance_spec.artifact.version;
+                let start_version = &ctx.data_version;
                 assert!(*start_version < pre_version_);
                 ctx.helper.new_data().get_proof_entry("v02pre").set(1_u8);
+                Ok(())
             })
             .add_script(Version::new(0, 2, 0), move |ctx| {
-                let start_version = &ctx.instance_spec.artifact.version;
+                let start_version = &ctx.data_version;
                 assert!(*start_version >= pre_version);
                 assert!(*start_version < Version::new(0, 2, 0));
                 ctx.helper.new_data().get_proof_entry("v02").set(2_u8);
+                Ok(())
             })
             .add_script(Version::new(0, 3, 0), |ctx| {
-                let start_version = &ctx.instance_spec.artifact.version;
+                let start_version = &ctx.data_version;
                 assert!(*start_version >= Version::new(0, 2, 0));
                 assert!(*start_version < Version::new(0, 3, 0));
                 ctx.helper.new_data().get_proof_entry("v03").set(3_u8);
+                Ok(())
             })
     }
 

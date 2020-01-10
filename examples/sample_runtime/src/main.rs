@@ -22,9 +22,10 @@ use exonum::{
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
-    messages::Verified,
     node::{Node, NodeApiConfig, NodeChannel, NodeConfig},
     runtime::{
+        migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
         AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
         InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
@@ -35,7 +36,7 @@ use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 use futures::{Future, IntoFuture};
 
-use std::{cell::Cell, collections::btree_map::BTreeMap, thread, time::Duration};
+use std::{cell::Cell, collections::BTreeMap, thread, time::Duration};
 
 /// Service instance with a counter.
 #[derive(Debug, Default)]
@@ -123,7 +124,7 @@ impl Runtime for SampleRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     ) {
         match status {
             InstanceStatus::Active => {
@@ -139,7 +140,19 @@ impl Runtime for SampleRuntime {
                 let instance = self.started_services.remove(&spec.id);
                 println!("Stopping service {}: {:?}", spec, instance);
             }
+
+            InstanceStatus::Migrating(_) => {
+                // We don't migrate service data in this demo.
+            }
         }
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(
@@ -336,33 +349,25 @@ fn main() {
         let instance_id = state.spec.id;
         // Send an update counter transaction.
         api_sender
-            .broadcast_transaction(Verified::from_value(
+            .broadcast_transaction(
                 AnyTx {
-                    call_info: CallInfo {
-                        instance_id,
-                        method_id: 0,
-                    },
+                    call_info: CallInfo::new(instance_id, 0),
                     arguments: 1_000_u64.into_bytes(),
-                },
-                service_keypair.0,
-                &service_keypair.1,
-            ))
+                }
+                .sign(service_keypair.0, &service_keypair.1),
+            )
             .wait()
             .unwrap();
         thread::sleep(Duration::from_secs(2));
         // Send a reset counter transaction.
         api_sender
-            .broadcast_transaction(Verified::from_value(
+            .broadcast_transaction(
                 AnyTx {
-                    call_info: CallInfo {
-                        instance_id,
-                        method_id: 1,
-                    },
+                    call_info: CallInfo::new(instance_id, 1),
                     arguments: Vec::default(),
-                },
-                service_keypair.0,
-                &service_keypair.1,
-            ))
+                }
+                .sign(service_keypair.0, &service_keypair.1),
+            )
             .wait()
             .unwrap();
 

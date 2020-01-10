@@ -55,12 +55,11 @@ impl ExecutionError {
         Self::new(ErrorKind::Service { code }, description)
     }
 
-    /// Creates an execution error from the panic description.
-    pub(super) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+    /// Tries to get a meaningful description from the given panic.
+    pub(crate) fn description_from_panic(any: impl AsRef<(dyn Any + Send)>) -> String {
         let any = any.as_ref();
 
-        // Tries to get a meaningful description from the given panic.
-        let description = if let Some(s) = any.downcast_ref::<&str>() {
+        if let Some(s) = any.downcast_ref::<&str>() {
             s.to_string()
         } else if let Some(s) = any.downcast_ref::<String>() {
             s.clone()
@@ -71,8 +70,12 @@ impl ExecutionError {
         } else {
             // Unknown error kind; keep its description empty.
             String::new()
-        };
+        }
+    }
 
+    /// Creates an execution error from the panic description.
+    pub(super) fn from_panic(any: impl AsRef<(dyn Any + Send)>) -> Self {
+        let description = Self::description_from_panic(any);
         Self::new(ErrorKind::Unexpected, description)
     }
 
