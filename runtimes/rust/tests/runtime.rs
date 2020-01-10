@@ -37,7 +37,7 @@ use std::{
 };
 
 use exonum_rust_runtime::{
-    ArtifactId, CallContext, Caller, DefaultInstance, CommonError, ErrorMatch, ExecutionError,
+    ArtifactId, CallContext, Caller, CommonError, DefaultInstance, ErrorMatch, ExecutionError,
     InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
     SUPERVISOR_INSTANCE_ID,
 };
