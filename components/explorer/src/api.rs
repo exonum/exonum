@@ -184,6 +184,12 @@ impl TransactionQuery {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct TestEndpointQuery {
+    /// The hash of the transaction to be searched.
+    pub hash: Hash,
+}
+
 /// Query parameters to check the execution status of a `before_transactions` or
 /// `after_transactions` call.
 #[derive(Debug, Serialize, Deserialize, Clone)]

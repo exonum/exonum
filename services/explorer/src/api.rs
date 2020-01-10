@@ -386,7 +386,7 @@ pub use exonum_explorer::{
 };
 
 use exonum::{
-    api::{Error as ApiError, FutureResult},
+    api::{error::ApiError as HttpApiError, Error as ApiError, FutureResult},
     blockchain::{Blockchain, CallInBlock, Schema},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
@@ -529,6 +529,22 @@ impl ExplorerApi {
         Ok(CallStatusResponse { status })
     }
 
+    pub fn test_endpoint(
+        _schema: Schema<&dyn Snapshot>,
+        query: TransactionQuery,
+    ) -> Result<CallStatusResponse, HttpApiError> {
+        let response = HttpApiError::BadRequest()
+            .error_type("test_endpoint failed".to_string())
+            .title("test_endpoint error title".to_string())
+            .detail(format!(
+                "Trying to access test_endpoint with query {}",
+                query.hash
+            ))
+            .error_code(42)
+            .param("query_hash".to_string(), query.hash.to_string());
+        Err(response)
+    }
+
     /// Returns call status of `before_transactions` hook.
     fn before_transactions_status(
         schema: Schema<&dyn Snapshot>,
@@ -584,6 +600,7 @@ impl ExplorerApi {
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
             .endpoint("v1/blocks", |state, query| {
+                println!("Explorer::endpoint::blocks");
                 Self::blocks(state.data().for_core(), query)
             })
             .endpoint("v1/block", |state, query| {
@@ -600,6 +617,10 @@ impl ExplorerApi {
             })
             .endpoint("v1/transactions", |state, query| {
                 Self::transaction_info(state.data().for_core(), query)
+            })
+            .endpoint_new("v1/test_endpoint", |state, query| {
+                println!("Explorer::endpoint::test_endpoint");
+                Self::test_endpoint(state.data().for_core(), query)
             });
 
         let tx_sender = self.blockchain.sender().to_owned();
