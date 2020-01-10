@@ -89,7 +89,9 @@ impl BinaryValue for Transfer {
 pub trait ExplorerTransactions<Ctx> {
     type Output;
 
+    #[interface_method(id = 0)]
     fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+    #[interface_method(id = 1)]
     fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use darling::FromMeta;
+use darling::{self, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
@@ -21,6 +21,7 @@ use syn::{
     NestedMeta, Receiver, ReturnType, TraitItem, TraitItemMethod, Type,
 };
 
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 use super::{find_meta_attrs, RustRuntimeCratePath};
@@ -164,6 +165,27 @@ impl TryFrom<&[Attribute]> for ExonumServiceAttrs {
     }
 }
 
+#[derive(Debug, FromMeta)]
+struct MethodIdAttr {
+    id: u32,
+}
+
+impl TryFrom<&[Attribute]> for MethodIdAttr {
+    type Error = darling::Error;
+
+    fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
+        find_meta_attrs("interface_method", args)
+            .map(|meta| Self::from_nested_meta(&meta))
+            .unwrap_or_else(|| {
+                let msg = format!(
+                    "Unable to find method ID mapping for method. \
+                     It should be specified, e.g. `#[interface_method(id = 0)]`",
+                );
+                return Err(darling::Error::custom(msg));
+            })
+    }
+}
+
 #[derive(Debug)]
 struct ExonumService {
     item_trait: ItemTrait,
@@ -194,14 +216,21 @@ impl ExonumService {
         // Process trait methods.
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
-        let mut method_id = 0;
+        let mut used_method_ids = HashSet::new();
 
         for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
+                    let id_attr = MethodIdAttr::try_from(method.attrs.as_ref())?;
+                    let method_id = id_attr.id;
+
+                    if !used_method_ids.insert(method_id) {
+                        let msg = format!("Method ID {} is already used", method_id);
+                        return Err(darling::Error::custom(msg).with_span(&method.sig));
+                    }
+
                     let method = ServiceMethodDescriptor::try_from(method_id, ctx_ident, method)?;
                     methods.push(method);
-                    method_id += 1;
                 }
                 TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {

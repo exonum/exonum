@@ -27,6 +27,7 @@ pub const DATA_SIZE: usize = 64;
 #[exonum_interface]
 pub trait Timestamping<Ctx> {
     type Output;
+    #[interface_method(id = 0)]
     fn timestamp(&self, ctx: Ctx, arg: Vec<u8>) -> Self::Output;
 }
 

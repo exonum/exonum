@@ -28,6 +28,7 @@ pub const SERVICE_NAME: &str = "after-commit";
 #[exonum_interface]
 pub trait AfterCommitInterface<Ctx> {
     type Output;
+    #[interface_method(id = 0)]
     fn after_commit(&self, ctx: Ctx, height: u64) -> Self::Output;
 }
 

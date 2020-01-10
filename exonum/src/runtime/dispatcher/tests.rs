@@ -202,6 +202,11 @@ impl Runtime for SampleRuntime {
         id.runtime_id == self.runtime_type
     }
 
+    fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+        // Not implemented for test runtime.
+        vec![]
+    }
+
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
@@ -367,7 +372,7 @@ fn test_dispatcher_simple() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+            &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID, ""),
             &tx_payload,
         )
         .expect_err("Rust service should not be active yet");
@@ -411,7 +416,7 @@ fn test_dispatcher_simple() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
+            &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID, ""),
             &tx_payload,
         )
         .expect("Correct tx rust");
@@ -419,7 +424,7 @@ fn test_dispatcher_simple() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
+            &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID, ""),
             &tx_payload,
         )
         .expect_err("Incorrect tx rust");
@@ -427,7 +432,7 @@ fn test_dispatcher_simple() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
+            &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID, ""),
             &tx_payload,
         )
         .expect("Correct tx java");
@@ -435,7 +440,7 @@ fn test_dispatcher_simple() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
+            &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID, ""),
             &tx_payload,
         )
         .expect_err("Incorrect tx java");
@@ -492,6 +497,11 @@ impl Runtime for ShutdownRuntime {
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
         false
+    }
+
+    fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+        // Not implemented for test runtime.
+        vec![]
     }
 
     fn initiate_adding_service(
@@ -674,6 +684,11 @@ impl Runtime for DeploymentRuntime {
             .copied()
             .unwrap_or_default()
             .is_deployed
+    }
+
+    fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+        // Not implemented for test runtime.
+        vec![]
     }
 
     fn initiate_adding_service(
@@ -932,7 +947,7 @@ fn stopped_service_workflow() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
+            &CallInfo::new(instance_id, 0, ""),
             &[],
         )
         .expect("Service is not stopped yet, transaction should be processed");
@@ -958,7 +973,7 @@ fn stopped_service_workflow() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
+            &CallInfo::new(instance_id, 0, ""),
             &[],
         )
         .expect_err("Service was stopped, transaction shouldn't be processed");
@@ -1004,7 +1019,7 @@ fn stopped_service_workflow() {
         .call(
             &mut fork,
             Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
+            &CallInfo::new(instance_id, 0, ""),
             &[],
         )
         .expect_err("Service was stopped before restart, transaction shouldn't be processed");

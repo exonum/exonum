@@ -88,7 +88,9 @@ impl GenericCall<InstanceId> for ArtifactReq {
 ///     #[exonum_interface]
 ///     pub trait Token<Ctx> {
 ///         type Output;
+///         #[interface_method(id = 0)]
 ///         fn create_wallet(&self, ctx: Ctx, owner: String) -> Self::Output;
+///         #[interface_method(id = 1)]
 ///         fn burn(&self, ctx: Ctx, amount: u64) -> Self::Output;
 ///         // Other methods...
 ///     }
@@ -160,6 +162,7 @@ pub trait MiddlewareInterface<Ctx> {
     /// # Authorization
     ///
     /// The inner call is authorized in the same way as the `checked_call`.
+    #[interface_method(id = 0)]
     fn checked_call(&self, context: Ctx, arg: CheckedCall) -> Self::Output;
 
     /// Performs batch execution of several transactions. Transactions are executed
@@ -170,6 +173,7 @@ pub trait MiddlewareInterface<Ctx> {
     /// # Authorization
     ///
     /// All transactions are authorized in the same way as the `batch` call itself.
+    #[interface_method(id = 1)]
     fn batch(&self, context: Ctx, arg: Batch) -> Self::Output;
 }
 
@@ -221,7 +225,7 @@ fn checked_call_in_json() {
         artifact_name: "test-artifact".to_string(),
         artifact_version: "^1.0.0".parse().unwrap(),
         inner: AnyTx {
-            call_info: CallInfo::new(100, 0),
+            call_info: CallInfo::new(100, 0, "".into()),
             arguments: vec![],
         },
     };

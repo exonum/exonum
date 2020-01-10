@@ -187,6 +187,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.runtime.is_artifact_deployed(id)
     }
 
+    fn interfaces(&self, id: InstanceId) -> Vec<String> {
+        self.runtime.interfaces(id)
+    }
+
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
@@ -291,8 +295,11 @@ impl_binary_value_for_bincode! { DeployArtifact, StartService, StopService }
 trait ToySupervisor<Ctx> {
     type Output;
 
+    #[interface_method(id = 0)]
     fn deploy_artifact(&self, context: Ctx, request: DeployArtifact) -> Self::Output;
+    #[interface_method(id = 1)]
     fn start_service(&self, context: Ctx, request: StartService) -> Self::Output;
+    #[interface_method(id = 2)]
     fn stop_service(&self, context: Ctx, request: StopService) -> Self::Output;
 }
 
@@ -359,7 +366,9 @@ impl Default for Init {
 #[exonum_interface]
 trait Test<Ctx> {
     type Output;
+    #[interface_method(id = 0)]
     fn method_a(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    #[interface_method(id = 1)]
     fn method_b(&self, ctx: Ctx, arg: u64) -> Self::Output;
 }
 

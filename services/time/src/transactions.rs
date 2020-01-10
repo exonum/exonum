@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
+use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{CallContext, ExecutionError};
 use serde::{Deserialize, Serialize};
@@ -51,7 +51,9 @@ impl TxTime {
 pub trait TimeOracleInterface<Ctx> {
     /// Output of the methods in this interface.
     type Output;
+
     /// Receives a new time from one of validators.
+    #[interface_method(id = 0)]
     fn report_time(&self, ctx: Ctx, arg: TxTime) -> Self::Output;
 }
 

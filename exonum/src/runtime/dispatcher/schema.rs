@@ -89,6 +89,11 @@ impl<T: Access> Schema<T> {
     pub fn get_artifact(&self, name: &ArtifactId) -> Option<ArtifactState> {
         self.artifacts().get(name)
     }
+
+    // /// Returns all the services which implement the provided interface.
+    // pub fn get_instances_by_interface(&self, interface_name: &'static str) -> Vec<InstanceState> {
+    //    self.instances().filter
+    //}
 }
 
 // `AsReadonly` specialization to ensure that we won't leak mutable schema access.

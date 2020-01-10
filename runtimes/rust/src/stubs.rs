@@ -107,7 +107,7 @@ impl GenericCall<InstanceId> for TxStub {
             panic!("Creating transactions with non-default interface is not yet supported");
         }
 
-        let call_info = CallInfo::new(instance_id, method.id);
+        let call_info = CallInfo::new(instance_id, method.id, method.interface_name);
         AnyTx {
             call_info,
             arguments: args,

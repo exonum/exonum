@@ -28,6 +28,9 @@ message CallInfo {
   uint32 instance_id = 1;
   // Identifier of the method in the service interface required for the call.
   uint32 method_id = 2;
+  // Identifier of the interface of service. Should be an empty string for primary
+  // service interface.
+  string interface = 3;
 }
 
 message AnyTx {

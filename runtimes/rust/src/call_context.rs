@@ -105,10 +105,7 @@ impl<'a> CallContext<'a> {
             .get_service(called_id)
             .ok_or(DispatcherError::IncorrectInstanceId)?;
 
-        let call_info = CallInfo {
-            instance_id: descriptor.id,
-            method_id: method.id,
-        };
+        let call_info = CallInfo::new(descriptor.id, method.id, method.interface_name);
 
         let caller = if fallthrough_auth {
             None

@@ -88,22 +88,33 @@ struct ServiceDispatcher {
     generics: Generics,
 }
 
+/// Transforms the interface object into token stream representing the interface trait.
+fn interface_trait(
+    cr: &RustRuntimeCratePath,
+    interface: &ServiceInterface,
+) -> proc_macro2::TokenStream {
+    let ctx = quote!(#cr::CallContext<'_>);
+    let res = quote!(std::result::Result<(), #cr::ExecutionError>);
+    let trait_name = &interface.path;
+    let interface_trait = if interface.is_raw {
+        quote!(dyn #trait_name)
+    } else {
+        quote!(dyn #trait_name<#ctx, Output = #res>)
+    };
+    quote!(<#interface_trait as #cr::Interface>)
+}
+
 impl ToTokens for ServiceDispatcher {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let service_name = &self.ident;
         let cr = &self.cr;
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
         let ctx = quote!(#cr::CallContext<'_>);
-        let res = quote!(std::result::Result<(), #cr::ExecutionError>);
 
+        // Match arms for implementing `call` method.
+        // Essentially here we provide a dispatching map for interface calls.
         let match_arms = self.implements.0.iter().map(|interface| {
-            let trait_name = &interface.path;
-            let interface_trait = if interface.is_raw {
-                quote!(dyn #trait_name)
-            } else {
-                quote!(dyn #trait_name<#ctx, Output = #res>)
-            };
-            let interface_trait = quote!(<#interface_trait as #cr::Interface>);
+            let interface_trait = interface_trait(&cr, interface);
 
             quote! {
                 #interface_trait::INTERFACE_NAME => {
@@ -112,6 +123,16 @@ impl ToTokens for ServiceDispatcher {
             }
         });
 
+        // List of interface names, available for service.
+        let interface_names = self.implements.0.iter().map(|interface| {
+            let interface_trait = interface_trait(&cr, interface);
+
+            quote! { #interface_trait::INTERFACE_NAME }
+        });
+
+        // Implementation of `ServiceDispatcher` trait for service type.
+        // Multiline implementation of `interfaces` is required, since rust cannot infer type
+        // of iterator for an empty array.
         let expanded = quote! {
             impl #impl_generics #cr::ServiceDispatcher for #service_name #ty_generics #where_clause  {
                 fn call(
@@ -125,6 +146,12 @@ impl ToTokens for ServiceDispatcher {
                         #( #match_arms )*
                         other => Err(#cr::DispatcherError::NoSuchInterface.into()),
                     }
+                }
+
+                fn interfaces(&self) -> Vec<String> {
+                    let interface_names = [#( (#interface_names) ),*];
+                    let iter: std::slice::Iter<&'static str> = interface_names.iter();
+                    iter.map(ToString::to_string).collect::<Vec<String>>()
                 }
             }
         };

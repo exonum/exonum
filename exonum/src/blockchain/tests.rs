@@ -178,7 +178,7 @@ impl Transaction {
     ) -> Verified<AnyTx> {
         let tx = AnyTx {
             arguments: self.into_bytes(),
-            call_info: CallInfo::new(instance_id, 0),
+            call_info: CallInfo::new(instance_id, 0, ""),
         };
         Verified::from_value(tx, public_key, secret_key)
     }
@@ -297,6 +297,11 @@ impl Runtime for RuntimeInspector {
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         self.deployed.contains(id)
+    }
+
+    fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+        // Not implemented for test runtime.
+        vec![]
     }
 
     fn initiate_adding_service(

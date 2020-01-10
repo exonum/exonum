@@ -24,6 +24,8 @@ use exonum_testkit::TestKitBuilder;
 #[exonum_interface]
 trait TimestampingInterface<Ctx> {
     type Output;
+
+    #[interface_method(id = 0)]
     fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
 }
 

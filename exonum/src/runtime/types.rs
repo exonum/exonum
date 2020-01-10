@@ -57,14 +57,18 @@ pub struct CallInfo {
     pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
+    /// Identifier of the interface of service. Should be an empty string for primary
+    /// service interface.
+    pub interface: String,
 }
 
 impl CallInfo {
     /// Create an ordinary `CallInfo` instance.
-    pub fn new(instance_id: u32, method_id: u32) -> Self {
+    pub fn new(instance_id: u32, method_id: u32, interface: &str) -> Self {
         Self {
             instance_id,
             method_id,
+            interface: interface.into(),
         }
     }
 }

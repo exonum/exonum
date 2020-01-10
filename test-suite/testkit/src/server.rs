@@ -181,7 +181,7 @@ mod tests {
         messages::{AnyTx, Verified},
         runtime::ExecutionError,
     };
-    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
     use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
@@ -206,6 +206,7 @@ mod tests {
     #[exonum_interface]
     trait SampleInterface<Ctx> {
         type Output;
+        #[interface_method(id = 0)]
         fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
     }
 

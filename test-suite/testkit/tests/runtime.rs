@@ -110,6 +110,11 @@ impl Runtime for TestRuntime {
         self.tester.is_artifact_deployed(id)
     }
 
+    fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+        // Not supported.
+        vec![]
+    }
+
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,

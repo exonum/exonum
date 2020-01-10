@@ -62,6 +62,7 @@ pub trait MarkerTransactions<Ctx> {
     /// Output returned by the interface methods.
     type Output;
     /// Transaction, which must be executed no later than the specified time (field `time`).
+    #[interface_method(id = 0)]
     fn mark(&self, context: Ctx, arg: TxMarker) -> Self::Output;
 }
 

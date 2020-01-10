@@ -49,6 +49,9 @@ pub trait ServiceDispatcher: Send {
         ctx: CallContext<'_>,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
+
+    /// Retrieves the list of all the interface names implemented by this service.
+    fn interfaces(&self) -> Vec<String>;
 }
 
 /// Describes an Exonum service instance.

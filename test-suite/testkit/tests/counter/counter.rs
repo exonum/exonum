@@ -89,7 +89,9 @@ pub trait CounterServiceInterface<Ctx> {
 
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
+    #[interface_method(id = 0)]
     fn increment(&self, ctx: Ctx, by: u64) -> Self::Output;
+    #[interface_method(id = 1)]
     fn reset(&self, ctx: Ctx, _: ()) -> Self::Output;
 }
 

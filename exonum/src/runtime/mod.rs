@@ -159,6 +159,7 @@ pub use self::{
 // Re-export for serializing `ExecutionError` via `serde`.
 #[doc(hidden)]
 pub use error::execution_error as execution_error_serde;
+pub mod interface;
 pub mod migrations;
 pub mod versioning;
 
@@ -307,6 +308,13 @@ pub trait Runtime: Send + fmt::Debug + 'static {
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
+
+    /// Should return the list of interface names implemented by service with given
+    /// `InstanceId`.
+    ///
+    /// The core guarantees that this method will always be invoked only for existent
+    /// `InstanceId`, thus this method should never fail.
+    fn interfaces(&self, instance_id: InstanceId) -> Vec<String>;
 
     /// Runs the constructor of a new service instance with the given specification
     /// and initial arguments. The constructor can initialize the storage of the service,

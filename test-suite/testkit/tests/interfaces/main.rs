@@ -68,7 +68,10 @@ fn test_create_wallet_fallthrough_auth() {
 
     // Without fallthrough auth, the call should fail: `create_wallet` expects the caller
     // to be external, and it is a service.
-    let mut call = AnyCall::new(CallInfo::new(WalletService::ID, 0), "Alice".to_owned());
+    let mut call = AnyCall::new(
+        CallInfo::new(WalletService::ID, 0, "".into()),
+        "Alice".to_owned(),
+    );
     let err = execute_transaction(
         &mut testkit,
         keypair.call_any(AnyCallService::ID, call.clone()),
@@ -129,7 +132,7 @@ fn test_deposit_ok() {
     // Since inner transactions are not checked for uniqueness, depositing the same amount again
     // should work fine.
     let mut call = AnyCall::new(
-        CallInfo::new(DepositService::ID, 0),
+        CallInfo::new(DepositService::ID, 0, "".into()),
         TxIssue {
             to: keypair.0,
             amount: 10_000,
@@ -155,7 +158,7 @@ fn test_deposit_ok() {
     // Add some more indirection layers.
     let mut call = call;
     for _ in 0..10 {
-        call = AnyCall::new(CallInfo::new(AnyCallService::ID, 0), call);
+        call = AnyCall::new(CallInfo::new(AnyCallService::ID, 0, "".into()), call);
         call.fallthrough_auth = true; // Must be set to `true` in all calls!
     }
     execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call))
@@ -184,7 +187,7 @@ fn test_deposit_invalid_auth() {
     .expect("Unable to create wallet");
 
     let mut call = AnyCall::new(
-        CallInfo::new(DepositService::ID, 0),
+        CallInfo::new(DepositService::ID, 0, "".into()),
         TxIssue {
             to: keypair.0,
             amount: 10_000,
@@ -200,7 +203,7 @@ fn test_deposit_invalid_auth() {
 
     call.fallthrough_auth = true;
     for i in 0..10 {
-        call = AnyCall::new(CallInfo::new(AnyCallService::ID, 0), call);
+        call = AnyCall::new(CallInfo::new(AnyCallService::ID, 0, "".into()), call);
         if i != 5 {
             call.fallthrough_auth = true;
         }
@@ -250,7 +253,7 @@ fn test_any_call_ok_deposit() {
     .expect("Unable to create wallet");
 
     let mut call = AnyCall::new(
-        CallInfo::new(DepositService::ID, 0),
+        CallInfo::new(DepositService::ID, 0, "".into()),
         TxIssue {
             to: keypair.0,
             amount: 10_000,
@@ -283,7 +286,7 @@ fn test_any_call_err_deposit_unauthorized() {
     .expect("Unable to create wallet");
 
     let mut call = AnyCall::new(
-        CallInfo::new(WalletService::ID, 0),
+        CallInfo::new(WalletService::ID, 0, "".into()),
         TxIssue {
             to: keypair.0,
             amount: 10_000,
@@ -303,7 +306,7 @@ fn test_any_call_err_deposit_unauthorized() {
 fn test_any_call_err_unknown_instance() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
-    let call = AnyCall::new(CallInfo::new(10_000, 0), ());
+    let call = AnyCall::new(CallInfo::new(10_000, 0, "".into()), ());
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
@@ -318,7 +321,7 @@ fn test_any_call_err_unknown_interface() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
-    let mut call = AnyCall::new(CallInfo::new(WalletService::ID, 0), ());
+    let mut call = AnyCall::new(CallInfo::new(WalletService::ID, 0, "".into()), ());
     call.interface_name = "FooFace".to_owned();
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
@@ -335,7 +338,7 @@ fn test_any_call_err_unknown_method() {
     let keypair = crypto::gen_keypair();
 
     let mut call = AnyCall::new(
-        CallInfo::new(WalletService::ID, 1),
+        CallInfo::new(WalletService::ID, 1, "".into()),
         TxIssue {
             to: keypair.0,
             amount: 10_000,
@@ -353,8 +356,8 @@ fn test_any_call_err_wrong_arg() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
-    let inner_call = AnyCall::new(CallInfo::new(10_000, 0), ());
-    let outer_call = AnyCall::new(CallInfo::new(WalletService::ID, 0), inner_call);
+    let inner_call = AnyCall::new(CallInfo::new(10_000, 0, "".into()), ());
+    let outer_call = AnyCall::new(CallInfo::new(WalletService::ID, 0, "".into()), inner_call);
     let err = execute_transaction(
         &mut testkit,
         keypair.call_any(AnyCallService::ID, outer_call),

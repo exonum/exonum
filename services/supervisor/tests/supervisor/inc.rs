@@ -64,6 +64,8 @@ where
 #[exonum_interface]
 pub trait IncInterface<Ctx> {
     type Output;
+
+    #[interface_method(id = 0)]
     fn inc(&self, context: Ctx, seed: u64) -> Self::Output;
 }
 

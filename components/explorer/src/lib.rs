@@ -505,6 +505,7 @@ impl CommittedTransaction {
 /// #[exonum_interface]
 /// trait ServiceInterface<Ctx> {
 ///     type Output;
+///     #[interface_method(id = 0)]
 ///     fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 /// }
 ///

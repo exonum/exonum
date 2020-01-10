@@ -301,6 +301,7 @@ mod tests {
                 call_info: CallInfo {
                     instance_id: 5,
                     method_id: 2,
+                    interface: "".into(),
                 },
                 arguments: vec![1, 2, 3, 4],
             },
@@ -323,6 +324,7 @@ mod tests {
                 call_info: CallInfo {
                     instance_id: 5,
                     method_id: 2,
+                    interface: "".into(),
                 },
                 arguments: vec![1, 2, 3, 4],
             },

@@ -29,6 +29,7 @@ use exonum_rust_runtime::{CallContext, DefaultInstance, Service, TxStub};
 #[exonum_interface]
 pub trait ConfigUpdater<Ctx> {
     type Output;
+    #[interface_method(id = 0)]
     fn update_config(&self, ctx: Ctx, arg: TxConfig) -> Self::Output;
 }
 

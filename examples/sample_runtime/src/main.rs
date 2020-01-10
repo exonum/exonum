@@ -113,6 +113,11 @@ impl Runtime for SampleRuntime {
         self.deployed_artifacts.contains_key(id)
     }
 
+    fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+        // In sample runtime all services implement only basic interface (with empty name).
+        vec!["".into()]
+    }
+
     /// Initiates adding a new service and sets the counter value for this.
     fn initiate_adding_service(
         &self,
@@ -351,6 +356,7 @@ fn main() {
                     call_info: CallInfo {
                         instance_id,
                         method_id: 0,
+                        interface: "".into(),
                     },
                     arguments: 1_000_u64.into_bytes(),
                 },
@@ -367,6 +373,7 @@ fn main() {
                     call_info: CallInfo {
                         instance_id,
                         method_id: 1,
+                        interface: "".into(),
                     },
                     arguments: Vec::default(),
                 },

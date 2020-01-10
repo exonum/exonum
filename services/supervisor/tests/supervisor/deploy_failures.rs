@@ -119,6 +119,10 @@ mod failing_runtime {
             false
         }
 
+        fn interfaces(&self, _id: InstanceId) -> Vec<String> {
+            vec![]
+        }
+
         /// Commits status for the `SampleService` instance with the specified ID.
         fn update_service_status(
             &mut self,

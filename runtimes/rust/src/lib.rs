@@ -66,6 +66,7 @@
 //!     type Output;
 //!     // Each method of the trait should have a signature of the following format.
 //!     // The argument should implement the `BinaryValue` trait.
+//!     #[interface_method(id = 0)]
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
 //! }
 //!
@@ -195,13 +196,15 @@
 //! ```
 //! # use exonum_rust_runtime::{CallContext, ExecutionError};
 //! # use exonum_crypto::gen_keypair;
-//! # use exonum_derive::exonum_interface;
+//! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
 //! # type Transfer = String;
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
+//!     #[interface_method(id = 1)]
 //!     fn transfer(&self, context: Ctx, arg: Transfer) -> Self::Output;
 //! }
 //!
@@ -568,6 +571,18 @@ impl Runtime for RustRuntime {
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         self.deployed_artifacts.contains(id)
+    }
+
+    fn interfaces(&self, id: InstanceId) -> Vec<String> {
+        debug_assert!(
+            self.started_services.get(&id).is_some(),
+            "BUG: Core called `interfaces` method for non-existent instance ID {}",
+            id
+        );
+
+        let instance = self.started_services.get(&id).unwrap();
+
+        instance.service.interfaces()
     }
 
     fn initiate_adding_service(

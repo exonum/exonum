@@ -136,9 +136,11 @@ pub enum Error {
 pub trait CurrencyInterface<Ctx> {
     type Output;
     /// Apply logic to the storage when executing the transaction.
+    #[interface_method(id = 0)]
     fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
+    #[interface_method(id = 1)]
     fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
