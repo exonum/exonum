@@ -16,15 +16,17 @@
 
 use exonum_derive::ExecutionFail;
 
-use std::fmt::Display;
+use crate::runtime::{ErrorKind, ExecutionError};
 
-use crate::runtime::{ErrorKind, ExecutionError, ExecutionFail};
-
-/// List of possible dispatcher errors.
+/// List of possible core errors.
+///
+/// Note that in most cases you don't need to spawn a core error,
+/// unless your service is providing some wrapper for core logic and
+/// should behave just like core.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
-#[execution_fail(crate = "crate", kind = "dispatcher")]
-pub enum Error {
+#[execution_fail(crate = "crate", kind = "core")]
+pub enum CoreError {
     /// Runtime identifier is incorrect in this context.
     IncorrectRuntime = 0,
     /// Artifact identifier is unknown.
@@ -41,40 +43,28 @@ pub enum Error {
     ServiceNotActive = 6,
     /// Suitable runtime for the given service instance ID is not found.
     IncorrectInstanceId = 7,
-    /// The interface is absent in the service.
-    NoSuchInterface = 8,
-    /// The method is absent in the service interface.
-    NoSuchMethod = 9,
     /// Maximum depth of the call stack has been reached.
-    StackOverflow = 10,
-    /// This caller is not authorized to call this method.
-    UnauthorizedCaller = 11,
-    /// Malformed arguments for calling a service interface method.
-    MalformedArguments = 12,
+    StackOverflow = 8,
     /// Service instance is already transitioning to a new status.
-    ServicePending = 13,
+    ServicePending = 9,
+    /// Migrated service is not stopped.
+    ServiceNotStopped = 10,
+    /// The artifact to migrate the service to is not a newer version of the current
+    /// service artifact.
+    CannotUpgradeService = 11,
+    /// Attempt to rollback or flush migration for a service which has no pending migration.
+    NoMigration = 12,
 }
 
-impl Error {
-    /// Creates a `MalformedArguments` error with the user-provided error cause.
-    /// The cause does not need to include the error location; this information is added
-    /// by the framework automatically.
-    pub fn malformed_arguments(cause: impl Display) -> ExecutionError {
-        let description = format!(
-            "Malformed arguments for calling a service interface method: {}",
-            cause
-        );
-        Error::MalformedArguments.with_description(description)
-    }
-
+impl CoreError {
     pub(crate) fn stack_overflow(max_depth: usize) -> ExecutionError {
         let description = format!(
             "Maximum depth of call stack ({}) has been reached.",
             max_depth
         );
         ExecutionError::new(
-            ErrorKind::Dispatcher {
-                code: Error::StackOverflow as u8,
+            ErrorKind::Core {
+                code: CoreError::StackOverflow as u8,
             },
             description,
         )

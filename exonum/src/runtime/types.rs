@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{PublicKey, SecretKey};
+use exonum_crypto::{Hash, PublicKey, SecretKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
@@ -195,6 +195,11 @@ impl ArtifactId {
         };
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    /// Checks if the specified artifact is an upgraded version of another artifact.
+    pub fn is_upgrade_of(&self, other: &Self) -> bool {
+        self.name == other.name && self.version > other.version
     }
 
     /// Converts into `InstanceInitParams` with given id, name and empty constructor.
@@ -425,71 +430,167 @@ impl ProtobufConvert for ArtifactStatus {
     }
 }
 
-// TODO Investigate boilerplate-less approach of enums usage as binary values and keys. [ECR-3941]
+/// Information about a migration of a service instance.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "schema::runtime::InstanceMigration")]
+pub struct InstanceMigration {
+    /// Migration target to obtain migration scripts from. This artifact
+    /// must be deployed on the blockchain.
+    pub target: ArtifactId,
+
+    /// Version of the instance data after the migration is completed.
+    /// Note that it does not necessarily match the version of `target`,
+    /// but should be not greater.
+    #[protobuf_convert(with = "self::pb_version")]
+    pub end_version: Version,
+
+    /// Consensus-wide outcome of the migration, in the form of the aggregation hash
+    /// of the migrated data. The lack of value signifies that the network has not yet reached
+    /// consensus about the migration outcome.
+    #[protobuf_convert(with = "self::pb_optional_hash")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completed_hash: Option<Hash>,
+}
+
+impl InstanceMigration {
+    pub(super) fn new(target: ArtifactId, end_version: Version) -> Self {
+        Self {
+            target,
+            end_version,
+            completed_hash: None,
+        }
+    }
+
+    /// Checks if the migration is considered completed, i.e., has migration state agreed
+    /// among all nodes in the blockchain network.
+    pub fn is_completed(&self) -> bool {
+        self.completed_hash.is_some()
+    }
+}
+
+mod pb_optional_hash {
+    use super::*;
+    use exonum_crypto::proto::types::Hash as PbHash;
+
+    pub fn from_pb(pb: PbHash) -> Result<Option<Hash>, failure::Error> {
+        if pb.get_data().is_empty() {
+            Ok(None)
+        } else {
+            Hash::from_pb(pb).map(Some)
+        }
+    }
+
+    pub fn to_pb(value: &Option<Hash>) -> PbHash {
+        if let Some(hash) = value {
+            hash.to_pb()
+        } else {
+            PbHash::new()
+        }
+    }
+}
 
 /// Status of a service instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(BinaryValue)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum InstanceStatus {
     /// The service instance is active.
-    Active = 1,
+    Active,
     /// The service instance is stopped.
-    Stopped = 2,
+    Stopped,
+    /// The service instance is migrating to the specified artifact.
+    Migrating(Box<InstanceMigration>),
 }
 
 impl InstanceStatus {
+    pub(super) fn migrating(migration: InstanceMigration) -> Self {
+        InstanceStatus::Migrating(Box::new(migration))
+    }
+
     /// Indicates whether the service instance status is active.
-    pub fn is_active(self) -> bool {
-        self == InstanceStatus::Active
+    pub fn is_active(&self) -> bool {
+        *self == InstanceStatus::Active
+    }
+
+    pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
+        match self {
+            InstanceStatus::Migrating(migration) if !migration.is_completed() => {
+                Some(&migration.target)
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn completed_migration_hash(&self) -> Option<Hash> {
+        match self {
+            InstanceStatus::Migrating(migration) => migration.completed_hash,
+            _ => None,
+        }
     }
 }
 
 impl Display for InstanceStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InstanceStatus::Active => f.write_str("active"),
-            InstanceStatus::Stopped => f.write_str("stopped"),
-        }
-    }
-}
-
-impl InstanceStatus {
-    // This method must have an exact signature so that is can be used with the
-    // `protobuf_convert(with)`.
-    #[allow(clippy::trivially_copy_pass_by_ref, clippy::wrong_self_convention)]
-    fn to_pb(status: &Option<InstanceStatus>) -> schema::runtime::InstanceState_Status {
-        match status {
-            None => schema::runtime::InstanceState_Status::NONE,
-            Some(InstanceStatus::Active) => schema::runtime::InstanceState_Status::ACTIVE,
-            Some(InstanceStatus::Stopped) => schema::runtime::InstanceState_Status::STOPPED,
-        }
-    }
-
-    fn from_pb(
-        pb: schema::runtime::InstanceState_Status,
-    ) -> Result<Option<InstanceStatus>, failure::Error> {
-        Ok(match pb {
-            schema::runtime::InstanceState_Status::NONE => None,
-            schema::runtime::InstanceState_Status::ACTIVE => Some(InstanceStatus::Active),
-            schema::runtime::InstanceState_Status::STOPPED => Some(InstanceStatus::Stopped),
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            InstanceStatus::Active => "active",
+            InstanceStatus::Stopped => "stopped",
+            InstanceStatus::Migrating(..) => "migrating",
         })
     }
 }
 
-impl BinaryValue for InstanceStatus {
-    fn to_bytes(&self) -> Vec<u8> {
-        (*self as u32).to_bytes()
+impl InstanceStatus {
+    // Used by `InstanceState`.
+    #[allow(clippy::wrong_self_convention)]
+    pub(super) fn to_pb(status: &Option<Self>) -> schema::runtime::InstanceStatus {
+        Self::create_pb(status.as_ref())
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        let code = u32::from_bytes(bytes)?;
-        match code {
-            1 => Ok(InstanceStatus::Active),
-            2 => Ok(InstanceStatus::Stopped),
-            other => Err(format_err!(
-                "Instance status with code {} is unknown.",
-                other
-            )),
+    fn create_pb(status: Option<&Self>) -> schema::runtime::InstanceStatus {
+        use schema::runtime::InstanceStatus_Simple::*;
+
+        let mut pb = schema::runtime::InstanceStatus::new();
+        match status {
+            None => pb.set_simple(NONE),
+            Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
+            Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
+            Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
         }
+        pb
+    }
+
+    pub(super) fn from_pb(
+        mut pb: schema::runtime::InstanceStatus,
+    ) -> Result<Option<Self>, failure::Error> {
+        use schema::runtime::InstanceStatus_Simple::*;
+
+        if pb.has_simple() {
+            Ok(match pb.get_simple() {
+                NONE => None,
+                ACTIVE => Some(InstanceStatus::Active),
+                STOPPED => Some(InstanceStatus::Stopped),
+            })
+        } else if pb.has_migration() {
+            InstanceMigration::from_pb(pb.take_migration())
+                .map(|migration| Some(InstanceStatus::migrating(migration)))
+        } else {
+            Err(format_err!("No variant specified for `InstanceStatus`"))
+        }
+    }
+}
+
+impl ProtobufConvert for InstanceStatus {
+    type ProtoStruct = schema::runtime::InstanceStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        Self::create_pb(Some(self))
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let maybe_self = Self::from_pb(pb)?;
+        maybe_self
+            .ok_or_else(|| format_err!("Cannot create `InstanceStatus` from `None` serialization"))
     }
 }
 
@@ -515,19 +616,51 @@ impl ArtifactState {
 }
 
 /// Current state of service instance in dispatcher.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::InstanceState")]
 pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
+
+    /// Version of the service data. `None` value means that the data version is the same
+    /// as the `spec.artifact`. `Some(version)` means that one or more [data migrations] have
+    /// been performed on the service, so that the service data is compatible with the `version`
+    /// of the artifact.
+    ///
+    /// [data migrations]: migrations/index.html
+    #[protobuf_convert(with = "self::pb_optional_version")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_version: Option<Version>,
+
     /// Service instance activity status.
     #[protobuf_convert(with = "InstanceStatus")]
     pub status: Option<InstanceStatus>,
+
     /// Pending status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
+}
+
+mod pb_optional_version {
+    use super::*;
+
+    pub fn from_pb(pb: String) -> Result<Option<Version>, failure::Error> {
+        if pb.is_empty() {
+            Ok(None)
+        } else {
+            pb.parse().map(Some).map_err(From::from)
+        }
+    }
+
+    pub fn to_pb(value: &Option<Version>) -> String {
+        if let Some(value) = value.as_ref() {
+            value.to_string()
+        } else {
+            String::new()
+        }
+    }
 }
 
 impl InstanceState {
@@ -535,9 +668,20 @@ impl InstanceState {
     pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
         Self {
             spec,
+            data_version: None,
             status: Some(status),
             pending_status: None,
         }
+    }
+
+    /// Returns the version of the service data. This can match the version of the service artifact,
+    /// or may be greater if [data migrations] have been performed on the service.
+    ///
+    /// [data migrations]: migrations/index.html
+    pub fn data_version(&self) -> &Version {
+        self.data_version
+            .as_ref()
+            .unwrap_or(&self.spec.artifact.version)
     }
 
     /// Sets next status as current and changes next status to `None`
@@ -550,9 +694,38 @@ impl InstanceState {
             self.pending_status.is_some(),
             "Next instance status should not be `None`"
         );
+        self.status = self.pending_status.take();
+    }
+}
 
-        self.status = self.pending_status;
-        self.pending_status = None;
+/// Result of execution of a migration script.
+#[derive(Debug, Clone)]
+#[derive(BinaryValue, ObjectHash)]
+pub struct MigrationStatus(pub Result<Hash, String>);
+
+impl ProtobufConvert for MigrationStatus {
+    type ProtoStruct = schema::runtime::MigrationStatus;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        match self.0 {
+            Ok(hash) => pb.set_hash(hash.to_pb()),
+            Err(ref e) => pb.set_error(e.clone()),
+        }
+        pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let inner = if pb.has_hash() {
+            Ok(Hash::from_pb(pb.take_hash())?)
+        } else if pb.has_error() {
+            Err(pb.take_error())
+        } else {
+            return Err(format_err!(
+                "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"
+            ));
+        };
+        Ok(MigrationStatus(inner))
     }
 }
 

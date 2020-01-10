@@ -101,6 +101,11 @@ impl TestKitApi {
         }
     }
 
+    /// Returns the resolved URL for the public API.
+    pub fn public_url(&self, url: &str) -> String {
+        self.test_server.url(&format!("public/{}", url))
+    }
+
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T>(&self, transaction: T)
     where
@@ -378,50 +383,3 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     info!("Test server created on {}", server.addr());
     server
 }
-
-// FIXME: move to explorer service
-/*
-/// A convenience wrapper for Exonum node API to reduce the boilerplate code.
-#[derive(Debug)]
-pub struct ExonumNodeApi<'a> {
-    pub inner: &'a TestKitApi,
-}
-
-impl<'a> ExonumNodeApi<'a> {
-    pub fn new(api: &'a TestKitApi) -> Self {
-        Self { inner: api }
-    }
-
-    /// Asserts that the transaction with the given hash has a specified status.
-    pub fn assert_tx_status(&self, tx_hash: Hash, expected_status: Result<(), &ErrorMatch>) {
-        let info: serde_json::Value = self
-            .inner
-            .public(ApiKind::Explorer)
-            .query(&TransactionQuery::new(tx_hash))
-            .get("v1/transactions")
-            .unwrap();
-        if let serde_json::Value::Object(info) = info {
-            let tx_status_raw = info.get("status").unwrap().clone();
-            let tx_status: ExecutionStatus = serde_json::from_value(tx_status_raw).unwrap();
-            match expected_status {
-                Ok(()) => tx_status.0.expect("Expected successful execution"),
-                Err(e) => assert_eq!(*e, tx_status.0.expect_err("Expected execution error")),
-            }
-        } else {
-            panic!("Invalid transaction info format, object expected");
-        }
-    }
-
-    /// Asserts that the transaction with the given hash was executed successfully.
-    pub fn assert_tx_success(&self, tx_hash: Hash) {
-        self.assert_tx_status(tx_hash, Ok(()));
-    }
-
-    /// Same as `assert_tx_success`, but for a sequence of transactions.
-    pub fn assert_txs_success(&self, tx_hashes: &[Hash]) {
-        for &tx_hash in tx_hashes {
-            self.assert_tx_success(tx_hash);
-        }
-    }
-}
-*/

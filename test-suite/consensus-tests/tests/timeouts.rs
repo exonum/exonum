@@ -15,14 +15,15 @@
 //! Tests in this module are designed to test details of round timeout handling.
 
 use exonum::{
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
+    merkledb::ObjectHash,
     node::constants::PROPOSE_REQUEST_TIMEOUT,
 };
-use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_crypto::Hash;
-use exonum_merkledb::ObjectHash;
 
 use std::time::Duration;
+
+use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
 
 /// HANDLE ROUND TIMEOUT:
 /// - Ignore if height and round are not the same

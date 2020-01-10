@@ -14,7 +14,7 @@
 
 //! Cryptocurrency wallet.
 
-use exonum_crypto::{Hash, PublicKey};
+use exonum::crypto::{Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 

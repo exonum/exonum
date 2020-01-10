@@ -18,7 +18,8 @@ use exonum::crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed};
 use exonum_derive::*;
 use exonum_rust_runtime::{
     migrations::{
-        DataMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationScript,
+        InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
+        MigrationScript,
     },
     versioning::Version,
     Service, ServiceFactory,
@@ -28,8 +29,6 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::borrow::Cow;
 
 use exonum_testkit::migrations::{MigrationTest, ScriptExt};
-
-mod proto;
 
 #[derive(Debug, Clone)]
 struct TestUser {
@@ -83,14 +82,14 @@ mod v01 {
             Fork, MapIndex,
         },
     };
-    use exonum_derive::*;
-    use exonum_proto::ProtobufConvert;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use serde_derive::{Deserialize, Serialize};
 
-    use crate::{proto, TestUser};
+    use crate::TestUser;
 
-    #[derive(Debug)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Wallet")]
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Wallet {
         pub username: String,
         pub balance: u64,
@@ -121,12 +120,12 @@ mod v01 {
 }
 
 mod v02 {
-    use exonum_crypto::PublicKey;
-    use exonum_derive::*;
-    use exonum_merkledb::{
+    use exonum::crypto::PublicKey;
+    use exonum::merkledb::{
         access::{Access, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
+    use exonum_derive::FromAccess;
 
     use crate::{v01::Wallet, TestUser};
 
@@ -161,28 +160,28 @@ mod v02 {
 }
 
 mod v05 {
-    use exonum_crypto::PublicKey;
-    use exonum_derive::*;
-    use exonum_merkledb::{
+    use exonum::crypto::PublicKey;
+    use exonum::merkledb::{
         access::{Access, AccessExt, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
-    use exonum_proto::ProtobufConvert;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use serde_derive::{Deserialize, Serialize};
 
-    use crate::{proto, TestUser};
+    use crate::TestUser;
 
-    #[derive(Debug)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Wallet_v2")]
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Wallet {
         pub first_name: String,
         pub last_name: String,
         pub balance: u64,
     }
 
-    #[derive(Debug)]
-    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-    #[protobuf_convert(source = "proto::Summary")]
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
     pub struct Summary {
         pub ticker: String,
         pub total_balance: u64,
@@ -224,7 +223,7 @@ mod v05 {
 }
 
 /// First migration script. Merkelizes the wallets table and records the total number of tokens.
-fn merkelize_wallets(ctx: &mut MigrationContext) {
+fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v01::Schema::new(ctx.helper.old_data());
     let mut new_schema = v02::Schema::new(ctx.helper.new_data());
 
@@ -234,31 +233,31 @@ fn merkelize_wallets(ctx: &mut MigrationContext) {
         new_schema.wallets.put(&key, wallet);
     }
     new_schema.total_balance.set(total_balance);
+    Ok(())
 }
 
 /// The alternative version of the previous migration script, which uses database merges.
-fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) {
+fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     const CHUNK_SIZE: usize = 500;
 
-    ctx.helper
-        .iter_loop(|helper, iters| {
-            let old_schema = v01::Schema::new(helper.old_data());
-            let mut new_schema = v02::Schema::new(helper.new_data());
+    ctx.helper.iter_loop(|helper, iters| {
+        let old_schema = v01::Schema::new(helper.old_data());
+        let mut new_schema = v02::Schema::new(helper.new_data());
 
-            let iter = iters.create("wallets", &old_schema.wallets);
-            let mut total_balance = 0;
-            for (key, wallet) in iter.take(CHUNK_SIZE) {
-                total_balance += wallet.balance;
-                new_schema.wallets.put(&key, wallet);
-            }
-            let prev_balance = new_schema.total_balance.get().unwrap_or(0);
-            new_schema.total_balance.set(prev_balance + total_balance);
-        })
-        .unwrap();
+        let iter = iters.create("wallets", &old_schema.wallets);
+        let mut total_balance = 0;
+        for (key, wallet) in iter.take(CHUNK_SIZE) {
+            total_balance += wallet.balance;
+            new_schema.wallets.put(&key, wallet);
+        }
+        let prev_balance = new_schema.total_balance.get().unwrap_or(0);
+        new_schema.total_balance.set(prev_balance + total_balance);
+    })?;
+    Ok(())
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
-fn transform_wallet_type(ctx: &mut MigrationContext) {
+fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v02::Schema::new(ctx.helper.old_data());
     let mut new_schema = v05::Schema::new(ctx.helper.new_data());
 
@@ -283,6 +282,7 @@ fn transform_wallet_type(ctx: &mut MigrationContext) {
         };
         new_schema.wallets.put(&key, new_wallet);
     }
+    Ok(())
 }
 
 // FIXME: add incorrect migration with DB merges and test it (ECR-4080)
@@ -297,7 +297,7 @@ impl MigrateData for MigratedService {
     fn migration_scripts(
         &self,
         start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
             .add_script(Version::new(0, 2, 0), merkelize_wallets)
             .add_script(Version::new(0, 5, 0), transform_wallet_type)

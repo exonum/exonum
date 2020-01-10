@@ -15,6 +15,8 @@
 use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
+        migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
         InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     },
@@ -22,6 +24,7 @@ use exonum::{
 use exonum_merkledb::Snapshot;
 use exonum_testkit::TestKitBuilder;
 use futures::{Future, IntoFuture};
+
 use std::{sync::Arc, sync::RwLock};
 
 // Tracks parts of state of runtime that we're interested in.
@@ -124,8 +127,16 @@ impl Runtime for TestRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(

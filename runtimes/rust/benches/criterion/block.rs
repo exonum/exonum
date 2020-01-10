@@ -38,12 +38,6 @@
 //!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
 use criterion::{Criterion, ParameterizedBenchmark, Throughput};
-use exonum_merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB};
-use rand::{rngs::StdRng, Rng, SeedableRng};
-use tempfile::TempDir;
-
-use std::{collections::BTreeMap, iter, sync::Arc};
-
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
@@ -51,9 +45,15 @@ use exonum::{
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
+    merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
     messages::{AnyTx, Verified},
     node::ApiSender,
 };
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use tempfile::TempDir;
+
+use std::{collections::BTreeMap, iter, sync::Arc};
+
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, SnapshotExt};
 
 /// Number of transactions added to the blockchain before the bench begins.
@@ -133,9 +133,8 @@ fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash
 }
 
 mod timestamping {
-    use exonum::{crypto::Hash, messages::Verified, runtime::AnyTx};
+    use exonum::{crypto::Hash, merkledb::ObjectHash, messages::Verified, runtime::AnyTx};
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-    use exonum_merkledb::ObjectHash;
     use exonum_rust_runtime::{CallContext, DefaultInstance, ExecutionError, InstanceId, Service};
     use rand::rngs::StdRng;
 
@@ -190,20 +189,20 @@ mod timestamping {
 mod cryptocurrency {
     use exonum::{
         crypto::PublicKey,
+        merkledb::access::AccessExt,
         messages::Verified,
         runtime::{AnyTx, ErrorKind, ExecutionError, InstanceId},
     };
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
     };
-    use exonum_merkledb::access::AccessExt;
     use exonum_proto::ProtobufConvert;
-    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
     use rand::{rngs::StdRng, seq::SliceRandom};
     use serde_derive::{Deserialize, Serialize};
 
     use super::gen_keypair_from_rng;
     use crate::proto;
+    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 
     const CRYPTOCURRENCY_SERVICE_ID: InstanceId = 255;
 

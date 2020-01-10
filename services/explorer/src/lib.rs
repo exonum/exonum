@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,11 @@
 //! and packages this logic as an Exonum service. Thus, this crate is useful if you want to provide
 //! the way for external apps to query the blockchain info.
 //!
+//! # HTTP API
+//!
+//! REST API of the service is documented in the [`api` module](api/index.html), and its
+//! WebSocket API in the [`api::websocket` module](api/websocket/index.html).
+//!
 //! # Examples
 //!
 //! ## Use with Testkit
@@ -50,8 +55,6 @@
 //!
 //! [`exonum-explorer`]: https://docs.rs/exonum-explorer
 
-// TODO: provide endpoint descriptions with examples (ECR-4040)
-
 #![deny(
     unsafe_code,
     bare_trait_objects,
@@ -66,10 +69,9 @@ use exonum_rust_runtime::{
     ExecutionFail, Service,
 };
 
-mod api;
-mod websocket;
+pub mod api;
 
-use crate::{api::ExplorerApi, websocket::SharedState};
+use crate::api::{websocket::SharedState, ExplorerApi};
 
 /// Errors that can occur during explorer service operation.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
@@ -110,7 +112,9 @@ impl Service for ExplorerService {
         let scope = builder
             .with_root_path(ExplorerFactory::INSTANCE_NAME)
             .public_scope();
-        ExplorerApi::new(blockchain).wire(self.shared_state.get_ref(), scope);
+        ExplorerApi::new(blockchain)
+            .wire_rest(scope)
+            .wire_ws(self.shared_state.get_ref(), scope);
     }
 }
 

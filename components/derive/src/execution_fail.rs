@@ -46,13 +46,13 @@ impl TryFrom<&[Attribute]> for ExecutionFailAttrs {
         find_meta_attrs("execution_fail", args)
             .map(|meta| {
                 Self::from_nested_meta(&meta).and_then(|mut attrs| match attrs.kind.as_str() {
-                    "service" | "runtime" | "dispatcher" => {
+                    "service" | "runtime" | "core" | "common" => {
                         attrs.kind[..1].make_ascii_uppercase();
                         Ok(attrs)
                     }
                     _ => {
                         let msg = "ExecutionFail: Unsupported error kind. Use one of \
-                                   \"service\", \"runtime\", or \"dispatcher\"";
+                                   \"service\", \"runtime\", or \"core\"";
                         Err(darling::Error::custom(msg))
                     }
                 })

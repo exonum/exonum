@@ -103,6 +103,8 @@ jobs:
     - touch target/doc/std/option/enum.Option.html
     - touch target/doc/std/primitive.usize.html
     - touch target/doc/std/primitive.char.html
+    - touch target/doc/exonum_rust_runtime/trait.Runtime.html
+    - touch target/doc/exonum_rust_runtime/struct.InstanceState.html
     - cargo deadlinks --dir target/doc
 
     # Run kcov.
@@ -137,7 +139,9 @@ jobs:
   # Run examples.
   - name: examples
     script:
-    - cargo run -p exonum-merkledb --example migration
+    - cargo run -p exonum-merkledb --example manual_migration
+    - cargo run -p exonum-merkledb --example migration_with_helper
+    - cargo run -p exonum-merkledb --example migration_with_iter_loop
     - cargo run -p exonum-merkledb --example blockchain
     - cargo run -p exonum-sample-runtime
     - cargo run -p exonum-explorer --example explorer

@@ -188,32 +188,33 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
         .expect("Unable to write data to file");
 }
 
-/// Generates .rs files from .proto files.
+/// Generates Rust modules from Protobuf files.
 ///
-/// `protoc` executable from protobuf should be in `$PATH`
+/// The `protoc` executable (i.e., the Protobuf compiler) should be in `$PATH`.
 ///
 /// # Examples
 ///
-/// In `build.rs`
-/// ```no_run
-///use exonum_build::ProtobufGenerator;
+/// Specify in the build script (`build.rs`) of your crate:
 ///
-///ProtobufGenerator::with_mod_name("exonum_tests_proto_mod.rs")
-///   .with_input_dir("src/proto")
-///   .with_crypto()
-///   .with_common()
-///   .with_merkledb()
-///   .generate();
+/// ```no_run
+/// use exonum_build::ProtobufGenerator;
+///
+/// ProtobufGenerator::with_mod_name("example_mod.rs")
+///     .with_input_dir("src/proto")
+///     .with_crypto()
+///     .with_common()
+///     .with_merkledb()
+///     .generate();
 /// ```
-/// After successful run `$OUT_DIR` will contain \*.rs for each \*.proto file in
-/// "src/proto/\*\*/" and example_mod.rs which will include all generated .rs files
+///
+/// After the successful run, `$OUT_DIR` will contain a module for each Protobuf file in
+/// `src/proto` and `example_mod.rs` which will include all generated modules
 /// as submodules.
 ///
-/// To use generated protobuf structs.
+/// To use the generated Rust types corresponding to Protobuf messages, specify
+/// in `src/proto/mod.rs`:
 ///
-/// In `src/proto/mod.rs`
 /// ```ignore
-///
 /// include!(concat!(env!("OUT_DIR"), "/example_mod.rs"));
 ///
 /// // If you use types from `exonum` .proto files.
@@ -275,7 +276,7 @@ impl<'a> ProtobufGenerator<'a> {
         self
     }
 
-    /// Proto files from `exonum-crypto` crate (`Hash`, `PublicKey`, etc..).
+    /// Proto files from `exonum-crypto` crate (`Hash`, `PublicKey`, etc.).
     pub fn with_crypto(mut self) -> Self {
         self.includes.push(ProtoSources::Crypto);
         self

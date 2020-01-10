@@ -19,16 +19,16 @@ travis-ci = { repository = "exonum/exonum" }
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
+hex = "0.4.0"
 serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
-bincode = "1.2.1"
-exonum-crypto = { version = "0.13.0-rc.2", path = "../crypto" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../derive" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../merkledb" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 
+bincode = "1.2.1"
 failure = "0.1.5"
 futures = "0.1.29"
 serde_json = "1.0"

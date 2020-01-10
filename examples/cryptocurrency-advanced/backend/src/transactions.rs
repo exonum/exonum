@@ -16,7 +16,7 @@
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{DispatcherError, ExecutionError},
+    runtime::{CommonError, ExecutionError},
 };
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -116,7 +116,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
 
@@ -149,7 +149,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         if let Some(wallet) = schema.public.wallets.get(&from) {
@@ -165,7 +165,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
         let (tx_hash, from) = context
             .caller()
             .as_transaction()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         if schema.public.wallets.get(&from).is_none() {

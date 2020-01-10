@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::{DispatcherError, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
@@ -20,10 +19,9 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder},
-    CallContext, DefaultInstance, Service,
+    CallContext, CommonError, DefaultInstance, ExecutionError, InstanceId, Service,
 };
 
-use crate::proto;
 use exonum_supervisor::Configure;
 
 pub const SERVICE_ID: InstanceId = 512;
@@ -68,14 +66,10 @@ pub trait IncInterface<Ctx> {
 }
 
 /// Very simple test service that has one tx and one endpoint.
-/// Basically, it just counts how many time the tx was received.
+/// Basically, it just counts how many time a transaction was received.
 #[derive(Clone, Default, Debug, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("IncInterface", raw = "Configure<Params = String>"))]
-#[service_factory(
-    artifact_name = "inc",
-    artifact_version = "1.0.0",
-    proto_sources = "proto"
-)]
+#[service_factory(artifact_name = "inc", artifact_version = "1.0.0")]
 pub struct IncService;
 
 impl IncInterface<CallContext<'_>> for IncService {
@@ -131,12 +125,12 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         match params.as_ref() {
             "error" => {
                 let details = "IncService: Configure error request";
-                Err(DispatcherError::malformed_arguments(details))
+                Err(CommonError::malformed_arguments(details))
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -151,7 +145,7 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         Schema::new(context.service_data())
             .params
@@ -160,7 +154,7 @@ impl Configure for IncService {
         match params.as_str() {
             "apply_error" => {
                 let details = "IncService: Configure error request";
-                Err(DispatcherError::malformed_arguments(details))
+                Err(CommonError::malformed_arguments(details))
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),

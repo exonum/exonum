@@ -35,3 +35,5 @@ for more details about the service API.
 
 `exonum-explorer-service` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
+
+[explorer]: https://crates.io/crates/exonum-explorer/

@@ -12,31 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate pretty_assertions;
-
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainBuilder, BlockchainMut, Schema as CoreSchema,
     },
+    crypto::Hash,
     helpers::{generate_testnet_config, Height, ValidatorId},
+    merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema},
     messages::{AnyTx, Verified},
     runtime::{
-        CallInfo, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
+        CallInfo, CoreError, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
         WellKnownRuntime,
     },
 };
-use exonum_crypto::Hash;
-use exonum_derive::exonum_interface;
-use exonum_derive::*;
-use exonum_merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema};
-use exonum_rust_runtime::{
-    ArtifactId, CallContext, Caller, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError,
-    InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
-    SUPERVISOR_INSTANCE_ID,
-};
+use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use futures::{sync::mpsc, Future};
+use pretty_assertions::assert_eq;
 use serde_derive::*;
 
 use std::{
@@ -44,20 +38,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-macro_rules! impl_binary_value_for_bincode {
-    ($( $type:ty ),*) => {
-        $(
-            impl BinaryValue for $type {
-                fn to_bytes(&self) -> Vec<u8> {
-                    bincode::serialize(self).expect("Error while serializing value")
-                }
-                fn from_bytes(bytes: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-                    bincode::deserialize(bytes.as_ref()).map_err(From::from)
-                }
-            }
-        )*
-    };
-}
+use exonum_rust_runtime::{
+    ArtifactId, CallContext, Caller, CommonError, DefaultInstance, ErrorMatch, ExecutionError,
+    InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
+    SUPERVISOR_INSTANCE_ID,
+};
 
 fn add_transactions_into_pool(
     blockchain: &mut BlockchainMut,
@@ -205,7 +190,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     ) {
         snapshot
             .for_dispatcher()
@@ -215,9 +200,20 @@ impl<T: Runtime> Runtime for Inspected<T> {
         let core_schema = CoreSchema::new(snapshot);
         let height = core_schema.next_height();
 
-        self.events
-            .push(RuntimeEvent::CommitService(height, spec.to_owned(), status));
+        self.events.push(RuntimeEvent::CommitService(
+            height,
+            spec.to_owned(),
+            status.to_owned(),
+        ));
         self.runtime.update_service_status(snapshot, spec, status)
+    }
+
+    fn migrate(
+        &self,
+        new_artifact: &ArtifactId,
+        data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        self.runtime.migrate(new_artifact, data_version)
     }
 
     fn execute(
@@ -268,24 +264,25 @@ impl WellKnownRuntime for Inspected<RustRuntime> {
     const ID: u32 = RustRuntime::ID;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 struct DeployArtifact {
     test_service_artifact: ArtifactId,
     spec: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 struct StartService {
     spec: InstanceSpec,
     constructor: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 struct StopService {
     instance_id: InstanceId,
 }
-
-impl_binary_value_for_bincode! { DeployArtifact, StartService, StopService }
 
 #[exonum_interface]
 trait ToySupervisor<Ctx> {
@@ -341,12 +338,11 @@ impl DefaultInstance for ToySupervisorService {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 pub struct Init {
     msg: String,
 }
-
-impl_binary_value_for_bincode! { Init }
 
 impl Default for Init {
     fn default() -> Self {
@@ -389,7 +385,7 @@ impl Test<CallContext<'_>> for TestServiceImpl {
 
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         context
             .service_data()
             .get_proof_entry("constructor_entry")
@@ -418,7 +414,7 @@ impl Test<CallContext<'_>> for TestServiceImplV2 {
     type Output = Result<(), ExecutionError>;
 
     fn method_a(&self, _context: CallContext<'_>, _arg: u64) -> Self::Output {
-        Err(DispatcherError::NoSuchMethod.into())
+        Err(CommonError::NoSuchMethod.into())
     }
 
     fn method_b(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
@@ -459,7 +455,7 @@ impl Service for DependentServiceImpl {
             other => panic!("Wrong caller type: {:?}", other),
         }
 
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         if context
             .data()
             .for_dispatcher()
@@ -880,7 +876,7 @@ fn multiple_service_versions() {
     )
     .unwrap_err();
     // `method_a` is removed from the newer service version.
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchMethod));
 
     {
         let snapshot = blockchain.snapshot();
@@ -1022,10 +1018,7 @@ fn conflicting_service_instances() {
     )
     .unwrap_err();
     // Alternative instance was discarded.
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 }
 
 #[test]
