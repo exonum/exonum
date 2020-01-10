@@ -16,8 +16,9 @@
 
 pub use self::{
     error::Error,
+    error::{ApiError, HttpCode},
     manager::UpdateEndpoints,
-    with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
+    with::{Actuality, ApiFutureResult, Deprecated, FutureResult, NamedWith, Result, With},
 };
 
 pub mod backends;

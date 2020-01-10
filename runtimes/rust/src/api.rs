@@ -14,9 +14,11 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
+pub use exonum::api::{
+    ApiError, ApiFutureResult, Deprecated, EndpointMutability, Error, FutureResult, Result,
+};
 
-use futures::IntoFuture;
+use futures::{Future, IntoFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
 use exonum::{
@@ -160,6 +162,32 @@ impl ServiceApiScope {
                 let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
+            });
+        self
+    }
+
+    pub fn endpoint_new<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        R: IntoFuture<Item = I, Error = crate::api::ApiError> + 'static,
+    {
+        let blockchain = self.blockchain.clone();
+        let descriptor = self.descriptor.clone();
+        self.inner
+            .endpoint(name, move |query: Q| -> crate::api::ApiFutureResult<I> {
+                let desc = descriptor.clone();
+                let state = ServiceApiState::from_api_context(
+                    &blockchain,
+                    (desc.0, desc.1.as_ref()).into(),
+                    name,
+                );
+                let result = handler(&state, query);
+                let future = result
+                    .into_future()
+                    .map_err(move |err| err.source(format!("{}:{}", desc.0, desc.1)));
+                Box::new(future)
             });
         self
     }

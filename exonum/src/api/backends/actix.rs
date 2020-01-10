@@ -44,8 +44,8 @@ use std::{
 use crate::api::{
     self,
     manager::{ApiManager, UpdateEndpoints},
-    Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
-    ExtendApiBackend, FutureResult, NamedWith,
+    Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiFutureResult, ApiScope, EndpointMutability,
+    ExtendApiBackend, FutureResult, HttpCode, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -139,6 +139,17 @@ impl ResponseError for api::Error {
                 .finish(),
             api::Error::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
             api::Error::Unauthorized => HttpResponse::Unauthorized().finish(),
+        }
+    }
+}
+
+impl ResponseError for api::ApiError {
+    fn error_response(&self) -> HttpResponse {
+        println!("ResponseError for api::ApiError");
+        match self.http_code {
+            HttpCode::BadRequest => HttpResponse::BadRequest().body(self.to_string()),
+            HttpCode::NotFound => HttpResponse::NotFound().body(self.to_string()),
+            HttpCode::Unexpected => HttpResponse::Unauthorized().finish(),
         }
     }
 }
