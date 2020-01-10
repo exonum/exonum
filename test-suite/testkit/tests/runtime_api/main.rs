@@ -50,7 +50,6 @@ fn test_exonum_core_protos(api: &TestKitApi) {
         "key_value_sequence.proto",
         "blockchain.proto",
         "consensus.proto",
-        "doc_tests.proto",
         "runtime.proto",
         "tests.proto",
         "common.proto",
@@ -60,7 +59,7 @@ fn test_exonum_core_protos(api: &TestKitApi) {
         "map_proof.proto",
     ]
     .into_iter()
-    .map(|s| s.to_owned())
+    .map(str::to_owned)
     .collect();
 
     assert_eq!(response, expected_files);

@@ -20,7 +20,7 @@ use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
 use exonum::crypto::{gen_keypair, hash, sign, verify};
-use num::pow::pow;
+
 use std::convert::TryInto;
 
 fn bench_sign(b: &mut Bencher<'_>, &count: &usize) {
@@ -51,19 +51,19 @@ pub fn bench_crypto(c: &mut Criterion) {
 
     c.bench(
         "hash",
-        ParameterizedBenchmark::new("hash", bench_hash, (6..16).map(|i| pow(2, i)))
+        ParameterizedBenchmark::new("hash", bench_hash, (6..16).map(|i| 1 << i))
             .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
     c.bench(
         "sign",
-        ParameterizedBenchmark::new("sign", bench_sign, (6..16).map(|i| pow(2, i)))
+        ParameterizedBenchmark::new("sign", bench_sign, (6..16).map(|i| 1 << i))
             .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
     c.bench(
         "verify",
-        ParameterizedBenchmark::new("verify", bench_verify, (6..16).map(|i| pow(2, i)))
+        ParameterizedBenchmark::new("verify", bench_verify, (6..16).map(|i| 1 << i))
             .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );

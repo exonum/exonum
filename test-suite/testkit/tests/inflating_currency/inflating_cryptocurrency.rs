@@ -22,14 +22,11 @@ use exonum_merkledb::{
     access::{Access, FromAccess},
     MapIndex,
 };
-use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder},
     CallContext, DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
-
-use super::proto;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -43,8 +40,8 @@ pub const INIT_BALANCE: u64 = 0;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Wallet")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct Wallet {
     pub pub_key: PublicKey,
     pub name: String,
@@ -101,8 +98,8 @@ impl<T: Access> CurrencySchema<T> {
 /// Create a new wallet.
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxCreateWallet")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct CreateWallet {
     pub name: String,
 }
@@ -116,8 +113,8 @@ impl CreateWallet {
 /// Transfer coins between the wallets.
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxTransfer")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct Transfer {
     pub to: PublicKey,
     pub amount: u64,
@@ -213,11 +210,7 @@ impl CryptocurrencyApi {
 
 /// Define the service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "cryptocurrency",
-    artifact_version = "1.0.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "cryptocurrency", artifact_version = "1.0.0")]
 #[service_dispatcher(implements("CurrencyInterface"))]
 pub struct CurrencyService;
 

@@ -19,7 +19,6 @@ pub mod sandbox_tests_helper;
 pub mod timestamping;
 
 mod guarded_queue;
-mod proto;
 
 use bit_vec::BitVec;
 use exonum::{
@@ -35,6 +34,8 @@ use exonum::{
         TimeoutRequest,
     },
     helpers::{user_agent, Height, Round, ValidatorId},
+    keys::Keys,
+    merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
@@ -44,10 +45,6 @@ use exonum::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
     },
-};
-use exonum_keys::Keys;
-use exonum_merkledb::{
-    BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
 };
 use exonum_rust_runtime::{
     ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
@@ -1245,7 +1242,7 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 
 #[cfg(test)]
 mod tests {
-    use exonum_crypto::gen_keypair;
+    use exonum::crypto::gen_keypair;
 
     use super::*;
 

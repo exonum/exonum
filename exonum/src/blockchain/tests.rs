@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_crypto::{PublicKey, SecretKey};
-use exonum_derive::FromAccess;
+use exonum_derive::{BinaryValue, FromAccess};
 use exonum_merkledb::{
     access::{Access, FromAccess},
     BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot, SystemSchema,
@@ -46,21 +46,6 @@ const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 const TEST_SERVICE_NAME: &str = "test_service";
 const PANIC_STR: &str = "Panicking on request";
 
-macro_rules! impl_binary_value_for_bincode {
-    ($( $type:ty ),*) => {
-        $(
-            impl BinaryValue for $type {
-                fn to_bytes(&self) -> Vec<u8> {
-                    bincode::serialize(self).expect("Error while serializing value")
-                }
-                fn from_bytes(bytes: std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-                    bincode::deserialize(bytes.as_ref()).map_err(From::from)
-                }
-            }
-        )*
-    };
-}
-
 fn create_consensus_config() -> ConsensusConfig {
     generate_testnet_config(1, 0)[0].clone().consensus
 }
@@ -81,7 +66,8 @@ impl<T: Access> InspectorSchema<T> {
 }
 
 /// Actions that performs at the `initiate_adding_service` stage.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 enum InitAction {
     /// Nothing happens.
     Noop,
@@ -113,9 +99,7 @@ impl Execute for InitAction {
     fn execute(self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
             InitAction::Noop => Ok(()),
-
             InitAction::Panic => panic!(PANIC_STR),
-
             InitAction::Error(code, description) => Err(ExecutionError::service(code, description)),
         }
     }
@@ -151,7 +135,8 @@ impl Execute for AfterTransactionsAction {
 }
 
 /// Runtime inspector transaction set.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
 enum Transaction {
     /// Add some value to the inspector schema index.
     AddValue(u64),
@@ -225,8 +210,6 @@ impl Execute for Transaction {
         }
     }
 }
-
-impl_binary_value_for_bincode! { InitAction, Transaction }
 
 #[derive(Debug)]
 struct RuntimeInspector {
