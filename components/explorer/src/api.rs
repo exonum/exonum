@@ -1,3 +1,17 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Types used in the explorer API.
 //!
 //! The types are bundled together with the explorer (rather than the explorer service)
@@ -5,18 +19,20 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::{Block, Schema, TxLocation},
+    blockchain::Block,
     crypto::Hash,
     helpers::Height,
-    merkledb::{access::Access, ListProof},
+    merkledb::BinaryValue,
     messages::{Precommit, Verified},
-    runtime::{CallInfo, ExecutionStatus, InstanceId},
+    runtime::{AnyTx, CallInfo, ExecutionStatus, InstanceId},
 };
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use std::ops::Range;
 
 use crate::median_precommits_time;
+
+pub mod websocket;
 
 /// The maximum number of blocks to return per blocks request, in this way
 /// the parameter limits the maximum execution time for such requests.
@@ -108,12 +124,12 @@ pub struct BlocksQuery {
     /// If true, then only non-empty blocks are returned. The default value is false.
     #[serde(default)]
     pub skip_empty_blocks: bool,
-    /// If true, then the returned `BlocksRange`'s `times` field will contain median time from the
-    /// corresponding blocks precommits.
+    /// If true, then the `time` field in each returned block will contain the median time from the
+    /// block precommits.
     #[serde(default)]
     pub add_blocks_time: bool,
-    /// If true, then the returned `BlocksRange.precommits` will contain precommits for the
-    /// corresponding returned blocks.
+    /// If true, then the `precommits` field in each returned block will contain precommits for the
+    /// block stored by the node.
     #[serde(default)]
     pub add_precommits: bool,
 }
@@ -139,10 +155,18 @@ pub struct TransactionHex {
     pub tx_body: String,
 }
 
-/// Transaction response.
+impl TransactionHex {
+    pub fn new(transaction: &Verified<AnyTx>) -> Self {
+        Self {
+            tx_body: hex::encode(transaction.to_bytes()),
+        }
+    }
+}
+
+/// Response to a request to broadcast a transaction over the blockchain network.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct TransactionResponse {
-    /// The hex value of the transaction to be broadcasted.
+    /// The hash digest of the transaction.
     pub tx_hash: Hash,
 }
 
@@ -160,26 +184,8 @@ impl TransactionQuery {
     }
 }
 
-impl AsRef<str> for TransactionHex {
-    fn as_ref(&self) -> &str {
-        self.tx_body.as_ref()
-    }
-}
-
-impl AsRef<[u8]> for TransactionHex {
-    fn as_ref(&self) -> &[u8] {
-        self.tx_body.as_ref()
-    }
-}
-
-/// Call status response.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CallStatusResponse {
-    /// Call status
-    pub status: ExecutionStatus,
-}
-
-/// Call status query parameters to check `before_transactions` or `after_transactions` call.
+/// Query parameters to check the execution status of a `before_transactions` or
+/// `after_transactions` call.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CallStatusQuery {
     /// Height of a block.
@@ -188,62 +194,9 @@ pub struct CallStatusQuery {
     pub service_id: InstanceId,
 }
 
-/// Summary about a particular transaction in the blockchain (without transaction content).
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommittedTransactionSummary {
-    /// Transaction identifier.
-    pub tx_hash: Hash,
-    /// ID of service.
-    pub service_id: u16,
-    /// ID of transaction in service.
-    pub message_id: u16,
-    /// Result of transaction execution.
+/// Call status response.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CallStatusResponse {
+    /// Execution status of a call.
     pub status: ExecutionStatus,
-    /// Transaction location in the blockchain.
-    pub location: TxLocation,
-    /// Proof of existence.
-    pub location_proof: ListProof<Hash>,
-    /// Approximate finalization time.
-    pub time: DateTime<Utc>,
-}
-
-impl CommittedTransactionSummary {
-    /// Constructs a transaction summary from the core schema.
-    pub fn new(schema: &Schema<impl Access>, tx_hash: &Hash) -> Option<Self> {
-        let tx = schema.transactions().get(tx_hash)?;
-        let tx = tx.as_ref();
-        let service_id = tx.call_info.instance_id as u16;
-        let tx_id = tx.call_info.method_id as u16;
-        let location = schema.transactions_locations().get(tx_hash)?;
-        let tx_result = schema.transaction_result(location)?;
-        let location_proof = schema
-            .block_transactions(location.block_height())
-            .get_proof(location.position_in_block().into());
-        let time = median_precommits_time(
-            &schema
-                .block_and_precommits(location.block_height())
-                .unwrap()
-                .precommits,
-        );
-        Some(Self {
-            tx_hash: *tx_hash,
-            service_id,
-            message_id: tx_id,
-            status: ExecutionStatus(tx_result),
-            location,
-            location_proof,
-            time,
-        })
-    }
-}
-
-/// Websocket notification message. This enum describes data which is sent
-/// to a WebSocket listener.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Notification {
-    /// Notification about new block.
-    Block(Block),
-    /// Notification about new transaction.
-    Transaction(CommittedTransactionSummary),
 }

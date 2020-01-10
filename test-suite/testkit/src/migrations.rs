@@ -23,7 +23,7 @@ use exonum::{
         Database, Fork, Snapshot, TemporaryDB,
     },
     runtime::{
-        migrations::{MigrateData, MigrationContext, MigrationScript},
+        migrations::{MigrateData, MigrationContext, MigrationError, MigrationScript},
         versioning::Version,
         InstanceSpec,
     },
@@ -98,20 +98,19 @@ where
     }
 
     fn do_execute_script(&mut self, script: MigrationScript) {
-        let mut artifact = self.service_factory.artifact_id();
-        artifact.version = self.data_version.clone();
         let instance_spec = InstanceSpec {
             id: 100,
             name: Self::SERVICE_NAME.to_owned(),
-            artifact,
+            artifact: self.service_factory.artifact_id(),
         };
 
         let mut context = MigrationContext {
             helper: MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
             instance_spec,
+            data_version: self.data_version.clone(),
         };
         let end_version = script.end_version().to_owned();
-        script.execute(&mut context);
+        script.execute(&mut context).unwrap();
         context.helper.finish().unwrap();
 
         let mut fork = self.db.fork();
@@ -146,12 +145,13 @@ where
 /// # Examples
 ///
 /// ```
-/// # use exonum::runtime::migrations::{MigrationContext, MigrationScript};
+/// # use exonum::runtime::migrations::{MigrationContext, MigrationError, MigrationScript};
 /// # use exonum_derive::*;
 /// use exonum_testkit::migrations::ScriptExt as _;
 ///
-/// fn some_script(ctx: &mut MigrationContext) {
+/// fn some_script(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
 ///     // business logic skipped
+/// #   Ok(())
 /// }
 ///
 /// let script: MigrationScript = some_script.with_end_version("0.2.0");
@@ -163,7 +163,7 @@ pub trait ScriptExt {
 
 impl<F> ScriptExt for F
 where
-    F: FnOnce(&mut MigrationContext) + Send + 'static,
+    F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
 {
     fn with_end_version(self, version: &str) -> MigrationScript {
         MigrationScript::new(self, version.parse().expect("Cannot parse end version"))
@@ -174,7 +174,7 @@ where
 mod tests {
     use super::*;
 
-    use exonum::runtime::{migrations::DataMigrationError, ArtifactId};
+    use exonum::runtime::{migrations::InitMigrationError, ArtifactId};
     use exonum_rust_runtime::{ArtifactProtobufSpec, Service};
 
     use std::sync::{
@@ -182,12 +182,14 @@ mod tests {
         Arc,
     };
 
-    fn script_1(ctx: &mut MigrationContext) {
-        assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 1, 0));
+    fn script_1(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+        assert_eq!(ctx.data_version, Version::new(0, 1, 0));
+        Ok(())
     }
 
-    fn script_2(ctx: &mut MigrationContext) {
-        assert_eq!(ctx.instance_spec.artifact.version, Version::new(0, 2, 0));
+    fn script_2(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+        assert_eq!(ctx.data_version, Version::new(0, 2, 0));
+        Ok(())
     }
 
     #[derive(Debug, Clone, Default)]
@@ -217,19 +219,21 @@ mod tests {
         fn migration_scripts(
             &self,
             _: &Version,
-        ) -> Result<Vec<MigrationScript>, DataMigrationError> {
+        ) -> Result<Vec<MigrationScript>, InitMigrationError> {
             let first_counter = Arc::clone(&self.script_counters[0]);
             let second_counter = Arc::clone(&self.script_counters[1]);
 
             Ok(vec![
                 (move |ctx: &mut MigrationContext| {
-                    script_1(ctx);
+                    script_1(ctx)?;
                     first_counter.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
                 })
                 .with_end_version("0.2.0"),
                 (move |ctx: &mut MigrationContext| {
-                    script_2(ctx);
+                    script_2(ctx)?;
                     second_counter.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
                 })
                 .with_end_version("0.3.0"),
             ])

@@ -267,7 +267,7 @@ use exonum::{
     merkledb::Snapshot,
     runtime::{
         catch_panic,
-        migrations::{DataMigrationError, MigrateData, MigrationScript},
+        migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
         ExecutionContext, Mailbox, Runtime,
     },
@@ -310,8 +310,8 @@ impl<T> MigrateData for WithoutMigrations<T> {
     fn migration_scripts(
         &self,
         _start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, DataMigrationError> {
-        Err(DataMigrationError::NotSupported)
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 }
 
@@ -594,7 +594,7 @@ impl Runtime for RustRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         spec: &InstanceSpec,
-        status: InstanceStatus,
+        status: &InstanceStatus,
     ) {
         match status {
             InstanceStatus::Active => {
@@ -605,12 +605,35 @@ impl Runtime for RustRuntime {
                 );
                 self.add_started_service(instance);
             }
-
             InstanceStatus::Stopped => {
                 self.remove_started_service(spec);
             }
+            InstanceStatus::Migrating(_) => { /* Do nothing. */ }
         }
         self.changed_services_since_last_block = true;
+    }
+
+    fn migrate(
+        &self,
+        new_artifact: &ArtifactId,
+        data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        let artifact = self
+            .available_artifacts
+            .get(&new_artifact)
+            .unwrap_or_else(|| {
+                panic!(
+                    "BUG: `migrate` call to a non-existing artifact {:?}",
+                    new_artifact
+                );
+            });
+
+        let mut scripts = artifact.migration_scripts(data_version)?;
+        Ok(if scripts.is_empty() {
+            None
+        } else {
+            Some(scripts.swap_remove(0))
+        })
     }
 
     fn execute(
