@@ -17,7 +17,7 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix = "0.7.9"
-actix-net = "0.2.6" # ???
+actix-net = "0.2.6"
 actix-web = { version = "0.7.18", default-features = false }
 chrono = { version = "0.4.6", features = ["serde"] }
 failure = "0.1.5"

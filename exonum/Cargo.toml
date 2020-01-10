@@ -18,8 +18,6 @@ links = "exonum_protobuf"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-# FIXME: revise
-actix-web = { version = "0.7.18", default-features = false }
 log = "0.4.6"
 byteorder = { version = "1.2.7", features = [ "i128" ] }
 hex = "0.4"
@@ -29,16 +27,12 @@ serde = "1.0.101"
 serde_derive = "1.0.101"
 serde_json = "1.0.19"
 serde_str = "0.1.0"
-serde_urlencoded = "0.6.0"
-erased-serde = "0.3"
-toml = "0.5.0"
 env_logger = "0.6.0"
 bytes = "0.4.11"
 futures = "0.1.25"
 tokio = "0.1.14"
 tokio-codec = "0.1.1"
 tokio-core = "0.1.17"
-tokio-current-thread = "0.1.4"
 tokio-io = "0.1.11"
 tokio-retry = "0.2.0"
 tokio-threadpool = "0.1.10"
@@ -46,12 +40,8 @@ tokio-dns-unofficial = "0.4.0"
 failure = "0.1.5"
 os_info = "1.0.1"
 chrono = { version = "0.4.6", features = ["serde"] }
-uuid = { version = "0.8.1", features = ["serde"] }
 snow = { version = "0.6.0", default-features = false }
-rust_decimal = "1.0"
 protobuf = { version = "2.8.1", features = ["with-serde"] }
-ctrlc = "3.1.1"
-rpassword = "4.0.1"
 semver = { version = "0.9.0", features = ["serde"] }
 
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
