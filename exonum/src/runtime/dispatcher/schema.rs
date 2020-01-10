@@ -93,6 +93,11 @@ impl<T: Access> Schema<T> {
 
 // `AsReadonly` specialization to ensure that we won't leak mutable schema access.
 impl<T: AsReadonly> Schema<T> {
+    /// Readonly set of artifacts.
+    pub fn service_artifacts(&self) -> ProofMapIndex<T::Readonly, ArtifactId, ArtifactState> {
+        self.access.as_readonly().get_proof_map(ARTIFACTS)
+    }
+
     /// Readonly set of service instances.
     pub fn service_instances(&self) -> ProofMapIndex<T::Readonly, String, InstanceState> {
         self.access.as_readonly().get_proof_map(INSTANCES)

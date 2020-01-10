@@ -17,15 +17,15 @@
 //! Public API includes universally available endpoints, e.g., allowing to view
 //! the list of services on the current node.
 
-use exonum_api::ApiScope;
-use exonum_merkledb::access::Access;
-
-use crate::{
+use exonum::{
+    api::ApiScope,
     blockchain::{Blockchain, Schema},
     helpers::user_agent,
-    node_api::SharedNodeState,
+    merkledb::access::AsReadonly,
+    node::SharedNodeState,
     runtime::{ArtifactId, DispatcherSchema, InstanceState, SnapshotExt},
 };
+use serde_derive::{Deserialize, Serialize};
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -71,10 +71,10 @@ pub struct DispatcherInfo {
 
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
-    pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
+    fn load<T: AsReadonly>(schema: &DispatcherSchema<T>) -> Self {
         Self {
-            artifacts: schema.artifacts().keys().collect(),
-            services: schema.instances().values().collect(),
+            artifacts: schema.service_artifacts().keys().collect(),
+            services: schema.service_instances().values().collect(),
         }
     }
 }

@@ -42,9 +42,8 @@ use exonum::{
     },
     node::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-        NetworkConfiguration, NodeHandler, NodeSender, State, SystemStateProvider,
+        NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
     },
-    node_api::SharedNodeState,
 };
 use exonum_rust_runtime::{
     ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,

@@ -17,17 +17,16 @@
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. shutting down the node.
 
-use exonum_api::{ApiBackend, ApiScope, Error as ApiError, FutureResult};
-use exonum_crypto::PublicKey;
-use futures::Future;
-
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-
-use crate::{
-    node::{ApiSender, ConnectInfo, ExternalMessage},
-    node_api::SharedNodeState,
+use exonum::{
+    api::{ApiBackend, ApiScope, Error as ApiError, FutureResult},
+    crypto::PublicKey,
+    node::{ApiSender, ConnectInfo, ExternalMessage, SharedNodeState},
     runtime::InstanceId,
 };
+use futures::Future;
+use serde_derive::{Deserialize, Serialize};
+
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 /// Short information about the service.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -168,7 +167,7 @@ impl SystemApi {
         // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
         use actix_web::{HttpRequest, HttpResponse};
-        use exonum_api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
+        use exonum::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
 
         let sender = self.sender.clone();
         let index = move |_: HttpRequest| -> FutureResponse {

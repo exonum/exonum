@@ -121,8 +121,7 @@ use exonum::{
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
-    node::{ApiSender, ExternalMessage},
-    node_api::{create_api_aggregator, SharedNodeState},
+    node::{ApiSender, ExternalMessage, NodePlugin, SharedNodeState},
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{
@@ -143,6 +142,7 @@ use crate::{
     poll_events::{poll_events, poll_latest},
     server::TestKitActor,
 };
+use exonum::node::PluginApiContext;
 
 mod api;
 mod builder;
@@ -168,6 +168,7 @@ pub struct TestKit {
     api_sender: ApiSender,
     api_notifier_channel: ApiNotifierChannel,
     api_aggregator: ApiAggregator,
+    plugins: Vec<Box<dyn NodePlugin>>,
 }
 
 impl fmt::Debug for TestKit {
@@ -203,7 +204,8 @@ impl TestKit {
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
         genesis_config: GenesisConfig,
-        runtimes: impl IntoIterator<Item = impl Into<RuntimeInstance>>,
+        runtimes: Vec<RuntimeInstance>,
+        plugins: Vec<Box<dyn NodePlugin>>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -226,8 +228,12 @@ impl TestKit {
             .build();
         // Initial API aggregator does not contain service endpoints. We expect them to arrive
         // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
-        let api_aggregator =
-            create_api_aggregator(blockchain.immutable_view(), SharedNodeState::new(10_000));
+        let mut api_aggregator = ApiAggregator::new();
+        let node_state = SharedNodeState::new(10_000);
+        let plugin_api_context = PluginApiContext::new(blockchain.as_ref(), &node_state);
+        for plugin in &plugins {
+            api_aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+        }
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -250,6 +256,7 @@ impl TestKit {
             network,
             api_notifier_channel,
             api_aggregator,
+            plugins,
         }
     }
 
@@ -261,10 +268,12 @@ impl TestKit {
     /// Updates API aggregator for the testkit and caches it for further use.
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
-            let mut aggregator = create_api_aggregator(
-                self.blockchain.immutable_view(),
-                SharedNodeState::new(10_000),
-            );
+            let mut aggregator = ApiAggregator::new();
+            let node_state = SharedNodeState::new(10_000);
+            let plugin_api_context = PluginApiContext::new(self.blockchain.as_ref(), &node_state);
+            for plugin in &self.plugins {
+                aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+            }
             aggregator.extend(update.user_endpoints);
             self.api_aggregator = aggregator;
         }
@@ -409,6 +418,9 @@ impl TestKit {
 
         self.poll_events();
         let snapshot = self.snapshot();
+        for plugin in &self.plugins {
+            plugin.after_commit(&snapshot);
+        }
         BlockchainExplorer::new(snapshot.as_ref())
             .block_with_txs(self.height())
             .unwrap()
@@ -650,6 +662,7 @@ impl TestKit {
         let Self {
             db_handler,
             network,
+            plugins,
             api_notifier_channel,
             ..
         } = self;
@@ -658,6 +671,7 @@ impl TestKit {
         StoppedTestKit {
             network,
             db,
+            plugins,
             api_notifier_channel,
         }
     }
@@ -732,11 +746,21 @@ impl TestKit {
 /// testkit.create_blocks_until(Height(8));
 /// assert_eq!(service.counter(), 3); // We've only created 3 new blocks.
 /// ```
-#[derive(Debug)]
 pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
+    plugins: Vec<Box<dyn NodePlugin>>,
     network: TestNetwork,
     api_notifier_channel: ApiNotifierChannel,
+}
+
+impl fmt::Debug for StoppedTestKit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("StoppedTestKit")
+            .field("height", &self.height())
+            .field("network", &self.network)
+            .finish()
+    }
 }
 
 impl StoppedTestKit {
@@ -778,6 +802,7 @@ impl StoppedTestKit {
             // TODO make consensus config optional [ECR-3222]
             GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
             runtimes,
+            self.plugins,
             self.api_notifier_channel,
         )
     }

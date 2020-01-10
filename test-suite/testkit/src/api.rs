@@ -35,7 +35,6 @@ use exonum::{
     api::{self, ApiAggregator},
     messages::{AnyTx, Verified},
     node::ApiSender,
-    node_api::public::DispatcherInfo,
 };
 
 use crate::TestKit;
@@ -47,7 +46,8 @@ use crate::TestKit;
 /// [`TestKitApi`]: struct.TestKitApi.html
 #[derive(Debug, Clone, Copy)]
 pub enum ApiKind {
-    /// `api/system` endpoints of the built-in Exonum REST API.
+    /// `api/system` endpoints of the system API node plugin. To access endpoints, the plugin
+    /// should be attached to the testkit.
     System,
     /// Endpoints of the REST API of the explorer service.
     Explorer,
@@ -131,11 +131,6 @@ impl TestKitApi {
             ApiAccess::Private,
             kind.to_string(),
         )
-    }
-
-    /// Performs a GET request to the "/services" system endpoint.
-    pub fn dispatcher_info(&self) -> DispatcherInfo {
-        self.public(ApiKind::System).get("v1/services").unwrap()
     }
 }
 

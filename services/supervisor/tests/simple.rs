@@ -19,10 +19,10 @@
 use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
+    merkledb::access::AccessExt,
     messages::{AnyTx, Verified},
 };
 use exonum_derive::*;
-use exonum_merkledb::access::AccessExt;
 use exonum_rust_runtime::{
     CallContext, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError, InstanceId, Service,
     ServiceFactory as _, SnapshotExt, SUPERVISOR_INSTANCE_ID,
@@ -356,10 +356,10 @@ fn deploy_service() {
 
     testkit.create_blocks_until(deadline_height);
     // Verify that after reaching the deadline height artifact is deployed.
-    assert!(testkit
-        .api()
-        .dispatcher_info()
-        .artifacts
+    let snapshot = testkit.snapshot();
+    assert!(snapshot
+        .for_dispatcher()
+        .service_artifacts()
         .contains(&artifact));
 }
 

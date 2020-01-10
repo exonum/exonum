@@ -38,6 +38,7 @@
 
 pub use self::{
     connect_list::{ConnectInfo, ConnectList, ConnectListConfig},
+    plugin::{NodePlugin, PluginApiContext, SharedNodeState},
     state::State,
 };
 
@@ -57,6 +58,7 @@ pub mod constants {
 
 pub(crate) use self::state::SharedConnectList;
 
+use exonum_api::ApiAggregator;
 use exonum_keys::Keys;
 use exonum_merkledb::{Database, ObjectHash};
 use failure::{ensure, format_err, Error, Fail};
@@ -96,7 +98,6 @@ use crate::{
     },
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
-    node_api::{create_api_aggregator, SharedNodeState},
     runtime::RuntimeInstance,
 };
 
@@ -104,6 +105,7 @@ mod basic;
 mod connect_list;
 mod consensus;
 mod events;
+mod plugin;
 mod requests;
 mod state;
 
@@ -169,6 +171,8 @@ pub struct NodeHandler {
     pub api_state: SharedNodeState,
     /// Blockchain.
     pub blockchain: BlockchainMut,
+    /// Node plugins.
+    plugins: Vec<Box<dyn NodePlugin>>,
     /// State of the `NodeHandler`.
     state: State,
     /// System state.
@@ -506,6 +510,7 @@ impl NodeHandler {
         Self {
             blockchain,
             api_state,
+            plugins: vec![],
             system_state,
             state,
             channel: sender,
@@ -809,12 +814,17 @@ impl ApiSender {
         ApiSender(mpsc::channel(0).0)
     }
 
-    /// Sends an external message.
+    /// Sends an arbitrary `ExternalMessage` to the node.
     ///
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub(crate) fn send_external_message(
+    ///
+    /// # Stability
+    ///
+    /// This method is considered unstable because its misuse can lead to node breakage.
+    #[doc(hidden)]
+    pub fn send_external_message(
         &self,
         message: ExternalMessage,
     ) -> impl Future<Item = (), Error = SendError> {
@@ -990,6 +1000,7 @@ pub struct NodeBuilder {
     blockchain_builder: BlockchainBuilder,
     node_config: NodeConfig,
     config_manager: Option<Box<dyn ConfigManager>>,
+    plugins: Vec<Box<dyn NodePlugin>>,
 }
 
 impl fmt::Debug for NodeBuilder {
@@ -1026,6 +1037,7 @@ impl NodeBuilder {
             blockchain_builder,
             node_config,
             config_manager: None,
+            plugins: vec![],
         }
     }
 
@@ -1055,6 +1067,12 @@ impl NodeBuilder {
         self
     }
 
+    /// Adds a plugin.
+    pub fn with_plugin<T: NodePlugin + 'static>(mut self, plugin: T) -> Self {
+        self.plugins.push(Box::new(plugin));
+        self
+    }
+
     /// Converts this builder into a `Node`.
     pub fn build(self) -> Node {
         let blockchain = self.blockchain_builder.build();
@@ -1063,6 +1081,7 @@ impl NodeBuilder {
             self.channel,
             self.node_config,
             self.config_manager,
+            self.plugins,
         )
     }
 }
@@ -1074,6 +1093,7 @@ impl Node {
         channel: NodeChannel,
         node_cfg: NodeConfig,
         config_manager: Option<Box<dyn ConfigManager>>,
+        plugins: Vec<Box<dyn NodePlugin>>,
     ) -> Self {
         crypto::init();
 
@@ -1087,7 +1107,13 @@ impl Node {
         };
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
-        let api_aggregator = create_api_aggregator(blockchain.immutable_view(), api_state.clone());
+        let mut api_aggregator = ApiAggregator::new();
+        let plugin_api_context = PluginApiContext::new(blockchain.as_ref(), &api_state);
+        for plugin in &plugins {
+            let endpoints = plugin.wire_api(plugin_api_context.clone());
+            api_aggregator.extend(endpoints);
+        }
+
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
 
@@ -1128,7 +1154,7 @@ impl Node {
             server_restart_max_retries: node_cfg.api.server_restart.max_retries,
         };
 
-        let handler = NodeHandler::new(
+        let mut handler = NodeHandler::new(
             blockchain,
             &node_cfg.external_address,
             channel.node_sender(),
@@ -1137,6 +1163,7 @@ impl Node {
             api_state,
             config_manager,
         );
+        handler.plugins = plugins;
 
         Self {
             api_options: api_cfg,

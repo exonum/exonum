@@ -58,7 +58,6 @@ pub mod messages;
 pub mod helpers;
 pub mod blockchain;
 pub mod node;
-pub mod node_api;
 pub mod runtime;
 
 #[macro_use]

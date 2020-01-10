@@ -12,15 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    helpers::user_agent,
-    node_api::{
-        private::NodeInfo,
-        public::{ConsensusStatus, HealthCheckInfo, StatsInfo},
-    },
-};
-use exonum_testkit::{ApiKind, TestKitBuilder};
+use exonum::helpers::user_agent;
+use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
+
+use exonum_system_api::{
+    private::NodeInfo,
+    public::{ConsensusStatus, HealthCheckInfo, StatsInfo},
+    SystemApiPlugin,
+};
+
+fn create_testkit() -> TestKit {
+    TestKitBuilder::validator()
+        .with_validators(2)
+        .with_plugin(SystemApiPlugin)
+        .create()
+}
 
 #[test]
 fn healthcheck() {
@@ -29,7 +36,7 @@ fn healthcheck() {
     //
     // - consensus - enabled
     // - connectivity - not connected, due to testkit unable to emulate nodes properly.
-    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = create_testkit();
     let api = testkit.api();
 
     let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
@@ -42,7 +49,7 @@ fn healthcheck() {
 
 #[test]
 fn stats() {
-    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = create_testkit();
     let api = testkit.api();
     let info: StatsInfo = api.public(ApiKind::System).get("v1/stats").unwrap();
     let expected = StatsInfo {
@@ -55,7 +62,7 @@ fn stats() {
 
 #[test]
 fn user_agent_info() {
-    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = create_testkit();
     let api = testkit.api();
     let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent();
@@ -64,7 +71,7 @@ fn user_agent_info() {
 
 #[test]
 fn network() {
-    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = create_testkit();
     let api = testkit.api();
     let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
@@ -72,7 +79,7 @@ fn network() {
 
 #[test]
 fn shutdown() {
-    let mut testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut testkit = create_testkit();
     let api = testkit.api();
     api.private(ApiKind::System)
         .post::<()>("v1/shutdown")

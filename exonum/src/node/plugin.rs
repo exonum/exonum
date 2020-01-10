@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Implementation of the built-in REST API of an exonum node.
-
-use exonum_api::{ApiAggregator, ApiBuilder};
+use exonum_api::ApiBuilder;
+use exonum_merkledb::Snapshot;
 
 use std::{
     collections::HashSet,
+    fmt,
     sync::{Arc, RwLock},
 };
 
@@ -27,11 +27,6 @@ use crate::{
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
 };
-
-pub mod private;
-pub mod public;
-
-use self::{private::SystemApi as PrivateSystemApi, public::SystemApi};
 
 #[derive(Debug, Default)]
 struct ApiNodeState {
@@ -175,24 +170,59 @@ impl SharedNodeState {
         self.state_update_timeout
     }
 
-    pub(crate) fn tx_cache_size(&self) -> usize {
+    /// Returns the current size of transaction cache.
+    pub fn tx_cache_size(&self) -> usize {
         let state = self.node.read().expect("Expected read lock");
         state.tx_cache_len
     }
 }
 
-/// Creates `ApiAggregator` with built-in APIs for a node.
-#[doc(hidden)]
-pub fn create_api_aggregator(blockchain: Blockchain, node_state: SharedNodeState) -> ApiAggregator {
-    let mut aggregator = ApiAggregator::new();
-    aggregator.insert("system", system_api(blockchain, node_state));
-    aggregator
+/// Context supplied to a node plugin in `wire_api` method.
+#[derive(Debug, Clone)]
+pub struct PluginApiContext<'a> {
+    blockchain: &'a Blockchain,
+    node_state: &'a SharedNodeState,
 }
 
-fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
-    let mut builder = ApiBuilder::new();
-    let sender = blockchain.sender().to_owned();
-    PrivateSystemApi::new(sender, shared_api_state.clone()).wire(builder.private_scope());
-    SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
-    builder
+impl<'a> PluginApiContext<'a> {
+    #[doc(hidden)] // public because of the testkit
+    pub fn new(blockchain: &'a Blockchain, node_state: &'a SharedNodeState) -> Self {
+        Self {
+            blockchain,
+            node_state,
+        }
+    }
+
+    /// Returns a reference to blockchain.
+    pub fn blockchain(&self) -> &Blockchain {
+        self.blockchain
+    }
+
+    /// Returns a reference to the node state.
+    pub fn node_state(&self) -> &SharedNodeState {
+        self.node_state
+    }
+}
+
+/// Plugin for Exonum node.
+pub trait NodePlugin: Send {
+    /// Notifies the plugin that the node has committed a block.
+    ///
+    /// The default implementation does nothing.
+    fn after_commit(&self, _snapshot: &dyn Snapshot) {
+        // Do nothing
+    }
+
+    /// Allows the plugin to extend HTTP API of the node.
+    ///
+    /// The default implementation returns an empty `Vec`.
+    fn wire_api(&self, _context: PluginApiContext<'_>) -> Vec<(String, ApiBuilder)> {
+        Vec::new()
+    }
+}
+
+impl fmt::Debug for dyn NodePlugin {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_tuple("NodePlugin").finish()
+    }
 }
