@@ -394,6 +394,28 @@ impl Schema<&Fork> {
         self.add_pending_status(state, InstanceStatus::Stopped, None)
     }
 
+    /// Adds information about resuming service instance to the schema.
+    pub(crate) fn initiate_resuming_service(
+        &mut self,
+        instance_id: InstanceId,
+    ) -> Result<(), CoreError> {
+        let instance_name = self
+            .instance_ids()
+            .get(&instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+
+        let state = self
+            .instances()
+            .get(&instance_name)
+            .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
+
+        match state.status {
+            Some(InstanceStatus::Stopped) => {}
+            _ => return Err(CoreError::ServiceNotStopped),
+        }
+        self.add_pending_status(state, InstanceStatus::Active, None)
+    }
+
     /// Makes pending artifacts and instances active.
     pub(super) fn activate_pending(&mut self) {
         // Activate pending artifacts.

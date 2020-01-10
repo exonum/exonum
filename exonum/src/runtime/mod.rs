@@ -369,6 +369,13 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
+    fn initiate_resuming_service(
+        &self,
+        context: ExecutionContext<'_>,
+        spec: &InstanceSpec,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError>;
+
     /// Notifies runtime about changes of the service instance state.
     ///
     /// This method notifies runtime about a specific service instance state changes in the
@@ -761,6 +768,37 @@ impl<'a> ExecutionContext<'a> {
             .initiate_adding_service(spec)
             .map_err(From::from)
     }
+
+    /// TODO Documentation ECR-3773
+    pub(crate) fn initiate_resuming_service(
+        &mut self,
+        instance_id: InstanceId,
+        params: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        let spec = DispatcherSchema::new(&*self.fork)
+            .get_instance(instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?
+            .spec;
+
+        let runtime = self
+            .dispatcher
+            .runtime_by_id(spec.artifact.runtime_id)
+            .ok_or(CoreError::IncorrectRuntime)?;
+        runtime
+            .initiate_resuming_service(self.reborrow(), &spec, params.into_bytes())
+            .map_err(|mut err| {
+                err.set_runtime_id(spec.artifact.runtime_id)
+                    .set_call_site(|| CallSite {
+                        instance_id,
+                        call_type: CallType::Constructor,
+                    });
+                err
+            })?;
+
+        DispatcherSchema::new(&*self.fork)
+            .initiate_resuming_service(instance_id)
+            .map_err(From::from)
+    }
 }
 
 /// Instance descriptor contains information to access the running service instance.
@@ -828,6 +866,17 @@ impl<'a> SupervisorExtensions<'a> {
     /// the stopping transaction is committed.
     pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
+    }
+
+    /// TODO Documentation ECR-3773
+    pub fn initiate_resuming_service(
+        &mut self,
+        instance_id: InstanceId,
+        params: impl BinaryValue,
+    ) -> Result<(), ExecutionError> {
+        self.0
+            .child_context(Some(SUPERVISOR_INSTANCE_ID))
+            .initiate_resuming_service(instance_id, params)
     }
 
     /// Provides writeable access to core schema.

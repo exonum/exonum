@@ -123,6 +123,15 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
+    fn initiate_resuming_service(
+        &self,
+        context: ExecutionContext<'_>,
+        spec: &InstanceSpec,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        unimplemented!("ECR-3773")
+    }
+
     fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,

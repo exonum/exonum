@@ -105,6 +105,8 @@ enum RuntimeEvent {
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
     StartAdding(InstanceSpec, Vec<u8>),
+    Migrate(ArtifactId, Version),
+    StartResuming(InstanceSpec, Vec<u8>),
     CommitService(Height, InstanceSpec, InstanceStatus),
     AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
@@ -186,6 +188,20 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .initiate_adding_service(context, spec, parameters)
     }
 
+    fn initiate_resuming_service(
+        &self,
+        context: ExecutionContext<'_>,
+        spec: &InstanceSpec,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        self.events.push(RuntimeEvent::StartResuming(
+            spec.to_owned(),
+            parameters.clone(),
+        ));
+        self.runtime
+            .initiate_resuming_service(context, spec, parameters)
+    }
+
     fn update_service_status(
         &mut self,
         snapshot: &dyn Snapshot,
@@ -213,6 +229,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
         new_artifact: &ArtifactId,
         data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        self.events.push(RuntimeEvent::Migrate(
+            new_artifact.to_owned(),
+            data_version.clone(),
+        ));
         self.runtime.migrate(new_artifact, data_version)
     }
 

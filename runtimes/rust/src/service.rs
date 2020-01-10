@@ -70,6 +70,10 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
+    fn resume(&self, _context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     /// Performs storage operations on behalf of the service before processing any transaction
     /// in the block.
     ///
