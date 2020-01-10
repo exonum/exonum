@@ -145,7 +145,7 @@ impl ApiScope {
     /// For now there is only web backend and it has the following requirements:
     ///
     /// - Query parameters should be decodable via `serde_urlencoded`, i.e. from the
-    ///   "first_param=value1&second_param=value2" form.
+    ///   `first_param=value1&second_param=value2` form.
     /// - Response items should be encodable via `serde_json` crate.
     pub fn endpoint<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
@@ -262,7 +262,7 @@ impl ApiAggregator {
         self.endpoints.extend(endpoints);
     }
 
-    /// Extend the given API backend by handlers with the given access level.
+    /// Extends the API backend with the handlers with the given access level.
     #[doc(hidden)] // used by testkit; logically not public
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         let endpoints = self.endpoints.iter();

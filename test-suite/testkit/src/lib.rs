@@ -274,7 +274,7 @@ impl TestKit {
             for plugin in &self.plugins {
                 aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
             }
-            aggregator.extend(update.user_endpoints);
+            aggregator.extend(update.endpoints);
             self.api_aggregator = aggregator;
         }
         self.api_aggregator.clone()

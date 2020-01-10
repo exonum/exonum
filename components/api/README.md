@@ -4,7 +4,8 @@
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
-`exonum-api` provides a high-level wrapper around the [`actix`] web server.
+`exonum-api` provides a high-level wrapper around a web server,
+which uses  [`actix`] internally.
 The wrapper is used in [Rust services][rust-runtime] and in plugins
 for the Exonum node.
 

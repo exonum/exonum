@@ -42,7 +42,7 @@ impl WebServerConfig {
     }
 }
 
-/// Configuration parameters for the actix system runtime.
+/// Configuration parameters for `ApiManager`.
 #[derive(Debug, Clone)]
 pub struct ApiManagerConfig {
     /// Active API runtimes.
@@ -57,7 +57,8 @@ pub struct ApiManagerConfig {
     pub server_restart_max_retries: u16,
 }
 
-/// Actor responsible for API management.
+/// Actor responsible for API management. The actor encapsulates endpoint handlers and
+/// is capable of updating them via `UpdateEndpoints`.
 pub struct ApiManager {
     config: ApiManagerConfig,
     server_addresses: HashMap<ApiAccess, Addr<Server>>,
@@ -184,12 +185,13 @@ impl Handler<StartServer> for ApiManager {
     }
 }
 
-/// Updates user-provided endpoints, restarting all HTTP servers managed by the addressed
-/// `ApiManager`.
+/// Updates variable endpoints of the service, restarting all HTTP servers managed by the addressed
+/// `ApiManager`. The endpoints initially supplied to the `ApiManager` during its construction
+/// are not affected.
 #[derive(Debug, Clone)]
 pub struct UpdateEndpoints {
     /// Complete list of endpoints.
-    pub user_endpoints: Vec<(String, ApiBuilder)>,
+    pub endpoints: Vec<(String, ApiBuilder)>,
 }
 
 impl Message for UpdateEndpoints {
@@ -199,7 +201,7 @@ impl Message for UpdateEndpoints {
 impl StreamHandler<UpdateEndpoints, ()> for ApiManager {
     fn handle(&mut self, msg: UpdateEndpoints, ctx: &mut Context<Self>) {
         log::info!("Server restart requested");
-        self.variable_endpoints = msg.user_endpoints;
+        self.variable_endpoints = msg.endpoints;
         self.initiate_restart(ctx.address());
     }
 }
