@@ -2,6 +2,8 @@
 
 import unittest
 
+import re
+from exonum_client import ExonumClient
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
 from exonum_launcher.explorer import ExecutionFailError
@@ -148,6 +150,190 @@ class RegularDeployTest(unittest.TestCase):
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
+    def test_deploy_regular_with_consensus_config(self):
+        """Tests the deploy mechanism in regular mode with consensus config."""
+
+        pub_configs = self.network._public_configs().split()
+        validator_keys = []
+        for pub_config in pub_configs:
+            keys = []
+            with open(pub_config, 'r') as file:
+                data = file.read()
+                keys.append(re.search('consensus_key = "(.+?)"', data).group(1))
+                keys.append(re.search('service_key = "(.+?)"', data).group(1))
+            validator_keys.append(keys)
+
+        cryptocurrency_advanced_config_dict = {
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "consensus": {
+              "validator_keys": validator_keys,
+              "first_round_timeout": 3000,
+              "status_timeout": 5000,
+              "peers_timeout": 10000,
+              "txs_block_limit": 5000,
+              "max_message_len": 1048576,
+              "min_propose_timeout": 10,
+              "max_propose_timeout": 200,
+              "propose_timeout_threshold": 500
+            },
+            "artifacts": {
+                "cryptocurrency": {
+                    "runtime": "rust",
+                    "name": "exonum-cryptocurrency-advanced",
+                    "version": "0.13.0-rc.2",
+                }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency"}},
+        }
+
+        cryptocurrency_advanced_config = Configuration(
+            cryptocurrency_advanced_config_dict
+        )
+        with Launcher(cryptocurrency_advanced_config) as launcher:
+            explorer = launcher.explorer()
+
+            launcher.deploy_all()
+            launcher.wait_for_deploy()
+            launcher.start_all()
+            launcher.wait_for_start()
+
+            for artifact in launcher.launch_state.completed_deployments():
+                deployed = explorer.check_deployed(artifact)
+                self.assertEqual(deployed, True)
+
+            self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
+
+        for validator_id in range(self.network.validators_count()):
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            supervisor_api = client.service_apis("supervisor")
+            consensus_config = supervisor_api[0].get_service("consensus-config").json()
+            # check that initial config has been applied
+            self.assertEqual(consensus_config['txs_block_limit'], 5000)
+
+    def test_deploy_regular_with_invalid_consensus_config(self):
+        """Tests the deploy mechanism in regular mode with
+        invalid consensus config."""
+
+        cryptocurrency_advanced_config_dict = {
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "consensus": {
+              "first_round_timeout": 3000,
+              "status_timeout": 5000,
+              "peers_timeout": 10000,
+              "txs_block_limit": 1000,
+              "max_message_len": 1048576,
+              "min_propose_timeout": 10,
+              "max_propose_timeout": 200,
+              "propose_timeout_threshold": 500
+            },
+            "artifacts": {
+                "cryptocurrency": {
+                    "runtime": "rust",
+                    "name": "exonum-cryptocurrency-advanced",
+                    "version": "0.13.0-rc.2",
+                }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency"}},
+        }
+
+        with self.assertRaises(RuntimeError):
+            Configuration(
+                cryptocurrency_advanced_config_dict)
+
+    def test_deploy_regular_stop_running_instance(self):
+        """Tests the deploy mechanism to stop running instance."""
+
+        cryptocurrency_advanced_config_dict = {
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "artifacts": {
+                "cryptocurrency": {
+                    "runtime": "rust",
+                    "name": "exonum-cryptocurrency-advanced",
+                    "version": "0.13.0-rc.2",
+                }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency"}},
+        }
+
+        cryptocurrency_advanced_config = Configuration(
+            cryptocurrency_advanced_config_dict
+        )
+        with Launcher(cryptocurrency_advanced_config) as launcher:
+            explorer = launcher.explorer()
+
+            launcher.deploy_all()
+            launcher.wait_for_deploy()
+            launcher.start_all()
+            launcher.wait_for_start()
+
+            for artifact in launcher.launch_state.completed_deployments():
+                deployed = explorer.check_deployed(artifact)
+                self.assertEqual(deployed, True)
+
+            self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
+
+        # stop service
+        cryptocurrency_advanced_config_dict = {
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "artifacts": {
+              "cryptocurrency": {
+                "runtime": "rust",
+                "name": "exonum-cryptocurrency-advanced",
+                "version": "0.13.0-rc.2",
+              }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency", "action": "stop"}},
+        }
+
+        cryptocurrency_advanced_config = Configuration(
+            cryptocurrency_advanced_config_dict
+        )
+        with Launcher(cryptocurrency_advanced_config) as launcher:
+
+            launcher.deploy_all()
+            launcher.wait_for_deploy()
+            launcher.start_all()
+            launcher.wait_for_start()
+
+        for validator_id in range(self.network.validators_count()):
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            available_services = client.public_api.available_services().json()
+            # crypto instance always first element in array
+            self.assertEqual(available_services['services'][0]['status'], 'Stopped')
+
+    def test_deploy_regular_with_instance_stop_action_before_start(self):
+        """Tests the deploy mechanism in regular mode with instance
+        within stop action before start."""
+
+        cryptocurrency_advanced_config_dict = {
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "artifacts": {
+                "cryptocurrency": {
+                    "runtime": "rust",
+                    "name": "exonum-cryptocurrency-advanced",
+                    "version": "0.13.0-rc.2",
+                }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency", "action": "stop"}},
+        }
+
+        cryptocurrency_advanced_config = Configuration(
+            cryptocurrency_advanced_config_dict
+        )
+        with Launcher(cryptocurrency_advanced_config) as launcher:
+
+            launcher.deploy_all()
+            launcher.wait_for_deploy()
+            with self.assertRaises(RuntimeError):
+                launcher.start_all()
+
     def test_deploy_regular_with_invalid_instance(self):
         """Tests the deploy mechanism in regular mode with invalid instance."""
 
@@ -179,6 +365,27 @@ class RegularDeployTest(unittest.TestCase):
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
+
+    def test_deploy_regular_with_invalid_action(self):
+        """Tests the deploy mechanism in regular mode with
+        invalid action."""
+
+        cryptocurrency_advanced_config_dict = {
+            "networks": launcher_networks(self.network),
+            "deadline_height": 10000,
+            "artifacts": {
+                "cryptocurrency": {
+                    "runtime": "rust",
+                    "name": "exonum-cryptocurrency-advanced",
+                    "version": "0.13.0-rc.2",
+                }
+            },
+            "instances": {"crypto": {"artifact": "cryptocurrency", "action": "invalid_action"}},
+        }
+
+        with self.assertRaises(RuntimeError):
+            Configuration(
+                cryptocurrency_advanced_config_dict)
 
     def tearDown(self):
         outputs = self.network.stop()
