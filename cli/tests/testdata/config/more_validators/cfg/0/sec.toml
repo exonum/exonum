@@ -4,6 +4,9 @@ master_key_path = "master.key.toml"
 
 [api]
 state_update_timeout = 10000
+[api.server_restart]
+max_retries = 20
+retry_timeout = 500
 
 [connect_list]
 peers = []
@@ -23,7 +26,3 @@ max_outgoing_connections = 128
 tcp_connect_max_retries = 10
 tcp_connect_retry_timeout = 15000
 tcp_nodelay = true
-
-[network.http_backend_config]
-server_restart_max_retries = 20
-server_restart_retry_timeout = 500

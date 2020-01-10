@@ -36,7 +36,7 @@ impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub(crate) fn handle_request(&mut self, msg: &Requests) {
         // Request are sent to us
-        if msg.to() != self.state.consensus_public_key() {
+        if msg.to() != self.state.keys().consensus_pk() {
             error!("Received message addressed to other peer = {:?}.", msg.to());
             return;
         }

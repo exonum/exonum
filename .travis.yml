@@ -137,7 +137,9 @@ jobs:
   # Run examples.
   - name: examples
     script:
-    - cargo run -p exonum-merkledb --example migration
+    - cargo run -p exonum-merkledb --example manual_migration
+    - cargo run -p exonum-merkledb --example migration_with_helper
+    - cargo run -p exonum-merkledb --example migration_with_iter_loop
     - cargo run -p exonum-merkledb --example blockchain
     - cargo run -p exonum-sample-runtime
     - cargo run -p exonum-explorer --example explorer

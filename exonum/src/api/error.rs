@@ -18,6 +18,8 @@ use failure::Fail;
 use serde::Serialize;
 use std::io;
 
+use crate::node::SendError;
+
 /// List of possible API errors.
 #[derive(Fail, Debug)]
 pub enum Error {
@@ -106,8 +108,16 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Converts the provided error into an internal server error.
 impl From<failure::Error> for Error {
     fn from(e: failure::Error) -> Self {
         Error::InternalError(e)
+    }
+}
+
+/// Converts the provided error into an internal server error.
+impl From<SendError> for Error {
+    fn from(e: SendError) -> Self {
+        Error::InternalError(e.into())
     }
 }

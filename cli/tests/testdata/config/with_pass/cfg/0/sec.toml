@@ -4,6 +4,9 @@ master_key_path = "master.key.toml"
 
 [api]
 state_update_timeout = 10000
+[api.server_restart]
+max_retries = 20
+retry_timeout = 500
 
 [connect_list]
 peers = []
@@ -11,6 +14,7 @@ peers = []
 [database]
 compression_type = "none"
 create_if_missing = true
+
 [mempool.events_pool_capacity]
 api_requests_capacity = 1024
 internal_events_capacity = 128

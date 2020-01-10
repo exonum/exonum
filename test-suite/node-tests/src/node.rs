@@ -18,7 +18,7 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
     merkledb::{Database, TemporaryDB},
-    node::{ApiSender, ExternalMessage, Node, NodeConfig},
+    node::{Node, NodeConfig, ShutdownHandle},
 };
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
 
@@ -36,7 +36,22 @@ use std::{
 #[derive(Debug)]
 struct RunHandle {
     node_thread: thread::JoinHandle<()>,
-    api_tx: ApiSender,
+    shutdown_handle: ShutdownHandle,
+}
+
+impl RunHandle {
+    fn new(node: Node) -> Self {
+        let shutdown_handle = node.shutdown_handle();
+        Self {
+            shutdown_handle,
+            node_thread: thread::spawn(|| node.run().unwrap()),
+        }
+    }
+
+    fn join(self) {
+        self.shutdown_handle.shutdown().wait().unwrap();
+        self.node_thread.join().unwrap();
+    }
 }
 
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
@@ -110,13 +125,7 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
             None,
         );
 
-        let api_tx = node.channel();
-        node_threads.push(RunHandle {
-            node_thread: thread::spawn(move || {
-                node.run().unwrap();
-            }),
-            api_tx,
-        });
+        node_threads.push(RunHandle::new(node));
         commit_rxs.push(commit_rx);
     }
     (node_threads, commit_rxs)
@@ -134,11 +143,7 @@ fn test_node_run() {
     }
 
     for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        handle.node_thread.join().unwrap();
+        handle.join();
     }
 }
 
@@ -159,17 +164,8 @@ fn test_node_restart_regression() {
                 .build(notifier)
                 .into()]
         };
-
         let node = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
-        let api_tx = node.channel();
-        let node_thread = thread::spawn(move || {
-            node.run().unwrap();
-        });
-        // Wait for shutdown
-        api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        node_thread.join().unwrap();
+        RunHandle::new(node).join();
     };
 
     let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
