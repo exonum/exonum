@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "http"]
 categories = ["cryptography"]
-description = "System API plugin the Exonum framework"
+description = "System API plugin of the Exonum framework"
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
