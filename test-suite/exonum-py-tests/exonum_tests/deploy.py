@@ -305,7 +305,7 @@ class RegularDeployTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             available_services = client.public_api.available_services().json()
             # crypto instance always first element in array
-            self.assertEqual(available_services['services'][0]['status'], 'Stopped')
+            self.assertEqual(available_services['services'][0]['status']['type'], 'stopped')
 
     def test_deploy_regular_with_instance_stop_action_before_start(self):
         """Tests the deploy mechanism in regular mode with instance
