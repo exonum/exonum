@@ -66,11 +66,7 @@ exonum-proto = { version = "0.13.0-rc.2", path = "../components/proto" }
 assert_matches = "1.3.0"
 bincode = "1.2.0"
 criterion = "0.3.0"
-modifier = "0.1.0"
-num = "0.2.0"
 pretty_assertions = "0.6.1"
-proptest = "0.9.1"
-tempfile = "3"
 
 [[bench]]
 name = "criterion"

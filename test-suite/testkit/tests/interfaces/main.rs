@@ -30,7 +30,6 @@ use crate::{
 
 mod error;
 mod interface;
-mod proto;
 mod schema;
 mod services;
 
@@ -353,7 +352,7 @@ fn test_any_call_err_wrong_arg() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
-    let inner_call = AnyCall::new(CallInfo::new(10_000, 0), ());
+    let inner_call = b"\xfe\xff".to_vec();
     let outer_call = AnyCall::new(CallInfo::new(WalletService::ID, 0), inner_call);
     let err = execute_transaction(
         &mut testkit,

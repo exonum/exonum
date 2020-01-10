@@ -12,9 +12,16 @@ fn create_path_to_protobuf_schema_env() {
     // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
 
     let current_dir = env::current_dir().expect("Failed to get current dir.");
-
     let protos = current_dir.join("src/proto/schema/exonum");
     println!("cargo:protos={}", protos.to_str().unwrap());
+
+    // Reexport MerkleDB and crypto protobuf files.
+    let crypto_protos = env::var("DEP_EXONUM_PROTOBUF_CRYPTO_PROTOS")
+        .expect("Cannot obtain `crypto` protobuf files");
+    println!("cargo:crypto_protos={}", crypto_protos);
+    let merkledb_protos = env::var("DEP_EXONUM_PROTOBUF_MERKLEDB_PROTOS")
+        .expect("Cannot obtain `merkledb` protobuf files");
+    println!("cargo:merkledb_protos={}", merkledb_protos);
 }
 
 fn write_user_agent_file() {

@@ -17,9 +17,8 @@
 use exonum::{
     api::{self, ApiBuilder},
     proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
-    runtime::{ArtifactId, RuntimeIdentifier},
+    runtime::{versioning::Version, ArtifactId, RuntimeIdentifier},
 };
-use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 
 use std::collections::HashMap;
