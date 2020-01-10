@@ -14,40 +14,60 @@
 
 use exonum_derive::*;
 
-/// Common errors emitted by transactions during execution.
+/// General errors that can occur within supervisor interaction.
+/// Error codes 0-15.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
-pub enum Error {
-    /// Artifact has been already deployed.
-    AlreadyDeployed = 0,
-    /// Transaction author is not a validator.
-    UnknownAuthor = 1,
+pub enum CommonError {
     /// Deadline exceeded for the current transaction.
-    DeadlineExceeded = 2,
-    /// Instance with the given name already exists.
-    InstanceExists = 3,
-    /// Deploy request has been already registered.
-    DeployRequestAlreadyRegistered = 4,
-    /// Deploy request has not been registered or accepted.
-    DeployRequestNotRegistered = 5,
+    DeadlineExceeded = 0,
+    /// Actual height for transaction is in the past.
+    ActualFromIsPast = 1,
+}
+
+/// Artifact-related errors group.
+/// Error codes 16-31.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum ArtifactError {
+    /// Artifact has been already deployed.
+    AlreadyDeployed = 16,
     /// Artifact identifier has incorrect format.
-    InvalidArtifactId = 6,
-    /// Instance name is incorrect.
-    InvalidInstanceName = 7,
-    /// Actual height for config proposal is in the past.
-    ActualFromIsPast = 8,
-    /// Active configuration change proposal already exists.
-    ConfigProposeExists = 9,
-    /// Malformed configuration change proposal.
-    MalformedConfigPropose = 10,
-    /// This configuration change proposal is not registered.
-    ConfigProposeNotRegistered = 11,
-    /// Transaction author attempts to vote twice.
-    AttemptToVoteTwice = 12,
+    InvalidArtifactId = 17,
+    /// Deploy request has been already registered.
+    DeployRequestAlreadyRegistered = 18,
+    /// Deploy request has not been registered or accepted.
+    DeployRequestNotRegistered = 19,
     /// Start request contains unknown artifact.
-    UnknownArtifact = 13,
+    UnknownArtifact = 20,
+}
+
+/// Instance-related errors group.
+/// Error codes 32-47.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum ServiceError {
+    /// Instance with the given name already exists.
+    InstanceExists = 32,
+    /// Instance name is incorrect.
+    InvalidInstanceName = 33,
+}
+
+/// Configuration-related errors group.
+/// Error codes 48-64.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum ConfigurationError {
+    /// Active configuration change proposal already exists.
+    ConfigProposeExists = 48,
+    /// Malformed configuration change proposal.
+    MalformedConfigPropose = 49,
+    /// This configuration change proposal is not registered.
+    ConfigProposeNotRegistered = 50,
+    /// Transaction author attempts to vote twice.
+    AttemptToVoteTwice = 51,
     /// Incorrect configuration number.
-    IncorrectConfigurationNumber = 14,
+    IncorrectConfigurationNumber = 52,
     /// Invalid configuration for supervisor.
-    InvalidConfig = 15,
+    InvalidConfig = 53,
 }

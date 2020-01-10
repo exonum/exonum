@@ -99,7 +99,7 @@ use semver::Version;
 
 use std::{collections::BTreeMap, fmt};
 
-use crate::runtime::{DispatcherError, ExecutionError, ExecutionFail, InstanceSpec};
+use crate::runtime::{CoreError, ExecutionError, ExecutionFail, InstanceSpec};
 
 type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
 
@@ -308,7 +308,7 @@ pub enum InitMigrationError {
 
 impl From<InitMigrationError> for ExecutionError {
     fn from(err: InitMigrationError) -> Self {
-        DispatcherError::NoMigration.with_description(err)
+        CoreError::NoMigration.with_description(err)
     }
 }
 

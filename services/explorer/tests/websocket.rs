@@ -22,9 +22,10 @@ use exonum::{
     helpers,
     merkledb::{ObjectHash, TemporaryDB},
     node::{Node, ShutdownHandle},
+    runtime::CoreError,
 };
 use exonum_explorer::api::Notification;
-use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
+use exonum_rust_runtime::{DefaultInstance, ExecutionError, RustRuntime, ServiceFactory};
 use futures::Future;
 use serde_json::json;
 use websocket::{
@@ -174,8 +175,7 @@ fn test_send_transaction() {
         response,
         json!({
             "result": "error",
-            "description": "Execution error with code `dispatcher:7` occurred: Suitable runtime \
-             for the given service instance ID is not found."
+            "description": ExecutionError::from(CoreError::IncorrectInstanceId).to_string(),
         })
     );
 

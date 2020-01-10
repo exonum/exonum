@@ -23,14 +23,14 @@ use exonum_merkledb::{
 use exonum_proto::ProtobufConvert;
 use semver::Version;
 
-use super::{ArtifactId, Error, InstanceSpec};
 use crate::{
     proto::schema::{
         self, runtime::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
     },
     runtime::{
         migrations::{InstanceMigration, MigrationStatus},
-        ArtifactState, ArtifactStatus, InstanceId, InstanceQuery, InstanceState, InstanceStatus,
+        ArtifactId, ArtifactState, ArtifactStatus, CoreError, ExecutionError, InstanceId,
+        InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
     },
 };
 
@@ -181,10 +181,10 @@ impl Schema<&Fork> {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(&artifact) {
-            return Err(Error::ArtifactAlreadyDeployed);
+            return Err(CoreError::ArtifactAlreadyDeployed.into());
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
@@ -204,36 +204,36 @@ impl Schema<&Fork> {
         &self,
         new_artifact: &ArtifactId,
         old_service: &str,
-    ) -> Result<InstanceState, Error> {
+    ) -> Result<InstanceState, CoreError> {
         // The service should exist.
         let instance_state = self
             .instances()
             .get(old_service)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         // The service should be stopped. Note that this also checks that
         // the service is not being migrated.
         if instance_state.status != Some(InstanceStatus::Stopped) {
-            return Err(Error::ServiceNotStopped);
+            return Err(CoreError::ServiceNotStopped);
         }
         // There should be no pending status for the service.
         if instance_state.pending_status.is_some() {
-            return Err(Error::ServicePending);
+            return Err(CoreError::ServicePending);
         }
 
         // The new artifact should exist.
         let artifact_state = self
             .artifacts()
             .get(&new_artifact)
-            .ok_or(Error::UnknownArtifactId)?;
+            .ok_or(CoreError::UnknownArtifactId)?;
         // The new artifact should be deployed.
         if artifact_state.status != ArtifactStatus::Active {
-            return Err(Error::ArtifactNotDeployed);
+            return Err(CoreError::ArtifactNotDeployed);
         }
 
         // The new artifact should refer a newer version of the service artifact.
         if !new_artifact.is_upgrade_of(&instance_state.spec.artifact) {
-            return Err(Error::CannotUpgradeService);
+            return Err(CoreError::CannotUpgradeService);
         }
         Ok(instance_state)
     }
@@ -275,9 +275,9 @@ impl Schema<&Fork> {
         mut instance_state: InstanceState,
         pending_status: InstanceStatus,
         migration_transition: Option<MigrationTransition>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CoreError> {
         if instance_state.pending_status.is_some() {
-            return Err(Error::ServicePending);
+            return Err(CoreError::ServicePending);
         }
         instance_state.pending_status = Some(pending_status);
         let instance_name = instance_state.spec.name.clone();
@@ -293,16 +293,16 @@ impl Schema<&Fork> {
         &mut self,
         instance_name: &str,
         outcome: MigrationOutcome,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CoreError> {
         let instance_state = self
             .instances()
             .get(instance_name)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let migration = match instance_state.status {
             Some(InstanceStatus::Migrating(ref migration)) if !migration.is_completed() => {
                 migration
             }
-            _ => return Err(Error::NoMigration),
+            _ => return Err(CoreError::NoMigration),
         };
         let new_status = match outcome {
             MigrationOutcome::Rollback => InstanceStatus::Stopped,
@@ -319,7 +319,7 @@ impl Schema<&Fork> {
 
     /// Saves migration rollback to the database. Returns an error if the rollback breaks
     /// invariants imposed by the migration workflow.
-    pub(super) fn add_migration_rollback(&mut self, instance_name: &str) -> Result<(), Error> {
+    pub(super) fn add_migration_rollback(&mut self, instance_name: &str) -> Result<(), CoreError> {
         self.resolve_ongoing_migration(instance_name, MigrationOutcome::Rollback)?;
         self.local_migration_results().remove(instance_name);
         Ok(())
@@ -332,7 +332,7 @@ impl Schema<&Fork> {
         &mut self,
         instance_name: &str,
         hash: Hash,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CoreError> {
         self.resolve_ongoing_migration(instance_name, MigrationOutcome::Commit(hash))
     }
 
@@ -346,20 +346,20 @@ impl Schema<&Fork> {
     }
 
     /// Adds information about a pending service instance to the schema.
-    pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), Error> {
+    pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), CoreError> {
         self.artifacts()
             .get(&spec.artifact)
-            .ok_or(Error::ArtifactNotDeployed)?;
+            .ok_or(CoreError::ArtifactNotDeployed)?;
 
         // Check that instance name doesn't exist.
         if self.instances().contains(&spec.name) {
-            return Err(Error::ServiceNameExists);
+            return Err(CoreError::ServiceNameExists);
         }
         // Check that instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
         let mut instance_ids = self.instance_ids();
         if instance_ids.contains(&spec.id) {
-            return Err(Error::ServiceIdExists);
+            return Err(CoreError::ServiceIdExists);
         }
         instance_ids.put(&spec.id, spec.name.clone());
 
@@ -376,11 +376,11 @@ impl Schema<&Fork> {
     pub(crate) fn initiate_stopping_service(
         &mut self,
         instance_id: InstanceId,
-    ) -> Result<(), Error> {
+    ) -> Result<(), CoreError> {
         let instance_name = self
             .instance_ids()
             .get(&instance_id)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         let state = self
             .instances()
@@ -389,7 +389,7 @@ impl Schema<&Fork> {
 
         match state.status {
             Some(InstanceStatus::Active) => {}
-            _ => return Err(Error::ServiceNotActive),
+            _ => return Err(CoreError::ServiceNotActive),
         }
         self.add_pending_status(state, InstanceStatus::Stopped, None)
     }
@@ -457,16 +457,16 @@ impl Schema<&Fork> {
 
     /// Marks a service migration as completed. This sets the service status from `Migrating`
     /// to `Stopped`, bumps its artifact version and removes the local migration result.
-    pub(super) fn complete_migration(&mut self, instance_name: &str) -> Result<(), Error> {
+    pub(super) fn complete_migration(&mut self, instance_name: &str) -> Result<(), CoreError> {
         let mut instance_state = self
             .instances()
             .get(instance_name)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let end_version = match instance_state.status {
             Some(InstanceStatus::Migrating(ref migration)) if migration.is_completed() => {
                 migration.end_version.clone()
             }
-            _ => return Err(Error::NoMigration),
+            _ => return Err(CoreError::NoMigration),
         };
 
         self.local_migration_results().remove(instance_name);

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::{error::Error, schema::Schema};
+pub use self::schema::Schema;
 
 use exonum_merkledb::{
     migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
@@ -37,7 +37,10 @@ use crate::{
     crypto::Hash,
     helpers::ValidateInput,
     messages::{AnyTx, Verified},
-    runtime::{ArtifactStatus, InstanceDescriptor, InstanceQuery, InstanceStatus, RuntimeInstance},
+    runtime::{
+        ArtifactStatus, CoreError, InstanceDescriptor, InstanceQuery, InstanceStatus,
+        RuntimeInstance,
+    },
 };
 
 use self::schema::{MigrationTransition, ModifiedInstanceInfo};
@@ -49,7 +52,6 @@ use super::{
     ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
 };
 
-mod error;
 #[cfg(test)]
 mod migration_tests;
 mod schema;
@@ -366,7 +368,7 @@ impl Dispatcher {
                 });
             Either::A(future)
         } else {
-            Either::B(future::err(Error::IncorrectRuntime.into()))
+            Either::B(future::err(CoreError::IncorrectRuntime.into()))
         }
     }
 
@@ -484,11 +486,11 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let instance = Schema::new(snapshot)
             .get_instance(call_info.instance_id)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
-            _ => Err(Error::ServiceNotActive.into()),
+            _ => Err(CoreError::ServiceNotActive.into()),
         }
     }
 
@@ -521,7 +523,7 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let (runtime_id, runtime) = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(Error::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
 
         let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);
@@ -652,7 +654,7 @@ impl Dispatcher {
     ) -> Result<Option<MigrationScript>, ExecutionError> {
         let runtime = self
             .runtime_by_id(new_artifact.runtime_id)
-            .ok_or(Error::IncorrectRuntime)?;
+            .ok_or(CoreError::IncorrectRuntime)?;
         runtime
             .migrate(new_artifact, data_version)
             .map_err(From::from)

@@ -24,7 +24,7 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        CallInfo, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        CallInfo, CoreError, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
         WellKnownRuntime,
     },
 };
@@ -39,7 +39,7 @@ use std::{
 };
 
 use exonum_rust_runtime::{
-    ArtifactId, CallContext, Caller, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError,
+    ArtifactId, CallContext, Caller, CommonError, DefaultInstance, ErrorMatch, ExecutionError,
     InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
     SUPERVISOR_INSTANCE_ID,
 };
@@ -385,7 +385,7 @@ impl Test<CallContext<'_>> for TestServiceImpl {
 
 impl Service for TestServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         context
             .service_data()
             .get_proof_entry("constructor_entry")
@@ -414,7 +414,7 @@ impl Test<CallContext<'_>> for TestServiceImplV2 {
     type Output = Result<(), ExecutionError>;
 
     fn method_a(&self, _context: CallContext<'_>, _arg: u64) -> Self::Output {
-        Err(DispatcherError::NoSuchMethod.into())
+        Err(CommonError::NoSuchMethod.into())
     }
 
     fn method_b(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
@@ -455,7 +455,7 @@ impl Service for DependentServiceImpl {
             other => panic!("Wrong caller type: {:?}", other),
         }
 
-        let init = Init::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         if context
             .data()
             .for_dispatcher()
@@ -876,7 +876,7 @@ fn multiple_service_versions() {
     )
     .unwrap_err();
     // `method_a` is removed from the newer service version.
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchMethod));
 
     {
         let snapshot = blockchain.snapshot();
@@ -1018,10 +1018,7 @@ fn conflicting_service_instances() {
     )
     .unwrap_err();
     // Alternative instance was discarded.
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 }
 
 #[test]

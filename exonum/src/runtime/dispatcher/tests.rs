@@ -38,7 +38,7 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
-        ArtifactId, BlockchainData, CallInfo, Caller, DispatcherError, DispatcherSchema, ErrorKind,
+        ArtifactId, BlockchainData, CallInfo, Caller, CoreError, DispatcherSchema, ErrorKind,
         ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceStatus, MethodId, Runtime, RuntimeInstance,
     },
@@ -83,7 +83,7 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let context = ExecutionContext::new(self, fork, caller);
         runtime.execute(context, call_info, arguments)
     }
@@ -190,7 +190,7 @@ impl Runtime for SampleRuntime {
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
-            Err(DispatcherError::IncorrectRuntime.into())
+            Err(CoreError::IncorrectRuntime.into())
         };
         Box::new(res.into_future())
     }
@@ -358,7 +358,7 @@ fn test_dispatcher_simple() {
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service = InstanceSpec {
-        artifact: java_artifact.clone(),
+        artifact: java_artifact,
         id: JAVA_SERVICE_ID,
         name: JAVA_SERVICE_NAME.into(),
     };
@@ -388,23 +388,17 @@ fn test_dispatcher_simple() {
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceIdExists)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
     let conflicting_rust_service = InstanceSpec {
-        artifact: rust_artifact.clone(),
+        artifact: rust_artifact,
         id: RUST_SERVICE_ID + 1,
         name: RUST_SERVICE_NAME.to_owned(),
     };
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceNameExists)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNameExists));
 
     // Activate services / artifacts.
     let patch = create_genesis_block(&mut dispatcher, fork);
@@ -902,7 +896,7 @@ fn stopped_service_workflow() {
     );
 
     let (changes_tx, changes_rx) = channel();
-    let runtime = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, changes_tx.clone());
+    let runtime = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, changes_tx);
 
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime.runtime_type, runtime.clone())
@@ -915,7 +909,7 @@ fn stopped_service_workflow() {
         .expect_err("`initiate_stopping_service` should fail");
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
     );
 
     let artifact = ArtifactId {
@@ -926,7 +920,7 @@ fn stopped_service_workflow() {
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec {
-        artifact: artifact.clone(),
+        artifact,
         id: instance_id,
         name: instance_name.into(),
     };
@@ -949,7 +943,7 @@ fn stopped_service_workflow() {
         .expect_err("`initiate_stopping_service` should fail");
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&DispatcherError::ServicePending)
+        ErrorMatch::from_fail(&CoreError::ServicePending)
     );
 
     // Check if transactions are still ready for execution.
@@ -1053,6 +1047,6 @@ fn stopped_service_workflow() {
         .expect_err("`initiate_stopping_service` should fail");
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceNotActive)
+        ErrorMatch::from_fail(&CoreError::ServiceNotActive)
     );
 }

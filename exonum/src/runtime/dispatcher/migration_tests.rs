@@ -27,8 +27,7 @@ use crate::{
     node::ApiSender,
     runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
-        CallInfo, DispatcherError, DispatcherSchema, ErrorMatch, RuntimeIdentifier,
-        WellKnownRuntime,
+        CallInfo, CoreError, DispatcherSchema, ErrorMatch, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 
@@ -320,10 +319,7 @@ fn migration_workflow() {
         .dispatcher()
         .initiate_migration(&fork, new_artifact.clone(), &service.name)
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ServiceNotStopped)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotStopped));
 
     // Stop the service.
     rig.stop_service(&service);
@@ -429,40 +425,28 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, unrelated_artifact.clone(), &old_service.name)
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::CannotUpgradeService)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
 
     // Attempt to downgrade service.
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, old_artifact, &new_service.name)
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::CannotUpgradeService)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
 
     // Attempt to migrate to the same version.
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, new_artifact.clone(), &new_service.name)
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::CannotUpgradeService)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
 
     // Attempt to migrate unknown service.
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, new_artifact, "bogus-service")
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Attempt to migrate to unknown artifact.
     let unknown_artifact = ArtifactId {
@@ -474,10 +458,7 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact.clone(), &old_service.name)
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::UnknownArtifactId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::UnknownArtifactId));
 
     // Mark the artifact as pending.
     Dispatcher::commit_artifact(&fork, unknown_artifact.clone(), vec![]);
@@ -485,10 +466,7 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact, &old_service.name)
         .unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::ArtifactNotDeployed)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed));
 }
 
 /// Tests that an unfinished migration script is restarted on node restart.
@@ -786,21 +764,18 @@ fn migration_rollback_invariants() {
     // Non-existing service.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::rollback_migration(&fork, "bogus").unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Service is not stopped.
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
 
     rig.stop_service(&service);
 
     // Service is stopped, but there is no migration happening.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
 
     // Start migration and commit its result, thus making the rollback impossible.
     rig.dispatcher()
@@ -813,12 +788,12 @@ fn migration_rollback_invariants() {
     // In the same block, we'll get an error because the service already has
     // a pending status update.
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::ServicePending));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServicePending));
     rig.create_block(fork);
     // ...In the next block, we'll get another error.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
 }
 
 /// Tests that migration rollback aborts locally executed migration script.
@@ -935,21 +910,18 @@ fn migration_commit_invariants() {
     // Non-existing service.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::commit_migration(&fork, "bogus", Hash::zero()).unwrap_err();
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Service is not stopped.
     let err = Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
 
     rig.stop_service(&service);
 
     // Service is stopped, but there is no migration happening.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
 
     // Start migration and commit its result, making the second commit impossible.
     rig.dispatcher()
@@ -963,12 +935,12 @@ fn migration_commit_invariants() {
     // In the same block, we'll get an error because the service already has
     // a pending status update.
     let err = Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::ServicePending));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServicePending));
     rig.create_block(fork);
     // ...In the next block, we'll get another error.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoMigration));
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
 }
 
 /// Tests that a migration commit after the migration script finished locally with an error
