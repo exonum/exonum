@@ -100,6 +100,7 @@ use exonum_rust_runtime::{
     DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
 };
 use exonum_supervisor::{Supervisor, SupervisorConfig};
+use exonum_system_api::SystemApiPlugin;
 
 use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
 
@@ -177,6 +178,7 @@ impl NodeBuilder {
             let mut node_builder =
                 CoreNodeBuilder::new(database, run_config.node_config.into(), genesis_config)
                     .with_config_manager(config_manager)
+                    .with_plugin(SystemApiPlugin)
                     .with_runtime_fn(|channel| rust_runtime.build(channel.endpoints_sender()));
             for runtime in self.external_runtimes {
                 node_builder = node_builder.with_runtime(runtime);

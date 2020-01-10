@@ -11,15 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use exonum_merkledb::TemporaryDB;
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     keys::Keys,
+    merkledb::TemporaryDB,
     node::{NodeApiConfig, NodeBuilder, NodeConfig},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
+use exonum_system_api::SystemApiPlugin;
 
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
@@ -69,11 +70,12 @@ fn main() {
         .with_artifact(ExplorerFactory.artifact_id())
         .with_instance(ExplorerFactory.default_instance())
         .with_artifact(artifact_id.clone())
-        .with_instance(artifact_id.into_default_instance(1, "cryptocurrency"))
+        .with_instance(artifact_id.into_default_instance(101, "cryptocurrency"))
         .build();
 
     println!("Creating database in temporary dir...");
     let node = NodeBuilder::new(TemporaryDB::new(), node_config, genesis_config)
+        .with_plugin(SystemApiPlugin)
         .with_runtime_fn(|channel| {
             RustRuntime::builder()
                 .with_factory(CryptocurrencyService)
