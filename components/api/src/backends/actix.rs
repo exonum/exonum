@@ -24,25 +24,19 @@ use actix_web::{
     error::ResponseError, http::header, AsyncResponder, FromRequest, HttpMessage, HttpResponse,
     Query,
 };
-use failure::{bail, ensure, format_err, Error};
+use failure::{ensure, format_err, Error};
 use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
-use serde::{
-    de::{self, DeserializeOwned},
-    ser, Serialize,
-};
+use serde::{de::DeserializeOwned, Serialize};
 
 use std::{
     fmt,
-    net::SocketAddr,
-    result,
-    str::FromStr,
     sync::Arc,
     thread::{self, JoinHandle},
 };
 
 use crate::{
-    manager::{ApiManager, UpdateEndpoints},
-    Actuality, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
+    manager::{ApiManager, WebServerConfig},
+    Actuality, AllowOrigin, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
     Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
 };
 
@@ -54,8 +48,6 @@ pub type HttpRequest = actix_web::HttpRequest<()>;
 pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
 /// Type alias for the `actix-web::App`.
 pub type App = actix_web::App<()>;
-/// Type alias for the `actix-web::App` configuration.
-pub type AppConfig = Arc<dyn Fn(App) -> App + 'static + Send + Sync>;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -280,81 +272,32 @@ where
 }
 
 /// Creates `actix_web::App` for the given aggregator and runtime configuration.
-pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
-    let app_config = runtime_config.app_config;
+pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: WebServerConfig) -> App {
     let access = runtime_config.access;
     let mut app = App::new();
     app = app.scope("api", |scope| aggregator.extend_backend(access, scope));
-    if let Some(app_config) = app_config {
-        app = app_config(app);
+    if let Some(allow_origin) = runtime_config.allow_origin {
+        let cors = Cors::from(allow_origin);
+        app = app.middleware(cors);
     }
     app
 }
 
-/// Configuration parameters for the `App` runtime.
-#[derive(Clone)]
-pub struct ApiRuntimeConfig {
-    /// The socket address to bind.
-    pub listen_address: SocketAddr,
-    /// API access level.
-    pub access: ApiAccess,
-    /// Optional App configuration.
-    pub app_config: Option<AppConfig>,
-}
-
-impl ApiRuntimeConfig {
-    /// Creates API runtime configuration for the given address and access level.
-    pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
-        Self {
-            listen_address,
-            access,
-            app_config: Default::default(),
-        }
-    }
-}
-
-impl fmt::Debug for ApiRuntimeConfig {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiRuntimeConfig")
-            .field("listen_address", &self.listen_address)
-            .field("access", &self.access)
-            .field("app_config", &self.app_config.as_ref().map(drop))
-            .finish()
-    }
-}
-
-/// Configuration parameters for the actix system runtime.
-#[derive(Debug, Clone)]
-pub struct SystemRuntimeConfig {
-    /// Active API runtimes.
-    pub api_runtimes: Vec<ApiRuntimeConfig>,
-    /// API aggregator.
-    pub api_aggregator: ApiAggregator,
-    /// The interval in milliseconds between attempts of restarting HTTP-server in case
-    /// the server failed to restart
-    pub server_restart_retry_timeout: u64,
-    /// The attempts counts of restarting HTTP-server in case the server failed to restart
-    pub server_restart_max_retries: u16,
-}
-
 /// Actix system runtime handle.
 pub struct SystemRuntime {
-    system_thread: JoinHandle<result::Result<(), Error>>,
+    system_thread: JoinHandle<Result<(), Error>>,
     system: System,
 }
 
-impl SystemRuntimeConfig {
+impl SystemRuntime {
     /// Starts actix system runtime along with all web runtimes.
-    pub fn start(
-        self,
-        endpoints_rx: mpsc::Receiver<UpdateEndpoints>,
-    ) -> result::Result<SystemRuntime, Error> {
+    pub fn start(manager: ApiManager) -> Result<Self, Error> {
         // Creates a system thread.
         let (system_tx, system_rx) = mpsc::unbounded();
-        let system_thread = thread::spawn(move || -> result::Result<(), Error> {
+        let system_thread = thread::spawn(move || -> Result<(), Error> {
             let system = System::new("http-server");
             system_tx.unbounded_send(System::current())?;
-            ApiManager::new(self, endpoints_rx).start();
+            manager.start();
 
             // Starts actix-web runtime.
             let code = system.run();
@@ -378,11 +321,9 @@ impl SystemRuntimeConfig {
             system,
         })
     }
-}
 
-impl SystemRuntime {
     /// Stops the actix system runtime along with all web runtimes.
-    pub fn stop(self) -> result::Result<(), Error> {
+    pub fn stop(self) -> Result<(), Error> {
         // Stop actix system runtime.
         self.system.stop();
         self.system_thread.join().map_err(|e| {
@@ -400,94 +341,8 @@ impl fmt::Debug for SystemRuntime {
     }
 }
 
-/// CORS header specification.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AllowOrigin {
-    /// Allows access from any host.
-    Any,
-    /// Allows access only from the specified hosts.
-    Whitelist(Vec<String>),
-}
-
-impl ser::Serialize for AllowOrigin {
-    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
-    where
-        S: ser::Serializer,
-    {
-        match *self {
-            AllowOrigin::Any => "*".serialize(serializer),
-            AllowOrigin::Whitelist(ref hosts) => {
-                if hosts.len() == 1 {
-                    hosts[0].serialize(serializer)
-                } else {
-                    hosts.serialize(serializer)
-                }
-            }
-        }
-    }
-}
-
-impl<'de> de::Deserialize<'de> for AllowOrigin {
-    fn deserialize<D>(d: D) -> result::Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = AllowOrigin;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a list of hosts or \"*\"")
-            }
-
-            fn visit_str<E>(self, value: &str) -> result::Result<AllowOrigin, E>
-            where
-                E: de::Error,
-            {
-                match value {
-                    "*" => Ok(AllowOrigin::Any),
-                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
-                }
-            }
-
-            fn visit_seq<A>(self, seq: A) -> result::Result<AllowOrigin, A::Error>
-            where
-                A: de::SeqAccess<'de>,
-            {
-                let hosts =
-                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
-                Ok(AllowOrigin::Whitelist(hosts))
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
-}
-
-impl FromStr for AllowOrigin {
-    type Err = Error;
-
-    fn from_str(s: &str) -> result::Result<Self, Self::Err> {
-        if s == "*" {
-            return Ok(AllowOrigin::Any);
-        }
-
-        let v: Vec<_> = s
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if v.is_empty() {
-            bail!("Invalid AllowOrigin::Whitelist value");
-        }
-
-        Ok(AllowOrigin::Whitelist(v))
-    }
-}
-
-impl<'a> From<&'a AllowOrigin> for Cors {
-    fn from(origin: &'a AllowOrigin) -> Self {
+impl From<&AllowOrigin> for Cors {
+    fn from(origin: &AllowOrigin) -> Self {
         match *origin {
             AllowOrigin::Any => Self::build().finish(),
             AllowOrigin::Whitelist(ref hosts) => {
@@ -512,32 +367,6 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-
-    #[test]
-    fn allow_origin_from_str() {
-        fn check(text: &str, expected: AllowOrigin) {
-            let from_str = AllowOrigin::from_str(text).unwrap();
-            assert_eq!(from_str, expected);
-        }
-
-        check(r#"*"#, AllowOrigin::Any);
-        check(
-            r#"http://example.com"#,
-            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org, http://b.org, "#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-        check(
-            r#"http://a.org,http://b.org"#,
-            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-        );
-    }
 
     fn assert_responses_eq(left: HttpResponse, right: HttpResponse) {
         assert_eq!(left.status(), right.status());

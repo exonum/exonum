@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "http"]
 categories = ["cryptography"]
-description = "HTTP API engine the Exonum framework"
+description = "HTTP API engine of the Exonum framework"
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
@@ -29,3 +29,4 @@ serde_urlencoded = "0.6.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
+serde_derive = "1.0.101"

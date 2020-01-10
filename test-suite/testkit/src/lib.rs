@@ -110,8 +110,8 @@ pub use exonum_explorer as explorer;
 
 use exonum::{
     api::{
-        backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
-        ApiAccess, ApiAggregator, UpdateEndpoints,
+        backends::actix::SystemRuntime, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
+        UpdateEndpoints, WebServerConfig,
     },
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
@@ -615,16 +615,17 @@ impl TestKit {
         let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
 
         let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
-        let system_runtime_config = SystemRuntimeConfig {
+        let api_manager_config = ApiManagerConfig {
             api_runtimes: vec![
-                ApiRuntimeConfig::new(public_api_address, ApiAccess::Public),
-                ApiRuntimeConfig::new(private_api_address, ApiAccess::Private),
+                WebServerConfig::new(public_api_address, ApiAccess::Public),
+                WebServerConfig::new(private_api_address, ApiAccess::Private),
             ],
             api_aggregator,
             server_restart_max_retries: 5,
             server_restart_retry_timeout: 500,
         };
-        let system_runtime = system_runtime_config.start(endpoints_rx).unwrap();
+        let api_manager = ApiManager::new(api_manager_config, endpoints_rx);
+        let system_runtime = SystemRuntime::start(api_manager).unwrap();
 
         // Run the event stream in a separate thread in order to put transactions to mempool
         // when they are received. Otherwise, a client would need to call a `poll_events` analogue

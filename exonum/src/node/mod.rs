@@ -80,10 +80,8 @@ use std::{
 use self::state::RequestData;
 use crate::{
     api::{
-        backends::actix::{
-            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig,
-        },
-        ApiAccess, UpdateEndpoints,
+        backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiManager, ApiManagerConfig,
+        UpdateEndpoints, WebServerConfig,
     },
     blockchain::{
         config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
@@ -946,7 +944,7 @@ pub trait ConfigManager: Send {
 /// algorithm.
 #[derive(Debug)]
 pub struct Node {
-    api_runtime_config: SystemRuntimeConfig,
+    api_manager_config: ApiManagerConfig,
     api_options: NodeApiConfig,
     network_config: NetworkConfiguration,
     handler: NodeHandler,
@@ -1118,30 +1116,22 @@ impl Node {
         let network_config = config.network;
 
         let api_cfg = node_cfg.api.clone();
-        let api_runtime_config = SystemRuntimeConfig {
+        let api_runtime_config = ApiManagerConfig {
             api_runtimes: {
-                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
-                    let app_config = move |app: App| -> App {
-                        let cors = Cors::from(allow_origin.clone());
-                        app.middleware(cors)
-                    };
-                    Arc::new(app_config)
-                };
-
                 let public_api_handler = api_cfg
                     .public_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
+                    .map(|listen_address| WebServerConfig {
                         listen_address,
                         access: ApiAccess::Public,
-                        app_config: api_cfg.public_allow_origin.clone().map(into_app_config),
+                        allow_origin: api_cfg.public_allow_origin.clone(),
                     })
                     .into_iter();
                 let private_api_handler = api_cfg
                     .private_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
+                    .map(|listen_address| WebServerConfig {
                         listen_address,
                         access: ApiAccess::Private,
-                        app_config: api_cfg.private_allow_origin.clone().map(into_app_config),
+                        allow_origin: api_cfg.private_allow_origin.clone(),
                     })
                     .into_iter();
                 // Collects API handlers.
@@ -1172,7 +1162,7 @@ impl Node {
             network_config,
             max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
-            api_runtime_config,
+            api_manager_config: api_runtime_config,
         }
     }
 
@@ -1231,10 +1221,8 @@ impl Node {
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list().clone();
-
-        self.api_runtime_config
-            .start(self.channel.endpoints.1)
-            .expect("Failed to start api_runtime.");
+        let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
+        SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {

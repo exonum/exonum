@@ -12,16 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! API and corresponding utilities.
-//! FIXME: expand.
+//! High-level wrapper around a web server used by the Exonum framework.
+//!
+//! The core APIs of this crate are designed to be reasonably independent from the web server
+//! implementation. [`actix`] is currently used as the server backend.
+//!
+//! The wrapper is used in [Rust services][rust-runtime] and in plugins
+//! for the Exonum node. The Rust runtime provides its own abstractions based on the wrapper;
+//! consult its docs for details. Node plugins use [`ApiBuilder`] directly.
+//!
+//! [`actix`]: https://crates.io/crates/actix
+//! [rust-runtime]: https://crates.io/crates/exonum-rust-runtime
+//! [`ApiBuilder`]: struct.ApiBuilder.html
+//!
+//! # Examples
+//!
+//! Providing HTTP API for a plugin:
+//!
+//! ```
+//! use exonum_api::{ApiBuilder};
+//! # use serde_derive::{Deserialize, Serialize};
+//!
+//! #[derive(Serialize, Deserialize)]
+//! pub struct SomeQuery {
+//!     pub first: u64,
+//!     pub second: u64,
+//! }
+//!
+//! fn create_api() -> ApiBuilder {
+//!     let mut builder = ApiBuilder::new();
+//!     builder
+//!         .public_scope()
+//!         .endpoint("some", |query: SomeQuery| {
+//!             Ok(query.first + query.second)
+//!         });
+//!     builder
+//! }
+//!
+//! let builder = create_api();
+//! // `builder` can now be passed to the node via plugin interface
+//! // or via node channel.
+//! ```
 
 pub use self::{
+    cors::AllowOrigin,
     error::{Error, MovedPermanentlyError},
-    manager::UpdateEndpoints,
+    manager::{ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
     with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 
 pub mod backends;
+mod cors;
 mod error;
 mod manager;
 mod with;
@@ -198,8 +239,8 @@ pub trait ExtendApiBackend {
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>;
 }
 
-/// Exonum node API aggregator. This structure enables several API backends to
-/// operate simultaneously. Currently, only HTTP v1 backend is available.
+/// Aggregator of `ApiBuilder`s. Each builder is associated with a mount point, which
+/// is used to separate endpoints for different builders.
 #[derive(Debug, Clone, Default)]
 pub struct ApiAggregator {
     endpoints: BTreeMap<String, ApiBuilder>,
@@ -222,6 +263,7 @@ impl ApiAggregator {
     }
 
     /// Extend the given API backend by handlers with the given access level.
+    #[doc(hidden)] // used by testkit; logically not public
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         let endpoints = self.endpoints.iter();
         match access {

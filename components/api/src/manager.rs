@@ -19,17 +19,50 @@ use actix_net::server::Server;
 use actix_web::server::{HttpServer, StopServer};
 use futures::{sync::mpsc, Future};
 
-use std::{collections::HashMap, fmt, io, time::Duration};
+use std::{collections::HashMap, fmt, io, net::SocketAddr, time::Duration};
 
-use crate::{
-    backends::actix::{create_app, ApiRuntimeConfig, SystemRuntimeConfig},
-    ApiBuilder,
-};
+use crate::{backends::actix::create_app, AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
+
+/// Configuration parameters for a single web server.
+#[derive(Debug, Clone)]
+pub struct WebServerConfig {
+    /// The socket address to bind.
+    pub listen_address: SocketAddr,
+    /// API access level.
+    pub access: ApiAccess,
+    /// Optional CORS settings.
+    pub allow_origin: Option<AllowOrigin>,
+}
+
+impl WebServerConfig {
+    /// Creates a web server configuration for the given listen address and access level.
+    pub fn new(listen_address: SocketAddr, access: ApiAccess) -> Self {
+        Self {
+            listen_address,
+            access,
+            allow_origin: None,
+        }
+    }
+}
+
+/// Configuration parameters for the actix system runtime.
+#[derive(Debug, Clone)]
+pub struct ApiManagerConfig {
+    /// Active API runtimes.
+    pub api_runtimes: Vec<WebServerConfig>,
+    /// API aggregator.
+    pub api_aggregator: ApiAggregator,
+    /// The interval in milliseconds between attempts of restarting HTTP-server in case
+    /// the server failed to restart
+    pub server_restart_retry_timeout: u64,
+    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    pub server_restart_max_retries: u16,
+}
 
 /// Actor responsible for API management.
 pub struct ApiManager {
-    runtime_config: SystemRuntimeConfig,
-    api_runtime_addresses: HashMap<Addr<Server>, ApiRuntimeConfig>,
+    runtime_config: ApiManagerConfig,
+    api_runtime_addresses: HashMap<Addr<Server>, WebServerConfig>,
     user_endpoints: Vec<(String, ApiBuilder)>,
     endpoints_rx: Option<mpsc::Receiver<UpdateEndpoints>>,
 }
@@ -46,7 +79,7 @@ impl ApiManager {
     /// Creates a new API manager instance with the specified runtime configuration and
     /// the receiver of the `UpdateEndpoints` events.
     pub fn new(
-        runtime_config: SystemRuntimeConfig,
+        runtime_config: ApiManagerConfig,
         endpoints_rx: mpsc::Receiver<UpdateEndpoints>,
     ) -> Self {
         Self {
@@ -72,7 +105,7 @@ impl ApiManager {
             .collect();
     }
 
-    fn start_server(&self, runtime_config: ApiRuntimeConfig) -> io::Result<Addr<Server>> {
+    fn start_server(&self, runtime_config: WebServerConfig) -> io::Result<Addr<Server>> {
         let access = runtime_config.access;
         let listen_address = runtime_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
@@ -113,7 +146,7 @@ impl Actor for ApiManager {
 
 #[derive(Debug)]
 struct StartServer {
-    config: ApiRuntimeConfig,
+    config: WebServerConfig,
     attempt: u16,
 }
 
@@ -151,7 +184,7 @@ impl Handler<StartServer> for ApiManager {
     }
 }
 
-/// Updates user-provided endpoints, restarting all HTTP service managed by the addressed
+/// Updates user-provided endpoints, restarting all HTTP servers managed by the addressed
 /// `ApiManager`.
 #[derive(Debug, Clone)]
 pub struct UpdateEndpoints {
