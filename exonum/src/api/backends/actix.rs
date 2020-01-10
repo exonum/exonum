@@ -281,6 +281,36 @@ where
     }
 }
 
+impl<Q, I, F> From<NamedWith<Q, I, ApiFutureResult<I>, F>> for RequestHandler
+where
+    F: Fn(Q) -> ApiFutureResult<I> + 'static + Clone + Send + Sync,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
+{
+    fn from(f: NamedWith<Q, I, ApiFutureResult<I>, F>) -> Self {
+        let handler = f.inner.handler;
+        let actuality = f.inner.actuality;
+        let mutability = f.mutability;
+        let index = move |request: HttpRequest| -> FutureResponse {
+            let handler = handler.clone();
+            let actuality = actuality.clone();
+            extract_query(request, mutability)
+                .and_then(move |query| {
+                    handler(query)
+                        .map(|value| json_response(actuality, value))
+                        .map_err(From::from)
+                })
+                .responder()
+        };
+
+        Self {
+            name: f.name,
+            method: f.mutability.into(),
+            inner: Arc::from(index) as Arc<RawHandler>,
+        }
+    }
+}
+
 /// Creates `actix_web::App` for the given aggregator and runtime configuration.
 pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
     let app_config = runtime_config.app_config;

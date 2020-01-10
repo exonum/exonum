@@ -24,6 +24,8 @@ pub type Result<I> = std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
 pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
+pub type ApiFutureResult<I> = Box<dyn Future<Item = I, Error = error::ApiError>>;
+
 /// API endpoint handler extractor which can extract a handler from various entities.
 ///
 /// The basic idea of this structure is to extract type parameters from the given handler,
@@ -228,6 +230,21 @@ where
 impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where
     F: Fn(Q) -> FutureResult<I>,
+{
+    fn from(handler: F) -> Self {
+        Self {
+            handler,
+            actuality: Actuality::Actual,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
+}
+
+impl<Q, I, F> From<F> for With<Q, I, ApiFutureResult<I>, F>
+where
+    F: Fn(Q) -> ApiFutureResult<I>,
 {
     fn from(handler: F) -> Self {
         Self {
