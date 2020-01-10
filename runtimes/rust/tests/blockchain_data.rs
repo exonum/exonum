@@ -17,23 +17,23 @@ use exonum::{
     blockchain::{
         config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut, IndexProof,
     },
+    crypto::PublicKey,
     helpers::{generate_testnet_config, Height, ValidatorId},
+    merkledb::{
+        access::{Access, AccessExt, FromAccess, Prefixed},
+        Entry, HashTag, ProofMapIndex, Snapshot,
+    },
 };
-use exonum_crypto::PublicKey;
 use exonum_derive::{FromAccess, ServiceDispatcher, ServiceFactory};
-use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess, Prefixed},
-    Entry, HashTag, ProofMapIndex, Snapshot,
-};
+use futures::sync::mpsc;
+
+use std::collections::BTreeMap;
+
 use exonum_rust_runtime::{
     versioning::{ArtifactReq, ArtifactReqError, RequireArtifact},
     BlockchainData, DefaultInstance, InstanceDescriptor, RustRuntimeBuilder, Service,
     ServiceFactory, SnapshotExt,
 };
-
-use futures::sync::mpsc;
-
-use std::collections::BTreeMap;
 
 #[derive(Debug, FromAccess)]
 struct Schema<T: Access> {

@@ -15,7 +15,7 @@
 use exonum::{
     crypto,
     messages::{AnyTx, Verified},
-    runtime::{CallInfo, DispatcherError, ErrorMatch, ExecutionError},
+    runtime::{CallInfo, CommonError, CoreError, ErrorMatch, ExecutionError},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
@@ -30,7 +30,6 @@ use crate::{
 
 mod error;
 mod interface;
-mod proto;
 mod schema;
 mod services;
 
@@ -307,10 +306,7 @@ fn test_any_call_err_unknown_instance() {
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::IncorrectInstanceId)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 }
 
 #[test]
@@ -323,10 +319,7 @@ fn test_any_call_err_unknown_interface() {
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
-    assert_eq!(
-        err,
-        ErrorMatch::from_fail(&DispatcherError::NoSuchInterface)
-    );
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchInterface));
 }
 
 #[test]
@@ -345,7 +338,7 @@ fn test_any_call_err_unknown_method() {
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
-    assert_eq!(err, ErrorMatch::from_fail(&DispatcherError::NoSuchMethod));
+    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchMethod));
 }
 
 #[test]
@@ -353,7 +346,7 @@ fn test_any_call_err_wrong_arg() {
     let mut testkit = testkit_with_interfaces();
     let keypair = crypto::gen_keypair();
 
-    let inner_call = AnyCall::new(CallInfo::new(10_000, 0), ());
+    let inner_call = b"\xfe\xff".to_vec();
     let outer_call = AnyCall::new(CallInfo::new(WalletService::ID, 0), inner_call);
     let err = execute_transaction(
         &mut testkit,
@@ -363,7 +356,7 @@ fn test_any_call_err_wrong_arg() {
 
     assert_eq!(
         err,
-        ErrorMatch::from_fail(&DispatcherError::MalformedArguments)
+        ErrorMatch::from_fail(&CommonError::MalformedArguments)
             .with_description_containing("invalid utf-8 sequence")
     );
 }
@@ -387,7 +380,7 @@ fn test_any_call_panic_recursion_limit() {
 
     assert_eq!(
         err,
-        ErrorMatch::from_fail(&DispatcherError::StackOverflow)
+        ErrorMatch::from_fail(&CoreError::StackOverflow)
             .with_description_containing("Maximum depth of call stack (256)")
     );
 }

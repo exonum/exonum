@@ -17,8 +17,10 @@
 use actix_web::ws::CloseCode;
 use assert_matches::assert_matches;
 use exonum::{
-    crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
-    runtime::SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
+    crypto::gen_keypair,
+    helpers::Height,
+    merkledb::ObjectHash,
+    runtime::{CoreError, ExecutionError, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID},
 };
 use exonum_explorer::api::websocket::Notification;
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
@@ -136,8 +138,7 @@ fn test_send_transaction() {
         response,
         json!({
             "result": "error",
-            "description": "Execution error with code `dispatcher:7` occurred: Suitable runtime \
-             for the given service instance ID is not found."
+            "description": ExecutionError::from(CoreError::IncorrectInstanceId).to_string(),
         })
     );
 }

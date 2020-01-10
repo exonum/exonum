@@ -14,13 +14,13 @@
 
 use exonum::{
     helpers::Height,
+    merkledb::{access::Prefixed, Fork},
     runtime::{
-        BlockchainData, CallInfo, Caller, DispatcherError, ExecutionContext,
-        ExecutionContextUnstable, ExecutionError, InstanceDescriptor, InstanceQuery,
-        SupervisorExtensions, SUPERVISOR_INSTANCE_ID,
+        BlockchainData, CallInfo, Caller, CoreError, ExecutionContext, ExecutionContextUnstable,
+        ExecutionError, InstanceDescriptor, InstanceQuery, SupervisorExtensions,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_merkledb::{access::Prefixed, Fork};
 
 use super::{GenericCallMut, MethodDescriptor};
 
@@ -103,7 +103,7 @@ impl<'a> CallContext<'a> {
         let descriptor = self
             .inner
             .get_service(called_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         let call_info = CallInfo {
             instance_id: descriptor.id,

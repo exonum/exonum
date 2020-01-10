@@ -14,7 +14,7 @@
 
 use exonum::{
     helpers::Height,
-    runtime::{execution_error_serde, ExecutionError},
+    runtime::{ExecutionError, ExecutionErrorSerde},
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -38,7 +38,7 @@ pub enum DeployState {
         /// Height on which error happened.
         height: Height,
         /// Occurred error.
-        #[serde(with = "execution_error_serde")]
+        #[serde(with = "ExecutionErrorSerde")]
         error: ExecutionError,
     },
     /// Deployment finished successfully.

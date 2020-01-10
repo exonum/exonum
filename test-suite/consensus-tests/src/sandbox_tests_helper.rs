@@ -17,11 +17,11 @@
 use bit_vec::BitVec;
 use exonum::{
     blockchain::{AdditionalHeaders, Block, ProposerId},
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
+    merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB},
     messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Verified},
 };
-use exonum_crypto::Hash;
-use exonum_merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB};
 use log::trace;
 
 use std::{cell::RefCell, collections::BTreeMap, time::Duration};

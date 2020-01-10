@@ -68,9 +68,10 @@ message GenesisConfig {
 // The kind of ExecutionError.
 enum ErrorKind {
   UNEXPECTED = 0;
-  DISPATCHER = 1;
+  CORE = 1;
   RUNTIME = 2;
   SERVICE = 3;
+  COMMON = 4;
 }
 
 // Result of unsuccessful runtime execution.

@@ -82,10 +82,9 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # Example
 ///
 /// ```
+/// # use exonum::{crypto::Hash, merkledb::Snapshot};
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
-/// # use exonum_merkledb::Snapshot;
 /// # use exonum_testkit::TestKitBuilder;
-/// # use exonum_crypto::Hash;
 /// # use exonum_rust_runtime::{BlockchainData, Service, ServiceFactory};
 /// #
 /// # const SERVICE_ID: u32 = 1;

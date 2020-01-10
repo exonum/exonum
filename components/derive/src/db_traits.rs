@@ -22,9 +22,57 @@ use std::collections::HashSet;
 
 use crate::find_meta_attrs;
 
-#[derive(Debug, FromDeriveInput)]
+#[derive(Debug)]
 struct BinaryValueStruct {
     ident: Ident,
+    attrs: BinaryValueAttrs,
+}
+
+impl FromDeriveInput for BinaryValueStruct {
+    fn from_derive_input(input: &DeriveInput) -> darling::Result<Self> {
+        let attrs = find_meta_attrs("binary_value", &input.attrs)
+            .map(|meta| BinaryValueAttrs::from_nested_meta(&meta))
+            .unwrap_or_else(|| Ok(BinaryValueAttrs::default()))?;
+
+        Ok(Self {
+            ident: input.ident.clone(),
+            attrs,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Codec {
+    Protobuf,
+    Bincode,
+}
+
+impl Default for Codec {
+    fn default() -> Self {
+        Codec::Protobuf
+    }
+}
+
+impl FromMeta for Codec {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        match value {
+            "protobuf" => Ok(Codec::Protobuf),
+            "bincode" => Ok(Codec::Bincode),
+            _ => {
+                let msg = format!(
+                    "Unknown codec ({}). Use one of `protobuf` or `bincode`",
+                    value
+                );
+                Err(darling::Error::custom(msg))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Default, FromMeta)]
+struct BinaryValueAttrs {
+    #[darling(default)]
+    codec: Codec,
 }
 
 #[derive(Debug, FromDeriveInput)]
@@ -38,10 +86,9 @@ impl ObjectHashStruct {
 
         quote! {
             impl exonum_merkledb::ObjectHash for #name {
-                fn object_hash(&self) -> exonum_crypto::Hash {
-                    use exonum_merkledb::BinaryValue;
-                    let v = self.to_bytes();
-                    exonum_crypto::hash(&v)
+                fn object_hash(&self) -> exonum_merkledb::_reexports::Hash {
+                    let bytes = exonum_merkledb::BinaryValue::to_bytes(self);
+                    exonum_merkledb::_reexports::hash(&bytes)
                 }
             }
         }
@@ -49,24 +96,56 @@ impl ObjectHashStruct {
 }
 
 impl BinaryValueStruct {
-    pub fn implement_binary_value(&self) -> impl ToTokens {
+    fn implement_binary_value_from_pb(&self) -> proc_macro2::TokenStream {
         let name = &self.ident;
 
         quote! {
-            // This trait assumes that we work with trusted data so we can unwrap here.
             impl exonum_merkledb::BinaryValue for #name {
                 fn to_bytes(&self) -> Vec<u8> {
-                    self.to_pb().write_to_bytes().expect(
-                        concat!("Failed to serialize in BinaryValue for ", stringify!(#name))
+                    use protobuf::Message as _;
+                    // This trait assumes that we work with trusted data so we can unwrap here.
+                    exonum_proto::ProtobufConvert::to_pb(self).write_to_bytes().expect(
+                        concat!("Failed to serialize `BinaryValue` for ", stringify!(#name))
                     )
                 }
 
-                fn from_bytes(value: std::borrow::Cow<[u8]>) -> Result<Self, failure::Error> {
+                fn from_bytes(
+                    value: std::borrow::Cow<[u8]>,
+                ) -> std::result::Result<Self, exonum_merkledb::_reexports::Error> {
+                    use protobuf::Message as _;
+
                     let mut block = <Self as exonum_proto::ProtobufConvert>::ProtoStruct::new();
                     block.merge_from_bytes(value.as_ref())?;
                     exonum_proto::ProtobufConvert::from_pb(block)
                 }
             }
+        }
+    }
+
+    fn implement_binary_value_from_bincode(&self) -> proc_macro2::TokenStream {
+        let name = &self.ident;
+
+        quote! {
+            impl exonum_merkledb::BinaryValue for #name {
+                fn to_bytes(&self) -> std::vec::Vec<u8> {
+                    bincode::serialize(self).expect(
+                        concat!("Failed to serialize `BinaryValue` for ", stringify!(#name))
+                    )
+                }
+
+                fn from_bytes(
+                    value: std::borrow::Cow<[u8]>,
+                ) -> std::result::Result<Self, exonum_merkledb::_reexports::Error> {
+                    bincode::deserialize(value.as_ref()).map_err(From::from)
+                }
+            }
+        }
+    }
+
+    fn implement_binary_value(&self) -> impl ToTokens {
+        match self.attrs.codec {
+            Codec::Protobuf => self.implement_binary_value_from_pb(),
+            Codec::Bincode => self.implement_binary_value_from_bincode(),
         }
     }
 }
@@ -82,10 +161,6 @@ impl ToTokens for BinaryValueStruct {
         let expanded = quote! {
             mod #mod_name {
                 use super::*;
-
-                use protobuf::Message as _ProtobufMessage;
-                use exonum_proto::ProtobufConvert;
-
                 #binary_value
             }
         };

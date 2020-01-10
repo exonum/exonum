@@ -14,10 +14,12 @@
 
 //! Transaction logic for `MiddlewareService`.
 
-use exonum::runtime::{AnyTx, DispatcherError, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::{CallContext, GenericCall, GenericCallMut, MethodDescriptor, TxStub};
+use exonum_rust_runtime::{
+    AnyTx, CallContext, CoreError, ExecutionError, GenericCall, GenericCallMut, InstanceId,
+    MethodDescriptor, TxStub,
+};
 use semver::VersionReq;
 use serde_derive::*;
 
@@ -181,7 +183,7 @@ impl MiddlewareInterface<CallContext<'_>> for MiddlewareService {
         let dispatcher_schema = context.data().for_dispatcher();
         let state = dispatcher_schema
             .get_instance(instance_id)
-            .ok_or(DispatcherError::IncorrectInstanceId)?;
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
         let artifact = &state.spec.artifact;
         if arg.artifact_name != artifact.name {

@@ -18,10 +18,10 @@
 //! and the `explanation` module below for an explanation how stubs work.
 
 use exonum::{
+    crypto::{PublicKey, SecretKey},
     messages::Verified,
     runtime::{AnyTx, CallInfo, ExecutionError, InstanceId, MethodId},
 };
-use exonum_crypto::{PublicKey, SecretKey};
 
 use crate::CallContext;
 
@@ -132,8 +132,8 @@ impl GenericCall<InstanceId> for (PublicKey, SecretKey) {
 #[cfg(test)]
 mod explanation {
     use super::*;
-    use exonum_crypto::gen_keypair;
-    use exonum_merkledb::BinaryValue;
+
+    use exonum::{crypto::gen_keypair, merkledb::BinaryValue};
     use pretty_assertions::assert_eq;
 
     // Suppose we have the following trait describing user service.
