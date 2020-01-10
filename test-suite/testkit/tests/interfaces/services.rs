@@ -22,7 +22,6 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
-use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{
     CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service,
 };
@@ -31,7 +30,6 @@ use serde_derive::{Deserialize, Serialize};
 use crate::{
     error::Error,
     interface::IssueReceiver,
-    proto,
     schema::{Wallet, WalletSchema},
 };
 
@@ -44,7 +42,7 @@ pub trait WalletInterface<Ctx> {
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("WalletInterface", "IssueReceiver"))]
-#[service_factory(artifact_name = "wallet-service", proto_sources = "proto")]
+#[service_factory(artifact_name = "wallet-service")]
 pub struct WalletService;
 
 impl WalletService {
@@ -103,10 +101,10 @@ impl DefaultInstance for WalletService {
     const INSTANCE_NAME: &'static str = "wallet";
 }
 
-#[protobuf_convert(source = "proto::Issue")]
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct TxIssue {
     pub to: PublicKey,
     pub amount: u64,
@@ -120,7 +118,7 @@ pub trait DepositInterface<Ctx> {
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(artifact_name = "deposit-service", proto_sources = "proto")]
+#[service_factory(artifact_name = "deposit-service")]
 #[service_dispatcher(implements("DepositInterface"))]
 pub struct DepositService;
 
@@ -158,8 +156,8 @@ impl DefaultInstance for DepositService {
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::AnyCall")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct AnyCall {
     pub inner: AnyTx,
     pub interface_name: String,
@@ -189,7 +187,7 @@ pub trait CallAny<Ctx> {
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(artifact_name = "any-call-service", proto_sources = "proto")]
+#[service_factory(artifact_name = "any-call-service")]
 #[service_dispatcher(implements("CallAny"))]
 pub struct AnyCallService;
 

@@ -23,8 +23,8 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    versioning::ArtifactReq as CoreReq, ArtifactId, ArtifactProtobufSpec, CallContext,
-    DispatcherError, ExecutionError, RuntimeIdentifier, Service, ServiceFactory,
+    versioning::ArtifactReq as CoreReq, ArtifactId, ArtifactProtobufSpec, CallContext, CommonError,
+    ExecutionError, RuntimeIdentifier, Service, ServiceFactory,
 };
 use semver::Version;
 
@@ -64,7 +64,7 @@ impl IncInterface<CallContext<'_>> for IncService {
         let author = context
             .caller()
             .author()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
         let mut schema = IncSchema::new(context.service_data());
         let count = schema.counts.get(&author).unwrap_or_default();
         schema.counts.put(&author, count + 1);

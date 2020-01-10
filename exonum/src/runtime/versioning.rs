@@ -146,7 +146,7 @@ pub use semver::{Version, VersionReq};
 use failure::{format_err, Fail};
 use std::{fmt, str::FromStr};
 
-use crate::runtime::{ArtifactId, DispatcherError, ExecutionError, ExecutionFail};
+use crate::runtime::{ArtifactId, CoreError, ExecutionError, ExecutionFail};
 
 /// Requirement on an artifact. Can be matched against artifact identifiers.
 ///
@@ -329,7 +329,7 @@ pub enum ArtifactReqError {
 
 impl From<ArtifactReqError> for ExecutionError {
     fn from(err: ArtifactReqError) -> Self {
-        DispatcherError::IncorrectInstanceId.with_description(err.to_string())
+        CoreError::IncorrectInstanceId.with_description(err.to_string())
     }
 }
 

@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Definition of the interfaces for tests of interservice calls.
+//! Definition of the interfaces for tests of inter-service calls.
 
 use exonum::crypto::PublicKey;
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
-
-use crate::proto;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Issue")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct Issue {
     pub to: PublicKey,
     pub amount: u64,

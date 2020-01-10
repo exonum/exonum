@@ -285,7 +285,7 @@ impl ExonumService {
             quote! {
                 #id => {
                     let arg: #arg_type = exonum::merkledb::BinaryValue::from_bytes(payload.into())
-                        .map_err(exonum::runtime::DispatcherError::malformed_arguments)?;
+                        .map_err(exonum::runtime::CommonError::malformed_arguments)?;
                     self.#name(context, arg)
                 }
             }
@@ -306,7 +306,7 @@ impl ExonumService {
                 ) -> #res {
                     match method {
                         #( #match_arms )*
-                        _ => Err(exonum::runtime::DispatcherError::NoSuchMethod.into()),
+                        _ => Err(exonum::runtime::CommonError::NoSuchMethod.into()),
                     }
                 }
             }

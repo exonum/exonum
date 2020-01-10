@@ -19,16 +19,13 @@ use exonum::{
         MapIndex,
     },
 };
-use exonum_derive::*;
-use exonum_proto::ProtobufConvert;
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use serde_derive::{Deserialize, Serialize};
-
-use crate::proto;
 
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Wallet")]
+#[derive(BinaryValue, ObjectHash)]
+#[binary_value(codec = "bincode")]
 pub struct Wallet {
     pub name: String,
     pub balance: u64,

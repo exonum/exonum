@@ -89,6 +89,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - A type for a position of transaction in the block has been changed for `u32`. (#1668)
 
+- `DispatcherError` has been split into two different types: `CoreError`
+  and `CommonError`. (#1680)
+
+- `Common` variant has been added to the `ErrorKind` enum. (#1680)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
@@ -100,6 +105,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `DeployConfirmation` structure was renamed to `DeployResult` and extended with
   `success` field. (#1648)
+
+- Error code values were changed and split into several enum
+  representing sub-groups. (#1680)
 
 #### exonum-merkledb
 

@@ -142,13 +142,10 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{
-        Action as DispatcherAction, Dispatcher, Error as DispatcherError, Mailbox,
-        Schema as DispatcherSchema,
-    },
+    dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
-        catch_panic, CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, ExecutionFail,
-        ExecutionStatus, SerdeExecutionStatus,
+        catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
+        ExecutionError, ExecutionFail, ExecutionStatus,
     },
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
@@ -158,7 +155,7 @@ pub use self::{
 
 // Re-export for serializing `ExecutionError` via `serde`.
 #[doc(hidden)]
-pub use error::execution_error as execution_error_serde;
+pub use error::execution_error::ExecutionErrorSerde;
 pub mod interface;
 pub mod migrations;
 pub mod versioning;
@@ -299,6 +296,10 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - For newly added artifacts, the method is called as the supervisor service decides to deploy
     ///   the artifact.
     /// - After the node restart, the method is called for all the previously deployed artifacts.
+    ///
+    /// Core guarantees that there will be no request to deploy an artifact which is already deployed,
+    /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
+    /// a bug in core.
     // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
     fn deploy_artifact(
         &mut self,
@@ -357,6 +358,10 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Thus, verifying prerequisites
     /// for instantiation and reporting corresponding failures should be performed at this stage
     /// rather than in `update_service_status`.
+    ///
+    /// Core guarantees that there will be no request to start a service instance which is already running,
+    /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
+    /// a bug in core.
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
@@ -672,14 +677,14 @@ impl<'a> ExecutionContext<'a> {
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
-            let err = DispatcherError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
             return Err(err);
         }
 
         let (runtime_id, runtime) = self
             .dispatcher
             .runtime_for_service(call_info.instance_id)
-            .ok_or(DispatcherError::IncorrectRuntime)?;
+            .ok_or(CoreError::IncorrectRuntime)?;
         let reborrowed = self.reborrow_with_interface(interface_name);
         runtime
             .execute(reborrowed, call_info, arguments)
@@ -710,7 +715,7 @@ impl<'a> ExecutionContext<'a> {
         let runtime = self
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
-            .ok_or(DispatcherError::IncorrectRuntime)?;
+            .ok_or(CoreError::IncorrectRuntime)?;
         runtime
             .initiate_adding_service(self.reborrow(), &spec, constructor.into_bytes())
             .map_err(|mut err| {

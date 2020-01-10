@@ -25,7 +25,6 @@
 //! };
 //! use serde_derive::*;
 //! use exonum_derive::*;
-//! use exonum_proto::ProtobufConvert;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_rust_runtime::{
@@ -305,7 +304,6 @@ impl TestKit {
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
     /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
-    /// # use exonum_proto::ProtobufConvert;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::crypto::{PublicKey, Hash, SecretKey};

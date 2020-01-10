@@ -14,11 +14,11 @@
 
 use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
+    merkledb::access::AccessExt,
     messages::Verified,
     runtime::{AnyTx, ExecutionError, InstanceId},
 };
-use exonum_derive::*;
-use exonum_merkledb::access::AccessExt;
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
@@ -33,11 +33,7 @@ pub trait Timestamping<Ctx> {
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("Timestamping"))]
-#[service_factory(
-    artifact_name = "timestamping",
-    artifact_version = "0.1.0",
-    proto_sources = "crate::proto"
-)]
+#[service_factory(artifact_name = "timestamping", artifact_version = "0.1.0")]
 pub struct TimestampingService;
 
 impl Timestamping<CallContext<'_>> for TimestampingService {
