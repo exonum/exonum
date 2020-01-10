@@ -24,13 +24,13 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    CallContext, DefaultInstance, DispatcherError, ErrorMatch, ExecutionError, InstanceId, Service,
+    CallContext, CommonError, DefaultInstance, ErrorMatch, ExecutionError, InstanceId, Service,
     ServiceFactory as _, SnapshotExt, SUPERVISOR_INSTANCE_ID,
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Error as TxError, Schema, Supervisor,
+    supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, Supervisor,
 };
 
 pub fn sign_config_propose_transaction(
@@ -80,10 +80,10 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         match params.as_str() {
-            "error" => Err(DispatcherError::malformed_arguments("Error!")),
+            "error" => Err(CommonError::malformed_arguments("Error!")),
             "panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -97,7 +97,7 @@ impl Configure for ConfigChangeService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         context
             .service_data()
@@ -105,7 +105,7 @@ impl Configure for ConfigChangeService {
             .set(params.clone());
 
         match params.as_str() {
-            "apply_error" => Err(DispatcherError::malformed_arguments("Error!")),
+            "apply_error" => Err(CommonError::malformed_arguments("Error!")),
             "apply_panic" => panic!("Aaaa!"),
             _ => Ok(()),
         }
@@ -262,7 +262,7 @@ fn discard_config_propose_from_auditor() {
     let block = testkit.create_block_with_transaction(config_propose);
     // Verify that transaction failed.
     let expected_err =
-        ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[0].status().unwrap_err(), expected_err);
 
     testkit.create_blocks_until(cfg_change_height);

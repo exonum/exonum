@@ -23,9 +23,9 @@ use exonum::{
     messages::Verified,
     node::{NodeApiConfig, NodeBuilder, NodeConfig},
     runtime::{
-        AnyTx, ArtifactId, CallInfo, DispatcherError, ExecutionContext, ExecutionError,
-        ExecutionFail, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
-        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
+        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -33,12 +33,7 @@ use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 use futures::{Future, IntoFuture};
 
-use std::{
-    cell::Cell,
-    collections::btree_map::{BTreeMap, Entry},
-    thread,
-    time::Duration,
-};
+use std::{cell::Cell, collections::btree_map::BTreeMap, thread, time::Duration};
 
 /// Service instance with a counter.
 #[derive(Debug, Default)]
@@ -68,12 +63,9 @@ enum SampleRuntimeError {
 impl SampleRuntime {
     /// Create a new service instance with the given specification.
     fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
-        if !self.deployed_artifacts.contains_key(&spec.artifact) {
-            return Err(DispatcherError::ArtifactNotDeployed.into());
-        }
-        if self.started_services.contains_key(&spec.id) {
-            return Err(DispatcherError::ServiceIdExists.into());
-        }
+        // Invariants guaranteed by the core.
+        assert!(self.deployed_artifacts.contains_key(&spec.artifact));
+        assert!(!self.started_services.contains_key(&spec.id));
 
         Ok(SampleService {
             name: spec.name.clone(),
@@ -87,14 +79,13 @@ impl SampleRuntime {
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        match self.deployed_artifacts.entry(artifact) {
-            Entry::Occupied(_) => Err(DispatcherError::ArtifactAlreadyDeployed.into()),
-            Entry::Vacant(entry) => {
-                println!("Deploying artifact: {}", entry.key());
-                entry.insert(spec);
-                Ok(())
-            }
-        }
+        // Invariant guaranteed by the core
+        assert!(!self.deployed_artifacts.contains_key(&artifact));
+
+        println!("Deploying artifact: {}", &artifact);
+        self.deployed_artifacts.insert(artifact, spec);
+
+        Ok(())
     }
 }
 
@@ -119,8 +110,7 @@ impl Runtime for SampleRuntime {
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let service_instance = self.start_service(spec)?;
-        let new_value =
-            u64::from_bytes(params.into()).map_err(DispatcherError::malformed_arguments)?;
+        let new_value = u64::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         service_instance.counter.set(new_value);
         println!("Initializing service {} with value {}", spec, new_value);
         Ok(())

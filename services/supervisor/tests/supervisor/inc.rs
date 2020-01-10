@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::{DispatcherError, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
@@ -20,7 +19,7 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder},
-    CallContext, DefaultInstance, Service,
+    CallContext, CommonError, DefaultInstance, ExecutionError, InstanceId, Service,
 };
 
 use exonum_supervisor::Configure;
@@ -126,12 +125,12 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         match params.as_ref() {
             "error" => {
                 let details = "IncService: Configure error request";
-                Err(DispatcherError::malformed_arguments(details))
+                Err(CommonError::malformed_arguments(details))
             }
             "panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),
@@ -146,7 +145,7 @@ impl Configure for IncService {
         context
             .caller()
             .as_supervisor()
-            .ok_or(DispatcherError::UnauthorizedCaller)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         Schema::new(context.service_data())
             .params
@@ -155,7 +154,7 @@ impl Configure for IncService {
         match params.as_str() {
             "apply_error" => {
                 let details = "IncService: Configure error request";
-                Err(DispatcherError::malformed_arguments(details))
+                Err(CommonError::malformed_arguments(details))
             }
             "apply_panic" => panic!("IncService: Configure panic request"),
             _ => Ok(()),

@@ -14,7 +14,7 @@
 
 //! Configuration interface used by the supervisor to change service configuration.
 
-use exonum::runtime::{DispatcherError, ExecutionError, InstanceId, MethodId};
+use exonum::runtime::{CommonError, ExecutionError, InstanceId, MethodId};
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{CallContext, GenericCallMut, Interface, MethodDescriptor};
 
@@ -90,17 +90,17 @@ impl<'a, T: BinaryValue> Interface<'a> for dyn Configure<Params = T> {
         match method {
             VERIFY_CONFIG_METHOD_ID => {
                 let params =
-                    T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?;
+                    T::from_bytes(payload.into()).map_err(CommonError::malformed_arguments)?;
                 self.verify_config(context, params)
             }
 
             APPLY_CONFIG_METHOD_ID => {
                 let params =
-                    T::from_bytes(payload.into()).map_err(DispatcherError::malformed_arguments)?;
+                    T::from_bytes(payload.into()).map_err(CommonError::malformed_arguments)?;
                 self.apply_config(context, params)
             }
 
-            _ => Err(DispatcherError::NoSuchMethod.into()),
+            _ => Err(CommonError::NoSuchMethod.into()),
         }
     }
 }

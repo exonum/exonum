@@ -20,11 +20,12 @@ use exonum::{
     runtime::SnapshotExt,
 };
 use exonum_rust_runtime::{
-    ArtifactId, ErrorMatch, InstanceId, RuntimeIdentifier, RustRuntimeBuilder, ServiceFactory,
-    SUPERVISOR_INSTANCE_ID,
+    ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier, RustRuntimeBuilder,
+    ServiceFactory, SUPERVISOR_INSTANCE_ID,
 };
 use exonum_supervisor::{
-    ConfigPropose, DeployRequest, DeployResult, Error as TxError, Supervisor, SupervisorInterface,
+    ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
+    DeployResult, ServiceError, Supervisor, SupervisorInterface,
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
@@ -322,8 +323,8 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
-    let expected_err =
-        ErrorMatch::from_fail(&TxError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID);
+    let expected_err = ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
+        .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
@@ -340,8 +341,8 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     let hash = start_service(&api, request);
     let block = testkit.create_block();
 
-    let expected_err =
-        ErrorMatch::from_fail(&TxError::ActualFromIsPast).for_service(SUPERVISOR_INSTANCE_ID);
+    let expected_err = ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
+        .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
@@ -357,7 +358,7 @@ fn test_try_run_unregistered_service_instance() {
     let hash = start_service(&api, request);
     let block = testkit.create_block();
 
-    let expected_err = ErrorMatch::from_fail(&TxError::UnknownArtifact)
+    let expected_err = ErrorMatch::from_fail(&ArtifactError::UnknownArtifact)
         .for_service(SUPERVISOR_INSTANCE_ID)
         .with_any_description();
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
@@ -426,7 +427,7 @@ fn test_empty_service_instance_name() {
     let hash = start_service(&api, request);
     let block = testkit.create_block();
 
-    let expected_err = ErrorMatch::from_fail(&TxError::InvalidInstanceName)
+    let expected_err = ErrorMatch::from_fail(&ServiceError::InvalidInstanceName)
         .with_description_containing("Service instance name should not be empty")
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
@@ -448,7 +449,7 @@ fn test_bad_service_instance_name() {
 
     let expected_description =
         "Service instance name (\u{2764}) contains illegal character, use only: a-zA-Z0-9 and one of _-";
-    let expected_err = ErrorMatch::from_fail(&TxError::InvalidInstanceName)
+    let expected_err = ErrorMatch::from_fail(&ServiceError::InvalidInstanceName)
         .with_description_containing(expected_description)
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
@@ -483,7 +484,7 @@ fn test_start_service_instance_twice() {
         let hash = start_service(&api, request);
         let block = testkit.create_block();
 
-        let expected_err = ErrorMatch::from_fail(&TxError::InstanceExists)
+        let expected_err = ErrorMatch::from_fail(&ServiceError::InstanceExists)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_any_description();
         assert_eq!(*block[hash].status().unwrap_err(), expected_err);
@@ -744,8 +745,8 @@ fn test_auditor_cant_send_requests() {
             tx.status().unwrap();
         } else if *tx.content() == deploy_request_from_auditor {
             // ... but the auditor's request is failed as expected.
-            let expected_err =
-                ErrorMatch::from_fail(&TxError::UnknownAuthor).for_service(SUPERVISOR_INSTANCE_ID);
+            let expected_err = ErrorMatch::from_fail(&CommonError::UnauthorizedCaller)
+                .for_service(SUPERVISOR_INSTANCE_ID);
             assert_eq!(*tx.status().unwrap_err(), expected_err);
         } else {
             panic!("Unexpected transaction in block: {:?}", tx);
@@ -898,7 +899,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     // and thus not registered.
     let confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let block = testkit.create_block_with_transaction(confirmation);
-    let expected_err = ErrorMatch::from_fail(&TxError::DeployRequestNotRegistered)
+    let expected_err = ErrorMatch::from_fail(&ArtifactError::DeployRequestNotRegistered)
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[0].status().unwrap_err(), expected_err);
 }
