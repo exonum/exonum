@@ -54,6 +54,13 @@
 //! // or via node channel.
 //! ```
 
+#![deny(
+    unsafe_code,
+    bare_trait_objects,
+    missing_docs,
+    missing_debug_implementations
+)]
+
 pub use self::{
     cors::AllowOrigin,
     error::{Error, MovedPermanentlyError},

@@ -54,6 +54,13 @@
 //! Note that the testkit does not emulate the functionality of the node completely; it does
 //! not update the `SharedNodeState`.
 
+#![deny(
+    unsafe_code,
+    bare_trait_objects,
+    missing_docs,
+    missing_debug_implementations
+)]
+
 pub mod private;
 pub mod public;
 
@@ -73,6 +80,9 @@ fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiB
     builder
 }
 
+/// Plugin responsible for adding system API to the Exonum node.
+///
+/// See crate docs for the examples of usage.
 #[derive(Debug, Clone, Copy)]
 pub struct SystemApiPlugin;
 
