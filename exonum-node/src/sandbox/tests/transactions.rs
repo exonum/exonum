@@ -22,15 +22,16 @@ use exonum::{
     merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
 };
-use exonum_consensus_tests::{
+
+use std::time::Duration;
+
+use crate::constants::TRANSACTIONS_REQUEST_TIMEOUT;
+use crate::sandbox::{
     config_updater::TxConfig,
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
     timestamping_sandbox, timestamping_sandbox_builder, Milliseconds, Sandbox,
 };
-use exonum_node::constants::TRANSACTIONS_REQUEST_TIMEOUT;
-
-use std::time::Duration;
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
 const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;

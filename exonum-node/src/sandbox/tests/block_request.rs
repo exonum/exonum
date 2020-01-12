@@ -18,10 +18,11 @@ use exonum::{
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
 };
-use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_node::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
 
 use std::time::Duration;
+
+use crate::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 /// Handle block response:
 ///

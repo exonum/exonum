@@ -39,11 +39,14 @@ exonum-api = { version = "0.13.0-rc.2", path = "../components/api" }
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
 
 [dev-dependencies]
+bincode = "1.2.1"
+chrono = "0.4.6"
 criterion = "0.3.0"
 hex = "0.4.0"
 pretty_assertions = "0.6.1"
 
 exonum-derive = { version = "0.13.0-rc.2", path = "../components/derive" }
+exonum-merkledb = { version = "0.13.0-rc.2", path = "../components/merkledb" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../runtimes/rust" }
 
 [features]

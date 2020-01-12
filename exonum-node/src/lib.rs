@@ -47,14 +47,7 @@ pub use self::{
 #[doc(hidden)]
 pub use exonum::blockchain::{ApiSender, ExternalMessage, SendError};
 
-/// Node timeout constants.
-///
-/// # Stability
-///
-/// The constants of this module is considered an implementation detail of the Exonum node and are
-/// thus exempt from semantic versioning.
-#[doc(hidden)]
-pub mod constants {
+pub(crate) mod constants {
     pub use super::state::{
         BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
         TRANSACTIONS_REQUEST_TIMEOUT,
@@ -111,6 +104,8 @@ mod consensus;
 mod events_impl;
 mod plugin;
 mod requests;
+#[cfg(test)]
+mod sandbox;
 mod state;
 
 /// Node timeout types.

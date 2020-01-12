@@ -25,16 +25,14 @@ use exonum::{
     merkledb::ObjectHash,
     messages::{PrevotesRequest, TransactionsRequest, Verified},
 };
-use exonum_node::constants::{
-    PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
-};
 use log::info;
 
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
-use exonum_consensus_tests::{
-    self, sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder,
+use crate::constants::{
+    PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder};
 
 /// check scenario:
 /// HANDLE FULL PROPOSE

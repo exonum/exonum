@@ -22,7 +22,7 @@ use exonum::{
     messages::{Propose, Verified},
 };
 
-use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 /// HANDLE message
 /// - verify signature

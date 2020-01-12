@@ -17,13 +17,14 @@ use std::time::Duration;
 use exonum::{
     blockchain::{AdditionalHeaders, Block, ProposerId},
     helpers::{Height, Round, ValidatorId},
+    merkledb::{HashTag, ObjectHash},
     messages::{Propose, Verified},
 };
-use exonum_consensus_tests::{
+
+use crate::sandbox::{
     sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
     timestamping_sandbox, Sandbox,
 };
-use exonum_merkledb::{HashTag, ObjectHash};
 
 #[test]
 fn test_send_propose_and_prevote() {

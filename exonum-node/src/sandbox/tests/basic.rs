@@ -19,18 +19,19 @@
 use exonum::{
     crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
+    merkledb::ObjectHash,
     messages::{Precommit, Verified},
     runtime::SnapshotExt,
 };
-use exonum_consensus_tests::{
+use rand::{thread_rng, Rng};
+
+use std::collections::BTreeMap;
+
+use crate::sandbox::{
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
     timestamping_sandbox, timestamping_sandbox_builder,
 };
-use exonum_merkledb::ObjectHash;
-use rand::{thread_rng, Rng};
-
-use std::collections::BTreeMap;
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader

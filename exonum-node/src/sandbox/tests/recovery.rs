@@ -15,11 +15,14 @@
 //! Tests in this module are designed to test ability of the node to recover
 //! state after restart/stop.
 
-use exonum::helpers::{user_agent, Height, Round, ValidatorId};
-use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
-use exonum_merkledb::ObjectHash;
+use exonum::{
+    helpers::{user_agent, Height, Round, ValidatorId},
+    merkledb::ObjectHash,
+};
 
 use std::time::Duration;
+
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
 
 /// Scenario:
 /// - Node sends `Propose` and `Prevote`.

@@ -25,7 +25,7 @@ use log::info;
 
 use std::time::Duration;
 
-use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
 
 #[test]
 fn test_queue_message_from_future_round() {

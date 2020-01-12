@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![warn(missing_debug_implementations, unsafe_code, bare_trait_objects)]
-
-pub mod config_updater;
-pub mod sandbox_tests_helper;
-pub mod timestamping;
-
+mod config_updater;
 mod guarded_queue;
+mod sandbox_tests_helper;
+mod tests;
+mod timestamping;
 
 use bit_vec::BitVec;
 use exonum::{
@@ -37,14 +35,6 @@ use exonum::{
         SignedMessage, Status, TransactionsRequest, TransactionsResponse, Verified,
     },
 };
-use exonum_node::{
-    events::{
-        Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
-        TimeoutRequest,
-    },
-    ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-    NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
-};
 use exonum_rust_runtime::{
     ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
 };
@@ -62,11 +52,19 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use crate::{
+use self::{
     config_updater::ConfigUpdaterService,
     guarded_queue::GuardedQueue,
     sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
     timestamping::TimestampingService,
+};
+use crate::{
+    events::{
+        Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
+        TimeoutRequest,
+    },
+    ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
+    NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
 };
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
@@ -284,7 +282,7 @@ impl Sandbox {
         &self,
         public_key: &PublicKey,
         addr: String,
-        time: chrono::DateTime<::chrono::Utc>,
+        time: chrono::DateTime<chrono::Utc>,
         user_agent: &str,
         secret_key: &SecretKey,
     ) -> Verified<Connect> {
@@ -455,15 +453,6 @@ impl Sandbox {
         let inner = self.inner.borrow();
         let time = *inner.time.lock().unwrap().deref();
         time
-    }
-
-    pub fn set_time(&mut self, new_time: SystemTime) {
-        let mut inner = self.inner.borrow_mut();
-        *inner.time.lock().unwrap() = new_time;
-    }
-
-    pub fn node_handler_mut(&self) -> RefMut<'_, NodeHandler> {
-        RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler)
     }
 
     pub fn node_state(&self) -> Ref<'_, State> {
@@ -986,11 +975,6 @@ impl SandboxBuilder {
         self
     }
 
-    pub fn with_services(mut self, services: Vec<InstanceInitParams>) -> Self {
-        self.services = services;
-        self
-    }
-
     pub fn with_consensus<F: FnOnce(&mut ConsensusConfig)>(mut self, update: F) -> Self {
         update(&mut self.consensus_config);
         self
@@ -1240,7 +1224,7 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 }
 
 #[cfg(test)]
-mod tests {
+mod unit_tests {
     use exonum::crypto::gen_keypair;
 
     use super::*;

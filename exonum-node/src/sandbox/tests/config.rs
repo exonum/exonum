@@ -14,11 +14,12 @@
 
 //! Tests in this module are designed to test configuration change protocol.
 
-use exonum::helpers::{Height, ValidatorId};
-use exonum_consensus_tests::{
-    config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox,
+use exonum::{
+    helpers::{Height, ValidatorId},
+    merkledb::BinaryValue,
 };
-use exonum_merkledb::BinaryValue;
+
+use crate::sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox};
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus

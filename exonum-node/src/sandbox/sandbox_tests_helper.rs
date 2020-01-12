@@ -291,19 +291,6 @@ where
     try_add_one_height_with_transactions(sandbox, sandbox_state, txs).unwrap()
 }
 
-pub fn try_add_one_height(
-    sandbox: &TimestampingSandbox,
-    sandbox_state: &SandboxState,
-) -> Result<(), String> {
-    // gen some tx
-    let tx = gen_timestamping_tx();
-    let result = try_add_one_height_with_transactions(sandbox, sandbox_state, &[tx]);
-    match result {
-        Ok(_) => Ok(()),
-        Err(msg) => Err(msg),
-    }
-}
-
 pub fn try_add_one_height_with_transactions<'a, I>(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,

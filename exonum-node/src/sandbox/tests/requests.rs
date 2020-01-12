@@ -59,7 +59,7 @@ use exonum::{
 
 use std::time::Duration;
 
-use exonum_consensus_tests::{sandbox_tests_helper::gen_timestamping_tx, timestamping_sandbox};
+use crate::sandbox::{sandbox_tests_helper::gen_timestamping_tx, timestamping_sandbox};
 
 // Receive status with pool_size = 1
 // Send pool transactions request
