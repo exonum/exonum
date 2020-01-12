@@ -50,8 +50,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct State {
+pub(crate) struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Verified<Connect>,
 
@@ -384,9 +383,9 @@ impl IncompleteBlock {
     }
 }
 
-#[derive(Clone, Debug, Default)]
 /// Shared `ConnectList` representation to be used in network.
-pub struct SharedConnectList {
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SharedConnectList {
     inner: Arc<RwLock<ConnectList>>,
 }
 

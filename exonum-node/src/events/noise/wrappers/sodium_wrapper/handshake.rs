@@ -39,26 +39,24 @@ use crate::{
 /// Params needed to establish secured connection using Noise Protocol.
 #[derive(Debug, Clone)]
 pub struct HandshakeParams {
-    pub public_key: x25519::PublicKey,
-    pub secret_key: x25519::SecretKey,
-    pub remote_key: Option<x25519::PublicKey>,
-    pub connect_list: SharedConnectList,
-    pub connect: Verified<Connect>,
+    pub(super) secret_key: x25519::SecretKey,
+    pub(super) remote_key: Option<x25519::PublicKey>,
+    pub(crate) connect_list: SharedConnectList,
+    pub(crate) connect: Verified<Connect>,
     max_message_len: u32,
 }
 
 impl HandshakeParams {
-    pub fn new(
+    pub(crate) fn new(
         public_key: PublicKey,
         secret_key: SecretKey,
         connect_list: SharedConnectList,
         connect: Verified<Connect>,
         max_message_len: u32,
     ) -> Self {
-        let (public_key, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+        let (_, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
 
         HandshakeParams {
-            public_key,
             secret_key,
             max_message_len,
             remote_key: None,

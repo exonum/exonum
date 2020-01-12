@@ -88,7 +88,7 @@ pub struct NetworkPart {
     pub max_message_len: u32,
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     pub network_tx: mpsc::Sender<NetworkEvent>,
-    pub connect_list: SharedConnectList,
+    pub(crate) connect_list: SharedConnectList,
 }
 
 #[derive(Clone, Debug)]

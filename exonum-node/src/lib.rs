@@ -36,11 +36,13 @@
 
 // spell-checker:ignore cors
 
-pub(crate) use self::state::SharedConnectList;
+pub(crate) use self::{
+    connect_list::ConnectList,
+    state::{SharedConnectList, State},
+};
 pub use self::{
-    connect_list::{ConnectInfo, ConnectList, ConnectListConfig},
+    connect_list::{ConnectInfo, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
-    state::State,
 };
 
 // FIXME: think about moving types here.
@@ -127,8 +129,7 @@ pub(crate) enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-#[doc(hidden)]
-pub trait SystemStateProvider: fmt::Debug + Send + 'static {
+pub(crate) trait SystemStateProvider: fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -141,8 +142,7 @@ pub trait SystemStateProvider: fmt::Debug + Send + 'static {
 ///
 /// This type and its methods are considered an implementation detail of the Exonum node and are
 /// thus exempt from semantic versioning.
-#[doc(hidden)]
-pub struct NodeHandler {
+pub(crate) struct NodeHandler {
     /// Shared API state.
     pub api_state: SharedNodeState,
     /// Blockchain.
@@ -371,8 +371,7 @@ impl ValidateInput for NodeConfig {
 /// This type is considered an implementation detail of the node handler; it is exempt from
 /// semantic versioning.
 #[derive(Debug, Clone)]
-#[doc(hidden)]
-pub struct Configuration {
+pub(crate) struct Configuration {
     /// Connection list.
     pub connect_list: ConnectList,
     /// Network configuration.
@@ -387,8 +386,7 @@ pub struct Configuration {
 
 /// Channel for messages, timeouts and api requests. Consumed by the `NodeHandler` constructor.
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct NodeSender {
+pub(crate) struct NodeSender {
     /// Internal requests sender.
     pub internal_requests: SyncSender<InternalRequest>,
     /// Network requests sender.
@@ -557,14 +555,13 @@ impl NodeHandler {
     }
 
     /// Returns `State` of the node.
-    #[doc(hidden)]
-    pub fn state(&self) -> &State {
+    pub(crate) fn state(&self) -> &State {
         &self.state
     }
 
     /// Returns a mutable reference to the `State` of the node.
-    #[doc(hidden)]
-    pub fn state_mut(&mut self) -> &mut State {
+    #[cfg(test)]
+    pub(crate) fn state_mut(&mut self) -> &mut State {
         &mut self.state
     }
 

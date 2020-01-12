@@ -43,7 +43,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct TestHandler {
+struct TestHandler {
     handle: Option<thread::JoinHandle<()>>,
     listen_address: SocketAddr,
     network_events_rx: mpsc::Receiver<NetworkEvent>,
@@ -51,7 +51,7 @@ pub struct TestHandler {
 }
 
 impl TestHandler {
-    pub fn new(
+    fn new(
         listen_address: SocketAddr,
         network_requests_tx: mpsc::Sender<NetworkRequest>,
         network_events_rx: mpsc::Receiver<NetworkEvent>,
@@ -64,7 +64,7 @@ impl TestHandler {
         }
     }
 
-    pub fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
+    fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
         let rx = self.network_events_rx.by_ref();
         let future = rx
             .into_future()
@@ -145,15 +145,15 @@ impl Drop for TestHandler {
 }
 
 #[derive(Debug)]
-pub struct TestEvents {
-    pub listen_address: SocketAddr,
-    pub network_config: NetworkConfiguration,
-    pub events_config: EventsPoolCapacity,
-    pub connect_list: SharedConnectList,
+struct TestEvents {
+    listen_address: SocketAddr,
+    network_config: NetworkConfiguration,
+    events_config: EventsPoolCapacity,
+    connect_list: SharedConnectList,
 }
 
 impl TestEvents {
-    pub fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> TestEvents {
+    fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> TestEvents {
         TestEvents {
             listen_address,
             network_config: NetworkConfiguration::default(),
@@ -162,11 +162,7 @@ impl TestEvents {
         }
     }
 
-    pub fn spawn(
-        self,
-        handshake_params: &HandshakeParams,
-        connect: Verified<Connect>,
-    ) -> TestHandler {
+    fn spawn(self, handshake_params: &HandshakeParams, connect: Verified<Connect>) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
@@ -219,9 +215,9 @@ pub fn raw_message(payload_len: usize) -> SignedMessage {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConnectionParams {
-    pub connect: Verified<Connect>,
-    pub connect_info: ConnectInfo,
+struct ConnectionParams {
+    connect: Verified<Connect>,
+    connect_info: ConnectInfo,
     address: SocketAddr,
     public_key: PublicKey,
     secret_key: SecretKey,
@@ -256,7 +252,7 @@ impl HandshakeParams {
 }
 
 impl ConnectionParams {
-    pub fn from_address(address: SocketAddr) -> Self {
+    fn from_address(address: SocketAddr) -> Self {
         let (public_key, secret_key) = gen_keypair();
         let connect = connect_message(address, public_key, &secret_key);
         let handshake_params = HandshakeParams::new(
@@ -281,7 +277,7 @@ impl ConnectionParams {
         }
     }
 
-    pub fn spawn(&mut self, events: TestEvents, connect_list: SharedConnectList) -> TestHandler {
+    fn spawn(&mut self, events: TestEvents, connect_list: SharedConnectList) -> TestHandler {
         self.handshake_params.connect_list = connect_list.clone();
         events.spawn(&self.handshake_params, self.connect.clone())
     }

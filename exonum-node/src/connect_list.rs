@@ -14,11 +14,9 @@
 
 //! Mapping between peers public keys and IP addresses / domain names.
 
-use exonum::{
-    blockchain::ValidatorKeys,
-    crypto::PublicKey,
-    messages::{Connect, Verified},
-};
+#[cfg(test)]
+use exonum::messages::{Connect, Verified};
+use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, fmt};
@@ -42,12 +40,9 @@ impl fmt::Display for ConnectInfo {
 
 /// Stores mapping between IP addresses / domain names and public keys.
 #[derive(Debug, Clone, Default)]
-#[doc(hidden)]
-// ^-- Unlike `ConnectListConfig`, this type is considered an implementation detail
-// since it's used exclusively by `NodeHandler`.
-pub struct ConnectList {
+pub(crate) struct ConnectList {
     /// Peers to which we can connect.
-    pub(super) peers: BTreeMap<PublicKey, String>,
+    pub peers: BTreeMap<PublicKey, String>,
 }
 
 impl ConnectList {
@@ -63,6 +58,7 @@ impl ConnectList {
     }
 
     /// Creates `ConnectList` from the previously saved list of peers.
+    #[cfg(test)]
     pub fn from_peers(peers: impl IntoIterator<Item = (PublicKey, Verified<Connect>)>) -> Self {
         Self {
             peers: peers

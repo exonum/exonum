@@ -89,7 +89,7 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 }
 
 #[derive(Debug)]
-pub struct SandboxInner {
+struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
     pub sent: GuardedQueue,
@@ -455,7 +455,7 @@ impl Sandbox {
         time
     }
 
-    pub fn node_state(&self) -> Ref<'_, State> {
+    pub(crate) fn node_state(&self) -> Ref<'_, State> {
         Ref::map(self.inner.borrow(), |inner| inner.handler.state())
     }
 
