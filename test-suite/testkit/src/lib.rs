@@ -121,7 +121,7 @@ use exonum::{
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
-    node::{ApiSender, ExternalMessage, NodePlugin, SharedNodeState},
+    node::{ApiSender, ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState},
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{
@@ -142,7 +142,6 @@ use crate::{
     poll_events::{poll_events, poll_latest},
     server::TestKitActor,
 };
-use exonum::node::PluginApiContext;
 
 mod api;
 mod builder;
