@@ -253,7 +253,6 @@ pub use self::{
 };
 
 pub mod api;
-pub mod error;
 
 use exonum::{
     api::{manager::UpdateEndpoints, ApiBuilder},
@@ -277,6 +276,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use self::api::ServiceApiBuilder;
 
 mod call_context;
+mod error;
 mod runtime_api;
 mod service;
 mod stubs;
