@@ -8,9 +8,9 @@ repository = "https://github.com/exonum/exonum"
 documentation = "https://docs.rs/exonum-system-api"
 readme = "README.md"
 license = "Apache-2.0"
-keywords = ["exonum", "http"]
+keywords = ["exonum", "http", "plugin"]
 categories = ["cryptography"]
-description = "System API plugin of the Exonum framework"
+description = "System API plugin for the Exonum framework"
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
