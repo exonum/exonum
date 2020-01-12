@@ -18,10 +18,8 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     merkledb::{Database, TemporaryDB},
 };
-use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
-use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
-
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_core::reactor::Core;
@@ -31,6 +29,8 @@ use std::{
     thread,
     time::Duration,
 };
+
+use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
 
 #[derive(Debug)]
 struct RunHandle {
