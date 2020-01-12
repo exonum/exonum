@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::{error, trace};
-
-use std::mem;
-
-use crate::{
+use exonum::{
     blockchain::{get_transaction, Schema},
     crypto::{Hash, PublicKey},
     merkledb::BinaryValue,
@@ -26,6 +22,9 @@ use crate::{
         TX_RES_PB_OVERHEAD_PAYLOAD,
     },
 };
+use log::{error, trace};
+
+use std::mem;
 
 use super::NodeHandler;
 

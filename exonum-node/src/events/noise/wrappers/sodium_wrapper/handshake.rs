@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::BinaryValue;
+use exonum::{
+    crypto::{
+        x25519::{self, into_x25519_keypair, into_x25519_public_key},
+        PublicKey, SecretKey,
+    },
+    merkledb::BinaryValue,
+    messages::{Connect, Verified},
+};
 use failure::bail;
 use futures::future::{done, Future};
 use tokio_codec::Decoder;
@@ -22,16 +29,11 @@ use std::net::SocketAddr;
 
 use super::wrapper::NoiseWrapper;
 use crate::{
-    crypto::{
-        x25519::{self, into_x25519_keypair, into_x25519_public_key},
-        PublicKey, SecretKey,
-    },
     events::{
         codec::MessagesCodec,
         noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
     },
-    messages::{Connect, Verified},
-    node::SharedConnectList,
+    SharedConnectList,
 };
 
 /// Params needed to establish secured connection using Noise Protocol.

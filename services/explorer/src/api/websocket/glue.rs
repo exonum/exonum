@@ -15,12 +15,10 @@
 //! Glue between WebSocket server and `actix-web` HTTP server.
 
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse, Query};
-use exonum::{
-    api::{
-        backends::actix::{self as actix_backend, HttpRequest, RawHandler, RequestHandler},
-        ApiBackend, Error as ApiError,
-    },
-    blockchain::Blockchain,
+use exonum::blockchain::Blockchain;
+use exonum_api::{
+    backends::actix::{self as actix_backend, HttpRequest, RawHandler, RequestHandler},
+    ApiBackend, Error as ApiError,
 };
 use exonum_rust_runtime::api::ServiceApiScope;
 use futures::IntoFuture;

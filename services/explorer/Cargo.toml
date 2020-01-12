@@ -17,6 +17,7 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-api = { version = "0.13.0-rc.2", path = "../../components/api" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-explorer = { version = "0.13.0-rc.2", path = "../../components/explorer" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }

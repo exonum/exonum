@@ -228,13 +228,15 @@ impl<T: Access> Schema<T> {
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
-    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
+    #[doc(hidden)] // FIXME: move to separate schema
+    pub fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
         self.access.clone().get_list(CONSENSUS_MESSAGES_CACHE)
     }
 
     /// Returns the saved value of the consensus round. Returns the first round
     /// if it has not been saved.
-    pub(crate) fn consensus_round(&self) -> Round {
+    #[doc(hidden)] // FIXME: move to separate schema
+    pub fn consensus_round(&self) -> Round {
         self.access
             .clone()
             .get_entry(CONSENSUS_ROUND)

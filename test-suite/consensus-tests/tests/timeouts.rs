@@ -18,8 +18,8 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
-    node::constants::PROPOSE_REQUEST_TIMEOUT,
 };
+use exonum_node::constants::PROPOSE_REQUEST_TIMEOUT;
 
 use std::time::Duration;
 

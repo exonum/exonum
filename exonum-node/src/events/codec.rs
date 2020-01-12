@@ -14,15 +14,17 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure::bail;
-use std::mem;
-use tokio_io::codec::{Decoder, Encoder};
-
-use crate::{
-    events::noise::{TransportWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH},
+use exonum::{
     merkledb::BinaryValue,
     messages::{SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
 };
+use failure::bail;
+use tokio_io::codec::{Decoder, Encoder};
+
+use std::mem;
+
+use crate::events::noise::{TransportWrapper, HEADER_LENGTH as NOISE_HEADER_LENGTH};
+
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
@@ -91,17 +93,16 @@ impl Encoder for MessagesCodec {
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
-    use exonum_merkledb::BinaryValue;
-    use tokio_io::codec::{Decoder, Encoder};
-
-    use crate::{
+    use exonum::{
         crypto::{gen_keypair, Hash},
-        events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper},
         helpers::Height,
+        merkledb::BinaryValue,
         messages::{Status, Verified, SIGNED_MESSAGE_MIN_SIZE},
     };
+    use tokio_io::codec::{Decoder, Encoder};
 
     use super::MessagesCodec;
+    use crate::events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper};
 
     fn get_decoded_message(data: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();

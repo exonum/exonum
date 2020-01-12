@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::BinaryValue;
+use exonum::{
+    merkledb::BinaryValue,
+    messages::{ExonumMessage, Message, SignedMessage},
+};
 use futures::{
     future::{self, Either, Executor},
     sync::mpsc,
@@ -21,8 +24,6 @@ use futures::{
 use tokio_core::reactor::{Handle, Timeout};
 
 use std::time::{Duration, SystemTime};
-
-use crate::messages::{ExonumMessage, Message, SignedMessage};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
 
@@ -116,16 +117,15 @@ impl InternalPart {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
-    use tokio_core::reactor::Core;
-
-    use std::thread;
-
-    use crate::{
+    use exonum::{
         crypto::{gen_keypair, Hash, Signature},
         helpers::Height,
         messages::{Status, Verified},
     };
+    use pretty_assertions::assert_eq;
+    use tokio_core::reactor::Core;
+
+    use std::thread;
 
     use super::*;
 

@@ -14,7 +14,6 @@
 
 use assert_matches::assert_matches;
 use exonum::{
-    api::Error as ApiError,
     blockchain::{AdditionalHeaders, CallInBlock, ProposerId},
     crypto::{gen_keypair, Hash},
     helpers::{Height, ValidatorId},
@@ -22,6 +21,7 @@ use exonum::{
     runtime::{CoreError, ErrorKind, ExecutionError},
 };
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
+use exonum_rust_runtime::api::Error as ApiError;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::{json, Value};
 

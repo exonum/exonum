@@ -386,15 +386,16 @@ pub use exonum_explorer::{
 };
 
 use exonum::{
-    api::{Error as ApiError, FutureResult},
-    blockchain::{Blockchain, CallInBlock, Schema},
+    blockchain::{ApiSender, Blockchain, CallInBlock, Schema},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
-    node::ApiSender,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::{api::ServiceApiScope, ExecutionStatus};
+use exonum_rust_runtime::{
+    api::{Error as ApiError, FutureResult, ServiceApiScope},
+    ExecutionStatus,
+};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;
@@ -569,7 +570,7 @@ impl ExplorerApi {
             sender
                 .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(ApiError::from)
+                .map_err(|e| ApiError::InternalError(e.into()))
         };
 
         Box::new(

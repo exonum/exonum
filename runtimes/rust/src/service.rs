@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::config::InstanceInitParams,
+    blockchain::{config::InstanceInitParams, ApiSender, SendError},
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
-    node::{ApiSender, SendError},
     runtime::{
         ArtifactId, DispatcherAction, ExecutionError, InstanceDescriptor, InstanceId, Mailbox,
         MethodId,

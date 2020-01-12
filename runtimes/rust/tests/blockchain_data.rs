@@ -15,10 +15,11 @@
 use assert_matches::assert_matches;
 use exonum::{
     blockchain::{
-        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut, IndexProof,
+        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig, IndexProof,
     },
     crypto::PublicKey,
-    helpers::{generate_testnet_config, Height, ValidatorId},
+    helpers::{Height, ValidatorId},
     merkledb::{
         access::{Access, AccessExt, FromAccess, Prefixed},
         Entry, HashTag, ProofMapIndex, Snapshot,
@@ -87,8 +88,8 @@ impl DefaultInstance for OtherService {
 }
 
 fn create_blockchain() -> BlockchainMut {
-    let config = generate_testnet_config(1, 0)[0].clone();
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
+    let (config, _) = ConsensusConfig::for_tests(1);
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config)
         .with_artifact(TokenService.artifact_id())
         .with_instance(TokenService.default_instance())
         .with_artifact(OldService.artifact_id())

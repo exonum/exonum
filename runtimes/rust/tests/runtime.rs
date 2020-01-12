@@ -15,10 +15,10 @@
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainBuilder, BlockchainMut, Schema as CoreSchema,
+        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, Schema as CoreSchema,
     },
     crypto::Hash,
-    helpers::{generate_testnet_config, Height, ValidatorId},
+    helpers::{Height, ValidatorId},
     merkledb::{access::AccessExt, BinaryValue, ObjectHash, Patch, Snapshot, SystemSchema},
     messages::{AnyTx, Verified},
     runtime::{
@@ -493,8 +493,7 @@ impl DefaultInstance for DependentServiceImpl {
 }
 
 fn create_genesis_config_builder() -> GenesisConfigBuilder {
-    let consensus_config = generate_testnet_config(1, 0)[0].clone().consensus;
-    GenesisConfigBuilder::with_consensus_config(consensus_config)
+    GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default())
 }
 
 fn create_genesis_config_with_supervisor() -> GenesisConfig {

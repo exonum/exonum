@@ -17,12 +17,9 @@
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. shutting down the node.
 
-use exonum::{
-    api::{ApiBackend, ApiScope, Error as ApiError, FutureResult},
-    crypto::PublicKey,
-    node::{ApiSender, ConnectInfo, ExternalMessage, SharedNodeState},
-    runtime::InstanceId,
-};
+use exonum::{crypto::PublicKey, runtime::InstanceId};
+use exonum_api::{ApiBackend, ApiScope, Error as ApiError, FutureResult};
+use exonum_node::{ApiSender, ConnectInfo, ExternalMessage, SharedNodeState};
 use futures::Future;
 use serde_derive::{Deserialize, Serialize};
 
@@ -129,7 +126,10 @@ impl SystemApi {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(name, move |connect_info: ConnectInfo| -> FutureResult<()> {
             let handler = sender
-                .send_external_message(ExternalMessage::PeerAdd(connect_info))
+                .send_external_message(ExternalMessage::PeerAdd {
+                    address: connect_info.address,
+                    public_key: connect_info.public_key,
+                })
                 .map_err(|e| ApiError::InternalError(e.into()));
             Box::new(handler)
         });
@@ -167,7 +167,7 @@ impl SystemApi {
         // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
         use actix_web::{HttpRequest, HttpResponse};
-        use exonum::api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
+        use exonum_api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
 
         let sender = self.sender.clone();
         let index = move |_: HttpRequest| -> FutureResponse {
@@ -175,7 +175,7 @@ impl SystemApi {
                 .send_external_message(ExternalMessage::Shutdown)
                 .map(|()| HttpResponse::Ok().json(()))
                 .map_err(|e| {
-                    let e: ApiError = e.into();
+                    let e = ApiError::InternalError(e.into());
                     actix_web::Error::from(e)
                 });
             Box::new(handler)

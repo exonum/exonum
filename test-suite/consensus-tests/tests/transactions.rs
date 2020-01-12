@@ -19,8 +19,8 @@ use exonum::{
     blockchain::ProposerId,
     crypto::{gen_keypair, Hash},
     helpers::{Height, Round, ValidatorId},
+    merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified, TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
-    node::constants::TRANSACTIONS_REQUEST_TIMEOUT,
 };
 use exonum_consensus_tests::{
     config_updater::TxConfig,
@@ -28,7 +28,7 @@ use exonum_consensus_tests::{
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
     timestamping_sandbox, timestamping_sandbox_builder, Milliseconds, Sandbox,
 };
-use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_node::constants::TRANSACTIONS_REQUEST_TIMEOUT;
 
 use std::time::Duration;
 

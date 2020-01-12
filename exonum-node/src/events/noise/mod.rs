@@ -14,7 +14,7 @@
 
 // spell-checker:ignore uint
 
-#[cfg(feature = "sodiumoxide-crypto")]
+#[cfg(feature = "exonum_sodiumoxide")]
 #[doc(inline)]
 pub use self::wrappers::sodium_wrapper::{
     handshake::{HandshakeParams, NoiseHandshake},
@@ -25,6 +25,7 @@ pub use self::wrappers::sodium_wrapper::{
 };
 
 use byteorder::{ByteOrder, LittleEndian};
+use exonum::crypto::x25519;
 use futures::future::Future;
 use tokio_codec::Framed;
 use tokio_io::{
@@ -33,7 +34,6 @@ use tokio_io::{
 };
 
 use crate::events::{codec::MessagesCodec, error::into_failure};
-use exonum_crypto::x25519;
 
 pub mod error;
 pub mod wrappers;

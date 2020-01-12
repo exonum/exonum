@@ -14,14 +14,16 @@
 
 //! Mapping between peers public keys and IP addresses / domain names.
 
-use std::{collections::BTreeMap, fmt};
-
-use super::SharedConnectList;
-use crate::{
+use exonum::{
     blockchain::ValidatorKeys,
     crypto::PublicKey,
     messages::{Connect, Verified},
 };
+use serde_derive::{Deserialize, Serialize};
+
+use std::{collections::BTreeMap, fmt};
+
+use super::SharedConnectList;
 
 /// Data needed to connect to a peer node.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -129,12 +131,12 @@ impl ConnectListConfig {
 
 #[cfg(test)]
 mod test {
+    use exonum::crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
     use pretty_assertions::assert_eq;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
     use super::*;
-    use crate::crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
-    use crate::node::ConnectInfo;
+    use crate::ConnectInfo;
 
     const SEED_LENGTH: usize = 32;
     static VALIDATORS: [[u8; SEED_LENGTH]; 2] = [[1; SEED_LENGTH], [2; SEED_LENGTH]];

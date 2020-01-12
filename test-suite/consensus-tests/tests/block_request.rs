@@ -16,10 +16,10 @@
 
 use exonum::{
     helpers::{Height, Round, ValidatorId},
-    node::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
+    merkledb::ObjectHash,
 };
 use exonum_consensus_tests::{sandbox_tests_helper::*, timestamping_sandbox};
-use exonum_merkledb::ObjectHash;
+use exonum_node::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
 
 use std::time::Duration;
 

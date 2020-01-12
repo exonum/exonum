@@ -23,6 +23,10 @@ pub mod internal;
 pub mod network;
 pub mod noise;
 
+use exonum::{
+    helpers::{Height, Round},
+    messages::Message,
+};
 use futures::{
     sink::Wait,
     sync::mpsc::{self, Sender},
@@ -31,9 +35,7 @@ use futures::{
 
 use std::{cmp::Ordering, time::SystemTime};
 
-use crate::helpers::{Height, Round};
-use crate::messages::Message;
-use crate::node::{ExternalMessage, NodeTimeout};
+use crate::{ExternalMessage, NodeTimeout};
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;

@@ -2,6 +2,7 @@
 members = [
     "cli",
     "exonum",
+    "exonum-node",
 
     "examples/cryptocurrency",
     "examples/cryptocurrency-advanced/backend",

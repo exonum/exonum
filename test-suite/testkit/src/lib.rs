@@ -109,19 +109,18 @@ pub use crate::{
 pub use exonum_explorer as explorer;
 
 use exonum::{
-    api::{
-        backends::actix::SystemRuntime, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
-        UpdateEndpoints, WebServerConfig,
-    },
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ExternalMessage,
     },
     crypto::{self, Hash},
     helpers::{byzantine_quorum, Height, ValidatorId},
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
-    node::{ApiSender, ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState},
+};
+use exonum_api::{
+    backends::actix::SystemRuntime, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
+    UpdateEndpoints, WebServerConfig,
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{
@@ -129,6 +128,9 @@ use exonum_rust_runtime::{
 };
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
+
+#[cfg(feature = "exonum-node")]
+use exonum_node::{NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -167,6 +169,7 @@ pub struct TestKit {
     api_sender: ApiSender,
     api_notifier_channel: ApiNotifierChannel,
     api_aggregator: ApiAggregator,
+    #[cfg(feature = "exonum-node")]
     plugins: Vec<Box<dyn NodePlugin>>,
 }
 
@@ -204,7 +207,6 @@ impl TestKit {
         network: TestNetwork,
         genesis_config: GenesisConfig,
         runtimes: Vec<RuntimeInstance>,
-        plugins: Vec<Box<dyn NodePlugin>>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
         let api_channel = mpsc::channel(1_000);
@@ -225,14 +227,6 @@ impl TestKit {
                 |builder, runtime| builder.with_runtime(runtime),
             )
             .build();
-        // Initial API aggregator does not contain service endpoints. We expect them to arrive
-        // via `api_notifier_channel`, so they will be picked up in `Self::update_aggregator()`.
-        let mut api_aggregator = ApiAggregator::new();
-        let node_state = SharedNodeState::new(10_000);
-        let plugin_api_context = PluginApiContext::new(blockchain.as_ref(), &node_state);
-        for plugin in &plugins {
-            api_aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
-        }
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -254,9 +248,25 @@ impl TestKit {
             processing_lock,
             network,
             api_notifier_channel,
-            api_aggregator,
-            plugins,
+            api_aggregator: ApiAggregator::new(),
+            #[cfg(feature = "exonum-node")]
+            plugins: vec![],
         }
+    }
+
+    /// Needs to be called immediately after node creation.
+    #[cfg(feature = "exonum-node")]
+    pub(crate) fn set_plugins(&mut self, plugins: Vec<Box<dyn NodePlugin>>) {
+        debug_assert!(self.plugins.is_empty());
+        let mut aggregator = ApiAggregator::new();
+        let node_state = SharedNodeState::new(10_000);
+        let plugin_api_context = PluginApiContext::new(self.blockchain.as_ref(), &node_state);
+        for plugin in &self.plugins {
+            aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+        }
+
+        self.api_aggregator = aggregator;
+        self.plugins = plugins;
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -268,10 +278,14 @@ impl TestKit {
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
             let mut aggregator = ApiAggregator::new();
-            let node_state = SharedNodeState::new(10_000);
-            let plugin_api_context = PluginApiContext::new(self.blockchain.as_ref(), &node_state);
-            for plugin in &self.plugins {
-                aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+            #[cfg(feature = "exonum-node")]
+            {
+                let node_state = SharedNodeState::new(10_000);
+                let plugin_api_context =
+                    PluginApiContext::new(self.blockchain.as_ref(), &node_state);
+                for plugin in &self.plugins {
+                    aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+                }
             }
             aggregator.extend(update.endpoints);
             self.api_aggregator = aggregator;
@@ -417,10 +431,13 @@ impl TestKit {
 
         self.poll_events();
         let snapshot = self.snapshot();
+
+        #[cfg(feature = "exonum-node")]
         for plugin in &self.plugins {
             plugin.after_commit(&snapshot);
         }
-        BlockchainExplorer::new(snapshot.as_ref())
+
+        BlockchainExplorer::new(&snapshot)
             .block_with_txs(self.height())
             .unwrap()
     }
@@ -662,20 +679,18 @@ impl TestKit {
     ///
     /// [`StoppedTestKit`]: struct.StoppedTestKit.html
     pub fn stop(self) -> StoppedTestKit {
-        let Self {
-            db_handler,
-            network,
-            plugins,
-            api_notifier_channel,
-            ..
-        } = self;
+        let db = self.db_handler.into_inner();
+        let network = self.network;
+        let api_notifier_channel = self.api_notifier_channel;
+        #[cfg(feature = "exonum-node")]
+        let plugins = self.plugins;
 
-        let db = db_handler.into_inner();
         StoppedTestKit {
             network,
             db,
-            plugins,
             api_notifier_channel,
+            #[cfg(feature = "exonum-node")]
+            plugins,
         }
     }
 }
@@ -751,6 +766,7 @@ impl TestKit {
 /// ```
 pub struct StoppedTestKit {
     db: CheckpointDb<TemporaryDB>,
+    #[cfg(feature = "exonum-node")]
     plugins: Vec<Box<dyn NodePlugin>>,
     network: TestNetwork,
     api_notifier_channel: ApiNotifierChannel,
@@ -799,15 +815,29 @@ impl StoppedTestKit {
         let rust_runtime = rust_runtime.build(self.api_notifier_channel.0.clone());
         let mut runtimes = external_runtimes;
         runtimes.push(rust_runtime.into());
-        TestKit::assemble(
-            self.db,
-            self.network,
-            // TODO make consensus config optional [ECR-3222]
-            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
-            runtimes,
-            self.plugins,
-            self.api_notifier_channel,
-        )
+
+        #[cfg(feature = "exonum-node")]
+        {
+            let mut testkit = TestKit::assemble(
+                self.db,
+                self.network,
+                GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+                runtimes,
+                self.api_notifier_channel,
+            );
+            testkit.set_plugins(self.plugins);
+            testkit
+        }
+        #[cfg(not(feature = "exonum-node"))]
+        {
+            TestKit::assemble(
+                self.db,
+                self.network,
+                GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+                runtimes,
+                self.api_notifier_channel,
+            )
+        }
     }
 }
 

@@ -24,9 +24,9 @@ use exonum::{
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
     messages::{PrevotesRequest, TransactionsRequest, Verified},
-    node::constants::{
-        PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
-    },
+};
+use exonum_node::constants::{
+    PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
 };
 use log::info;
 

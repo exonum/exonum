@@ -14,6 +14,10 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use exonum::{
+    crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
+    merkledb::BinaryValue,
+};
 use futures::{
     future::Either,
     sync::{mpsc, mpsc::Sender},
@@ -29,22 +33,18 @@ use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::{net::SocketAddr, thread, time::Duration};
 
-use crate::{
-    crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
-    events::{
-        error::into_failure,
-        noise::{
-            wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
-            Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
-            NoiseWrapper, TransportWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
-        },
-        tests::raw_message,
+use crate::events::{
+    error::into_failure,
+    noise::{
+        wrappers::sodium_wrapper::resolver::{SodiumDh25519, SodiumResolver},
+        Handshake, HandshakeParams, HandshakeRawMessage, HandshakeResult, NoiseHandshake,
+        NoiseWrapper, TransportWrapper, HEADER_LENGTH, MAX_MESSAGE_LENGTH,
     },
-    merkledb::BinaryValue,
+    tests::raw_message,
 };
 
 #[test]
-#[cfg(feature = "sodiumoxide-crypto")]
+#[cfg(feature = "exonum_sodiumoxide")]
 fn noise_convert_ed_to_curve_dh() {
     use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 
@@ -71,7 +71,7 @@ fn noise_convert_ed_to_curve_dh() {
 }
 
 #[test]
-#[cfg(feature = "sodiumoxide-crypto")]
+#[cfg(feature = "exonum_sodiumoxide")]
 fn noise_converted_keys_handshake() {
     use crate::crypto::{gen_keypair, x25519::into_x25519_keypair};
 

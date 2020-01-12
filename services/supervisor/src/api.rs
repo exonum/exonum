@@ -141,19 +141,19 @@ impl PrivateApi for ApiImpl<'_> {
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .request_artifact_deploy((), artifact)
-            .map_err(From::from)
+            .map_err(|e| api::Error::InternalError(e.into()))
     }
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .propose_config_change((), proposal)
-            .map_err(From::from)
+            .map_err(|e| api::Error::InternalError(e.into()))
     }
 
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .confirm_config_change((), vote)
-            .map_err(From::from)
+            .map_err(|e| api::Error::InternalError(e.into()))
     }
 
     fn configuration_number(&self) -> Result<u64, Self::Error> {

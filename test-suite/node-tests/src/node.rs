@@ -16,10 +16,9 @@
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
-    helpers,
     merkledb::{Database, TemporaryDB},
-    node::{Node, NodeBuilder, NodeConfig, ShutdownHandle},
 };
+use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
 
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
@@ -99,7 +98,7 @@ impl StartCheckerServiceFactory {
 fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
-    for node_cfg in helpers::generate_testnet_config(count, start_port) {
+    for node_cfg in generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = mpsc::unbounded();
 
         let service = CommitWatcherService(commit_tx);
@@ -162,7 +161,7 @@ fn test_node_restart_regression() {
     };
 
     let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
-    let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
+    let node_cfg = generate_testnet_config(1, 3600)[0].clone();
 
     let start_times = Arc::new(Mutex::new(0));
     // First launch

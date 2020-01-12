@@ -20,7 +20,6 @@ use exonum::{
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
-    node::{NodeApiConfig, NodeBuilder, NodeConfig},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
@@ -30,6 +29,7 @@ use exonum::{
     },
 };
 use exonum_derive::*;
+use exonum_node::{NodeApiConfig, NodeBuilder, NodeConfig};
 use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 use futures::{Future, IntoFuture};

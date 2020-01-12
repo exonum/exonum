@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::blockchain::Schema;
 use log::{info, trace, warn};
 
-use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectInfo, ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 
-use crate::{
-    blockchain::Schema,
-    events::{
-        error::LogError, Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest,
-        NetworkEvent,
-    },
+use crate::events::{
+    error::LogError, Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest,
+    NetworkEvent,
 };
 
 impl EventHandler for NodeHandler {
@@ -62,7 +60,14 @@ impl NodeHandler {
             ExternalMessage::Transaction(tx) => {
                 self.handle_incoming_tx(tx);
             }
-            ExternalMessage::PeerAdd(info) => {
+            ExternalMessage::PeerAdd {
+                address,
+                public_key,
+            } => {
+                let info = ConnectInfo {
+                    address,
+                    public_key,
+                };
                 info!("Send Connect message to {}", info);
                 self.state.add_peer_to_connect_list(info.clone());
                 self.connect(info.public_key);

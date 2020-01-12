@@ -28,10 +28,6 @@ use exonum::{
         ConsensusConfig, Schema, ValidatorKeys,
     },
     crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
-    events::{
-        Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
-        TimeoutRequest,
-    },
     helpers::{user_agent, Height, Round, ValidatorId},
     keys::Keys,
     merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
@@ -40,10 +36,14 @@ use exonum::{
         PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
         SignedMessage, Status, TransactionsRequest, TransactionsResponse, Verified,
     },
-    node::{
-        ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-        NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
+};
+use exonum_node::{
+    events::{
+        Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
+        TimeoutRequest,
     },
+    ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
+    NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
 };
 use exonum_rust_runtime::{
     ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,

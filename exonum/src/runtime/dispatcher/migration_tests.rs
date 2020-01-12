@@ -22,9 +22,8 @@ use std::time::Duration;
 
 use super::*;
 use crate::{
-    blockchain::{Block, BlockchainMut},
+    blockchain::{ApiSender, Block, BlockchainMut},
     helpers::ValidatorId,
-    node::ApiSender,
     runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
         CallInfo, CoreError, DispatcherSchema, ErrorMatch, RuntimeIdentifier, WellKnownRuntime,

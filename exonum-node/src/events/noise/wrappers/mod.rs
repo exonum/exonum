@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "sodiumoxide-crypto")]
+#[cfg(feature = "exonum_sodiumoxide")]
 pub mod sodium_wrapper;

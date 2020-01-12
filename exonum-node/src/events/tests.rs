@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{
+    blockchain::ConsensusConfig,
+    crypto::{
+        gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
+        SEED_LENGTH, SIGNATURE_LENGTH,
+    },
+    helpers::user_agent,
+    merkledb::BinaryValue,
+    messages::{Connect, SignedMessage, Verified},
+};
 use futures::{sync::mpsc, Future, Sink, Stream};
 use pretty_assertions::assert_eq;
 use tokio::util::FutureExt;
@@ -24,22 +34,12 @@ use std::{
 };
 
 use crate::{
-    blockchain::ConsensusConfig,
-    crypto::{
-        gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
-        SEED_LENGTH, SIGNATURE_LENGTH,
-    },
     events::{
         error::log_error, network::NetworkPart, noise::HandshakeParams, NetworkEvent,
         NetworkRequest,
     },
-    helpers::user_agent,
-    merkledb::BinaryValue,
-    messages::{Connect, SignedMessage, Verified},
-    node::{
-        ConnectInfo, ConnectList, EventsPoolCapacity, NetworkConfiguration, NodeChannel,
-        SharedConnectList,
-    },
+    ConnectInfo, ConnectList, EventsPoolCapacity, NetworkConfiguration, NodeChannel,
+    SharedConnectList,
 };
 
 #[derive(Debug)]

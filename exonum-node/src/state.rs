@@ -15,7 +15,17 @@
 //! State of the `NodeHandler`.
 
 use bit_vec::BitVec;
-use exonum_merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch};
+use exonum::{
+    blockchain::{contains_transaction, ConsensusConfig, ProposerId, ValidatorKeys},
+    crypto::{Hash, PublicKey},
+    helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
+    keys::Keys,
+    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch},
+    messages::{
+        AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
+        Verified,
+    },
+};
 use failure::bail;
 use log::{error, trace};
 
@@ -25,18 +35,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::{
-    blockchain::{contains_transaction, ConsensusConfig, ProposerId, ValidatorKeys},
-    crypto::{Hash, PublicKey},
-    events::network::ConnectedPeerAddr,
-    helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
-    messages::{
-        AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
-        Verified,
-    },
-    node::{connect_list::ConnectList, ConnectInfo},
-};
-use exonum_keys::Keys;
+use crate::{connect_list::ConnectList, events::network::ConnectedPeerAddr, ConnectInfo};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 

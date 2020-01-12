@@ -41,13 +41,12 @@ use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
+        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
     messages::{AnyTx, Verified},
-    node::ApiSender,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempfile::TempDir;

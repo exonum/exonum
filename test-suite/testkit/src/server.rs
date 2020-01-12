@@ -13,12 +13,8 @@
 // limitations under the License.
 
 use actix::prelude::*;
-use exonum::{
-    api::{self, ApiAggregator, ApiBuilder, FutureResult},
-    blockchain::ConsensusConfig,
-    crypto::Hash,
-    helpers::Height,
-};
+use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
+use exonum_api::{self as api, ApiAggregator, ApiBuilder, FutureResult};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
@@ -175,12 +171,12 @@ impl Handler<RollBack> for TestKitActor {
 mod tests {
     use assert_matches::assert_matches;
     use exonum::{
-        api,
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::ExecutionError,
     };
+    use exonum_api as api;
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;

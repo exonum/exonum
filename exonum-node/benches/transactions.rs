@@ -20,25 +20,29 @@ const MESSAGES_COUNT: u64 = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
 use criterion::{
-    AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
+    criterion_group, criterion_main, AxisScale, Bencher, Criterion, ParameterizedBenchmark,
+    PlotConfiguration, Throughput,
+};
+use exonum::{
+    crypto,
+    merkledb::BinaryValue,
+    messages::{Message, Verified},
+    runtime::{AnyTx, CallInfo},
 };
 use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
 use tokio_core::reactor::Core;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     sync::{Arc, RwLock},
     thread::{self, JoinHandle},
 };
 
-use exonum::{
-    crypto,
+use exonum_node::{
     events::InternalRequest,
     events::{Event, EventHandler, HandlerPart, InternalPart, NetworkEvent},
-    messages::{Message, Verified},
-    node::{EventsPoolCapacity, ExternalMessage, NodeChannel},
-    runtime::{AnyTx, CallInfo},
+    EventsPoolCapacity, ExternalMessage, NodeChannel,
 };
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 struct MessagesHandler {
     txs_count: usize,
@@ -84,7 +88,6 @@ impl EventHandler for MessagesHandler {
 }
 
 fn gen_messages(count: u64, tx_size: usize) -> Vec<Vec<u8>> {
-    use exonum_merkledb::BinaryValue;
     let (p, s) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
@@ -234,7 +237,7 @@ fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     verifier.join();
 }
 
-pub fn bench_verify_transactions(c: &mut Criterion) {
+fn bench_verify_transactions(c: &mut Criterion) {
     crypto::init();
 
     let parameters = (7..12).map(|i| 1 << i).collect::<Vec<_>>();
@@ -254,3 +257,6 @@ pub fn bench_verify_transactions(c: &mut Criterion) {
             .sample_size(SAMPLE_SIZE),
     );
 }
+
+criterion_group!(benches, bench_verify_transactions);
+criterion_main!(benches);

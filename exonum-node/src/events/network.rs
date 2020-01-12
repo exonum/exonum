@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{
+    crypto::{
+        x25519::{self, into_x25519_public_key},
+        PublicKey,
+    },
+    messages::{Connect, Message, Service, SignedMessage, Verified},
+};
 use failure::{bail, ensure, format_err};
 use futures::{
     future::{self, err, Either},
@@ -23,7 +30,6 @@ use log::{error, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
 use tokio_core::reactor::Handle;
-
 use tokio_retry::{
     strategy::{jitter, FixedInterval},
     Retry,
@@ -33,16 +39,13 @@ use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Du
 
 use super::{error::log_error, to_box};
 use crate::{
-    crypto::{x25519, PublicKey},
     events::{
         codec::MessagesCodec,
         error::into_failure,
         noise::{Handshake, HandshakeParams, NoiseHandshake},
     },
-    messages::{Connect, Message, Service, SignedMessage, Verified},
-    node::{NetworkConfiguration, SharedConnectList},
+    NetworkConfiguration, SharedConnectList,
 };
-use exonum_crypto::x25519::into_x25519_public_key;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 

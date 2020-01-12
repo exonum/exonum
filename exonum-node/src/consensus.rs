@@ -12,25 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, ObjectHash, Patch};
-use failure::{bail, format_err};
-use log::{error, info, trace, warn};
-
-use std::{collections::HashSet, convert::TryFrom};
-
-use crate::blockchain::ProposerId;
-use crate::{
-    blockchain::{contains_transaction, Blockchain, Schema},
+use exonum::{
+    blockchain::{contains_transaction, Blockchain, ProposerId, Schema},
     crypto::{Hash, PublicKey},
-    events::InternalRequest,
     helpers::{Height, Round},
+    merkledb::{BinaryValue, ObjectHash, Patch},
     messages::{
         AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest,
         Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
         TransactionsRequest, TransactionsResponse, Verified,
     },
-    node::{state::RequestData, NodeHandler},
 };
+use failure::{bail, format_err};
+use log::{error, info, trace, warn};
+
+use std::{collections::HashSet, convert::TryFrom};
+
+use crate::{events::InternalRequest, state::RequestData, NodeHandler};
 
 // Shortcut to get verified messages from bytes.
 fn into_verified<T: TryFrom<SignedMessage>>(

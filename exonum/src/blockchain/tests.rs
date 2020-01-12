@@ -33,7 +33,7 @@ use crate::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainBuilder, BlockchainMut, Schema,
     },
-    helpers::{generate_testnet_config, Height, ValidatorId},
+    helpers::{Height, ValidatorId},
     messages::Verified,
     runtime::{
         catch_panic,
@@ -48,12 +48,9 @@ const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 const TEST_SERVICE_NAME: &str = "test_service";
 const PANIC_STR: &str = "Panicking on request";
 
-fn create_consensus_config() -> ConsensusConfig {
-    generate_testnet_config(1, 0)[0].clone().consensus
-}
-
 fn create_genesis_config() -> GenesisConfig {
-    GenesisConfigBuilder::with_consensus_config(create_consensus_config()).build()
+    let (config, _) = ConsensusConfig::for_tests(1);
+    GenesisConfigBuilder::with_consensus_config(config).build()
 }
 
 #[derive(Debug, FromAccess)]
@@ -395,10 +392,11 @@ fn create_blockchain(
     runtime: RuntimeInspector,
     instances: Vec<InstanceInitParams>,
 ) -> BlockchainMut {
+    let (config, _) = ConsensusConfig::for_tests(1);
     let genesis_config = instances
         .into_iter()
         .fold(
-            GenesisConfigBuilder::with_consensus_config(create_consensus_config()),
+            GenesisConfigBuilder::with_consensus_config(config),
             |builder, instance| {
                 builder
                     .with_artifact(instance.instance_spec.artifact.clone())

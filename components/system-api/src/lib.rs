@@ -64,11 +64,9 @@
 pub mod private;
 pub mod public;
 
-use exonum::{
-    api::ApiBuilder,
-    blockchain::Blockchain,
-    node::{NodePlugin, PluginApiContext, SharedNodeState},
-};
+use exonum::blockchain::Blockchain;
+use exonum_api::ApiBuilder;
+use exonum_node::{NodePlugin, PluginApiContext, SharedNodeState};
 
 use crate::{private::SystemApi as PrivateSystemApi, public::SystemApi};
 

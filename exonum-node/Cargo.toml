@@ -1,0 +1,52 @@
+[package]
+name = "exonum-node"
+version = "0.13.0-rc.2"
+edition = "2018"
+authors = ["The Exonum Team <contact@exonum.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+documentation = "https://docs.rs/exonum"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["exonum", "blockchain", "node"]
+categories = ["cryptography"]
+description = "Node of the Exonum blockchain framework."
+
+[badges]
+travis-ci = { repository = "exonum/exonum" }
+
+[dependencies]
+bit-vec = "0.6.0"
+byteorder = { version = "1.2.7", features = [ "i128" ] }
+bytes = "0.4.11"
+failure = "0.1.5"
+futures = "0.1.25"
+log = "0.4.6"
+rand = "0.7"
+serde = "1.0.101"
+serde_derive = "1.0.101"
+snow = { version = "0.6.0", default-features = false }
+tokio = "0.1.14"
+tokio-codec = "0.1.1"
+tokio-core = "0.1.17"
+tokio-io = "0.1.11"
+tokio-retry = "0.2.0"
+tokio-threadpool = "0.1.10"
+tokio-dns-unofficial = "0.4.0"
+
+exonum = { version = "0.13.0-rc.2", path = "../exonum" }
+exonum-api = { version = "0.13.0-rc.2", path = "../components/api" }
+exonum_sodiumoxide = { version = "0.0.23", optional = true }
+
+[dev-dependencies]
+criterion = "0.3.0"
+hex = "0.4.0"
+pretty_assertions = "0.6.1"
+
+[features]
+default = ["exonum_sodiumoxide"]
+
+[[bench]]
+name = "transactions"
+harness = false
+path = "benches/transactions.rs"

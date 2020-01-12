@@ -15,12 +15,13 @@
 //! Simplified blockchain emulation for the explorer tests.
 
 use exonum::{
-    blockchain::{config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, BlockchainMut},
+    blockchain::{
+        config::GenesisConfigBuilder, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig,
+    },
     crypto::{self, PublicKey, SecretKey},
-    helpers::generate_testnet_config,
     merkledb::{ObjectHash, TemporaryDB},
     messages::Verified,
-    node::ApiSender,
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
@@ -107,16 +108,19 @@ pub fn consensus_keys() -> (PublicKey, SecretKey) {
 
 /// Creates a blockchain with no blocks.
 pub fn create_blockchain() -> BlockchainMut {
-    let config = generate_testnet_config(1, 0)[0].clone();
+    let (config, node_keys) = ConsensusConfig::for_tests(1);
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
-        config.service_keypair(),
+        (
+            node_keys.service.public_key(),
+            node_keys.service.secret_key().to_owned(),
+        ),
         ApiSender::closed(),
     );
 
     let my_service = MyService;
     let my_service_artifact = my_service.artifact_id();
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus)
+    let genesis_config = GenesisConfigBuilder::with_consensus_config(config)
         .with_artifact(my_service_artifact.clone())
         .with_instance(my_service_artifact.into_default_instance(SERVICE_ID, "my-service"))
         .build();

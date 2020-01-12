@@ -93,9 +93,9 @@ pub use structopt;
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::RocksDB,
-    node::NodeBuilder as CoreNodeBuilder,
 };
 use exonum_explorer_service::ExplorerFactory;
+use exonum_node::NodeBuilder as CoreNodeBuilder;
 use exonum_rust_runtime::{
     DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
 };

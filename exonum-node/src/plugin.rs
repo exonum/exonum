@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::{
+    blockchain::{Blockchain, ValidatorKeys},
+    helpers::Milliseconds,
+    merkledb::Snapshot,
+};
 use exonum_api::ApiBuilder;
-use exonum_merkledb::Snapshot;
 
 use std::{
     collections::HashSet,
@@ -21,12 +25,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::{
-    blockchain::{Blockchain, ValidatorKeys},
-    events::network::ConnectedPeerAddr,
-    helpers::Milliseconds,
-    node::{ConnectInfo, NodeRole, State},
-};
+use crate::{events::network::ConnectedPeerAddr, ConnectInfo, NodeRole, State};
 
 #[derive(Debug, Default)]
 struct ApiNodeState {

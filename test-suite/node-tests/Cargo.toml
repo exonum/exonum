@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-node = { version = "0.13.0-rc.2", path = "../../exonum-node" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 futures = "0.1.25"

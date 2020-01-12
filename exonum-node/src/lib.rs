@@ -36,11 +36,16 @@
 
 // spell-checker:ignore cors
 
+pub(crate) use self::state::SharedConnectList;
 pub use self::{
     connect_list::{ConnectInfo, ConnectList, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
     state::State,
 };
+
+// FIXME: think about moving types here.
+#[doc(hidden)]
+pub use exonum::blockchain::{ApiSender, ExternalMessage, SendError};
 
 /// Node timeout constants.
 ///
@@ -56,14 +61,26 @@ pub mod constants {
     };
 }
 
-pub(crate) use self::state::SharedConnectList;
-
-use exonum_api::ApiAggregator;
-use exonum_keys::Keys;
-use exonum_merkledb::{Database, ObjectHash};
-use failure::{ensure, format_err, Error, Fail};
+use exonum::{
+    blockchain::{
+        config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        Schema,
+    },
+    crypto::{self, Hash, PublicKey, SecretKey},
+    helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
+    keys::Keys,
+    merkledb::{Database, ObjectHash},
+    messages::{Connect, ExonumMessage, SignedMessage, Verified},
+    runtime::RuntimeInstance,
+};
+use exonum_api::{
+    backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiAggregator, ApiManager,
+    ApiManagerConfig, UpdateEndpoints, WebServerConfig,
+};
+use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
 use log::{info, trace};
+use serde_derive::{Deserialize, Serialize};
 use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
@@ -78,53 +95,23 @@ use std::{
 };
 
 use self::state::RequestData;
-use crate::{
-    api::{
-        backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiManager, ApiManagerConfig,
-        UpdateEndpoints, WebServerConfig,
-    },
-    blockchain::{
-        config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        Schema,
-    },
-    crypto::{self, Hash, PublicKey, SecretKey},
-    events::{
-        error::{into_failure, LogError},
-        noise::HandshakeParams,
-        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
-        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
-    },
-    helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
-    messages::{AnyTx, Connect, ExonumMessage, SignedMessage, Verified},
-    runtime::RuntimeInstance,
+use crate::events::{
+    error::{into_failure, LogError},
+    noise::HandshakeParams,
+    EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
+    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
+
+#[doc(hidden)]
+pub mod events;
 
 mod basic;
 mod connect_list;
 mod consensus;
-mod events;
+mod events_impl;
 mod plugin;
 mod requests;
 mod state;
-
-/// External messages sent to the node via `ApiSender`.
-///
-/// # Stability
-///
-/// This type and its methods are considered an implementation detail of the Exonum node and are
-/// thus exempt from semantic versioning.
-#[doc(hidden)]
-#[derive(Debug)]
-pub enum ExternalMessage {
-    /// Add a new connection.
-    PeerAdd(ConnectInfo),
-    /// Transaction that implements the `Transaction` trait.
-    Transaction(Verified<AnyTx>),
-    /// Enable or disable the node.
-    Enable(bool),
-    /// Shutdown the node.
-    Shutdown,
-}
 
 /// Node timeout types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -152,10 +139,6 @@ pub trait SystemStateProvider: fmt::Debug + Send + 'static {
     /// Return the current system time.
     fn current_time(&self) -> SystemTime;
 }
-
-/// Transactions sender.
-#[derive(Clone)]
-pub struct ApiSender(mpsc::Sender<ExternalMessage>);
 
 /// Handler responsible for the consensus algorithm.
 ///
@@ -800,71 +783,6 @@ impl fmt::Debug for NodeHandler {
     }
 }
 
-impl ApiSender {
-    /// Creates new `ApiSender` with given channel.
-    #[doc(hidden)]
-    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
-        ApiSender(inner)
-    }
-
-    /// Creates a dummy sender which is not connected to the node and thus cannot send messages.
-    pub fn closed() -> Self {
-        ApiSender(mpsc::channel(0).0)
-    }
-
-    /// Sends an arbitrary `ExternalMessage` to the node.
-    ///
-    /// # Return value
-    ///
-    /// The failure means that the node is being shut down.
-    ///
-    /// # Stability
-    ///
-    /// This method is considered unstable because its misuse can lead to node breakage.
-    #[doc(hidden)]
-    pub fn send_external_message(
-        &self,
-        message: ExternalMessage,
-    ) -> impl Future<Item = (), Error = SendError> {
-        self.0
-            .clone()
-            .send(message)
-            .map(drop)
-            .map_err(|_| SendError(()))
-    }
-
-    /// Broadcasts transaction to other nodes in the blockchain network. This is an asynchronous
-    /// operation that can take some time if the node is overloaded with requests.
-    ///
-    /// # Return value
-    ///
-    /// The failure means that the node is being shut down.
-    pub fn broadcast_transaction(
-        &self,
-        tx: Verified<AnyTx>,
-    ) -> impl Future<Item = (), Error = SendError> {
-        self.send_external_message(ExternalMessage::Transaction(tx))
-    }
-}
-
-impl fmt::Debug for ApiSender {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.debug_tuple("ApiSender").field(&"..").finish()
-    }
-}
-
-/// Errors that can occur during sending a message to the node via `ApiSender` or `ShutdownHandle`.
-#[derive(Debug, Fail)]
-#[fail(display = "Failed to send API request to the node: the node is being shut down")]
-pub struct SendError(());
-
-/// Converts the provided error into an internal server error.
-impl From<SendError> for exonum_api::Error {
-    fn from(e: SendError) -> Self {
-        exonum_api::Error::InternalError(e.into())
-    }
-}
-
 /// Handle allowing to shut down the node.
 #[derive(Debug, Clone)]
 pub struct ShutdownHandle {
@@ -974,7 +892,7 @@ impl NodeChannel {
 
     /// Returns the sender for API requests.
     pub fn api_sender(&self) -> ApiSender {
-        ApiSender(self.api_requests.0.clone())
+        ApiSender::new(self.api_requests.0.clone())
     }
 
     /// Returns the sender for HTTP endpoints.
@@ -1266,17 +1184,55 @@ impl Node {
     }
 }
 
+#[doc(hidden)]
+pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
+    use exonum::{blockchain::ValidatorKeys, crypto::gen_keypair};
+
+    let keys: Vec<_> = (0..count as usize)
+        .map(|_| (gen_keypair(), gen_keypair()))
+        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .collect();
+
+    let consensus = ConsensusConfig {
+        validator_keys: keys
+            .iter()
+            .map(|keys| ValidatorKeys {
+                consensus_key: keys.consensus_pk(),
+                service_key: keys.service_pk(),
+            })
+            .collect(),
+        ..ConsensusConfig::default()
+    };
+    let peers = (0..keys.len())
+        .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
+        .collect::<Vec<_>>();
+
+    keys.into_iter()
+        .enumerate()
+        .map(|(idx, keys)| NodeConfig {
+            listen_address: peers[idx].parse().unwrap(),
+            external_address: peers[idx].clone(),
+            network: Default::default(),
+            consensus: consensus.clone(),
+            connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
+            api: Default::default(),
+            mempool: Default::default(),
+            thread_pool_size: Default::default(),
+            keys,
+        })
+        .collect::<Vec<_>>()
+}
+
 #[cfg(test)]
 mod tests {
-    use exonum_merkledb::TemporaryDB;
+    use exonum::{blockchain::config::GenesisConfigBuilder, merkledb::TemporaryDB};
 
     use super::*;
-    use crate::{blockchain::config::GenesisConfigBuilder, helpers};
 
     #[test]
     fn test_good_internal_events_config() {
         let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let node_cfg = generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
         NodeBuilder::new(db, node_cfg, genesis_config);
@@ -1286,7 +1242,7 @@ mod tests {
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
         let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
@@ -1300,7 +1256,7 @@ mod tests {
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
         let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
@@ -1316,7 +1272,7 @@ mod tests {
         let accidental_large_value = usize::max_value();
         let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
 
-        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
@@ -1332,7 +1288,7 @@ mod tests {
         let accidental_large_value = usize::max_value();
         let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
 
-        let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
