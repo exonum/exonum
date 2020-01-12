@@ -17,13 +17,10 @@
 use exonum::{
     crypto::gen_keypair,
     merkledb::{access::Access, Snapshot},
-    runtime::CoreError,
+    runtime::{versioning::Version, CoreError, ErrorMatch, InstanceId, SnapshotExt},
 };
-use exonum_rust_runtime::{
-    DefaultInstance, ErrorMatch, InstanceId, ServiceFactory, SnapshotExt, TxStub,
-};
+use exonum_rust_runtime::{DefaultInstance, ServiceFactory, TxStub};
 use exonum_testkit::{TestKit, TestKitBuilder};
-use semver::Version;
 
 use exonum_middleware_service::{
     ArtifactReq, Batch, Error as TxError, MiddlewareInterface, MiddlewareInterfaceMut,

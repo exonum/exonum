@@ -94,11 +94,10 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::{Database, RocksDB},
     node::Node,
+    runtime::{RuntimeInstance, WellKnownRuntime},
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_rust_runtime::{
-    DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 
 use std::sync::Arc;

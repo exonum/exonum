@@ -24,8 +24,9 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        CallInfo, CoreError, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        WellKnownRuntime,
+        ArtifactId, CallInfo, Caller, CommonError, CoreError, ErrorMatch, ExecutionContext,
+        ExecutionError, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt,
+        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -39,9 +40,7 @@ use std::{
 };
 
 use exonum_rust_runtime::{
-    ArtifactId, CallContext, Caller, CommonError, DefaultInstance, ErrorMatch, ExecutionError,
-    InstanceId, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
-    SUPERVISOR_INSTANCE_ID,
+    CallContext, DefaultInstance, RustRuntime, RustRuntimeBuilder, Service, ServiceFactory,
 };
 
 fn add_transactions_into_pool(

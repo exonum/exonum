@@ -15,13 +15,13 @@
 use exonum::{
     api, crypto,
     helpers::{Height, ValidatorId},
+    merkledb::ObjectHash,
     messages::{AnyTx, Verified},
+    runtime::{
+        ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier, SUPERVISOR_INSTANCE_ID,
+    },
 };
-use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::{
-    ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier, RustRuntimeBuilder,
-    ServiceFactory, SUPERVISOR_INSTANCE_ID,
-};
+use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,

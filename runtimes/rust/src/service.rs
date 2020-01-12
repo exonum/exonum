@@ -19,8 +19,8 @@ use exonum::{
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     node::{ApiSender, SendError},
     runtime::{
-        ArtifactId, DispatcherAction, ExecutionError, InstanceDescriptor, InstanceId, Mailbox,
-        MethodId,
+        ArtifactId, BlockchainData, DispatcherAction, ExecutionError, InstanceDescriptor,
+        InstanceId, Mailbox, MethodId,
     },
 };
 use futures::{Future, IntoFuture};
@@ -31,8 +31,7 @@ use std::{
 };
 
 use super::{
-    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, GenericCall,
-    MethodDescriptor,
+    api::ServiceApiBuilder, ArtifactProtobufSpec, CallContext, GenericCall, MethodDescriptor,
 };
 
 /// Describes how the service instance should dispatch specific method calls

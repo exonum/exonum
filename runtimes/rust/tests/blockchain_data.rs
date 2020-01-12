@@ -23,17 +23,17 @@ use exonum::{
         access::{Access, AccessExt, FromAccess, Prefixed},
         Entry, HashTag, ProofMapIndex, Snapshot,
     },
+    runtime::{
+        versioning::{ArtifactReq, ArtifactReqError, RequireArtifact},
+        BlockchainData, InstanceDescriptor, SnapshotExt,
+    },
 };
 use exonum_derive::{FromAccess, ServiceDispatcher, ServiceFactory};
 use futures::sync::mpsc;
 
 use std::collections::BTreeMap;
 
-use exonum_rust_runtime::{
-    versioning::{ArtifactReq, ArtifactReqError, RequireArtifact},
-    BlockchainData, DefaultInstance, InstanceDescriptor, RustRuntimeBuilder, Service,
-    ServiceFactory, SnapshotExt,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
 #[derive(Debug, FromAccess)]
 struct Schema<T: Access> {
