@@ -23,7 +23,7 @@ use super::{error, EndpointMutability};
 pub type Result<I> = std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
 pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
-
+/// Type alias for the asynchronous result that will be ready in the future, but with `ApiError` error type.
 pub type ApiFutureResult<I> = Box<dyn Future<Item = I, Error = error::ApiError>>;
 
 /// API endpoint handler extractor which can extract a handler from various entities.

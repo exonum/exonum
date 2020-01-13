@@ -22,21 +22,35 @@ use std::io;
 
 use crate::node::SendError;
 
+/// List of possible HTTP response codes.
 #[derive(Debug, Serialize)]
 pub enum HttpCode {
-    Unexpected,
-    BadRequest,
-    NotFound,
+    #[allow(missing_docs)]
+    BadRequest = 400,
+    #[allow(missing_docs)]
+    NotFound = 404,
+    #[allow(missing_docs)]
+    NotImplemented = 501,
 }
 
+/// API HTTP error struct.
 #[derive(Fail, Debug, Serialize)]
 pub struct ApiError {
+    /// HTTP error code.
+    #[serde(skip)]
     pub http_code: HttpCode,
+    /// A URI reference to the documentation or possible solutions for the problem.
+    #[serde(rename = "type")]
     pub error_type: String,
+    /// Short description of the error.
     pub title: String,
+    /// Detailed description of the error.
     pub detail: String,
+    /// HashMap with additional parameters.
     pub params: HashMap<String, String>,
+    /// Source of the error.
     pub source: String,
+    /// Internal error code.
     pub error_code: i8,
 }
 
@@ -49,7 +63,7 @@ impl std::fmt::Display for ApiError {
 impl ApiError {
     fn default() -> Self {
         Self {
-            http_code: HttpCode::Unexpected,
+            http_code: HttpCode::NotImplemented,
             error_type: String::new(),
             title: String::new(),
             detail: String::new(),
@@ -59,6 +73,8 @@ impl ApiError {
         }
     }
 
+    /// Builds a BadRequest error.
+    #[allow(non_snake_case)]
     pub fn BadRequest() -> Self {
         Self {
             http_code: HttpCode::BadRequest,
@@ -66,6 +82,8 @@ impl ApiError {
         }
     }
 
+    /// Builds a NotFound error.
+    #[allow(non_snake_case)]
     pub fn NotFound() -> Self {
         Self {
             http_code: HttpCode::NotFound,
@@ -73,31 +91,37 @@ impl ApiError {
         }
     }
 
+    /// Sets `error_type` of an error.
     pub fn error_type(mut self, error_type: String) -> Self {
         self.error_type = error_type;
         self
     }
 
+    /// Sets `title` of an error.
     pub fn title(mut self, title: String) -> Self {
         self.title = title;
         self
     }
 
+    /// Sets `detail` of an error.
     pub fn detail(mut self, detail: String) -> Self {
         self.detail = detail;
         self
     }
 
+    /// Inserts new value into `params`.
     pub fn param(mut self, key: String, value: String) -> Self {
         self.params.insert(key, value);
         self
     }
 
+    /// Sets `source` of an error.
     pub fn source(mut self, source: String) -> Self {
         self.source = source;
         self
     }
 
+    /// Sets `error_code` of an error.
     pub fn error_code(mut self, error_code: i8) -> Self {
         self.error_code = error_code;
         self

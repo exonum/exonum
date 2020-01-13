@@ -619,7 +619,6 @@ impl ExplorerApi {
                 Self::transaction_info(state.data().for_core(), query)
             })
             .endpoint_new("v1/test_endpoint", |state, query| {
-                println!("Explorer::endpoint::test_endpoint");
                 Self::test_endpoint(state.data().for_core(), query)
             });
 
