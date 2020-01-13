@@ -14,10 +14,10 @@
 
 use exonum::{
     blockchain::{
-        config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
+        config::{GenesisConfig, InstanceInitParams},
         Blockchain, BlockchainBuilder, BlockchainMut,
     },
-    helpers::{generate_testnet_config, Height},
+    helpers::Height,
     merkledb::{access::AccessExt, BinaryValue, SystemSchema},
     runtime::{CoreError, InstanceStatus},
 };
@@ -34,7 +34,7 @@ use exonum_rust_runtime::{
 };
 
 use self::inspected::{
-    create_block_with_transactions, execute_transaction,
+    create_block_with_transactions, create_genesis_config_builder, execute_transaction,
     DeployArtifact, EventsHandle, Inspected, RuntimeEvent, StartService, StopService,
     ToySupervisor, ToySupervisorService,
 };
@@ -193,11 +193,6 @@ impl DefaultInstance for DependentServiceImpl {
                 msg: TestServiceImpl::INSTANCE_NAME.to_owned(),
             })
     }
-}
-
-fn create_genesis_config_builder() -> GenesisConfigBuilder {
-    let consensus_config = generate_testnet_config(1, 0)[0].clone().consensus;
-    GenesisConfigBuilder::with_consensus_config(consensus_config)
 }
 
 fn create_genesis_config_with_supervisor() -> GenesisConfig {

@@ -16,11 +16,11 @@
 
 use exonum::{
     blockchain::{
-        config::{InstanceInitParams},
+        config::{GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainMut, Schema as CoreSchema,
     },
     crypto::Hash,
-    helpers::{Height, ValidatorId},
+    helpers::{generate_testnet_config, Height, ValidatorId},
     merkledb::{ObjectHash, Patch, Snapshot},
     messages::{AnyTx, Verified},
     runtime::{
@@ -31,7 +31,7 @@ use exonum::{
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
-use futures::{Future};
+use futures::Future;
 use serde_derive::*;
 
 use std::{
@@ -40,9 +40,8 @@ use std::{
 };
 
 use exonum_rust_runtime::{
-    ArtifactId, CallContext, DefaultInstance, ExecutionError,
-    InstanceId, RustRuntime, Service, ServiceFactory, SnapshotExt,
-    SUPERVISOR_INSTANCE_ID,
+    ArtifactId, CallContext, DefaultInstance, ExecutionError, InstanceId, RustRuntime, Service,
+    ServiceFactory, SnapshotExt, SUPERVISOR_INSTANCE_ID,
 };
 
 pub fn execute_transaction(
@@ -81,6 +80,10 @@ pub fn create_block_with_transactions(
     )
 }
 
+pub fn create_genesis_config_builder() -> GenesisConfigBuilder {
+    let consensus_config = generate_testnet_config(1, 0)[0].clone().consensus;
+    GenesisConfigBuilder::with_consensus_config(consensus_config)
+}
 
 fn add_transactions_into_pool(
     blockchain: &mut BlockchainMut,
@@ -306,6 +309,13 @@ pub struct StopService {
     pub instance_id: InstanceId,
 }
 
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct ResumeService {
+    pub instance_id: InstanceId,
+    pub params: Vec<u8>,
+}
+
 #[exonum_interface]
 pub trait ToySupervisor<Ctx> {
     type Output;
@@ -313,6 +323,7 @@ pub trait ToySupervisor<Ctx> {
     fn deploy_artifact(&self, context: Ctx, request: DeployArtifact) -> Self::Output;
     fn start_service(&self, context: Ctx, request: StartService) -> Self::Output;
     fn stop_service(&self, context: Ctx, request: StopService) -> Self::Output;
+    fn resume_service(&self, context: Ctx, request: ResumeService) -> Self::Output;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -344,6 +355,12 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
         context
             .supervisor_extensions()
             .initiate_stopping_service(request.instance_id)
+    }
+
+    fn resume_service(&self, mut context: CallContext<'_>, request: ResumeService) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .initiate_resuming_service(request.instance_id, request.params)
     }
 }
 
