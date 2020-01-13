@@ -92,7 +92,7 @@ enum ErrorKind {
 // Option with set call site and unset runtime ID is not valid, receiving a message
 // with such a combination means receiving a malformed message.
 message ExecutionError {
-  // The kind of error that indicates the type of occurred error.
+  // The kind of error that indicates its type.
   ErrorKind kind = 1;
   // User defined error code that can have different meanings for the different
   // error kinds.
@@ -104,7 +104,7 @@ message ExecutionError {
   oneof runtime {
     // Identifier of runtime in which error originates.
     uint32 runtime_id = 4;
-    // The error originates not in the runtime code.
+    // The error does not originate in the runtime code.
     google.protobuf.Empty no_runtime_id = 5;
   }
 
@@ -112,7 +112,7 @@ message ExecutionError {
   oneof call_info {
     // Information about service call from which error originates.
     CallSite call_site = 6;
-    // The error originates not in the service code.
+    // The error does not originate in the service code.
     google.protobuf.Empty no_call_site = 7;
   }
 }
