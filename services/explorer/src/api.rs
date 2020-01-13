@@ -529,12 +529,12 @@ impl ExplorerApi {
         Ok(CallStatusResponse { status })
     }
 
-    pub fn test_endpoint(
+    fn test_endpoint(
         _schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> Result<CallStatusResponse, HttpApiError> {
         let response = HttpApiError::BadRequest()
-            .error_type("test_endpoint failed".to_string())
+            .error_type("http://some-docs.com/bad_request".to_string())
             .title("test_endpoint error title".to_string())
             .detail(format!(
                 "Trying to access test_endpoint with query {}",
