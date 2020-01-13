@@ -16,16 +16,16 @@
 //!
 //! Every message passes through three phases:
 //!
-//!   * `Vec<u8>`: raw bytes as received from the network
-//!   * `SignedMessage`: integrity and signature of the message has been verified
-//!   * `Message`: the message has been completely parsed and has correct structure
+//!   - `Vec<u8>`: raw bytes as received from the network
+//!   - `SignedMessage`: integrity and signature of the message has been verified
+//!   - `impl IntoMessage`:  the message has been completely parsed and has correct structure
 //!
 //! Graphical representation of the message processing flow:
 //!
 //! ```text
-//! +---------+             +---------------+                  +----------+
-//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Message  |-->(handle)
-//! +---------+     |       +---------------+        |         +----------+
+//! +---------+             +---------------+                  +------------------+
+//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| impl IntoMessage |-->(handle)
+//! +---------+     |       +---------------+        |         +------------------+
 //!                 |                                |
 //!                 V                                V
 //!              (drop)                           (drop)
@@ -37,21 +37,24 @@
 //! The procedure of creating a new signed message is as follows.
 //!
 //! ```
-//! use exonum::{
-//!     crypto::{self, Hash},
-//!     helpers::Height,
-//!     messages::{Status, Verified},
-//! };
-//!
+//! # use chrono::Utc;
+//! # use exonum::{
+//! #     crypto::{self, Hash},
+//! #     helpers::{Height, Round, ValidatorId},
+//! #     messages::{Precommit, Verified},
+//! # };
 //! # fn send<T>(_: T) {}
 //! let keypair = crypto::gen_keypair();
 //! // For example, get some `Status` message.
-//! let payload = Status {
+//! let payload = Precommit {
+//!     validator: ValidatorId(0),
 //!     height: Height(15),
-//!     last_hash: Hash::zero(),
-//!     pool_size: 12,
+//!     round: Round::first(),
+//!     propose_hash: crypto::hash(b"propose_hash"),
+//!     block_hash: crypto::hash(b"block_hash"),
+//!     time: Utc::now(),
 //! };
-//! // Sign the message with some keypair to get a trusted "Status" message.
+//! // Sign the message with some keypair to get a trusted `Precommit` message.
 //! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
 //! // Further, convert the trusted message into a raw signed message and send
 //! // it through the network.
@@ -62,33 +65,36 @@
 //! The procedure of verification of a signed message is as follows:
 //!
 //! ```
-//! use exonum::{
-//!     crypto::{self, Hash},
-//!     helpers::Height,
-//!     messages::{Status, Verified, SignedMessage, ExonumMessage},
-//! };
-//!
+//! # use assert_matches::assert_matches;
+//! # use chrono::Utc;
+//! # use exonum::{
+//! #     crypto::{self, Hash},
+//! #     helpers::{Height, Round, ValidatorId},
+//! #     messages::{CoreMessage, Precommit, Verified, SignedMessage},
+//! # };
 //! # fn get_signed_message() -> SignedMessage {
-//! #   let keypair = crypto::gen_keypair();
-//! #   let payload = Status {
-//! #       height: Height(15),
-//! #       last_hash: Hash::zero(),
-//! #       pool_size: 0,
-//! #   };
-//! #   Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
+//! #     let keypair = crypto::gen_keypair();
+//! #     let payload = Precommit {
+//! #         validator: ValidatorId(0),
+//! #         height: Height(15),
+//! #         round: Round::first(),
+//! #         propose_hash: crypto::hash(b"propose_hash"),
+//! #         block_hash: crypto::hash(b"block_hash"),
+//! #         time: Utc::now(),
+//! #     };
+//! #     Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
 //! # }
 //! // Assume you have some signed message.
 //! let raw: SignedMessage = get_signed_message();
-//! // You know that this is a type of `ExonumMessage`, so you can
-//! // verify its signature and convert it into `ExonumMessage`.
-//! let verified = raw.into_verified::<ExonumMessage>().expect("verification failed");
-//! // Further, check whether it is a `Status` message.
-//! if let ExonumMessage::Status(ref status) = verified.payload() {
-//!     // ...
-//! }
+//! // You know that this is a type of `CoreMessage`, so you can
+//! // verify its signature and convert it into `CoreMessage`.
+//! let verified = raw.into_verified::<CoreMessage>().expect("verification failed");
+//! // Further, check whether it is a `Precommit` message.
+//! assert_matches!(
+//!     verified.payload(),
+//!      CoreMessage::Precommit(ref precommit) if precommit.height == Height(15)
+//! );
 //! ```
-//!
-//!
 
 pub use self::{
     signed::{IntoMessage, Verified},

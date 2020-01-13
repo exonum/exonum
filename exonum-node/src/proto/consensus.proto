@@ -98,6 +98,9 @@ message PoolTransactionsRequest {
   exonum.crypto.PublicKey to = 1;
 }
 
+// Messages exchanged by Exonum nodes over the P2P network.
+// Note that this is a superset of `CoreMessage` defined in core;
+// the tags for the types in core *must* match the tags here.
 message ExonumMessage {
   oneof kind {
     exonum.runtime.AnyTx any_tx = 1;

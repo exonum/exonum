@@ -123,8 +123,9 @@ where
     }
 }
 
-/// Message that can be converted into a uniform presentation. The uniformity should be guaranteed
-/// by the implementation.
+/// Message that can be converted into a unambiguous presentation for signing. Unambiguity
+/// means that any sequence of bytes produced can be interpreted in a single way; in other words,
+/// messages of different types have separated representation domains.
 pub trait IntoMessage: Sized {
     /// Container for the message.
     type Container: BinaryValue + From<Self> + TryInto<Self>;

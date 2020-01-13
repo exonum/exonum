@@ -332,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_verified_from_signed_correct_signature() {
-        let keypair = crypto::gen_keypair();
+        let keypair = gen_keypair();
 
         let msg = Status {
             height: Height(0),
@@ -355,7 +355,7 @@ mod tests {
 
     #[test]
     fn test_verified_from_signed_incorrect_signature() {
-        let keypair = crypto::gen_keypair();
+        let keypair = gen_keypair();
 
         let msg = Status {
             height: Height(0),
@@ -365,14 +365,14 @@ mod tests {
         let protocol_message = ExonumMessage::from(msg.clone());
         let mut signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
         // Update author
-        signed.author = crypto::gen_keypair().0;
+        signed.author = gen_keypair().0;
         let err = signed.clone().into_verified::<ExonumMessage>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to verify signature.");
     }
 
     #[test]
     fn test_verified_status_binary_value() {
-        let keypair = crypto::gen_keypair();
+        let keypair = gen_keypair();
 
         let msg = Verified::from_value(
             Status {

@@ -16,6 +16,7 @@ pub use crate::runtime::AnyTx;
 
 use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
+use exonum_merkledb::BinaryValue;
 use exonum_proto::ProtobufConvert;
 
 use std::convert::TryFrom;
@@ -41,24 +42,10 @@ pub struct SignedMessage {
     pub signature: Signature,
 }
 
-/// Pre-commit for a proposal.
-///
-/// ### Validation
-/// A node panics if it has already sent a different `Precommit` for the
-/// same round.
-///
-/// ### Processing
-/// Pre-commit is added to the list of known pre-commits.  If a proposal is
-/// unknown to the node, `ProposeRequest` is sent in reply.  If `round`
-/// number from the message is bigger than a node's "locked round", then a
-/// node replies with `PrevotesRequest`.  If there are unknown transactions,
-/// then `TransactionsRequest` is sent in reply.  If a validator receives
-/// +2/3 precommits for the same proposal with the same `block_hash`, then
-/// block is executed and `Status` is broadcast.
-///
-/// ### Generation
-/// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
-/// pre-votes and no unknown transactions.
+/// Pre-commit for a block, essentially meaning that a validator node endorses the block.
+/// The consensus algorithm ensures that once a Byzantine majority of validators has
+/// endorsed a block, no other block at the same height may be endorsed at any point in the future.
+/// Thus, such a block can be considered committed.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
@@ -123,7 +110,11 @@ impl Precommit {
     }
 }
 
-/// This type describes a subset of Exonum messages defined in the Exonum core.
+/// Subset of Exonum messages defined in the Exonum core.
+///
+/// This type is intentionally kept as minimal as possible to ensure compatibility
+/// even if the consensus details change. Most of consensus messages are defined separately
+/// in the `exonum-node` crate; they are not public.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(
@@ -138,24 +129,32 @@ pub enum CoreMessage {
     Precommit(Precommit),
 }
 
+impl TryFrom<SignedMessage> for CoreMessage {
+    type Error = failure::Error;
+
+    fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
+        <Self as BinaryValue>::from_bytes(value.payload.into())
+    }
+}
+
 #[doc(hidden)] // Library users should not define new message types.
 #[macro_export]
 macro_rules! impl_exonum_msg_try_from_signed {
     ( $base:ident => $( $name:ident ),* ) => {
         $(
-            impl TryFrom<$crate::messages::SignedMessage> for $name {
+            impl std::convert::TryFrom<$crate::messages::SignedMessage> for $name {
                 type Error = failure::Error;
 
-                fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
+                fn try_from(value: $crate::messages::SignedMessage) -> Result<Self, Self::Error> {
                     <$base as $crate::merkledb::BinaryValue>::from_bytes(value.payload.into())
                         .and_then(Self::try_from)
                 }
             }
 
-            impl TryFrom<&$crate::messages::SignedMessage> for $name {
+            impl std::convert::TryFrom<&$crate::messages::SignedMessage> for $name {
                 type Error = failure::Error;
 
-                fn try_from(value: &SignedMessage) -> Result<Self, Self::Error> {
+                fn try_from(value: &$crate::messages::SignedMessage) -> Result<Self, Self::Error> {
                     let bytes = std::borrow::Cow::Borrowed(value.payload.as_slice());
                     <$base as $crate::merkledb::BinaryValue>::from_bytes(bytes)
                         .and_then(Self::try_from)
