@@ -66,18 +66,33 @@ message GenesisConfig {
   repeated InstanceInitParams builtin_instances = 3;
 }
 
-// The kind of ExecutionError.
+// The type of ExecutionError.
+// Note that ErrorKind doesn't communicate the source of the error, for this
+// see the 'runtime_id' and 'call_site' fields of ExecutionError.
 enum ErrorKind {
+  // An unexpected error which does not have a specific cause.
+  // The description of the error is the only source of information about this kind of errors.
   UNEXPECTED = 0;
+  // An error specific to the core. See core error codes for details.
   CORE = 1;
+  // An error specific to the certain runtime. See error codes of corresponding runtime for details.
   RUNTIME = 2;
+  // An error specific to the certain service. See error codes of corresponding service for details.
   SERVICE = 3;
+  // A common error which can occur in different contexts. See common error codes for details.
   COMMON = 4;
 }
 
 // Result of unsuccessful runtime execution.
+// ExecutionError message provides the information about the source of the error.
+// The source of error is determined as following:
+// - If both runtime ID and call site are set, then error originates in the service code.
+// - If runtime ID is set, and call site is not set, then error originates in the runtime code.
+// - If none of runtime ID and call site is set, then error originates in the core code.
+// Option with set call site and unset runtime ID is not valid, receiving a message
+// with such a combination means receiving a malformed message.
 message ExecutionError {
-  // The kind of error that indicates in which module the error occurred.
+  // The kind of error that indicates the type of occurred error.
   ErrorKind kind = 1;
   // User defined error code that can have different meanings for the different
   // error kinds.
@@ -85,15 +100,19 @@ message ExecutionError {
   // Optional description which doesn't affect `object_hash`.
   string description = 3;
 
+  // Runtime ID will be set if the error originates in code related to the certain runtime.
   oneof runtime {
-    // Runtime identifier associated with the error.
+    // Identifier of runtime in which error originates.
     uint32 runtime_id = 4;
-    // The runtime associated with the error is unknown.
+    // The error originates not in the runtime code.
     google.protobuf.Empty no_runtime_id = 5;
   }
 
+  // Call site will be set if the error originates in code related to the certain service.
   oneof call_info {
+    // Information about service call from which error originates.
     CallSite call_site = 6;
+    // The error originates not in the service code.
     google.protobuf.Empty no_call_site = 7;
   }
 }
@@ -125,7 +144,9 @@ message CallSite {
 // Result of runtime execution.
 message ExecutionStatus {
   oneof result {
+    // Successful execution.
     google.protobuf.Empty ok = 1;
+    // Execution happened with an error.
     ExecutionError error = 2;
   }
 }
