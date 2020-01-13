@@ -15,7 +15,7 @@
 //! The module containing building blocks for creating blockchains powered by the Exonum framework.
 
 pub use self::{
-    api_sender::{ApiSender, ExternalMessage, SendError},
+    api_sender::{ApiSender, SendError},
     block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ValidatorKeys},

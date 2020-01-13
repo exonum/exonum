@@ -23,7 +23,10 @@ pub mod internal;
 pub mod network;
 pub mod noise;
 
-use exonum::helpers::{Height, Round};
+use exonum::{
+    helpers::{Height, Round},
+    messages::{AnyTx, Verified},
+};
 use futures::{
     sink::Wait,
     sync::mpsc::{self, Sender},
@@ -112,6 +115,7 @@ impl TimeoutRequest {
 #[derive(Debug)]
 pub enum Event {
     Network(NetworkEvent),
+    Transaction(Verified<AnyTx>),
     Api(ExternalMessage),
     Internal(InternalEvent),
 }
@@ -125,19 +129,23 @@ pub struct HandlerPart<H: EventHandler> {
     pub handler: H,
     pub internal_rx: mpsc::Receiver<InternalEvent>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
+    pub transactions_rx: mpsc::Receiver<Verified<AnyTx>>,
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl<H: EventHandler + 'static> HandlerPart<H> {
     pub fn run(self) -> Box<dyn Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
-
-        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
-            move |event| {
-                handler.handle_event(event);
-                Ok(())
-            },
+        let aggregator = EventsAggregator::new(
+            self.internal_rx,
+            self.network_rx,
+            self.transactions_rx,
+            self.api_rx,
         );
+        let fut = aggregator.for_each(move |event| {
+            handler.handle_event(event);
+            Ok(())
+        });
 
         to_box(fut)
     }
@@ -173,6 +181,12 @@ impl Into<Event> for NodeTimeout {
     }
 }
 
+impl Into<Event> for Verified<AnyTx> {
+    fn into(self) -> Event {
+        Event::Transaction(self)
+    }
+}
+
 impl Into<Event> for ExternalMessage {
     fn into(self) -> Event {
         Event::Api(self)
@@ -188,39 +202,38 @@ impl Into<Event> for InternalEvent {
 /// Receives timeout, network and api events and invokes `handle_event` method of handler.
 /// If one of these streams closes, the aggregator stream completes immediately.
 #[derive(Debug)]
-pub struct EventsAggregator<S1, S2, S3>
-where
-    S1: Stream,
-    S2: Stream,
-    S3: Stream,
-{
+pub struct EventsAggregator<S1, S2, S3, S4> {
     done: bool,
     internal: S1,
     network: S2,
-    api: S3,
+    transactions: S3,
+    api: S4,
 }
 
-impl<S1, S2, S3> EventsAggregator<S1, S2, S3>
+impl<S1, S2, S3, S4> EventsAggregator<S1, S2, S3, S4>
 where
     S1: Stream,
     S2: Stream,
     S3: Stream,
+    S4: Stream,
 {
-    pub fn new(internal: S1, network: S2, api: S3) -> Self {
+    pub fn new(internal: S1, network: S2, transactions: S3, api: S4) -> Self {
         Self {
             done: false,
             network,
             internal,
+            transactions,
             api,
         }
     }
 }
 
-impl<S1, S2, S3> Stream for EventsAggregator<S1, S2, S3>
+impl<S1, S2, S3, S4> Stream for EventsAggregator<S1, S2, S3, S4>
 where
     S1: Stream<Item = InternalEvent>,
     S2: Stream<Item = NetworkEvent, Error = S1::Error>,
-    S3: Stream<Item = ExternalMessage, Error = S1::Error>,
+    S3: Stream<Item = Verified<AnyTx>, Error = S1::Error>,
+    S4: Stream<Item = ExternalMessage, Error = S1::Error>,
 {
     type Item = Event;
     type Error = S1::Error;
@@ -240,6 +253,7 @@ where
                 }
                 Async::NotReady => {}
             };
+
             match self.network.poll()? {
                 Async::Ready(Some(item)) => {
                     return Ok(Async::Ready(Some(Event::Network(item))));
@@ -250,6 +264,18 @@ where
                 }
                 Async::NotReady => {}
             };
+
+            match self.transactions.poll()? {
+                Async::Ready(Some(item)) => {
+                    return Ok(Async::Ready(Some(Event::Transaction(item))));
+                }
+                Async::Ready(None) => {
+                    self.done = true;
+                    return Ok(Async::Ready(None));
+                }
+                Async::NotReady => {}
+            };
+
             match self.api.poll()? {
                 Async::Ready(None) => {
                     self.done = true;

@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// TODO: try using separate trait instead of defining `ExternalMessage` here.
-
-use exonum_crypto::PublicKey;
 use failure::Fail;
 use futures::{sync::mpsc, Future, Sink};
 
@@ -22,38 +19,18 @@ use std::fmt;
 
 use crate::messages::{AnyTx, Verified};
 
-/// External messages sent to the node via `ApiSender`.
-///
-/// # Stability
-///
-/// This type and its methods are considered an implementation detail of the Exonum node and are
-/// thus exempt from semantic versioning.
-#[doc(hidden)]
-#[derive(Debug)]
-pub enum ExternalMessage {
-    /// Add a new connection.
-    PeerAdd {
-        /// Peer address.
-        address: String,
-        /// Peer public key.
-        public_key: PublicKey,
-    },
-    /// Transaction that implements the `Transaction` trait.
-    Transaction(Verified<AnyTx>),
-    /// Enable or disable the node.
-    Enable(bool),
-    /// Shutdown the node.
-    Shutdown,
+/// Transactions sender.
+pub struct ApiSender<T = Verified<AnyTx>>(mpsc::Sender<T>);
+
+impl<T> Clone for ApiSender<T> {
+    fn clone(&self) -> Self {
+        ApiSender(self.0.clone())
+    }
 }
 
-/// Transactions sender.
-#[derive(Clone)]
-pub struct ApiSender(mpsc::Sender<ExternalMessage>);
-
-impl ApiSender {
+impl<T: Send + 'static> ApiSender<T> {
     /// Creates new `ApiSender` with given channel.
-    #[doc(hidden)]
-    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> Self {
+    pub fn new(inner: mpsc::Sender<T>) -> Self {
         ApiSender(inner)
     }
 
@@ -67,22 +44,16 @@ impl ApiSender {
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    ///
-    /// # Stability
-    ///
-    /// This method is considered unstable because its misuse can lead to node breakage.
-    #[doc(hidden)]
-    pub fn send_external_message(
-        &self,
-        message: ExternalMessage,
-    ) -> impl Future<Item = (), Error = SendError> {
+    pub fn send_message(&self, message: T) -> impl Future<Item = (), Error = SendError> {
         self.0
             .clone()
             .send(message)
             .map(drop)
             .map_err(|_| SendError(()))
     }
+}
 
+impl ApiSender {
     /// Broadcasts transaction to other nodes in the blockchain network. This is an asynchronous
     /// operation that can take some time if the node is overloaded with requests.
     ///
@@ -93,11 +64,11 @@ impl ApiSender {
         &self,
         tx: Verified<AnyTx>,
     ) -> impl Future<Item = (), Error = SendError> {
-        self.send_external_message(ExternalMessage::Transaction(tx))
+        self.send_message(tx)
     }
 }
 
-impl fmt::Debug for ApiSender {
+impl<T> fmt::Debug for ApiSender<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_tuple("ApiSender").field(&"..").finish()
     }

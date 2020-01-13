@@ -15,7 +15,7 @@
 use exonum::blockchain::Schema;
 use log::{info, trace, warn};
 
-use super::{ConnectInfo, ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
+use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 
 use crate::events::{
     error::LogError, Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest,
@@ -26,6 +26,7 @@ impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
         match event {
             Event::Network(network) => self.handle_network_event(network),
+            Event::Transaction(tx) => self.handle_incoming_tx(tx),
             Event::Api(api) => self.handle_api_event(api),
             Event::Internal(internal) => self.handle_internal_event(internal),
         }
@@ -57,17 +58,7 @@ impl NodeHandler {
 
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
-            ExternalMessage::Transaction(tx) => {
-                self.handle_incoming_tx(tx);
-            }
-            ExternalMessage::PeerAdd {
-                address,
-                public_key,
-            } => {
-                let info = ConnectInfo {
-                    address,
-                    public_key,
-                };
+            ExternalMessage::PeerAdd(info) => {
                 info!("Send Connect message to {}", info);
                 self.state.add_peer_to_connect_list(info.clone());
                 self.connect(info.public_key);
@@ -79,6 +70,7 @@ impl NodeHandler {
                     config_manager.store_connect_list(connect_list_config);
                 }
             }
+
             ExternalMessage::Enable(value) => {
                 let s = if value { "enabled" } else { "disabled" };
                 if self.is_enabled == value {
@@ -92,6 +84,7 @@ impl NodeHandler {
                     }
                 }
             }
+
             ExternalMessage::Shutdown => self.handle_shutdown(),
         }
     }

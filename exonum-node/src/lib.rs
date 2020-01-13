@@ -48,8 +48,6 @@ pub use self::{
 // FIXME: think about moving types here.
 #[doc(hidden)] // Needed for `transactions` benchmark; logically, `Message` is private
 pub use crate::messages::Message as PeerMessage;
-#[doc(hidden)]
-pub use exonum::blockchain::{ApiSender, ExternalMessage, SendError};
 
 pub(crate) mod constants {
     pub use super::state::{
@@ -60,14 +58,14 @@ pub(crate) mod constants {
 
 use exonum::{
     blockchain::{
-        config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        Schema,
+        config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig, Schema, SendError,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     keys::Keys,
     merkledb::{Database, ObjectHash},
-    messages::{IntoMessage, SignedMessage, Verified},
+    messages::{AnyTx, IntoMessage, SignedMessage, Verified},
     runtime::RuntimeInstance,
 };
 use exonum_api::{
@@ -115,6 +113,17 @@ mod requests;
 mod sandbox;
 mod schema;
 mod state;
+
+/// External messages sent to the node via `ApiSender`.
+#[derive(Debug)]
+pub enum ExternalMessage {
+    /// Add a new connection.
+    PeerAdd(ConnectInfo),
+    /// Enable or disable the node.
+    Enable(bool),
+    /// Shutdown the node.
+    Shutdown,
+}
 
 /// Node timeout types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -397,6 +406,8 @@ pub(crate) struct NodeSender {
     pub internal_requests: SyncSender<InternalRequest>,
     /// Network requests sender.
     pub network_requests: SyncSender<NetworkRequest>,
+    /// Transactions sender.
+    pub transactions: SyncSender<Verified<AnyTx>>,
     /// Api requests sender.
     pub api_requests: SyncSender<ExternalMessage>,
 }
@@ -788,7 +799,7 @@ impl fmt::Debug for NodeHandler {
 /// Handle allowing to shut down the node.
 #[derive(Debug, Clone)]
 pub struct ShutdownHandle {
-    inner: ApiSender,
+    inner: ApiSender<ExternalMessage>,
 }
 
 impl ShutdownHandle {
@@ -798,7 +809,7 @@ impl ShutdownHandle {
     ///
     /// The failure means that the node is already being shut down.
     pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
-        self.inner.send_external_message(ExternalMessage::Shutdown)
+        self.inner.send_message(ExternalMessage::Shutdown)
     }
 }
 
@@ -835,6 +846,13 @@ pub struct NodeChannel {
     endpoints: (
         mpsc::Sender<UpdateEndpoints>,
         mpsc::Receiver<UpdateEndpoints>,
+    ),
+
+    /// Channel for externally generated transactions.
+    #[doc(hidden)] // public because of the `transactions` benchmark
+    pub transactions: (
+        mpsc::Sender<Verified<AnyTx>>,
+        mpsc::Receiver<Verified<AnyTx>>,
     ),
 
     /// Channel for API requests.
@@ -886,6 +904,7 @@ impl NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
             endpoints: mpsc::channel(buffer_sizes.internal_events_capacity),
+            transactions: mpsc::channel(buffer_sizes.api_requests_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
             internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
@@ -894,7 +913,7 @@ impl NodeChannel {
 
     /// Returns the sender for API requests.
     pub fn api_sender(&self) -> ApiSender {
-        ApiSender::new(self.api_requests.0.clone())
+        ApiSender::new(self.transactions.0.clone())
     }
 
     /// Returns the sender for HTTP endpoints.
@@ -907,6 +926,7 @@ impl NodeChannel {
         NodeSender {
             internal_requests: self.internal_requests.0.clone().wait(),
             network_requests: self.network_requests.0.clone().wait(),
+            transactions: self.transactions.0.clone().wait(),
             api_requests: self.api_requests.0.clone().wait(),
         }
     }
@@ -1155,6 +1175,7 @@ impl Node {
             handler: self.handler,
             internal_rx,
             network_rx,
+            transactions_rx: self.channel.transactions.1,
             api_rx: self.channel.api_requests.1,
         };
 

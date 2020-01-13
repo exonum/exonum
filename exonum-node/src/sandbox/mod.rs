@@ -157,6 +157,7 @@ impl SandboxInner {
         });
         internal_getter.wait().unwrap();
     }
+
     fn process_api_requests(&mut self) {
         let api_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
@@ -854,6 +855,7 @@ impl Sandbox {
     pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
+        let tx_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
 
         let address: SocketAddr = self
@@ -865,6 +867,7 @@ impl Sandbox {
         let node_sender = NodeSender {
             network_requests: network_channel.0.clone().wait(),
             internal_requests: internal_channel.0.clone().wait(),
+            transactions: tx_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
         let peers = inner
@@ -1140,11 +1143,11 @@ fn sandbox_with_services_uninitialized(
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
 
-    let api_channel = mpsc::channel(100);
+    let tx_channel = mpsc::channel(100);
     let blockchain = Blockchain::new(
         TemporaryDB::new(),
         service_keys[0].clone(),
-        ApiSender::new(api_channel.0.clone()),
+        ApiSender::new(tx_channel.0.clone()),
     );
 
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
@@ -1171,9 +1174,11 @@ fn sandbox_with_services_uninitialized(
 
     let network_channel = mpsc::channel(100);
     let internal_channel = mpsc::channel(100);
+    let api_channel = mpsc::channel(100);
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone().wait(),
         internal_requests: internal_channel.0.clone().wait(),
+        transactions: tx_channel.0.clone().wait(),
         api_requests: api_channel.0.clone().wait(),
     };
     let api_state = SharedNodeState::new(5000);
