@@ -186,7 +186,7 @@ impl ServiceApiScope {
                 let result = handler(&state, query);
                 let future = result
                     .into_future()
-                    .map_err(move |err| err.source(format!("{}:{}", desc.0, desc.1)));
+                    .map_err(move |err| err.source(format!("{}:{}", desc.1, desc.0)));
                 Box::new(future)
             });
         self
