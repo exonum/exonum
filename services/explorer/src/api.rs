@@ -600,7 +600,6 @@ impl ExplorerApi {
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
             .endpoint("v1/blocks", |state, query| {
-                println!("Explorer::endpoint::blocks");
                 Self::blocks(state.data().for_core(), query)
             })
             .endpoint("v1/block", |state, query| {
