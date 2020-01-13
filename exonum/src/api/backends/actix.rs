@@ -145,12 +145,15 @@ impl ResponseError for api::Error {
 
 impl ResponseError for api::ApiError {
     fn error_response(&self) -> HttpResponse {
-        println!("ResponseError for api::ApiError");
-        match self.http_code {
-            HttpCode::BadRequest => HttpResponse::BadRequest().body(self.to_string()),
-            HttpCode::NotFound => HttpResponse::NotFound().body(self.to_string()),
-            HttpCode::Unexpected => HttpResponse::Unauthorized().finish(),
-        }
+        let mut response = match self.http_code {
+            HttpCode::BadRequest => HttpResponse::BadRequest(),
+            HttpCode::NotFound => HttpResponse::NotFound(),
+            HttpCode::NotImplemented => HttpResponse::NotImplemented(),
+        };
+
+        response
+            .header(header::CONTENT_TYPE, "application/problem+json")
+            .body(self.to_string())
     }
 }
 
