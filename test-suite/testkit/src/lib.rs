@@ -390,7 +390,6 @@ impl TestKit {
 
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
-        let last_hash = self.last_block_hash();
         let saved_consensus_config = self.consensus_config();
         let validator_id = self.leader().validator_id().unwrap();
 
@@ -402,14 +401,11 @@ impl TestKit {
             &mut BTreeMap::new(),
         );
 
-        let propose =
-            self.leader()
-                .create_propose(new_block_height, last_hash, tx_hashes.iter().cloned());
         let precommits: Vec<_> = self
             .network()
             .validators()
             .iter()
-            .map(|v| v.create_precommit(propose.as_ref(), block_hash))
+            .map(|v| v.create_precommit(new_block_height, block_hash))
             .collect();
 
         self.blockchain

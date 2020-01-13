@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module with protobuf generated files from `schema/exonum`.
-
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-
-use crate::crypto::proto::*;
-use crate::merkledb::proto::*;
-#[cfg(test)]
+use exonum::{crypto::proto::*, proto::schema::*};
 use exonum_proto::proto::*;
 
-include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
+include!(concat!(env!("OUT_DIR"), "/exonum_node_mod.rs"));

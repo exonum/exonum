@@ -97,12 +97,15 @@ mod test {
         crypto::{gen_keypair, Hash},
         helpers::Height,
         merkledb::BinaryValue,
-        messages::{Status, Verified, SIGNED_MESSAGE_MIN_SIZE},
+        messages::{Verified, SIGNED_MESSAGE_MIN_SIZE},
     };
     use tokio_io::codec::{Decoder, Encoder};
 
     use super::MessagesCodec;
-    use crate::events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper};
+    use crate::{
+        events::noise::{HandshakeParams, NoiseWrapper, TransportWrapper},
+        messages::Status,
+    };
 
     fn get_decoded_message(data: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();

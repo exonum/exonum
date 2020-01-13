@@ -20,7 +20,7 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB},
-    messages::{AnyTx, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, Verified},
+    messages::{AnyTx, Precommit, Verified},
 };
 use log::trace;
 
@@ -30,6 +30,7 @@ use super::{
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
     Sandbox,
 };
+use crate::messages::{Prevote, PrevotesRequest, Propose, ProposeRequest};
 
 pub type TimestampingSandbox = Sandbox;
 

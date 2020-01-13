@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::PublicKey, messages::Message};
+use exonum::crypto::PublicKey;
+
 use std::{
     collections::VecDeque,
     ops::{Deref, DerefMut},
 };
+
+use crate::messages::Message;
 
 /// Guarded queue for messages sent by the sandbox. If the queue is not empty when dropped,
 /// it panics.

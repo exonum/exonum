@@ -19,10 +19,12 @@ use exonum::{
         access::{Access, AccessExt, RawAccessMut},
         ListIndex, MapIndex,
     },
-    messages::{Connect, Message, Verified},
+    messages::Verified,
 };
 
 use std::iter;
+
+use crate::messages::{Connect, Message};
 
 const CONSENSUS_MESSAGES_CACHE: &str = "core.consensus_messages_cache";
 const CONSENSUS_ROUND: &str = "core.consensus_round";

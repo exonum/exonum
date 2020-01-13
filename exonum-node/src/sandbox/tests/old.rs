@@ -18,9 +18,10 @@ use exonum::{
     blockchain::{AdditionalHeaders, Block, ProposerId},
     helpers::{Height, Round, ValidatorId},
     merkledb::{HashTag, ObjectHash},
-    messages::{Propose, Verified},
+    messages::Verified,
 };
 
+use crate::messages::Propose;
 use crate::sandbox::{
     sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
     timestamping_sandbox, Sandbox,

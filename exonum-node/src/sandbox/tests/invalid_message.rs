@@ -19,10 +19,13 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
-    messages::{Propose, Verified},
+    messages::Verified,
 };
 
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::{
+    messages::Propose,
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+};
 
 /// HANDLE message
 /// - verify signature

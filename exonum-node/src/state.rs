@@ -21,10 +21,7 @@ use exonum::{
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
     merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch},
-    messages::{
-        AnyTx, BlockResponse, Connect, Consensus as ConsensusMessage, Precommit, Prevote, Propose,
-        Verified,
-    },
+    messages::{AnyTx, Precommit, Verified},
 };
 use failure::bail;
 use log::{error, trace};
@@ -35,7 +32,12 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::{connect_list::ConnectList, events::network::ConnectedPeerAddr, ConnectInfo};
+use crate::{
+    connect_list::ConnectList,
+    events::network::ConnectedPeerAddr,
+    messages::{BlockResponse, Connect, Consensus as ConsensusMessage, Prevote, Propose},
+    ConnectInfo,
+};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 

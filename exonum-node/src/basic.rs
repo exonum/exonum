@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    crypto::PublicKey,
-    helpers::Height,
-    messages::{Connect, Message, PeersRequest, Responses, Service, Status, Verified},
-};
+use exonum::{crypto::PublicKey, helpers::Height, messages::Verified};
 use log::{error, info, trace};
 use rand::Rng;
 
-use crate::events::{error::LogError, network::ConnectedPeerAddr};
-use crate::{schema::NodeSchema, state::RequestData, NodeHandler, NodeRole};
+use crate::{
+    events::{error::LogError, network::ConnectedPeerAddr},
+    messages::{Connect, Message, PeersRequest, Responses, Service, Status},
+    schema::NodeSchema,
+    state::RequestData,
+    NodeHandler, NodeRole,
+};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.

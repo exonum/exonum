@@ -17,7 +17,7 @@ use exonum::{
         x25519::{self, into_x25519_public_key},
         PublicKey,
     },
-    messages::{Connect, Message, Service, SignedMessage, Verified},
+    messages::{SignedMessage, Verified},
 };
 use failure::{bail, ensure, format_err};
 use futures::{
@@ -44,6 +44,7 @@ use crate::{
         error::into_failure,
         noise::{Handshake, HandshakeParams, NoiseHandshake},
     },
+    messages::{Connect, Message, Service},
     NetworkConfiguration, SharedConnectList,
 };
 

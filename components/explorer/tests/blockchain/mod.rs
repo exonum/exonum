@@ -135,8 +135,11 @@ pub fn create_blockchain() -> BlockchainMut {
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
 pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<AnyTx>>) {
-    use exonum::helpers::{Round, ValidatorId};
-    use exonum::messages::{Precommit, Propose};
+    use exonum::{
+        crypto::Hash,
+        helpers::{Round, ValidatorId},
+        messages::Precommit,
+    };
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
@@ -148,23 +151,12 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
         blockchain.create_patch(ValidatorId(0).into(), height, &tx_hashes, &mut tx_cache);
     let (consensus_public_key, consensus_secret_key) = consensus_keys();
 
-    let propose = Verified::from_value(
-        Propose::new(
-            ValidatorId(0),
-            height,
-            Round::first(),
-            blockchain.as_ref().last_hash(),
-            tx_hashes,
-        ),
-        consensus_public_key,
-        &consensus_secret_key,
-    );
     let precommit = Verified::from_value(
         Precommit::new(
             ValidatorId(0),
-            propose.payload().height,
-            propose.payload().round,
-            propose.object_hash(),
+            height,
+            Round::first(),
+            Hash::zero(),
             block_hash,
             SystemTime::now().into(),
         ),

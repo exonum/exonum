@@ -15,7 +15,10 @@ fn create_path_to_protobuf_schema_env() {
     let protos = current_dir.join("src/proto/schema/exonum");
     println!("cargo:protos={}", protos.to_str().unwrap());
 
-    // Reexport MerkleDB and crypto protobuf files.
+    // Reexport common, MerkleDB and crypto protobuf files.
+    let common_protos = env::var("DEP_EXONUM_PROTOBUF_COMMON_PROTOS")
+        .expect("Cannot obtain `common` protobuf files");
+    println!("cargo:common_protos={}", common_protos);
     let crypto_protos = env::var("DEP_EXONUM_PROTOBUF_CRYPTO_PROTOS")
         .expect("Cannot obtain `crypto` protobuf files");
     println!("cargo:crypto_protos={}", crypto_protos);

@@ -14,14 +14,17 @@
 
 //! Mapping between peers public keys and IP addresses / domain names.
 
-#[cfg(test)]
-use exonum::messages::{Connect, Verified};
 use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{collections::BTreeMap, fmt};
 
 use super::SharedConnectList;
+
+#[cfg(test)]
+use crate::messages::Connect;
+#[cfg(test)]
+use exonum::messages::Verified;
 
 /// Data needed to connect to a peer node.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]

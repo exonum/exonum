@@ -26,7 +26,7 @@ use criterion::{
 use exonum::{
     crypto,
     merkledb::BinaryValue,
-    messages::{Message, Verified},
+    messages::Verified,
     runtime::{AnyTx, CallInfo},
 };
 use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
@@ -39,9 +39,8 @@ use std::{
 };
 
 use exonum_node::{
-    events::InternalRequest,
-    events::{Event, EventHandler, HandlerPart, InternalPart, NetworkEvent},
-    EventsPoolCapacity, ExternalMessage, NodeChannel,
+    events::{Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent},
+    EventsPoolCapacity, ExternalMessage, NodeChannel, PeerMessage,
 };
 
 struct MessagesHandler {
@@ -216,7 +215,7 @@ fn bench_verify_messages_simple(b: &mut Bencher<'_>, &size: &usize) {
         || messages.clone(),
         |messages| {
             for message in messages {
-                let _ = Message::from_raw_buffer(message).unwrap();
+                PeerMessage::from_raw_buffer(message).unwrap();
             }
         },
     )

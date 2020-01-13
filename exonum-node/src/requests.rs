@@ -16,17 +16,20 @@ use exonum::{
     blockchain::{get_transaction, Schema},
     crypto::{Hash, PublicKey},
     merkledb::BinaryValue,
-    messages::{
-        BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest, ProposeRequest,
-        Requests, TransactionsRequest, TransactionsResponse, Verified, TX_RES_EMPTY_SIZE,
-        TX_RES_PB_OVERHEAD_PAYLOAD,
-    },
+    messages::Verified,
 };
 use log::{error, trace};
 
 use std::mem;
 
-use super::NodeHandler;
+use crate::{
+    messages::{
+        BlockRequest, BlockResponse, PoolTransactionsRequest, PrevotesRequest, ProposeRequest,
+        Requests, TransactionsRequest, TransactionsResponse, TX_RES_EMPTY_SIZE,
+        TX_RES_PB_OVERHEAD_PAYLOAD,
+    },
+    NodeHandler,
+};
 
 // TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
 // TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)

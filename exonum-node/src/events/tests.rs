@@ -20,7 +20,7 @@ use exonum::{
     },
     helpers::user_agent,
     merkledb::BinaryValue,
-    messages::{Connect, SignedMessage, Verified},
+    messages::{SignedMessage, Verified},
 };
 use futures::{sync::mpsc, Future, Sink, Stream};
 use pretty_assertions::assert_eq;
@@ -38,6 +38,7 @@ use crate::{
         error::log_error, network::NetworkPart, noise::HandshakeParams, NetworkEvent,
         NetworkRequest,
     },
+    messages::Connect,
     ConnectInfo, ConnectList, EventsPoolCapacity, NetworkConfiguration, NodeChannel,
     SharedConnectList,
 };

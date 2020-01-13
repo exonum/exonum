@@ -17,18 +17,24 @@ use exonum::{
     crypto::{Hash, PublicKey},
     helpers::{Height, Round},
     merkledb::{BinaryValue, ObjectHash, Patch},
-    messages::{
-        AnyTx, BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest,
-        Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest, SignedMessage,
-        TransactionsRequest, TransactionsResponse, Verified,
-    },
+    messages::{AnyTx, Precommit, SignedMessage, Verified},
 };
 use failure::{bail, format_err};
 use log::{error, info, trace, warn};
 
 use std::{collections::HashSet, convert::TryFrom};
 
-use crate::{events::InternalRequest, schema::NodeSchema, state::RequestData, NodeHandler};
+use crate::{
+    events::InternalRequest,
+    messages::{
+        BlockRequest, BlockResponse, Consensus as ConsensusMessage, PoolTransactionsRequest,
+        Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
+        TransactionsResponse,
+    },
+    schema::NodeSchema,
+    state::RequestData,
+    NodeHandler,
+};
 
 // Shortcut to get verified messages from bytes.
 fn into_verified<T: TryFrom<SignedMessage>>(

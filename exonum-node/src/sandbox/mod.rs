@@ -29,11 +29,7 @@ use exonum::{
     helpers::{user_agent, Height, Round, ValidatorId},
     keys::Keys,
     merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
-    messages::{
-        AnyTx, BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
-        PoolTransactionsRequest, Precommit, Prevote, PrevotesRequest, Propose, ProposeRequest,
-        SignedMessage, Status, TransactionsRequest, TransactionsResponse, Verified,
-    },
+    messages::{AnyTx, Precommit, SignedMessage, Verified},
 };
 use exonum_rust_runtime::{
     ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
@@ -62,6 +58,11 @@ use crate::{
     events::{
         Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
         TimeoutRequest,
+    },
+    messages::{
+        BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
+        PoolTransactionsRequest, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
+        TransactionsRequest, TransactionsResponse,
     },
     ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
     NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,

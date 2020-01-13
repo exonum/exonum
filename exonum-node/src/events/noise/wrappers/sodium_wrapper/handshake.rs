@@ -18,7 +18,7 @@ use exonum::{
         PublicKey, SecretKey,
     },
     merkledb::BinaryValue,
-    messages::{Connect, Verified},
+    messages::Verified,
 };
 use failure::bail;
 use futures::future::{done, Future};
@@ -33,6 +33,7 @@ use crate::{
         codec::MessagesCodec,
         noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
     },
+    messages::Connect,
     SharedConnectList,
 };
 

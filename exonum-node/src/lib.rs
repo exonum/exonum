@@ -46,6 +46,8 @@ pub use self::{
 };
 
 // FIXME: think about moving types here.
+#[doc(hidden)] // Needed for `transactions` benchmark; logically, `Message` is private
+pub use crate::messages::Message as PeerMessage;
 #[doc(hidden)]
 pub use exonum::blockchain::{ApiSender, ExternalMessage, SendError};
 
@@ -65,7 +67,7 @@ use exonum::{
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     keys::Keys,
     merkledb::{Database, ObjectHash},
-    messages::{Connect, ExonumMessage, SignedMessage, Verified},
+    messages::{IntoMessage, SignedMessage, Verified},
     runtime::RuntimeInstance,
 };
 use exonum_api::{
@@ -95,7 +97,7 @@ use crate::events::{
     EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
     NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
-use crate::{schema::NodeSchema, state::RequestData};
+use crate::{messages::Connect, schema::NodeSchema, state::RequestData};
 
 #[doc(hidden)]
 pub mod events;
@@ -105,7 +107,9 @@ mod connect_list;
 mod consensus;
 mod events_impl;
 pub mod helpers;
+mod messages;
 mod plugin;
+mod proto;
 mod requests;
 #[cfg(test)]
 mod sandbox;
@@ -504,7 +508,7 @@ impl NodeHandler {
 
     fn sign_message<T>(&self, message: T) -> Verified<T>
     where
-        T: TryFrom<SignedMessage> + Into<ExonumMessage> + TryFrom<ExonumMessage>,
+        T: TryFrom<SignedMessage> + IntoMessage,
     {
         Verified::from_value(
             message,

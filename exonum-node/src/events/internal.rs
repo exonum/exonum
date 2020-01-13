@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    merkledb::BinaryValue,
-    messages::{ExonumMessage, Message, SignedMessage},
-};
+use exonum::{merkledb::BinaryValue, messages::SignedMessage};
 use futures::{
     future::{self, Either, Executor},
     sync::mpsc,
@@ -26,6 +23,7 @@ use tokio_core::reactor::{Handle, Timeout};
 use std::time::{Duration, SystemTime};
 
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
+use crate::messages::{ExonumMessage, Message};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -120,7 +118,7 @@ mod tests {
     use exonum::{
         crypto::{gen_keypair, Hash, Signature},
         helpers::Height,
-        messages::{Status, Verified},
+        messages::Verified,
     };
     use pretty_assertions::assert_eq;
     use tokio_core::reactor::Core;
@@ -128,6 +126,7 @@ mod tests {
     use std::thread;
 
     use super::*;
+    use crate::messages::Status;
 
     fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, internal_rx) = mpsc::channel(16);
