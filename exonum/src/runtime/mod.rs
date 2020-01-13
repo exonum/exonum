@@ -773,12 +773,14 @@ impl<'a> ExecutionContext<'a> {
     pub(crate) fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
+        artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        let spec = DispatcherSchema::new(&*self.fork)
+        let mut spec = DispatcherSchema::new(&*self.fork)
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?
             .spec;
+        spec.artifact = artifact;
 
         let runtime = self
             .dispatcher
@@ -796,7 +798,7 @@ impl<'a> ExecutionContext<'a> {
             })?;
 
         DispatcherSchema::new(&*self.fork)
-            .initiate_resuming_service(instance_id)
+            .initiate_resuming_service(instance_id, spec.artifact)
             .map_err(From::from)
     }
 }
@@ -872,11 +874,12 @@ impl<'a> SupervisorExtensions<'a> {
     pub fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
+        artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         self.0
             .child_context(Some(SUPERVISOR_INSTANCE_ID))
-            .initiate_resuming_service(instance_id, params)
+            .initiate_resuming_service(instance_id, artifact, params)
     }
 
     /// Provides writeable access to core schema.

@@ -312,8 +312,16 @@ pub struct StopService {
 #[derive(Debug, Serialize, Deserialize, BinaryValue)]
 #[binary_value(codec = "bincode")]
 pub struct ResumeService {
+    pub artifact: ArtifactId,
     pub instance_id: InstanceId,
     pub params: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct MigrateService {
+    pub instance_name: String,
+    pub artifact: ArtifactId,
 }
 
 #[exonum_interface]
@@ -324,6 +332,7 @@ pub trait ToySupervisor<Ctx> {
     fn start_service(&self, context: Ctx, request: StartService) -> Self::Output;
     fn stop_service(&self, context: Ctx, request: StopService) -> Self::Output;
     fn resume_service(&self, context: Ctx, request: ResumeService) -> Self::Output;
+    fn migrate_service(&self, context: Ctx, request: MigrateService) -> Self::Output;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -358,9 +367,21 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
     }
 
     fn resume_service(&self, mut context: CallContext<'_>, request: ResumeService) -> Self::Output {
+        context.supervisor_extensions().initiate_resuming_service(
+            request.instance_id,
+            request.artifact,
+            request.params,
+        )
+    }
+
+    fn migrate_service(
+        &self,
+        mut context: CallContext<'_>,
+        request: MigrateService,
+    ) -> Self::Output {
         context
             .supervisor_extensions()
-            .initiate_resuming_service(request.instance_id, request.params)
+            .initiate_migration(request.artifact, &request.instance_name)
     }
 }
 

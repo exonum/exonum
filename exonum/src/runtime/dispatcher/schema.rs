@@ -398,13 +398,14 @@ impl Schema<&Fork> {
     pub(crate) fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
+        artifact: ArtifactId,
     ) -> Result<(), CoreError> {
         let instance_name = self
             .instance_ids()
             .get(&instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        let state = self
+        let mut state = self
             .instances()
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
@@ -413,6 +414,14 @@ impl Schema<&Fork> {
             Some(InstanceStatus::Stopped) => {}
             _ => return Err(CoreError::ServiceNotStopped),
         }
+        if state.spec.artifact.name != artifact.name {
+            return Err(CoreError::CannotResumeService);
+        }
+        if state.data_version() != &artifact.version {
+            return Err(CoreError::CannotResumeService);
+        }
+
+        state.spec.artifact = artifact;
         self.add_pending_status(state, InstanceStatus::Active, None)
     }
 
