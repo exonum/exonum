@@ -152,6 +152,7 @@ impl MessageVerifier {
             handler: handler.clone(),
             internal_rx: channel.internal_events.1,
             network_rx: channel.network_events.1,
+            transactions_rx: channel.transactions.1,
             api_rx: channel.api_requests.1,
         };
 

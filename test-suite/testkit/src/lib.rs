@@ -111,7 +111,7 @@ pub use exonum_explorer as explorer;
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
-        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ExternalMessage,
+        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
     helpers::{byzantine_quorum, Height, ValidatorId},
@@ -130,7 +130,7 @@ use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
 #[cfg(feature = "exonum-node")]
-use exonum_node::{NodePlugin, PluginApiContext, SharedNodeState};
+use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -171,6 +171,11 @@ pub struct TestKit {
     api_aggregator: ApiAggregator,
     #[cfg(feature = "exonum-node")]
     plugins: Vec<Box<dyn NodePlugin>>,
+    #[cfg(feature = "exonum-node")]
+    control_channel: (
+        mpsc::Sender<ExternalMessage>,
+        mpsc::Receiver<ExternalMessage>,
+    ),
 }
 
 impl fmt::Debug for TestKit {
@@ -232,11 +237,9 @@ impl TestKit {
         let processing_lock_ = Arc::clone(&processing_lock);
 
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
-            Box::new(api_channel.1.and_then(move |event| {
+            Box::new(api_channel.1.and_then(move |transaction| {
                 let _guard = processing_lock_.lock().unwrap();
-                if let ExternalMessage::Transaction(tx) = event {
-                    BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(tx));
-                }
+                BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(transaction));
                 Ok(())
             }));
 
@@ -251,6 +254,8 @@ impl TestKit {
             api_aggregator: ApiAggregator::new(),
             #[cfg(feature = "exonum-node")]
             plugins: vec![],
+            #[cfg(feature = "exonum-node")]
+            control_channel: mpsc::channel(100),
         }
     }
 
@@ -258,15 +263,37 @@ impl TestKit {
     #[cfg(feature = "exonum-node")]
     pub(crate) fn set_plugins(&mut self, plugins: Vec<Box<dyn NodePlugin>>) {
         debug_assert!(self.plugins.is_empty());
-        let mut aggregator = ApiAggregator::new();
-        let node_state = SharedNodeState::new(10_000);
-        let plugin_api_context = PluginApiContext::new(self.blockchain.as_ref(), &node_state);
-        for plugin in &self.plugins {
-            aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+        self.plugins = plugins;
+        self.api_aggregator = self.create_api_aggregator();
+    }
+
+    fn create_api_aggregator(&self) -> ApiAggregator {
+        #[cfg(feature = "exonum-node")]
+        {
+            let mut aggregator = ApiAggregator::new();
+            let node_state = SharedNodeState::new(10_000);
+            let plugin_api_context = PluginApiContext::new(
+                self.blockchain.as_ref(),
+                &node_state,
+                ApiSender::new(self.control_channel.0.clone()),
+            );
+            for plugin in &self.plugins {
+                aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
+            }
+            aggregator
         }
 
-        self.api_aggregator = aggregator;
-        self.plugins = plugins;
+        #[cfg(not(feature = "exonum-node"))]
+        {
+            ApiAggregator::new()
+        }
+    }
+
+    /// Returns control messages received by the testkit since the last call to this method.
+    #[cfg(feature = "exonum-node")]
+    pub fn poll_control_messages(&mut self) -> Vec<ExternalMessage> {
+        use crate::poll_events::poll_all;
+        poll_all(&mut self.control_channel.1)
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -277,16 +304,7 @@ impl TestKit {
     /// Updates API aggregator for the testkit and caches it for further use.
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
-            let mut aggregator = ApiAggregator::new();
-            #[cfg(feature = "exonum-node")]
-            {
-                let node_state = SharedNodeState::new(10_000);
-                let plugin_api_context =
-                    PluginApiContext::new(self.blockchain.as_ref(), &node_state);
-                for plugin in &self.plugins {
-                    aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
-                }
-            }
+            let mut aggregator = self.create_api_aggregator();
             aggregator.extend(update.endpoints);
             self.api_aggregator = aggregator;
         }

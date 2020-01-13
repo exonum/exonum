@@ -115,7 +115,7 @@ mod schema;
 mod state;
 
 /// External messages sent to the node via `ApiSender`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
@@ -1046,7 +1046,11 @@ impl Node {
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let mut api_aggregator = ApiAggregator::new();
-        let plugin_api_context = PluginApiContext::new(blockchain.as_ref(), &api_state);
+        let plugin_api_context = PluginApiContext::new(
+            blockchain.as_ref(),
+            &api_state,
+            ApiSender::new(channel.api_requests.0.clone()),
+        );
         for plugin in &plugins {
             let endpoints = plugin.wire_api(plugin_api_context.clone());
             api_aggregator.extend(endpoints);

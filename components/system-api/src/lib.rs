@@ -64,15 +64,18 @@
 pub mod private;
 pub mod public;
 
-use exonum::blockchain::Blockchain;
+use exonum::blockchain::{ApiSender, Blockchain};
 use exonum_api::ApiBuilder;
-use exonum_node::{NodePlugin, PluginApiContext, SharedNodeState};
+use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use crate::{private::SystemApi as PrivateSystemApi, public::SystemApi};
 
-fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
+fn system_api(
+    blockchain: Blockchain,
+    sender: ApiSender<ExternalMessage>,
+    shared_api_state: SharedNodeState,
+) -> ApiBuilder {
     let mut builder = ApiBuilder::new();
-    let sender = blockchain.sender().to_owned();
     PrivateSystemApi::new(sender, shared_api_state.clone()).wire(builder.private_scope());
     SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
     builder
@@ -88,6 +91,7 @@ impl NodePlugin for SystemApiPlugin {
     fn wire_api(&self, context: PluginApiContext<'_>) -> Vec<(String, ApiBuilder)> {
         let api_builder = system_api(
             context.blockchain().to_owned(),
+            context.api_sender(),
             context.node_state().to_owned(),
         );
         vec![("system".to_owned(), api_builder)]

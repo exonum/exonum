@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{Blockchain, ValidatorKeys},
+    blockchain::{ApiSender, Blockchain, ValidatorKeys},
     helpers::Milliseconds,
     merkledb::Snapshot,
 };
@@ -25,7 +25,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::{events::network::ConnectedPeerAddr, ConnectInfo, NodeRole, State};
+use crate::{events::network::ConnectedPeerAddr, ConnectInfo, ExternalMessage, NodeRole, State};
 
 #[derive(Debug, Default)]
 struct ApiNodeState {
@@ -181,14 +181,20 @@ impl SharedNodeState {
 pub struct PluginApiContext<'a> {
     blockchain: &'a Blockchain,
     node_state: &'a SharedNodeState,
+    api_sender: ApiSender<ExternalMessage>,
 }
 
 impl<'a> PluginApiContext<'a> {
     #[doc(hidden)] // public because of the testkit
-    pub fn new(blockchain: &'a Blockchain, node_state: &'a SharedNodeState) -> Self {
+    pub fn new(
+        blockchain: &'a Blockchain,
+        node_state: &'a SharedNodeState,
+        api_sender: ApiSender<ExternalMessage>,
+    ) -> Self {
         Self {
             blockchain,
             node_state,
+            api_sender,
         }
     }
 
@@ -200,6 +206,11 @@ impl<'a> PluginApiContext<'a> {
     /// Returns a reference to the node state.
     pub fn node_state(&self) -> &SharedNodeState {
         self.node_state
+    }
+
+    /// Returns sender of control messages to the node.
+    pub fn api_sender(&self) -> ApiSender<ExternalMessage> {
+        self.api_sender.clone()
     }
 }
 
