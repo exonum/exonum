@@ -20,8 +20,8 @@ use exonum::{
 use log::{error, info, trace};
 use rand::Rng;
 
-use super::{state::RequestData, NodeHandler, NodeRole};
 use crate::events::{error::LogError, network::ConnectedPeerAddr};
+use crate::{schema::NodeSchema, state::RequestData, NodeHandler, NodeRole};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
@@ -74,7 +74,13 @@ impl NodeHandler {
     /// again if it was in the validators list.
     fn remove_peer_with_addr(&mut self, key: PublicKey) {
         self.state.remove_peer_with_pubkey(&key);
-        self.blockchain.remove_peer_with_pubkey(&key);
+
+        let fork = self.blockchain.fork();
+        NodeSchema::new(&fork).remove_peer_with_pubkey(&key);
+        self.blockchain
+            .merge(fork.into_patch())
+            .expect("Cannot remove peer from peer cache");
+
         let is_validator = self.state.peer_is_validator(&key);
         let in_connect_list = self.state.peer_in_connect_list(&key);
         if is_validator && in_connect_list {
@@ -131,12 +137,18 @@ impl NodeHandler {
                     .update_peer(&public_key, message.payload().host.to_string())
             }
         }
+
         self.state.add_peer(public_key, message.clone());
         info!(
             "Received Connect message from {}. Need to connect: {}",
             address, need_connect,
         );
-        self.blockchain.save_peer(&public_key, message);
+        let fork = self.blockchain.fork();
+        NodeSchema::new(&fork).save_peer(&public_key, message);
+        self.blockchain
+            .merge(fork.into_patch())
+            .expect("Cannot save `Connect` from peer");
+
         if need_connect {
             // TODO: reduce double sending of connect message
             info!("Send Connect message to {}", address);

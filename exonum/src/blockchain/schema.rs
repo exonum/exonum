@@ -26,8 +26,8 @@ use std::fmt;
 use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
 use crate::{
     crypto::{Hash, PublicKey},
-    helpers::{Height, Round, ValidatorId},
-    messages::{AnyTx, Connect, Message, Precommit, Verified},
+    helpers::{Height, ValidatorId},
+    messages::{AnyTx, Precommit, Verified},
     proto::{self, schema::blockchain as pb_blockchain},
     runtime::InstanceId,
 };
@@ -54,9 +54,6 @@ define_names!(
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
-    PEERS_CACHE => "peers_cache";
-    CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
-    CONSENSUS_ROUND => "consensus_round";
     CONSENSUS_CONFIG => "consensus_config";
 );
 
@@ -220,30 +217,6 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_proof_entry(CONSENSUS_CONFIG)
     }
 
-    /// Returns peers that have to be recovered in case of process restart
-    /// after abnormal termination.
-    pub(crate) fn peers_cache(&self) -> MapIndex<T::Base, PublicKey, Verified<Connect>> {
-        self.access.clone().get_map(PEERS_CACHE)
-    }
-
-    /// Returns consensus messages that have to be recovered in case of process restart
-    /// after abnormal termination.
-    #[doc(hidden)] // FIXME: move to separate schema
-    pub fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
-        self.access.clone().get_list(CONSENSUS_MESSAGES_CACHE)
-    }
-
-    /// Returns the saved value of the consensus round. Returns the first round
-    /// if it has not been saved.
-    #[doc(hidden)] // FIXME: move to separate schema
-    pub fn consensus_round(&self) -> Round {
-        self.access
-            .clone()
-            .get_entry(CONSENSUS_ROUND)
-            .get()
-            .unwrap_or_else(Round::first)
-    }
-
     /// Returns the block hash for the given height.
     pub fn block_hash_by_height(&self, height: Height) -> Option<Hash> {
         self.block_hashes_by_height().get(height.into())
@@ -315,11 +288,6 @@ impl<T: Access> Schema<T>
 where
     T::Base: RawAccessMut,
 {
-    /// Saves the given consensus round value into the storage.
-    pub(crate) fn set_consensus_round(&mut self, round: Round) {
-        self.access.clone().get_entry(CONSENSUS_ROUND).set(round);
-    }
-
     /// Adds a transaction into the persistent pool. The caller must ensure that the transaction
     /// is not already in the pool.
     ///

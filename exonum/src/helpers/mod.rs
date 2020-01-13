@@ -27,10 +27,7 @@ pub use self::types::Milliseconds;
 mod ordered_map;
 
 use env_logger::Builder;
-use exonum_merkledb::Fork;
 use log::SetLoggerError;
-
-use crate::blockchain::Schema;
 
 mod types;
 mod user_agent;
@@ -53,14 +50,6 @@ pub trait ValidateInput: Sized {
     fn into_validated(self) -> Result<Self, Self::Error> {
         self.validate().map(|_| self)
     }
-}
-
-/// Clears consensus messages cache.
-///
-/// Used in `exonum-cli` to implement `clear-cache` maintenance action.
-#[doc(hidden)]
-pub fn clear_consensus_messages_cache(fork: &Fork) {
-    Schema::new(fork).consensus_messages_cache().clear();
 }
 
 /// Returns sufficient number of votes for the given validators number.

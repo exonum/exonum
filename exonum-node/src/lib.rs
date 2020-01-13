@@ -89,13 +89,13 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use self::state::RequestData;
 use crate::events::{
     error::{into_failure, LogError},
     noise::HandshakeParams,
     EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
     NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
 };
+use crate::{schema::NodeSchema, state::RequestData};
 
 #[doc(hidden)]
 pub mod events;
@@ -104,10 +104,12 @@ mod basic;
 mod connect_list;
 mod consensus;
 mod events_impl;
+pub mod helpers;
 mod plugin;
 mod requests;
 #[cfg(test)]
 mod sandbox;
+mod schema;
 mod state;
 
 /// Node timeout types.
@@ -465,12 +467,16 @@ impl NodeHandler {
         );
 
         let connect_list = config.connect_list;
+        let peers = NodeSchema::new(&blockchain.snapshot())
+            .peers_cache()
+            .iter()
+            .collect();
         let state = State::new(
             validator_id,
             connect_list,
             consensus_config,
             connect,
-            blockchain.as_ref().get_saved_peers(),
+            peers,
             last_hash,
             last_height,
             system_state.current_time(),
@@ -589,7 +595,7 @@ impl NodeHandler {
         }
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = NodeSchema::new(&snapshot);
         // Recover previous saved round if any.
         let round = schema.consensus_round();
         self.state.jump_round(round);
