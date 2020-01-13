@@ -48,7 +48,7 @@ fn test_exonum_core_protos(api: &TestKitApi) {
     let expected_files: HashSet<String> = vec![
         "key_value_sequence.proto",
         "blockchain.proto",
-        "consensus.proto",
+        "messages.proto",
         "runtime.proto",
         "tests.proto",
         "common.proto",
