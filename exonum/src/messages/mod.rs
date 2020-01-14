@@ -114,7 +114,7 @@ pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH 
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use exonum_crypto::{self as crypto, gen_keypair, Signature};
+    use exonum_crypto::{self as crypto, gen_keypair};
     use exonum_merkledb::BinaryValue;
     use exonum_proto::ProtobufConvert;
     use protobuf::Message;
@@ -205,32 +205,6 @@ mod tests {
             pub_key,
             &secret_key,
         );
-
-        let precommit_json = serde_json::to_string(&precommit).unwrap();
-        let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
-        assert_eq!(precommit2, precommit);
-    }
-
-    #[test]
-    #[should_panic(expected = "Failed to verify signature.")]
-    fn test_precommit_serde_wrong_signature() {
-        let (pub_key, secret_key) = gen_keypair();
-        let ts = Utc::now();
-
-        let mut precommit = Verified::from_value(
-            Precommit::new(
-                ValidatorId(123),
-                Height(15),
-                Round(25),
-                crypto::hash(&[1, 2, 3]),
-                crypto::hash(&[3, 2, 1]),
-                ts,
-            ),
-            pub_key,
-            &secret_key,
-        );
-        // Break signature.
-        precommit.raw.signature = Signature::zero();
 
         let precommit_json = serde_json::to_string(&precommit).unwrap();
         let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();

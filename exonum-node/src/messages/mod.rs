@@ -206,11 +206,13 @@ macro_rules! impl_message_from_verified {
 
         impl From<Verified<ExonumMessage>> for Message {
             fn from(msg: Verified<ExonumMessage>) -> Self {
-                let raw = msg.raw;
-                match msg.inner {
+                match msg.payload() {
                     $(
-                        ExonumMessage::$concrete(inner) => {
-                            let inner = Verified::<$concrete> { raw, inner };
+                        ExonumMessage::$concrete(_) => {
+                            let inner = msg.downcast_map(|payload| match payload {
+                                ExonumMessage::$concrete(payload) => payload,
+                                _ => unreachable!(),
+                            });
                             Self::from(inner)
                         }
                     )*
@@ -343,10 +345,9 @@ mod tests {
         let signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
 
         let verified_protocol = signed.clone().into_verified::<ExonumMessage>().unwrap();
-        assert_eq!(verified_protocol.inner, protocol_message);
-
+        assert_eq!(*verified_protocol.payload(), protocol_message);
         let verified_status = signed.clone().into_verified::<Status>().unwrap();
-        assert_eq!(verified_status.inner, msg);
+        assert_eq!(*verified_status.payload(), msg);
 
         // Wrong variant
         let err = signed.into_verified::<Precommit>().unwrap_err();

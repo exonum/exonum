@@ -79,10 +79,8 @@ impl_serde_hex_for_binary_value! { SignedMessage }
 /// See module [documentation](index.html#examples) for examples.
 #[derive(Clone, Debug)]
 pub struct Verified<T> {
-    #[doc(hidden)] // FIXME: how to keep fields private?
-    pub raw: SignedMessage,
-    #[doc(hidden)]
-    pub inner: T,
+    raw: SignedMessage,
+    inner: T,
 }
 
 impl<T> PartialEq for Verified<T> {
@@ -105,6 +103,18 @@ impl<T> Verified<T> {
     /// Returns message author key.
     pub fn author(&self) -> PublicKey {
         self.raw.author
+    }
+
+    /// Downcasts this message to a more specific type. This is only appropriate if the target
+    /// type retains all information about the message.
+    pub fn downcast_map<U>(self, map_fn: impl FnOnce(T) -> U) -> Verified<U>
+    where
+        U: TryFrom<SignedMessage> + IntoMessage,
+    {
+        Verified {
+            raw: self.raw,
+            inner: map_fn(self.inner),
+        }
     }
 }
 
@@ -233,11 +243,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+    use exonum_crypto::{self as crypto, Signature};
     use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::{
-        crypto,
+        helpers::{Height, Round, ValidatorId},
+        messages::Precommit,
         runtime::{AnyTx, CallInfo},
     };
 
@@ -283,5 +296,31 @@ mod tests {
         let from_pb = Verified::from_pb(to_pb).expect("Failed to convert from protobuf.");
 
         assert_eq!(msg, from_pb);
+    }
+
+    #[test]
+    #[should_panic(expected = "Failed to verify signature.")]
+    fn test_precommit_serde_wrong_signature() {
+        let (pub_key, secret_key) = crypto::gen_keypair();
+        let ts = Utc::now();
+
+        let mut precommit = Verified::from_value(
+            Precommit::new(
+                ValidatorId(123),
+                Height(15),
+                Round(25),
+                crypto::hash(&[1, 2, 3]),
+                crypto::hash(&[3, 2, 1]),
+                ts,
+            ),
+            pub_key,
+            &secret_key,
+        );
+        // Break signature.
+        precommit.raw.signature = Signature::zero();
+
+        let precommit_json = serde_json::to_string(&precommit).unwrap();
+        let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+        assert_eq!(precommit2, precommit);
     }
 }
