@@ -37,8 +37,6 @@ use std::{cmp::Ordering, time::SystemTime};
 
 use crate::{messages::Message, ExternalMessage, NodeTimeout};
 
-#[cfg(all(test, feature = "long_benchmarks"))]
-mod benches;
 #[cfg(test)]
 mod tests;
 
