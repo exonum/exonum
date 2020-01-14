@@ -18,7 +18,6 @@ use actix_web::http::StatusCode;
 use failure::Fail;
 use serde::Serialize;
 
-use std::collections::HashMap;
 use std::io;
 
 /// API HTTP error struct.
@@ -34,8 +33,6 @@ pub struct ApiError {
     pub title: String,
     /// Detailed description of the error.
     pub detail: String,
-    /// HashMap with additional parameters.
-    pub params: HashMap<String, String>,
     /// Source of the error.
     pub source: String,
     /// Internal error code.
@@ -55,7 +52,6 @@ impl ApiError {
             docs_uri: String::new(),
             title: String::new(),
             detail: String::new(),
-            params: HashMap::new(),
             source: String::new(),
             error_code: 0,
         }
@@ -94,12 +90,6 @@ impl ApiError {
     /// Sets `detail` of an error.
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = detail.into();
-        self
-    }
-
-    /// Inserts new value into `params`.
-    pub fn param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.params.insert(key.into(), value.into());
         self
     }
 
