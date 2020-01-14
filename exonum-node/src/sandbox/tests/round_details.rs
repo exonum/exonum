@@ -29,12 +29,10 @@ use log::info;
 
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
-use crate::constants::{
-    PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT,
-};
 use crate::{
     messages::{PrevotesRequest, TransactionsRequest},
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder},
+    state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
 };
 
 /// check scenario:

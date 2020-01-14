@@ -21,8 +21,10 @@ use exonum::{
 
 use std::time::Duration;
 
-use crate::constants::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::{
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+    state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
+};
 
 /// Handle block response:
 ///

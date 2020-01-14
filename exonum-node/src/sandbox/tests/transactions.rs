@@ -25,15 +25,15 @@ use exonum::{
 
 use std::time::Duration;
 
-use crate::sandbox::{
-    config_updater::TxConfig,
-    sandbox_tests_helper::*,
-    timestamping::{TimestampingTxGenerator, DATA_SIZE},
-    timestamping_sandbox, timestamping_sandbox_builder, Milliseconds, Sandbox,
-};
 use crate::{
-    constants::TRANSACTIONS_REQUEST_TIMEOUT,
     messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
+    sandbox::{
+        config_updater::TxConfig,
+        sandbox_tests_helper::*,
+        timestamping::{TimestampingTxGenerator, DATA_SIZE},
+        timestamping_sandbox, timestamping_sandbox_builder, Milliseconds, Sandbox,
+    },
+    state::TRANSACTIONS_REQUEST_TIMEOUT,
 };
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;

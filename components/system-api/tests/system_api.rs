@@ -85,8 +85,9 @@ fn shutdown() {
     api.private(ApiKind::System)
         .post::<()>("v1/shutdown")
         .unwrap();
-    assert_eq!(
-        testkit.poll_control_messages(),
-        vec![ExternalMessage::Shutdown]
-    );
+    let control_messages = testkit.poll_control_messages();
+    match control_messages.as_slice() {
+        [ExternalMessage::Shutdown] => {}
+        _ => panic!("Unexpected control messages: {:?}", control_messages),
+    }
 }

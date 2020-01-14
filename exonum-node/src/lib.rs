@@ -16,10 +16,10 @@
 //!
 //! # Overview
 //!
-//! This module contains the following APIs:
+//! This crate contains the following APIs:
 //!
 //! - [`Node`] encapsulates a full-fledged Exonum node
-//! - [`ApiSender`], [`NodeChannel`] and [`ShutdownHandle`] allow to interact with the node
+//! - [`NodeChannel`] and [`ShutdownHandle`] allow to interact with the node
 //!   (mind that `NodeChannel` is relatively low-level)
 //! - Configuration types, "rooted" in [`NodeConfig`], allow to configure aspects
 //!   of the `Node` behavior
@@ -29,32 +29,23 @@
 //! (In other words, these APIs may change or be removed in any release without prior warning.)
 //!
 //! [`Node`]: struct.Node.html
-//! [`ApiSender`]: struct.ApiSender.html
 //! [`NodeChannel`]: struct.NodeChannel.html
 //! [`ShutdownHandle`]: struct.ShutdownHandle.html
 //! [`NodeConfig`]: struct.NodeConfig.html
 
 // spell-checker:ignore cors
 
-pub(crate) use self::{
-    connect_list::ConnectList,
-    state::{SharedConnectList, State},
-};
-pub use self::{
+#[doc(hidden)] // Needed for `transactions` benchmark; logically, `Message` is private
+pub use crate::messages::Message as PeerMessage;
+pub use crate::{
     connect_list::{ConnectInfo, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
-// FIXME: think about moving types here.
-#[doc(hidden)] // Needed for `transactions` benchmark; logically, `Message` is private
-pub use crate::messages::Message as PeerMessage;
-
-pub(crate) mod constants {
-    pub use super::state::{
-        BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-        TRANSACTIONS_REQUEST_TIMEOUT,
-    };
-}
+pub(crate) use crate::{
+    connect_list::ConnectList,
+    state::{SharedConnectList, State},
+};
 
 use exonum::{
     blockchain::{
@@ -114,8 +105,13 @@ mod sandbox;
 mod schema;
 mod state;
 
-/// External messages sent to the node via `ApiSender`.
-#[derive(Debug, PartialEq)]
+/// External messages sent to the node.
+///
+/// # Stability
+///
+/// This enum is not intended to be exhaustively matched. New variants may be added to it
+/// without breaking semver compatibility.
+#[derive(Debug)]
 pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
@@ -123,6 +119,8 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 /// Node timeout types.

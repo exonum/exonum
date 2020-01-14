@@ -22,8 +22,10 @@ use exonum::{
 
 use std::time::Duration;
 
-use crate::constants::PROPOSE_REQUEST_TIMEOUT;
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox};
+use crate::{
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+    state::PROPOSE_REQUEST_TIMEOUT,
+};
 
 /// HANDLE ROUND TIMEOUT:
 /// - Ignore if height and round are not the same

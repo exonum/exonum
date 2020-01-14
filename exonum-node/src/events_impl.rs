@@ -86,6 +86,7 @@ impl NodeHandler {
             }
 
             ExternalMessage::Shutdown => self.handle_shutdown(),
+            ExternalMessage::__NonExhaustive => unreachable!("Variant never created"),
         }
     }
 
