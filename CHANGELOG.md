@@ -94,8 +94,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Common` variant has been added to the `ErrorKind` enum. (#1680)
 
+- `api` module of the `exonum` crate has been moved to 2 separate crates (#1690):
+
+  - `exonum-api` crate defining the base HTTP wrapper
+  - `exonum-system-api` crate implementing system API endpoints
+
 - Added a new method `initiate_resuming_service` to the `Runtime` trait.
-  This method is used to resume a previously stopped service.
+  This method is used to resume a previously stopped services.
   (#1693)
 
 #### exonum-cli

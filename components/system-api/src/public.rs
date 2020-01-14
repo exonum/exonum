@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Public system API.
+//! Public part of the node REST API.
+//!
+//! Public API includes universally available endpoints, e.g., allowing to view
+//! the list of services on the current node.
 
-use exonum_merkledb::access::Access;
-
-use crate::{
-    api::{node::SharedNodeState, ApiScope},
+use exonum::{
+    api::ApiScope,
     blockchain::{Blockchain, Schema},
     helpers::user_agent,
+    merkledb::access::AsReadonly,
+    node::SharedNodeState,
     runtime::{ArtifactId, DispatcherSchema, InstanceState, SnapshotExt},
 };
+use serde_derive::{Deserialize, Serialize};
 
 /// Information about the current state of the node memory pool.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -67,25 +71,17 @@ pub struct DispatcherInfo {
 
 impl DispatcherInfo {
     /// Loads dispatcher information from database.
-    pub fn load(schema: &DispatcherSchema<impl Access>) -> Self {
+    fn load<T: AsReadonly>(schema: &DispatcherSchema<T>) -> Self {
         Self {
-            artifacts: schema.artifacts().keys().collect(),
-            services: schema.instances().values().collect(),
+            artifacts: schema.service_artifacts().keys().collect(),
+            services: schema.service_instances().values().collect(),
         }
     }
 }
 
-/// Protobuf sources query parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProtoSourcesQuery {
-    /// Artifact identifier, if specified, query returns the source files of the artifact,
-    /// otherwise it returns source files of `exonum` itself.
-    pub artifact: Option<String>,
-}
-
 /// Public system API.
 #[derive(Clone, Debug)]
-pub struct SystemApi {
+pub(super) struct SystemApi {
     blockchain: Blockchain,
     node_state: SharedNodeState,
 }

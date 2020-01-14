@@ -32,6 +32,7 @@ serde_json = "1.0"
 
 [dev-dependencies]
 exonum-explorer-service = { version = "0.13.0-rc.2", path = "../../services/explorer" }
+exonum-system-api = { version = "0.13.0-rc.2", path = "../../components/system-api" }
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
 
 assert_matches = "1.2.0"
