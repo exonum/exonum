@@ -634,6 +634,10 @@ impl NodeHandler {
         };
 
         let snapshot = self.blockchain.snapshot();
+        for plugin in &self.plugins {
+            plugin.after_commit(&snapshot);
+        }
+
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();
 
@@ -642,7 +646,7 @@ impl NodeHandler {
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
             height,
             proposer,
-            round.map_or_else(|| "?".into(), |x| format!("{}", x)),
+            round.map_or_else(|| "?".to_owned(), |x| x.to_string()),
             committed_txs,
             pool_len,
             block_hash.to_hex(),

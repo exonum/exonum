@@ -12,51 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum node API implementation.
+use exonum_api::ApiBuilder;
+use exonum_merkledb::Snapshot;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fmt,
-    net::SocketAddr,
     sync::{Arc, RwLock},
 };
 
 use crate::{
-    blockchain::ValidatorKeys,
+    blockchain::{Blockchain, ValidatorKeys},
     events::network::ConnectedPeerAddr,
     helpers::Milliseconds,
     node::{ConnectInfo, NodeRole, State},
 };
 
-pub mod private;
-pub mod public;
-
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     incoming_connections: HashSet<ConnectInfo>,
     outgoing_connections: HashSet<ConnectInfo>,
-    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     is_enabled: bool,
     node_role: NodeRole,
     majority_count: usize,
     validators: Vec<ValidatorKeys>,
     tx_cache_len: usize,
-}
-
-impl fmt::Debug for ApiNodeState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ApiNodeState")
-            .field("incoming_connections", &self.incoming_connections)
-            .field("outgoing_connections", &self.outgoing_connections)
-            .field("reconnects_timeout", &self.reconnects_timeout)
-            .field("is_enabled", &self.is_enabled)
-            .field("node_role", &self.node_role)
-            .field("majority_count", &self.majority_count)
-            .field("validators", &self.validators)
-            .field("tx_cache_len", &self.tx_cache_len)
-            .finish()
-    }
 }
 
 impl ApiNodeState {
@@ -75,8 +56,7 @@ impl ApiNodeState {
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     node: Arc<RwLock<ApiNodeState>>,
-    /// Timeout to update API state.
-    pub state_update_timeout: Milliseconds,
+    state_update_timeout: Milliseconds,
 }
 
 impl SharedNodeState {
@@ -107,19 +87,6 @@ impl SharedNodeState {
             .outgoing_connections
             .iter()
             .cloned()
-            .collect()
-    }
-
-    /// Returns a list of other nodes to which the connection has failed
-    /// and a reconnect attempt is required. The method also indicates the time
-    /// after which a new connection attempt is performed.
-    pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
-        self.node
-            .read()
-            .expect("Expected read lock.")
-            .reconnects_timeout
-            .iter()
-            .map(|(c, e)| (*c, *e))
             .collect()
     }
 
@@ -166,19 +133,19 @@ impl SharedNodeState {
         lock.validators = state.validators().to_vec();
         lock.tx_cache_len = state.tx_cache_len();
 
-        for (p, a) in state.connections() {
-            match a {
+        for (public_key, addr) in state.connections() {
+            match addr {
                 ConnectedPeerAddr::In(addr) => {
                     let conn_info = ConnectInfo {
                         address: addr.to_string(),
-                        public_key: *p,
+                        public_key: *public_key,
                     };
                     lock.incoming_connections.insert(conn_info);
                 }
                 ConnectedPeerAddr::Out(_, addr) => {
                     let conn_info = ConnectInfo {
                         address: addr.to_string(),
-                        public_key: *p,
+                        public_key: *public_key,
                     };
                     lock.outgoing_connections.insert(conn_info);
                 }
@@ -203,30 +170,59 @@ impl SharedNodeState {
         self.state_update_timeout
     }
 
-    /// Adds a reconnect timeout.
-    pub fn add_reconnect_timeout(
-        &self,
-        addr: SocketAddr,
-        timeout: Milliseconds,
-    ) -> Option<Milliseconds> {
-        self.node
-            .write()
-            .expect("Expected write lock")
-            .reconnects_timeout
-            .insert(addr, timeout)
-    }
-
-    /// Removes the reconnect timeout and returns the previous value.
-    pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
-        self.node
-            .write()
-            .expect("Expected write lock")
-            .reconnects_timeout
-            .remove(addr)
-    }
-
-    pub(crate) fn tx_cache_size(&self) -> usize {
+    /// Returns the current size of transaction cache.
+    pub fn tx_cache_size(&self) -> usize {
         let state = self.node.read().expect("Expected read lock");
         state.tx_cache_len
+    }
+}
+
+/// Context supplied to a node plugin in `wire_api` method.
+#[derive(Debug, Clone)]
+pub struct PluginApiContext<'a> {
+    blockchain: &'a Blockchain,
+    node_state: &'a SharedNodeState,
+}
+
+impl<'a> PluginApiContext<'a> {
+    #[doc(hidden)] // public because of the testkit
+    pub fn new(blockchain: &'a Blockchain, node_state: &'a SharedNodeState) -> Self {
+        Self {
+            blockchain,
+            node_state,
+        }
+    }
+
+    /// Returns a reference to blockchain.
+    pub fn blockchain(&self) -> &Blockchain {
+        self.blockchain
+    }
+
+    /// Returns a reference to the node state.
+    pub fn node_state(&self) -> &SharedNodeState {
+        self.node_state
+    }
+}
+
+/// Plugin for Exonum node.
+pub trait NodePlugin: Send {
+    /// Notifies the plugin that the node has committed a block.
+    ///
+    /// The default implementation does nothing.
+    fn after_commit(&self, _snapshot: &dyn Snapshot) {
+        // Do nothing
+    }
+
+    /// Allows the plugin to extend HTTP API of the node.
+    ///
+    /// The default implementation returns an empty `Vec`.
+    fn wire_api(&self, _context: PluginApiContext<'_>) -> Vec<(String, ApiBuilder)> {
+        Vec::new()
+    }
+}
+
+impl fmt::Debug for dyn NodePlugin {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_tuple("NodePlugin").finish()
     }
 }

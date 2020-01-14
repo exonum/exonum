@@ -20,6 +20,7 @@ use exonum::{
     helpers::ValidatorId,
     keys::Keys,
     merkledb::{BinaryValue, TemporaryDB},
+    node::NodePlugin,
     runtime::{ArtifactId, RuntimeInstance, WellKnownRuntime},
 };
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory};
@@ -116,6 +117,7 @@ pub struct TestKitBuilder {
     rust_runtime: RustRuntimeBuilder,
     api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: Vec<RuntimeInstance>,
+    plugins: Vec<Box<dyn NodePlugin>>,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
 }
@@ -173,6 +175,12 @@ impl TestKitBuilder {
             .with_rust_service(service)
     }
 
+    /// Adds a node plugin to the testkit.
+    pub fn with_plugin(mut self, plugin: impl NodePlugin + 'static) -> Self {
+        self.plugins.push(Box::new(plugin));
+        self
+    }
+
     /// Enables a logger inside the testkit.
     pub fn with_logger(mut self) -> Self {
         self.logger = true;
@@ -183,7 +191,7 @@ impl TestKitBuilder {
     ///
     /// # Panics
     ///
-    /// - Panics if builder's instance already contains specified runtime.
+    /// - Panics if the builder already contains specified runtime.
     pub fn with_additional_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         let instance: RuntimeInstance = runtime.into();
         if instance.id == RustRuntime::ID
@@ -262,6 +270,7 @@ impl TestKitBuilder {
             network,
             genesis_config,
             self.additional_runtimes,
+            self.plugins,
             self.api_notifier_channel,
         )
     }
@@ -288,6 +297,7 @@ impl TestKitBuilder {
             rust_runtime: RustRuntimeBuilder::new(),
             api_notifier_channel,
             additional_runtimes: vec![],
+            plugins: vec![],
             instances: vec![],
             artifacts: HashMap::new(),
         }
