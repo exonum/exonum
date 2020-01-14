@@ -693,10 +693,6 @@ fn migration_influencing_state_hash() {
 
         let new_state_hash = rig.create_block(rig.blockchain.fork()).state_hash;
         assert_eq!(state_hash, new_state_hash);
-        // Check that the data is written by the migration.
-        let snapshot = rig.blockchain.snapshot();
-        let migration = Migration::new(&service.name, &snapshot);
-        assert!(migration.get_proof_entry::<_, u32>("entry").exists());
     }
 
     let snapshot = rig.blockchain.snapshot();
