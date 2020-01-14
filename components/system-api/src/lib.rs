@@ -22,8 +22,8 @@
 //! use exonum::{
 //!     blockchain::config::GenesisConfig,
 //!     merkledb::TemporaryDB,
-//!     node::{NodeBuilder, NodeConfig},
 //! };
+//! use exonum_node::{NodeBuilder, NodeConfig};
 //! use exonum_system_api::SystemApiPlugin;
 //!
 //! let node_config: NodeConfig = // ...
