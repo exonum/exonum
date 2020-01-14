@@ -133,9 +133,10 @@ where
     }
 }
 
-/// Message that can be converted into a unambiguous presentation for signing. Unambiguity
-/// means that any sequence of bytes produced can be interpreted in a single way; in other words,
-/// messages of different types have separated representation domains.
+/// Message that can be converted into a unambiguous presentation for signing. "Unambiguous"
+/// means that any sequence of bytes produced by serializing `Container` obtained by converting
+/// this message can be interpreted in a single way. In other words, messages of different types
+/// have separated representation domains.
 pub trait IntoMessage: Sized {
     /// Container for the message.
     type Container: BinaryValue + From<Self> + TryInto<Self>;
