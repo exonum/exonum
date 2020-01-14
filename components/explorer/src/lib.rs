@@ -475,18 +475,14 @@ impl CommittedTransaction {
 
 /// Information about the transaction.
 ///
-/// Values of this type are returned by the [`transaction()`] method of the `BlockchainExplorer`.
-///
-/// [`transaction()`]: struct.BlockchainExplorer.html#method.transaction
+/// Values of this type are returned by the `transaction()` method of the `BlockchainExplorer`.
 ///
 /// # JSON presentation
 ///
 /// ## Committed transactions
 ///
-/// Committed transactions are represented just like a [`CommittedTransaction`],
+/// Committed transactions are represented just like a `CommittedTransaction`,
 /// with the additional `type` field equal to `"committed"`.
-///
-/// [`CommittedTransaction`]: struct.CommittedTransaction.html#json-presentation
 ///
 /// ## Transaction in pool
 ///

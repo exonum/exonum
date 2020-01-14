@@ -18,8 +18,9 @@
 //! and `migrate_wallets` functions.
 //!
 //! The main points of this example are:
-//! - We have to create `Fork` from the DB manually,
-//!  as well as `Migration` and `Prefixed` access to the data.
+//!
+//! - We have to create `Fork` from the DB manually, as well as `Migration` and `Prefixed` access
+//!   to the data.
 //! - We have to apply `Patch` to the DB manually.
 //! - Data migration is performed by direct access to old and new schemas.
 //!
@@ -31,9 +32,8 @@ use exonum_merkledb::{
 
 use std::sync::Arc;
 
-use migration::{perform_migration, v1, v2};
-
 mod migration;
+use crate::migration::{perform_migration, v1, v2};
 
 /// Provides migration of wallets with schema.
 ///

@@ -47,6 +47,13 @@ pub enum CoreError {
     StackOverflow = 8,
     /// Service instance is already transitioning to a new status.
     ServicePending = 9,
+    /// Migrated service is not stopped.
+    ServiceNotStopped = 10,
+    /// The artifact to migrate the service to is not a newer version of the current
+    /// service artifact.
+    CannotUpgradeService = 11,
+    /// Attempt to rollback or flush migration for a service which has no pending migration.
+    NoMigration = 12,
 }
 
 impl CoreError {

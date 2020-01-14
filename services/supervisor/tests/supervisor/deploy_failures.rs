@@ -41,6 +41,8 @@ mod failing_runtime {
 
     use exonum::merkledb::Snapshot;
     use exonum::runtime::{
+        migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
         ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
         InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     };
@@ -123,16 +125,6 @@ mod failing_runtime {
             vec![]
         }
 
-        /// Commits status for the `SampleService` instance with the specified ID.
-        fn update_service_status(
-            &mut self,
-            _snapshot: &dyn Snapshot,
-            _spec: &InstanceSpec,
-            _status: InstanceStatus,
-        ) {
-            unimplemented!("This runtime does not support service instantiation");
-        }
-
         /// Initiates adding a new service and sets the counter value for this.
         fn initiate_adding_service(
             &self,
@@ -141,6 +133,24 @@ mod failing_runtime {
             _params: Vec<u8>,
         ) -> Result<(), ExecutionError> {
             unimplemented!("This runtime does not support service instantiation");
+        }
+
+        /// Commits status for the `SampleService` instance with the specified ID.
+        fn update_service_status(
+            &mut self,
+            _snapshot: &dyn Snapshot,
+            _spec: &InstanceSpec,
+            _status: &InstanceStatus,
+        ) {
+            unimplemented!("This runtime does not support service instantiation");
+        }
+
+        fn migrate(
+            &self,
+            _new_artifact: &ArtifactId,
+            _data_version: &Version,
+        ) -> Result<Option<MigrationScript>, InitMigrationError> {
+            unimplemented!("This runtime does not support data migration");
         }
 
         fn execute(

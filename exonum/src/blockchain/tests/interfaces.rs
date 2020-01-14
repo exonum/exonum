@@ -23,6 +23,7 @@ use crate::{
         Blockchain, BlockchainBuilder, BlockchainMut,
     },
     runtime::{
+        migrations::{InitMigrationError, MigrationScript},
         ArtifactId, CallInfo, DispatcherSchema, ExecutionContext, ExecutionError, InstanceId,
         InstanceSpec, InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
     },
@@ -110,8 +111,16 @@ impl Runtime for InterfacesRuntime {
         &mut self,
         _snapshot: &dyn Snapshot,
         _spec: &InstanceSpec,
-        _status: InstanceStatus,
+        _status: &InstanceStatus,
     ) {
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
     }
 
     fn execute(

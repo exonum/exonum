@@ -19,6 +19,7 @@ package exonum.runtime;
 option java_package = "com.exonum.core.messages";
 
 import "blockchain.proto";
+import "types.proto";
 import "google/protobuf/empty.proto";
 
 // Unique service transaction identifier.
@@ -150,10 +151,8 @@ message ArtifactState {
   Status status = 2;
 }
 
-// Current state of service instance in dispatcher.
-message InstanceState {
-  // Status of a service instance.
-  enum Status {
+message InstanceStatus {
+  enum Simple {
     // The service instance has no status, i.e. this value corresponds to
     // `Option::None` on the Rust code level and other corresponds to
     // `Some(...)`.
@@ -163,10 +162,64 @@ message InstanceState {
     // The service instance is stopped.
     STOPPED = 2;
   }
+
+  oneof status {
+    // Service has a status from the `Simple` enum.
+    Simple simple = 1;
+    // Service is in process of migration.
+    InstanceMigration migration = 2;
+  }
+}
+
+message InstanceMigration {
+  // Migration target to obtain migration scripts from. This artifact
+  // must be deployed on the blockchain.
+  ArtifactId target = 1;
+  // Version of the instance data after the migration is completed.
+  // Note that it does not necessarily match the version of `target`,
+  // but should be not greater.
+  string end_version = 2;
+  // Consensus-wide outcome of the migration, in the form of
+  // the aggregation hash of the migrated data.
+  // The lack of value signifies that the migration is not finished yet.
+  exonum.crypto.Hash completed_hash = 3;
+}
+
+
+// Current state of service instance in dispatcher.
+message InstanceState {
   // Service instance specification.
   exonum.runtime.InstanceSpec spec = 1;
   // Service instance activity status.
-  Status status = 2;
+  InstanceStatus status = 2;
   // Pending status of instance if the value is not `NONE`.
-  Status pending_status = 3;
+  InstanceStatus pending_status = 3;
+  // Version of the service data. The empty value means that the data version
+  // is the same as the `spec.artifact`. Non-empty value means that one or more
+  // data migrations have been performed on the service, so that the service data
+  // is compatible with a newer artifact.
+  string data_version = 4;
+}
+
+// Local result of a migration.
+message MigrationStatus {
+  oneof result {
+    // Hash of the successfully migrated data.
+    exonum.crypto.Hash hash = 1;
+    // Human-readable description of an error that has occurred
+    // during migration.
+    string error = 2;
+  }
+}
+
+// Information about a modified service instance.
+message ModifiedInstanceInfo {
+  enum MigrationTransition {
+    NONE = 0;
+    START = 1;
+    COMMIT = 2;
+    ROLLBACK = 3;
+  }
+
+  MigrationTransition migration_transition = 1;
 }

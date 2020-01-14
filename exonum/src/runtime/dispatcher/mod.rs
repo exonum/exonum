@@ -14,16 +14,23 @@
 
 pub use self::schema::Schema;
 
-use exonum_merkledb::{access::RawAccess, Fork, Patch, Snapshot};
+use exonum_merkledb::{
+    access::RawAccess,
+    migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
+    Database, Fork, Patch, Snapshot,
+};
 use futures::{
     future::{self, Either},
     Future,
 };
 use log::{error, info};
+use semver::Version;
 
 use std::{
     collections::{BTreeMap, HashMap},
     fmt, panic,
+    sync::{mpsc, Arc},
+    thread,
 };
 
 use crate::{
@@ -37,11 +44,17 @@ use crate::{
     },
 };
 
+use self::schema::{MigrationTransition, ModifiedInstanceInfo};
 use super::{
     error::{CallSite, CallType, ErrorKind, ExecutionError},
-    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, Runtime,
+    migrations::{
+        InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
+    },
+    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
 };
 
+#[cfg(test)]
+mod migration_tests;
 mod schema;
 #[cfg(test)]
 mod tests;
@@ -80,7 +93,7 @@ impl CommittedServices {
     fn get_instance<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceDescriptor<'_>, InstanceStatus)> {
+    ) -> Option<(InstanceDescriptor<'_>, &InstanceStatus)> {
         let (id, info) = match id.into() {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
@@ -90,7 +103,7 @@ impl CommittedServices {
             }
         };
         let name = info.name.as_str();
-        Some((InstanceDescriptor { id, name }, info.status))
+        Some((InstanceDescriptor { id, name }, &info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -104,11 +117,123 @@ impl CommittedServices {
     }
 }
 
+#[derive(Debug)]
+struct MigrationThread {
+    handle: thread::JoinHandle<Result<Hash, MigrationError>>,
+    abort_handle: AbortHandle,
+}
+
+impl MigrationThread {
+    fn join(self) -> MigrationStatus {
+        let result = match self.handle.join() {
+            Ok(Ok(hash)) => Ok(hash),
+            Ok(Err(MigrationError::Custom(description))) => Err(description),
+            Ok(Err(MigrationError::Helper(e))) => {
+                // TODO: Is panicking OK here?
+                panic!("Migration terminated with database error: {}", e);
+            }
+            Err(e) => Err(ExecutionError::description_from_panic(e)),
+        };
+        MigrationStatus(result)
+    }
+}
+
+#[derive(Debug)]
+struct Migrations {
+    db: Arc<dyn Database>,
+    threads: HashMap<String, MigrationThread>,
+}
+
+impl Migrations {
+    fn new(blockchain: &Blockchain) -> Self {
+        Self {
+            db: blockchain.database().to_owned(),
+            threads: HashMap::new(),
+        }
+    }
+
+    fn add_migration(
+        &mut self,
+        instance_spec: InstanceSpec,
+        data_version: Version,
+        script: MigrationScript,
+    ) {
+        let db = Arc::clone(&self.db);
+        let instance_name = instance_spec.name.clone();
+        let script_name = script.name().to_owned();
+        let (handle_tx, handle_rx) = mpsc::channel();
+
+        let thread_fn = move || -> Result<Hash, MigrationError> {
+            let script_name = script.name().to_owned();
+            log::info!("Starting migration script {}", script_name);
+
+            let (helper, abort_handle) =
+                MigrationHelper::with_handle(Arc::clone(&db), &instance_spec.name);
+            handle_tx.send(abort_handle).unwrap();
+            let mut context = MigrationContext {
+                helper,
+                data_version,
+                instance_spec,
+            };
+
+            script.execute(&mut context)?;
+            let migration_hash = context.helper.finish()?;
+            log::info!(
+                "Successfully finished migration script {} with hash {:?}",
+                script_name,
+                migration_hash
+            );
+            Ok(migration_hash)
+        };
+
+        let handle = thread::Builder::new()
+            .name(script_name)
+            .spawn(thread_fn)
+            .expect("Cannot spawn thread for migration script");
+
+        let prev_thread = self.threads.insert(
+            instance_name.clone(),
+            MigrationThread {
+                handle,
+                abort_handle: handle_rx.recv().unwrap(),
+            },
+        );
+        debug_assert!(
+            prev_thread.is_none(),
+            "Attempt to run concurrent migrations for service `{}`",
+            instance_name
+        );
+    }
+
+    fn take_completed(&mut self) -> Vec<(String, MigrationStatus)> {
+        let completed_names: Vec<_> = self
+            .threads
+            .iter()
+            .filter_map(|(name, thread)| {
+                if thread.abort_handle.is_finished() {
+                    Some(name.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        completed_names
+            .into_iter()
+            .map(|name| {
+                let thread = self.threads.remove(&name).unwrap();
+                (name, thread.join())
+            })
+            .collect()
+    }
+}
+
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
     runtimes: BTreeMap<u32, Box<dyn Runtime>>,
     service_infos: CommittedServices,
+    migrations: Migrations,
 }
 
 impl Dispatcher {
@@ -123,6 +248,7 @@ impl Dispatcher {
                 .map(|runtime| (runtime.id, runtime.instance))
                 .collect(),
             service_infos: CommittedServices::default(),
+            migrations: Migrations::new(blockchain),
         };
         for runtime in this.runtimes.values_mut() {
             runtime.initialize(blockchain);
@@ -137,6 +263,7 @@ impl Dispatcher {
     /// This method panics if the stored state cannot be restored.
     pub(crate) fn restore_state(&mut self, snapshot: &dyn Snapshot) {
         let schema = Schema::new(snapshot);
+
         // Restore information about the deployed services.
         for (artifact, state) in schema.artifacts().iter() {
             debug_assert_eq!(
@@ -154,13 +281,23 @@ impl Dispatcher {
                     );
                 });
         }
+
         // Restart active service instances.
         for state in schema.instances().values() {
+            let data_version = state.data_version().to_owned();
             let status = state
                 .status
-                .expect("BUG: Stored service instance should have a determined state.");
-            self.update_service_status(snapshot, &state.spec, status);
+                .expect("BUG: Stored service instance should have a determined status.");
+            self.update_service_status(snapshot, &state.spec, status.clone());
+
+            // Restart a migration script if it is not finished locally.
+            if let Some(target) = status.ongoing_migration_target() {
+                if schema.local_migration_result(&state.spec.name).is_none() {
+                    self.start_migration_script(target, state.spec, data_version);
+                }
+            }
         }
+
         // Notify runtimes about the end of initialization process.
         for runtime in self.runtimes.values_mut() {
             runtime.on_resume();
@@ -196,14 +333,15 @@ impl Dispatcher {
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
         fork.flush();
-        for (spec, status) in pending_instances {
+        for (state, _) in pending_instances {
+            let status = state.status;
             debug_assert_eq!(
                 status,
-                InstanceStatus::Active,
-                "BUG: The built-in service instance must have an active status at startup."
+                Some(InstanceStatus::Active),
+                "BUG: The built-in service instance must have an active status at startup"
             );
-            self.update_service_status(fork.readonly().snapshot(), &spec, status);
-            self.store_interfaces(&fork, &spec);
+            self.update_service_status(fork.readonly().snapshot(), &state.spec, status.unwrap());
+            self.store_interfaces(&fork, &state.spec);
         }
         fork.into_patch()
     }
@@ -272,6 +410,63 @@ impl Dispatcher {
         Schema::new(fork)
             .add_pending_artifact(artifact, deploy_spec)
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
+    }
+
+    /// Initiates migration of an existing stopped service to a newer artifact.
+    /// The migration script is started once the block corresponding to `fork`
+    /// is committed.
+    pub(crate) fn initiate_migration(
+        &self,
+        fork: &Fork,
+        new_artifact: ArtifactId,
+        service_name: &str,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(fork);
+        let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
+        let maybe_script =
+            self.get_migration_script(&new_artifact, instance_state.data_version())?;
+        if let Some(script) = maybe_script {
+            let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
+            schema.add_pending_migration(instance_state, migration);
+        } else {
+            // No migration script means that the service instance may be immediately updated to
+            // the new artifact version.
+            schema.fast_forward_migration(instance_state, new_artifact.version);
+        }
+        Ok(())
+    }
+
+    /// Initiates migration rollback. The rollback will actually be performed once
+    /// the block corresponding to `fork` is committed.
+    pub(crate) fn rollback_migration(
+        fork: &Fork,
+        service_name: &str,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .add_migration_rollback(service_name)
+            .map_err(From::from)
+    }
+
+    /// Makes the node block on the specified migration after the block corresponding
+    /// to `fork` is committed. After the block is committed, all nodes in the network
+    /// are guaranteed to have migration data prepared for flushing.
+    pub(crate) fn commit_migration(
+        fork: &Fork,
+        service_name: &str,
+        migration_hash: Hash,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .add_migration_commit(service_name, migration_hash)
+            .map_err(From::from)
+    }
+
+    pub(crate) fn flush_migration(
+        fork: &mut Fork,
+        service_name: &str,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(&*fork).complete_migration(service_name)?;
+        flush_migration(fork, service_name);
+        Ok(())
     }
 
     /// Initiates stopping of an existing service instance in the blockchain. The stopping
@@ -458,24 +653,171 @@ impl Dispatcher {
         let mut schema = Schema::new(&fork);
         let pending_artifacts = schema.take_pending_artifacts();
         let modified_instances = schema.take_modified_instances();
-        fork.flush();
+
+        // Process migration commits and rollbacks.
+        self.block_on_migrations(&modified_instances, &mut schema);
+        drop(schema); // Required to not generate double mutable borrowing on fork (in schema and in line below).
+        self.rollback_migrations(&modified_instances, &mut fork);
+
+        // Check if any migration scripts have completed locally. Record migration results in the DB.
+        let results = self.migrations.take_completed();
+        let mut schema = Schema::new(&fork);
+        for (instance_name, result) in results {
+            schema.add_local_migration_result(&instance_name, result);
+        }
 
         // Block futures with pending deployments.
         for (artifact, deploy_spec) in pending_artifacts {
             self.block_until_deployed(artifact, deploy_spec);
         }
+
         // Notify runtime about changes in service instances.
-        for (spec, status) in modified_instances {
-            self.update_service_status(fork.readonly().snapshot(), &spec, status);
+        fork.flush();
+        for (state, modified_info) in modified_instances {
+            let data_version = state.data_version().to_owned();
+            let status = state
+                .status
+                .expect("BUG: Service status cannot be changed to `None`");
+
+            self.update_service_status(fork.readonly().snapshot(), &state.spec, status.clone());
 
             // If instance became active, we need to store its interfaces.
             if let InstanceStatus::Active = status {
                 // Collect interfaces implemented by service into `HashSet`.
-                self.store_interfaces(&fork, &spec);
+                self.store_interfaces(&fork, &state.spec);
+            }
+
+            if modified_info.migration_transition == Some(MigrationTransition::Start) {
+                let target = status
+                    .ongoing_migration_target()
+                    .expect("BUG: Migration target is not specified for ongoing migration");
+                self.start_migration_script(target, state.spec, data_version);
             }
         }
 
         fork.into_patch()
+    }
+
+    fn get_migration_script(
+        &self,
+        new_artifact: &ArtifactId,
+        data_version: &Version,
+    ) -> Result<Option<MigrationScript>, ExecutionError> {
+        let runtime = self
+            .runtime_by_id(new_artifact.runtime_id)
+            .ok_or(CoreError::IncorrectRuntime)?;
+        runtime
+            .migrate(new_artifact, data_version)
+            .map_err(From::from)
+    }
+
+    fn start_migration_script(
+        &mut self,
+        new_artifact: &ArtifactId,
+        old_service: InstanceSpec,
+        data_version: Version,
+    ) {
+        let maybe_script = self
+            .get_migration_script(new_artifact, &data_version)
+            .unwrap_or_else(|err| {
+                panic!(
+                    "BUG: Cannot obtain migration script for migrating {:?} to new artifact {:?}, {}",
+                    old_service, new_artifact, err
+                );
+            });
+        let script = maybe_script.unwrap_or_else(|| {
+            panic!(
+                "BUG: Runtime returned no script for migrating {:?} to new artifact {:?}, \
+                 although it earlier returned a script for the same migration",
+                old_service, new_artifact
+            );
+        });
+        self.migrations
+            .add_migration(old_service, data_version, script);
+    }
+
+    /// Blocks until all committed migrations are completed with the expected outcome.
+    /// The node will panic if the local outcome of a migration is unexpected.
+    fn block_on_migrations(
+        &mut self,
+        modified_instances: &[(InstanceState, ModifiedInstanceInfo)],
+        schema: &mut Schema<&Fork>,
+    ) {
+        let committed_migrations = modified_instances.iter().filter(|(_, modified_info)| {
+            modified_info.migration_transition == Some(MigrationTransition::Commit)
+        });
+        for (state, _) in committed_migrations {
+            let migration_hash = state
+                .status
+                .as_ref()
+                .and_then(InstanceStatus::completed_migration_hash)
+                .expect("BUG: No migration hash saved for committed migration");
+
+            let instance_name = &state.spec.name;
+            let local_result = schema.local_migration_result(instance_name);
+            let local_result = self.block_on_migration(instance_name, migration_hash, local_result);
+            schema.add_local_migration_result(instance_name, local_result);
+        }
+    }
+
+    fn block_on_migration(
+        &mut self,
+        namespace: &str,
+        global_hash: Hash,
+        local_result: Option<MigrationStatus>,
+    ) -> MigrationStatus {
+        let local_result = if let Some(thread) = self.migrations.threads.remove(namespace) {
+            // If the migration script hasn't finished locally, wait until it's finished.
+            thread.join()
+        } else {
+            // If the local script has finished, the result should be recorded in the database.
+            local_result.unwrap_or_else(|| {
+                panic!(
+                    "BUG: migration is marked as completed for service `{}`, but its result \
+                     is missing from the database",
+                    namespace
+                );
+            })
+        };
+
+        // Check if the local result agrees with the global one. Any deviation is considered
+        // a consensus failure.
+        let res = local_result.0.as_ref();
+        let local_hash = *res.unwrap_or_else(|err| {
+            // FIXME: Add a maintenance command for removing local migration result (ECR-4095).
+            panic!(
+                "Migration for service `{}` is committed with migration hash {:?}, \
+                 but locally it has finished with an error: {}",
+                namespace, global_hash, err
+            );
+        });
+        assert!(
+            local_hash == global_hash,
+            "Migration for service `{}` is committed with migration hash {:?}, \
+             but locally it has finished with another hash {:?}",
+            namespace,
+            global_hash,
+            local_hash
+        );
+
+        local_result
+    }
+
+    fn rollback_migrations(
+        &mut self,
+        modified_instances: &[(InstanceState, ModifiedInstanceInfo)],
+        fork: &mut Fork,
+    ) {
+        let migration_rollbacks = modified_instances.iter().filter(|(_, modified_info)| {
+            modified_info.migration_transition == Some(MigrationTransition::Rollback)
+        });
+        for (state, _) in migration_rollbacks {
+            // Remove the thread corresponding to the migration (if any). This will abort
+            // the migration script since its `AbortHandle` is dropped.
+            let namespace = &state.spec.name;
+            self.migrations.threads.remove(namespace);
+            rollback_migration(fork, namespace);
+        }
     }
 
     /// Make pending artifacts and instances active.
@@ -570,7 +912,7 @@ impl Dispatcher {
             "BUG: `update_service_status` was invoked for incorrect runtime, \
              this should never happen because of preemptive checks.",
         );
-        runtime.update_service_status(snapshot, instance, status);
+        runtime.update_service_status(snapshot, instance, &status);
 
         info!(
             "Committing service instance {:?} with status {}",
