@@ -324,7 +324,7 @@ fn resume_with_fast_forward_migration() {
         events_handle.take(),
         vec![
             RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::Migrate(
+            RuntimeEvent::MigrateService(
                 withdrawal_service.artifact.clone(),
                 WithdrawalServiceV1.artifact_id().version
             ),

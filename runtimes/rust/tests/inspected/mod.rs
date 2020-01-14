@@ -105,12 +105,12 @@ fn add_transactions_into_pool(
 
 #[derive(Debug, PartialEq)]
 pub enum RuntimeEvent {
-    Initialize,
-    Resume,
+    InitializeRuntime,
+    ResumeRuntime,
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
     StartAddingService(InstanceSpec, Vec<u8>),
-    Migrate(ArtifactId, Version),
+    MigrateService(ArtifactId, Version),
     StartResumingService(InstanceSpec, Vec<u8>),
     CommitService(Height, InstanceSpec, InstanceStatus),
     AfterTransactions(Height, InstanceId),
@@ -153,12 +153,12 @@ impl<T: Runtime> Inspected<T> {
 
 impl<T: Runtime> Runtime for Inspected<T> {
     fn initialize(&mut self, blockchain: &Blockchain) {
-        self.events.push(RuntimeEvent::Initialize);
+        self.events.push(RuntimeEvent::InitializeRuntime);
         self.runtime.initialize(blockchain)
     }
 
     fn on_resume(&mut self) {
-        self.events.push(RuntimeEvent::Resume);
+        self.events.push(RuntimeEvent::ResumeRuntime);
         self.runtime.on_resume()
     }
 
@@ -234,7 +234,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         new_artifact: &ArtifactId,
         data_version: &Version,
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
-        self.events.push(RuntimeEvent::Migrate(
+        self.events.push(RuntimeEvent::MigrateService(
             new_artifact.to_owned(),
             data_version.clone(),
         ));

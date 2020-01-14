@@ -239,7 +239,7 @@ fn basic_runtime_workflow() {
     assert_eq!(
         events_handle.take(),
         vec![
-            RuntimeEvent::Initialize,
+            RuntimeEvent::InitializeRuntime,
             RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
             RuntimeEvent::StartAddingService(
                 supervisor.instance_spec.clone(),
@@ -435,7 +435,7 @@ fn runtime_restart() {
     assert_eq!(
         events_handle.take(),
         vec![
-            RuntimeEvent::Initialize,
+            RuntimeEvent::InitializeRuntime,
             RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
             RuntimeEvent::StartAddingService(
                 supervisor.instance_spec.clone(),
@@ -483,7 +483,7 @@ fn runtime_restart() {
     assert_eq!(
         events_handle.take(),
         vec![
-            RuntimeEvent::Initialize,
+            RuntimeEvent::InitializeRuntime,
             RuntimeEvent::DeployArtifact(test_service_artifact, vec![]),
             RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
             // `Runtime::start_adding_service` is never called for the same service
@@ -493,7 +493,7 @@ fn runtime_restart() {
                 InstanceStatus::Active
             ),
             // `Runtime::after_commit` is never called for the same block
-            RuntimeEvent::Resume,
+            RuntimeEvent::ResumeRuntime,
         ]
     );
 
