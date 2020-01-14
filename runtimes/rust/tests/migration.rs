@@ -24,8 +24,8 @@ use exonum_derive::*;
 use exonum_rust_runtime::{
     migrations::{InitMigrationError, MigrateData, MigrationScript},
     versioning::Version,
-    CallContext, CoreError, DefaultInstance, ErrorMatch, ExecutionError, InstanceStatus,
-    RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
+    CallContext, CommonError, CoreError, DefaultInstance, ErrorMatch, ExecutionError,
+    ExecutionFail, InstanceStatus, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
 };
 use pretty_assertions::assert_eq;
 
@@ -119,7 +119,12 @@ impl Service for WithdrawalServiceV2 {
         Ok(())
     }
 
-    fn resume(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn resume(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+        if !params.is_empty() {
+            return Err(CommonError::MalformedArguments
+                .with_description("Resuming parameters should be empty."));
+        }
+
         // Recalculate the balance taking into account the error of the previous implementation.
         // Despite the simplicity this approach is very fragile and can lead to errors during
         // subsequent migrations.
@@ -356,6 +361,20 @@ fn resume_with_fast_forward_migration() {
         ]
     );
 
+    // Check instance state after migration and resume.
+    let instance_state = blockchain
+        .snapshot()
+        .for_dispatcher()
+        .get_instance(WithdrawalServiceV2::INSTANCE_ID)
+        .unwrap();
+
+    assert_eq!(instance_state.spec, withdrawal_service);
+    assert_eq!(instance_state.status, Some(InstanceStatus::Active));
+    assert_eq!(
+        instance_state.data_version(),
+        &withdrawal_service.artifact.version
+    );
+
     // Make another withdrawal.
     let amount_2 = 20_000;
     execute_transaction(
@@ -447,5 +466,81 @@ fn test_resume_incorrect_artifact_name() {
     assert_eq!(
         actual_err,
         ErrorMatch::from_fail(&CoreError::CannotResumeService)
+    );
+}
+
+#[test]
+fn test_resume_service_error() {
+    let (mut blockchain, _) = create_runtime();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+
+    // Make withdrawal.
+    let amount = 10_000;
+    execute_transaction(
+        &mut blockchain,
+        keypair.withdraw(WithdrawalServiceV1::INSTANCE_ID, amount),
+    )
+    .unwrap();
+
+    // Stop running service instance.
+    execute_transaction(
+        &mut blockchain,
+        keypair.stop_service(
+            ToySupervisorService::INSTANCE_ID,
+            StopService {
+                instance_id: WithdrawalServiceV1::INSTANCE_ID,
+            },
+        ),
+    )
+    .unwrap();
+
+    // Make fast-forward migration to the WithdrawalServiceV2.
+    execute_transaction(
+        &mut blockchain,
+        keypair.migrate_service(
+            ToySupervisorService::INSTANCE_ID,
+            MigrateService {
+                instance_name: WithdrawalServiceV1::INSTANCE_NAME.to_owned(),
+                artifact: WithdrawalServiceV2.artifact_id(),
+            },
+        ),
+    )
+    .unwrap();
+
+    // Resume stopped service instance.
+    let actual_err = execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: WithdrawalServiceV2::INSTANCE_ID,
+                artifact: WithdrawalServiceV2.artifact_id(),
+                params: vec![1, 2, 3, 4],
+            },
+        ),
+    )
+    .unwrap_err();
+
+    // Verify the service instance after migration and unsuccessful resume.
+    let instance_state = blockchain
+        .snapshot()
+        .for_dispatcher()
+        .get_instance(WithdrawalServiceV1::INSTANCE_ID)
+        .unwrap();
+
+    assert_eq!(
+        instance_state.spec,
+        WithdrawalServiceV1.default_instance().instance_spec
+    );
+    assert_eq!(instance_state.status, Some(InstanceStatus::Stopped));
+    assert_eq!(
+        instance_state.data_version(),
+        &WithdrawalServiceV2.artifact_id().version
+    );
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&CommonError::MalformedArguments)
+            .with_description_containing("Resuming parameters should be empty")
     );
 }
