@@ -15,9 +15,10 @@
 use exonum::{
     api, crypto,
     helpers::{Height, ValidatorId},
+    merkledb::ObjectHash,
     messages::{AnyTx, Verified},
+    runtime::SnapshotExt,
 };
-use exonum_merkledb::ObjectHash;
 use exonum_rust_runtime::{
     ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier, RustRuntimeBuilder,
     ServiceFactory, SUPERVISOR_INSTANCE_ID,
@@ -63,21 +64,24 @@ fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
     assert!(response.is_err());
 }
 
-fn artifact_exists(api: &TestKitApi, name: &str) -> bool {
-    let artifacts = &api.dispatcher_info().artifacts;
-    artifacts.iter().any(|a| a.name == name)
+#[allow(clippy::let_and_return)] // doesn't work otherwise
+fn artifact_exists(testkit: &TestKit, name: &str) -> bool {
+    let snapshot = testkit.snapshot();
+    let artifacts = snapshot.for_dispatcher().service_artifacts();
+    let artifact_exists = artifacts.keys().any(|artifact| artifact.name == name);
+    artifact_exists
 }
 
-fn service_instance_exists(api: &TestKitApi, name: &str) -> bool {
-    let services = &api.dispatcher_info().services;
-    services.iter().any(|s| s.spec.name == name)
+fn service_instance_exists(testkit: &TestKit, name: &str) -> bool {
+    let snapshot = testkit.snapshot();
+    snapshot.for_dispatcher().get_instance(name).is_some()
 }
 
-fn find_instance_id(api: &TestKitApi, instance_name: &str) -> InstanceId {
-    let services = &api.dispatcher_info().services;
-    services
-        .iter()
-        .find(|service| service.spec.name == instance_name)
+fn find_instance_id(testkit: &TestKit, instance_name: &str) -> InstanceId {
+    let snapshot = testkit.snapshot();
+    snapshot
+        .for_dispatcher()
+        .get_instance(instance_name)
         .expect("Can't find the instance")
         .spec
         .id
@@ -175,7 +179,7 @@ fn deploy_default(testkit: &mut TestKit) {
     let artifact = default_artifact();
     let api = testkit.api();
 
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(testkit, &artifact.name));
 
     let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(testkit, &request);
@@ -190,23 +194,21 @@ fn deploy_default(testkit: &mut TestKit) {
     // Confirmation is gone now.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
-    let api = testkit.api(); // update the API
-    assert!(artifact_exists(&api, &artifact.name));
+    assert!(artifact_exists(&testkit, &artifact.name));
 }
 
 fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
-    let api = testkit.api();
-    assert!(!service_instance_exists(&api, instance_name));
+    assert!(!service_instance_exists(testkit, instance_name));
 
+    let api = testkit.api();
     let request = start_service_request(default_artifact(), instance_name, START_HEIGHT);
     let hash = start_service(&api, request);
     let block = testkit.create_block();
     block[hash].status().unwrap();
     testkit.create_blocks_until(START_HEIGHT);
 
-    let api = testkit.api(); // Update the API
-    assert!(service_instance_exists(&api, instance_name));
-    find_instance_id(&api, instance_name)
+    assert!(service_instance_exists(testkit, instance_name));
+    find_instance_id(testkit, instance_name)
 }
 
 fn testkit_with_inc_service() -> TestKit {
@@ -317,7 +319,7 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     let hash = deploy_artifact(&api, request);
     let block = testkit.create_block();
 
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
     // No confirmation was generated
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
@@ -383,9 +385,8 @@ fn test_bad_artifact_name() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
     testkit.create_block();
 
-    let api = testkit.api();
     // ...and no artifact was deployed.
-    assert!(!artifact_exists(&api, &bad_artifact.name));
+    assert!(!artifact_exists(&testkit, &bad_artifact.name));
 }
 
 #[test]
@@ -409,9 +410,8 @@ fn test_bad_runtime_id() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
     testkit.create_block();
-    let api = testkit.api();
     // ...and no artifact was deployed.
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 }
 
 #[test]
@@ -463,17 +463,16 @@ fn test_start_service_instance_twice() {
 
     // Start the first instance
     {
-        let api = testkit.api();
-        assert!(!service_instance_exists(&api, instance_name));
+        assert!(!service_instance_exists(&testkit, instance_name));
 
+        let api = testkit.api();
         let deadline = testkit.height().next();
         let request = start_service_request(default_artifact(), instance_name, deadline);
         let hash = start_service(&api, request);
         let block = testkit.create_block();
         block[hash].status().unwrap();
 
-        let api = testkit.api(); // Update the API
-        assert!(service_instance_exists(&api, instance_name));
+        assert!(service_instance_exists(&testkit, instance_name));
     }
 
     // Try to start another instance with the same name
@@ -500,9 +499,8 @@ fn test_start_two_services_in_one_request() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit);
 
-    let api = testkit.api();
-    assert!(!service_instance_exists(&api, instance_name_1));
-    assert!(!service_instance_exists(&api, instance_name_2));
+    assert!(!service_instance_exists(&testkit, instance_name_1));
+    assert!(!service_instance_exists(&testkit, instance_name_2));
 
     let artifact = default_artifact();
     let deadline = testkit.height().next();
@@ -511,13 +509,13 @@ fn test_start_two_services_in_one_request() {
         .start_service(artifact.clone(), instance_name_1, Vec::default())
         .start_service(artifact.clone(), instance_name_2, Vec::default());
 
+    let api = testkit.api();
     let hash = start_service(&api, request);
     let block = testkit.create_block();
     block[hash].status().unwrap();
 
-    let api = testkit.api(); // Update the API
-    assert!(service_instance_exists(&api, instance_name_1));
-    assert!(service_instance_exists(&api, instance_name_2));
+    assert!(service_instance_exists(&testkit, instance_name_1));
+    assert!(service_instance_exists(&testkit, instance_name_2));
 }
 
 #[test]
@@ -535,10 +533,9 @@ fn test_restart_node_and_start_service_instance() {
     let stopped_testkit = testkit.stop();
     // ...and start it again with the same service factory.
     let mut testkit = stopped_testkit.resume(available_services());
-    let api = testkit.api();
 
     // Ensure that the deployed artifact still exists.
-    assert!(artifact_exists(&api, &default_artifact().name));
+    assert!(artifact_exists(&testkit, &default_artifact().name));
 
     let instance_name = "test_basics";
     let keypair = crypto::gen_keypair();
@@ -566,7 +563,7 @@ fn test_restart_node_and_start_service_instance() {
     let api = testkit.api();
 
     // Ensure that the started service instance still exists.
-    assert!(service_instance_exists(&api, instance_name));
+    assert!(service_instance_exists(&testkit, instance_name));
 
     // Check that the service instance still works.
     {
@@ -582,7 +579,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = default_artifact();
     let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT.next());
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -612,8 +609,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
 
-    let api = testkit.api(); // update the API
-    assert!(artifact_exists(&api, &artifact.name));
+    assert!(artifact_exists(&testkit, &artifact.name));
 }
 
 /// This test emulates a normal workflow with two validators.
@@ -622,7 +618,7 @@ fn test_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = default_artifact();
     let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -648,12 +644,12 @@ fn test_two_validators() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_1.object_hash()));
 
     let api = testkit.api(); // update the API
-    assert!(artifact_exists(&api, &artifact.name));
+    assert!(artifact_exists(&testkit, &artifact.name));
     let instance_name = "inc";
 
     // Start the service now
     {
-        assert!(!service_instance_exists(&api, instance_name));
+        assert!(!service_instance_exists(&testkit, instance_name));
         // Add two heights to the deadline: one for block with config proposal and one for confirmation.
         let deadline = DEPLOY_HEIGHT.next();
         let request_start = start_service_request(default_artifact(), instance_name, deadline);
@@ -671,12 +667,11 @@ fn test_two_validators() {
             .status()
             .expect("Transaction with confirmations discarded.");
 
-        let api = testkit.api(); // Update the API
-        assert!(service_instance_exists(&api, instance_name));
+        assert!(service_instance_exists(&testkit, instance_name));
     }
 
     let api = testkit.api(); // Update the API
-    let instance_id = find_instance_id(&api, instance_name);
+    let instance_id = find_instance_id(&testkit, instance_name);
     // Basic check that service works.
     {
         assert_count_is_not_set(&api, instance_name);
@@ -698,7 +693,7 @@ fn test_multiple_validators_no_confirmation() {
 
     let artifact = default_artifact();
     let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -715,7 +710,7 @@ fn test_multiple_validators_no_confirmation() {
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_0.object_hash()));
     testkit.create_block();
     // ...and no artifact was deployed.
-    assert!(!artifact_exists(&testkit.api(), &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 }
 
 // Test that auditor can't send any requests.
@@ -724,9 +719,7 @@ fn test_auditor_cant_send_requests() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
 
     let artifact = default_artifact();
-    let api = testkit.api();
-
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
@@ -766,8 +759,7 @@ fn test_auditor_cant_send_requests() {
 fn test_auditor_normal_workflow() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
     let artifact = default_artifact();
-    let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
@@ -786,13 +778,12 @@ fn test_auditor_normal_workflow() {
     // The confirmation is gone.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation.object_hash()));
     // The artifact is deployed.
-    assert!(artifact_exists(&testkit.api(), &artifact.name));
+    assert!(artifact_exists(&testkit, &artifact.name));
 
     let instance_name = "inc";
     // Start the service now
     {
-        let api = testkit.api();
-        assert!(!service_instance_exists(&api, instance_name));
+        assert!(!service_instance_exists(&testkit, instance_name));
         let deadline = DEPLOY_HEIGHT;
         let request_start = start_service_request(default_artifact(), instance_name, deadline);
 
@@ -800,12 +791,11 @@ fn test_auditor_normal_workflow() {
         start_service_manually(&mut testkit, &request_start, ValidatorId(0));
         let block = testkit.create_block();
         block.iter().for_each(|tx| tx.status().unwrap());
-        let api = testkit.api(); // Update the API
-        assert!(service_instance_exists(&api, instance_name));
+        assert!(service_instance_exists(&testkit, instance_name));
     }
 
     let api = testkit.api(); // Update the API
-    let instance_id = find_instance_id(&api, instance_name);
+    let instance_id = find_instance_id(&testkit, instance_name);
 
     // Check that service still works.
     {
@@ -827,8 +817,7 @@ fn test_multiple_validators_deploy_confirm() {
     let validators_count = 12;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
     let artifact = default_artifact();
-    let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
@@ -851,8 +840,7 @@ fn test_multiple_validators_deploy_confirm() {
     testkit.create_block_with_transactions(deploy_confirmations);
 
     // Check that artifact is deployed now.
-    let api = testkit.api(); // update the API
-    assert!(artifact_exists(&api, &artifact.name));
+    assert!(artifact_exists(&testkit, &artifact.name));
 }
 
 /// This test emulates a deploy confirmation with 12 validators.
@@ -864,8 +852,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_majority() {
     let byzantine_majority = (validators_count * 2 / 3) + 1;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
     let artifact = default_artifact();
-    let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
@@ -884,8 +871,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_majority() {
     testkit.create_block_with_transactions(deploy_confirmations);
 
     // Check that artifact is deployed now.
-    let api = testkit.api(); // update the API
-    assert!(artifact_exists(&api, &artifact.name));
+    assert!(artifact_exists(&testkit, &artifact.name));
 }
 
 /// This test emulates a deploy confirmation with 12 validators.
@@ -897,8 +883,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     let byzantine_minority = validators_count * 2 / 3;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
     let artifact = default_artifact();
-    let api = testkit.api();
-    assert!(!artifact_exists(&api, &artifact.name));
+    assert!(!artifact_exists(&testkit, &artifact.name));
 
     let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
 
@@ -943,9 +928,14 @@ fn test_id_assignment() {
     testkit.create_block();
 
     // Check that new instances have IDs 1 and 2.
-    let api = testkit.api();
-    assert_eq!(find_instance_id(&api, instance_name_1), max_builtin_id + 1);
-    assert_eq!(find_instance_id(&api, instance_name_2), max_builtin_id + 2);
+    assert_eq!(
+        find_instance_id(&testkit, instance_name_1),
+        max_builtin_id + 1
+    );
+    assert_eq!(
+        find_instance_id(&testkit, instance_name_2),
+        max_builtin_id + 2
+    );
 }
 
 /// Checks that if builtin IDs space is sparse (here we have `Supervisor` with ID 0 and
@@ -983,6 +973,8 @@ fn test_id_assignment_sparse() {
     testkit.create_block();
 
     // Check that new instance has ID 101.
-    let api = testkit.api();
-    assert_eq!(find_instance_id(&api, instance_name), max_builtin_id + 1);
+    assert_eq!(
+        find_instance_id(&testkit, instance_name),
+        max_builtin_id + 1
+    );
 }

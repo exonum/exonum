@@ -95,6 +95,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Common` variant has been added to the `ErrorKind` enum. (#1680)
 
 - `CallInfo` now contains an interface name. (#1699)
+- `api` module of the `exonum` crate has been moved to 2 separate crates (#1690):
+
+  - `exonum-api` crate defining the base HTTP wrapper
+  - `exonum-system-api` crate implementing system API endpoints
 
 #### exonum-cli
 

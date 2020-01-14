@@ -16,13 +16,11 @@
 //! increment and reset counter in the service instance.
 
 use exonum::{
-    blockchain::{
-        config::GenesisConfigBuilder, Blockchain, BlockchainBuilder, ConsensusConfig, ValidatorKeys,
-    },
+    blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
-    node::{Node, NodeApiConfig, NodeChannel, NodeConfig},
+    node::{NodeApiConfig, NodeBuilder, NodeConfig},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
@@ -288,26 +286,22 @@ fn main() {
     let node_cfg = node_config();
     let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_cfg.service_keypair();
-    let channel = NodeChannel::default();
-    let api_sender = channel.api_sender();
-
-    println!("Creating blockchain with additional runtime...");
-    // Create a blockchain with the Rust runtime and our additional runtime.
-    let blockchain_base = Blockchain::new(db, service_keypair.clone(), api_sender.clone());
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .build();
-    let rust_runtime = RustRuntime::builder()
-        .with_factory(Supervisor)
-        .build(channel.endpoints_sender());
-    let blockchain = BlockchainBuilder::new(blockchain_base, genesis_config)
-        .with_runtime(rust_runtime)
+
+    println!("Creating blockchain with additional runtime...");
+    let node = NodeBuilder::new(db, node_cfg, genesis_config)
         .with_runtime(SampleRuntime::default())
+        .with_runtime_fn(|channel| {
+            RustRuntime::builder()
+                .with_factory(Supervisor)
+                .build(channel.endpoints_sender())
+        })
         .build();
 
-    let blockchain_ref = blockchain.as_ref().to_owned();
-    let node = Node::with_blockchain(blockchain, channel, node_cfg, None);
+    let blockchain_ref = node.blockchain().to_owned();
     let shutdown_handle = node.shutdown_handle();
     println!("Starting a single node...");
     println!("Blockchain is ready for transactions!");
@@ -321,7 +315,11 @@ fn main() {
             spec: Vec::default(),
         };
         let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
-        api_sender.broadcast_transaction(tx).wait().unwrap();
+        blockchain_ref
+            .sender()
+            .broadcast_transaction(tx)
+            .wait()
+            .unwrap();
 
         // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
@@ -329,7 +327,8 @@ fn main() {
         // Send a `StartService` request to the sample runtime.
         let instance_name = "instance";
 
-        api_sender
+        blockchain_ref
+            .sender()
             .broadcast_transaction(
                 ConfigPropose::immediate(0)
                     .start_service(
@@ -353,7 +352,8 @@ fn main() {
         assert_eq!(state.status.unwrap(), InstanceStatus::Active);
         let instance_id = state.spec.id;
         // Send an update counter transaction.
-        api_sender
+        blockchain_ref
+            .sender()
             .broadcast_transaction(
                 AnyTx {
                     call_info: CallInfo::new(instance_id, 0, "".into()),
@@ -365,7 +365,8 @@ fn main() {
             .unwrap();
         thread::sleep(Duration::from_secs(2));
         // Send a reset counter transaction.
-        api_sender
+        blockchain_ref
+            .sender()
             .broadcast_transaction(
                 AnyTx {
                     call_info: CallInfo::new(instance_id, 1, "".into()),

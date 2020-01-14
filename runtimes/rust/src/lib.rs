@@ -264,7 +264,7 @@ pub mod api;
 pub mod error;
 
 use exonum::{
-    api::{manager::UpdateEndpoints, ApiBuilder},
+    api::{ApiBuilder, UpdateEndpoints},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     merkledb::Snapshot,
@@ -528,7 +528,9 @@ impl RustRuntime {
             if !self.api_notifier.is_closed() {
                 self.api_notifier
                     .clone()
-                    .send(UpdateEndpoints { user_endpoints })
+                    .send(UpdateEndpoints {
+                        endpoints: user_endpoints,
+                    })
                     .wait()
                     .ok();
             }
