@@ -12,24 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate simplifies writing build.rs for Exonum and Exonum services.
+//! This crate simplifies writing `build.rs` for Exonum and Exonum services.
 //!
-//! Since protobuf is exonum default serialization format, build.rs is mostly used
-//! to compile protobuf files and generate a corresponding code. This code is used later in
+//! Since `protobuf` is the Exonum default serialization format, `build.rs` is mostly used
+//! to compile `protobuf` files and generate a corresponding code. This code is used later by
 //! the Exonum core and services.
 //!
 //! All you need to do is to call `ProtobufGenerator` with required params, for an example see
 //! [`ProtobufGenerator`] docs.
 //!
-//! There are three predefined sets of protobuf sources available for use.
+//! There are four predefined sets of protobuf sources available for use.
 //! See [`ProtoSources`].
 //!
-//! - Crypto sources: contains all the necessary crypto types used in services and system proto-files.
+//! - Crypto sources: all the necessary crypto types used in services and system proto-files.
 //! These types are `Hash`, `PublicKey` and `Signature`.
 //!
-//! - Exonum sources: contains types used in core and in system services such as supervisor.
+//! - Exonum sources: types used in core and in system services such as supervisor.
 //!
-//! - Common sources: currently contains only `BitVec` type and it is used in the core consensus messages.
+//! - Common sources: types that can be used by various parts of Exonum.
+//!
+//! - MerkleDB sources: types representing proofs of existence of element in database.
 //!
 //! [`ProtobufGenerator`]: struct.ProtobufGenerator.html
 //! [`ProtoSources`]: enum.ProtoSources.html

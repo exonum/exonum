@@ -14,6 +14,31 @@ REST and WebSocket endpoints and packages this logic as an Exonum service.
 Thus, this crate is useful if you want to provide the way for external apps
 to query the blockchain info.
 
+## Description
+
+The explorer service does not define transactions, but it has several
+REST / WebSocket endpoints allowing to retrieve information from the
+blockchain in a structured way.
+
+Usually, the explorer service should be instantiated at the blockchain start
+with the default identifiers. There may be no more than one explorer service
+on a blockchain; an attempt to create a second service instance will lead to
+an error in the service constructor.
+
+The API types necessary to interact with the service HTTP API are defined in
+a separate crate, [`exonum-explorer`]. The base explorer provides Rust language
+APIs for retrieving info from the blockchain, while this crate translates these
+APIs into REST and WebSocket endpoints and packages this logic as an Exonum
+service.
+
+Thus, this crate is useful if you want to provide the way for external apps to
+query the blockchain info.
+
+## HTTP API
+
+REST API of the service is documented in the [`api` module](api-module), and its
+WebSocket API in the [`api::websocket` module](websocket-module).
+
 ## Usage
 
 Include `exonum-explorer-service` as a dependency in your `Cargo.toml`:
@@ -37,3 +62,5 @@ for more details about the service API.
 See [LICENSE](LICENSE) for details.
 
 [explorer]: https://crates.io/crates/exonum-explorer/
+[api-module]: https://docs.rs/exonum-explorer-service/latest/exonum-explorer-service/api/index.html
+[websocket-module]: https://docs.rs/exonum-explorer-service/latest/exonum-explorer-service/api/websocket/index.html
