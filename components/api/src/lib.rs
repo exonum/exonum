@@ -12,34 +12,74 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! API and corresponding utilities.
+//! High-level wrapper around a web server used by the Exonum framework.
+//!
+//! The core APIs of this crate are designed to be reasonably independent from the web server
+//! implementation. [`actix`] is currently used as the server backend.
+//!
+//! The wrapper is used in [Rust services][rust-runtime] and in plugins
+//! for the Exonum node. The Rust runtime provides its own abstractions based on the wrapper;
+//! consult its docs for details. Node plugins use [`ApiBuilder`] directly.
+//!
+//! [`actix`]: https://crates.io/crates/actix
+//! [rust-runtime]: https://crates.io/crates/exonum-rust-runtime
+//! [`ApiBuilder`]: struct.ApiBuilder.html
+//!
+//! # Examples
+//!
+//! Providing HTTP API for a plugin:
+//!
+//! ```
+//! use exonum_api::{ApiBuilder};
+//! # use serde_derive::{Deserialize, Serialize};
+//!
+//! #[derive(Serialize, Deserialize)]
+//! pub struct SomeQuery {
+//!     pub first: u64,
+//!     pub second: u64,
+//! }
+//!
+//! fn create_api() -> ApiBuilder {
+//!     let mut builder = ApiBuilder::new();
+//!     builder
+//!         .public_scope()
+//!         .endpoint("some", |query: SomeQuery| {
+//!             Ok(query.first + query.second)
+//!         });
+//!     builder
+//! }
+//!
+//! let builder = create_api();
+//! // `builder` can now be passed to the node via plugin interface
+//! // or via node channel.
+//! ```
+
+#![deny(
+    unsafe_code,
+    bare_trait_objects,
+    missing_docs,
+    missing_debug_implementations
+)]
 
 pub use self::{
-    error::Error,
+    cors::AllowOrigin,
+    error::{Error, MovedPermanentlyError},
     error::{ApiError, HttpCode},
-    manager::UpdateEndpoints,
-    with::{Actuality, ApiFutureResult, Deprecated, FutureResult, NamedWith, Result, With},
+    manager::{ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
+    with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 
 pub mod backends;
-pub mod error;
-pub mod manager;
-pub mod node;
-//pub mod websocket;
+mod cors;
+mod error;
+mod manager;
+mod with;
 
 use serde::{de::DeserializeOwned, Serialize};
+
 use std::{collections::BTreeMap, fmt};
 
-use self::{
-    backends::actix,
-    node::{
-        private::{NodeInfo, SystemApi as PrivateSystemApi},
-        public::SystemApi,
-    },
-};
-use crate::{api::node::SharedNodeState, blockchain::Blockchain};
-
-mod with;
+use crate::backends::actix;
 
 /// Mutability of the endpoint. Used for auto-generated endpoints, e.g.
 /// in `moved_permanently` method.
@@ -113,7 +153,7 @@ impl ApiScope {
     /// For now there is only web backend and it has the following requirements:
     ///
     /// - Query parameters should be decodable via `serde_urlencoded`, i.e. from the
-    ///   "first_param=value1&second_param=value2" form.
+    ///   `first_param=value1&second_param=value2` form.
     /// - Response items should be encodable via `serde_json` crate.
     pub fn endpoint<Q, I, R, F, E>(&mut self, name: &str, endpoint: E) -> &mut Self
     where
@@ -179,7 +219,7 @@ impl ApiBuilder {
 }
 
 /// Exonum API access level, either private or public.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApiAccess {
     /// Public API for end users.
     Public,
@@ -207,22 +247,17 @@ pub trait ExtendApiBackend {
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>;
 }
 
-/// Exonum node API aggregator. This structure enables several API backends to
-/// operate simultaneously. Currently, only HTTP v1 backend is available.
-#[derive(Debug, Clone)]
+/// Aggregator of `ApiBuilder`s. Each builder is associated with a mount point, which
+/// is used to separate endpoints for different builders.
+#[derive(Debug, Clone, Default)]
 pub struct ApiAggregator {
     endpoints: BTreeMap<String, ApiBuilder>,
 }
 
 impl ApiAggregator {
-    /// Creates an API aggregator for the given blockchain and node state.
-    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> Self {
-        let mut endpoints = BTreeMap::new();
-        endpoints.insert(
-            "system".to_owned(),
-            Self::system_api(blockchain.clone(), node_state.clone()),
-        );
-        Self { endpoints }
+    /// Creates an empty API aggregator.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Inserts a handler for a set of endpoints with the given mount point.
@@ -235,7 +270,8 @@ impl ApiAggregator {
         self.endpoints.extend(endpoints);
     }
 
-    /// Extend the given API backend by handlers with the given access level.
+    /// Extends the API backend with the handlers with the given access level.
+    #[doc(hidden)] // used by testkit; logically not public
     pub fn extend_backend<B: ExtendApiBackend>(&self, access: ApiAccess, backend: B) -> B {
         let endpoints = self.endpoints.iter();
         match access {
@@ -244,14 +280,5 @@ impl ApiAggregator {
             ApiAccess::Private => backend
                 .extend(endpoints.map(|(name, builder)| (name.as_str(), &builder.private_scope))),
         }
-    }
-
-    fn system_api(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiBuilder {
-        let mut builder = ApiBuilder::new();
-        let sender = blockchain.sender().clone();
-        PrivateSystemApi::new(sender, NodeInfo::new(), shared_api_state.clone())
-            .wire(builder.private_scope());
-        SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
-        builder
     }
 }

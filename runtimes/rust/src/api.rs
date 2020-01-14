@@ -22,7 +22,7 @@ use futures::{Future, IntoFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
 use exonum::{
-    api::{backends::actix, error::MovedPermanentlyError, ApiBuilder, ApiScope},
+    api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError},
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::PublicKey,
     merkledb::{access::Prefixed, Snapshot},

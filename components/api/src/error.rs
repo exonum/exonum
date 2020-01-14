@@ -20,8 +20,6 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::io;
 
-use crate::node::SendError;
-
 /// List of possible HTTP response codes.
 #[derive(Debug, Serialize)]
 pub enum HttpCode {
@@ -220,12 +218,5 @@ impl From<io::Error> for Error {
 impl From<failure::Error> for Error {
     fn from(e: failure::Error) -> Self {
         Error::InternalError(e)
-    }
-}
-
-/// Converts the provided error into an internal server error.
-impl From<SendError> for Error {
-    fn from(e: SendError) -> Self {
-        Error::InternalError(e.into())
     }
 }

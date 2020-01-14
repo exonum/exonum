@@ -38,6 +38,7 @@
 
 pub use self::{
     connect_list::{ConnectInfo, ConnectList, ConnectListConfig},
+    plugin::{NodePlugin, PluginApiContext, SharedNodeState},
     state::State,
 };
 
@@ -57,6 +58,7 @@ pub mod constants {
 
 pub(crate) use self::state::SharedConnectList;
 
+use exonum_api::ApiAggregator;
 use exonum_keys::Keys;
 use exonum_merkledb::{Database, ObjectHash};
 use failure::{ensure, format_err, Error, Fail};
@@ -66,7 +68,7 @@ use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt,
     net::SocketAddr,
@@ -78,12 +80,8 @@ use std::{
 use self::state::RequestData;
 use crate::{
     api::{
-        backends::actix::{
-            AllowOrigin, ApiRuntimeConfig, App, AppConfig, Cors, SystemRuntimeConfig,
-        },
-        manager::UpdateEndpoints,
-        node::SharedNodeState,
-        ApiAccess, ApiAggregator,
+        backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiManager, ApiManagerConfig,
+        UpdateEndpoints, WebServerConfig,
     },
     blockchain::{
         config::GenesisConfig, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
@@ -105,6 +103,7 @@ mod basic;
 mod connect_list;
 mod consensus;
 mod events;
+mod plugin;
 mod requests;
 mod state;
 
@@ -170,6 +169,8 @@ pub struct NodeHandler {
     pub api_state: SharedNodeState,
     /// Blockchain.
     pub blockchain: BlockchainMut,
+    /// Node plugins.
+    plugins: Vec<Box<dyn NodePlugin>>,
     /// State of the `NodeHandler`.
     state: State,
     /// System state.
@@ -507,6 +508,7 @@ impl NodeHandler {
         Self {
             blockchain,
             api_state,
+            plugins: vec![],
             system_state,
             state,
             channel: sender,
@@ -810,12 +812,17 @@ impl ApiSender {
         ApiSender(mpsc::channel(0).0)
     }
 
-    /// Sends an external message.
+    /// Sends an arbitrary `ExternalMessage` to the node.
     ///
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub(crate) fn send_external_message(
+    ///
+    /// # Stability
+    ///
+    /// This method is considered unstable because its misuse can lead to node breakage.
+    #[doc(hidden)]
+    pub fn send_external_message(
         &self,
         message: ExternalMessage,
     ) -> impl Future<Item = (), Error = SendError> {
@@ -850,6 +857,13 @@ impl fmt::Debug for ApiSender {
 #[derive(Debug, Fail)]
 #[fail(display = "Failed to send API request to the node: the node is being shut down")]
 pub struct SendError(());
+
+/// Converts the provided error into an internal server error.
+impl From<SendError> for exonum_api::Error {
+    fn from(e: SendError) -> Self {
+        exonum_api::Error::InternalError(e.into())
+    }
+}
 
 /// Handle allowing to shut down the node.
 #[derive(Debug, Clone)]
@@ -930,7 +944,7 @@ pub trait ConfigManager: Send {
 /// algorithm.
 #[derive(Debug)]
 pub struct Node {
-    api_runtime_config: SystemRuntimeConfig,
+    api_manager_config: ApiManagerConfig,
     api_options: NodeApiConfig,
     network_config: NetworkConfiguration,
     handler: NodeHandler,
@@ -978,44 +992,106 @@ impl NodeChannel {
     }
 }
 
-impl Node {
-    /// Creates node for the given services and node configuration.
-    ///
-    /// Due to the API is part of Node, it is hard to pass API restart notifier to the runtime
-    /// instances. `with_runtimes` closure takes restart notifiers and returns list of runtime
-    /// instances.
-    ///
-    /// TODO [ECR-3949]
-    #[doc(hidden)]
+/// Builder for `Node`.
+pub struct NodeBuilder {
+    channel: NodeChannel,
+    blockchain_builder: BlockchainBuilder,
+    node_config: NodeConfig,
+    config_manager: Option<Box<dyn ConfigManager>>,
+    plugins: Vec<Box<dyn NodePlugin>>,
+}
+
+impl fmt::Debug for NodeBuilder {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NodeBuilder")
+            .field("channel", &self.channel)
+            .field("blockchain_builder", &self.blockchain_builder)
+            .field("node_config", &self.node_config)
+            .finish()
+    }
+}
+
+impl NodeBuilder {
+    /// Instantiates a builder.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        with_runtimes: impl FnOnce(mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance>,
-        node_cfg: NodeConfig,
+        node_config: NodeConfig,
         genesis_config: GenesisConfig,
-        config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
-        node_cfg
+        node_config
             .validate()
             .expect("Node configuration is inconsistent");
-        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
-        let blockchain =
-            Blockchain::new(database, node_cfg.service_keypair(), channel.api_sender());
+        let channel = NodeChannel::new(&node_config.mempool.events_pool_capacity);
+        let blockchain = Blockchain::new(
+            database,
+            node_config.service_keypair(),
+            channel.api_sender(),
+        );
+        let blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
 
-        let mut blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
-        for runtime in with_runtimes(channel.endpoints.0.clone()) {
-            blockchain_builder = blockchain_builder.with_runtime(runtime);
+        Self {
+            channel,
+            blockchain_builder,
+            node_config,
+            config_manager: None,
+            plugins: vec![],
         }
-        let blockchain = blockchain_builder.build();
-
-        Self::with_blockchain(blockchain, channel, node_cfg, config_manager)
     }
 
+    /// Adds a runtime to the blockchain.
+    pub fn with_runtime<T>(mut self, runtime: T) -> Self
+    where
+        T: Into<RuntimeInstance>,
+    {
+        self.blockchain_builder = self.blockchain_builder.with_runtime(runtime);
+        self
+    }
+
+    /// Adds a runtime which depends on a `NodeChannel` (e.g., to update HTTP API of the node).
+    pub fn with_runtime_fn<T, F>(mut self, runtime_fn: F) -> Self
+    where
+        T: Into<RuntimeInstance>,
+        F: FnOnce(&NodeChannel) -> T,
+    {
+        let runtime = runtime_fn(&self.channel);
+        self.blockchain_builder = self.blockchain_builder.with_runtime(runtime);
+        self
+    }
+
+    /// Adds the configuration manager.
+    pub fn with_config_manager<T: ConfigManager + 'static>(mut self, manager: T) -> Self {
+        self.config_manager = Some(Box::new(manager));
+        self
+    }
+
+    /// Adds a plugin.
+    pub fn with_plugin<T: NodePlugin + 'static>(mut self, plugin: T) -> Self {
+        self.plugins.push(Box::new(plugin));
+        self
+    }
+
+    /// Converts this builder into a `Node`.
+    pub fn build(self) -> Node {
+        let blockchain = self.blockchain_builder.build();
+        Node::with_blockchain(
+            blockchain,
+            self.channel,
+            self.node_config,
+            self.config_manager,
+            self.plugins,
+        )
+    }
+}
+
+impl Node {
     /// Creates a node for the given blockchain and node configuration.
-    pub fn with_blockchain(
+    fn with_blockchain(
         blockchain: BlockchainMut,
         channel: NodeChannel,
         node_cfg: NodeConfig,
         config_manager: Option<Box<dyn ConfigManager>>,
+        plugins: Vec<Box<dyn NodePlugin>>,
     ) -> Self {
         crypto::init();
 
@@ -1029,47 +1105,41 @@ impl Node {
         };
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
+        let mut api_aggregator = ApiAggregator::new();
+        let plugin_api_context = PluginApiContext::new(blockchain.as_ref(), &api_state);
+        for plugin in &plugins {
+            let endpoints = plugin.wire_api(plugin_api_context.clone());
+            api_aggregator.extend(endpoints);
+        }
+
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
-
         let api_cfg = node_cfg.api.clone();
-        let api_runtime_config = SystemRuntimeConfig {
-            api_runtimes: {
-                fn into_app_config(allow_origin: AllowOrigin) -> AppConfig {
-                    let app_config = move |app: App| -> App {
-                        let cors = Cors::from(allow_origin.clone());
-                        app.middleware(cors)
-                    };
-                    Arc::new(app_config)
-                };
 
-                let public_api_handler = api_cfg
-                    .public_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
-                        listen_address,
-                        access: ApiAccess::Public,
-                        app_config: api_cfg.public_allow_origin.clone().map(into_app_config),
-                    })
-                    .into_iter();
-                let private_api_handler = api_cfg
-                    .private_api_address
-                    .map(|listen_address| ApiRuntimeConfig {
-                        listen_address,
-                        access: ApiAccess::Private,
-                        app_config: api_cfg.private_allow_origin.clone().map(into_app_config),
-                    })
-                    .into_iter();
-                // Collects API handlers.
-                public_api_handler
-                    .chain(private_api_handler)
-                    .collect::<Vec<_>>()
-            },
-            api_aggregator: ApiAggregator::new(blockchain.immutable_view(), api_state.clone()),
+        let mut servers = HashMap::new();
+        if let Some(listen_address) = api_cfg.public_api_address {
+            let server_config = WebServerConfig {
+                listen_address,
+                allow_origin: api_cfg.public_allow_origin.clone(),
+            };
+            servers.insert(ApiAccess::Public, server_config);
+        }
+        if let Some(listen_address) = api_cfg.private_api_address {
+            let server_config = WebServerConfig {
+                listen_address,
+                allow_origin: api_cfg.private_allow_origin.clone(),
+            };
+            servers.insert(ApiAccess::Private, server_config);
+        }
+
+        let api_runtime_config = ApiManagerConfig {
+            servers,
+            api_aggregator,
             server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
             server_restart_max_retries: node_cfg.api.server_restart.max_retries,
         };
 
-        let handler = NodeHandler::new(
+        let mut handler = NodeHandler::new(
             blockchain,
             &node_cfg.external_address,
             channel.node_sender(),
@@ -1078,6 +1148,7 @@ impl Node {
             api_state,
             config_manager,
         );
+        handler.plugins = plugins;
 
         Self {
             api_options: api_cfg,
@@ -1086,7 +1157,7 @@ impl Node {
             network_config,
             max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
-            api_runtime_config,
+            api_manager_config: api_runtime_config,
         }
     }
 
@@ -1145,10 +1216,8 @@ impl Node {
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list().clone();
-
-        self.api_runtime_config
-            .start(self.channel.endpoints.1)
-            .expect("Failed to start api_runtime.");
+        let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
+        SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
@@ -1181,6 +1250,12 @@ impl Node {
         self.handler.state()
     }
 
+    /// Returns the blockchain handle, which can be used to read blockchain state and send
+    /// transactions to the node.
+    pub fn blockchain(&self) -> &Blockchain {
+        self.handler.blockchain.as_ref()
+    }
+
     /// Returns a shutdown handle for the node. It is possible to instantiate multiple handles
     /// using this method; only the first call to shutdown the node is guaranteed to succeed
     /// (but this single call is enough to stop the node).
@@ -1196,25 +1271,21 @@ mod tests {
     use exonum_merkledb::TemporaryDB;
 
     use super::*;
-    use crate::{blockchain::config::GenesisConfigBuilder, helpers, runtime::RuntimeInstance};
-
-    fn with_runtimes(_: mpsc::Sender<UpdateEndpoints>) -> Vec<RuntimeInstance> {
-        Vec::new()
-    }
+    use crate::{blockchain::config::GenesisConfigBuilder, helpers};
 
     #[test]
     fn test_good_internal_events_config() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1222,13 +1293,13 @@ mod tests {
             .internal_events_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
@@ -1236,14 +1307,14 @@ mod tests {
             .network_requests_capacity = 0;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_internal_events_capacity_too_large() {
         let accidental_large_value = usize::max_value();
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1252,14 +1323,14 @@ mod tests {
             .internal_events_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_network_requests_capacity_too_large() {
         let accidental_large_value = usize::max_value();
-        let db = Arc::from(Box::new(TemporaryDB::new()) as Box<dyn Database>) as Arc<dyn Database>;
+        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
 
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
@@ -1268,6 +1339,6 @@ mod tests {
             .network_requests_capacity = accidental_large_value;
         let genesis_config =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        let _ = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        NodeBuilder::new(db, node_cfg, genesis_config);
     }
 }
