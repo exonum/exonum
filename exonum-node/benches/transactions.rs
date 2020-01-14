@@ -139,6 +139,8 @@ struct MessageVerifier {
     tx_handler: MessagesHandlerRef,
     network_thread: JoinHandle<()>,
     handler_thread: JoinHandle<()>,
+    // We retain sender references in order to not shut down the event loop prematurely.
+    external_tx_sender: Option<Sender<Verified<AnyTx>>>,
     api_sender: Option<Sender<ExternalMessage>>,
     network_sender: Option<Sender<NetworkEvent>>,
 }
@@ -181,12 +183,13 @@ impl MessageVerifier {
             network_thread,
             tx_sender: Some(channel.internal_requests.0.clone()),
             tx_handler: handler,
+            external_tx_sender: Some(channel.transactions.0),
             api_sender: Some(channel.api_requests.0),
             network_sender: Some(channel.network_events.0),
         }
     }
 
-    fn send_all<'a>(&self, messages: Vec<Vec<u8>>) -> impl Future<Item = (), Error = ()> + 'a {
+    fn send_all(&self, messages: Vec<Vec<u8>>) -> impl Future<Item = (), Error = ()> {
         let tx_sender = self.tx_sender.as_ref().unwrap().clone();
         let finish_signal = self.tx_handler.reset(messages.len());
 
@@ -204,6 +207,7 @@ impl MessageVerifier {
         self.tx_sender = None;
         self.network_thread.join().unwrap();
 
+        self.external_tx_sender = None;
         self.api_sender = None;
         self.network_sender = None;
         self.handler_thread.join().unwrap();
