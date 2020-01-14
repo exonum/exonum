@@ -524,8 +524,8 @@ impl MigrationHelper {
     /// Use [`flush_migration`] to flush the migrated data.
     ///
     /// [`flush_migration`]: fn.flush_migration.html
-    pub fn finish(self) -> Result<Hash, MigrationError> {
-        let patch = self.fork.unwrap().into_patch();
+    pub fn finish(mut self) -> Result<Hash, MigrationError> {
+        let patch = self.fork.take().unwrap().into_patch();
         let hash = Migration::new(&self.namespace, &patch).state_hash();
         if self.is_aborted() {
             Err(MigrationError::Aborted)
