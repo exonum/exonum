@@ -218,7 +218,7 @@ impl ProtobufConvert for CallSite {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
 pub enum CallType {
-    /// Service initialization parameters.
+    /// Service initialization or resuming.
     Constructor,
     /// Service method.
     Method {

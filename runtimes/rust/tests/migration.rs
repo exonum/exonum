@@ -382,7 +382,13 @@ fn resume_with_fast_forward_migration() {
         keypair.withdraw(WithdrawalServiceV2::INSTANCE_ID, amount_2),
     )
     .unwrap();
-    drop(events_handle.take());
+    assert_eq!(events_handle.take(), vec![
+            RuntimeEvent::BeforeTransactions(Height(5), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(5), WithdrawalServiceV2::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(5), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(5), WithdrawalServiceV2::INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(6)),
+    ]);
 
     // Check balance and history.
     let snapshot = blockchain.snapshot();
@@ -520,6 +526,11 @@ fn test_resume_service_error() {
         ),
     )
     .unwrap_err();
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&CommonError::MalformedArguments)
+            .with_description_containing("Resuming parameters should be empty")
+    );
 
     // Verify the service instance after migration and unsuccessful resume.
     let instance_state = blockchain
@@ -536,11 +547,5 @@ fn test_resume_service_error() {
     assert_eq!(
         instance_state.data_version(),
         &WithdrawalServiceV2.artifact_id().version
-    );
-
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CommonError::MalformedArguments)
-            .with_description_containing("Resuming parameters should be empty")
     );
 }
