@@ -18,7 +18,7 @@ use exonum::{
     blockchain::config::GenesisConfigBuilder,
     helpers,
     merkledb::{Database, TemporaryDB},
-    node::{Node, NodeConfig, ShutdownHandle},
+    node::{Node, NodeBuilder, NodeConfig, ShutdownHandle},
 };
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
 
@@ -110,20 +110,13 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
                 .with_instance(artifact.into_default_instance(2, "commit-watcher"))
                 .build();
 
-        let with_runtimes = |notifier| {
-            vec![RustRuntime::builder()
-                .with_factory(service)
-                .build(notifier)
-                .into()]
-        };
-
-        let node = Node::new(
-            TemporaryDB::new(),
-            with_runtimes,
-            node_cfg,
-            genesis_config,
-            None,
-        );
+        let node = NodeBuilder::new(TemporaryDB::new(), node_cfg, genesis_config)
+            .with_runtime_fn(|channel| {
+                RustRuntime::builder()
+                    .with_factory(service)
+                    .build(channel.endpoints_sender())
+            })
+            .build();
 
         node_threads.push(RunHandle::new(node));
         commit_rxs.push(commit_rx);
@@ -158,13 +151,13 @@ fn test_node_restart_regression() {
                 .with_instance(artifact.into_default_instance(4, "startup-checker"))
                 .build();
 
-        let with_runtimes = |notifier| {
-            vec![RustRuntime::builder()
-                .with_factory(service)
-                .build(notifier)
-                .into()]
-        };
-        let node = Node::new(db, with_runtimes, node_cfg, genesis_config, None);
+        let node = NodeBuilder::new(db, node_cfg, genesis_config)
+            .with_runtime_fn(|channel| {
+                RustRuntime::builder()
+                    .with_factory(service)
+                    .build(channel.endpoints_sender())
+            })
+            .build();
         RunHandle::new(node).join();
     };
 

@@ -14,7 +14,7 @@
 
 // This is a regression test for exonum configuration.
 
-use exonum::{api::backends::actix::AllowOrigin, blockchain::ValidatorKeys, crypto::gen_keypair};
+use exonum::{api::AllowOrigin, blockchain::ValidatorKeys, crypto::gen_keypair};
 use exonum_cli::{
     command::{
         finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
