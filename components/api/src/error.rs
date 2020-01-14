@@ -27,16 +27,20 @@ pub struct ApiError {
     #[serde(skip)]
     pub http_code: StatusCode,
     /// A URI reference to the documentation or possible solutions for the problem.
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
     pub docs_uri: String,
     /// Short description of the error.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub title: String,
     /// Detailed description of the error.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub detail: String,
     /// Source of the error.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub source: String,
     /// Internal error code.
-    pub error_code: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<u8>,
 }
 
 impl std::fmt::Display for ApiError {
@@ -53,7 +57,7 @@ impl ApiError {
             title: String::new(),
             detail: String::new(),
             source: String::new(),
-            error_code: 0,
+            error_code: None,
         }
     }
 
@@ -101,7 +105,7 @@ impl ApiError {
 
     /// Sets `error_code` of an error.
     pub fn error_code(mut self, error_code: u8) -> Self {
-        self.error_code = error_code;
+        self.error_code = Some(error_code);
         self
     }
 }
