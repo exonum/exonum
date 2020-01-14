@@ -711,7 +711,7 @@ fn basic_runtime_workflow() {
 
 /// In this test, we try to create Rust runtime artifact with the non-empty spec.
 #[test]
-#[should_panic(expected = "specified artifact has non-empty spec")]
+#[should_panic(expected = "Cannot deploy artifact because it has non-empty specification")]
 fn create_runtime_non_empty_spec() {
     let genesis_config = create_genesis_config_builder()
         .with_parametric_artifact(TestServiceImpl.artifact_id(), vec![1, 2, 3, 4])
