@@ -92,32 +92,32 @@ impl ApiError {
     }
 
     /// Sets `docs_uri` of an error.
-    pub fn docs_uri(mut self, docs_uri: String) -> Self {
-        self.docs_uri = docs_uri;
+    pub fn docs_uri(mut self, docs_uri: impl Into<String>) -> Self {
+        self.docs_uri = docs_uri.into();
         self
     }
 
     /// Sets `title` of an error.
-    pub fn title(mut self, title: String) -> Self {
-        self.title = title;
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
         self
     }
 
     /// Sets `detail` of an error.
-    pub fn detail(mut self, detail: String) -> Self {
-        self.detail = detail;
+    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = detail.into();
         self
     }
 
     /// Inserts new value into `params`.
-    pub fn param(mut self, key: String, value: String) -> Self {
-        self.params.insert(key, value);
+    pub fn param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.params.insert(key.into(), value.into());
         self
     }
 
     /// Sets `source` of an error.
-    pub fn source(mut self, source: String) -> Self {
-        self.source = source;
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.source = source.into();
         self
     }
 
