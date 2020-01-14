@@ -125,9 +125,9 @@ impl Runtime for TestRuntime {
 
     fn initiate_resuming_service(
         &self,
-        context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
-        parameters: Vec<u8>,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         unimplemented!("ECR-3773")
     }

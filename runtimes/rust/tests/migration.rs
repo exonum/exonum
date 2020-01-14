@@ -23,12 +23,11 @@ use exonum::{
 use exonum_derive::*;
 use exonum_rust_runtime::{
     migrations::{InitMigrationError, MigrateData, MigrationScript},
+    versioning::Version,
     CallContext, CoreError, DefaultInstance, ErrorMatch, ExecutionError, InstanceStatus,
     RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
 };
-use futures::sync::mpsc;
 use pretty_assertions::assert_eq;
-use semver::Version;
 
 use self::inspected::{
     create_genesis_config_builder, execute_transaction, EventsHandle, Inspected, MigrateService,
@@ -95,8 +94,8 @@ impl DefaultInstance for WithdrawalServiceV1 {
     }
 }
 
-/// This implementation fixes the incorrect behavior of the previous one. During the migration
-/// procedure, the implementation also recalculates the resulting balance.
+/// This implementation fixes the incorrect behavior of the previous one. After the migration
+/// procedure, during the resuming this implementation also recalculates the resulting balance.
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_dispatcher(implements("Withdrawal"))]
 #[service_factory(artifact_name = "withdrawal", artifact_version = "0.2.0")]
@@ -173,7 +172,7 @@ fn create_runtime() -> (BlockchainMut, EventsHandle) {
             .with_factory(WithdrawalServiceV1)
             .with_migrating_factory(WithdrawalServiceV2)
             .with_factory(ToySupervisorService)
-            .build(mpsc::channel(1).0),
+            .build_for_tests(),
     );
     let events_handle = inspected.events.clone();
 
@@ -233,7 +232,7 @@ fn resume_without_migration() {
         events_handle.take(),
         vec![
             RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartResuming(withdrawal_service.clone(), vec![]),
+            RuntimeEvent::StartResumingService(withdrawal_service.clone(), vec![]),
             RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::CommitService(
                 Height(4),
@@ -342,7 +341,20 @@ fn resume_with_fast_forward_migration() {
         ),
     )
     .unwrap();
-    drop(events_handle.take());
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(4), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::StartResumingService(withdrawal_service.clone(), vec![]),
+            RuntimeEvent::AfterTransactions(Height(4), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::CommitService(
+                Height(5),
+                WithdrawalServiceV2.default_instance().instance_spec,
+                InstanceStatus::Active,
+            ),
+            RuntimeEvent::AfterCommit(Height(5)),
+        ]
+    );
 
     // Make another withdrawal.
     let amount_2 = 20_000;

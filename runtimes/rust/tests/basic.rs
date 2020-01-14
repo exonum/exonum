@@ -22,7 +22,6 @@ use exonum::{
     runtime::{CoreError, InstanceStatus},
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
-use futures::sync::mpsc;
 use pretty_assertions::assert_eq;
 use serde_derive::*;
 
@@ -212,7 +211,7 @@ fn create_runtime(
             .with_factory(TestServiceImplV2)
             .with_factory(ToySupervisorService)
             .with_factory(DependentServiceImpl)
-            .build(mpsc::channel(1).0),
+            .build_for_tests(),
     );
     let events_handle = inspected.events.clone();
 
@@ -242,7 +241,10 @@ fn basic_runtime_workflow() {
         vec![
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
-            RuntimeEvent::StartAdding(supervisor.instance_spec.clone(), supervisor.constructor),
+            RuntimeEvent::StartAddingService(
+                supervisor.instance_spec.clone(),
+                supervisor.constructor
+            ),
             RuntimeEvent::CommitService(
                 Height(0),
                 supervisor.instance_spec.clone(),
@@ -297,7 +299,7 @@ fn basic_runtime_workflow() {
         // and `before_transactions` should not be called for it.
         vec![
             RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartAdding(
+            RuntimeEvent::StartAddingService(
                 test_instance.instance_spec.clone(),
                 test_instance.constructor
             ),
@@ -435,7 +437,10 @@ fn runtime_restart() {
         vec![
             RuntimeEvent::Initialize,
             RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
-            RuntimeEvent::StartAdding(supervisor.instance_spec.clone(), supervisor.constructor),
+            RuntimeEvent::StartAddingService(
+                supervisor.instance_spec.clone(),
+                supervisor.constructor
+            ),
             RuntimeEvent::CommitService(
                 Height(0),
                 supervisor.instance_spec.clone(),
@@ -653,7 +658,7 @@ fn conflicting_service_instances() {
         events_handle.take(),
         vec![
             RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartAdding(
+            RuntimeEvent::StartAddingService(
                 init_params.instance_spec.clone(),
                 init_params.constructor.clone()
             ),
@@ -679,7 +684,7 @@ fn conflicting_service_instances() {
         events_handle.take(),
         vec![
             RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartAdding(
+            RuntimeEvent::StartAddingService(
                 init_params_2.instance_spec.clone(),
                 init_params_2.constructor
             ),

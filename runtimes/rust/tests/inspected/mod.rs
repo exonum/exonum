@@ -109,9 +109,9 @@ pub enum RuntimeEvent {
     Resume,
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
-    StartAdding(InstanceSpec, Vec<u8>),
+    StartAddingService(InstanceSpec, Vec<u8>),
     Migrate(ArtifactId, Version),
-    StartResuming(InstanceSpec, Vec<u8>),
+    StartResumingService(InstanceSpec, Vec<u8>),
     CommitService(Height, InstanceSpec, InstanceStatus),
     AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
@@ -185,7 +185,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        self.events.push(RuntimeEvent::StartAdding(
+        self.events.push(RuntimeEvent::StartAddingService(
             spec.to_owned(),
             parameters.clone(),
         ));
@@ -199,7 +199,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         spec: &InstanceSpec,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        self.events.push(RuntimeEvent::StartResuming(
+        self.events.push(RuntimeEvent::StartResumingService(
             spec.to_owned(),
             parameters.clone(),
         ));
