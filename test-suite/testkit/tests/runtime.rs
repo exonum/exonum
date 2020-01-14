@@ -129,7 +129,7 @@ impl Runtime for TestRuntime {
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        unimplemented!("ECR-3773")
+        Ok(())
     }
 
     fn update_service_status(

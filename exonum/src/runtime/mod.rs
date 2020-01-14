@@ -779,39 +779,6 @@ impl<'a> ExecutionContext<'a> {
             .initiate_adding_service(spec)
             .map_err(From::from)
     }
-
-    /// TODO Documentation ECR-3773
-    pub(crate) fn initiate_resuming_service(
-        &mut self,
-        instance_id: InstanceId,
-        artifact: ArtifactId,
-        params: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        let mut spec = DispatcherSchema::new(&*self.fork)
-            .get_instance(instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?
-            .spec;
-        spec.artifact = artifact;
-
-        let runtime = self
-            .dispatcher
-            .runtime_by_id(spec.artifact.runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
-        runtime
-            .initiate_resuming_service(self.reborrow(), &spec, params.into_bytes())
-            .map_err(|mut err| {
-                err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: CallType::Constructor,
-                    });
-                err
-            })?;
-
-        DispatcherSchema::new(&*self.fork)
-            .initiate_resuming_service(instance_id, spec.artifact)
-            .map_err(From::from)
-    }
 }
 
 /// Instance descriptor contains information to access the running service instance.
@@ -881,16 +848,49 @@ impl<'a> SupervisorExtensions<'a> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
     }
 
-    /// TODO Documentation ECR-3773
+    /// Initiates resuming previously stopped service instance in the blockchain.
+    ///
+    /// Service will use the specified artifact to resume. Artifact name should be same as
+    /// the artifact name of the stopped instance previously stopped instance.
+    /// Artifact version should be same as the `data_version` stored in the stopped service
+    /// instance.
+    ///
+    /// This method can be used to resume modified service after successful migration.
+    ///
+    /// The service is not immediately activated; it activates if / when the block containing
+    /// the activation transaction is committed.
     pub fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
         artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        self.0
-            .child_context(Some(SUPERVISOR_INSTANCE_ID))
-            .initiate_resuming_service(instance_id, artifact, params)
+        let mut context = self.0.child_context(Some(SUPERVISOR_INSTANCE_ID));
+
+        let mut spec = DispatcherSchema::new(&*context.fork)
+            .get_instance(instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?
+            .spec;
+        spec.artifact = artifact;
+
+        let runtime = context
+            .dispatcher
+            .runtime_by_id(spec.artifact.runtime_id)
+            .ok_or(CoreError::IncorrectRuntime)?;
+        runtime
+            .initiate_resuming_service(context.reborrow(), &spec, params.into_bytes())
+            .map_err(|mut err| {
+                err.set_runtime_id(spec.artifact.runtime_id)
+                    .set_call_site(|| CallSite {
+                        instance_id,
+                        call_type: CallType::Constructor,
+                    });
+                err
+            })?;
+
+        DispatcherSchema::new(&*context.fork)
+            .initiate_resuming_service(instance_id, spec.artifact)
+            .map_err(From::from)
     }
 
     /// Provides writeable access to core schema.
