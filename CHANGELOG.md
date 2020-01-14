@@ -94,6 +94,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Common` variant has been added to the `ErrorKind` enum. (#1680)
 
+- Added a new method `initiate_resuming_service` to the `Runtime` trait.
+  This method is used to resume a previously stopped service.
+  (#1693)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
