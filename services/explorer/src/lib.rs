@@ -62,11 +62,13 @@
     missing_debug_implementations
 )]
 
-use exonum::merkledb::ObjectHash;
+use exonum::{
+    merkledb::ObjectHash,
+    runtime::{ExecutionError, ExecutionFail},
+};
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, CallContext, DefaultInstance, ExecutionError,
-    ExecutionFail, Service,
+    api::ServiceApiBuilder, AfterCommitContext, CallContext, DefaultInstance, Service,
 };
 
 pub mod api;

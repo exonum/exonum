@@ -30,10 +30,9 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
+    runtime::{ArtifactId, SnapshotExt},
 };
-use exonum_rust_runtime::{
-    ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{

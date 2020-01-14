@@ -390,12 +390,10 @@ use exonum::{
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
+    runtime::ExecutionStatus,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::{
-    api::{Error as ApiError, FutureResult, ServiceApiScope},
-    ExecutionStatus,
-};
+use exonum_rust_runtime::api::{Error as ApiError, FutureResult, ServiceApiScope};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;

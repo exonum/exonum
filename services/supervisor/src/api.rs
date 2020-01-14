@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
+use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height, runtime::ArtifactId};
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    ArtifactId, Broadcaster,
+    Broadcaster,
 };
 use failure::Fail;
 use serde_derive::{Deserialize, Serialize};
-use std::{convert::TryFrom, str::FromStr};
+
+use std::convert::TryFrom;
 
 use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, ConfigProposalWithHash, ConfigPropose,
@@ -44,7 +45,9 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
     type Error = api::Error;
 
     fn try_from(query: DeployInfoQuery) -> Result<Self, Self::Error> {
-        let artifact = ArtifactId::from_str(&query.artifact)
+        let artifact = query
+            .artifact
+            .parse::<ArtifactId>()
             .map_err(|err| api::Error::BadRequest(err.to_string()))?;
         let spec =
             hex::decode(query.spec).map_err(|err| api::Error::BadRequest(err.to_string()))?;

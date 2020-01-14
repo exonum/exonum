@@ -14,16 +14,18 @@
 
 // cspell:ignore Trillian, Vogon
 
-use exonum::crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed};
-use exonum_derive::*;
-use exonum_rust_runtime::{
-    migrations::{
-        InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
-        MigrationScript,
+use exonum::{
+    crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
+    runtime::{
+        migrations::{
+            InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
+            MigrationScript,
+        },
+        versioning::Version,
     },
-    versioning::Version,
-    Service, ServiceFactory,
 };
+use exonum_derive::*;
+use exonum_rust_runtime::{Service, ServiceFactory};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use std::borrow::Cow;

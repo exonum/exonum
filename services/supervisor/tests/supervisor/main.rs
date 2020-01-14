@@ -17,12 +17,12 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
-    runtime::SnapshotExt,
+    runtime::{
+        ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
+    },
 };
-use exonum_rust_runtime::{
-    api::Result as ApiResult, ArtifactId, CommonError, ErrorMatch, InstanceId, RuntimeIdentifier,
-    RustRuntimeBuilder, ServiceFactory, SUPERVISOR_INSTANCE_ID,
-};
+use exonum_rust_runtime::{api::Result as ApiResult, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,
