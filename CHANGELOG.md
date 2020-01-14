@@ -94,10 +94,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Common` variant has been added to the `ErrorKind` enum. (#1680)
 
+- `CallInfo` now contains an interface name. (#1699)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
   (#1598)
+
+#### exonum-derive
+
+- It is now required to specify method ids manually when
+  deriving `exonum_interface`. (#1699)
 
 #### exonum-supervisor
 
@@ -166,6 +173,12 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Slash (`/`) is now allowed to be a part of artifact/instance name. (#1681)
 
+- `Dispatcher::check_tx` now verifies that target instance implements the
+  required interface. (#1699)
+
+- `dispatcher::Schema` now provides method `get_instances_by_interface` to get all
+  instances which implement certain interface. (#1699)
+
 #### exonum-merkledb
 
 - MerkleDB now performs automated state aggregation allowing to construct proofs
@@ -190,6 +203,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Rust runtime module was moved from the `exonum` crate into the separate
   `exonum-rust-runtime` crate. (#1641)
+
 - It is now possible to iterate over keys of the indexes within a group. (#1662)
 
 #### exonum-supervisor

@@ -26,7 +26,9 @@ use exonum::{
         WellKnownRuntime,
     },
 };
-use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
+use exonum_derive::{
+    exonum_interface, interface_method, BinaryValue, ServiceDispatcher, ServiceFactory,
+};
 use futures::{sync::mpsc, Future};
 use pretty_assertions::assert_eq;
 use serde_derive::*;
@@ -825,6 +827,7 @@ fn state_aggregation() {
             "core.consensus_config",
             "dispatcher_artifacts",
             "dispatcher_instances",
+            "dispatcher_interfaces",
             "test_service_name.constructor_entry"
         ]
     );

@@ -14,7 +14,7 @@
 
 pub use self::schema::Schema;
 
-use exonum_merkledb::{Fork, Patch, Snapshot};
+use exonum_merkledb::{access::RawAccess, Fork, Patch, Snapshot};
 use futures::{
     future::{self, Either},
     Future,
@@ -189,22 +189,42 @@ impl Dispatcher {
     }
 
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
-    pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
+    pub(crate) fn start_builtin_instances(&mut self, mut fork: Fork) -> Patch {
         // Mark services as active.
         self.activate_pending(&fork);
         // Start pending services.
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
-        let patch = fork.into_patch();
+        fork.flush();
         for (spec, status) in pending_instances {
             debug_assert_eq!(
                 status,
                 InstanceStatus::Active,
                 "BUG: The built-in service instance must have an active status at startup."
             );
-            self.update_service_status(&patch, &spec, status);
+            self.update_service_status(fork.readonly().snapshot(), &spec, status);
+            self.store_interfaces(&fork, &spec);
         }
-        patch
+        fork.into_patch()
+    }
+
+    /// Persists the information about interfaces implemented by a service
+    /// in the `Dispatcher` schema.
+    fn store_interfaces(&mut self, fork: &Fork, instance: &InstanceSpec) {
+        let mut schema = Schema::new(fork);
+
+        // Get the runtime. If we're going to store interfaces for a service,
+        // we assume that runtime for this instance should exist.
+        let runtime = self.runtimes.get(&instance.artifact.runtime_id).expect(
+            "BUG: `update_service_status` was invoked for incorrect runtime, \
+             this should never happen because of preemptive checks.",
+        );
+
+        // Collect interfaces for service, transforming `Vec` into `HashSet`.
+        let interfaces = runtime.interfaces(instance.id).into_iter().collect();
+
+        // Store interfaces implemented by a service.
+        schema.update_service_interfaces(instance.id, interfaces);
     }
 
     /// Initiate artifact deploy procedure in the corresponding runtime. If the deploy
@@ -280,6 +300,11 @@ impl Dispatcher {
 
     /// Performs several shallow checks that transaction is correct.
     ///
+    /// List of performed checks:
+    /// - Target instance should exist in some runtime;
+    /// - Target instance should implement interface specified in `CallInfo`;
+    /// - Target instance should be active.
+    ///
     /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
     /// executed successfully, but returned `Err(..)` value means that this transaction is
     /// **obviously** incorrect and should be declined as early as possible.
@@ -287,13 +312,31 @@ impl Dispatcher {
         snapshot: &dyn Snapshot,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        // Currently the only check is that destination service exists, but later
-        // functionality of this method can be extended.
+        use super::CommonError;
+
+        let schema = Schema::new(snapshot);
+
+        // Check that target instance exists.
         let call_info = &tx.as_ref().call_info;
-        let instance = Schema::new(snapshot)
-            .get_instance(call_info.instance_id)
+        let instance_id = call_info.instance_id;
+        let instance = schema
+            .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
+        // Check that target instance implements required interface (only
+        // if interface is not an empty string, since empty string denotes
+        // the default interface which any service has).
+        if !call_info.interface.is_empty() {
+            let implemented_interfaces = schema
+                .service_interfaces()
+                .get(&instance_id)
+                .expect("BUG: Instance exists, but interfaces lookup failed");
+            if !implemented_interfaces.inner.contains(&call_info.interface) {
+                return Err(CommonError::NoSuchInterface.into());
+            }
+        }
+
+        // Check that target instance is active.
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
             _ => Err(CoreError::ServiceNotActive.into()),
@@ -411,11 +454,11 @@ impl Dispatcher {
     }
 
     /// Commits to service instances and artifacts marked as pending in the provided `fork`.
-    pub(crate) fn commit_block(&mut self, fork: Fork) -> Patch {
+    pub(crate) fn commit_block(&mut self, mut fork: Fork) -> Patch {
         let mut schema = Schema::new(&fork);
         let pending_artifacts = schema.take_pending_artifacts();
         let modified_instances = schema.take_modified_instances();
-        let patch = fork.into_patch();
+        fork.flush();
 
         // Block futures with pending deployments.
         for (artifact, deploy_spec) in pending_artifacts {
@@ -423,9 +466,16 @@ impl Dispatcher {
         }
         // Notify runtime about changes in service instances.
         for (spec, status) in modified_instances {
-            self.update_service_status(&patch, &spec, status);
+            self.update_service_status(fork.readonly().snapshot(), &spec, status);
+
+            // If instance became active, we need to store its interfaces.
+            if let InstanceStatus::Active = status {
+                // Collect interfaces implemented by service into `HashSet`.
+                self.store_interfaces(&fork, &spec);
+            }
         }
-        patch
+
+        fork.into_patch()
     }
 
     /// Make pending artifacts and instances active.

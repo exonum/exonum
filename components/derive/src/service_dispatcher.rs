@@ -144,7 +144,7 @@ impl ToTokens for ServiceDispatcher {
                 ) -> Result<(), #cr::ExecutionError> {
                     match interface_name {
                         #( #match_arms )*
-                        other => Err(#cr::CommonError::NoSuchInterface.into()),
+                        _ => Err(#cr::CommonError::NoSuchInterface.into()),
                     }
                 }
 

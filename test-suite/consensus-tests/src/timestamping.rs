@@ -18,7 +18,7 @@ use exonum::{
     messages::Verified,
     runtime::{AnyTx, ExecutionError, InstanceId},
 };
-use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 

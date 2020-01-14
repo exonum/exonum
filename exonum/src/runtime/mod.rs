@@ -156,7 +156,6 @@ pub use self::{
 // Re-export for serializing `ExecutionError` via `serde`.
 #[doc(hidden)]
 pub use error::execution_error::ExecutionErrorSerde;
-pub mod interface;
 pub mod migrations;
 pub mod versioning;
 
@@ -672,7 +671,6 @@ impl<'a> ExecutionContext<'a> {
 
     pub(crate) fn call(
         &mut self,
-        interface_name: &str,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -681,18 +679,27 @@ impl<'a> ExecutionContext<'a> {
             return Err(err);
         }
 
+        // Find the suitable runtime for call.
         let (runtime_id, runtime) = self
             .dispatcher
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectRuntime)?;
-        let reborrowed = self.reborrow_with_interface(interface_name);
+
+        // Verify that target instance implements requested interface.
+        runtime
+            .interfaces(call_info.instance_id)
+            .into_iter()
+            .find(|interface| *interface == call_info.interface)
+            .ok_or(CommonError::NoSuchInterface)?;
+
+        let reborrowed = self.reborrow_with_interface(&call_info.interface);
         runtime
             .execute(reborrowed, call_info, arguments)
             .map_err(|mut err| {
                 err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
                     instance_id: call_info.instance_id,
                     call_type: CallType::Method {
-                        interface: interface_name.to_owned(),
+                        interface: call_info.interface.to_owned(),
                         id: call_info.method_id,
                     },
                 });
@@ -730,7 +737,9 @@ impl<'a> ExecutionContext<'a> {
         // Add a service instance to the dispatcher schema.
         DispatcherSchema::new(&*self.fork)
             .initiate_adding_service(spec)
-            .map_err(From::from)
+            .map_err(ExecutionError::from)?;
+
+        Ok(())
     }
 }
 
@@ -820,7 +829,6 @@ pub trait ExecutionContextUnstable {
     /// You may override the instance ID of the one who calls this method by the given one.
     fn make_child_call(
         &mut self,
-        interface_name: &str,
         call_info: &CallInfo,
         arguments: &[u8],
         caller: Option<InstanceId>,
@@ -848,12 +856,10 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
 
     fn make_child_call(
         &mut self,
-        interface_name: &str,
         call_info: &CallInfo,
         arguments: &[u8],
         caller: Option<InstanceId>,
     ) -> Result<(), ExecutionError> {
-        self.child_context(caller)
-            .call(interface_name, call_info, arguments)
+        self.child_context(caller).call(call_info, arguments)
     }
 }

@@ -29,10 +29,26 @@ const PENDING_ARTIFACTS: &str = "dispatcher_pending_artifacts";
 const INSTANCES: &str = "dispatcher_instances";
 const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
+const SERVICE_INTERFACES: &str = "dispatcher_interfaces";
+
+use exonum_derive::BinaryValue;
+use serde_derive::{Deserialize, Serialize};
+use std::collections::HashSet;
+
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct ServiceInterfaces {
+    pub inner: HashSet<String>,
+}
+
+impl From<HashSet<String>> for ServiceInterfaces {
+    fn from(inner: HashSet<String>) -> Self {
+        Self { inner }
+    }
+}
 
 /// Schema of the dispatcher, used to store information about pending artifacts / service
 /// instances, and to reload artifacts / instances on node restart.
-// TODO: Add information about implemented interfaces [ECR-3747]
 #[derive(Debug)]
 pub struct Schema<T: Access> {
     access: T,
@@ -52,6 +68,13 @@ impl<T: Access> Schema<T> {
     /// Returns a service instances registry indexed by the instance name.
     pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, str, InstanceState> {
         self.access.clone().get_proof_map(INSTANCES)
+    }
+
+    /// Returns a mapping between service instance IDs and interfaces that they implement.
+    pub(crate) fn service_interfaces(
+        &self,
+    ) -> ProofMapIndex<T::Base, InstanceId, ServiceInterfaces> {
+        self.access.clone().get_proof_map(SERVICE_INTERFACES)
     }
 
     /// Returns a lookup table to map instance ID with the instance name.
@@ -90,10 +113,19 @@ impl<T: Access> Schema<T> {
         self.artifacts().get(name)
     }
 
-    // /// Returns all the services which implement the provided interface.
-    // pub fn get_instances_by_interface(&self, interface_name: &'static str) -> Vec<InstanceState> {
-    //    self.instances().filter
-    //}
+    /// Returns all the services which implement the provided interface.
+    pub fn get_instances_by_interface(&self, interface_name: &'static str) -> Vec<InstanceId> {
+        self.service_interfaces()
+            .iter()
+            .filter_map(|(id, interfaces)| {
+                if interfaces.inner.contains(interface_name) {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 // `AsReadonly` specialization to ensure that we won't leak mutable schema access.
@@ -166,6 +198,15 @@ impl Schema<&Fork> {
             .put(&instance_name, pending_status);
         instance_ids.put(&instance_id, instance_name);
         Ok(())
+    }
+
+    pub(crate) fn update_service_interfaces(
+        &mut self,
+        instance_id: InstanceId,
+        interfaces: HashSet<String>,
+    ) {
+        self.service_interfaces()
+            .put(&instance_id, interfaces.into());
     }
 
     /// Adds information about stopping service instance to the schema.

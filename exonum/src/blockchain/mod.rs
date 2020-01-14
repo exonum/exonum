@@ -152,6 +152,11 @@ impl Blockchain {
 
     /// Performs several shallow checks that transaction is correct.
     ///
+    /// List of performed checks:
+    /// - Target instance should exist in some runtime;
+    /// - Target instance should implement interface specified in `CallInfo`;
+    /// - Target instance should be active.
+    ///
     /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
     /// executed successfully, but returned `Err(..)` value means that this transaction is
     /// **obviously** incorrect and should be declined as early as possible.

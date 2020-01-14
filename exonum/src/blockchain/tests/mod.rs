@@ -43,6 +43,8 @@ use crate::{
     },
 };
 
+mod interfaces;
+
 const TEST_SERVICE_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 const TEST_SERVICE_NAME: &str = "test_service";
 const PANIC_STR: &str = "Panicking on request";
@@ -281,8 +283,8 @@ impl Runtime for RuntimeInspector {
     }
 
     fn interfaces(&self, _id: InstanceId) -> Vec<String> {
-        // Not implemented for test runtime.
-        vec![]
+        // We assume that in this runtime all services implement only basic interface.
+        vec!["".into()]
     }
 
     fn initiate_adding_service(
@@ -385,8 +387,7 @@ fn execute_transaction(
     schema.transaction_result(location).unwrap()
 }
 
-/// Attempts to create a blockchain, returning an error if the genesis block
-/// was not created.
+/// Creates a blockchain, panicking if it can't be done.
 fn create_blockchain(
     runtime: RuntimeInspector,
     instances: Vec<InstanceInitParams>,
@@ -799,6 +800,7 @@ fn state_aggregation() {
         "core.consensus_config",
         "dispatcher_artifacts",
         "dispatcher_instances",
+        "dispatcher_interfaces",
         "values",
     ];
     let actual_indexes: Vec<_> = SystemSchema::new(&snapshot)
