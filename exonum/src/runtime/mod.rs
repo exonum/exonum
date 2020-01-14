@@ -98,9 +98,9 @@
 //! Transitions between service states (including service creation) occur once the block
 //! with the transition is committed; the effect of a transition is not immediate. This means
 //! that, for example, an instantiated service cannot process transactions or internal calls
-//! in the block it is instantiated in, but can in the following block. Likewise, the service hooks
-//! (`before_transactions` / `after_transactions`) are *not* called in the block service is
-//! instantiated in.
+//! in the block with instantiation, but can in the following block. Likewise, the service hooks
+//! (`before_transactions` / `after_transactions`) are *not* called in the block with service
+//! instantiation.
 //!
 //! When the service is stopped, the reverse is true:
 //!
@@ -590,7 +590,7 @@ pub trait WellKnownRuntime: Runtime {
 pub struct RuntimeInstance {
     /// Identifier of the enclosed runtime.
     pub id: u32,
-    /// Enclosed `Runtime` instance.
+    /// Enclosed `Runtime` object.
     pub instance: Box<dyn Runtime>,
 }
 

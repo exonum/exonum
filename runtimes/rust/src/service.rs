@@ -120,7 +120,8 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The default implementation does nothing.
     ///
-    /// Try not to perform long operations in this handler, it is executed on the consensus thread.
+    /// Try not to perform long operations in this handler since it is executed
+    /// on the consensus thread.
     fn after_commit(&self, _context: AfterCommitContext<'_>) {}
 
     /// Attaches the request handlers of the service API to the Exonum API schema.
