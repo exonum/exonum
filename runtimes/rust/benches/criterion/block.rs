@@ -134,7 +134,7 @@ fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash
 
 mod timestamping {
     use exonum::{crypto::Hash, merkledb::ObjectHash, messages::Verified, runtime::AnyTx};
-    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{CallContext, DefaultInstance, ExecutionError, InstanceId, Service};
     use rand::rngs::StdRng;
 
@@ -145,7 +145,9 @@ mod timestamping {
     #[exonum_interface]
     pub trait TimestampingInterface<Ctx> {
         type Output;
+        #[interface_method(id = 0)]
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
+        #[interface_method(id = 1)]
         fn timestamp_panic(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
@@ -194,7 +196,8 @@ mod cryptocurrency {
         runtime::{AnyTx, ErrorKind, ExecutionError, InstanceId},
     };
     use exonum_derive::{
-        exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
+        exonum_interface, interface_method, BinaryValue, ObjectHash, ServiceDispatcher,
+        ServiceFactory,
     };
     use exonum_proto::ProtobufConvert;
     use rand::{rngs::StdRng, seq::SliceRandom};
@@ -216,10 +219,13 @@ mod cryptocurrency {
         type Output;
 
         /// Transfers one unit of currency from `from` to `to`.
+        #[interface_method(id = 0)]
         fn transfer(&self, ctx: Ctx, arg: Tx) -> Self::Output;
         /// Same as `transfer`, but without cryptographic proofs in `execute`.
+        #[interface_method(id = 1)]
         fn transfer_without_proof(&self, ctx: Ctx, arg: Tx) -> Self::Output;
         /// Same as `transfer_without_proof`, but signals an error 50% of the time.
+        #[interface_method(id = 2)]
         fn transfer_error_sometimes(&self, ctx: Ctx, arg: Tx) -> Self::Output;
     }
 
@@ -350,7 +356,7 @@ mod foreign_interface_call {
         messages::Verified,
         runtime::{AnyTx, ExecutionError, InstanceId},
     };
-    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory as _};
     use rand::rngs::StdRng;
     use tempfile::TempDir;
@@ -366,13 +372,16 @@ mod foreign_interface_call {
     #[exonum_interface]
     pub trait SelfInterface<Ctx> {
         type Output;
+        #[interface_method(id = 0)]
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
+        #[interface_method(id = 1)]
         fn call_foreign(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
     #[exonum_interface]
     pub trait ForeignInterface<Ctx> {
         type Output;
+        #[interface_method(id = 0)]
         fn foreign_timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 

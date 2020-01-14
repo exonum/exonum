@@ -93,6 +93,7 @@ fn gen_messages(count: u64, tx_size: usize) -> Vec<Vec<u8>> {
                     call_info: CallInfo {
                         instance_id: 0,
                         method_id: 0,
+                        interface: "".into(),
                     },
                     arguments: vec![0; tx_size],
                 },

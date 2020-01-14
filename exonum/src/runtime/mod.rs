@@ -312,6 +312,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Should return the list of interface names implemented by service with given
     /// `InstanceId`.
     ///
+    /// Default "empty" interface should always be included in the response.
+    ///
     /// The core guarantees that this method will always be invoked only for existent
     /// `InstanceId`, thus this method should never fail.
     fn interfaces(&self, instance_id: InstanceId) -> Vec<String>;
@@ -686,11 +688,14 @@ impl<'a> ExecutionContext<'a> {
             .ok_or(CoreError::IncorrectRuntime)?;
 
         // Verify that target instance implements requested interface.
-        runtime
-            .interfaces(call_info.instance_id)
-            .into_iter()
-            .find(|interface| *interface == call_info.interface)
-            .ok_or(CommonError::NoSuchInterface)?;
+        // "Empty" interface is default and always exists.
+        if !call_info.interface.is_empty() {
+            runtime
+                .interfaces(call_info.instance_id)
+                .into_iter()
+                .find(|interface| *interface == call_info.interface)
+                .ok_or(CommonError::NoSuchInterface)?;
+        }
 
         let reborrowed = self.reborrow_with_interface(&call_info.interface);
         runtime

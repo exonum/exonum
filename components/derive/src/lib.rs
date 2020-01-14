@@ -279,10 +279,10 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn interface_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // We don't modify the input stream, since `interface_method` attribute only
-    // provides additional metainfo for `exonum_interface` attribute.
+    // provides additional metadata for `exonum_interface` attribute.
     //
-    // This however should be a `proc_macro_attribute`, so `rustc` won't complain about
-    // unknown attribute.
+    // This however should be a `proc_macro_attribute`, so `rust` compiler won't complain
+    // about unknown attribute.
     item
 }
 

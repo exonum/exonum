@@ -131,8 +131,6 @@ impl ToTokens for ServiceDispatcher {
         });
 
         // Implementation of `ServiceDispatcher` trait for service type.
-        // Multiline implementation of `interfaces` is required, since rust cannot infer type
-        // of iterator for an empty array.
         let expanded = quote! {
             impl #impl_generics #cr::ServiceDispatcher for #service_name #ty_generics #where_clause  {
                 fn call(
