@@ -382,13 +382,16 @@ fn resume_with_fast_forward_migration() {
         keypair.withdraw(WithdrawalServiceV2::INSTANCE_ID, amount_2),
     )
     .unwrap();
-    assert_eq!(events_handle.take(), vec![
+    assert_eq!(
+        events_handle.take(),
+        vec![
             RuntimeEvent::BeforeTransactions(Height(5), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::BeforeTransactions(Height(5), WithdrawalServiceV2::INSTANCE_ID),
             RuntimeEvent::AfterTransactions(Height(5), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::AfterTransactions(Height(5), WithdrawalServiceV2::INSTANCE_ID),
             RuntimeEvent::AfterCommit(Height(6)),
-    ]);
+        ]
+    );
 
     // Check balance and history.
     let snapshot = blockchain.snapshot();
