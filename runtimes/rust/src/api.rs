@@ -320,7 +320,7 @@ impl ServiceApiScope {
 ///     builder
 /// }
 /// # use exonum::{
-/// #     blockchain::Blockchain, merkledb::TemporaryDB, node::ApiSender,
+/// #     blockchain::{ApiSender, Blockchain}, merkledb::TemporaryDB,
 /// #     runtime::InstanceDescriptor,
 /// # };
 /// # use futures::sync::mpsc;

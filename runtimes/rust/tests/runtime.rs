@@ -493,7 +493,8 @@ impl DefaultInstance for DependentServiceImpl {
 }
 
 fn create_genesis_config_builder() -> GenesisConfigBuilder {
-    GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default())
+    let (consensus_config, _) = ConsensusConfig::for_tests(1);
+    GenesisConfigBuilder::with_consensus_config(consensus_config)
 }
 
 fn create_genesis_config_with_supervisor() -> GenesisConfig {
