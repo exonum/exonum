@@ -138,7 +138,7 @@ impl ResponseError for HttpApiError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.http_code)
             .header(header::CONTENT_TYPE, "application/problem+json")
-            .body(self.to_string())
+            .body(serde_json::to_string(self).unwrap())
     }
 }
 
