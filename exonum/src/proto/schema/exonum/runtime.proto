@@ -67,8 +67,9 @@ message GenesisConfig {
 }
 
 // The type of ExecutionError.
-// Note that ErrorKind doesn't communicate the source of the error, for this
-// see the 'runtime_id' and 'call_site' fields of ExecutionError.
+// Note that ErrorKind isn't a primary source for determining the origin of the error.
+// First, see the 'runtime_id' and 'call_site' fields of ExecutionError, and only then
+// you can rely on `ErrorKind` to resolve ambiguity.
 enum ErrorKind {
   // An unexpected error which does not have a specific cause.
   // The description of the error is the only source of information about this kind of errors.
@@ -84,6 +85,7 @@ enum ErrorKind {
 }
 
 // Result of unsuccessful runtime execution.
+//
 // ExecutionError message provides the information about the source of the error.
 // The source of error is determined as following:
 // - If both runtime ID and call site are set, then error originates in the service code.
@@ -91,6 +93,9 @@ enum ErrorKind {
 // - If none of runtime ID and call site is set, then error originates in the core code.
 // Option with set call site and unset runtime ID is not valid, receiving a message
 // with such a combination means receiving a malformed message.
+//
+// Though in most cases 'runtime_id' and 'call_site' are enough to deduce the source of error,
+// 'ErrorKind' type can be used to resolve ambiguity.
 message ExecutionError {
   // The kind of error that indicates its type.
   ErrorKind kind = 1;
@@ -104,7 +109,7 @@ message ExecutionError {
   oneof runtime {
     // Identifier of runtime in which error originates.
     uint32 runtime_id = 4;
-    // The error does not originate in the runtime code.
+    // There was no runtime to process an erroneous call.
     google.protobuf.Empty no_runtime_id = 5;
   }
 
@@ -112,7 +117,7 @@ message ExecutionError {
   oneof call_info {
     // Information about service call from which error originates.
     CallSite call_site = 6;
-    // The error does not originate in the service code.
+    // There was no service to process an erroneous call.
     google.protobuf.Empty no_call_site = 7;
   }
 }
@@ -146,7 +151,7 @@ message ExecutionStatus {
   oneof result {
     // Successful execution.
     google.protobuf.Empty ok = 1;
-    // Execution happened with an error.
+    // Execution ended with an error.
     ExecutionError error = 2;
   }
 }
