@@ -41,7 +41,7 @@ pub struct ApiError {
     pub http_code: HttpCode,
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type")]
-    pub error_type: String,
+    pub docs_uri: String,
     /// Short description of the error.
     pub title: String,
     /// Detailed description of the error.
@@ -64,7 +64,7 @@ impl ApiError {
     fn default() -> Self {
         Self {
             http_code: HttpCode::NotImplemented,
-            error_type: String::new(),
+            docs_uri: String::new(),
             title: String::new(),
             detail: String::new(),
             params: HashMap::new(),
@@ -91,9 +91,9 @@ impl ApiError {
         }
     }
 
-    /// Sets `error_type` of an error.
-    pub fn error_type(mut self, error_type: String) -> Self {
-        self.error_type = error_type;
+    /// Sets `docs_uri` of an error.
+    pub fn docs_uri(mut self, docs_uri: String) -> Self {
+        self.docs_uri = docs_uri;
         self
     }
 
