@@ -49,7 +49,7 @@ pub struct ApiError {
     /// Source of the error.
     pub source: String,
     /// Internal error code.
-    pub error_code: i8,
+    pub error_code: u8,
 }
 
 impl std::fmt::Display for ApiError {
@@ -120,7 +120,7 @@ impl ApiError {
     }
 
     /// Sets `error_code` of an error.
-    pub fn error_code(mut self, error_code: i8) -> Self {
+    pub fn error_code(mut self, error_code: u8) -> Self {
         self.error_code = error_code;
         self
     }
