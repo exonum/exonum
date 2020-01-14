@@ -20,6 +20,7 @@ members = [
 
     "runtimes/rust",
 
+    "components/api",
     "components/build",
     "components/crypto",
     "components/derive",
@@ -27,5 +28,6 @@ members = [
     "components/keys",
     "components/merkledb",
     "components/proto",
+    "components/system-api",
 ]
 exclude = [ "exonum/fuzz" ]
