@@ -21,7 +21,7 @@ use exonum_derive::ExecutionFail;
 #[derive(ExecutionFail)]
 #[execution_fail(kind = "runtime")]
 pub enum Error {
-    /// Unable to parse artifact identifier or specified artifact has non-empty spec.
+    /// Cannot deploy artifact because it has non-empty specification.
     IncorrectArtifactId = 0,
     /// Unable to deploy artifact with the specified identifier, it is not listed
     /// among available artifacts.

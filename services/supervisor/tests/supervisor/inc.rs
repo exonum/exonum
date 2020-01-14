@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::runtime::{CommonError, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
@@ -19,7 +20,7 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder},
-    CallContext, CommonError, DefaultInstance, ExecutionError, InstanceId, Service,
+    CallContext, DefaultInstance, Service,
 };
 
 use exonum_supervisor::Configure;

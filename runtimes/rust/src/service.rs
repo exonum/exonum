@@ -19,8 +19,8 @@ use exonum::{
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     node::{ApiSender, SendError},
     runtime::{
-        ArtifactId, DispatcherAction, ExecutionError, InstanceDescriptor, InstanceId, Mailbox,
-        MethodId,
+        ArtifactId, BlockchainData, DispatcherAction, ExecutionError, InstanceDescriptor,
+        InstanceId, Mailbox, MethodId,
     },
 };
 use futures::{Future, IntoFuture};
@@ -31,8 +31,7 @@ use std::{
 };
 
 use super::{
-    api::ServiceApiBuilder, ArtifactProtobufSpec, BlockchainData, CallContext, GenericCall,
-    MethodDescriptor,
+    api::ServiceApiBuilder, ArtifactProtobufSpec, CallContext, GenericCall, MethodDescriptor,
 };
 
 /// Describes how the service instance should dispatch specific method calls
@@ -56,9 +55,10 @@ pub trait ServiceDispatcher: Send {
 /// That is, `Service` determines how a service instance responds to certain requests and events
 /// from the runtime.
 pub trait Service: ServiceDispatcher + Debug + 'static {
-    /// Initializes a new service instance with the given parameters.
+    /// Initializes a new service instance with the given parameters. This method is called once
+    /// after creating a new service instance.
     ///
-    /// This method is called once after creating a new service instance.
+    /// The default implementation does nothing and returns `Ok(())`.
     ///
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
@@ -73,35 +73,39 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// Performs storage operations on behalf of the service before processing any transaction
     /// in the block.
     ///
-    /// Any changes of the storage state will affect `state_hash`, which means this method must
-    /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `CallContext`.
-    ///
-    /// Services should not rely on a particular ordering of `Service::before_transactions`
-    /// invocations.
-    fn before_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
-    /// Performs storage operations on behalf of the service before committing the block.
     /// The default implementation does nothing and returns `Ok(())`.
     ///
     /// Any changes of the storage state will affect `state_hash`, which means this method must
     /// act similarly on different nodes. In other words, the service should only use data available
     /// in the provided `CallContext`.
     ///
-    /// Note that if service was added within genesis block, it will be activated **immediately** and
+    /// Services should not rely on a particular ordering of `Service::before_transactions`
+    /// invocations among services.
+    fn before_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    /// Performs storage operations on behalf of the service after processing all transactions
+    /// in the block.
+    ///
+    /// The default implementation does nothing and returns `Ok(())`.
+    ///
+    /// Any changes of the storage state will affect `state_hash`, which means this method must
+    /// act similarly on different nodes. In other words, the service should only use data available
+    /// in the provided `CallContext`.
+    ///
+    /// Note that if service was added in the genesis block, it will be activated immediately and
     /// thus `after_transactions` will be invoked for such a service after the genesis block creation.
     /// If you aren't interested in the processing of for the genesis block, you can use
     /// [`CallContext::in_genesis_block`] method and exit early if `true` is returned.
     ///
-    /// Invocation of `exonum::blockchain::Schema::height` will **panic**
+    /// Invocation of the `height()` method of the core blockchain schema will **panic**
     /// if invoked within `after_transactions` of the genesis block. If you are going
-    /// to process the genesis block and need to know current height, use
-    /// `exonum::blockchain::Schema::next_height` to infer the current blockchain height.
+    /// to process the genesis block and need to know current height, use the `next_height()` method
+    /// to infer the current blockchain height.
     ///
     /// Services should not rely on a particular ordering of `Service::after_transactions`
-    /// invocations.
+    /// invocations among services.
     ///
     /// [`CallContext::in_genesis_block`]: struct.CallContext.html#method.in_genesis_block
     fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
@@ -110,14 +114,19 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
 
     /// Handles block commit event.
     ///
-    /// This handler is an optional callback method which is invoked by the blockchain
-    /// after each block commit. For example, a service can create one or more transactions
+    /// This handler is a callback which is invoked by the blockchain
+    /// after each block commit. For example, a service can broadcast one or more transactions
     /// if a specific condition has occurred.
     ///
-    /// *Try not to perform long operations in this handler*.
+    /// The default implementation does nothing.
+    ///
+    /// Try not to perform long operations in this handler since it is executed
+    /// on the consensus thread.
     fn after_commit(&self, _context: AfterCommitContext<'_>) {}
 
     /// Attaches the request handlers of the service API to the Exonum API schema.
+    ///
+    /// The default implementation does nothing (i.e., does not provide any API for the service).
     ///
     /// The request handlers are mounted on the `/api/services/{instance_name}` path at the
     /// listen address of every full node in the blockchain network.

@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::ObjectHash;
-use exonum_testkit::TestKitBuilder;
-
 use exonum::{
     blockchain::CallInBlock,
     crypto,
     helpers::{Height, ValidatorId},
-    runtime::{ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    merkledb::ObjectHash,
+    runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::{CommonError, ServiceFactory};
+use exonum_rust_runtime::ServiceFactory;
+use exonum_testkit::TestKitBuilder;
 
 use crate::{utils::*, IncService as ConfigChangeService};
 use exonum_supervisor::{

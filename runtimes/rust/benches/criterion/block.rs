@@ -48,13 +48,14 @@ use exonum::{
     merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
     messages::{AnyTx, Verified},
     node::ApiSender,
+    runtime::SnapshotExt,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempfile::TempDir;
 
 use std::{collections::BTreeMap, iter, sync::Arc};
 
-use exonum_rust_runtime::{DefaultInstance, RustRuntime, SnapshotExt};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime};
 
 /// Number of transactions added to the blockchain before the bench begins.
 const PREPARE_TRANSACTIONS: usize = 10_000;
@@ -133,9 +134,14 @@ fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash
 }
 
 mod timestamping {
-    use exonum::{crypto::Hash, merkledb::ObjectHash, messages::Verified, runtime::AnyTx};
+    use exonum::{
+        crypto::Hash,
+        merkledb::ObjectHash,
+        messages::Verified,
+        runtime::{AnyTx, ExecutionError, InstanceId},
+    };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-    use exonum_rust_runtime::{CallContext, DefaultInstance, ExecutionError, InstanceId, Service};
+    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;

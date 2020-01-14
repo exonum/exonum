@@ -123,9 +123,9 @@ impl ToTokens for ServiceFactory {
 
         let expanded = quote! {
             impl #impl_generics #cr::ServiceFactory for #name #ty_generics #where_clause {
-                fn artifact_id(&self) -> #cr::ArtifactId {
-                    #cr::ArtifactId {
-                        runtime_id: #cr::RuntimeIdentifier::Rust as _,
+                fn artifact_id(&self) -> #cr::_reexports::ArtifactId {
+                    #cr::_reexports::ArtifactId {
+                        runtime_id: #cr::_reexports::RuntimeIdentifier::Rust as _,
                         name: #artifact_name.to_string(),
                         version: #artifact_version.parse().expect("Cannot parse artifact version"),
                     }

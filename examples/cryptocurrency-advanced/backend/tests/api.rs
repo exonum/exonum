@@ -19,11 +19,12 @@
 
 use exonum::{
     crypto::{self, Hash, PublicKey, SecretKey},
+    merkledb::ObjectHash,
     messages::{AnyTx, Verified},
+    runtime::SnapshotExt,
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::{ServiceFactory, SnapshotExt};
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{
     explorer::api::{TransactionQuery, TransactionResponse},
     ApiKind, TestKit, TestKitApi, TestKitBuilder,

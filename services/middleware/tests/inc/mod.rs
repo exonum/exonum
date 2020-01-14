@@ -20,13 +20,13 @@ use exonum::{
         access::{Access, FromAccess},
         MapIndex,
     },
+    runtime::{
+        versioning::{ArtifactReq as CoreReq, Version},
+        ArtifactId, CommonError, ExecutionError, RuntimeIdentifier,
+    },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    versioning::ArtifactReq as CoreReq, ArtifactId, ArtifactProtobufSpec, CallContext, CommonError,
-    ExecutionError, RuntimeIdentifier, Service, ServiceFactory,
-};
-use semver::Version;
+use exonum_rust_runtime::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory};
 
 use exonum_middleware_service::ArtifactReq;
 
