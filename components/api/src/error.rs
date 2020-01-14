@@ -14,29 +14,19 @@
 
 //! The set of errors for the Exonum API module.
 
+use actix_web::http::StatusCode;
 use failure::Fail;
 use serde::Serialize;
 
 use std::collections::HashMap;
 use std::io;
 
-/// List of possible HTTP response codes.
-#[derive(Debug, Serialize)]
-pub enum HttpCode {
-    #[allow(missing_docs)]
-    BadRequest = 400,
-    #[allow(missing_docs)]
-    NotFound = 404,
-    #[allow(missing_docs)]
-    NotImplemented = 501,
-}
-
 /// API HTTP error struct.
 #[derive(Fail, Debug, Serialize)]
 pub struct ApiError {
     /// HTTP error code.
     #[serde(skip)]
-    pub http_code: HttpCode,
+    pub http_code: StatusCode,
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type")]
     pub docs_uri: String,
@@ -61,7 +51,7 @@ impl std::fmt::Display for ApiError {
 impl ApiError {
     fn default() -> Self {
         Self {
-            http_code: HttpCode::NotImplemented,
+            http_code: StatusCode::NOT_IMPLEMENTED,
             docs_uri: String::new(),
             title: String::new(),
             detail: String::new(),
@@ -75,7 +65,7 @@ impl ApiError {
     #[allow(non_snake_case)]
     pub fn BadRequest() -> Self {
         Self {
-            http_code: HttpCode::BadRequest,
+            http_code: StatusCode::BAD_REQUEST,
             ..Self::default()
         }
     }
@@ -84,7 +74,7 @@ impl ApiError {
     #[allow(non_snake_case)]
     pub fn NotFound() -> Self {
         Self {
-            http_code: HttpCode::NotFound,
+            http_code: StatusCode::NOT_FOUND,
             ..Self::default()
         }
     }
