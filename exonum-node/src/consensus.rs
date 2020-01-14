@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{contains_transaction, Blockchain, ProposerId, Schema},
+    blockchain::{contains_transaction, Blockchain, BlockchainMut, ProposerId, Schema},
     crypto::{Hash, PublicKey},
     helpers::{Height, Round},
-    merkledb::{BinaryValue, ObjectHash, Patch},
+    merkledb::{BinaryValue, Fork, ObjectHash, Patch},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
 };
 use failure::{bail, format_err};
@@ -36,7 +36,7 @@ use crate::{
     NodeHandler,
 };
 
-// Shortcut to get verified messages from bytes.
+/// Shortcut to get verified messages from bytes.
 fn into_verified<T: TryFrom<SignedMessage>>(
     raw: &[Vec<u8>],
 ) -> Result<Vec<Verified<T>>, failure::Error> {
@@ -46,6 +46,25 @@ fn into_verified<T: TryFrom<SignedMessage>>(
         items.push(verified);
     }
     Ok(items)
+}
+
+/// Helper trait to efficiently merge changes to the `BlockchainMut`.
+trait PersistChanges {
+    /// Persists changes to the node schema.
+    fn persist_changes<F>(&mut self, change: F, error_msg: &str)
+    where
+        F: FnOnce(&mut NodeSchema<&Fork>);
+}
+
+impl PersistChanges for BlockchainMut {
+    fn persist_changes<F>(&mut self, change: F, error_msg: &str)
+    where
+        F: FnOnce(&mut NodeSchema<&Fork>),
+    {
+        let fork = self.fork();
+        change(&mut NodeSchema::new(&fork));
+        self.merge(fork.into_patch()).expect(error_msg);
+    }
 }
 
 /// Result of an action within a round.
@@ -542,11 +561,10 @@ impl NodeHandler {
                     .iter()
                     .map(|p| p.clone().into());
 
-                let fork = self.blockchain.fork();
-                NodeSchema::new(&fork).save_messages(round, raw_messages);
-                self.blockchain
-                    .merge(fork.into_patch())
-                    .expect("Cannot save consensus messages");
+                self.blockchain.persist_changes(
+                    |schema| schema.save_messages(round, raw_messages),
+                    "Cannot save consensus messages",
+                );
 
                 // Lock the state on the round and propose.
                 self.state.lock(round, propose_hash);
@@ -632,11 +650,10 @@ impl NodeHandler {
 
                 // Consensus messages cache is useful only during one height, so it should be
                 // cleared when a new height is achieved.
-                let fork = self.blockchain.fork();
-                NodeSchema::new(&fork).consensus_messages_cache().clear();
-                self.blockchain
-                    .merge(fork.into_patch())
-                    .expect("Cannot clear consensus messages");
+                self.blockchain.persist_changes(
+                    |schema| schema.consensus_messages_cache().clear(),
+                    "Cannot clear consensus messages",
+                );
 
                 (committed_txs, proposer)
             };
@@ -884,11 +901,10 @@ impl NodeHandler {
                 txs,
             ));
             // Put our propose to the consensus messages cache.
-            let fork = self.blockchain.fork();
-            NodeSchema::new(&fork).save_message(round, propose.clone());
-            self.blockchain
-                .merge(fork.into_patch())
-                .expect("Cannot save `Propose` to message cache");
+            self.blockchain.persist_changes(
+                |schema| schema.save_message(round, propose.clone()),
+                "Cannot save `Propose` to message cache",
+            );
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.clone());
@@ -1119,11 +1135,10 @@ impl NodeHandler {
 
         // save outgoing Prevote to the consensus messages cache before broadcast
         self.check_propose_saved(round, &propose_hash);
-        let fork = self.blockchain.fork();
-        NodeSchema::new(&fork).save_message(round, prevote.clone());
-        self.blockchain
-            .merge(fork.into_patch())
-            .expect("Cannot save `Prevote` to message cache");
+        self.blockchain.persist_changes(
+            |schema| schema.save_message(round, prevote.clone()),
+            "Cannot save `Prevote` to message cache",
+        );
 
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote);
@@ -1148,11 +1163,10 @@ impl NodeHandler {
         self.state.add_precommit(precommit.clone());
 
         // Put our Precommit to the consensus cache before broadcast.
-        let fork = self.blockchain.fork();
-        NodeSchema::new(&fork).save_message(round, precommit.clone());
-        self.blockchain
-            .merge(fork.into_patch())
-            .expect("Cannot save `Propose` to message cache");
+        self.blockchain.persist_changes(
+            |schema| schema.save_message(round, precommit.clone()),
+            "Cannot save `Precommit` to message cache",
+        );
 
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit);
@@ -1233,15 +1247,14 @@ impl NodeHandler {
         Ok(())
     }
 
-    /// Checks whether Propose is saved to the consensus cache and saves it otherwise.
+    /// Checks whether `Propose` is saved to the consensus cache and saves it otherwise.
     fn check_propose_saved(&mut self, round: Round, propose_hash: &Hash) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {
-                let fork = self.blockchain.fork();
-                NodeSchema::new(&fork).save_message(round, propose_state.message().clone());
-                self.blockchain
-                    .merge(fork.into_patch())
-                    .expect("Cannot save foreign `Propose` to message cache");
+                self.blockchain.persist_changes(
+                    |schema| schema.save_message(round, propose_state.message().clone()),
+                    "Cannot save foreign `Propose` to message cache",
+                );
                 propose_state.set_saved(true);
             }
         }
