@@ -181,7 +181,7 @@ impl TryFrom<&[Attribute]> for MethodIdAttr {
                     "Unable to find method ID mapping for method. \
                      It should be specified, e.g. `#[interface_method(id = 0)]`",
                 );
-                return Err(darling::Error::custom(msg));
+                Err(darling::Error::custom(msg))
             })
     }
 }
