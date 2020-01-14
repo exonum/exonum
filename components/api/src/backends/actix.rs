@@ -36,8 +36,9 @@ use std::{
 
 use crate::{
     manager::{ApiManager, WebServerConfig},
-    Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
-    Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
+    Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiError as HttpApiError,
+    ApiFutureResult, ApiScope, EndpointMutability, Error as ApiError, ExtendApiBackend,
+    FutureResult, HttpCode, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -133,7 +134,7 @@ impl ResponseError for ApiError {
     }
 }
 
-impl ResponseError for api::ApiError {
+impl ResponseError for HttpApiError {
     fn error_response(&self) -> HttpResponse {
         let mut response = match self.http_code {
             HttpCode::BadRequest => HttpResponse::BadRequest(),

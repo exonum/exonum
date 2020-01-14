@@ -386,7 +386,7 @@ pub use exonum_explorer::{
 };
 
 use exonum::{
-    api::{error::ApiError as HttpApiError, Error as ApiError, FutureResult},
+    api::{ApiError as HttpApiError, Error as ApiError, FutureResult},
     blockchain::{Blockchain, CallInBlock, Schema},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
@@ -534,14 +534,14 @@ impl ExplorerApi {
         query: TransactionQuery,
     ) -> Result<CallStatusResponse, HttpApiError> {
         let response = HttpApiError::BadRequest()
-            .error_type("http://some-docs.com/bad_request".to_string())
-            .title("test_endpoint error title".to_string())
+            .docs_uri("http://some-docs.com/bad_request")
+            .title("test_endpoint error title")
             .detail(format!(
                 "Trying to access test_endpoint with query {}",
                 query.hash
             ))
             .error_code(42)
-            .param("query_hash".to_string(), query.hash.to_string());
+            .param("query_hash", query.hash.to_string());
         Err(response)
     }
 
