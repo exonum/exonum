@@ -50,32 +50,15 @@ impl std::fmt::Display for ApiError {
 }
 
 impl ApiError {
-    fn default() -> Self {
+    /// Builds a ApiError with the given `http_code`.
+    pub fn new(http_code: StatusCode) -> Self {
         Self {
-            http_code: StatusCode::NOT_IMPLEMENTED,
+            http_code,
             docs_uri: String::new(),
             title: String::new(),
             detail: String::new(),
             source: String::new(),
             error_code: None,
-        }
-    }
-
-    /// Builds a BadRequest error.
-    #[allow(non_snake_case)]
-    pub fn BadRequest() -> Self {
-        Self {
-            http_code: StatusCode::BAD_REQUEST,
-            ..Self::default()
-        }
-    }
-
-    /// Builds a NotFound error.
-    #[allow(non_snake_case)]
-    pub fn NotFound() -> Self {
-        Self {
-            http_code: StatusCode::NOT_FOUND,
-            ..Self::default()
         }
     }
 

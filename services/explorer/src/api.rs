@@ -385,6 +385,7 @@ pub use exonum_explorer::{
     TransactionInfo,
 };
 
+use actix_web::http::StatusCode;
 use exonum::{
     api::{ApiError as HttpApiError, Error as ApiError, FutureResult},
     blockchain::{Blockchain, CallInBlock, Schema},
@@ -533,15 +534,14 @@ impl ExplorerApi {
         _schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> Result<CallStatusResponse, HttpApiError> {
-        let response = HttpApiError::BadRequest()
+        let response = HttpApiError::new(StatusCode::BAD_REQUEST)
             .docs_uri("http://some-docs.com/bad_request")
             .title("test_endpoint error title")
             .detail(format!(
                 "Trying to access test_endpoint with query {}",
                 query.hash
             ))
-            .error_code(42)
-            .param("query_hash", query.hash.to_string());
+            .error_code(42);
         Err(response)
     }
 
