@@ -88,8 +88,8 @@ enum ErrorKind {
 //
 // ExecutionError message provides the information about the source of the error.
 // The source of error is determined as following:
-// - If both runtime ID and call site are set, then error originates in the service code.
-// - If runtime ID is set, and call site is not set, then error originates in the runtime code.
+// - If both runtime ID and call site are set, then error is related to the service code.
+// - If runtime ID is set, and call site is not set, then error is related to the runtime code.
 // - If none of runtime ID and call site is set, then error originates in the core code.
 // Option with set call site and unset runtime ID is not valid, receiving a message
 // with such a combination means receiving a malformed message.
@@ -105,17 +105,17 @@ message ExecutionError {
   // Optional description which doesn't affect `object_hash`.
   string description = 3;
 
-  // Runtime ID will be set if the error originates in code related to the certain runtime.
+  // Runtime ID will be set if the error is related to the certain runtime.
   oneof runtime {
-    // Identifier of runtime in which error originates.
+    // Identifier of runtime associated with the error.
     uint32 runtime_id = 4;
     // There was no runtime to process an erroneous call.
     google.protobuf.Empty no_runtime_id = 5;
   }
 
-  // Call site will be set if the error originates in code related to the certain service.
+  // Call site will be set if the error is related to the certain service.
   oneof call_info {
-    // Information about service call from which error originates.
+    // Information about service call associated with the error.
     CallSite call_site = 6;
     // There was no service to process an erroneous call.
     google.protobuf.Empty no_call_site = 7;
