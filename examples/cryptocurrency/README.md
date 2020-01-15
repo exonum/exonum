@@ -55,4 +55,4 @@ handy way to do this).
 Cryptocurrency is licensed under the Apache License (Version 2.0). See
 [LICENSE](LICENSE) for details.
 
-[the transaction endpoint]: http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets
+[the transaction endpoint]: http://127.0.0.1:8000/api/explorer/v1/transactions
