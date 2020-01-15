@@ -49,7 +49,7 @@ rest of the network.
 
 Key point here is that user **should not** send transactions to the supervisor
 by himself. An expected format of requests for those endpoints is a serialized
-`protobuf` message.
+Protobuf message.
 
 To deploy an artifact, one (within the "simple" mode) or majority (within the
 "decentralized" mode) of the nodes should receive a [`DeployRequest`] message

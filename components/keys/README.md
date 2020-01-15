@@ -7,7 +7,7 @@
 `exonum-keys` provides tools for storing and loading encrypted keys for
 Exonum core.
 
-This is a simply utility crate specialized for the Exonum core needs.
+This is a simple utility crate specialized for the Exonum core needs.
 
 Consult [the crate docs](https://docs.rs/exonum-keys) for more details.
 

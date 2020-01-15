@@ -14,15 +14,17 @@
 
 //! This crate simplifies writing `build.rs` for Exonum and Exonum services.
 //!
-//! Since `protobuf` is the Exonum default serialization format, `build.rs` is mostly used
-//! to compile `protobuf` files and generate a corresponding code. This code is used later by
+//! Since Protobuf is the Exonum default serialization format, `build.rs` is mostly used
+//! to compile Protobuf files and generate a corresponding code. This code is used later by
 //! the Exonum core and services.
 //!
 //! All you need to do is to call `ProtobufGenerator` with required params, for an example see
 //! [`ProtobufGenerator`] docs.
 //!
-//! There are four predefined sets of protobuf sources available for use.
+//! There are several predefined sets of protobuf sources available for use.
 //! See [`ProtoSources`].
+//!
+//! Currently presented sets:
 //!
 //! - Crypto sources: all the necessary crypto types used in services and system proto-files.
 //! These types are `Hash`, `PublicKey` and `Signature`.

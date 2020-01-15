@@ -10,7 +10,7 @@ HTTP APIs.
 Within Exonum, this crate is used by [Rust services][rust-runtime] and in
 plugins for the Exonum node.
 
-Under the hood `exonum-api` uses `actix`.
+Under the hood `exonum-api` uses [`actix`].
 
 Consult [the crate docs](https://docs.rs/exonum-api) for more details.
 

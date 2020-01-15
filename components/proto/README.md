@@ -1,4 +1,4 @@
-# High-level `protobuf` conversion library for Exonum
+# High-level Protobuf conversion library for Exonum
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
@@ -12,7 +12,7 @@ The central part of this crate is `ProtobufConvert` trait.
 The main purpose of this trait is to allow users to create
 a map between their types and the types generated from `.proto`
 descriptions, while providing a mechanism for additional
-validation of protobuf data.
+validation of Protobuf data.
 
 Most of the time you do not have to implement this trait because most
 of the use cases are covered by `#[derive(ProtobufConvert)]`
@@ -20,11 +20,11 @@ from `exonum_derive` crate.
 
 A typical example of such mapping with validation is manual implementation
 of this trait for `exonum_crypto::Hash`. `exonum_crypto::Hash` is a fixed
-sized array of bytes but protobuf does not allow us to express this
+sized array of bytes but Protobuf does not allow us to express this
 constraint since only dynamically sized arrays are supported.
 
-If you would like to use `Hash` as a part of your protobuf struct, you would
-have to write a conversion function from protobuf `proto::Hash`(which
+If you would like to use `Hash` as a part of your Protobuf struct, you would
+have to write a conversion function from Protobuf `proto::Hash`(which
 is dynamically sized array of bytes) to`exonum_crypto::Hash` and call
 it every time when you want to use `exonum_crypto::Hash` in your application.
 
@@ -37,7 +37,7 @@ Consult [the crate docs](https://docs.rs/exonum-proto) for more details.
 
 ## Examples
 
-Sample `protobuf` roundtrip:
+Sample Protobuf roundtrip:
 
 ```rust
 use exonum_proto::ProtobufConvert;

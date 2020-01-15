@@ -1,16 +1,17 @@
-# `build.rs` utility for Exonum
+# Build scripts utility for Exonum
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
-This crate simplifies writing `build.rs` for Exonum and Exonum services.
+This crate simplifies writing build scripts for Exonum and Exonum services.
 
-Since `protobuf` is the Exonum default serialization format, `build.rs` is
-mostly used to compile `protobuf` files and generate corresponding code.
+Since Protobuf is the Exonum default serialization format, build scripts
+are mostly used to compile Protobuf files and generate corresponding code.
 Generated code is used later by the Exonum core and services.
 
-There are three predefined sets of protobuf sources available for use:
+There are several predefined sets of protobuf sources available for use.
+Currently presented sets:
 
 - Crypto sources: all the necessary crypto types used in services
   and system proto-files. These types are Hash, PublicKey and Signature.
@@ -27,19 +28,12 @@ Consult [the crate docs](https://docs.rs/exonum-build) for more details.
 Sample `build.rs` using `exonum-build`:
 
 ```rust
+use exonum_build::ProtobufGenerator;
+use std::env;
+
 fn main() {
-    #[cfg(feature = "with-protobuf")]
-    gen_proto_files();
-}
-
-#[cfg(feature = "with-protobuf")]
-fn gen_proto_files() {
-    use exonum_build::ProtobufGenerator;
-    use std::env;
-
     let current_dir = env::current_dir().expect("Failed to get current dir.");
     let protos = current_dir.join("src/proto");
-    println!("cargo:protos={}", protos.to_str().unwrap());
 
     ProtobufGenerator::with_mod_name("protobuf_mod.rs")
         .with_input_dir("src/proto")
