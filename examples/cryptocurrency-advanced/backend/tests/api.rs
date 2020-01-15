@@ -50,10 +50,7 @@ const SERVICE_ID: u32 = 120;
 const SERVICE_NAME: &str = "tst-token";
 
 fn author_address(tx: &Verified<AnyTx>) -> CallerAddress {
-    Caller::Transaction {
-        author: tx.author(),
-    }
-    .address()
+    Caller::address_from_key(tx.author())
 }
 
 /// Check that the wallet creation transaction works when invoked via API.

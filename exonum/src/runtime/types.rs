@@ -763,6 +763,11 @@ pub enum Caller {
 }
 
 impl Caller {
+    /// Converts a public key to an address.
+    pub fn address_from_key(public_key: PublicKey) -> CallerAddress {
+        Caller::Transaction { author: public_key }.address()
+    }
+
     /// Returns the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
         if let Caller::Transaction { author } = self {

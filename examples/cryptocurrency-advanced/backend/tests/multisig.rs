@@ -221,7 +221,7 @@ fn test_multisig() {
     assert_eq!(ms_wallet.balance, 100);
 
     // Spend some tokens from the wallet!
-    let alice_address = Caller::Transaction { author: alice.0 }.address();
+    let alice_address = Caller::address_from_key(alice.0);
     let action = TxStub.transfer(
         SERVICE_ID,
         Transfer {
@@ -286,7 +286,7 @@ fn test_2_of_3_multisig() {
     let action = TxStub.transfer(
         SERVICE_ID,
         Transfer {
-            to: Caller::Transaction { author: carol.0 }.address(),
+            to: Caller::address_from_key(carol.0),
             amount: 10,
             seed: 0,
         },
@@ -299,7 +299,7 @@ fn test_2_of_3_multisig() {
     block[0].status().unwrap();
     block[1].status().unwrap();
 
-    // Check that the change in the multisig wallet balance.
+    // Check the change in the multisig wallet balance.
     let snapshot = testkit.snapshot();
     let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
     let ms_wallet = schema.wallets.get(&ms_address).unwrap();
