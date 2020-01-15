@@ -177,16 +177,16 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         self.inner
             .endpoint(name, move |query: Q| -> crate::api::ApiFutureResult<I> {
-                let desc = descriptor.clone();
+                let (instance_id, instance_name) = descriptor.clone();
                 let state = ServiceApiState::from_api_context(
                     &blockchain,
-                    (desc.0, desc.1.as_ref()).into(),
+                    (instance_id, instance_name.as_ref()).into(),
                     name,
                 );
                 let result = handler(&state, query);
                 let future = result
                     .into_future()
-                    .map_err(move |err| err.source(format!("{}:{}", desc.1, desc.0)));
+                    .map_err(move |err| err.source(format!("{}:{}", instance_name, instance_id)));
                 Box::new(future)
             });
         self
