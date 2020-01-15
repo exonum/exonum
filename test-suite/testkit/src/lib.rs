@@ -264,29 +264,29 @@ impl TestKit {
         self.api_aggregator = self.create_api_aggregator();
     }
 
+    #[cfg(feature = "exonum-node")]
     fn create_api_aggregator(&self) -> ApiAggregator {
-        #[cfg(feature = "exonum-node")]
-        {
-            let mut aggregator = ApiAggregator::new();
-            let node_state = SharedNodeState::new(10_000);
-            let plugin_api_context = PluginApiContext::new(
-                self.blockchain.as_ref(),
-                &node_state,
-                ApiSender::new(self.control_channel.0.clone()),
-            );
-            for plugin in &self.plugins {
-                aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
-            }
-            aggregator
+        let mut aggregator = ApiAggregator::new();
+        let node_state = SharedNodeState::new(10_000);
+        let plugin_api_context = PluginApiContext::new(
+            self.blockchain.as_ref(),
+            &node_state,
+            ApiSender::new(self.control_channel.0.clone()),
+        );
+        for plugin in &self.plugins {
+            aggregator.extend(plugin.wire_api(plugin_api_context.clone()));
         }
+        aggregator
+    }
 
-        #[cfg(not(feature = "exonum-node"))]
-        {
-            ApiAggregator::new()
-        }
+    #[cfg(not(feature = "exonum-node"))]
+    fn create_api_aggregator(&self) -> ApiAggregator {
+        ApiAggregator::new()
     }
 
     /// Returns control messages received by the testkit since the last call to this method.
+    ///
+    /// This method is only available if the crate is compiled with the `exonum-node` feature.
     #[cfg(feature = "exonum-node")]
     pub fn poll_control_messages(&mut self) -> Vec<ExternalMessage> {
         use crate::poll_events::poll_all;
@@ -795,22 +795,22 @@ impl fmt::Debug for StoppedTestKit {
 }
 
 impl StoppedTestKit {
-    /// Return a snapshot of the database state.
+    /// Returns a snapshot of the database state.
     pub fn snapshot(&self) -> Box<dyn Snapshot> {
         self.db.snapshot()
     }
 
-    /// Return the height of latest committed block.
+    /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
         self.snapshot().for_core().height()
     }
 
-    /// Return the reference to test network.
+    /// Returns the reference to test network.
     pub fn network(&self) -> &TestNetwork {
         &self.network
     }
 
-    /// Resume the operation of the testkit with the Rust runtime.
+    /// Resumes the operation of the testkit with the Rust runtime.
     ///
     /// Note that services in the Rust runtime may differ from the initially passed to the `TestKit`
     /// (which is also what may happen with real Exonum apps).
@@ -818,7 +818,7 @@ impl StoppedTestKit {
         self.resume_with_runtimes(rust_runtime, Vec::new())
     }
 
-    /// Resume the operation fo the testkit with the specified runtimes.
+    /// Resumes the operation fo the testkit with the specified runtimes.
     pub fn resume_with_runtimes(
         self,
         rust_runtime: RustRuntimeBuilder,
@@ -827,29 +827,31 @@ impl StoppedTestKit {
         let rust_runtime = rust_runtime.build(self.api_notifier_channel.0.clone());
         let mut runtimes = external_runtimes;
         runtimes.push(rust_runtime.into());
+        self.do_resume(runtimes)
+    }
 
-        #[cfg(feature = "exonum-node")]
-        {
-            let mut testkit = TestKit::assemble(
-                self.db,
-                self.network,
-                GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
-                runtimes,
-                self.api_notifier_channel,
-            );
-            testkit.set_plugins(self.plugins);
-            testkit
-        }
-        #[cfg(not(feature = "exonum-node"))]
-        {
-            TestKit::assemble(
-                self.db,
-                self.network,
-                GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
-                runtimes,
-                self.api_notifier_channel,
-            )
-        }
+    #[cfg(feature = "exonum-node")]
+    fn do_resume(self, runtimes: Vec<RuntimeInstance>) -> TestKit {
+        let mut testkit = TestKit::assemble(
+            self.db,
+            self.network,
+            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+            runtimes,
+            self.api_notifier_channel,
+        );
+        testkit.set_plugins(self.plugins);
+        testkit
+    }
+
+    #[cfg(not(feature = "exonum-node"))]
+    fn do_resume(self, runtimes: Vec<RuntimeInstance>) -> TestKit {
+        TestKit::assemble(
+            self.db,
+            self.network,
+            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+            runtimes,
+            self.api_notifier_channel,
+        )
     }
 }
 
