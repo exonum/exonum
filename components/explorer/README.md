@@ -16,6 +16,9 @@ Correspondingly, this crate is primarily useful for Rust-language client apps.
 Another use case is testing; the [testkit] relies on types in this crate
 and re-exports it as the `explorer` module.
 
+Consult [the crate docs](https://docs.rs/exonum-explorer)
+and [examples](examples) for more details about the service API.
+
 ## Usage
 
 Include `exonum-explorer` as a dependency in your `Cargo.toml`:
@@ -25,9 +28,6 @@ Include `exonum-explorer` as a dependency in your `Cargo.toml`:
 exonum = "0.13.0-rc.2"
 exonum-explorer = "0.13.0-rc.2"
 ```
-
-Consult [the crate docs](https://docs.rs/exonum-explorer)
-and [examples](examples) for more details about the service API.
 
 ## License
 

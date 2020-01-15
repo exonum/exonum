@@ -55,7 +55,7 @@
 //! The operation of starting a service is treated similarly to a configuration change and follows the same rules.
 //!
 //! [exonum]: https://github.com/exonum/exonum
-//! [runtime-docs]: https://docs.rs/exonum/0.13.0/exonum/runtime/index.html
+//! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 //! [`DeployRequest`]: struct.DeployRequest.html
 //! [`ConfigPropose`]: struct.ConfigPropose.html
 //! [`ConfigVote`]: struct.ConfigVote.html
