@@ -462,10 +462,10 @@ where
             trace!("Body: {}", body);
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");
 
-            return Ok(value);
+            Ok(value)
         } else {
             let error = extract_error(&mut response).expect("Failed to get error from response.");
-            return Err(error);
+            Err(error)
         }
     }
 }

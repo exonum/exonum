@@ -14,9 +14,11 @@
 
 //! Tests related to the API.
 
+use actix_web::http::StatusCode;
 use assert_matches::assert_matches;
 use pretty_assertions::assert_eq;
 
+use exonum::api::ApiError as HttpApiError;
 use exonum::api::Error as ApiError;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
@@ -131,4 +133,36 @@ fn moved() {
         .post::<u64>("moved-mutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
     assert_matches!(pong_error, ApiError::MovedPermanently(_));
+}
+
+/// Checks response from endpoint with new error type.
+#[test]
+fn endpoint_with_new_error_type() {
+    let (_testkit, api) = init_testkit();
+
+    // Check OK response.
+    let ok_query = PingQuery { value: 64 };
+    let response: u64 = api
+        .public(ApiKind::Service("api-service"))
+        .query(&ok_query)
+        .get_new::<u64>("new-error-type")
+        .expect("This request should be successful");
+    assert_eq!(ok_query.value, response);
+
+    // Check error response.
+    let err_query = PingQuery { value: 63 };
+    let error: HttpApiError = api
+        .public(ApiKind::Service("api-service"))
+        .query(&err_query)
+        .get_new::<u64>("new-error-type")
+        .expect_err("Should return error.");
+
+    assert_eq!(error.http_code, StatusCode::BAD_REQUEST);
+    assert_eq!(error.docs_uri, "http://some-docs.com");
+    assert_eq!(error.title, "Test endpoint error.");
+    assert_eq!(
+        error.detail,
+        format!("Test endpoint failed with query: {}", err_query.value)
+    );
+    assert_eq!(error.error_code, Some(42));
 }
