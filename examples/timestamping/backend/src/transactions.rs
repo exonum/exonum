@@ -14,9 +14,10 @@
 
 //! Timestamping transactions.
 
+use exonum::runtime::{CommonError, ExecutionError};
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::{CallContext, CommonError, ExecutionError};
+use exonum_rust_runtime::CallContext;
 use exonum_time::schema::TimeSchema;
 use log::trace;
 

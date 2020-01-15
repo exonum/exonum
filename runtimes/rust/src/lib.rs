@@ -37,7 +37,8 @@
 //! ## Minimal complete example
 //!
 //! ```
-//! use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
+//! use exonum::runtime::{BlockchainData, ExecutionError};
+//! use exonum_rust_runtime::{CallContext, Service};
 //! use exonum_derive::*;
 //! use serde_derive::*;
 //!
@@ -105,7 +106,8 @@
 //! prototyping.
 //!
 //! ```
-//! # use exonum_rust_runtime::{CallContext, Service, BlockchainData, ExecutionError};
+//! # use exonum::runtime::{BlockchainData, ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, Service};
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
@@ -188,7 +190,8 @@
 //! ## Interface usage
 //!
 //! ```
-//! # use exonum_rust_runtime::{CallContext, ExecutionError};
+//! # use exonum::runtime::ExecutionError;
+//! # use exonum_rust_runtime::CallContext;
 //! # use exonum::crypto::gen_keypair;
 //! # use exonum_derive::exonum_interface;
 //! # type CreateWallet = String;
@@ -238,14 +241,6 @@
 //! # }
 //! ```
 
-pub use exonum::runtime::{
-    migrations, versioning, AnyTx, ArtifactId, BlockchainData, CallInfo, CallSite, CallType,
-    Caller, CommonError, CoreError, DispatcherSchema, ErrorKind, ErrorMatch, ExecutionError,
-    ExecutionFail, ExecutionStatus, InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus,
-    MethodId, RuntimeIdentifier, RuntimeInstance, SnapshotExt, WellKnownRuntime,
-    SUPERVISOR_INSTANCE_ID,
-};
-
 pub use self::{
     call_context::CallContext,
     error::Error,
@@ -258,7 +253,6 @@ pub use self::{
 };
 
 pub mod api;
-pub mod error;
 
 use exonum::{
     api::{ApiBuilder, UpdateEndpoints},
@@ -269,7 +263,9 @@ use exonum::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        ExecutionContext, Mailbox, Runtime,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, ExecutionFail, InstanceDescriptor,
+        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier,
+        WellKnownRuntime,
     },
 };
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
@@ -280,9 +276,19 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use self::api::ServiceApiBuilder;
 
 mod call_context;
+mod error;
 mod runtime_api;
 mod service;
 mod stubs;
+
+#[doc(hidden)]
+pub mod _reexports {
+    //! Types necessary for `ServiceDispatcher` and `ServiceFactory` derive macros to work.
+
+    pub use exonum::runtime::{
+        ArtifactId, CommonError, ExecutionError, MethodId, RuntimeIdentifier,
+    };
+}
 
 trait FactoryWithMigrations: ServiceFactory + MigrateData {}
 

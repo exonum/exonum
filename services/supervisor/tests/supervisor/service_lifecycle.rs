@@ -14,16 +14,15 @@
 
 //! Tests for the phases of the service life cycle, including starting and stopping service instances.
 
-use exonum::messages::{AnyTx, Verified};
-use exonum_rust_runtime::{
-    DefaultInstance, ErrorMatch, ExecutionError, InstanceId, ServiceFactory, SnapshotExt,
-    SUPERVISOR_INSTANCE_ID,
+use exonum::{
+    messages::{AnyTx, Verified},
+    runtime::{ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
+use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
-use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor};
-
 use crate::inc::IncService;
+use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor};
 
 /// Creates block with the specified transaction and returns its execution result.
 fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(), ExecutionError> {

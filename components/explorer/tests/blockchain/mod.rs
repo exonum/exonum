@@ -21,11 +21,10 @@ use exonum::{
     merkledb::{ObjectHash, TemporaryDB},
     messages::Verified,
     node::ApiSender,
+    runtime::{AnyTx, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    AnyTx, CallContext, ExecutionError, InstanceId, RustRuntime, Service, ServiceFactory,
-};
+use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory};
 use serde_derive::*;
 
 use std::collections::BTreeMap;

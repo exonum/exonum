@@ -21,11 +21,9 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, TemporaryDB},
     node::NodePlugin,
+    runtime::{ArtifactId, RuntimeInstance, WellKnownRuntime},
 };
-use exonum_rust_runtime::{
-    ArtifactId, DefaultInstance, RuntimeInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory,
-    WellKnownRuntime,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory};
 use futures::sync::mpsc;
 
 use std::{collections::HashMap, net::SocketAddr};
@@ -83,10 +81,10 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # Example
 ///
 /// ```
-/// # use exonum::{crypto::Hash, merkledb::Snapshot};
+/// # use exonum::{crypto::Hash, merkledb::Snapshot, runtime::BlockchainData};
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
 /// # use exonum_testkit::TestKitBuilder;
-/// # use exonum_rust_runtime::{BlockchainData, Service, ServiceFactory};
+/// # use exonum_rust_runtime::{Service, ServiceFactory};
 /// #
 /// # const SERVICE_ID: u32 = 1;
 /// #

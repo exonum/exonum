@@ -15,12 +15,11 @@
 use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidateInput},
+    runtime::{CommonError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus},
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::{
-    CallContext, CommonError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus,
-};
+use exonum_rust_runtime::CallContext;
 
 use std::collections::HashSet;
 

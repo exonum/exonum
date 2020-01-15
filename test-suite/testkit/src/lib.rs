@@ -22,15 +22,13 @@
 //!     blockchain::{Block, Schema},
 //!     crypto::{gen_keypair, Hash},
 //!     helpers::Height,
+//!     runtime::{BlockchainData, SnapshotExt, ExecutionError},
 //! };
 //! use serde_derive::*;
 //! use exonum_derive::*;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
-//! use exonum_rust_runtime::{
-//!     ServiceFactory, CallContext, Service,
-//!     BlockchainData, SnapshotExt, ExecutionError,
-//! };
+//! use exonum_rust_runtime::{ServiceFactory, CallContext, Service};
 //!
 //! // Simple service implementation.
 //!
@@ -122,11 +120,10 @@ use exonum::{
     merkledb::{BinaryValue, Database, ObjectHash, Snapshot, TemporaryDB},
     messages::{AnyTx, Verified},
     node::{ApiSender, ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState},
+    runtime::{InstanceId, RuntimeInstance, SnapshotExt},
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
-use exonum_rust_runtime::{
-    InstanceId, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
-};
+use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio_core::reactor::Core;
 
@@ -312,8 +309,8 @@ impl TestKit {
     /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
-    /// # use exonum::crypto::{PublicKey, Hash, SecretKey};
-    /// # use exonum_rust_runtime::{CallContext, Service, ServiceFactory, ExecutionError};
+    /// # use exonum::{crypto::{PublicKey, Hash, SecretKey}, runtime::ExecutionError};
+    /// # use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
     /// #
     /// // Suppose we test this service interface:
     /// #[exonum_interface]
@@ -696,8 +693,9 @@ impl TestKit {
 /// # use exonum::{
 /// #     crypto::{PublicKey, Hash},
 /// #     helpers::Height,
+/// #     runtime::BlockchainData,
 /// # };
-/// # use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, BlockchainData};
+/// # use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service};
 /// # use exonum_merkledb::{Fork, Snapshot};
 /// # use exonum_testkit::{StoppedTestKit, TestKit};
 /// # use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};

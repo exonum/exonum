@@ -38,11 +38,12 @@ pub use crate::{
     transactions::{Config, Error, TimestampingInterface},
 };
 
-use exonum::merkledb::BinaryValue;
-use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_rust_runtime::{
-    api::ServiceApiBuilder, CallContext, CommonError, ExecutionError, Service,
+use exonum::{
+    merkledb::BinaryValue,
+    runtime::{CommonError, ExecutionError},
 };
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
