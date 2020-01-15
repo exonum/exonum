@@ -25,8 +25,9 @@ use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Verified},
+    runtime::{ExecutionError, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::{ExecutionError, ServiceFactory, SUPERVISOR_INSTANCE_ID};
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -34,7 +35,7 @@ use exonum_supervisor::{
     SupervisorInterface,
 };
 
-use failing_runtime::{FailingRuntime, FailingRuntimeError};
+use self::failing_runtime::{FailingRuntime, FailingRuntimeError};
 
 mod failing_runtime {
     use std::str::FromStr;

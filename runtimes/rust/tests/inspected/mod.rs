@@ -26,8 +26,8 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        CallInfo, ExecutionContext, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        WellKnownRuntime,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -39,10 +39,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use exonum_rust_runtime::{
-    ArtifactId, CallContext, DefaultInstance, ExecutionError, InstanceId, RustRuntime, Service,
-    ServiceFactory, SnapshotExt, SUPERVISOR_INSTANCE_ID,
-};
+use exonum_rust_runtime::{CallContext, DefaultInstance, RustRuntime, Service, ServiceFactory};
 
 pub fn execute_transaction(
     blockchain: &mut BlockchainMut,

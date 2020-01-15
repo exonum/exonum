@@ -80,7 +80,9 @@
 //! 3. Once the service is instantiated, it can process transactions and interact with the
 //!   external users in other ways. Different services instantiated from the same artifact
 //!   are independent and have separate blockchain storages. Users can distinguish services
-//!   by their IDs; both numeric and string IDs are unique within a blockchain.
+//!   by their IDs; both numeric and string IDs are unique within a blockchain. (Note that
+//!   the transition to the "active" state is not immediate;
+//!   see [*Service State Transitions*](#service-state-transitions) section below.)
 //!
 //! 4. Active service instances can be stopped by a corresponding request to [`Dispatcher`].
 //!   A stopped service no longer participates in business logic, i.e. it does not process
@@ -90,6 +92,21 @@
 //!   adding new services.
 //!
 //! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
+//!
+//! ## Service State Transitions
+//!
+//! Transitions between service states (including service creation) occur once the block
+//! with the transition is committed; the effect of a transition is not immediate. This means
+//! that, for example, an instantiated service cannot process transactions or internal calls
+//! in the block with instantiation, but can in the following block. Likewise, the service hooks
+//! (`before_transactions` / `after_transactions`) are *not* called in the block with service
+//! instantiation.
+//!
+//! When the service is stopped, the reverse is true:
+//!
+//! - The service continues processing transactions until the end of the block containing
+//!   the stop command
+//! - The service hooks *are* called for the service in this block
 //!
 //! # Transaction Lifecycle
 //!
@@ -459,9 +476,11 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///   from the script. `end_version` does not need to correspond to the version of `new_artifact`,
     ///   or to a version of an artifact deployed on the blockchain in general.
     /// - `Ok(None)` means that the service does not require data migration. `data_version`
-    ///   of the service will be updated to the version of `new_artifact` immediately.
+    ///   of the service will be updated to the version of `new_artifact` once the block
+    ///   with the migration command is committed; see [*Service State Transitions*] for details.
     ///
     /// [`data_version`]: struct.InstanceState.html#field.data_version
+    /// [*Service State Transitions*]: index.html#service-state-transitions
     fn migrate(
         &self,
         new_artifact: &ArtifactId,
@@ -469,6 +488,9 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ) -> Result<Option<MigrationScript>, InitMigrationError>;
 
     /// Dispatches payload to the method of a specific service instance.
+    ///
+    /// The call is dispatched iff the service is considered active at the moment.
+    /// See [*Service State Transitions*] for more details.
     ///
     /// # Arguments
     ///
@@ -494,6 +516,8 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// An error returned from this method will lead to the rollback of all changes
     /// in the fork enclosed in the `context`.
+    ///
+    /// [*Service State Transitions*]: index.html#service-state-transitions
     fn execute(
         &self,
         context: ExecutionContext<'_>,
@@ -568,19 +592,23 @@ impl<T: Runtime> From<T> for Box<dyn Runtime> {
     }
 }
 
-/// Specifies a system identifier for [`Runtime`].
+/// A subset of [`Runtime`]s with a well-known runtime identifier.
+///
+/// [`Runtime`]: trait.Runtime.html
 pub trait WellKnownRuntime: Runtime {
     /// Identifier of the present runtime.
     const ID: u32;
 }
 
 // TODO: Rethink visibility [ECR-3913]
-#[derive(Debug)]
 /// Instance of [`Runtime`] with the corresponding ID.
+///
+/// [`Runtime`]: trait.Runtime.html
+#[derive(Debug)]
 pub struct RuntimeInstance {
-    /// Identifier of the present runtime.
+    /// Identifier of the enclosed runtime.
     pub id: u32,
-    /// Instance of [`Runtime`].
+    /// Enclosed `Runtime` object.
     pub instance: Box<dyn Runtime>,
 }
 

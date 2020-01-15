@@ -94,11 +94,10 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
     exonum_merkledb::RocksDB,
     node::NodeBuilder as CoreNodeBuilder,
+    runtime::{RuntimeInstance, WellKnownRuntime},
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_rust_runtime::{
-    DefaultInstance, RuntimeInstance, RustRuntimeBuilder, ServiceFactory, WellKnownRuntime,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 use exonum_system_api::SystemApiPlugin;
 

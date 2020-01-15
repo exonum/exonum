@@ -44,10 +44,9 @@ use exonum::{
         ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
         NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
     },
+    runtime::{ArtifactId, SnapshotExt},
 };
-use exonum_rust_runtime::{
-    ArtifactId, DefaultInstance, RustRuntimeBuilder, ServiceFactory, SnapshotExt,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
 use futures::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{

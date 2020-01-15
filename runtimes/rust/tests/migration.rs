@@ -19,13 +19,16 @@ use exonum::{
         access::{Access, FromAccess},
         BinaryValue, ProofEntry, ProofListIndex,
     },
+    runtime::{
+        migrations::{InitMigrationError, MigrateData, MigrationScript},
+        versioning::Version,
+        CommonError, CoreError, ErrorMatch, ExecutionError, ExecutionFail, InstanceStatus,
+        SnapshotExt,
+    },
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    migrations::{InitMigrationError, MigrateData, MigrationScript},
-    versioning::Version,
-    CallContext, CommonError, CoreError, DefaultInstance, ErrorMatch, ExecutionError,
-    ExecutionFail, InstanceStatus, RustRuntimeBuilder, Service, ServiceFactory, SnapshotExt,
+    CallContext, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
 };
 use pretty_assertions::assert_eq;
 
