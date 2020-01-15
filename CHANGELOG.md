@@ -99,6 +99,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `exonum-api` crate defining the base HTTP wrapper
   - `exonum-system-api` crate implementing system API endpoints
 
+- Added a new method `initiate_resuming_service` to the `Runtime` trait.
+  This method is used to resume a previously stopped services.
+  (#1693)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.

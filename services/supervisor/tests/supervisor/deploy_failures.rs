@@ -132,6 +132,15 @@ mod failing_runtime {
             unimplemented!("This runtime does not support service instantiation");
         }
 
+        fn initiate_resuming_service(
+            &self,
+            _context: ExecutionContext<'_>,
+            _spec: &InstanceSpec,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            unimplemented!("This runtime does not support service resuming");
+        }
+
         /// Commits status for the `SampleService` instance with the specified ID.
         fn update_service_status(
             &mut self,
