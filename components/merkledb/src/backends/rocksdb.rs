@@ -189,7 +189,7 @@ impl RocksDB {
     }
 
     #[allow(unsafe_code)]
-    fn rocksdb_snapshot(&self) -> RocksDBSnapshot {
+    pub(super) fn rocksdb_snapshot(&self) -> RocksDBSnapshot {
         RocksDBSnapshot {
             // SAFETY:
             // The snapshot carries an `Arc` to the database to make sure that database

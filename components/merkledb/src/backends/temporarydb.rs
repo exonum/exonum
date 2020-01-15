@@ -19,10 +19,13 @@ use tempfile::TempDir;
 
 use std::sync::Arc;
 
-use super::rocksdb::RocksDB;
+use crate::backends::rocksdb::{RocksDB, RocksDBSnapshot};
 use crate::{db::DB_METADATA, Database, DbOptions, Iter, Patch, ResolvedAddress, Result, Snapshot};
 
-/// Wrapper over the `RocksDB` backend which stores data in the temporary directory
+#[cfg(test)]
+use std::path::Path;
+
+/// A wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.
 ///
 /// This database is only used for testing and experimenting; is not designed to
@@ -33,8 +36,10 @@ pub struct TemporaryDB {
     dir: Arc<TempDir>,
 }
 
+/// A wrapper over the `RocksDB` snapshot with the `TempDir` handle to prevent
+/// it from destroying until all the snapshots and database itself are dropped.
 struct TemporarySnapshot {
-    snapshot: Box<dyn Snapshot>,
+    snapshot: RocksDBSnapshot,
     _dir: Arc<TempDir>,
 }
 
@@ -95,9 +100,14 @@ impl TemporaryDB {
 
     fn temporary_snapshot(&self) -> TemporarySnapshot {
         TemporarySnapshot {
-            snapshot: self.inner.snapshot(),
-            _dir: self.dir.clone(),
+            snapshot: self.inner.rocksdb_snapshot(),
+            _dir: Arc::clone(&self.dir),
         }
+    }
+
+    #[cfg(test)]
+    fn get_db_path(&self) -> &Path {
+        self.dir.path()
     }
 }
 
@@ -161,4 +171,27 @@ fn clearing_database() {
     let list = snapshot.get_proof_list::<_, u32>("foo");
     assert_eq!(list.len(), 3);
     assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5, 6]);
+}
+
+#[test]
+fn check_if_snapshot_is_still_valid() {
+    use crate::access::AccessExt;
+
+    let (snapshot, db_path) = {
+        let db = TemporaryDB::new();
+        let db_path = db.get_db_path().to_path_buf();
+        let fork = db.fork();
+        {
+            let mut index = fork.get_list("index");
+            index.push(1);
+        }
+        db.merge_sync(fork.into_patch()).unwrap();
+        (db.snapshot(), db_path)
+    };
+
+    assert!(db_path.exists()); // A directory with db files still exists.
+                               // So we can safety work with the snapshot.
+
+    let index = snapshot.get_list("index");
+    assert_eq!(index.get(0), Some(1));
 }
