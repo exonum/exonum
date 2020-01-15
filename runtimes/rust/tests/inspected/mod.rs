@@ -213,7 +213,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         snapshot
             .for_dispatcher()
             .get_instance(spec.id)
-            .expect("Service instance should be exists");
+            .expect("Service instance should exist");
 
         let core_schema = CoreSchema::new(snapshot);
         let height = core_schema.next_height();
@@ -391,6 +391,5 @@ impl DefaultInstance for ToySupervisorService {
     fn default_instance(&self) -> InstanceInitParams {
         self.artifact_id()
             .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
-            .with_constructor(Vec::default())
     }
 }

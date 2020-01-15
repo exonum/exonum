@@ -387,7 +387,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ) -> Result<(), ExecutionError>;
 
     /// Resumes previously stopped service instance with the given specification and arguments.
-    /// For example, by this arguments service instance can update configuration.
+    /// As an example, arguments can be used to update the service configuration.
     ///
     /// The dispatcher ensures that a service instance with the given specification has been
     /// previously stopped and has the proper artifact version and name.
@@ -396,7 +396,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The main difference is that `initialize_adding_service` should call the service
     /// `initialize` method and `initiate_resuming_service` should call the service `resume` method.
     ///
-    /// [`initiate_adding_service`]: trait.Runtime.html#tymethod.initiate_adding_service
+    /// [`initiate_adding_service`]: #tymethod.initiate_adding_service
     fn initiate_resuming_service(
         &self,
         context: ExecutionContext<'_>,

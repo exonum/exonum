@@ -70,6 +70,16 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
         Ok(())
     }
 
+    /// Resumes a previously stopped service instance with the given parameters. This method
+    /// is called once after restarting a service instance.
+    ///
+    /// The default implementation does nothing and returns `Ok(())`.
+    ///
+    /// The parameters passed to the method are not saved by the framework
+    /// automatically, hence the user must do it manually, if needed.
+    ///
+    /// Please note that you should not do any data schema transformations here, as this may
+    /// violate further migration scripts.
     fn resume(&self, _context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
         Ok(())
     }

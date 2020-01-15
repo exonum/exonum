@@ -241,6 +241,9 @@
 //! # }
 //! ```
 
+#![warn(missing_debug_implementations, missing_docs)]
+#![deny(unsafe_code, bare_trait_objects)]
+
 pub use self::{
     call_context::CallContext,
     error::Error,
