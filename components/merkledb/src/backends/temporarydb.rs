@@ -19,10 +19,10 @@ use tempfile::TempDir;
 
 use std::sync::Arc;
 
-use super::rocksdb::RocksDB;
-use crate::{db::DB_METADATA, Database, DbOptions, Patch, Result, Snapshot};
+use crate::backends::rocksdb::{RocksDB, RocksDBSnapshot};
+use crate::{db::DB_METADATA, Database, DbOptions, Iter, Patch, ResolvedAddress, Result, Snapshot};
 
-/// Wrapper over the `RocksDB` backend which stores data in the temporary directory
+/// A wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.
 ///
 /// This database is only used for testing and experimenting; is not designed to
@@ -30,15 +30,22 @@ use crate::{db::DB_METADATA, Database, DbOptions, Patch, Result, Snapshot};
 #[derive(Debug)]
 pub struct TemporaryDB {
     inner: RocksDB,
-    dir: TempDir,
+    dir: Arc<TempDir>,
+}
+
+/// A wrapper over the `RocksDB` snapshot with the `TempDir` handle to prevent
+/// it from destroying until all the snapshots and database itself are dropped.
+struct TemporarySnapshot {
+    snapshot: RocksDBSnapshot,
+    _dir: Arc<TempDir>,
 }
 
 impl TemporaryDB {
     /// Creates a new, empty database.
     pub fn new() -> Self {
-        let dir = TempDir::new().unwrap();
+        let dir = Arc::new(TempDir::new().unwrap());
         let options = DbOptions::default();
-        let inner = RocksDB::open(&dir, &options).unwrap();
+        let inner = RocksDB::open(dir.path(), &options).unwrap();
         Self { dir, inner }
     }
 
@@ -87,11 +94,18 @@ impl TemporaryDB {
             .write_opt(batch, &write_options)
             .map_err(Into::into)
     }
+
+    fn temporary_snapshot(&self) -> TemporarySnapshot {
+        TemporarySnapshot {
+            snapshot: self.inner.rocksdb_snapshot(),
+            _dir: Arc::clone(&self.dir),
+        }
+    }
 }
 
 impl Database for TemporaryDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
-        self.inner.snapshot()
+        Box::new(self.temporary_snapshot())
     }
 
     fn merge(&self, patch: Patch) -> Result<()> {
@@ -100,6 +114,16 @@ impl Database for TemporaryDB {
 
     fn merge_sync(&self, patch: Patch) -> Result<()> {
         self.inner.merge_sync(patch)
+    }
+}
+
+impl Snapshot for TemporarySnapshot {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
+        self.snapshot.get(name, key)
+    }
+
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+        self.snapshot.iter(name, from)
     }
 }
 
@@ -139,4 +163,27 @@ fn clearing_database() {
     let list = snapshot.get_proof_list::<_, u32>("foo");
     assert_eq!(list.len(), 3);
     assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5, 6]);
+}
+
+#[test]
+fn check_if_snapshot_is_still_valid() {
+    use crate::access::AccessExt;
+
+    let (snapshot, db_path) = {
+        let db = TemporaryDB::new();
+        let db_path = db.dir.path().to_path_buf();
+        let fork = db.fork();
+        {
+            let mut index = fork.get_list("index");
+            index.push(1);
+        }
+        db.merge_sync(fork.into_patch()).unwrap();
+        (db.snapshot(), db_path)
+    };
+
+    assert!(db_path.exists()); // A directory with db files still exists.
+                               // So we can safety work with the snapshot.
+
+    let index = snapshot.get_list("index");
+    assert_eq!(index.get(0), Some(1));
 }

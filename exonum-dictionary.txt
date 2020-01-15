@@ -204,6 +204,7 @@ tymethod
 uint
 unboxed
 unflushed
+unittest
 unreceived
 unseparated
 unsized

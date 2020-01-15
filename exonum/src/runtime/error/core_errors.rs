@@ -54,6 +54,9 @@ pub enum CoreError {
     CannotUpgradeService = 11,
     /// Attempt to rollback or flush migration for a service which has no pending migration.
     NoMigration = 12,
+    /// An attempt to resume the service instance with the wrong artifact. The specified
+    /// artifact has a different name or an inappropriate version.
+    CannotResumeService = 13,
 }
 
 impl CoreError {

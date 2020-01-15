@@ -6,6 +6,7 @@ authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
 documentation = "https://docs.rs/exonum-crypto"
+readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "cryptography", "library"]
 categories = ["cryptography", "hashing"]

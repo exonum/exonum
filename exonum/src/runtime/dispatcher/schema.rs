@@ -392,11 +392,42 @@ impl Schema<&Fork> {
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
 
-        match state.status {
-            Some(InstanceStatus::Active) => {}
-            _ => return Err(CoreError::ServiceNotActive),
+        if let Some(InstanceStatus::Active) = state.status {
+            self.add_pending_status(state, InstanceStatus::Stopped, None)
+        } else {
+            Err(CoreError::ServiceNotActive)
         }
-        self.add_pending_status(state, InstanceStatus::Stopped, None)
+    }
+
+    /// Adds information about resuming service instance to the schema.
+    pub(crate) fn initiate_resuming_service(
+        &mut self,
+        instance_id: InstanceId,
+        artifact: ArtifactId,
+    ) -> Result<(), CoreError> {
+        let instance_name = self
+            .instance_ids()
+            .get(&instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+
+        let mut state = self
+            .instances()
+            .get(&instance_name)
+            .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
+
+        if state.spec.artifact.name != artifact.name {
+            return Err(CoreError::CannotResumeService);
+        }
+        if state.data_version() != &artifact.version {
+            return Err(CoreError::CannotResumeService);
+        }
+
+        if let Some(InstanceStatus::Stopped) = state.status {
+            state.spec.artifact = artifact;
+            self.add_pending_status(state, InstanceStatus::Active, None)
+        } else {
+            Err(CoreError::ServiceNotStopped)
+        }
     }
 
     /// Makes pending artifacts and instances active.
