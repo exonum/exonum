@@ -25,7 +25,9 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::{events::network::ConnectedPeerAddr, ConnectInfo, ExternalMessage, NodeRole, State};
+use crate::{
+    events::network::ConnectedPeerAddr, state::State, ConnectInfo, ExternalMessage, NodeRole,
+};
 
 #[derive(Debug, Default)]
 struct ApiNodeState {

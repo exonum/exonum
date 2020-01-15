@@ -45,7 +45,8 @@ use crate::{
         noise::{Handshake, HandshakeParams, NoiseHandshake},
     },
     messages::{Connect, Message, Service},
-    NetworkConfiguration, SharedConnectList,
+    state::SharedConnectList,
+    NetworkConfiguration,
 };
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
@@ -75,9 +76,12 @@ pub enum NetworkEvent {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum NetworkRequest {
     SendMessage(PublicKey, SignedMessage),
+    // TODO: This variant is never constructed in main code. Is it necessary? (ECR-4118)
     DisconnectWithPeer(PublicKey),
+    // TODO: This variant is never constructed in main code. Is it necessary? (ECR-4118)
     Shutdown,
 }
 

@@ -20,9 +20,6 @@ pub enum NoiseError {
     #[fail(display = "Wrong handshake message length {}", _0)]
     WrongMessageLength(usize),
 
-    #[fail(display = "{}", _0)]
-    Other(String),
-
     #[fail(display = "Snow error: {}", _0)]
     Snow(Error),
 }

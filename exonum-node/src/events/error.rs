@@ -20,10 +20,6 @@ use log::error;
 
 use std::{error::Error as StdError, fmt::Display};
 
-pub fn result_ok<T>(_: T) -> Result<(), Error> {
-    Ok(())
-}
-
 pub fn log_error<E: Display>(error: E) {
     error!("An error occurred: {}", error)
 }

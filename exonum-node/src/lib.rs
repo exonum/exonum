@@ -35,16 +35,9 @@
 
 // spell-checker:ignore cors
 
-#[doc(hidden)] // Needed for `transactions` benchmark; logically, `Message` is private
-pub use crate::messages::Message as PeerMessage;
 pub use crate::{
     connect_list::{ConnectInfo, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
-};
-
-pub(crate) use crate::{
-    connect_list::ConnectList,
-    state::{SharedConnectList, State},
 };
 
 use exonum::{
@@ -80,20 +73,23 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::events::{
-    error::{into_failure, LogError},
-    noise::HandshakeParams,
-    EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
-    NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+use crate::{
+    connect_list::ConnectList,
+    events::{
+        error::{into_failure, LogError},
+        noise::HandshakeParams,
+        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
+        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+    },
+    messages::Connect,
+    schema::NodeSchema,
+    state::{RequestData, State},
 };
-use crate::{messages::Connect, schema::NodeSchema, state::RequestData};
-
-#[doc(hidden)]
-pub mod events;
 
 mod basic;
 mod connect_list;
 mod consensus;
+mod events;
 mod events_impl;
 pub mod helpers;
 mod messages;
@@ -104,6 +100,15 @@ mod requests;
 mod sandbox;
 mod schema;
 mod state;
+
+// Logically private types re-exported for benchmarks.
+#[doc(hidden)]
+pub mod _bench_types {
+    pub use crate::{
+        events::{Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent},
+        messages::Message as PeerMessage,
+    };
+}
 
 /// External messages sent to the node.
 ///

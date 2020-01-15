@@ -39,8 +39,10 @@ use std::{
 };
 
 use exonum_node::{
-    events::{Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent},
-    EventsPoolCapacity, ExternalMessage, NodeChannel, PeerMessage,
+    EventsPoolCapacity, ExternalMessage, NodeChannel,
+    _bench_types::{
+        Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent, PeerMessage,
+    },
 };
 
 struct MessagesHandler {

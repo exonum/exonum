@@ -54,6 +54,7 @@ use self::{
     timestamping::TimestampingService,
 };
 use crate::{
+    connect_list::ConnectList,
     events::{
         Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
         TimeoutRequest,
@@ -63,8 +64,9 @@ use crate::{
         PoolTransactionsRequest, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
         TransactionsRequest, TransactionsResponse,
     },
-    ApiSender, Configuration, ConnectInfo, ConnectList, ConnectListConfig, ExternalMessage,
-    NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, State, SystemStateProvider,
+    state::State,
+    ApiSender, Configuration, ConnectInfo, ConnectListConfig, ExternalMessage,
+    NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, SystemStateProvider,
 };
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;

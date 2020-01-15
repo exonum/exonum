@@ -34,13 +34,14 @@ use std::{
 };
 
 use crate::{
+    connect_list::ConnectList,
     events::{
         error::log_error, network::NetworkPart, noise::HandshakeParams, NetworkEvent,
         NetworkRequest,
     },
     messages::Connect,
-    ConnectInfo, ConnectList, EventsPoolCapacity, NetworkConfiguration, NodeChannel,
-    SharedConnectList,
+    state::SharedConnectList,
+    ConnectInfo, EventsPoolCapacity, NetworkConfiguration, NodeChannel,
 };
 
 #[derive(Debug)]
