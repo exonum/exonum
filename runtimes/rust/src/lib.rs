@@ -63,9 +63,13 @@
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
+//!     // Each method in service should have an `interface_method` attribute specifying its ID.
+//!     // Alternative is to use `#[exonum_interface(auto_ids)]` to assign IDs automatically, but
+//!     // this is not a good idea for production code, since the method IDs assigned automatically
+//!     // can change (e.g. because of reordering methods in trait).
+//!     #[interface_method(id = 0)]
 //!     // Each method of the trait should have a signature of the following format.
 //!     // The argument should implement the `BinaryValue` trait.
-//!     #[interface_method(id = 0)]
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
 //! }
 //!

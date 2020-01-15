@@ -24,7 +24,7 @@ use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;
 
-#[exonum_interface(id_auto_increment = true)]
+#[exonum_interface(auto_ids)]
 pub trait Timestamping<Ctx> {
     type Output;
     fn timestamp(&self, ctx: Ctx, arg: Vec<u8>) -> Self::Output;

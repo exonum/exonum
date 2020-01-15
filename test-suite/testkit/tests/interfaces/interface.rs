@@ -27,7 +27,7 @@ pub struct Issue {
     pub amount: u64,
 }
 
-#[exonum_interface(interface = "IssueReceiver", id_auto_increment = true)]
+#[exonum_interface(interface = "IssueReceiver", auto_ids)]
 pub trait IssueReceiver<Ctx> {
     type Output;
     fn issue(&self, ctx: Ctx, arg: Issue) -> Self::Output;

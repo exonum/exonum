@@ -53,7 +53,7 @@ impl TxMarker {
 }
 
 /// Marker service transactions interface definition.
-#[exonum_interface(id_auto_increment = true)]
+#[exonum_interface(auto_ids)]
 pub trait MarkerTransactions<Ctx> {
     /// Output returned by the interface methods.
     type Output;

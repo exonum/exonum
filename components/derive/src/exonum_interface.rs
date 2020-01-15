@@ -143,7 +143,7 @@ impl ServiceMethodDescriptor {
 struct ExonumInterfaceAttrs {
     #[darling(rename = "crate")]
     cr: RustRuntimeCratePath,
-    id_auto_increment: bool,
+    auto_ids: bool,
     interface: Option<String>,
 }
 
@@ -151,7 +151,7 @@ impl Default for ExonumInterfaceAttrs {
     fn default() -> Self {
         Self {
             cr: RustRuntimeCratePath::default(),
-            id_auto_increment: false,
+            auto_ids: false,
             interface: None,
         }
     }
@@ -168,11 +168,11 @@ impl TryFrom<&[Attribute]> for ExonumInterfaceAttrs {
 }
 
 #[derive(Debug, FromMeta)]
-struct MethodIdAttr {
+struct InterfaceMethodAttrs {
     id: u32,
 }
 
-impl TryFrom<&[Attribute]> for MethodIdAttr {
+impl TryFrom<&[Attribute]> for InterfaceMethodAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
@@ -225,9 +225,9 @@ impl ExonumInterface {
         for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
-                    let method_id = if !attrs.id_auto_increment {
+                    let method_id = if !attrs.auto_ids {
                         // Auto-increment disabled, parse ID from attribute.
-                        let id_attr = MethodIdAttr::try_from(method.attrs.as_ref())?;
+                        let id_attr = InterfaceMethodAttrs::try_from(method.attrs.as_ref())?;
                         let method_id = id_attr.id;
 
                         if !used_method_ids.insert(method_id) {

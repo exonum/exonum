@@ -24,7 +24,7 @@ use exonum_derive::*;
 use exonum_rust_runtime::{CallContext, DefaultInstance, Service, TxStub};
 use serde_derive::{Deserialize, Serialize};
 
-#[exonum_interface(id_auto_increment = true)]
+#[exonum_interface(auto_ids)]
 pub trait ConfigUpdater<Ctx> {
     type Output;
     fn update_config(&self, ctx: Ctx, arg: TxConfig) -> Self::Output;

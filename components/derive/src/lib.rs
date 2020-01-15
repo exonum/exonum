@@ -253,7 +253,7 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 /// ## `id_auto_increment`
 ///
 /// ```text
-/// #[exonum_interface(id_auto_increment = true)]
+/// #[exonum_interface(auto_ids)]
 /// ```
 ///
 /// Enables automatic ID assignment for interface methods. This may be useful for writing tests,
