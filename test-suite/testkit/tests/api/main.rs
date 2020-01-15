@@ -156,7 +156,6 @@ fn endpoint_with_new_error_type() {
         .query(&err_query)
         .get_new::<u64>("new-error-type")
         .expect_err("Should return error.");
-    println!("{:?}", error);
 
     assert_eq!(error.http_code, StatusCode::BAD_REQUEST);
     assert_eq!(error.body.docs_uri, "http://some-docs.com");
