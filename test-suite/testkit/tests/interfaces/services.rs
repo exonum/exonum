@@ -33,7 +33,7 @@ use crate::{
     schema::{Wallet, WalletSchema},
 };
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 pub trait WalletInterface<Ctx> {
     type Output;
     fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
@@ -109,7 +109,7 @@ pub struct TxIssue {
     pub amount: u64,
 }
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 pub trait DepositInterface<Ctx> {
     type Output;
     fn deposit(&self, context: Ctx, arg: TxIssue) -> Self::Output;
@@ -175,7 +175,7 @@ impl AnyCall {
     }
 }
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 pub trait CallAny<Ctx> {
     type Output;
     fn call_any(&self, context: Ctx, arg: AnyCall) -> Self::Output;

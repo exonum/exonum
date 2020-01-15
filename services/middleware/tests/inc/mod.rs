@@ -44,7 +44,7 @@ impl<T: Access> IncSchema<T> {
     }
 }
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 pub trait IncInterface<Ctx> {
     type Output;
     fn increment(&self, context: Ctx, seed: u8) -> Self::Output;

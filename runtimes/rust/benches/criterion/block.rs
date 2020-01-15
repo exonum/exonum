@@ -148,7 +148,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
-    #[exonum_interface]
+    #[exonum_interface(id_auto_increment = true)]
     pub trait TimestampingInterface<Ctx> {
         type Output;
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
@@ -217,7 +217,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[exonum_interface]
+    #[exonum_interface(id_auto_increment = true)]
     pub trait CryptocurrencyInterface<Ctx> {
         type Output;
 
@@ -369,30 +369,30 @@ mod foreign_interface_call {
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
 
-    #[exonum_interface]
+    #[exonum_interface(id_auto_increment = true)]
     pub trait SelfInterface<Ctx> {
         type Output;
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
         fn call_foreign(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
-    #[exonum_interface]
+    #[exonum_interface(id_auto_increment = true)]
     pub trait ForeignInterface<Ctx> {
         type Output;
         fn foreign_timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
-    #[exonum_interface(interface = "Configure")]
+    #[exonum_interface(interface = "Configure", id_auto_increment = true)]
     pub trait Configure<Ctx> {
         type Output;
     }
 
-    #[exonum_interface(interface = "Events")]
+    #[exonum_interface(interface = "Events", id_auto_increment = true)]
     pub trait Events<Ctx> {
         type Output;
     }
 
-    #[exonum_interface(interface = "ERC30Tokens")]
+    #[exonum_interface(interface = "ERC30Tokens", id_auto_increment = true)]
     pub trait ERC30Tokens<Ctx> {
         type Output;
     }

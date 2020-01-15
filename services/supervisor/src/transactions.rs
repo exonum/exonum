@@ -42,12 +42,14 @@ pub trait SupervisorInterface<Ctx> {
     /// of other validators as well).
     /// After that, the supervisor will try to deploy the artifact, and if this procedure
     /// will be successful it will send `confirm_artifact_deploy` transaction.
+    #[interface_method(id = 0)]
     fn request_artifact_deploy(&self, context: Ctx, artifact: DeployRequest) -> Self::Output;
 
     /// Confirmation that the artifact was successfully deployed by the validator.
     ///
     /// The artifact is registered in the dispatcher if all validators send this confirmation.
     /// This confirmation is sent automatically by the node if the deploy succeeds.
+    #[interface_method(id = 1)]
     fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployResult) -> Self::Output;
 
     /// Propose config change
@@ -60,6 +62,7 @@ pub trait SupervisorInterface<Ctx> {
     /// are required.
     ///
     /// **Note:** only one proposal at time is possible.
+    #[interface_method(id = 2)]
     fn propose_config_change(&self, context: Ctx, propose: ConfigPropose) -> Self::Output;
 
     /// Confirm config change
@@ -68,6 +71,7 @@ pub trait SupervisorInterface<Ctx> {
     /// Vote of the author of the `propose_config_change` transaction is taken into
     /// account automatically.
     /// The configuration application rules depend on the `Supervisor` mode.
+    #[interface_method(id = 3)]
     fn confirm_config_change(&self, context: Ctx, vote: ConfigVote) -> Self::Output;
 }
 

@@ -203,7 +203,7 @@ mod tests {
     #[service_dispatcher(implements("SampleInterface"))]
     struct SampleService;
 
-    #[exonum_interface]
+    #[exonum_interface(id_auto_increment = true)]
     trait SampleInterface<Ctx> {
         type Output;
         fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;

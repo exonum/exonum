@@ -65,6 +65,7 @@
 //!     type Output;
 //!     // Each method of the trait should have a signature of the following format.
 //!     // The argument should implement the `BinaryValue` trait.
+//!     #[interface_method(id = 0)]
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
 //! }
 //!
@@ -193,13 +194,15 @@
 //! # use exonum::runtime::ExecutionError;
 //! # use exonum_rust_runtime::CallContext;
 //! # use exonum::crypto::gen_keypair;
-//! # use exonum_derive::exonum_interface;
+//! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
 //! # type Transfer = String;
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
+//!     #[interface_method(id = 1)]
 //!     fn transfer(&self, context: Ctx, arg: Transfer) -> Self::Output;
 //! }
 //!

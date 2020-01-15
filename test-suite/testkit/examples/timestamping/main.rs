@@ -23,7 +23,7 @@ use exonum_derive::*;
 use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 trait TimestampingInterface<Ctx> {
     type Output;
     fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;

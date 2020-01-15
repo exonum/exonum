@@ -25,7 +25,7 @@ use std::sync::{
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "after-commit";
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 pub trait AfterCommitInterface<Ctx> {
     type Output;
     fn after_commit(&self, ctx: Ctx, height: u64) -> Self::Output;

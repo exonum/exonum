@@ -283,7 +283,7 @@ struct StopService {
     instance_id: InstanceId,
 }
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 trait ToySupervisor<Ctx> {
     type Output;
 
@@ -351,7 +351,7 @@ impl Default for Init {
     }
 }
 
-#[exonum_interface]
+#[exonum_interface(id_auto_increment = true)]
 trait Test<Ctx> {
     type Output;
     fn method_a(&self, ctx: Ctx, arg: u64) -> Self::Output;
