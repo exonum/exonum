@@ -20,7 +20,7 @@ use tempfile::TempDir;
 use std::sync::Arc;
 
 use super::rocksdb::RocksDB;
-use crate::{db::DB_METADATA, Database, DbOptions, Patch, Result, Snapshot};
+use crate::{db::DB_METADATA, Database, DbOptions, Iter, Patch, ResolvedAddress, Result, Snapshot};
 
 /// Wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.
@@ -30,15 +30,20 @@ use crate::{db::DB_METADATA, Database, DbOptions, Patch, Result, Snapshot};
 #[derive(Debug)]
 pub struct TemporaryDB {
     inner: RocksDB,
-    dir: TempDir,
+    dir: Arc<TempDir>,
+}
+
+struct TemporarySnapshot {
+    snapshot: Box<dyn Snapshot>,
+    _dir: Arc<TempDir>,
 }
 
 impl TemporaryDB {
     /// Creates a new, empty database.
     pub fn new() -> Self {
-        let dir = TempDir::new().unwrap();
+        let dir = Arc::new(TempDir::new().unwrap());
         let options = DbOptions::default();
-        let inner = RocksDB::open(&dir, &options).unwrap();
+        let inner = RocksDB::open(dir.path(), &options).unwrap();
         Self { dir, inner }
     }
 
@@ -87,11 +92,18 @@ impl TemporaryDB {
             .write_opt(batch, &write_options)
             .map_err(Into::into)
     }
+
+    fn temporary_snapshot(&self) -> TemporarySnapshot {
+        TemporarySnapshot {
+            snapshot: self.inner.snapshot(),
+            _dir: self.dir.clone(),
+        }
+    }
 }
 
 impl Database for TemporaryDB {
     fn snapshot(&self) -> Box<dyn Snapshot> {
-        self.inner.snapshot()
+        Box::new(self.temporary_snapshot())
     }
 
     fn merge(&self, patch: Patch) -> Result<()> {
@@ -100,6 +112,16 @@ impl Database for TemporaryDB {
 
     fn merge_sync(&self, patch: Patch) -> Result<()> {
         self.inner.merge_sync(patch)
+    }
+}
+
+impl Snapshot for TemporarySnapshot {
+    fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
+        self.snapshot.get(name, key)
+    }
+
+    fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
+        self.snapshot.iter(name, from)
     }
 }
 
