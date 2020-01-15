@@ -32,6 +32,7 @@ exonum-explorer-service = { version = "0.13.0-rc.2", path = "../../../services/e
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../../test-suite/testkit" }
 
 assert_matches = "1.2.0"
+bincode = "1.2.1"
 hex = "0.4"
 pretty_assertions = "0.6.1"
 serde_json = "1.0.0"

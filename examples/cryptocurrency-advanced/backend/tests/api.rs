@@ -40,10 +40,14 @@ use exonum_cryptocurrency_advanced::{
     CryptocurrencyInterface, CryptocurrencyService,
 };
 
-// Imports shared test constants.
-use crate::constants::{ALICE_NAME, BOB_NAME, SERVICE_ID, SERVICE_NAME};
-
-mod constants;
+/// Alice's wallets name.
+const ALICE_NAME: &str = "Alice";
+/// Bob's wallet name.
+const BOB_NAME: &str = "Bob";
+/// Service instance ID.
+const SERVICE_ID: u32 = 120;
+/// Service instance name.
+const SERVICE_NAME: &str = "tst-token";
 
 fn author_address(tx: &Verified<AnyTx>) -> CallerAddress {
     Caller::Transaction {
