@@ -21,8 +21,6 @@ package exonum.messages;
 option java_package = "com.exonum.core.messages";
 
 import "types.proto";
-import "common.proto";
-import "blockchain.proto";
 import "runtime.proto";
 import "google/protobuf/timestamp.proto";
 
