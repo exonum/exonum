@@ -88,6 +88,7 @@ impl ApiError {
     }
 
     /// Sets `source` of an error.
+    #[doc(hidden)]
     pub fn source(mut self, source: impl Into<String>) -> Self {
         self.body.source = source.into();
         self
