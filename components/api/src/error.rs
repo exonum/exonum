@@ -27,19 +27,19 @@ pub struct ApiError {
     #[serde(skip)]
     pub http_code: StatusCode,
     /// A URI reference to the documentation or possible solutions for the problem.
-    #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
+    #[serde(rename = "type", skip_serializing_if = "String::is_empty")]
     pub docs_uri: String,
     /// Short description of the error.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub title: String,
     /// Detailed description of the error.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub detail: String,
     /// Source of the error.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub source: String,
     /// Internal error code.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<u8>,
 }
 
