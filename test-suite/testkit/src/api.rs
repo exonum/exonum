@@ -428,43 +428,14 @@ where
     where
         R: DeserializeOwned + 'static,
     {
-        fn extract_error(response: &mut Response) -> Option<api::ApiError> {
-            let code = response.status();
-            let body = response.text().expect("Unable to get response text");
-
-            let mut error = api::ApiError::new(code);
-            if let Some(json_obj) = serde_json::from_str::<serde_json::Value>(&body)
-                .unwrap()
-                .as_object()
-            {
-                if json_obj.contains_key("type") {
-                    error = error.docs_uri(json_obj["type"].as_str()?);
-                }
-                if json_obj.contains_key("title") {
-                    error = error.title(json_obj["title"].as_str()?);
-                }
-                if json_obj.contains_key("detail") {
-                    error = error.detail(json_obj["detail"].as_str()?);
-                }
-                if json_obj.contains_key("source") {
-                    error = error.source(json_obj["source"].as_str()?);
-                }
-                if json_obj.contains_key("error_code") {
-                    error = error.error_code(json_obj["error_code"].as_u64()? as u8);
-                }
-            }
-
-            Some(error)
-        }
-
-        if response.status() == StatusCode::OK {
-            let body = response.text().expect("Unable to get response text");
-            trace!("Body: {}", body);
+        let code = response.status();
+        let body = response.text().expect("Unable to get response text");
+        trace!("Body: {}", body);
+        if code == StatusCode::OK {
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");
-
             Ok(value)
         } else {
-            let error = extract_error(&mut response).expect("Failed to get error from response.");
+            let error = api::ApiError::parse(code, &body).expect("Unable to deserialize API error");
             Err(error)
         }
     }

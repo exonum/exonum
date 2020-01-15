@@ -145,7 +145,7 @@ fn endpoint_with_new_error_type() {
     let response: u64 = api
         .public(ApiKind::Service("api-service"))
         .query(&ok_query)
-        .get_new::<u64>("new-error-type")
+        .get_new("new-error-type")
         .expect("This request should be successful");
     assert_eq!(ok_query.value, response);
 
@@ -156,13 +156,14 @@ fn endpoint_with_new_error_type() {
         .query(&err_query)
         .get_new::<u64>("new-error-type")
         .expect_err("Should return error.");
+    println!("{:?}", error);
 
     assert_eq!(error.http_code, StatusCode::BAD_REQUEST);
-    assert_eq!(error.docs_uri, "http://some-docs.com");
-    assert_eq!(error.title, "Test endpoint error.");
+    assert_eq!(error.body.docs_uri, "http://some-docs.com");
+    assert_eq!(error.body.title, "Test endpoint error.");
     assert_eq!(
-        error.detail,
+        error.body.detail,
         format!("Test endpoint failed with query: {}", err_query.value)
     );
-    assert_eq!(error.error_code, Some(42));
+    assert_eq!(error.body.error_code, Some(42));
 }

@@ -16,36 +16,41 @@
 
 use actix_web::http::StatusCode;
 use failure::Fail;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use std::io;
 
 /// API HTTP error struct.
-#[derive(Fail, Debug, Serialize)]
+#[derive(Fail, Debug)]
 pub struct ApiError {
     /// HTTP error code.
-    #[serde(skip)]
     pub http_code: StatusCode,
+    /// API error body.
+    pub body: ApiErrorBody,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ApiErrorBody {
     /// A URI reference to the documentation or possible solutions for the problem.
-    #[serde(rename = "type", skip_serializing_if = "String::is_empty")]
+    #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
     pub docs_uri: String,
     /// Short description of the error.
-    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub title: String,
     /// Detailed description of the error.
-    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub detail: String,
     /// Source of the error.
-    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub source: String,
     /// Internal error code.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_code: Option<u8>,
 }
 
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.title, self.detail)
+        write!(f, "{}: {}", self.body.title, self.body.detail)
     }
 }
 
@@ -54,42 +59,50 @@ impl ApiError {
     pub fn new(http_code: StatusCode) -> Self {
         Self {
             http_code,
-            docs_uri: String::new(),
-            title: String::new(),
-            detail: String::new(),
-            source: String::new(),
-            error_code: None,
+            body: ApiErrorBody {
+                docs_uri: String::new(),
+                title: String::new(),
+                detail: String::new(),
+                source: String::new(),
+                error_code: None,
+            },
         }
     }
 
     /// Sets `docs_uri` of an error.
     pub fn docs_uri(mut self, docs_uri: impl Into<String>) -> Self {
-        self.docs_uri = docs_uri.into();
+        self.body.docs_uri = docs_uri.into();
         self
     }
 
     /// Sets `title` of an error.
     pub fn title(mut self, title: impl Into<String>) -> Self {
-        self.title = title.into();
+        self.body.title = title.into();
         self
     }
 
     /// Sets `detail` of an error.
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
-        self.detail = detail.into();
+        self.body.detail = detail.into();
         self
     }
 
     /// Sets `source` of an error.
     pub fn source(mut self, source: impl Into<String>) -> Self {
-        self.source = source.into();
+        self.body.source = source.into();
         self
     }
 
     /// Sets `error_code` of an error.
     pub fn error_code(mut self, error_code: u8) -> Self {
-        self.error_code = Some(error_code);
+        self.body.error_code = Some(error_code);
         self
+    }
+
+    /// Tries to create `ApiError` from JSON.
+    pub fn parse(http_code: StatusCode, body: &str) -> std::result::Result<Self, String> {
+        let body = serde_json::from_str(body).or(Err("Failed to deserialize error body."))?;
+        Ok(Self { http_code, body })
     }
 }
 
