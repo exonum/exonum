@@ -385,9 +385,8 @@ pub use exonum_explorer::{
     TransactionInfo,
 };
 
-use actix_web::http::StatusCode;
 use exonum::{
-    api::{ApiError as HttpApiError, Error as ApiError, FutureResult},
+    api::{Error as ApiError, FutureResult},
     blockchain::{Blockchain, CallInBlock, Schema},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
@@ -530,21 +529,6 @@ impl ExplorerApi {
         Ok(CallStatusResponse { status })
     }
 
-    fn test_endpoint(
-        _schema: Schema<&dyn Snapshot>,
-        query: TransactionQuery,
-    ) -> Result<CallStatusResponse, HttpApiError> {
-        let response = HttpApiError::new(StatusCode::BAD_REQUEST)
-            .docs_uri("http://some-docs.com/bad_request")
-            .title("test_endpoint error title")
-            .detail(format!(
-                "Trying to access test_endpoint with query {}",
-                query.hash
-            ))
-            .error_code(42);
-        Err(response)
-    }
-
     /// Returns call status of `before_transactions` hook.
     fn before_transactions_status(
         schema: Schema<&dyn Snapshot>,
@@ -616,9 +600,6 @@ impl ExplorerApi {
             })
             .endpoint("v1/transactions", |state, query| {
                 Self::transaction_info(state.data().for_core(), query)
-            })
-            .endpoint_new("v1/test_endpoint", |state, query| {
-                Self::test_endpoint(state.data().for_core(), query)
             });
 
         let tx_sender = self.blockchain.sender().to_owned();
