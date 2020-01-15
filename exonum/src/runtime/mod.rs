@@ -900,7 +900,7 @@ impl<'a> SupervisorExtensions<'a> {
             .ok_or(CoreError::IncorrectInstanceId)?;
 
         match state.status {
-            Some(InstanceStatus::Stopped) => {},
+            Some(InstanceStatus::Stopped) => {}
             _ => return Err(CoreError::ServiceNotStopped.into()),
         }
 
