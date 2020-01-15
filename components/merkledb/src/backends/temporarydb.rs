@@ -22,9 +22,6 @@ use std::sync::Arc;
 use crate::backends::rocksdb::{RocksDB, RocksDBSnapshot};
 use crate::{db::DB_METADATA, Database, DbOptions, Iter, Patch, ResolvedAddress, Result, Snapshot};
 
-#[cfg(test)]
-use std::path::Path;
-
 /// A wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.
 ///
@@ -104,11 +101,6 @@ impl TemporaryDB {
             _dir: Arc::clone(&self.dir),
         }
     }
-
-    #[cfg(test)]
-    fn get_db_path(&self) -> &Path {
-        self.dir.path()
-    }
 }
 
 impl Database for TemporaryDB {
@@ -179,7 +171,7 @@ fn check_if_snapshot_is_still_valid() {
 
     let (snapshot, db_path) = {
         let db = TemporaryDB::new();
-        let db_path = db.get_db_path().to_path_buf();
+        let db_path = db.dir.path().to_path_buf();
         let fork = db.fork();
         {
             let mut index = fork.get_list("index");
