@@ -648,7 +648,7 @@ pub enum ExonumMessage {
     Propose(Propose),
     /// Consensus `Prevote` message.
     Prevote(Prevote),
-    /// Precommit.
+    /// Consensus `Precommit` message.
     Precommit(Precommit),
     /// Information about transactions, that sent as response to `TransactionsRequest`.
     TransactionsResponse(TransactionsResponse),

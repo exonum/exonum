@@ -144,7 +144,7 @@ fn test_allow_origin_toml() {
         let config_toml = format!("allow_origin = {}\n", text);
         let config: Config = toml::from_str(&config_toml).unwrap();
         assert_eq!(config.allow_origin, allow_origin);
-        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+        assert_eq!(toml::to_string(&config).unwrap(), config_toml);
     }
 
     check(r#""*""#, AllowOrigin::Any);
