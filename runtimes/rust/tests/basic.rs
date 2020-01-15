@@ -151,10 +151,10 @@ impl Service for DependentServiceImpl {
     fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         // Due to the fact that our toy supervisor immediately executes start / stop requests,
         // caller might be `ToySupervisorService::INSTANCE_ID`.
-        match *context.caller() {
+        match context.caller() {
             Caller::Blockchain => {}
-            Caller::Service { instance_id } if instance_id == ToySupervisorService::INSTANCE_ID => {
-            }
+            Caller::Service { instance_id }
+                if *instance_id == ToySupervisorService::INSTANCE_ID => {}
             other => panic!("Wrong caller type: {:?}", other),
         }
 

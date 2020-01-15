@@ -15,7 +15,7 @@
 //! Cryptocurrency transactions.
 
 use exonum::{
-    crypto::PublicKey,
+    crypto::{Hash, PublicKey},
     runtime::{CommonError, ExecutionError},
 };
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
@@ -113,11 +113,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     type Output = Result<(), ExecutionError>;
 
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Self::Output {
-        let (tx_hash, from) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
-
+        let (from, tx_hash) = extract_info(&context)?;
         let mut schema = SchemaImpl::new(context.service_data());
 
         let to = arg.to;
@@ -146,10 +142,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     }
 
     fn issue(&self, context: CallContext<'_>, arg: Issue) -> Self::Output {
-        let (tx_hash, from) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
+        let (from, tx_hash) = extract_info(&context)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         if let Some(wallet) = schema.public.wallets.get(&from) {
@@ -162,10 +155,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     }
 
     fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Self::Output {
-        let (tx_hash, from) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
+        let (from, tx_hash) = extract_info(&context)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         if schema.public.wallets.get(&from).is_none() {
@@ -176,4 +166,15 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
             Err(Error::WalletAlreadyExists.into())
         }
     }
+}
+
+fn extract_info(context: &CallContext<'_>) -> Result<(PublicKey, Hash), ExecutionError> {
+    let tx_hash = context
+        .transaction_hash()
+        .ok_or(CommonError::UnauthorizedCaller)?;
+    let from = context
+        .caller()
+        .author()
+        .ok_or(CommonError::UnauthorizedCaller)?;
+    Ok((from, tx_hash))
 }

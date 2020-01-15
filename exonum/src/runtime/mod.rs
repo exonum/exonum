@@ -621,45 +621,40 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
     }
 }
 
-/// The initiator of the method execution.
-#[derive(Debug, PartialEq, Copy, Clone)]
+/// The authorization information for a call to the service.
+///
+/// This enum is not supposed to be exhaustively matched, so that new variants may be added to it
+/// without breaking semver compatibility.
+#[derive(Debug, PartialEq, Clone)]
 pub enum Caller {
     /// A usual transaction from the Exonum client authorized by its key pair.
     Transaction {
-        /// Hash of the transaction message.
-        hash: Hash,
         /// Public key of the user who signed this transaction.
         author: PublicKey,
     },
 
-    /// Method is invoked during the method execution of a different service.
+    /// The call is invoked with the authority of a blockchain service.
     Service {
-        /// Identifier of the service instance which invoked the present method.
+        /// Identifier of the service instance which invoked the call.
         instance_id: InstanceId,
     },
 
-    /// Call is invoked by one of the blockchain lifecycle events.
+    /// The call is invoked by one of the blockchain lifecycle events.
     ///
     /// This kind of authorization is used for `before_transactions` / `after_transactions`
-    /// calls to the service instances, and for initialization of built-in services.
+    /// calls to the service instances, and for initialization of the built-in services.
     Blockchain,
+
+    // Hidden variant to prevent exhaustive matching.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl Caller {
     /// Returns the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
-        self.as_transaction().map(|(_hash, author)| author)
-    }
-
-    /// Return the transaction hash, if it exists.
-    pub fn transaction_hash(&self) -> Option<Hash> {
-        self.as_transaction().map(|(hash, _)| hash)
-    }
-
-    /// Tries to reinterpret the caller as an authorized transaction.
-    pub fn as_transaction(&self) -> Option<(Hash, PublicKey)> {
-        if let Caller::Transaction { hash, author } = self {
-            Some((*hash, *author))
+        if let Caller::Transaction { author } = self {
+            Some(*author)
         } else {
             None
         }
@@ -693,12 +688,15 @@ pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a mut Fork,
+    /// Hash of the currently executing transaction.
     /// The initiator of the transaction execution.
     pub caller: Caller,
     /// Identifier of the service interface required for the call. Keep in mind that this field, in
     /// fact, is a part of an unfinished "interfaces" feature. It will be replaced in future releases.
     /// At the moment this field is always empty for the primary service interface.
     pub interface_name: &'a str,
+    /// Hash of the currently executing transaction, or `None` for non-transaction calls.
+    transaction_hash: Option<Hash>,
     /// Reference to the dispatcher.
     dispatcher: &'a Dispatcher,
     /// Depth of the call stack.
@@ -709,14 +707,44 @@ impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     const MAX_CALL_STACK_DEPTH: usize = 256;
 
-    pub(crate) fn new(dispatcher: &'a Dispatcher, fork: &'a mut Fork, caller: Caller) -> Self {
+    pub(crate) fn for_transaction(
+        dispatcher: &'a Dispatcher,
+        fork: &'a mut Fork,
+        author: PublicKey,
+        transaction_hash: Hash,
+    ) -> Self {
+        Self::new(
+            dispatcher,
+            fork,
+            Caller::Transaction { author },
+            Some(transaction_hash),
+        )
+    }
+
+    pub(crate) fn for_block_call(dispatcher: &'a Dispatcher, fork: &'a mut Fork) -> Self {
+        Self::new(dispatcher, fork, Caller::Blockchain, None)
+    }
+
+    fn new(
+        dispatcher: &'a Dispatcher,
+        fork: &'a mut Fork,
+        caller: Caller,
+        transaction_hash: Option<Hash>,
+    ) -> Self {
         Self {
             dispatcher,
             fork,
             caller,
+            transaction_hash,
             interface_name: "",
             call_stack_depth: 0,
         }
+    }
+
+    /// Returns the hash of the currently executing transaction, or `None` for non-transaction
+    /// root calls (e.g., `before_transactions` / `after_transactions` service hooks).
+    pub fn transaction_hash(&self) -> Option<Hash> {
+        self.transaction_hash
     }
 
     /// Returns extensions required for the Supervisor service implementation.
@@ -737,7 +765,8 @@ impl<'a> ExecutionContext<'a> {
         ExecutionContext {
             caller: caller_service_id
                 .map(|instance_id| Caller::Service { instance_id })
-                .unwrap_or(self.caller),
+                .unwrap_or_else(|| self.caller.clone()),
+            transaction_hash: self.transaction_hash,
             dispatcher: self.dispatcher,
             fork: self.fork,
             interface_name: "",
@@ -987,7 +1016,8 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
     fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
         ExecutionContext {
             fork: &mut *self.fork,
-            caller: self.caller,
+            caller: self.caller.clone(),
+            transaction_hash: self.transaction_hash,
             interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
