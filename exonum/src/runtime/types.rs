@@ -732,7 +732,26 @@ impl ProtobufConvert for MigrationStatus {
     }
 }
 
-/// The authorization information for a call to the service.
+/// The authorization information for a service call.
+///
+/// `Caller` answers the question who the call is authorized by. The called service may use `Caller`
+/// to decide whether to proceed with the processing, or to return an error because the caller
+/// has insufficient privileges. In some other cases (e.g., crypto-tokens), `Caller` may be used
+/// to get or modify information about the caller in the blockchain state (e.g., the current token
+/// balance).
+///
+/// Authorization info is not purely determined by the call stack. While outermost
+/// transactions calls always have `Transaction` auth, services may make internal
+/// calls, which either inherit the parent authorization or authorize a child call in their
+/// name (`Service` auth). This is decided by the service; both kinds of auth may make sense
+/// depending on the use case. Inherited auth makes sense for "middleware" (e.g.,
+/// batched calls), while service auth makes sense for stateful authorization (e.g.,
+/// multi-signatures).
+///
+/// Note that `Caller` has a forward-compatible uniform representation obtained via
+/// [`address()`](#method.address) method. Services may use this representation to compare
+/// or index callers without the necessity to care about all possible kinds of authorization
+/// supported by the framework.
 ///
 /// This enum is not supposed to be exhaustively matched, so that new variants may be added to it
 /// without breaking semver compatibility.
