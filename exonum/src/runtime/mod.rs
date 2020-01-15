@@ -171,8 +171,9 @@ pub use self::{
         ExecutionError, ExecutionFail, ExecutionStatus,
     },
     types::{
-        AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, InstanceId,
-        InstanceQuery, InstanceSpec, InstanceState, InstanceStatus, MethodId,
+        AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, Caller,
+        CallerAddress, InstanceId, InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
+        MethodId,
     },
 };
 
@@ -618,66 +619,6 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
             id: T::ID,
             instance: runtime.into(),
         }
-    }
-}
-
-/// The authorization information for a call to the service.
-///
-/// This enum is not supposed to be exhaustively matched, so that new variants may be added to it
-/// without breaking semver compatibility.
-#[derive(Debug, PartialEq, Clone)]
-pub enum Caller {
-    /// A usual transaction from the Exonum client authorized by its key pair.
-    Transaction {
-        /// Public key of the user who signed this transaction.
-        author: PublicKey,
-    },
-
-    /// The call is invoked with the authority of a blockchain service.
-    Service {
-        /// Identifier of the service instance which invoked the call.
-        instance_id: InstanceId,
-    },
-
-    /// The call is invoked by one of the blockchain lifecycle events.
-    ///
-    /// This kind of authorization is used for `before_transactions` / `after_transactions`
-    /// calls to the service instances, and for initialization of the built-in services.
-    Blockchain,
-
-    // Hidden variant to prevent exhaustive matching.
-    #[doc(hidden)]
-    __NonExhaustive,
-}
-
-impl Caller {
-    /// Returns the author's public key, if it exists.
-    pub fn author(&self) -> Option<PublicKey> {
-        if let Caller::Transaction { author } = self {
-            Some(*author)
-        } else {
-            None
-        }
-    }
-
-    /// Tries to reinterpret the caller as a service.
-    pub fn as_service(&self) -> Option<InstanceId> {
-        if let Caller::Service { instance_id } = self {
-            Some(*instance_id)
-        } else {
-            None
-        }
-    }
-
-    /// Verifies that the caller of this method is a supervisor service.
-    pub fn as_supervisor(&self) -> Option<()> {
-        self.as_service().and_then(|instance_id| {
-            if instance_id == SUPERVISOR_INSTANCE_ID {
-                Some(())
-            } else {
-                None
-            }
-        })
     }
 }
 

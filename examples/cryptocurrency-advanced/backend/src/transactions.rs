@@ -15,8 +15,8 @@
 //! Cryptocurrency transactions.
 
 use exonum::{
-    crypto::{Hash, PublicKey},
-    runtime::{CommonError, ExecutionError},
+    crypto::Hash,
+    runtime::{CallerAddress as Address, CommonError, ExecutionError},
 };
 use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -55,7 +55,7 @@ pub enum Error {
 #[protobuf_convert(source = "proto::Transfer", serde_pb_convert)]
 pub struct Transfer {
     /// `PublicKey` of receiver's wallet.
-    pub to: PublicKey,
+    pub to: Address,
     /// Amount of currency to transfer.
     pub amount: u64,
     /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
@@ -160,7 +160,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
         let mut schema = SchemaImpl::new(context.service_data());
         if schema.public.wallets.get(&from).is_none() {
             let name = &arg.name;
-            schema.create_wallet(&from, name, tx_hash);
+            schema.create_wallet(from, name, tx_hash);
             Ok(())
         } else {
             Err(Error::WalletAlreadyExists.into())
@@ -168,13 +168,10 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     }
 }
 
-fn extract_info(context: &CallContext<'_>) -> Result<(PublicKey, Hash), ExecutionError> {
+fn extract_info(context: &CallContext<'_>) -> Result<(Address, Hash), ExecutionError> {
     let tx_hash = context
         .transaction_hash()
         .ok_or(CommonError::UnauthorizedCaller)?;
-    let from = context
-        .caller()
-        .author()
-        .ok_or(CommonError::UnauthorizedCaller)?;
+    let from = context.caller().address();
     Ok((from, tx_hash))
 }

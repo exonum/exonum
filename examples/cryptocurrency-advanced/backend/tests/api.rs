@@ -21,7 +21,7 @@ use exonum::{
     crypto::{self, Hash, PublicKey, SecretKey},
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
-    runtime::SnapshotExt,
+    runtime::{Caller, CallerAddress, SnapshotExt},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_rust_runtime::ServiceFactory;
@@ -45,6 +45,13 @@ use crate::constants::{ALICE_NAME, BOB_NAME, SERVICE_ID, SERVICE_NAME};
 
 mod constants;
 
+fn author_address(tx: &Verified<AnyTx>) -> CallerAddress {
+    Caller::Transaction {
+        author: tx.author(),
+    }
+    .address()
+}
+
 /// Check that the wallet creation transaction works when invoked via API.
 #[test]
 fn test_create_wallet() {
@@ -56,7 +63,7 @@ fn test_create_wallet() {
 
     // Check that the user indeed is persisted by the service.
     let wallet = api.get_wallet(tx.author()).unwrap();
-    assert_eq!(wallet.pub_key, tx.author());
+    assert_eq!(wallet.owner, author_address(&tx));
     assert_eq!(wallet.name, ALICE_NAME);
     assert_eq!(wallet.balance, 100);
 }
@@ -82,7 +89,7 @@ fn test_transfer() {
     let tx = alice.transfer(
         SERVICE_ID,
         Transfer {
-            to: tx_bob.author(),
+            to: author_address(&tx_bob),
             amount: 10,
             seed: 10,
         },
@@ -102,9 +109,9 @@ fn test_transfer() {
     // Check the balances via public schema.
     let snapshot = testkit.snapshot();
     let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
-    let alice_wallet = schema.wallets.get(&tx_alice.author()).unwrap();
+    let alice_wallet = schema.wallets.get(&author_address(&tx_alice)).unwrap();
     assert_eq!(alice_wallet.balance, 90);
-    let bob_wallet = schema.wallets.get(&tx_bob.author()).unwrap();
+    let bob_wallet = schema.wallets.get(&author_address(&tx_bob)).unwrap();
     assert_eq!(bob_wallet.balance, 110);
 }
 
@@ -126,7 +133,7 @@ fn test_transfer_from_nonexisting_wallet() {
     let tx = alice.transfer(
         SERVICE_ID,
         Transfer {
-            to: tx_bob.author(),
+            to: author_address(&tx_bob),
             amount: 10,
             seed: 0,
         },
@@ -156,7 +163,7 @@ fn test_transfer_from_nonexisting_wallet() {
     // Same check via schema.
     let snapshot = testkit.snapshot();
     let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
-    let wallet = schema.wallets.get(&tx_bob.author()).unwrap();
+    let wallet = schema.wallets.get(&author_address(&tx_bob)).unwrap();
     assert_eq!(wallet.balance, 100);
 }
 
@@ -178,7 +185,7 @@ fn test_transfer_to_nonexisting_wallet() {
     let tx = alice.transfer(
         SERVICE_ID,
         Transfer {
-            to: tx_bob.author(),
+            to: author_address(&tx_bob),
             amount: 10,
             seed: 0,
         },
@@ -219,7 +226,7 @@ fn test_transfer_overcharge() {
     let tx = alice.transfer(
         SERVICE_ID,
         Transfer {
-            to: tx_bob.author(),
+            to: author_address(&tx_bob),
             amount: 110,
             seed: 0,
         },
@@ -308,7 +315,8 @@ impl CryptocurrencyApi {
             .to_wallet
             .check_against_hash(table_hash)
             .unwrap();
-        let (_, wallet) = to_wallet.all_entries().find(|(&key, _)| key == pub_key)?;
+        let address = Caller::Transaction { author: pub_key }.address();
+        let (_, wallet) = to_wallet.all_entries().find(|(&key, _)| key == address)?;
         wallet.cloned()
     }
 
@@ -333,7 +341,8 @@ impl CryptocurrencyApi {
             .unwrap();
 
         let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
-        assert!(to_wallet.missing_keys().any(|&key| key == pub_key))
+        let address = Caller::Transaction { author: pub_key }.address();
+        assert!(to_wallet.missing_keys().any(|&key| key == address))
     }
 
     /// Asserts that the transaction with the given hash has a specified status.

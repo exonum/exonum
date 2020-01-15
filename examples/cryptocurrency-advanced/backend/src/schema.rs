@@ -14,11 +14,12 @@
 
 //! Cryptocurrency database schema.
 
-use exonum::crypto::{Hash, PublicKey};
+use exonum::crypto::Hash;
 use exonum::merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Group, ObjectHash, ProofListIndex, RawProofMapIndex,
 };
+use exonum::runtime::CallerAddress as Address;
 use exonum_derive::{FromAccess, RequireArtifact};
 
 use crate::{wallet::Wallet, INITIAL_BALANCE};
@@ -32,14 +33,14 @@ pub(crate) struct SchemaImpl<T: Access> {
     #[from_access(flatten)]
     pub public: Schema<T>,
     /// History for specific wallets.
-    pub wallet_history: Group<T, PublicKey, ProofListIndex<T::Base, Hash>>,
+    pub wallet_history: Group<T, Address, ProofListIndex<T::Base, Hash>>,
 }
 
 /// Public part of the cryptocurrency schema.
 #[derive(Debug, FromAccess, RequireArtifact)]
 pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
-    pub wallets: RawProofMapIndex<T::Base, PublicKey, Wallet>,
+    pub wallets: RawProofMapIndex<T::Base, Address, Wallet>,
 }
 
 impl<T: Access> SchemaImpl<T> {
@@ -62,12 +63,12 @@ where
         amount: u64,
         transaction: Hash,
     ) {
-        let mut history = self.wallet_history.get(&wallet.pub_key);
+        let mut history = self.wallet_history.get(&wallet.owner);
         history.push(transaction);
         let history_hash = history.object_hash();
         let balance = wallet.balance;
         let wallet = wallet.set_balance(balance + amount, &history_hash);
-        let wallet_key = wallet.pub_key;
+        let wallet_key = wallet.owner;
         self.public.wallets.put(&wallet_key, wallet);
     }
 
@@ -80,21 +81,21 @@ where
         amount: u64,
         transaction: Hash,
     ) {
-        let mut history = self.wallet_history.get(&wallet.pub_key);
+        let mut history = self.wallet_history.get(&wallet.owner);
         history.push(transaction);
         let history_hash = history.object_hash();
         let balance = wallet.balance;
         let wallet = wallet.set_balance(balance - amount, &history_hash);
-        let wallet_key = wallet.pub_key;
+        let wallet_key = wallet.owner;
         self.public.wallets.put(&wallet_key, wallet);
     }
 
     /// Create new wallet and append first record to its history.
-    pub(crate) fn create_wallet(&mut self, key: &PublicKey, name: &str, transaction: Hash) {
-        let mut history = self.wallet_history.get(key);
+    pub(crate) fn create_wallet(&mut self, key: Address, name: &str, transaction: Hash) {
+        let mut history = self.wallet_history.get(&key);
         history.push(transaction);
         let history_hash = history.object_hash();
         let wallet = Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash);
-        self.public.wallets.put(key, wallet);
+        self.public.wallets.put(&key, wallet);
     }
 }
