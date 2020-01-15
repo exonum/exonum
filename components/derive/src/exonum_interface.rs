@@ -179,11 +179,9 @@ impl TryFrom<&[Attribute]> for MethodIdAttr {
         find_meta_attrs("interface_method", args)
             .map(|meta| Self::from_nested_meta(&meta))
             .unwrap_or_else(|| {
-                let msg = format!(
-                    "Unable to find method ID mapping for method. \
-                     It should be specified, e.g. `#[interface_method(id = 0)]`",
-                );
-                Err(darling::Error::custom(msg))
+                let msg = "Unable to find method ID mapping for method. \
+                           It should be specified, e.g. `#[interface_method(id = 0)]`";
+                Err(darling::Error::custom(msg.to_string()))
             })
     }
 }
