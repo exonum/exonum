@@ -123,7 +123,7 @@ impl Runtime for SampleRuntime {
         _spec: &InstanceSpec,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        unreachable!("We don't migrate service data in this demo.")
+        unreachable!("We don't resume services in this example.")
     }
 
     /// Commits status for the `SampleService` instance with the specified ID.

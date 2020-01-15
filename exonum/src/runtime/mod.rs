@@ -394,7 +394,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// This method has the same workflow as [`initiate_adding_service`] method.
     /// The main difference is that `initialize_adding_service` should call the service
-    /// initialize method and `initiate_resuming_service` should call the service resume method.
+    /// `initialize` method and `initiate_resuming_service` should call the service `resume` method.
     ///
     /// [`initiate_adding_service`]: trait.Runtime.html#tymethod.initiate_adding_service
     fn initiate_resuming_service(
@@ -878,14 +878,14 @@ impl<'a> SupervisorExtensions<'a> {
 
     /// Initiates resuming previously stopped service instance in the blockchain.
     ///
-    /// Service will use the specified artifact to resume. Artifact name should be same as
-    /// the artifact name of the stopped instance previously stopped instance.
+    /// Provided artifact will be used in attempt to resume service. Artifact name should be equal to
+    /// the artifact name of the previously stopped instance.
     /// Artifact version should be same as the `data_version` stored in the stopped service
     /// instance.
     ///
     /// This method can be used to resume modified service after successful migration.
     ///
-    /// The service is not immediately activated; it activates if / when the block containing
+    /// The service is not immediately activated; it activates when the block containing
     /// the activation transaction is committed.
     pub fn initiate_resuming_service(
         &mut self,

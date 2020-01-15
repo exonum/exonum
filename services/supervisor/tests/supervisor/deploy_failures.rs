@@ -138,7 +138,7 @@ mod failing_runtime {
             _spec: &InstanceSpec,
             _params: Vec<u8>,
         ) -> Result<(), ExecutionError> {
-            unimplemented!("This runtime does not support service instantiation");
+            unimplemented!("This runtime does not support service resuming");
         }
 
         /// Commits status for the `SampleService` instance with the specified ID.
