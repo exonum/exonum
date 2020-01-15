@@ -104,7 +104,7 @@ impl CallInfo {
 /// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert)]
+#[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::runtime::AnyTx")]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
