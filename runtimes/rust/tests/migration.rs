@@ -555,3 +555,49 @@ fn test_resume_service_error() {
         &WithdrawalServiceV2.artifact_id().version
     );
 }
+
+#[test]
+fn resume_non_existent_service_error() {
+    let (mut blockchain, _) = create_runtime();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+
+    let actual_err = execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: WithdrawalServiceV2::INSTANCE_ID + 1,
+                artifact: WithdrawalServiceV2.artifact_id(),
+                params: vec![],
+            },
+        ),
+    )
+    .unwrap_err();
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+    );
+}
+
+#[test]
+fn resume_active_service_error() {
+    let (mut blockchain, _) = create_runtime();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+
+    let actual_err = execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: WithdrawalServiceV1::INSTANCE_ID,
+                artifact: WithdrawalServiceV1.artifact_id(),
+                params: vec![],
+            },
+        ),
+    )
+    .unwrap_err();
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&CoreError::ServiceNotStopped)
+    );
+}

@@ -895,10 +895,16 @@ impl<'a> SupervisorExtensions<'a> {
     ) -> Result<(), ExecutionError> {
         let mut context = self.0.child_context(Some(SUPERVISOR_INSTANCE_ID));
 
-        let mut spec = DispatcherSchema::new(&*context.fork)
+        let state = DispatcherSchema::new(&*context.fork)
             .get_instance(instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?
-            .spec;
+            .ok_or(CoreError::IncorrectInstanceId)?;
+
+        match state.status {
+            Some(InstanceStatus::Stopped) => {},
+            _ => return Err(CoreError::ServiceNotStopped.into()),
+        }
+
+        let mut spec = state.spec;
         spec.artifact = artifact;
 
         let runtime = context
