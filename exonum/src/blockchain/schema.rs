@@ -126,7 +126,7 @@ impl<T: Access> Schema<T> {
     /// ended up with a particular status.
     /// For an execution that resulted in an error, this will be an usual proof of existence.
     /// If transaction was executed successfully, such a proof will be a proof of absence.
-    /// Since the number of transaction in a block is mentioned in the block header, user
+    /// Since the number of transactions in a block is mentioned in the block header, the user
     /// will be able to distinguish absence of error (meaning successful execution) from
     /// absence of transaction with such an index: if index is less than amount of transactions
     /// in block, proof denotes successful execution, otherwise transaction with such an index
