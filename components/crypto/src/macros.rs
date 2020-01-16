@@ -38,8 +38,13 @@ macro_rules! implement_public_crypto_wrapper {
             $crate::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
+        /// Copies bytes from this instance.
+        pub fn as_bytes(&self) -> [u8; $size] {
+            (self.0).0
+        }
+
         /// Returns a hex representation of binary data.
-        /// Lower case letters are used (e.g. f9b4ca).
+        /// Lower case letters are used (e.g. `f9b4ca`).
         pub fn to_hex(&self) -> String {
             encode_hex(self)
         }
