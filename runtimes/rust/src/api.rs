@@ -166,6 +166,9 @@ impl ServiceApiScope {
         self
     }
 
+    /// Adds a readonly endpoint with new error type handler to the service API scope.
+    ///
+    /// In HTTP backends this type of endpoint corresponds to `GET` requests.
     pub fn endpoint_new<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
