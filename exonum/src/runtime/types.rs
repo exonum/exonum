@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{Hash, PublicKey, SecretKey};
+use exonum_crypto::{Hash, PublicKey, SecretKey, HASH_SIZE};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
+    indexes::proof_map::RawKey,
     validation::{is_allowed_index_name_char, is_valid_index_name_component},
-    BinaryValue, ObjectHash,
+    BinaryKey, BinaryValue, ObjectHash,
 };
 use exonum_proto::ProtobufConvert;
 use failure::{bail, ensure, format_err};
@@ -45,9 +46,6 @@ use crate::{
 pub type InstanceId = u32;
 /// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
-
-/// Uniform presentation of a `Caller`.
-pub type CallerAddress = Hash;
 
 /// Information for calling the service method.
 #[derive(Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
@@ -734,7 +732,7 @@ impl ProtobufConvert for MigrationStatus {
 
 /// The authorization information for a service call.
 ///
-/// `Caller` answers the question who the call is authorized by. The called service may use `Caller`
+/// `Caller` provides authorization details about the call. The called service may use `Caller`
 /// to decide whether to proceed with the processing, or to return an error because the caller
 /// has insufficient privileges. In some other cases (e.g., crypto-tokens), `Caller` may be used
 /// to get or modify information about the caller in the blockchain state (e.g., the current token
@@ -820,7 +818,7 @@ impl Caller {
     /// as the account *address*. Different addresses are guaranteed to correspond to
     /// different `Caller`s.
     pub fn address(&self) -> CallerAddress {
-        self.object_hash()
+        CallerAddress(self.object_hash())
     }
 }
 
@@ -851,6 +849,47 @@ impl ProtobufConvert for Caller {
         } else {
             bail!("No variant specified for `Caller`");
         })
+    }
+}
+
+/// Uniform presentation of a `Caller`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[serde(transparent)]
+pub struct CallerAddress(Hash);
+
+impl ProtobufConvert for CallerAddress {
+    type ProtoStruct = exonum_crypto::proto::types::Hash;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.0.to_pb()
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Hash::from_pb(pb).map(CallerAddress)
+    }
+}
+
+impl BinaryKey for CallerAddress {
+    fn size(&self) -> usize {
+        self.0.size()
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        self.0.write(buffer)
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        CallerAddress(Hash::read(buffer))
+    }
+}
+
+// SAFETY: We proxy `Hash` implementation of raw keys which satisfies expected invariants.
+#[allow(unsafe_code)]
+unsafe impl RawKey for CallerAddress {
+    fn to_raw_key(&self) -> [u8; HASH_SIZE] {
+        self.0.as_bytes()
     }
 }
 
@@ -999,8 +1038,8 @@ mod tests {
     fn caller_addresses() {
         let blockchain_addr = Caller::Blockchain.address();
         let supervisor_addr = Caller::Service { instance_id: 0 }.address();
-        assert_ne!(blockchain_addr, crypto::hash(&[]));
-        assert_ne!(supervisor_addr, crypto::hash(&[]));
+        assert_ne!(blockchain_addr.0, crypto::hash(&[]));
+        assert_ne!(supervisor_addr.0, crypto::hash(&[]));
         assert_ne!(blockchain_addr, supervisor_addr);
     }
 }
