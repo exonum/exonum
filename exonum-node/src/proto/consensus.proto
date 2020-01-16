@@ -103,10 +103,11 @@ message PoolTransactionsRequest {
 message ExonumMessage {
   oneof kind {
     exonum.runtime.AnyTx any_tx = 1;
-    Connect connect = 2;
-    Status status = 3;
+    exonum.messages.Precommit precommit = 2;
 
-    exonum.messages.Precommit precommit = 4;
+    Status status = 3;
+    Connect connect = 4;
+
     Propose propose = 5;
     Prevote prevote = 6;
 

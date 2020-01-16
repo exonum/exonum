@@ -39,18 +39,28 @@ message Verified {
   SignedMessage raw = 1;
 }
 
+// Subset of Exonum messages defined in the Exonum core.
 message CoreMessage {
   oneof kind {
+    // Transaction message.
     exonum.runtime.AnyTx any_tx = 1;
-    Precommit precommit = 4;
+    // Precommit (block endorsement) message.
+    Precommit precommit = 2;
   }
 }
 
+// Pre-commit for a block, essentially meaning that a validator node endorses the block.
 message Precommit {
+  // ID of the validator endorsing the block.
   uint32 validator = 1;
+  // The height to which the message is related.
   uint64 height = 2;
+  // The round to which the message is related.
   uint32 round = 3;
+  // Hash of the block proposal. Note that the proposal format is not defined by the core.
   exonum.crypto.Hash propose_hash = 4;
+  // Hash of the new block.
   exonum.crypto.Hash block_hash = 5;
+  // Local time of the validator node when the `Precommit` was created.
   google.protobuf.Timestamp time = 6;
 }

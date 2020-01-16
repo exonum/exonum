@@ -51,17 +51,17 @@ pub struct SignedMessage {
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "messages::Precommit")]
 pub struct Precommit {
-    /// The validator id.
+    /// ID of the validator endorsing the block.
     pub validator: ValidatorId,
     /// The height to which the message is related.
     pub height: Height,
     /// The round to which the message is related.
     pub round: Round,
-    /// Hash of the corresponding `Propose`.
+    /// Hash of the block proposal. Note that the proposal format is not defined by the core.
     pub propose_hash: Hash,
     /// Hash of the new block.
     pub block_hash: Hash,
-    /// Time of the `Precommit`.
+    /// Local time of the validator node when the `Precommit` was created.
     pub time: DateTime<Utc>,
 }
 
