@@ -865,6 +865,14 @@ impl From<SendError> for exonum_api::Error {
     }
 }
 
+impl From<SendError> for exonum_api::ApiError {
+    fn from(e: SendError) -> Self {
+        exonum_api::ApiError::new(exonum_api::HttpStatusCode::INTERNAL_SERVER_ERROR)
+            .title("Failed to send message")
+            .detail(e.to_string())
+    }
+}
+
 /// Handle allowing to shut down the node.
 #[derive(Debug, Clone)]
 pub struct ShutdownHandle {
