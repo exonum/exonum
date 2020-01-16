@@ -53,12 +53,4 @@ impl DefaultInstance for SampleService {
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
-impl Service for SampleService {
-    fn before_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-
-    fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
-        Ok(())
-    }
-}
+impl Service for SampleService {}
