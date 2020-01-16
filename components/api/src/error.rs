@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 
 /// API HTTP error struct.
-#[derive(Fail, Debug)]
+#[derive(Fail, Debug, PartialEq)]
 pub struct ApiError {
     /// HTTP error code.
     pub http_code: HttpStatusCode,
@@ -29,7 +29,7 @@ pub struct ApiError {
     pub body: ApiErrorBody,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
 pub struct ApiErrorBody {
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
