@@ -629,7 +629,6 @@ pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
     pub fork: &'a mut Fork,
-    /// Hash of the currently executing transaction.
     /// The initiator of the transaction execution.
     pub caller: Caller,
     /// Identifier of the service interface required for the call. Keep in mind that this field, in
