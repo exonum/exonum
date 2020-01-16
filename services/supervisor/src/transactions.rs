@@ -132,16 +132,13 @@ impl ResumeService {
     fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
         let instance = get_instance(context, self.instance_id)?;
 
-        match instance.status {
-            Some(InstanceStatus::Stopped) => {}
-            _ => {
-                return Err(
-                    ConfigurationError::MalformedConfigPropose.with_description(format!(
-                        "Discarded an attempt to resume not stopped service instance: {}",
-                        instance.spec.name
-                    )),
-                )
-            }
+        if instance.status != Some(InstanceStatus::Stopped) {
+            return Err(
+                ConfigurationError::MalformedConfigPropose.with_description(format!(
+                    "Discarded an attempt to resume not stopped service instance: {}",
+                    instance.spec.name
+                )),
+            );
         }
 
         if instance.data_version() != &self.artifact.version {
