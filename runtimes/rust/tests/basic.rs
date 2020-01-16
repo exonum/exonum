@@ -55,7 +55,7 @@ impl Default for Init {
     }
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 trait Test<Ctx> {
     type Output;
     fn method_a(&self, ctx: Ctx, arg: u64) -> Self::Output;

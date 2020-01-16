@@ -97,16 +97,23 @@ impl Service for MultisigService {
 trait MultisigInterface<Ctx> {
     type Output;
 
+    /// Proposes an `action` to be authorized by the service.
+    ///
+    /// This call should be authorized by one of multisig participants.
+    #[interface_method(id = 0)]
     fn propose_action(&self, context: Ctx, action: AnyTx) -> Self::Output;
+
+    /// Approves an earlier proposed action. If the action has reached threshold approval,
+    /// it is executed with the service authorization and removed from the pending actions.
+    ///
+    /// This call should be authorized by one of multisig participants.
+    #[interface_method(id = 1)]
     fn support_action(&self, context: Ctx, action_hash: Hash) -> Self::Output;
 }
 
 impl MultisigInterface<CallContext<'_>> for MultisigService {
     type Output = Result<(), ExecutionError>;
 
-    /// Proposes an `action` to be authorized by the service.
-    ///
-    /// This call should be authorized by one of multisig participants.
     fn propose_action(&self, context: CallContext<'_>, action: AnyTx) -> Self::Output {
         let caller = context.caller().address();
         // Note that identifying a proposal by the enclosing transaction hash is not always sound.
@@ -132,10 +139,6 @@ impl MultisigInterface<CallContext<'_>> for MultisigService {
         Ok(())
     }
 
-    /// Approves an earlier proposed action. If the action has reached threshold approval,
-    /// it is executed with the service authorization and removed from the pending actions.
-    ///
-    /// This call should be authorized by one of multisig participants.
     fn support_action(&self, mut context: CallContext<'_>, action_hash: Hash) -> Self::Output {
         let caller = context.caller().address();
 

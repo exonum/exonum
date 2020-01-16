@@ -127,6 +127,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
 
+#### exonum-rust-runtime
+
+- Service interfaces now have to specify method IDs with either `interface_method`
+  attribute or `id_auto_increment` option. (#1701)
+
 ### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)
@@ -195,11 +200,12 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
+- It is now possible to iterate over keys of the indexes within a group. (#1662)
+
 #### exonum-rust-runtime
 
 - Rust runtime module was moved from the `exonum` crate into the separate
   `exonum-rust-runtime` crate. (#1641)
-- It is now possible to iterate over keys of the indexes within a group. (#1662)
 
 #### exonum-supervisor
 

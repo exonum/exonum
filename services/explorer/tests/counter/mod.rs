@@ -66,7 +66,7 @@ pub enum Error {
     BadLuck = 2,
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait CounterInterface<Ctx> {
     type Output;
 

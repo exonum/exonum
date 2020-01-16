@@ -18,7 +18,7 @@ use exonum::{
     crypto::Hash,
     runtime::{CallerAddress as Address, CommonError, ExecutionError},
 };
-use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
+use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::CallContext;
 
@@ -102,10 +102,13 @@ pub trait CryptocurrencyInterface<Ctx> {
     type Output;
 
     /// Transfers `amount` of the currency from one wallet to another.
+    #[interface_method(id = 0)]
     fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
     /// Issues `amount` of the currency to the `wallet`.
+    #[interface_method(id = 1)]
     fn issue(&self, ctx: Ctx, arg: Issue) -> Self::Output;
     /// Creates wallet with the given `name`.
+    #[interface_method(id = 2)]
     fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
 }
 

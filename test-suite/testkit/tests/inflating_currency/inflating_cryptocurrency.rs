@@ -129,7 +129,7 @@ pub enum Error {
     SenderSameAsReceiver = 0,
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait CurrencyInterface<Ctx> {
     type Output;
     /// Apply logic to the storage when executing the transaction.
