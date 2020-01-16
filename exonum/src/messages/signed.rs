@@ -243,9 +243,8 @@ where
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
         let signed_message = SignedMessage {
             payload: pb.take_payload(),
-            author: PublicKey::from_pb(pb.take_author()).expect("Failed to convert from protobuf."),
-            signature: Signature::from_pb(pb.take_signature())
-                .expect("Failed to convert from protobuf."),
+            author: PublicKey::from_pb(pb.take_author())?,
+            signature: Signature::from_pb(pb.take_signature())?,
         };
 
         signed_message.into_verified()
