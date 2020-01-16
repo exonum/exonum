@@ -224,6 +224,26 @@ where
     }
 }
 
+impl<Q, I, F> From<NamedWith<Q, I, crate::ApiResult<I>, F>> for RequestHandler
+where
+    F: Fn(Q) -> crate::ApiResult<I> + 'static + Send + Sync + Clone,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
+{
+    fn from(f: NamedWith<Q, I, crate::ApiResult<I>, F>) -> Self {
+        // Convert handler that returns a `Result` into handler that will return `FutureResult`.
+        let handler = f.inner.handler;
+        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = HttpApiError>> {
+            let future = handler(query).into_future();
+            Box::new(future)
+        };
+        let named_with_future = NamedWith::new(f.name, future_endpoint, f.mutability);
+
+        // Then we can create a `RequestHandler` with the `From` specialization for future result.
+        RequestHandler::from(named_with_future)
+    }
+}
+
 /// Takes `HttpRequest` as a parameter and extracts query:
 /// - If request is immutable, the query is parsed from query string,
 /// - If request is mutable, the query is parsed from the request body as JSON.

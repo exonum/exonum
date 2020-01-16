@@ -227,6 +227,21 @@ where
     }
 }
 
+impl<Q, I, F> From<F> for With<Q, I, ApiResult<I>, F>
+where
+    F: Fn(Q) -> ApiResult<I>,
+{
+    fn from(handler: F) -> Self {
+        Self {
+            handler,
+            actuality: Actuality::Actual,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+        }
+    }
+}
+
 // Implementations for `FutureResult` and `query` parameters.
 
 impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
