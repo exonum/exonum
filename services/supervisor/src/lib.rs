@@ -52,7 +52,8 @@
 //! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
 //! This node votes for the configuration propose automatically.
 //!
-//! The operation of starting a service is treated similarly to a configuration change and follows the same rules.
+//! The operation of starting or resuming a service is treated similarly to a configuration change
+//! and follows the same rules.
 //!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
