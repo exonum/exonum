@@ -15,7 +15,8 @@
 //! Building blocks for creating HTTP API of Rust services.
 
 pub use exonum::api::{
-    ApiError, ApiFutureResult, Deprecated, EndpointMutability, Error, FutureResult, Result,
+    ApiError, ApiFutureResult, ApiResult, Deprecated, EndpointMutability, Error, FutureResult,
+    Result,
 };
 
 use futures::{Future, IntoFuture};
@@ -152,28 +153,6 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
-    {
-        let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
-        self.inner
-            .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let descriptor = (descriptor.0, descriptor.1.as_ref());
-                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
-                let result = handler(&state, query);
-                Box::new(result.into_future())
-            });
-        self
-    }
-
-    /// Adds a readonly endpoint with new error type handler to the service API scope.
-    ///
-    /// In HTTP backends this type of endpoint corresponds to `GET` requests.
-    pub fn endpoint_new<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
-    where
-        Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
         R: IntoFuture<Item = I, Error = crate::api::ApiError> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -203,16 +182,23 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+        R: IntoFuture<Item = I, Error = crate::api::ApiError> + 'static,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         self.inner
-            .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let descriptor = (descriptor.0, descriptor.1.as_ref());
-                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            .endpoint_mut(name, move |query: Q| -> crate::api::ApiFutureResult<I> {
+                let (instance_id, instance_name) = descriptor.clone();
+                let state = ServiceApiState::from_api_context(
+                    &blockchain,
+                    (instance_id, instance_name.as_ref()).into(),
+                    name,
+                );
                 let result = handler(&state, query);
-                Box::new(result.into_future())
+                let future = result
+                    .into_future()
+                    .map_err(move |err| err.source(format!("{}:{}", instance_name, instance_id)));
+                Box::new(future)
             });
         self
     }
