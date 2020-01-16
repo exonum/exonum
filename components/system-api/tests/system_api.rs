@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use exonum::helpers::user_agent;
+use exonum_node::ExternalMessage;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
@@ -84,4 +85,9 @@ fn shutdown() {
     api.private(ApiKind::System)
         .post::<()>("v1/shutdown")
         .unwrap();
+    let control_messages = testkit.poll_control_messages();
+    match control_messages.as_slice() {
+        [ExternalMessage::Shutdown] => {}
+        _ => panic!("Unexpected control messages: {:?}", control_messages),
+    }
 }

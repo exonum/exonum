@@ -131,6 +131,7 @@
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn do_nothing(&self, ctx: Ctx, _seed: u32) -> Self::Output;
 //! }
 //!
@@ -195,6 +196,7 @@
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn cause_error(&self, ctx: Ctx, _seed: u32) -> Self::Output;
 //! }
 //!
@@ -336,6 +338,7 @@
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn do_nothing(&self, ctx: Ctx, _seed: u32) -> Self::Output;
 //! }
 //!
@@ -386,16 +389,14 @@ pub use exonum_explorer::{
 };
 
 use exonum::{
-    api::{Error as ApiError, FutureResult},
-    blockchain::{Blockchain, CallInBlock, Schema},
+    blockchain::{ApiSender, Blockchain, CallInBlock, Schema},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
-    node::ApiSender,
     runtime::ExecutionStatus,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::api::ServiceApiScope;
+use exonum_rust_runtime::api::{Error as ApiError, FutureResult, ServiceApiScope};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;
@@ -570,7 +571,7 @@ impl ExplorerApi {
             sender
                 .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(ApiError::from)
+                .map_err(|e| ApiError::InternalError(e.into()))
         };
 
         Box::new(

@@ -13,12 +13,8 @@
 // limitations under the License.
 
 use actix::prelude::*;
-use exonum::{
-    api::{self, ApiAggregator, ApiBuilder, ApiFutureResult as FutureResult},
-    blockchain::ConsensusConfig,
-    crypto::Hash,
-    helpers::Height,
-};
+use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
+use exonum_api::{self as api, ApiAggregator, ApiBuilder, FutureResult};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
@@ -178,12 +174,12 @@ impl Handler<RollBack> for TestKitActor {
 #[cfg(test)]
 mod tests {
     use exonum::{
-        api,
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::ExecutionError,
     };
+    use exonum_api as api;
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
@@ -207,7 +203,7 @@ mod tests {
     #[service_dispatcher(implements("SampleInterface"))]
     struct SampleService;
 
-    #[exonum_interface]
+    #[exonum_interface(auto_ids)]
     trait SampleInterface<Ctx> {
         type Output;
         fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;

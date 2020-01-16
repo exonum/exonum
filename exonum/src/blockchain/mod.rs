@@ -15,6 +15,7 @@
 //! The module containing building blocks for creating blockchains powered by the Exonum framework.
 
 pub use self::{
+    api_sender::{ApiSender, SendError},
     block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ValidatorKeys},
@@ -33,21 +34,17 @@ use exonum_merkledb::{
 use failure::Error;
 use futures::Future;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    iter,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
     blockchain::config::GenesisConfig,
     crypto::{Hash, PublicKey, SecretKey},
-    helpers::{Height, Round, ValidateInput, ValidatorId},
-    messages::{AnyTx, Connect, Message, Precommit, Verified},
-    node::ApiSender,
+    helpers::{Height, ValidateInput, ValidatorId},
+    messages::{AnyTx, Precommit, Verified},
     runtime::{ArtifactSpec, Dispatcher},
 };
 
+mod api_sender;
 mod block;
 mod builder;
 mod schema;
@@ -115,14 +112,9 @@ impl Blockchain {
     }
 
     /// Returns the transactions pool size.
-    pub(crate) fn pool_size(&self) -> u64 {
+    #[doc(hidden)] // FIXME: move to separate schema
+    pub fn pool_size(&self) -> u64 {
         Schema::new(&self.snapshot()).transactions_pool_len()
-    }
-
-    /// Returns `Connect` messages from peers saved in the cache, if any.
-    pub(crate) fn get_saved_peers(&self) -> HashMap<PublicKey, Verified<Connect>> {
-        let snapshot = self.snapshot();
-        Schema::new(&snapshot).peers_cache().iter().collect()
     }
 
     /// Starts promotion into a mutable blockchain instance that can be used to process
@@ -136,12 +128,11 @@ impl Blockchain {
     /// this node is the only validator.
     #[cfg(test)]
     pub fn into_mut_with_dummy_config(self) -> BlockchainBuilder {
-        use crate::{blockchain::config::GenesisConfigBuilder, helpers::generate_testnet_config};
-        use exonum_crypto::KeyPair;
+        use self::config::GenesisConfigBuilder;
 
-        let mut config = generate_testnet_config(1, 0).pop().unwrap();
-        config.keys.service = KeyPair::from(self.service_keypair.clone());
-        let genesis_config = GenesisConfigBuilder::with_consensus_config(config.consensus).build();
+        let (mut config, _) = ConsensusConfig::for_tests(1);
+        config.validator_keys[0].service_key = self.service_keypair.0;
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(config).build();
         self.into_mut(genesis_config)
     }
 
@@ -417,9 +408,6 @@ impl BlockchainMut {
         let fork: Fork = patch.into();
         let mut schema = Schema::new(&fork);
         schema.precommits(&block_hash).extend(precommits);
-        // Consensus messages cache is useful only during one height, so it should be
-        // cleared when a new height is achieved.
-        schema.consensus_messages_cache().clear();
         let txs_in_block = schema.last_block().tx_count;
         schema.update_transaction_count(u64::from(txs_in_block));
 
@@ -474,41 +462,6 @@ impl BlockchainMut {
     /// Shuts down the dispatcher. This should be the last operation performed on this instance.
     pub fn shutdown(&mut self) {
         self.dispatcher.shutdown();
-    }
-
-    /// Saves the given raw message to the consensus messages cache.
-    pub(crate) fn save_message<T: Into<Message>>(&mut self, round: Round, message: T) {
-        self.save_messages(round, iter::once(message.into()));
-    }
-
-    /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
-    /// `Fork` instance.
-    pub(crate) fn save_messages<I>(&mut self, round: Round, iter: I)
-    where
-        I: IntoIterator<Item = Message>,
-    {
-        let fork = self.fork();
-        let mut schema = Schema::new(&fork);
-        schema.consensus_messages_cache().extend(iter);
-        schema.set_consensus_round(round);
-        self.merge(fork.into_patch())
-            .expect("Unable to save messages to the consensus cache");
-    }
-
-    /// Saves the `Connect` message from a peer to the cache.
-    pub(crate) fn save_peer(&mut self, pubkey: &PublicKey, peer: Verified<Connect>) {
-        let fork = self.fork();
-        Schema::new(&fork).peers_cache().put(pubkey, peer);
-        self.merge(fork.into_patch())
-            .expect("Unable to save peer to the peers cache");
-    }
-
-    /// Removes from the cache the `Connect` message from a peer.
-    pub(crate) fn remove_peer_with_pubkey(&mut self, key: &PublicKey) {
-        let fork = self.fork();
-        Schema::new(&fork).peers_cache().remove(key);
-        self.merge(fork.into_patch())
-            .expect("Unable to remove peer from the peers cache");
     }
 }
 

@@ -15,13 +15,13 @@
 //! Sample counter service.
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
-    api::{
-        self,
-        backends::actix::{HttpRequest, RawHandler, RequestHandler},
-        ApiBackend,
-    },
     blockchain::{IndexProof, ValidatorKeys},
     runtime::{ExecutionError, InstanceId},
+};
+use exonum_api::{
+    self as api,
+    backends::actix::{HttpRequest, RawHandler, RequestHandler},
+    ApiBackend,
 };
 use exonum_derive::*;
 use exonum_explorer::api::TransactionResponse;
@@ -83,7 +83,7 @@ pub enum Error {
     BadLuck = 2,
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait CounterServiceInterface<Ctx> {
     type Output;
 
@@ -184,7 +184,10 @@ struct CounterApi;
 impl CounterApi {
     fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
-        let tx_hash = state.generic_broadcaster().increment((), value)?;
+        let tx_hash = state
+            .generic_broadcaster()
+            .increment((), value)
+            .map_err(|e| api::Error::InternalError(e.into()))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -208,7 +211,10 @@ impl CounterApi {
     fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
         // The first `()` is the empty context, the second one is the `reset` arg.
-        let tx_hash = state.generic_broadcaster().reset((), ())?;
+        let tx_hash = state
+            .generic_broadcaster()
+            .reset((), ())
+            .map_err(|e| api::Error::InternalError(e.into()))?;
         Ok(TransactionResponse { tx_hash })
     }
 

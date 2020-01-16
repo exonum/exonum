@@ -19,7 +19,6 @@ package exonum.supervisor;
 import "types.proto";
 import "service.proto";
 import "runtime.proto";
-import "google/protobuf/empty.proto";
 
 message ConfigProposalWithHash {
     exonum.crypto.Hash propose_hash = 1;

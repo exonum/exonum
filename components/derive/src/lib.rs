@@ -249,9 +249,50 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 ///
 /// Prefix of the `exonum` crate has two main values - `crate` or `exonum`. The default value
 /// is `exonum`.
+///
+/// ## `id_auto_increment`
+///
+/// ```text
+/// #[exonum_interface(auto_ids)]
+/// ```
+///
+/// Enables automatic ID assignment for interface methods. This may be useful for writing tests,
+/// but not recommended for production code.
+///
+/// # Method attributes
+///
+/// ## `interface_method`
+///
+/// ```test
+/// #[interface_method(id = 0)]
+/// ```
+///
+/// All the method in the trait with `exonum_interface` attribute should have `interface_method`
+/// attribute with unsigned integer value. All the method IDs should be unique.
 #[proc_macro_attribute]
 pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
     exonum_interface::impl_exonum_interface(attr, item)
+}
+
+/// Meta-information attribute for interface methods.
+///
+/// # Fields
+///
+/// ## `id` (required)
+///
+/// ```text
+/// #[interface_method(id = 0)]
+/// ```
+///
+/// Numeric identifier of the method. Should be unique for every method in the trait.
+#[proc_macro_attribute]
+pub fn interface_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    // We don't modify the input stream, since `interface_method` attribute only
+    // provides additional metadata for `exonum_interface` attribute.
+    //
+    // This however should be a `proc_macro_attribute`, so rust compiler won't complain about
+    // unknown attribute.
+    item
 }
 
 /// Implements `ExecutionFail` trait for the given enum. Additionally,

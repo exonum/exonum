@@ -126,17 +126,17 @@ launch-server
 
 echo "Creating a wallet for Alice..."
 create-wallet "$ROOT_DIR/create-wallet-1.json"
-check-transaction de7283a8
+check-transaction abe9ac1e
 
 echo "Creating a wallet for Bob..."
 create-wallet "$ROOT_DIR/create-wallet-2.json"
-check-transaction 34f33f36
+check-transaction 59198cca
 
 sleep 5
 
 echo "Transferring funds from Alice to Bob"
 transfer "$ROOT_DIR/transfer-funds.json"
-check-transaction 60750247
+check-transaction b5d68015
 
 echo "Waiting until transactions are committed..."
 sleep 3
@@ -146,21 +146,21 @@ RESP=`curl $BASE_URL/wallets 2>/dev/null`
 # Wallet records in the response are deterministically ordered by increasing
 # public key. As Alice's pubkey is lexicographically lesser than Bob's, it it possible to
 # determine his wallet as .[0] and hers as .[1].
-check-request "Bob" 105 "`echo $RESP | jq .[0]`"
-check-request "Alice" 95 "`echo $RESP | jq .[1]`"
+check-request "Alice" 95 "`echo $RESP | jq .[0]`"
+check-request "Bob" 105 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallet?pub_key=763cd266f3f6b6d5746f67477ed39c74c7249991ebbe34446d176fc81b36a41e 2>/dev/null`
+RESP=`curl $BASE_URL/wallet?pub_key=070122b6eb3f63a14b25aacd7a1922c418025e04b1be9d1febdfdbcf67615799 2>/dev/null`
 check-request "Alice" 95 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
-TXID=de7283a8c2a49c476ec91681e795181d9846a5bbce6488d4313a8300b34b4d48
+TXID=abe9ac1eef23b4cda7fc408ce488b233c3446331ac0f8195b7d21a210908b447
 RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
 EXP=`cat "$ROOT_DIR/create-wallet-1.json" | jq ".tx_body"`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
-TXID=6075024770778476b80d4fe880c408f3df4c3df04bff6d2ae81ae1e415449840
+TXID=b5d68015cb47f1b1f909e7667c219f1c63a0b7c978cdd6e8ffc279d05ba66fec
 RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
 EXP=`cat "$ROOT_DIR/transfer-funds.json" | jq ".tx_body"`
 check-transfer-tx "$EXP" "$RESP"

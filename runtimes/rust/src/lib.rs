@@ -63,6 +63,11 @@
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
+//!     // Each method in service should have an `interface_method` attribute specifying its ID.
+//!     // Alternative is to use `#[exonum_interface(auto_ids)]` to assign IDs automatically, but
+//!     // this is not a good idea for production code, since the method IDs assigned automatically
+//!     // can change (e.g. because of reordering methods in trait).
+//!     #[interface_method(id = 0)]
 //!     // Each method of the trait should have a signature of the following format.
 //!     // The argument should implement the `BinaryValue` trait.
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
@@ -193,13 +198,15 @@
 //! # use exonum::runtime::ExecutionError;
 //! # use exonum_rust_runtime::CallContext;
 //! # use exonum::crypto::gen_keypair;
-//! # use exonum_derive::exonum_interface;
+//! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
 //! # type Transfer = String;
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn create_wallet(&self, context: Ctx, arg: CreateWallet) -> Self::Output;
+//!     #[interface_method(id = 1)]
 //!     fn transfer(&self, context: Ctx, arg: Transfer) -> Self::Output;
 //! }
 //!
@@ -258,7 +265,6 @@ pub use self::{
 pub mod api;
 
 use exonum::{
-    api::{ApiBuilder, UpdateEndpoints},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     merkledb::Snapshot,
@@ -271,6 +277,7 @@ use exonum::{
         WellKnownRuntime,
     },
 };
+use exonum_api::{ApiBuilder, UpdateEndpoints};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
 

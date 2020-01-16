@@ -14,9 +14,15 @@
 
 //! API encapsulation for the testkit.
 
-pub use exonum::api::ApiAccess;
+pub use exonum_api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
+use exonum::{
+    blockchain::ApiSender,
+    messages::{AnyTx, Verified},
+};
+use exonum_api::{self as api, ApiAggregator};
+use failure::format_err;
 use futures::Future;
 use log::{info, trace};
 use reqwest::{
@@ -27,12 +33,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::HashMap,
     fmt::{self, Display},
-};
-
-use exonum::{
-    api::{self, ApiAggregator},
-    messages::{AnyTx, Verified},
-    node::ApiSender,
 };
 
 use crate::TestKit;

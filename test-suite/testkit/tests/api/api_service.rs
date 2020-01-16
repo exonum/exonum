@@ -16,14 +16,13 @@
 //! This service can be used for testing features related only to the API.
 
 use chrono::{TimeZone, Utc};
-use serde_derive::{Deserialize, Serialize};
-
-use exonum::{api, runtime::InstanceId};
+use exonum::runtime::InstanceId;
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    api::{Deprecated, ServiceApiBuilder, ServiceApiState},
+    api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
+use serde_derive::{Deserialize, Serialize};
 
 pub const SERVICE_NAME: &str = "api-service";
 pub const SERVICE_ID: InstanceId = 3;

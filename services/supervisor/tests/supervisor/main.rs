@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    api, crypto,
+    crypto,
     helpers::{Height, ValidatorId},
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
@@ -22,7 +22,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{api::Result as ApiResult, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,

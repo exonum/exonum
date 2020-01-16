@@ -17,10 +17,10 @@
 use exonum::{
     blockchain::{
         config::{GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, Schema as CoreSchema,
+        Blockchain, BlockchainMut, ConsensusConfig, Schema as CoreSchema,
     },
     crypto::Hash,
-    helpers::{generate_testnet_config, Height, ValidatorId},
+    helpers::{Height, ValidatorId},
     merkledb::{ObjectHash, Patch, Snapshot},
     messages::{AnyTx, Verified},
     runtime::{
@@ -78,7 +78,7 @@ pub fn create_block_with_transactions(
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {
-    let consensus_config = generate_testnet_config(1, 0)[0].clone().consensus;
+    let (consensus_config, _) = ConsensusConfig::for_tests(1);
     GenesisConfigBuilder::with_consensus_config(consensus_config)
 }
 
@@ -321,7 +321,7 @@ pub struct MigrateService {
     pub artifact: ArtifactId,
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait ToySupervisor<Ctx> {
     type Output;
 

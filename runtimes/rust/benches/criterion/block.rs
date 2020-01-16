@@ -41,13 +41,12 @@ use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
-        Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
+        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
     },
     crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, ValidatorId},
     merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
     messages::{AnyTx, Verified},
-    node::ApiSender,
     runtime::SnapshotExt,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -148,7 +147,7 @@ mod timestamping {
 
     const TIMESTAMPING_SERVICE_ID: InstanceId = 254;
 
-    #[exonum_interface]
+    #[exonum_interface(auto_ids)]
     pub trait TimestampingInterface<Ctx> {
         type Output;
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
@@ -217,7 +216,7 @@ mod cryptocurrency {
     // Initial balance of each account.
     const INITIAL_BALANCE: u64 = 100;
 
-    #[exonum_interface]
+    #[exonum_interface(auto_ids)]
     pub trait CryptocurrencyInterface<Ctx> {
         type Output;
 
@@ -369,30 +368,30 @@ mod foreign_interface_call {
     const SELF_INTERFACE_SERVICE_ID: InstanceId = 254;
     const FOREIGN_INTERFACE_SERVICE_ID: InstanceId = 255;
 
-    #[exonum_interface]
+    #[exonum_interface(auto_ids)]
     pub trait SelfInterface<Ctx> {
         type Output;
         fn timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
         fn call_foreign(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
-    #[exonum_interface]
+    #[exonum_interface(auto_ids)]
     pub trait ForeignInterface<Ctx> {
         type Output;
         fn foreign_timestamp(&self, ctx: Ctx, arg: Hash) -> Self::Output;
     }
 
-    #[exonum_interface(interface = "Configure")]
+    #[exonum_interface(interface = "Configure", auto_ids)]
     pub trait Configure<Ctx> {
         type Output;
     }
 
-    #[exonum_interface(interface = "Events")]
+    #[exonum_interface(interface = "Events", auto_ids)]
     pub trait Events<Ctx> {
         type Output;
     }
 
-    #[exonum_interface(interface = "ERC30Tokens")]
+    #[exonum_interface(interface = "ERC30Tokens", auto_ids)]
     pub trait ERC30Tokens<Ctx> {
         type Output;
     }

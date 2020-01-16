@@ -15,10 +15,9 @@
 //! Tests related to the API.
 
 use assert_matches::assert_matches;
-use pretty_assertions::assert_eq;
-
-use exonum::api::{ApiError as HttpApiError, Error as ApiError, HttpStatusCode};
+use exonum_api::Error as ApiError;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use pretty_assertions::assert_eq;
 
 use crate::api_service::{ApiService, PingQuery, SERVICE_ID, SERVICE_NAME};
 

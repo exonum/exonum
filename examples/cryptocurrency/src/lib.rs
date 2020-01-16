@@ -193,7 +193,7 @@ pub mod errors {
 /// Contracts.
 pub mod contracts {
     use exonum::runtime::ExecutionError;
-    use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
 
     use crate::{
@@ -213,8 +213,10 @@ pub mod contracts {
         type Output;
 
         /// Creates wallet with the given `name`.
+        #[interface_method(id = 0)]
         fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
         /// Transfers `amount` of the currency from one wallet to another.
+        #[interface_method(id = 1)]
         fn transfer(&self, ctx: Ctx, arg: TxTransfer) -> Self::Output;
     }
 
