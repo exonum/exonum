@@ -121,6 +121,22 @@ impl ToProofPath<[u8; 32]> for Raw {
     }
 }
 
+/// Trait signalling that a key is usable as a key of `RawProofMapIndex`.
+///
+/// This trait is unsafe because the implementation is responsible for ensuring the invariants
+/// expected from raw keys (uniform distribution, absence of collisions, etc.)
+#[allow(unsafe_code)]
+pub unsafe trait RawKey {
+    /// Returns the key bytes.
+    fn to_raw_key(&self) -> [u8; HASH_SIZE];
+}
+
+impl<T: RawKey> ToProofPath<T> for Raw {
+    fn transform_key(key: &T) -> ProofPath {
+        ProofPath::from_bytes(key.to_raw_key())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ChildKind {
     Left,
