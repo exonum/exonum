@@ -14,8 +14,8 @@
 
 //! The set of errors for the Exonum API module.
 
-use actix_web::http::StatusCode;
-use failure::Fail;
+pub use actix_web::http::StatusCode as HttpStatusCode;
+use failure::{format_err, Fail};
 use serde::{Deserialize, Serialize};
 
 use std::io;
@@ -24,12 +24,12 @@ use std::io;
 #[derive(Fail, Debug)]
 pub struct ApiError {
     /// HTTP error code.
-    pub http_code: StatusCode,
+    pub http_code: HttpStatusCode,
     /// API error body.
     pub body: ApiErrorBody,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ApiErrorBody {
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
@@ -56,16 +56,10 @@ impl std::fmt::Display for ApiError {
 
 impl ApiError {
     /// Builds a ApiError with the given `http_code`.
-    pub fn new(http_code: StatusCode) -> Self {
+    pub fn new(http_code: HttpStatusCode) -> Self {
         Self {
             http_code,
-            body: ApiErrorBody {
-                docs_uri: String::new(),
-                title: String::new(),
-                detail: String::new(),
-                source: String::new(),
-                error_code: None,
-            },
+            body: ApiErrorBody::default(),
         }
     }
 
@@ -101,8 +95,12 @@ impl ApiError {
     }
 
     /// Tries to create `ApiError` from JSON.
-    pub fn parse(http_code: StatusCode, body: &str) -> std::result::Result<Self, String> {
-        let body = serde_json::from_str(body).or(Err("Failed to deserialize error body."))?;
+    pub fn parse(
+        http_code: HttpStatusCode,
+        body: &str,
+    ) -> std::result::Result<Self, failure::Error> {
+        let body =
+            serde_json::from_str(body).or(Err(format_err!("Failed to deserialize error body.")))?;
         Ok(Self { http_code, body })
     }
 }

@@ -14,12 +14,10 @@
 
 //! Tests related to the API.
 
-use actix_web::http::StatusCode;
 use assert_matches::assert_matches;
 use pretty_assertions::assert_eq;
 
-use exonum::api::ApiError as HttpApiError;
-use exonum::api::Error as ApiError;
+use exonum::api::{ApiError as HttpApiError, Error as ApiError, HttpStatusCode};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use crate::api_service::{ApiService, PingQuery, SERVICE_ID, SERVICE_NAME};
@@ -157,7 +155,7 @@ fn endpoint_with_new_error_type() {
         .get_new::<u64>("new-error-type")
         .expect_err("Should return error.");
 
-    assert_eq!(error.http_code, StatusCode::BAD_REQUEST);
+    assert_eq!(error.http_code, HttpStatusCode::BAD_REQUEST);
     assert_eq!(error.body.docs_uri, "http://some-docs.com");
     assert_eq!(error.body.title, "Test endpoint error.");
     assert_eq!(

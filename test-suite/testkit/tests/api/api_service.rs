@@ -15,7 +15,6 @@
 //! Service with API, but without any transactions.
 //! This service can be used for testing features related only to the API.
 
-use actix_web::http::StatusCode;
 use chrono::{TimeZone, Utc};
 use serde_derive::{Deserialize, Serialize};
 
@@ -95,7 +94,7 @@ impl Api {
                 if query.value == 64 {
                     Ok(query.value)
                 } else {
-                    Err(api::ApiError::new(StatusCode::BAD_REQUEST)
+                    Err(api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
                         .docs_uri("http://some-docs.com")
                         .title("Test endpoint error.")
                         .detail(format!("Test endpoint failed with query: {}", query.value))
