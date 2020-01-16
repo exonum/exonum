@@ -68,12 +68,12 @@ function Main () {
     @{
       name = 'Alice';
       json = "$wd/create-wallet-1.json";
-      hash = 'de7283a8c2a49c476ec91681e795181d9846a5bbce6488d4313a8300b34b4d48';
+      hash = 'abe9ac1eef23b4cda7fc408ce488b233c3446331ac0f8195b7d21a210908b447';
     },
     @{
       name = 'Bob';
       json = "$wd/create-wallet-2.json";
-      hash = '34f33f3667e7f63a1d67cfeeed264f0d6bd50919c5c0cbc4dc857c2858a9fee7';
+      hash = '59198ccaba93d0dcf2081f3820e54e5233d7eaf223f13c147df88ccfc351ac27';
     }
   );
 
@@ -96,7 +96,7 @@ function Main () {
   }
 
   echo 'Transferring tokens between Alice and Bob...';
-  $transferHash = '6075024770778476b80d4fe880c408f3df4c3df04bff6d2ae81ae1e415449840';
+  $transferHash = 'b5d68015cb47f1b1f909e7667c219f1c63a0b7c978cdd6e8ffc279d05ba66fec';
   $hash = Send-Tx("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
@@ -110,10 +110,10 @@ function Main () {
   # Wallet records in the response are deterministically ordered by increasing
   # public key. As Alice's pubkey is lexicographically lesser than Bob's, it is possible to
   # determine his wallet as .[0] and hers as .[1].
-  Check-Wallet $resp[0] 'Bob' '105';
-  Check-Wallet $resp[1] 'Alice' '95';
+  Check-Wallet $resp[0] 'Alice' '95';
+  Check-Wallet $resp[1] 'Bob' '105';
   echo "Retrieving info on Alice's wallet...";
-  $pubkey = '763cd266f3f6b6d5746f67477ed39c74c7249991ebbe34446d176fc81b36a41e';
+  $pubkey = '070122b6eb3f63a14b25aacd7a1922c418025e04b1be9d1febdfdbcf67615799';
   $resp = (Invoke-WebRequest "$BASE_URL/wallet?pub_key=$pubkey").Content | ConvertFrom-Json;
   Check-Wallet $resp 'Alice' '95';
 }

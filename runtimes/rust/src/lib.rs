@@ -241,6 +241,9 @@
 //! # }
 //! ```
 
+#![warn(missing_debug_implementations, missing_docs)]
+#![deny(unsafe_code, bare_trait_objects)]
+
 pub use self::{
     call_context::CallContext,
     error::Error,
@@ -596,6 +599,19 @@ impl Runtime for RustRuntime {
         let descriptor = instance.descriptor();
         let context = CallContext::new(context, descriptor);
         catch_panic(|| service.initialize(context, parameters))
+    }
+
+    fn initiate_resuming_service(
+        &self,
+        context: ExecutionContext<'_>,
+        spec: &InstanceSpec,
+        parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let instance = self.new_service(spec)?;
+        let service = instance.as_ref();
+        let descriptor = instance.descriptor();
+        let context = CallContext::new(context, descriptor);
+        catch_panic(|| service.resume(context, parameters))
     }
 
     fn update_service_status(
