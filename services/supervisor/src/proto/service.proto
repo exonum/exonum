@@ -65,7 +65,7 @@ message ServiceConfig {
   bytes params = 2;
 }
 
-// Request for the resume previously stopped service instance.
+// Request to resume a previously stopped service instance.
 message ResumeService {
   // Corresponding service instance ID.
   uint32 instance_id = 1;
