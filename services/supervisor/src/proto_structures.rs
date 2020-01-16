@@ -218,6 +218,22 @@ impl ConfigPropose {
             .push(ConfigChange::StopService(StopService { instance_id }));
         self
     }
+
+    /// Adds service resume request to this proposal.
+    pub fn resume_service(
+        mut self,
+        instance_id: InstanceId,
+        artifact: ArtifactId,
+        params: impl BinaryValue,
+    ) -> Self {
+        self.changes
+            .push(ConfigChange::ResumeService(ResumeService {
+                instance_id,
+                artifact,
+                params: params.into_bytes(),
+            }));
+        self
+    }
 }
 
 /// Confirmation vote for the configuration change

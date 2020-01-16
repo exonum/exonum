@@ -16,7 +16,7 @@
 
 use exonum::{
     messages::{AnyTx, Verified},
-    runtime::{ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{ErrorMatch, ExecutionError, InstanceState, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
@@ -51,7 +51,7 @@ fn create_testkit() -> TestKit {
 }
 
 /// Starts service instance and gets its ID
-fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
+fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
     let keypair = testkit.us().service_keypair();
     // Start `inc` service instance
     execute_transaction(
@@ -66,12 +66,11 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceId {
     )
     .expect("Start service transaction should be processed");
     // Get started service instance ID.
-    let service_info = testkit
+    testkit
         .snapshot()
         .for_dispatcher()
         .get_instance(IncService::INSTANCE_NAME)
-        .unwrap();
-    service_info.spec.id
+        .unwrap()
 }
 
 #[test]
@@ -79,7 +78,7 @@ fn start_stop_inc_service() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
 
-    let instance_id = start_inc_service(&mut testkit);
+    let instance_id = start_inc_service(&mut testkit).spec.id;
     assert!(
         is_inc_service_api_available(&mut testkit),
         "Inc service API should be available after starting."
@@ -125,7 +124,7 @@ fn duplicate_stop_service_request() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
 
-    let instance_id = start_inc_service(&mut testkit);
+    let instance_id = start_inc_service(&mut testkit).spec.id;
     // An attempt to stop service twice.
     let actual_err = execute_transaction(
         &mut testkit,
@@ -151,7 +150,7 @@ fn stop_already_stopped_service() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
 
-    let instance_id = start_inc_service(&mut testkit);
+    let instance_id = start_inc_service(&mut testkit).spec.id;
     // Stop service instance.
     execute_transaction(
         &mut testkit,
@@ -175,6 +174,131 @@ fn stop_already_stopped_service() {
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
                 "Discarded an attempt to stop the already stopped service instance"
+            )
+    )
+}
+
+#[test]
+fn resume_stopped_service() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance = start_inc_service(&mut testkit);
+    // Stop service instance.
+    execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .stop_service(instance.spec.id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect("Transaction should be processed");
+
+    // Resume service instance.
+    execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(2)
+            .resume_service(instance.spec.id, instance.spec.artifact, Vec::default())
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect("Transaction should be processed");
+
+    // Check resumed service API.
+    assert!(is_inc_service_api_available(&mut testkit));
+}
+
+#[test]
+fn resume_active_service() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance = start_inc_service(&mut testkit);
+    // Resume service instance.
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .resume_service(instance.spec.id, instance.spec.artifact, Vec::default())
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(
+                "Discarded an attempt to resume not stopped service instance"
+            )
+    )
+}
+
+#[test]
+fn resume_service_with_different_artifact_name() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance = start_inc_service(&mut testkit);
+    // Stop service instance.
+    execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .stop_service(instance.spec.id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect("Transaction should be processed");
+
+    // Resume service instance.
+    let mut artifact = instance.spec.artifact;
+    artifact.name = "inc2".to_owned();
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(2)
+            .resume_service(instance.spec.id, artifact, Vec::default())
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(
+                "Discarded an attempt to resume service with different artifact name"
+            )
+    )
+}
+
+#[test]
+fn resume_service_with_different_artifact_version() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let instance = start_inc_service(&mut testkit);
+    // Stop service instance.
+    execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(1)
+            .stop_service(instance.spec.id)
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect("Transaction should be processed");
+
+    // Resume service instance.
+    let mut artifact = instance.spec.artifact;
+    artifact.version.patch += 1;
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(2)
+            .resume_service(instance.spec.id, artifact, Vec::default())
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(
+                "Discarded an attempt to resume service with incorrect artifact version"
             )
     )
 }
