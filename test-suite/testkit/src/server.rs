@@ -14,7 +14,7 @@
 
 use actix::prelude::*;
 use exonum::{
-    api::{self, ApiAggregator, ApiBuilder, FutureResult},
+    api::{self, ApiAggregator, ApiBuilder, ApiFutureResult as FutureResult},
     blockchain::ConsensusConfig,
     crypto::Hash,
     helpers::Height,
@@ -72,11 +72,13 @@ impl Actor for TestKitActor {
     type Context = Context<Self>;
 }
 
-fn flatten_err<T>(res: Result<Result<T, api::Error>, MailboxError>) -> Result<T, api::Error> {
+fn flatten_err<T>(res: Result<Result<T, api::ApiError>, MailboxError>) -> Result<T, api::ApiError> {
     match res {
         Ok(Ok(value)) => Ok(value),
         Ok(Err(e)) => Err(e),
-        Err(e) => Err(api::Error::InternalError(e.into())),
+        Err(e) => Err(
+            api::ApiError::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR).detail(e.to_string()),
+        ),
     }
 }
 
@@ -84,7 +86,7 @@ fn flatten_err<T>(res: Result<Result<T, api::Error>, MailboxError>) -> Result<T,
 struct GetStatus;
 
 impl Message for GetStatus {
-    type Result = api::Result<TestKitStatus>;
+    type Result = api::ApiResult<TestKitStatus>;
 }
 
 /// Testkit status, returned by the corresponding API endpoint.
@@ -97,7 +99,7 @@ pub struct TestKitStatus {
 }
 
 impl Handler<GetStatus> for TestKitActor {
-    type Result = api::Result<TestKitStatus>;
+    type Result = api::ApiResult<TestKitStatus>;
 
     fn handle(&mut self, _msg: GetStatus, _ctx: &mut Self::Context) -> Self::Result {
         Ok(TestKitStatus {
@@ -114,20 +116,22 @@ struct CreateBlock {
 }
 
 impl Message for CreateBlock {
-    type Result = api::Result<BlockWithTransactions>;
+    type Result = api::ApiResult<BlockWithTransactions>;
 }
 
 impl Handler<CreateBlock> for TestKitActor {
-    type Result = api::Result<BlockWithTransactions>;
+    type Result = api::ApiResult<BlockWithTransactions>;
 
     fn handle(&mut self, msg: CreateBlock, _ctx: &mut Self::Context) -> Self::Result {
         let block_info = if let Some(tx_hashes) = msg.tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !self.0.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
-                return Err(api::Error::BadRequest(format!(
-                    "Transaction not in mempool: {}",
-                    missing_tx.to_string()
-                )));
+                return Err(api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+                    .title("CreateBlock handler failed.")
+                    .detail(format!(
+                        "Transaction not in mempool: {}",
+                        missing_tx.to_string()
+                    )));
             }
 
             // NB: checkpoints must correspond 1-to-1 to blocks.
@@ -145,17 +149,17 @@ impl Handler<CreateBlock> for TestKitActor {
 struct RollBack(Height);
 
 impl Message for RollBack {
-    type Result = api::Result<Option<BlockWithTransactions>>;
+    type Result = api::ApiResult<Option<BlockWithTransactions>>;
 }
 
 impl Handler<RollBack> for TestKitActor {
-    type Result = api::Result<Option<BlockWithTransactions>>;
+    type Result = api::ApiResult<Option<BlockWithTransactions>>;
 
     fn handle(&mut self, RollBack(height): RollBack, _ctx: &mut Self::Context) -> Self::Result {
         if height == Height(0) {
-            return Err(api::Error::BadRequest(
-                "Cannot rollback past genesis block".into(),
-            ));
+            return Err(api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+                .title("RollBack handler failed.")
+                .detail("Cannot rollback past genesis block"));
         }
 
         if self.0.height() >= height {
@@ -173,7 +177,6 @@ impl Handler<RollBack> for TestKitActor {
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
     use exonum::{
         api,
         crypto::{gen_keypair, Hash},
@@ -185,6 +188,7 @@ mod tests {
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
     use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+    use pretty_assertions::assert_eq;
 
     use std::time::Duration;
 
@@ -328,10 +332,12 @@ mod tests {
             .query(&body)
             .post::<BlockWithTransactions>("v1/blocks/create")
             .unwrap_err();
-        assert_matches!(
-            err,
-            api::Error::BadRequest(ref body) if body.starts_with("Transaction not in mempool")
-        );
+
+        let expected_err = api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+            .title("CreateBlock handler failed.")
+            .detail(format!("Transaction not in mempool: {}", Hash::zero()));
+
+        assert_eq!(err, expected_err);
     }
 
     #[test]
@@ -384,9 +390,10 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap_err();
 
-        assert_matches!(
-            err,
-            api::Error::BadRequest(ref body) if body == "Cannot rollback past genesis block"
-        );
+        let expected_err = api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+            .title("RollBack handler failed.")
+            .detail("Cannot rollback past genesis block");
+
+        assert_eq!(err, expected_err);
     }
 }
