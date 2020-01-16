@@ -133,11 +133,11 @@ pub enum ConfigChange {
     Consensus(ConsensusConfig),
     /// New service instance config.
     Service(ServiceConfig),
-    /// New service instance start request.
+    /// Request to start a new service instance.
     StartService(StartService),
-    /// Existing service instance stop request.
+    /// Request to stop an existing service instance.
     StopService(StopService),
-    /// Previously stopped service instance resume request.
+    /// Request to resume a previously stopped service instance.
     ResumeService(ResumeService),
 }
 

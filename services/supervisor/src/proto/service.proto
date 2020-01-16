@@ -82,11 +82,11 @@ message ConfigChange {
     exonum.Config consensus = 1;
     // New service instance config.
     ServiceConfig service = 2;
-    // New service instance start request.
+    // Request to start a new service instance.
     StartService start_service = 3;
-    // Existing service instance stop request.
+    // Request to stop an existing service instance.
     StopService stop_service = 4;
-    // Previously stopped service instance resume request.
+    // Request to resume a previously stopped service instance.
     ResumeService resume_service = 5;
   }
 }

@@ -302,3 +302,30 @@ fn resume_service_with_different_artifact_version() {
             )
     )
 }
+
+#[test]
+fn multiple_stop_resume_requests() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let spec = start_inc_service(&mut testkit).spec;
+
+    // Config proposal with two requests for single service instance.
+    let actual_err = execute_transaction(
+        &mut testkit,
+        ConfigPropose::immediate(2)
+            .stop_service(spec.id)
+            .resume_service(spec.id, spec.artifact, Vec::default())
+            .sign_for_supervisor(keypair.0, &keypair.1),
+    )
+    .expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(
+                "Discarded multiple instances with the same name in one request"
+            )
+    )
+}
