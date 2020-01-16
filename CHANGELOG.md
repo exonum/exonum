@@ -118,6 +118,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Error code values were changed and split into several enum
   representing sub-groups. (#1680)
 
+- Added support for resuming previously stopped services. (#1706)
+  - Added `resume_service` method to the `ConfigPropose`.
+  - Added `ResumeService` variant to the `ConfigChange` enumeration.
+
 #### exonum-merkledb
 
 - The crate has been restructured, indexes are now located in separate module.
