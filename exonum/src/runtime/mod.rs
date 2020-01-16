@@ -186,7 +186,7 @@
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
 //! [`ExecutionError`]: struct.ExecutionError.html
-//! [`CommonError`]: struct.CommonError.html
+//! [`CommonError`]: enum.CommonError.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.method_id
 
 pub use self::{
