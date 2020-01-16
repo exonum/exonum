@@ -14,10 +14,8 @@
 
 //! Standard Exonum CLI command used to perform different maintenance actions.
 
-use exonum::{
-    exonum_merkledb::{Database, RocksDB},
-    helpers::clear_consensus_messages_cache,
-};
+use exonum::merkledb::{Database, RocksDB};
+use exonum_node::helpers::clear_consensus_messages_cache;
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;

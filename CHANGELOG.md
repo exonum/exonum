@@ -61,12 +61,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
     and `helpers::clear_consensus_messages_cache` functions;
   - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
-  - `messages::BinaryValue` public re-export;
-  - `node` module types / methods logically related to the consensus
-    algorithm implementation (i.e., `NodeHandler` and types used by it);
   - `proto` module;
   - `runtime::error` module (`catch_panic` was added to the list of public
     re-exports from `runtime::error`).
+
+- `node` module and P2P messages from the `message` module (except for
+  `AnyTx` and `Precommit`) were moved to a separate crate, `exonum-node`.
+  The moved P2P messages were made private along with types / methods
+  logically related to the consensus algorithm implementation
+  (i.e., `NodeHandler` and types used by it). (#1698)
 
 - The artifact identifier now has first-class semantic version. Previously, it was
   specific to the Rust runtime. (#1590)
@@ -201,6 +204,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
 - It is now possible to iterate over keys of the indexes within a group. (#1662)
+
+#### exonum-node
+
+- Node logic (including P2P networking and consensus algorithm) was moved
+  from the `exonum` crate into the separate `exonum-node` crate. (#1698)
 
 #### exonum-rust-runtime
 

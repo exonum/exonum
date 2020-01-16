@@ -16,12 +16,11 @@ use serde::{Deserialize, Serialize};
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
-    crypto::{self, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey, SecretKey},
     helpers::{Height, Round, ValidatorId},
     keys::Keys,
-    messages::{Precommit, Propose, Verified},
+    messages::{Precommit, Verified},
 };
-use exonum_merkledb::ObjectHash;
 
 // TODO Refactor TestNetwork and TestkitBuilder [ECR-3222]
 
@@ -224,31 +223,10 @@ impl TestNode {
         }
     }
 
-    /// Creates a `Propose` message signed by this validator.
-    pub fn create_propose(
-        &self,
-        height: Height,
-        last_hash: crypto::Hash,
-        tx_hashes: impl IntoIterator<Item = crypto::Hash>,
-    ) -> Verified<Propose> {
-        Verified::from_value(
-            Propose::new(
-                self.validator_id
-                    .expect("An attempt to create propose from a non-validator node."),
-                height,
-                Round::first(),
-                last_hash,
-                tx_hashes,
-            ),
-            self.keys.consensus_pk(),
-            &self.keys.consensus_sk(),
-        )
-    }
-
     /// Creates a `Precommit` message signed by this validator.
     pub fn create_precommit(
         &self,
-        propose: &Propose,
+        height: Height,
         block_hash: crypto::Hash,
     ) -> Verified<Precommit> {
         use std::time::SystemTime;
@@ -257,9 +235,9 @@ impl TestNode {
             Precommit::new(
                 self.validator_id
                     .expect("An attempt to create propose from a non-validator node."),
-                propose.height(),
-                propose.round(),
-                propose.object_hash(),
+                height,
+                Round::first(),
+                Hash::zero(),
                 block_hash,
                 SystemTime::now().into(),
             ),

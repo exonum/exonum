@@ -18,10 +18,10 @@ use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
     exonum_merkledb::DbOptions,
     keys::{read_keys_from_file, Keys},
-    node::{
-        ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig,
-        NodeConfig as CoreNodeConfig,
-    },
+};
+use exonum_node::{
+    ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig,
+    NodeConfig as CoreNodeConfig,
 };
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::{Deserialize, Serialize};

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use futures::{future, Future, IntoFuture};
@@ -32,9 +31,8 @@ use std::{
 };
 
 use crate::{
-    blockchain::{AdditionalHeaders, Block, Blockchain, Schema as CoreSchema},
+    blockchain::{AdditionalHeaders, ApiSender, Block, Blockchain, Schema as CoreSchema},
     helpers::Height,
-    node::ApiSender,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
@@ -648,7 +646,7 @@ impl Runtime for DeploymentRuntime {
         artifact: ArtifactId,
         spec: Vec<u8>,
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        let delay = LittleEndian::read_u64(&spec);
+        let delay = BinaryValue::from_bytes(spec.into()).unwrap();
         let delay = Duration::from_millis(delay);
 
         let error_kind = ErrorKind::Runtime { code: 0 };
@@ -862,8 +860,7 @@ fn failed_deployment_with_node_restart() {
         .with_runtime(2, runtime)
         .finalize(&blockchain);
 
-    let mut spec = vec![0_u8; 8];
-    LittleEndian::write_u64(&mut spec, 100);
+    let spec = 100_u64.to_bytes();
 
     let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec);

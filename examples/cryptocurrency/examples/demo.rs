@@ -16,9 +16,9 @@ use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
     keys::Keys,
     merkledb::TemporaryDB,
-    node::{NodeApiConfig, NodeBuilder, NodeConfig},
 };
 use exonum_explorer_service::ExplorerFactory;
+use exonum_node::{NodeApiConfig, NodeBuilder, NodeConfig};
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
 use exonum_system_api::SystemApiPlugin;
 

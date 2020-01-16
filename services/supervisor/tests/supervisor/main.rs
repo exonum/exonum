@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    api, crypto,
+    crypto,
     helpers::{Height, ValidatorId},
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
@@ -22,7 +22,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{api::Result as ApiResult, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,
@@ -60,7 +60,7 @@ fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u6
 
 /// Check that the service's counter isn't started yet (no Inc txs were received).
 fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
-    let response: api::Result<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
+    let response: ApiResult<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
     assert!(response.is_err());
 }
 

@@ -14,10 +14,9 @@
 
 use criterion::{criterion_group, criterion_main};
 
-use crate::{crypto::bench_crypto, transactions::bench_verify_transactions};
+use crate::crypto::bench_crypto;
 
 mod crypto;
-mod transactions;
 
-criterion_group!(benches, bench_crypto, bench_verify_transactions);
+criterion_group!(benches, bench_crypto);
 criterion_main!(benches);
