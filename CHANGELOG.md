@@ -130,6 +130,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
 
+#### exonum-rust-runtime
+
+- Service interfaces now have to specify method IDs with either `interface_method`
+  attribute or `id_auto_increment` option. (#1701)
+
 ### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)

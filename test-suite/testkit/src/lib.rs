@@ -47,6 +47,7 @@
 //! #[exonum_interface]
 //! pub trait TimestampingInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn timestamp(&self, _: Ctx, arg: String) -> Self::Output;
 //! }
 //!
@@ -338,7 +339,7 @@ impl TestKit {
     ///
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
-    /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher, BinaryValue};
+    /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{crypto::{PublicKey, Hash, SecretKey}, runtime::ExecutionError};
@@ -348,6 +349,7 @@ impl TestKit {
     /// #[exonum_interface]
     /// pub trait ExampleInterface<Ctx> {
     ///     type Output;
+    ///     #[interface_method(id = 0)]
     ///     fn example_tx(&self, ctx: Ctx, arg: String) -> Self::Output;
     /// }
     ///

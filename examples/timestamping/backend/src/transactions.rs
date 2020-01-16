@@ -15,7 +15,7 @@
 //! Timestamping transactions.
 
 use exonum::runtime::{CommonError, ExecutionError};
-use exonum_derive::{exonum_interface, BinaryValue, ExecutionFail, ObjectHash};
+use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::CallContext;
 use exonum_time::schema::TimeSchema;
@@ -49,6 +49,7 @@ pub struct Config {
 #[exonum_interface]
 pub trait TimestampingInterface<Ctx> {
     type Output;
+    #[interface_method(id = 0)]
     fn timestamp(&self, ctx: Ctx, arg: Timestamp) -> Self::Output;
 }
 

@@ -321,7 +321,7 @@ pub struct MigrateService {
     pub artifact: ArtifactId,
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait ToySupervisor<Ctx> {
     type Output;
 

@@ -131,6 +131,7 @@
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn do_nothing(&self, ctx: Ctx, _seed: u32) -> Self::Output;
 //! }
 //!
@@ -195,6 +196,7 @@
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn cause_error(&self, ctx: Ctx, _seed: u32) -> Self::Output;
 //! }
 //!
@@ -336,6 +338,7 @@
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
+//!     #[interface_method(id = 0)]
 //!     fn do_nothing(&self, ctx: Ctx, _seed: u32) -> Self::Output;
 //! }
 //!

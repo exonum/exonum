@@ -67,7 +67,7 @@ pub enum Error {
     NotAllowed = 0,
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait ExplorerTransactions<Ctx> {
     type Output;
 
