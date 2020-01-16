@@ -208,6 +208,15 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
+    fn initiate_resuming_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
@@ -502,6 +511,15 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
+    fn initiate_resuming_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
     fn update_service_status(
         &mut self,
         _snapshot: &dyn Snapshot,
@@ -686,6 +704,15 @@ impl Runtime for DeploymentRuntime {
     }
 
     fn initiate_adding_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _spec: &InstanceSpec,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
         _spec: &InstanceSpec,
