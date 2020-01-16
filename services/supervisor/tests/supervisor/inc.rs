@@ -60,7 +60,7 @@ where
     }
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 pub trait IncInterface<Ctx> {
     type Output;
     fn inc(&self, context: Ctx, seed: u64) -> Self::Output;

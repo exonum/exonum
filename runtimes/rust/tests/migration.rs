@@ -53,7 +53,7 @@ impl<T: Access> Schema<T> {
     }
 }
 
-#[exonum_interface]
+#[exonum_interface(auto_ids)]
 trait Withdrawal<Ctx> {
     type Output;
 

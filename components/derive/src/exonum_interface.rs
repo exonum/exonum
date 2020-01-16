@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use darling::FromMeta;
+use darling::{self, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
@@ -21,6 +21,7 @@ use syn::{
     NestedMeta, Receiver, ReturnType, TraitItem, TraitItemMethod, Type,
 };
 
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 use super::{find_meta_attrs, RustRuntimeCratePath};
@@ -139,22 +140,24 @@ impl ServiceMethodDescriptor {
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]
-struct ExonumServiceAttrs {
+struct ExonumInterfaceAttrs {
     #[darling(rename = "crate")]
     cr: RustRuntimeCratePath,
+    auto_ids: bool,
     interface: Option<String>,
 }
 
-impl Default for ExonumServiceAttrs {
+impl Default for ExonumInterfaceAttrs {
     fn default() -> Self {
         Self {
             cr: RustRuntimeCratePath::default(),
+            auto_ids: false,
             interface: None,
         }
     }
 }
 
-impl TryFrom<&[Attribute]> for ExonumServiceAttrs {
+impl TryFrom<&[Attribute]> for ExonumInterfaceAttrs {
     type Error = darling::Error;
 
     fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
@@ -164,16 +167,38 @@ impl TryFrom<&[Attribute]> for ExonumServiceAttrs {
     }
 }
 
+#[derive(Debug, FromMeta)]
+struct InterfaceMethodAttrs {
+    id: u32,
+}
+
+impl TryFrom<&[Attribute]> for InterfaceMethodAttrs {
+    type Error = darling::Error;
+
+    fn try_from(args: &[Attribute]) -> Result<Self, Self::Error> {
+        find_meta_attrs("interface_method", args)
+            .map(|meta| Self::from_nested_meta(&meta))
+            .unwrap_or_else(|| {
+                let msg = "Unable to find method ID mapping for method. \
+                           It should be specified, e.g. `#[interface_method(id = 0)]`";
+                Err(darling::Error::custom(msg.to_string()))
+            })
+    }
+}
+
 #[derive(Debug)]
-struct ExonumService {
+struct ExonumInterface {
     item_trait: ItemTrait,
-    attrs: ExonumServiceAttrs,
+    attrs: ExonumInterfaceAttrs,
     methods: Vec<ServiceMethodDescriptor>,
 }
 
-impl ExonumService {
+impl ExonumInterface {
     fn new(item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
         use syn::GenericParam;
+
+        // Extract attributes.
+        let attrs = ExonumInterfaceAttrs::from_list(&args)?;
 
         // Extract context type param from the trait generics.
         let params = &item_trait.generics.params;
@@ -194,14 +219,31 @@ impl ExonumService {
         // Process trait methods.
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
-        let mut method_id = 0;
+        let mut used_method_ids = HashSet::new();
+        let mut next_method_id = 0;
 
         for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
+                    let method_id = if !attrs.auto_ids {
+                        // Auto-increment disabled, parse ID from attribute.
+                        let id_attr = InterfaceMethodAttrs::try_from(method.attrs.as_ref())?;
+                        let method_id = id_attr.id;
+
+                        if !used_method_ids.insert(method_id) {
+                            let msg = format!("Method ID {} is already used", method_id);
+                            return Err(darling::Error::custom(msg).with_span(&method.sig));
+                        }
+                        method_id
+                    } else {
+                        // Auto-increment enabled, assign automatically.
+                        let method_id = next_method_id;
+                        next_method_id += 1;
+                        method_id
+                    };
+
                     let method = ServiceMethodDescriptor::try_from(method_id, ctx_ident, method)?;
                     methods.push(method);
-                    method_id += 1;
                 }
                 TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {
@@ -224,7 +266,7 @@ impl ExonumService {
 
         Ok(Self {
             item_trait,
-            attrs: ExonumServiceAttrs::from_list(&args)?,
+            attrs,
             methods,
         })
     }
@@ -361,7 +403,7 @@ impl ExonumService {
     }
 }
 
-impl ToTokens for ExonumService {
+impl ToTokens for ExonumInterface {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let item_trait = &self.item_trait;
         let mut_trait = self.mut_trait();
@@ -382,10 +424,10 @@ pub fn impl_exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStrea
     let item_trait = parse_macro_input!(item as ItemTrait);
     let attrs = parse_macro_input!(attr as AttributeArgs);
 
-    let exonum_service = match ExonumService::new(item_trait, attrs) {
-        Ok(exonum_service) => exonum_service,
+    let exonum_interface = match ExonumInterface::new(item_trait, attrs) {
+        Ok(exonum_interface) => exonum_interface,
         Err(e) => return e.write_errors().into(),
     };
-    let tokens = quote!(#exonum_service);
+    let tokens = quote!(#exonum_interface);
     tokens.into()
 }

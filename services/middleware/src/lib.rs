@@ -85,6 +85,7 @@ impl DefaultInstance for MiddlewareService {
 /// #[exonum_interface]
 /// trait SomeService<Ctx> {
 ///     type Output;
+///     #[interface_method(id = 0)]
 ///     fn do_something(&self, ctx: Ctx, arg: String) -> Self::Output;
 /// }
 ///
