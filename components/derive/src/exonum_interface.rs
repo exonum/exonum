@@ -169,7 +169,11 @@ impl TryFrom<&[Attribute]> for ExonumInterfaceAttrs {
 
 #[derive(Debug, FromMeta)]
 struct InterfaceMethodAttrs {
+    /// Numeric identifier of the method.
     id: u32,
+    /// Flag for removed methods.
+    #[darling(default)]
+    removed: bool,
 }
 
 impl TryFrom<&[Attribute]> for InterfaceMethodAttrs {
@@ -191,10 +195,11 @@ struct ExonumInterface {
     item_trait: ItemTrait,
     attrs: ExonumInterfaceAttrs,
     methods: Vec<ServiceMethodDescriptor>,
+    removed_methods: Vec<ServiceMethodDescriptor>,
 }
 
 impl ExonumInterface {
-    fn new(item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
+    fn new(mut item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
         use syn::GenericParam;
 
         // Extract attributes.
@@ -218,14 +223,17 @@ impl ExonumInterface {
 
         // Process trait methods.
         let mut methods = Vec::with_capacity(item_trait.items.len());
+        let mut removed_methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
         let mut used_method_ids = HashSet::new();
         let mut next_method_id = 0;
 
+        let mut trait_items_to_remove = HashSet::new();
+
         for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
-                    let method_id = if !attrs.auto_ids {
+                    let (method_id, removed) = if !attrs.auto_ids {
                         // Auto-increment disabled, parse ID from attribute.
                         let id_attr = InterfaceMethodAttrs::try_from(method.attrs.as_ref())?;
                         let method_id = id_attr.id;
@@ -234,16 +242,23 @@ impl ExonumInterface {
                             let msg = format!("Method ID {} is already used", method_id);
                             return Err(darling::Error::custom(msg).with_span(&method.sig));
                         }
-                        method_id
+                        (method_id, id_attr.removed)
                     } else {
                         // Auto-increment enabled, assign automatically.
                         let method_id = next_method_id;
                         next_method_id += 1;
-                        method_id
+
+                        // Marking methods as removed is not available within automatic ID assignment.
+                        (method_id, false)
                     };
 
                     let method = ServiceMethodDescriptor::try_from(method_id, ctx_ident, method)?;
-                    methods.push(method);
+                    if !removed {
+                        methods.push(method);
+                    } else {
+                        removed_methods.push(method);
+                        trait_items_to_remove.insert(trait_item.clone());
+                    }
                 }
                 TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {
@@ -259,6 +274,13 @@ impl ExonumInterface {
             }
         }
 
+        // Remove methods marked as `removed` from trait, so they won't need an implementation.
+        item_trait.items = item_trait
+            .items
+            .into_iter()
+            .filter(|item| !trait_items_to_remove.contains(item))
+            .collect();
+
         if !has_output {
             let msg = "The trait should have associated `Output` type";
             return Err(darling::Error::custom(msg).with_span(&item_trait));
@@ -268,6 +290,7 @@ impl ExonumInterface {
             item_trait,
             attrs,
             methods,
+            removed_methods,
         })
     }
 
@@ -292,7 +315,7 @@ impl ExonumInterface {
         let trait_name = &self.item_trait.ident;
         let interface_name = self.interface_name();
 
-        let impl_match_arm = |descriptor: &ServiceMethodDescriptor| {
+        let impl_match_arm_for_method = |descriptor: &ServiceMethodDescriptor| {
             let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
 
             quote! {
@@ -303,7 +326,21 @@ impl ExonumInterface {
                 }
             }
         };
-        let match_arms = self.methods.iter().map(impl_match_arm);
+        let match_arms = self.methods.iter().map(impl_match_arm_for_method);
+
+        let impl_match_arm_for_removed_method = |descriptor: &ServiceMethodDescriptor| {
+            let id = descriptor.id;
+
+            quote! {
+                #id => {
+                    return Err(exonum::runtime::CommonError::MethodRemoved.into());
+                }
+            }
+        };
+        let removed_match_arms = self
+            .removed_methods
+            .iter()
+            .map(impl_match_arm_for_removed_method);
 
         let ctx = quote!(#cr::CallContext<'a>);
         let res = quote!(std::result::Result<(), exonum::runtime::ExecutionError>);
@@ -319,6 +356,7 @@ impl ExonumInterface {
                 ) -> #res {
                     match method {
                         #( #match_arms )*
+                        #( #removed_match_arms )*
                         _ => Err(exonum::runtime::CommonError::NoSuchMethod.into()),
                     }
                 }

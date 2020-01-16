@@ -153,6 +153,56 @@
 //! # impl Service for StatefulService {}
 //! ```
 //!
+//! ## Transactions removing
+//!
+//! If transaction became obsolete, it can be removed from the service.
+//! Removed transaction will remain its ID, but attempt to invoke it will result
+//! in returning [`CommonError::NoSuchMethod`].
+//!
+//! Example:
+//!
+//! ```
+//! # use exonum::runtime::{ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, Service};
+//! # use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
+//! #[exonum_interface]
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!     
+//!     // Method marked as `removed` will be removed from trait completely, there
+//!     // is no need to implement it. Moreover, the argument type does not have to be
+//!     // available, and if it's not needed anymore, it can be removed: since method
+//!     // will be removed from trait before compilation, compiler won't produce an error.
+//!     #[interface_method(id = 0, removed)]
+//!     fn removed_method(&self, context: Ctx, arg: SomeObsoleteType) -> Self::Output;
+//!
+//!     #[interface_method(id = 1)]
+//!     fn actual_method(&self, context: Ctx, arg: u64) -> Self::Output;
+//! }
+//!
+//!
+//! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+//! #[service_dispatcher(implements("Transactions"))]
+//! #[service_factory(proto_sources = "exonum::proto::schema")]
+//! pub struct SampleService;
+//!
+//! impl Transactions<CallContext<'_>> for SampleService {
+//!     type Output = Result<(), ExecutionError>;
+//!
+//!     // Implement only existing methods in trait.
+//!     fn actual_method(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: u64,
+//!     ) -> Result<(), ExecutionError> {
+//!         // Some business logic...
+//!         Ok(())
+//!     }
+//! }
+//!
+//! impl Service for SampleService {}
+//! ```
+//!
 //! # Interfaces
 //!
 //! By bringing an interface trait into scope, you can use its methods with any stub type.
@@ -191,6 +241,7 @@
 //! [`CallContext`]: struct.CallContext.html
 //! [`GenericCall`]: trait.GenericCall.html
 //! [`GenericCallMut`]: trait.GenericCallMut.html
+//! [`CommonError::NoSuchMethod`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CommonError.html
 //!
 //! ## Interface usage
 //!

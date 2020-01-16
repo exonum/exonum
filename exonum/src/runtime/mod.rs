@@ -93,6 +93,29 @@
 //!
 //! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
+//! ## Service transactions
+//!
+//! To be able to process transactions, service must have a static mapping between numeric
+//! identifier of transaction and logic of transaction processing. Logic of transaction processing
+//! may include deserializing input parameters from byte array, processing the input and reporting
+//! the execution result (which can be either successful or unsuccessful).
+//!
+//! **Important:** Transaction numeric identifier is considered a constant during all the time of
+//! service existence. It means that if transaction was declared with certain ID, its logic can
+//! be updated (e.g., to fix a bug) or be removed, but it **never** should be replaced with other
+//! transaction.
+//!
+//! If transaction was removed from service, attempt to invoke it should always
+//! result in returning an `ExecutionError`.
+//!
+//! `runtime` module provides a [`CommonError`] variant designed for this
+//! purpose: `CommonError::MethodRemoved`, it is highly recommended to use it
+//! as an error to report.
+//!
+//! At the same time, Exonum core does not provide a tool for marking transaction as deprecated.
+//! It is expected that service authors will notify users about transaction deprecation via
+//! documentation update or in any other applicable way.
+//!
 //! ## Service State Transitions
 //!
 //! Transitions between service states (including service creation) occur once the block
@@ -162,6 +185,9 @@
 //! [`migrations` module docs]: migrations/index.html
 //! [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
 //! [`Mailbox`]: struct.Mailbox.html
+//! [`ExecutionError`]: struct.ExecutionError.html
+//! [`CommonError`]: struct.CommonError.html
+//! [`instance_id`]: struct.CallInfo.html#structfield.method_id
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},

@@ -285,6 +285,18 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// Numeric identifier of the method. Should be unique for every method in the trait.
+///
+/// ## `removed` (optional)
+///
+/// ```text
+/// #[interface_method(id = 0, removed)]
+/// ```
+///
+/// Marks method as removed. The following method will be removed from trait, and attempt
+/// to invoke the method with corresponding ID will always result in an error.
+///
+/// Using this attribute is a recommended way to remove methods from interface, since it
+/// guarantees that method ID won't be reused.
 #[proc_macro_attribute]
 pub fn interface_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // We don't modify the input stream, since `interface_method` attribute only
