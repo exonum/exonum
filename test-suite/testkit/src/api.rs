@@ -17,12 +17,10 @@
 pub use exonum::api::ApiAccess;
 
 use actix_web::{test::TestServer, App};
-use failure::format_err;
 use futures::Future;
 use log::{info, trace};
 use reqwest::{
-    header, Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response,
-    StatusCode,
+    Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -223,7 +221,7 @@ where
 
     /// Sends a get request to the testing API endpoint and decodes response as
     /// the corresponding type.
-    pub fn get<R>(self, endpoint: &str) -> api::Result<R>
+    pub fn get<R>(self, endpoint: &str) -> api::ApiResult<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -255,45 +253,11 @@ where
         let response = builder.send().expect("Unable to send request");
         Self::verify_headers(self.expected_headers, &response);
         Self::response_to_api_result(response)
-    }
-
-    pub fn get_new<R>(self, endpoint: &str) -> api::ApiResult<R>
-    where
-        R: DeserializeOwned + 'static,
-    {
-        let params = self
-            .query
-            .as_ref()
-            .map(|query| {
-                format!(
-                    "?{}",
-                    serde_urlencoded::to_string(query).expect("Unable to serialize query.")
-                )
-            })
-            .unwrap_or_default();
-        let url = format!(
-            "{url}{access}/{prefix}/{endpoint}{query}",
-            url = self.test_server_url,
-            access = self.access,
-            prefix = self.prefix,
-            endpoint = endpoint,
-            query = params
-        );
-
-        trace!("GET {}", url);
-
-        let mut builder = self.test_client.get(&url);
-        if let Some(modifier) = self.modifier {
-            builder = modifier(builder);
-        }
-        let response = builder.send().expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result_new(response)
     }
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
-    pub fn post<R>(self, endpoint: &str) -> api::Result<R>
+    pub fn post<R>(self, endpoint: &str) -> api::ApiResult<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -320,35 +284,6 @@ where
         let response = builder.send().expect("Unable to send request");
         Self::verify_headers(self.expected_headers, &response);
         Self::response_to_api_result(response)
-    }
-
-    pub fn post_new<R>(self, endpoint: &str) -> api::ApiResult<R>
-    where
-        R: DeserializeOwned + 'static,
-    {
-        let url = format!(
-            "{url}{access}/{prefix}/{endpoint}",
-            url = self.test_server_url,
-            access = self.access,
-            prefix = self.prefix,
-            endpoint = endpoint
-        );
-
-        trace!("POST {}", url);
-
-        let builder = self.test_client.post(&url);
-        let mut builder = if let Some(ref query) = self.query.as_ref() {
-            trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
-            builder.json(query)
-        } else {
-            builder.json(&serde_json::Value::Null)
-        };
-        if let Some(modifier) = self.modifier {
-            builder = modifier(builder);
-        }
-        let response = builder.send().expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result_new(response)
     }
 
     // Checks that response contains headers expected by the request author.
@@ -370,61 +305,8 @@ where
         }
     }
 
-    /// Converts reqwest Response to api::Result.
-    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
-    where
-        R: DeserializeOwned + 'static,
-    {
-        trace!("Response status: {}", response.status());
-
-        fn extract_description(body: &str) -> Option<String> {
-            trace!("Error: {}", body);
-            match serde_json::from_str::<serde_json::Value>(body).ok()? {
-                serde_json::Value::Object(ref object) if object.contains_key("description") => {
-                    Some(object["description"].as_str()?.to_owned())
-                }
-                serde_json::Value::String(string) => Some(string),
-                _ => None,
-            }
-        }
-
-        fn error(mut response: Response) -> String {
-            let body = response.text().expect("Unable to get response text");
-            extract_description(&body).unwrap_or(body)
-        }
-
-        let error = match response.status() {
-            StatusCode::OK => {
-                let body = response.text().expect("Unable to get response text");
-                trace!("Body: {}", body);
-                let value = serde_json::from_str(&body).expect("Unable to deserialize body");
-
-                return Ok(value);
-            }
-            StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => api::Error::Unauthorized,
-            StatusCode::BAD_REQUEST => api::Error::BadRequest(error(response)),
-            StatusCode::NOT_FOUND => api::Error::NotFound(error(response)),
-            StatusCode::MOVED_PERMANENTLY => {
-                let location = response
-                    .headers()
-                    .get(header::LOCATION)
-                    .expect("Received a MOVED_PERMANENTLY response without location header")
-                    .to_str()
-                    .unwrap()
-                    .to_owned();
-                api::Error::MovedPermanently(location)
-            }
-            StatusCode::GONE => api::Error::Gone,
-            s if s.is_server_error() => {
-                api::Error::InternalError(format_err!("{}", error(response)))
-            }
-            s => panic!("Received non-error response status: {}", s.as_u16()),
-        };
-
-        Err(error)
-    }
-
-    fn response_to_api_result_new<R>(mut response: Response) -> api::ApiResult<R>
+    /// Converts reqwest Response to `api::ApiResult`.
+    fn response_to_api_result<R>(mut response: Response) -> api::ApiResult<R>
     where
         R: DeserializeOwned + 'static,
     {
