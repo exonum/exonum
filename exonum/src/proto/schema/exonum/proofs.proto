@@ -33,7 +33,7 @@ message BlockProof {
   // in the block, etc.
   Block block = 1;
   // List of `Precommit` messages for the block.
-  repeated messages.Verified precommits = 2;
+  repeated messages.SignedMessage precommits = 2;
 }
 
 // Proof of authenticity for a single index within the database.

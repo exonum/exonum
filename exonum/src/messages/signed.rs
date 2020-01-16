@@ -26,7 +26,7 @@ use std::{
 };
 
 use crate::{
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey, SecretKey, Signature},
     messages::types::SignedMessage,
     proto,
 };
@@ -228,17 +228,27 @@ impl<T> ProtobufConvert for Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    type ProtoStruct = proto::Verified;
+    type ProtoStruct = proto::SignedMessage;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        let mut verified = Self::ProtoStruct::new();
-        verified.set_raw(self.as_raw().to_pb());
-        verified
+        let mut message = Self::ProtoStruct::new();
+        let signed_message = self.as_raw();
+
+        message.set_payload(signed_message.payload.to_pb());
+        message.set_author(signed_message.author.to_pb());
+        message.set_signature(signed_message.signature.to_pb());
+        message
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let raw = SignedMessage::from_pb(pb.take_raw())?;
-        raw.into_verified()
+        let signed_message = SignedMessage {
+            payload: pb.take_payload(),
+            author: PublicKey::from_pb(pb.take_author()).expect("Failed to convert from protobuf."),
+            signature: Signature::from_pb(pb.take_signature())
+                .expect("Failed to convert from protobuf."),
+        };
+
+        signed_message.into_verified()
     }
 }
 

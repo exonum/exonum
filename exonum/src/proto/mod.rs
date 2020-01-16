@@ -16,7 +16,7 @@
 
 pub use self::schema::{
     blockchain::{AdditionalHeaders, Block, CallInBlock, TxLocation},
-    messages::{CoreMessage, Precommit, SignedMessage, Verified},
+    messages::{CoreMessage, Precommit, SignedMessage},
     proofs::{BlockProof, IndexProof},
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
