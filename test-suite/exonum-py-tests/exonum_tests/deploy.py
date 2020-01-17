@@ -4,6 +4,7 @@ import unittest
 
 import re
 from exonum_client import ExonumClient
+from exonum_client.crypto import KeyPair
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
 from exonum_launcher.explorer import ExecutionFailError
@@ -14,6 +15,7 @@ from suite import (
     launcher_networks,
     run_4_nodes,
     wait_network_to_start,
+    ExonumCryptoAdvancedClient
 )
 
 
@@ -306,6 +308,14 @@ class RegularDeployTest(unittest.TestCase):
             available_services = client.public_api.available_services().json()
             # crypto instance always first element in array
             self.assertEqual(available_services['services'][0]['status']['type'], 'stopped')
+            with ExonumCryptoAdvancedClient(client) as crypto_client:
+                alice_keys = KeyPair.generate()
+                tx_response = crypto_client.create_wallet(
+                    alice_keys, "Alice" + str(validator_id)
+                )
+                # in case of stopped service its tx will not be processed
+                self.assertEqual(tx_response.status_code, 400)
+                self.assertIn("Specified service is not active", str(tx_response.content))
 
     def test_deploy_regular_with_instance_stop_action_before_start(self):
         """Tests the deploy mechanism in regular mode with instance
