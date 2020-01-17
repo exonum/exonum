@@ -26,7 +26,7 @@ use std::{
 };
 
 use crate::{
-    crypto::{self, Hash, PublicKey, SecretKey, Signature},
+    crypto::{self, Hash, PublicKey, SecretKey},
     messages::types::SignedMessage,
     proto,
 };
@@ -231,22 +231,12 @@ where
     type ProtoStruct = proto::SignedMessage;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        let mut message = Self::ProtoStruct::new();
         let signed_message = self.as_raw();
-
-        message.set_payload(signed_message.payload.to_pb());
-        message.set_author(signed_message.author.to_pb());
-        message.set_signature(signed_message.signature.to_pb());
-        message
+        signed_message.to_pb()
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let signed_message = SignedMessage {
-            payload: pb.take_payload(),
-            author: PublicKey::from_pb(pb.take_author())?,
-            signature: Signature::from_pb(pb.take_signature())?,
-        };
-
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let signed_message = SignedMessage::from_pb(pb)?;
         signed_message.into_verified()
     }
 }
