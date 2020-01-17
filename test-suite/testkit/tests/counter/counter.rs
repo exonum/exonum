@@ -19,9 +19,8 @@ use exonum::{
     runtime::{ExecutionError, InstanceId},
 };
 use exonum_api::{
-    self as api,
     backends::actix::{HttpRequest, RawHandler, RequestHandler},
-    ApiBackend,
+    ApiBackend, ApiError, ApiResult, HttpStatusCode,
 };
 use exonum_derive::*;
 use exonum_explorer::api::TransactionResponse;
@@ -182,25 +181,31 @@ impl CounterWithProof {
 struct CounterApi;
 
 impl CounterApi {
-    fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
+    fn increment(state: &ServiceApiState<'_>, value: u64) -> ApiResult<TransactionResponse> {
         trace!("received increment tx");
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
-            .map_err(|e| api::Error::InternalError(e.into()))?;
+            .map_err(|e| {
+                ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                    .title("Failed to increment counter")
+                    .detail(e.to_string())
+            })?;
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn count(snapshot: impl Access) -> api::Result<u64> {
+    fn count(snapshot: impl Access) -> ApiResult<u64> {
         let schema = CounterSchema::new(snapshot);
         Ok(schema.counter.get().unwrap_or_default())
     }
 
-    fn count_with_proof(state: &ServiceApiState<'_>) -> api::Result<CounterWithProof> {
+    fn count_with_proof(state: &ServiceApiState<'_>) -> ApiResult<CounterWithProof> {
         let proof = state
             .data()
             .proof_for_service_index("counter")
-            .ok_or_else(|| api::Error::NotFound("counter not initialized".to_owned()))?;
+            .ok_or_else(|| {
+                ApiError::new(HttpStatusCode::NOT_FOUND).title("Counter not initialized")
+            })?;
         let schema = CounterSchema::new(state.service_data());
         Ok(CounterWithProof {
             counter: schema.counter.get(),
@@ -208,13 +213,14 @@ impl CounterApi {
         })
     }
 
-    fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
+    fn reset(state: &ServiceApiState<'_>) -> ApiResult<TransactionResponse> {
         trace!("received reset tx");
         // The first `()` is the empty context, the second one is the `reset` arg.
-        let tx_hash = state
-            .generic_broadcaster()
-            .reset((), ())
-            .map_err(|e| api::Error::InternalError(e.into()))?;
+        let tx_hash = state.generic_broadcaster().reset((), ()).map_err(|e| {
+            ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                .title("Failed to reset counter")
+                .detail(e.to_string())
+        })?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -242,15 +248,17 @@ impl CounterApi {
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
         let blockchain = builder.blockchain().clone();
-        let handler = move |request: HttpRequest| -> api::Result<u64> {
+        let handler = move |request: HttpRequest| -> ApiResult<u64> {
             let auth_header = request
                 .headers()
                 .get("Authorization")
-                .ok_or_else(|| api::Error::Unauthorized)?
+                .ok_or_else(|| ApiError::new(HttpStatusCode::UNAUTHORIZED))?
                 .to_str()
-                .map_err(|_| api::Error::BadRequest("Malformed `Authorization`".to_owned()))?;
+                .map_err(|_| {
+                    ApiError::new(HttpStatusCode::BAD_REQUEST).title("Malformed `Authorization`")
+                })?;
             if auth_header != "Bearer SUPER_SECRET_111" {
-                return Err(api::Error::Unauthorized);
+                return Err(ApiError::new(HttpStatusCode::UNAUTHORIZED));
             }
 
             let snapshot = blockchain.snapshot();
