@@ -24,7 +24,10 @@
 use exonum::{
     merkledb::{
         access::Prefixed,
-        migration::{flush_migration, MigrationHelper},
+        migration::{
+            flush_migration, AbortMigration, Migration, MigrationError as DbMigrationError,
+            MigrationHelper,
+        },
         Database, Fork, Snapshot, TemporaryDB,
     },
     runtime::{
@@ -35,7 +38,19 @@ use exonum::{
 };
 use exonum_rust_runtime::ServiceFactory;
 
-use std::sync::Arc;
+use std::{
+    iter,
+    sync::{Arc, Mutex},
+};
+
+/// Status of a migration script execution.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScriptStatus {
+    /// The script has successfully completed and the migration data was flushed.
+    Ok,
+    /// The script was aborted as per abort policy used.
+    Aborted,
+}
 
 /// Helper for migration testing.
 ///
@@ -135,7 +150,19 @@ where
         Prefixed::new(Self::SERVICE_NAME, snapshot)
     }
 
-    /// Gets the snapshot at the end of the migration.
+    /// Gets the migrated data. This method is useful to inspect migration state after
+    /// script abortion. Once the migration is flushed, the migrated data is erased.
+    pub fn migration_data(&self) -> Migration<'static, &dyn Snapshot> {
+        let snapshot = self
+            .end_snapshot
+            .as_ref()
+            .expect("Cannot take snapshot before `migrate` method is called");
+        Migration::new(Self::SERVICE_NAME, snapshot)
+    }
+
+    /// Gets the snapshot at the end of the migration. If the latest migration script execution
+    /// was aborted, this method will provide access to old data since the migration is not
+    /// flushed in this case.
     pub fn end_snapshot(&self) -> Prefixed<'static, &dyn Snapshot> {
         let snapshot = self
             .end_snapshot
@@ -147,12 +174,82 @@ where
     /// Executes a single migration script.
     pub fn execute_script(&mut self, script: MigrationScript) -> &mut Self {
         self.start_snapshot = Some(self.db.snapshot());
-        self.do_execute_script(script);
+        self.do_execute_script(script, ());
         self.end_snapshot = Some(self.db.snapshot());
         self
     }
 
-    fn do_execute_script(&mut self, script: MigrationScript) {
+    /// Executes a migration script with the specified abort policy. Each time the script merges
+    /// changes to the database, the policy will be queried whether to proceed or emulate script
+    /// abort.
+    ///
+    /// # Return Value
+    ///
+    /// Returns status of the script indicating whether it completed successfully or was aborted.
+    pub fn execute_script_with_aborts(
+        &mut self,
+        script: MigrationScript,
+        abort_handle: impl AbortMigration + 'static,
+    ) -> ScriptStatus {
+        self.start_snapshot = Some(self.db.snapshot());
+        let status = self.do_execute_script(script, abort_handle);
+        self.end_snapshot = Some(self.db.snapshot());
+        status
+    }
+
+    /// Repeatedly executes a migration script with the provided abort policy until the script
+    /// is completed (i.e., returns `Ok(_)`). The migration is flushed after this method returns.
+    ///
+    /// The policy should be configured in such a way that it eventually progresses
+    /// the script. A policy that aborts the script every time will lead to a hang-up
+    /// if the script has at least one merge. [`AbortPolicy`] automatically
+    /// satisfies this requirement; after each abort, it allows at least one merge.
+    ///
+    /// [`AbortPolicy`]: struct.AbortPolicy.html
+    pub fn execute_until_flush<F, T>(
+        &mut self,
+        script_fn: F,
+        script_end_version: &str,
+        aborts: T,
+    ) -> &mut Self
+    where
+        F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Clone + Send + 'static,
+        T: AbortMigration + Send + Sync + 'static,
+    {
+        #[derive(Debug)]
+        struct Shared<U>(Arc<U>);
+
+        impl<U> Clone for Shared<U> {
+            fn clone(&self) -> Self {
+                Shared(Arc::clone(&self.0))
+            }
+        }
+
+        impl<U> AbortMigration for Shared<U>
+        where
+            U: AbortMigration + Send + Sync,
+        {
+            fn is_aborted(&self) -> bool {
+                self.0.is_aborted()
+            }
+        }
+
+        let abort_handle = Shared(Arc::new(aborts));
+        loop {
+            let script = script_fn.clone().with_end_version(script_end_version);
+            let res = self.execute_script_with_aborts(script, abort_handle.clone());
+            if res == ScriptStatus::Ok {
+                break;
+            }
+        }
+        self
+    }
+
+    fn do_execute_script(
+        &mut self,
+        script: MigrationScript,
+        abort_handle: impl AbortMigration + 'static,
+    ) -> ScriptStatus {
         let instance_spec = InstanceSpec {
             id: 100,
             name: Self::SERVICE_NAME.to_owned(),
@@ -164,14 +261,34 @@ where
             instance_spec,
             data_version: self.data_version.clone(),
         };
+        context.helper.set_abort_handle(abort_handle);
         let end_version = script.end_version().to_owned();
-        script.execute(&mut context).unwrap();
-        context.helper.finish().unwrap();
 
-        let mut fork = self.db.fork();
-        flush_migration(&mut fork, Self::SERVICE_NAME);
-        self.db.merge(fork.into_patch()).unwrap();
-        self.data_version = end_version;
+        match script.execute(&mut context) {
+            Ok(()) => {
+                // The fork in `MigrationHelper` may contain unmerged changes. We want to merge them,
+                // but we need to swap the abort handle first (since the old one may lead to `finish`
+                // failing).
+                context.helper.set_abort_handle(());
+                context.helper.finish().unwrap();
+
+                let mut fork = self.db.fork();
+                flush_migration(&mut fork, Self::SERVICE_NAME);
+                self.db.merge(fork.into_patch()).unwrap();
+                self.data_version = end_version;
+                ScriptStatus::Ok
+            }
+            Err(MigrationError::Custom(err)) => {
+                panic!("Script has generated a user-defined error: {}", err)
+            }
+            Err(MigrationError::Helper(DbMigrationError::Merge(err))) => {
+                panic!("MerkleDB error during migration script execution: {}", err)
+            }
+            Err(MigrationError::Helper(DbMigrationError::Aborted)) => {
+                // We've successfully emulated script abortion!
+                ScriptStatus::Aborted
+            }
+        }
     }
 }
 
@@ -188,10 +305,80 @@ where
 
         self.start_snapshot = Some(self.db.snapshot());
         for script in scripts {
-            self.do_execute_script(script);
+            self.do_execute_script(script, ());
         }
         self.end_snapshot = Some(self.db.snapshot());
         self
+    }
+}
+
+/// Abort policy based on an iterator yielding responses to the question whether to abort
+/// the migration script when it merges data to the database.
+///
+/// After each "yes" answer (i.e., script abort) the policy will return "no" to the following
+/// question without querying the iterator. This ensures that using `AbortPolicy` in the
+/// [`execute_until_flush`] method will eventually complete the script (unless the script logic
+/// itself is faulty).
+///
+/// [`execute_until_flush`]: struct.MigrationTest.html#method.execute_until_flush
+#[derive(Debug)]
+pub struct AbortPolicy<I> {
+    // `Mutex` is used to make the type `Send` / `Sync`.
+    inner: Mutex<AbortPolicyInner<I>>,
+}
+
+impl<I> AbortPolicy<I>
+where
+    I: Iterator<Item = bool>,
+{
+    /// Creates a new policy around the provided iterator. The iterator may be finite; once
+    /// it runs out of items, the answer to the question whether to abort the script will always
+    /// be "no".
+    pub fn new(iter: I) -> Self {
+        let inner = AbortPolicyInner {
+            iter,
+            was_aborted_on_prev_iteration: false,
+        };
+        Self {
+            inner: Mutex::new(inner),
+        }
+    }
+}
+
+impl AbortPolicy<iter::Repeat<bool>> {
+    /// Creates a policy which aborts the script every other time. This ensures that the script
+    /// makes progress, but tests it failure tolerance in "unfriendly" conditions.
+    pub fn abort_repeatedly() -> Self {
+        Self::new(iter::repeat(true))
+    }
+}
+
+impl<I> AbortMigration for AbortPolicy<I>
+where
+    I: Iterator<Item = bool> + Send,
+{
+    fn is_aborted(&self) -> bool {
+        let mut lock = self.inner.lock().expect("Cannot lock `AbortPolicy` mutex");
+        lock.should_abort()
+    }
+}
+
+#[derive(Debug)]
+struct AbortPolicyInner<I> {
+    iter: I,
+    was_aborted_on_prev_iteration: bool,
+}
+
+impl<I: Iterator<Item = bool>> AbortPolicyInner<I> {
+    fn should_abort(&mut self) -> bool {
+        if self.was_aborted_on_prev_iteration {
+            self.was_aborted_on_prev_iteration = false;
+            false
+        } else {
+            let next_value = self.iter.next().unwrap_or(false);
+            self.was_aborted_on_prev_iteration = next_value;
+            next_value
+        }
     }
 }
 
@@ -229,12 +416,15 @@ where
 mod tests {
     use super::*;
 
-    use exonum::runtime::{migrations::InitMigrationError, ArtifactId};
+    use exonum::{
+        merkledb::access::AccessExt,
+        runtime::{migrations::InitMigrationError, ArtifactId},
+    };
     use exonum_rust_runtime::{ArtifactProtobufSpec, Service};
 
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
+    use std::{
+        iter,
+        sync::atomic::{AtomicUsize, Ordering},
     };
 
     fn script_1(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
@@ -244,6 +434,26 @@ mod tests {
 
     fn script_2(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
         assert_eq!(ctx.data_version, Version::new(0, 2, 0));
+        Ok(())
+    }
+
+    /// This script counts to 10.
+    fn script_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+        let mut current_value = ctx
+            .helper
+            .new_data()
+            .get_entry::<_, u32>("entry")
+            .get()
+            .unwrap_or(0);
+
+        while current_value < 10 {
+            ctx.helper
+                .new_data()
+                .get_entry::<_, u32>("entry")
+                .set(current_value + 1);
+            ctx.helper.merge()?;
+            current_value += 1;
+        }
         Ok(())
     }
 
@@ -312,5 +522,84 @@ mod tests {
         assert_eq!(test.data_version, Version::new(0, 3, 0));
         assert_eq!(factory.script_counters[0].load(Ordering::SeqCst), 1);
         assert_eq!(factory.script_counters[1].load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn abort_policy_with_chosen_iterators() {
+        let abort_policy = AbortPolicy::new(iter::repeat(false));
+        for _ in 0..100 {
+            assert!(!abort_policy.is_aborted());
+        }
+
+        let abort_policy = AbortPolicy::new(iter::repeat(true));
+        for i in 0..100 {
+            // We should get `true, false, true, false, ...` sequence of aborts.
+            assert_eq!(abort_policy.is_aborted(), i % 2 == 0);
+        }
+
+        let seq = iter::repeat(false).take(3).chain(iter::repeat(true));
+        let abort_policy = AbortPolicy::new(seq);
+        let expected_aborts = vec![false, false, false, true, false, true, false, true];
+        for expected in expected_aborts {
+            assert_eq!(expected, abort_policy.is_aborted());
+        }
+
+        let seq = vec![false, true, false, false, true];
+        let abort_policy = AbortPolicy::new(seq.into_iter());
+        let expected_aborts = vec![false, true, false, false, false, true, false, false];
+        for expected in expected_aborts {
+            assert_eq!(expected, abort_policy.is_aborted());
+        }
+    }
+
+    #[test]
+    fn testing_script_with_aborts() {
+        let mut test = MigrationTest::new(SomeService::default(), Version::new(0, 1, 0));
+        let abort_policy = AbortPolicy::new(iter::once(true));
+        let status = test
+            .setup(|_| {})
+            .execute_script_with_aborts(script_with_merges.with_end_version("0.2.0"), abort_policy);
+        assert_eq!(status, ScriptStatus::Aborted);
+        let value = test.end_snapshot().get_entry::<_, u32>("entry").get();
+        assert_eq!(value, None);
+
+        let abort_policy = AbortPolicy::new(vec![false, false, true].into_iter());
+        let status = test
+            .execute_script_with_aborts(script_with_merges.with_end_version("0.2.0"), abort_policy);
+        assert_eq!(status, ScriptStatus::Aborted);
+        let value = test.migration_data().get_entry::<_, u32>("entry").get();
+        assert_eq!(value, Some(2)); // Two successful iterations.
+
+        let status =
+            test.execute_script_with_aborts(script_with_merges.with_end_version("0.2.0"), ());
+        assert_eq!(status, ScriptStatus::Ok);
+        let value = test.end_snapshot().get_entry::<_, u32>("entry").get();
+        assert_eq!(value, Some(10));
+        assert!(test.migration_data().index_type("entry").is_none());
+    }
+
+    #[test]
+    fn running_script_until_flush() {
+        let abort_policy = AbortPolicy::new(iter::repeat(true));
+        let mut test = MigrationTest::new(SomeService::default(), Version::new(0, 1, 0));
+
+        let fail_counter = Arc::new(AtomicUsize::new(0));
+        let fail_counter_ = Arc::clone(&fail_counter);
+        let snapshot = test
+            .execute_until_flush(
+                |ctx| {
+                    script_with_merges(ctx).map_err(move |err| {
+                        fail_counter_.fetch_add(1, Ordering::SeqCst);
+                        err
+                    })
+                },
+                "0.2.0",
+                abort_policy,
+            )
+            .end_snapshot();
+
+        let value = snapshot.get_entry::<_, u32>("entry").get();
+        assert_eq!(value, Some(10));
+        assert_eq!(fail_counter.load(Ordering::SeqCst), 10);
     }
 }
