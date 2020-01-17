@@ -37,8 +37,7 @@ use std::{
 use crate::{
     manager::{ApiManager, WebServerConfig},
     Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiError as HttpApiError,
-    ApiFutureResult, ApiScope, EndpointMutability, Error as ApiError, ExtendApiBackend,
-    FutureResult, NamedWith,
+    ApiFutureResult, ApiScope, EndpointMutability, ExtendApiBackend, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -115,25 +114,6 @@ impl ExtendApiBackend for actix_web::Scope<()> {
     }
 }
 
-impl ResponseError for ApiError {
-    fn error_response(&self) -> HttpResponse {
-        match self {
-            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
-            ApiError::InternalError(err) => {
-                HttpResponse::InternalServerError().body(err.to_string())
-            }
-            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            ApiError::Gone => HttpResponse::Gone().finish(),
-            ApiError::MovedPermanently(new_location) => HttpResponse::MovedPermanently()
-                .header(header::LOCATION, new_location.clone())
-                .finish(),
-            ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
-            ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
-        }
-    }
-}
-
 impl ResponseError for HttpApiError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.http_code)
@@ -204,26 +184,6 @@ impl From<EndpointMutability> for actix_web::http::Method {
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, crate::Result<I>, F>> for RequestHandler
-where
-    F: Fn(Q) -> crate::Result<I> + 'static + Send + Sync + Clone,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, crate::Result<I>, F>) -> Self {
-        // Convert handler that returns a `Result` into handler that will return `FutureResult`.
-        let handler = f.inner.handler;
-        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = ApiError>> {
-            let future = handler(query).into_future();
-            Box::new(future)
-        };
-        let named_with_future = NamedWith::new(f.name, future_endpoint, f.mutability);
-
-        // Then we can create a `RequestHandler` with the `From` specialization for future result.
-        RequestHandler::from(named_with_future)
-    }
-}
-
 impl<Q, I, F> From<NamedWith<Q, I, crate::ApiResult<I>, F>> for RequestHandler
 where
     F: Fn(Q) -> crate::ApiResult<I> + 'static + Send + Sync + Clone,
@@ -266,36 +226,6 @@ where
         EndpointMutability::Mutable => {
             let future = request.json().from_err();
             Either::B(future)
-        }
-    }
-}
-
-impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
-where
-    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
-        let handler = f.inner.handler;
-        let actuality = f.inner.actuality;
-        let mutability = f.mutability;
-        let index = move |request: HttpRequest| -> FutureResponse {
-            let handler = handler.clone();
-            let actuality = actuality.clone();
-            extract_query(request, mutability)
-                .and_then(move |query| {
-                    handler(query)
-                        .map(|value| json_response(actuality, value))
-                        .map_err(From::from)
-                })
-                .responder()
-        };
-
-        Self {
-            name: f.name,
-            method: f.mutability.into(),
-            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }

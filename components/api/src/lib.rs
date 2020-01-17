@@ -63,11 +63,9 @@
 
 pub use self::{
     cors::AllowOrigin,
-    error::{ApiError, Error, HttpStatusCode, MovedPermanentlyError},
+    error::{ApiError, HttpStatusCode, MovedPermanentlyError},
     manager::{ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
-    with::{
-        Actuality, ApiFutureResult, ApiResult, Deprecated, FutureResult, NamedWith, Result, With,
-    },
+    with::{Actuality, ApiFutureResult, ApiResult, Deprecated, NamedWith, With},
 };
 
 pub mod backends;

@@ -21,8 +21,6 @@ pub use actix_web::http::{
 use failure::{format_err, Fail};
 use serde::{Deserialize, Serialize};
 
-use std::io;
-
 /// API HTTP error struct.
 #[derive(Fail, Debug, PartialEq)]
 pub struct ApiError {
@@ -121,47 +119,6 @@ impl ApiError {
     }
 }
 
-/// List of possible API errors.
-#[derive(Fail, Debug)]
-pub enum Error {
-    /// Storage error. This type includes errors related to the database, caused
-    /// by, for example, serialization issues.
-    #[fail(display = "Storage error: {}", _0)]
-    Storage(#[cause] failure::Error),
-
-    /// Input/output error. This type includes errors related to files that are not
-    /// a part of the Exonum storage.
-    #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] io::Error),
-
-    /// Bad request. This error occurs when the request contains invalid syntax.
-    #[fail(display = "Bad request: {}", _0)]
-    BadRequest(String),
-
-    /// Moved permanently. This error means that resource existed at the specified
-    /// location, but now is moved to the other place.
-    #[fail(display = "Moved permanently; Location: {}", _0)]
-    MovedPermanently(String),
-
-    /// Gone. This error means that resource existed in the past, but now is not present.
-    #[fail(display = "Gone")]
-    Gone,
-
-    /// Not found. This error occurs when the server cannot locate the requested
-    /// resource.
-    #[fail(display = "Not found: {}", _0)]
-    NotFound(String),
-
-    /// Internal server error. This type can return any internal server error to the user.
-    #[fail(display = "Internal server error: {}", _0)]
-    InternalError(failure::Error),
-
-    /// Unauthorized error. This error occurs when the request lacks valid
-    /// authentication credentials.
-    #[fail(display = "Unauthorized")]
-    Unauthorized,
-}
-
 /// A helper structure allowing to build `MovedPermanently` response from the
 /// composite parts.
 #[derive(Debug)]
@@ -192,17 +149,6 @@ impl MovedPermanentlyError {
     }
 }
 
-impl From<MovedPermanentlyError> for Error {
-    fn from(e: MovedPermanentlyError) -> Self {
-        let full_location = match e.query_part {
-            Some(query) => format!("{}?{}", e.location, query),
-            None => e.location,
-        };
-
-        Error::MovedPermanently(full_location)
-    }
-}
-
 impl From<MovedPermanentlyError> for ApiError {
     fn from(e: MovedPermanentlyError) -> Self {
         let full_location = match e.query_part {
@@ -211,18 +157,5 @@ impl From<MovedPermanentlyError> for ApiError {
         };
 
         ApiError::new(HttpStatusCode::MOVED_PERMANENTLY).header(header::LOCATION, &full_location)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::Io(e)
-    }
-}
-
-/// Converts the provided error into an internal server error.
-impl From<failure::Error> for Error {
-    fn from(e: failure::Error) -> Self {
-        Error::InternalError(e)
     }
 }

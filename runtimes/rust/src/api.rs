@@ -14,9 +14,7 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum_api::{
-    ApiError, ApiFutureResult, Deprecated, EndpointMutability, Error, FutureResult, Result,
-};
+pub use exonum_api::{ApiError, ApiFutureResult, Deprecated, EndpointMutability};
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},

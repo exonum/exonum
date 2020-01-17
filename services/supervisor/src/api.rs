@@ -146,7 +146,7 @@ impl ApiImpl<'_> {
 }
 
 impl PrivateApi for ApiImpl<'_> {
-    type Error = api::Error;
+    type Error = ApiError;
 
     fn deploy_artifact(&self, artifact: DeployRequest) -> ApiResult<Hash> {
         self.broadcaster()?
@@ -199,7 +199,7 @@ impl PrivateApi for ApiImpl<'_> {
 }
 
 impl PublicApi for ApiImpl<'_> {
-    type Error = api::Error;
+    type Error = ApiError;
 
     fn consensus_config(&self) -> ApiResult<ConsensusConfig> {
         Ok(self.0.data().for_core().consensus_config())
