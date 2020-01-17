@@ -116,9 +116,11 @@ impl ExtendApiBackend for actix_web::Scope<()> {
 
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.http_code)
+        let mut response = HttpResponse::build(self.http_code)
             .header(header::CONTENT_TYPE, "application/problem+json")
-            .body(serde_json::to_string(&self.body).unwrap())
+            .body(serde_json::to_string(&self.body).unwrap());
+        response.headers_mut().extend(self.headers.clone());
+        response
     }
 }
 
