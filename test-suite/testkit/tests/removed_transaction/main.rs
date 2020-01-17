@@ -35,11 +35,29 @@ fn generate_tx() -> Verified<AnyTx> {
     gen_keypair().method_b(SERVICE_ID, 0)
 }
 
-fn generate_tx_for_removed_method() -> Verified<AnyTx> {
+fn generate_txs_for_removed_methods() -> Vec<Verified<AnyTx>> {
+    let keypair = gen_keypair();
+
+    let create_tx = |id| {
+        let tx = AnyTx {
+            call_info: CallInfo::new(SERVICE_ID, id),
+            arguments: BinaryValue::to_bytes(&0_u64),
+        };
+
+        tx.sign(keypair.0, &keypair.1)
+    };
+
+    let tx1 = create_tx(0);
+    let tx2 = create_tx(2);
+
+    vec![tx1, tx2]
+}
+
+fn generate_tx_for_nonexistent_method() -> Verified<AnyTx> {
     let keypair = gen_keypair();
 
     let tx = AnyTx {
-        call_info: CallInfo::new(SERVICE_ID, 0),
+        call_info: CallInfo::new(SERVICE_ID, 3),
         arguments: BinaryValue::to_bytes(&0_u64),
     };
 
@@ -51,16 +69,21 @@ fn generate_tx_for_removed_method() -> Verified<AnyTx> {
 #[test]
 fn call_removed_method() {
     let (mut testkit, _) = init_testkit();
-    let tx = generate_tx_for_removed_method();
-
-    let error = testkit.create_block_with_transaction(tx).transactions[0]
-        .status()
-        .expect_err("Tx for `method_b` should be executed successfully")
-        .clone();
+    let txs = generate_txs_for_removed_methods();
 
     let expected_error = ErrorMatch::from_fail(&CommonError::MethodRemoved).for_service(SERVICE_ID);
 
-    assert_eq!(error, expected_error);
+    testkit
+        .create_block_with_transactions(txs)
+        .iter()
+        .for_each(|tx| {
+            let error = tx
+                .status()
+                .expect_err("Tx for `method_b` should be executed successfully")
+                .clone();
+
+            assert_eq!(error, expected_error);
+        });
 }
 
 /// Checks that attempt to call existing method from service in which one method was removed
@@ -74,4 +97,21 @@ fn call_existing_method() {
     testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .expect("Tx for `method_b` should be executed successfully");
+}
+
+/// Checks that for nonexistent method `CommonError::NoSuchMethod` is
+/// returned.
+#[test]
+fn call_nonexisting_method() {
+    let (mut testkit, _) = init_testkit();
+    let tx = generate_tx_for_nonexistent_method();
+
+    let error = testkit.create_block_with_transaction(tx).transactions[0]
+        .status()
+        .expect_err("Tx for `method_b` should be executed successfully")
+        .clone();
+
+    let expected_error = ErrorMatch::from_fail(&CommonError::NoSuchMethod).for_service(SERVICE_ID);
+
+    assert_eq!(error, expected_error);
 }

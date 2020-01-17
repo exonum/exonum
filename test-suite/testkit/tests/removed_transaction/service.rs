@@ -22,17 +22,17 @@ use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 pub const SERVICE_NAME: &str = "sample_service";
 pub const SERVICE_ID: InstanceId = 100;
 
-#[exonum_interface]
+#[exonum_interface(removed_tx_ids(0, 2))]
 pub trait SampleServiceInterface<Ctx> {
     type Output;
 
-    /// Removed method. Attempt to call it should result in `CommonError::MethodRemoved`.
-    #[interface_method(id = 0, removed)]
-    fn method_a(&self, ctx: Ctx, arg: u64) -> Self::Output;
+    // Method with ID 0 was removed.
 
     /// Usual method.
     #[interface_method(id = 1)]
     fn method_b(&self, ctx: Ctx, arg: u64) -> Self::Output;
+
+    // Method with ID 2 was removed.
 }
 
 impl SampleServiceInterface<CallContext<'_>> for SampleService {

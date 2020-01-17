@@ -17,12 +17,13 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, spanned::Spanned, Attribute, AttributeArgs, FnArg, Ident, ItemTrait,
+    parse_macro_input, spanned::Spanned, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, Lit,
     NestedMeta, Receiver, ReturnType, TraitItem, TraitItemMethod, Type,
 };
 
 use std::collections::HashSet;
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 use super::{find_meta_attrs, RustRuntimeCratePath};
 
@@ -138,6 +139,49 @@ impl ServiceMethodDescriptor {
     }
 }
 
+#[derive(Debug, Default)]
+struct RemovedMethods {
+    pub ids: Vec<u32>,
+}
+
+impl FromMeta for RemovedMethods {
+    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
+        // Go through every item in list and check that this item satisfies the following criteria:
+        // - It must be `Lit` (not `Meta`);
+        // - Type of `Lit` must be `Lit::Int`;
+        // - Contents of `Lit::Int` can be parsed to `u32`.
+        //
+        // Results of `map`ping are collected into `Result` of either `Vec` or `darling` error.
+        let ids: Result<Vec<_>, _> = items
+            .iter()
+            .map(|item| {
+                if let NestedMeta::Lit(lit) = item {
+                    if let Lit::Int(int) = lit {
+                        match u32::from_str(int.base10_digits()) {
+                            Ok(id) => Ok(id),
+                            Err(_) => {
+                                let msg = "Incorrect method ID, must be an unsigned integer";
+                                return Err(darling::Error::custom(msg).with_span(&lit));
+                            }
+                        }
+                    } else {
+                        let msg = "Incorrect method ID, must be an unsigned integer";
+                        Err(darling::Error::custom(msg).with_span(&lit))
+                    }
+                } else {
+                    let msg = "Incorrect method ID, must be an unsigned integer";
+                    Err(darling::Error::custom(msg).with_span(&item))
+                }
+            })
+            .collect();
+
+        match ids {
+            Ok(ids) => Ok(Self { ids }),
+            Err(err) => Err(err),
+        }
+    }
+}
+
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 struct ExonumInterfaceAttrs {
@@ -145,6 +189,7 @@ struct ExonumInterfaceAttrs {
     cr: RustRuntimeCratePath,
     auto_ids: bool,
     interface: Option<String>,
+    removed_tx_ids: RemovedMethods,
 }
 
 impl Default for ExonumInterfaceAttrs {
@@ -153,6 +198,7 @@ impl Default for ExonumInterfaceAttrs {
             cr: RustRuntimeCratePath::default(),
             auto_ids: false,
             interface: None,
+            removed_tx_ids: RemovedMethods::default(),
         }
     }
 }
@@ -171,9 +217,6 @@ impl TryFrom<&[Attribute]> for ExonumInterfaceAttrs {
 struct InterfaceMethodAttrs {
     /// Numeric identifier of the method.
     id: u32,
-    /// Flag for removed methods.
-    #[darling(default)]
-    removed: bool,
 }
 
 impl TryFrom<&[Attribute]> for InterfaceMethodAttrs {
@@ -195,15 +238,19 @@ struct ExonumInterface {
     item_trait: ItemTrait,
     attrs: ExonumInterfaceAttrs,
     methods: Vec<ServiceMethodDescriptor>,
-    removed_methods: Vec<ServiceMethodDescriptor>,
 }
 
 impl ExonumInterface {
-    fn new(mut item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
+    fn new(item_trait: ItemTrait, args: Vec<NestedMeta>) -> Result<Self, darling::Error> {
         use syn::GenericParam;
 
         // Extract attributes.
         let attrs = ExonumInterfaceAttrs::from_list(&args)?;
+
+        if attrs.auto_ids && !attrs.removed_tx_ids.ids.is_empty() {
+            let msg = "`auto_ids` and `removed_tx_ids` attributes cannot be used together";
+            return Err(darling::Error::custom(msg).with_span(&item_trait));
+        }
 
         // Extract context type param from the trait generics.
         let params = &item_trait.generics.params;
@@ -223,17 +270,14 @@ impl ExonumInterface {
 
         // Process trait methods.
         let mut methods = Vec::with_capacity(item_trait.items.len());
-        let mut removed_methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
         let mut used_method_ids = HashSet::new();
         let mut next_method_id = 0;
 
-        let mut trait_items_to_remove = HashSet::new();
-
         for trait_item in &item_trait.items {
             match trait_item {
                 TraitItem::Method(method) => {
-                    let (method_id, removed) = if !attrs.auto_ids {
+                    let method_id = if !attrs.auto_ids {
                         // Auto-increment disabled, parse ID from attribute.
                         let id_attr = InterfaceMethodAttrs::try_from(method.attrs.as_ref())?;
                         let method_id = id_attr.id;
@@ -242,23 +286,16 @@ impl ExonumInterface {
                             let msg = format!("Method ID {} is already used", method_id);
                             return Err(darling::Error::custom(msg).with_span(&method.sig));
                         }
-                        (method_id, id_attr.removed)
+                        (method_id)
                     } else {
                         // Auto-increment enabled, assign automatically.
                         let method_id = next_method_id;
                         next_method_id += 1;
-
-                        // Marking methods as removed is not available within automatic ID assignment.
-                        (method_id, false)
+                        method_id
                     };
 
                     let method = ServiceMethodDescriptor::try_from(method_id, ctx_ident, method)?;
-                    if !removed {
-                        methods.push(method);
-                    } else {
-                        removed_methods.push(method);
-                        trait_items_to_remove.insert(trait_item.clone());
-                    }
+                    methods.push(method);
                 }
                 TraitItem::Type(ty) if ty.ident == "Output" => {
                     if !ty.bounds.is_empty() {
@@ -274,13 +311,6 @@ impl ExonumInterface {
             }
         }
 
-        // Remove methods marked as `removed` from trait, so they won't need an implementation.
-        item_trait.items = item_trait
-            .items
-            .into_iter()
-            .filter(|item| !trait_items_to_remove.contains(item))
-            .collect();
-
         if !has_output {
             let msg = "The trait should have associated `Output` type";
             return Err(darling::Error::custom(msg).with_span(&item_trait));
@@ -290,7 +320,6 @@ impl ExonumInterface {
             item_trait,
             attrs,
             methods,
-            removed_methods,
         })
     }
 
@@ -315,6 +344,9 @@ impl ExonumInterface {
         let trait_name = &self.item_trait.ident;
         let interface_name = self.interface_name();
 
+        // For existing methods we create a match arm for method ID, which decodes
+        // an input argument using `BinaryValue` trait, and then invokes the corresponding
+        // method of interface trait.
         let impl_match_arm_for_method = |descriptor: &ServiceMethodDescriptor| {
             let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
 
@@ -328,9 +360,9 @@ impl ExonumInterface {
         };
         let match_arms = self.methods.iter().map(impl_match_arm_for_method);
 
-        let impl_match_arm_for_removed_method = |descriptor: &ServiceMethodDescriptor| {
-            let id = descriptor.id;
-
+        // For removed methods we create a match arm which returns `CommonError::MethodRemoved`
+        // for any input, without any checks for input correctness.
+        let impl_match_arm_for_removed_method = |id: &u32| {
             quote! {
                 #id => {
                     return Err(exonum::runtime::CommonError::MethodRemoved.into());
@@ -338,7 +370,9 @@ impl ExonumInterface {
             }
         };
         let removed_match_arms = self
-            .removed_methods
+            .attrs
+            .removed_tx_ids
+            .ids
             .iter()
             .map(impl_match_arm_for_removed_method);
 
