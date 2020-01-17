@@ -18,10 +18,10 @@ use exonum::{
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
+    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID, CallContext},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, DefaultInstance, Service, TxStub};
+use exonum_rust_runtime::{DefaultInstance, Service, TxStub};
 use serde_derive::{Deserialize, Serialize};
 
 #[exonum_interface(auto_ids)]
