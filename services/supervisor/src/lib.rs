@@ -52,7 +52,8 @@
 //! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
 //! This node votes for the configuration propose automatically.
 //!
-//! The operation of starting a service is treated similarly to a configuration change and follows the same rules.
+//! The operation of starting or resuming a service is treated similarly to a configuration change
+//! and follows the same rules.
 //!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
@@ -74,7 +75,7 @@ pub use self::{
     errors::{ArtifactError, CommonError, ConfigurationError, ServiceError},
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
-        DeployResult, ServiceConfig, StartService, StopService, SupervisorConfig,
+        DeployResult, ResumeService, ServiceConfig, StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -153,7 +154,7 @@ fn update_configs(
 
             ConfigChange::StartService(start_service) => {
                 log::trace!(
-                    "Request add service with name {:?} from artifact {:?}",
+                    "Request add service with name {} from artifact {}",
                     start_service.name,
                     start_service.artifact
                 );
@@ -180,7 +181,7 @@ fn update_configs(
                     );
 
                 log::trace!(
-                    "Request stop service with name {:?} from artifact {:?}",
+                    "Request stop service with name {} from artifact {}",
                     instance.spec.name,
                     instance.spec.artifact
                 );
@@ -188,6 +189,29 @@ fn update_configs(
                 context
                     .supervisor_extensions()
                     .initiate_stopping_service(stop_service.instance_id)?;
+            }
+
+            ConfigChange::ResumeService(resume_service) => {
+                let instance = context
+                    .data()
+                    .for_dispatcher()
+                    .get_instance(resume_service.instance_id)
+                    .expect(
+                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
+                    );
+
+                log::trace!(
+                    "Request resume service with name {} from artifact {} up to {}",
+                    instance.spec.name,
+                    instance.spec.artifact,
+                    resume_service.artifact,
+                );
+
+                context.supervisor_extensions().initiate_resuming_service(
+                    resume_service.instance_id,
+                    resume_service.artifact,
+                    resume_service.params,
+                )?;
             }
         }
     }

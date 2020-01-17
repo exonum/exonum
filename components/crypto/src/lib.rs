@@ -469,7 +469,7 @@ pub struct KeyPair {
 
 impl KeyPair {
     pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
-        debug_assert!(
+        assert!(
             verify_keys_match(&public_key, &secret_key),
             "Public key does not match the secret key."
         );
