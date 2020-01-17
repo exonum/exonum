@@ -112,14 +112,15 @@ impl Error {
         http_code: HttpStatusCode,
         body: &str,
     ) -> std::result::Result<Self, serde_json::Error> {
-        let mut resp_body = ErrorBody::default();
-        if !body.is_empty() {
-            resp_body = serde_json::from_str(body)?;
-        }
+        let body = if !body.is_empty() {
+            serde_json::from_str(body)?
+        } else {
+            ErrorBody::default()
+        };
 
         Ok(Self {
             http_code,
-            body: resp_body,
+            body,
             headers: HeaderMap::new(),
         })
     }
