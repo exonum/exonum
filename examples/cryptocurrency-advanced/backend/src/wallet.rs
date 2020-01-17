@@ -24,7 +24,7 @@ use super::proto;
 #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Wallet", serde_pb_convert)]
 pub struct Wallet {
-    /// Address of the wallet's owner. This address may transate to a Ed25519 public key,
+    /// Address of the wallet's owner. This address may translate to a Ed25519 public key,
     /// or to service authorization.
     pub owner: Address,
     /// Name of the wallet.
