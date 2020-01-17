@@ -780,11 +780,6 @@ pub enum Caller {
 }
 
 impl Caller {
-    /// Converts a public key to an address.
-    pub fn address_from_key(public_key: PublicKey) -> CallerAddress {
-        Caller::Transaction { author: public_key }.address()
-    }
-
     /// Returns the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
         if let Caller::Transaction { author } = self {
@@ -860,13 +855,13 @@ impl ProtobufConvert for Caller {
 /// This ensures that addresses are unique, collision-resistant and domain-separated for different
 /// `Caller` types.
 ///
-/// For example, to compute an address from a public key, you can use `Caller::address_from_key()`
+/// For example, to compute an address from a public key, you can use `CallerAddress::from_key()`
 /// (in Rust code), or create and hash a `Caller` Protobuf message (in any programming language).
 ///
 /// ```
 /// # use exonum::{crypto, merkledb::BinaryValue, runtime::{Caller, CallerAddress}};
 /// let (public_key, _) = crypto::gen_keypair();
-/// let address = Caller::address_from_key(public_key);
+/// let address = CallerAddress::from_key(public_key);
 /// let caller = Caller::Transaction { author: public_key };
 /// // Obtain Protobuf serialization of the `Caller`.
 /// let caller_pb = caller.to_bytes();
@@ -879,6 +874,13 @@ impl ProtobufConvert for Caller {
 #[derive(BinaryValue, ObjectHash)]
 #[serde(transparent)]
 pub struct CallerAddress(Hash);
+
+impl CallerAddress {
+    /// Converts a public key to an address.
+    pub fn from_key(public_key: PublicKey) -> Self {
+        Caller::Transaction { author: public_key }.address()
+    }
+}
 
 impl AsRef<[u8]> for CallerAddress {
     fn as_ref(&self) -> &[u8] {

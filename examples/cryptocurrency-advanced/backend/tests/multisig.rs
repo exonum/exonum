@@ -224,7 +224,7 @@ fn test_multisig() {
     assert_eq!(ms_wallet.balance, 100);
 
     // Spend some tokens from the wallet!
-    let alice_address = Caller::address_from_key(alice.0);
+    let alice_address = CallerAddress::from_key(alice.0);
     let action = TxStub.transfer(
         SERVICE_ID,
         Transfer {
@@ -289,7 +289,7 @@ fn test_2_of_3_multisig() {
     let action = TxStub.transfer(
         SERVICE_ID,
         Transfer {
-            to: Caller::address_from_key(carol.0),
+            to: CallerAddress::from_key(carol.0),
             amount: 10,
             seed: 0,
         },
