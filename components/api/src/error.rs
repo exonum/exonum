@@ -16,7 +16,7 @@
 
 pub use actix_web::http::{
     header::{self, HeaderName},
-    HeaderMap as HttpHeaderMap, StatusCode as HttpStatusCode,
+    HeaderMap, StatusCode as HttpStatusCode,
 };
 use failure::Fail;
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ pub struct Error {
     /// API error body.
     pub body: ErrorBody,
     /// Additional HTTP headers.
-    pub headers: HttpHeaderMap,
+    pub headers: HeaderMap,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
@@ -65,7 +65,7 @@ impl Error {
         Self {
             http_code,
             body: ErrorBody::default(),
-            headers: HttpHeaderMap::new(),
+            headers: HeaderMap::new(),
         }
     }
 
@@ -112,11 +112,15 @@ impl Error {
         http_code: HttpStatusCode,
         body: &str,
     ) -> std::result::Result<Self, serde_json::Error> {
-        let body = serde_json::from_str(body)?;
+        let mut resp_body = ErrorBody::default();
+        if !body.is_empty() {
+            resp_body = serde_json::from_str(body)?;
+        }
+
         Ok(Self {
             http_code,
-            body,
-            headers: HttpHeaderMap::new(),
+            body: resp_body,
+            headers: HeaderMap::new(),
         })
     }
 }
