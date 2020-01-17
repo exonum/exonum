@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,48 @@ use exonum_rust_runtime::ServiceFactory;
 use std::sync::Arc;
 
 /// Helper for migration testing.
+///
+/// # Examples
+///
+/// Testing a single migration script:
+///
+/// ```
+/// # use exonum_derive::*;
+/// # use exonum::runtime::{
+/// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
+/// # };
+/// use exonum::merkledb::access::AccessExt;
+/// # use exonum_rust_runtime::Service;
+/// use exonum_testkit::migrations::{MigrationTest, ScriptExt};
+///
+/// fn script_under_test(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+///     let old_data = ctx.helper.old_data();
+///     let old_value = old_data.get_entry::<_, u32>("entry").get().unwrap_or(0);
+///     let new_data = ctx.helper.new_data();
+///     new_data.get_proof_entry("entry").set(old_value + 1);
+///     Ok(())
+/// }
+///
+/// /// Service under test.
+/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// #[service_factory(artifact_name = "test-service")]
+/// pub struct ServiceUnderTest;
+///
+/// impl Service for ServiceUnderTest {}
+///
+/// let mut test = MigrationTest::new(ServiceUnderTest, Version::new(0, 1, 0));
+/// let snapshot = test
+///     .setup(|access| {
+///         // Setup data for the test, for example, create the old service schema
+///         // and add test data into it.
+///         access.get_entry("entry").set(1_u32);
+///     })
+///     .execute_script(script_under_test.with_end_version("0.2.0"))
+///     .end_snapshot();
+/// // Check the data in the snapshot after the script is executed.
+/// let value = snapshot.get_proof_entry::<_, u32>("entry").get();
+/// assert_eq!(value, Some(2));
+/// ```
 #[derive(Debug)]
 pub struct MigrationTest<S> {
     db: Arc<dyn Database>,
@@ -59,7 +101,7 @@ where
         }
     }
 
-    /// Sets up initial data.
+    /// Sets up initial data for the service before the migration.
     pub fn setup<F>(&mut self, setup: F) -> &mut Self
     where
         F: FnOnce(Prefixed<'static, &Fork>),
