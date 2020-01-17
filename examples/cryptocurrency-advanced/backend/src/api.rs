@@ -14,14 +14,14 @@
 
 //! Cryptocurrency API.
 
-use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
-
 use exonum::{
     blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
 };
-use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
+use exonum_api as api;
+use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
+use exonum_rust_runtime::api::{ServiceApiBuilder, ServiceApiState};
 
 use crate::{schema::SchemaImpl, wallet::Wallet};
 
@@ -71,7 +71,7 @@ impl PublicApi {
         self,
         state: &ServiceApiState<'_>,
         pub_key: PublicKey,
-    ) -> api::Result<WalletInfo> {
+    ) -> api::ApiResult<WalletInfo> {
         let IndexProof {
             block_proof,
             index_proof,
