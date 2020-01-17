@@ -857,7 +857,7 @@ impl ProtobufConvert for Caller {
 /// # Converting to Address
 ///
 /// The address for a [`Caller`] is defined as the SHA-256 digest of its Protobuf serialization.
-/// This ensures that addresses are unique, collision-resistant and domain-seprated for different
+/// This ensures that addresses are unique, collision-resistant and domain-separated for different
 /// `Caller` types.
 ///
 /// For example, to compute an address from a public key, you can use `Caller::address_from_key()`
@@ -873,7 +873,7 @@ impl ProtobufConvert for Caller {
 /// assert_eq!(address.as_ref(), &crypto::hash(&caller_pb)[..]);
 /// ```
 ///
-/// [`Caller`]: struct.Caller.html
+/// [`Caller`]: enum.Caller.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash)]
