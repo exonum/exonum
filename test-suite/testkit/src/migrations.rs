@@ -14,7 +14,12 @@
 
 //! Testing framework for data migrations.
 //!
-//! FIXME: more documentation, examples (ECR-4081)
+//! This module allows to test data migration scripts in isolation, without involving actual
+//! migration workflow for service instances or `TestKit` in general.
+//!
+//! The core type in this module is [`MigrationTest`]; see its docs for examples of usage.
+//!
+//! [`MigrationTest`]: struct.MigrationTest.html
 
 use exonum::{
     merkledb::{
@@ -33,6 +38,14 @@ use exonum_rust_runtime::ServiceFactory;
 use std::sync::Arc;
 
 /// Helper for migration testing.
+///
+/// The helper implements the following workflow:
+///
+/// 1. Prepare test data to be migrated using [`setup`](#method.setup).
+/// 2. Execute one or more migration scripts using [`execute_script`](#method.execute_script)
+///   or [`migrate`](#method.migrate).
+/// 3. Check that the migrated data is valid using the [`end_snapshot`](#method.end_snapshot)
+///   of the database and, possible, the [snapshot before migration](#method.start_snapshot).
 ///
 /// # Examples
 ///
