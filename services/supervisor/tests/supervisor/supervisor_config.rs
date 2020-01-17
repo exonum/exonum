@@ -66,15 +66,13 @@ fn initial_configuration() {
 #[should_panic(expected = "Invalid configuration for supervisor.")]
 fn incorrect_configuration() {
     let incorrect_config = vec![0x12, 0x34]; // Obviously incorrect config.
-    let instance_spec = InstanceSpec {
-        id: SUPERVISOR_INSTANCE_ID,
-        name: Supervisor::NAME.into(),
-        artifact: Supervisor.artifact_id(),
-    };
-    let incorrect_instance = InstanceInitParams {
-        instance_spec,
-        constructor: incorrect_config,
-    };
+    let instance_spec = InstanceSpec::from_raw_parts(
+        SUPERVISOR_INSTANCE_ID,
+        Supervisor::NAME.into(),
+        Supervisor.artifact_id(),
+    );
+    let incorrect_instance =
+        InstanceInitParams::from(instance_spec).with_constructor(incorrect_config);
 
     let _testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)

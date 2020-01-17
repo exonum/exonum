@@ -15,7 +15,7 @@
 //! Standard Exonum CLI command used to combine a private and all the public parts of the
 //! node configuration in a single file.
 
-use exonum::{blockchain::ConsensusConfig, crypto::PublicKey};
+use exonum::crypto::PublicKey;
 use exonum_node::{ConnectInfo, ConnectListConfig, NodeApiConfig};
 use failure::{bail, ensure, format_err, Error};
 use serde_derive::{Deserialize, Serialize};
@@ -159,13 +159,11 @@ impl ExonumCommand for Finalize {
             public_configs.len()
         );
 
-        let consensus = ConsensusConfig {
-            validator_keys: public_configs
-                .iter()
-                .flat_map(|c| c.validator_keys)
-                .collect(),
-            ..common.consensus
-        };
+        let validator_keys = public_configs
+            .iter()
+            .flat_map(|c| c.validator_keys)
+            .collect();
+        let consensus = common.consensus.with_validator_keys(validator_keys);
 
         let connect_list = Self::create_connect_list_config(&public_configs, &private_config);
 

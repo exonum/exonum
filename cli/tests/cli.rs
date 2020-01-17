@@ -527,10 +527,7 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
 }
 
 fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
-    let keys = ValidatorKeys {
-        consensus_key: gen_keypair().0,
-        service_key: gen_keypair().0,
-    };
+    let keys = ValidatorKeys::new(gen_keypair().0, gen_keypair().0);
     NodePublicConfig {
         consensus: Default::default(),
         general: GeneralConfig {

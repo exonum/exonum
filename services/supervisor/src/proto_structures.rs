@@ -88,11 +88,7 @@ impl StartService {
     /// Given the instance ID, splits the `StartService` request into `InstanceSpec`
     /// and config value.
     pub fn into_parts(self, id: InstanceId) -> (InstanceSpec, Vec<u8>) {
-        let spec = InstanceSpec {
-            id,
-            name: self.name,
-            artifact: self.artifact,
-        };
+        let spec = InstanceSpec::from_raw_parts(id, self.name, self.artifact);
 
         (spec, self.config)
     }

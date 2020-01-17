@@ -207,6 +207,9 @@ mod types;
 pub const SUPERVISOR_INSTANCE_ID: InstanceId = 0;
 
 /// List of predefined runtimes.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
 pub enum RuntimeIdentifier {
@@ -214,6 +217,10 @@ pub enum RuntimeIdentifier {
     Rust = 0,
     /// Exonum Java Binding runtime.
     Java = 1,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl From<RuntimeIdentifier> for u32 {
@@ -237,6 +244,7 @@ impl fmt::Display for RuntimeIdentifier {
         match self {
             RuntimeIdentifier::Rust => f.write_str("Rust runtime"),
             RuntimeIdentifier::Java => f.write_str("Java runtime"),
+            RuntimeIdentifier::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 }
@@ -610,14 +618,25 @@ pub struct RuntimeInstance {
     pub id: u32,
     /// Enclosed `Runtime` object.
     pub instance: Box<dyn Runtime>,
+
+    /// No-op field for forward compatibility.
+    non_exhaustive: (),
+}
+
+impl RuntimeInstance {
+    /// Constructs a new `RuntimeInstance` object.
+    pub fn new(id: u32, instance: Box<dyn Runtime>) -> Self {
+        Self {
+            id,
+            instance,
+            non_exhaustive: (),
+        }
+    }
 }
 
 impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
     fn from(runtime: T) -> Self {
-        RuntimeInstance {
-            id: T::ID,
-            instance: runtime.into(),
-        }
+        RuntimeInstance::new(T::ID, runtime.into())
     }
 }
 
@@ -818,6 +837,20 @@ pub struct InstanceDescriptor<'a> {
     /// A unique name of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.name)
     pub name: &'a str,
+
+    /// No-op field for forward compatibility.
+    non_exhaustive: (),
+}
+
+impl<'a> InstanceDescriptor<'a> {
+    /// Creates a new `InstanceDescriptor` object.
+    pub fn new(id: InstanceId, name: &'a str) -> Self {
+        Self {
+            id,
+            name,
+            non_exhaustive: (),
+        }
+    }
 }
 
 impl fmt::Display for InstanceDescriptor<'_> {
@@ -834,7 +867,7 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
 
 impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
     fn from((id, name): (InstanceId, &'a str)) -> Self {
-        InstanceDescriptor { id, name }
+        InstanceDescriptor::new(id, name)
     }
 }
 

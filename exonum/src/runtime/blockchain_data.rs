@@ -216,10 +216,7 @@ impl SnapshotExt for dyn Snapshot {
         let aggregator = SystemSchema::new(self).state_aggregator();
         aggregator.get(index_name)?;
         let index_proof = aggregator.get_proof(index_name.to_string());
-        Some(IndexProof {
-            block_proof,
-            index_proof,
-        })
+        Some(IndexProof::new(block_proof, index_proof))
     }
 
     fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>

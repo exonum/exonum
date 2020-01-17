@@ -38,6 +38,9 @@ mod tests;
 /// Represents current view of the database by specified `address` and
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug)]
 pub enum View<T: RawAccess> {
     Real(ViewInner<T>),

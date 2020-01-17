@@ -27,6 +27,9 @@ use crate::{BinaryKey, BinaryValue, HashTag, ObjectHash};
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
 /// Enum that represents the type of the `ProofMap` node.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug)]
 pub enum Node {
     /// Leaf node that contains a hash of the leaf value.

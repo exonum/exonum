@@ -45,6 +45,26 @@ pub struct DbOptions {
     ///
     /// Defaults to `CompressionType::None`, meaning there is no compression.
     pub compression_type: CompressionType,
+
+    /// No-op field for forward compatibility.
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl DbOptions {
+    /// Creates a new `DbOptions` object.
+    pub fn new(
+        max_open_files: Option<i32>,
+        create_if_missing: bool,
+        compression_type: CompressionType,
+    ) -> Self {
+        Self {
+            max_open_files,
+            create_if_missing,
+            compression_type,
+            non_exhaustive: (),
+        }
+    }
 }
 
 /// Algorithms of compression for the database.
@@ -81,10 +101,6 @@ impl From<CompressionType> for DBCompressionType {
 
 impl Default for DbOptions {
     fn default() -> Self {
-        Self {
-            max_open_files: None,
-            create_if_missing: true,
-            compression_type: CompressionType::None,
-        }
+        Self::new(None, true, CompressionType::None)
     }
 }

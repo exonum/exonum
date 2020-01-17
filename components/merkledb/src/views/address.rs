@@ -289,15 +289,23 @@ pub struct ResolvedAddress {
     /// for different views in the same column family. In other words, key spaces for two addresses
     /// with equal `name` and `id`s `Some(x)` and `Some(y)`, `x != y`, must not intersect.
     pub id: Option<NonZeroU64>,
+
+    /// No-op field for forward compatibility.
+    non_exhaustive: (),
 }
 
 impl ResolvedAddress {
-    /// Creates a system view. System views are low-level (i.e., they are not wrapped in indexes).
-    pub(crate) fn system(name: impl Into<String>) -> Self {
+    pub(crate) fn new(name: impl Into<String>, id: Option<NonZeroU64>) -> Self {
         Self {
             name: name.into(),
-            id: None,
+            id,
+            non_exhaustive: (),
         }
+    }
+
+    /// Creates a system view. System views are low-level (i.e., they are not wrapped in indexes).
+    pub(crate) fn system(name: impl Into<String>) -> Self {
+        Self::new(name, None)
     }
 
     pub(crate) fn id_to_bytes(&self) -> Option<[u8; 8]> {

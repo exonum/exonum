@@ -220,7 +220,10 @@ impl BlockchainMut {
             .consensus_config_entry()
             .set(genesis_config.consensus_config);
 
-        for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
+        for ArtifactSpec {
+            artifact, payload, ..
+        } in genesis_config.artifacts
+        {
             Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone());
             self.dispatcher
                 .deploy_artifact(artifact, payload)
@@ -349,15 +352,15 @@ impl BlockchainMut {
         let patch = fork.into_patch();
         let state_hash = SystemSchema::new(&patch).state_hash();
 
-        let mut block = Block {
+        let mut block = Block::new(
             height,
-            tx_count: tx_hashes.len() as u32,
+            tx_hashes.len() as u32,
             prev_hash,
             tx_hash,
             state_hash,
             error_hash,
-            additional_headers: AdditionalHeaders::new(),
-        };
+            AdditionalHeaders::new(),
+        );
 
         block.add_header::<ProposerId>(proposer_id);
 

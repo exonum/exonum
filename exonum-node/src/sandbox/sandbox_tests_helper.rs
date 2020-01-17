@@ -107,17 +107,16 @@ impl<'a> BlockBuilder<'a> {
         let mut headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
         headers.insert::<ProposerId>(proposer_id.into());
 
-        Block {
-            height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
-            tx_count: self.tx_count.unwrap_or(0),
-            prev_hash: self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
-            tx_hash: self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
-            state_hash: self
-                .state_hash
+        Block::new(
+            self.height.unwrap_or_else(|| self.sandbox.current_height()),
+            self.tx_count.unwrap_or(0),
+            self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
+            self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
+            self.state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
-            error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
-            additional_headers: headers,
-        }
+            self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
+            headers,
+        )
     }
 }
 

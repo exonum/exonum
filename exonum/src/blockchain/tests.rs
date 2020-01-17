@@ -160,10 +160,7 @@ impl Transaction {
         public_key: PublicKey,
         secret_key: &SecretKey,
     ) -> Verified<AnyTx> {
-        let tx = AnyTx {
-            arguments: self.into_bytes(),
-            call_info: CallInfo::new(instance_id, 0),
-        };
+        let tx = AnyTx::new(CallInfo::new(instance_id, 0), self.into_bytes());
         Verified::from_value(tx, public_key, secret_key)
     }
 }
@@ -588,11 +585,11 @@ fn start_stop_service_instance() {
     );
 
     // Start secondary service instance.
-    let instance_spec = InstanceSpec {
-        id: 10,
-        name: "secondary".to_owned(),
-        artifact: RuntimeInspector::default_artifact_id(),
-    };
+    let instance_spec = InstanceSpec::from_raw_parts(
+        10,
+        "secondary".to_owned(),
+        RuntimeInspector::default_artifact_id(),
+    );
 
     // Check that the secondary service instance is absent in the dispatcher schema.
     let snapshot = blockchain.snapshot();

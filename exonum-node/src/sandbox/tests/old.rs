@@ -77,15 +77,15 @@ fn create_block(sandbox: &Sandbox) -> Block {
     let mut headers = AdditionalHeaders::new();
     headers.insert::<ProposerId>(ValidatorId(2).into());
 
-    Block {
-        height: Height(1),
-        tx_count: 0,
-        prev_hash: sandbox.last_hash(),
-        tx_hash: HashTag::empty_list_hash(),
-        state_hash: sandbox.last_state_hash(),
-        error_hash: HashTag::empty_map_hash(),
-        additional_headers: headers,
-    }
+    Block::new(
+        Height(1),
+        0,
+        sandbox.last_hash(),
+        HashTag::empty_list_hash(),
+        sandbox.last_state_hash(),
+        HashTag::empty_map_hash(),
+        headers,
+    )
 }
 
 #[test]

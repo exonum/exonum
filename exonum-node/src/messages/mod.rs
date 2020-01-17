@@ -424,15 +424,15 @@ mod tests {
         let txs = [2];
         let tx_count = txs.len() as u32;
 
-        let content = Block {
-            height: Height(500),
+        let content = Block::new(
+            Height(500),
             tx_count,
-            prev_hash: crypto::hash(&[1]),
-            tx_hash: crypto::hash(&txs),
-            state_hash: crypto::hash(&[3]),
-            error_hash: crypto::hash(&[4]),
-            additional_headers: AdditionalHeaders::new(),
-        };
+            crypto::hash(&[1]),
+            crypto::hash(&txs),
+            crypto::hash(&[3]),
+            crypto::hash(&[4]),
+            AdditionalHeaders::new(),
+        );
 
         let precommits = vec![
             Verified::from_value(
@@ -521,10 +521,7 @@ mod tests {
         assert_eq!(block2.payload().block, content);
         assert_eq!(block2.payload().precommits, precommits_buf);
         assert_eq!(block2.payload().transactions, transactions);
-        let block_proof = BlockProof {
-            block: content.clone(),
-            precommits: precommits.clone(),
-        };
+        let block_proof = BlockProof::new(content.clone(), precommits.clone());
         let json_str = serde_json::to_string(&block_proof).unwrap();
         let block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap();
         assert_eq!(block_proof, block_proof_1);

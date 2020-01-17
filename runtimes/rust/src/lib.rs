@@ -364,10 +364,7 @@ impl Instance {
     }
 
     fn descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor {
-            id: self.id,
-            name: &self.name,
-        }
+        InstanceDescriptor::new(self.id, &self.name)
     }
 }
 
@@ -519,10 +516,7 @@ impl RustRuntime {
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
                     self.blockchain().clone(),
-                    InstanceDescriptor {
-                        id: instance.id,
-                        name: instance.name.as_ref(),
-                    },
+                    InstanceDescriptor::new(instance.id, instance.name.as_ref()),
                 );
                 instance.as_ref().wire_api(&mut builder);
                 let root_path = builder
@@ -640,6 +634,12 @@ impl Runtime for RustRuntime {
                 self.remove_started_service(spec);
             }
             InstanceStatus::Migrating(_) => { /* Do nothing. */ }
+            other => {
+                log::warn!(
+                    "Received non-expected service status: {}; ignoring the request",
+                    other
+                );
+            }
         }
         self.changed_services_since_last_block = true;
     }

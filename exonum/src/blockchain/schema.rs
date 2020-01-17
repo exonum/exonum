@@ -227,7 +227,7 @@ impl<T: Access> Schema<T> {
         let block_hash = self.block_hash_by_height(height)?;
         let block = self.blocks().get(&block_hash).unwrap();
         let precommits = self.precommits(&block_hash).iter().collect();
-        Some(BlockProof { block, precommits })
+        Some(BlockProof::new(block, precommits))
     }
 
     /// Returns the latest committed block.
@@ -342,6 +342,9 @@ where
 /// assert!(CallInBlock::after_transactions(0) < CallInBlock::after_transactions(1));
 /// ```
 ///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
+///
 /// # See also
 ///
 /// Not to be confused with [`CallSite`], which provides information about a call in which
@@ -368,6 +371,10 @@ pub enum CallInBlock {
         /// Numerical service identifier.
         id: InstanceId,
     },
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl ProtobufConvert for CallInBlock {
@@ -379,6 +386,7 @@ impl ProtobufConvert for CallInBlock {
             CallInBlock::BeforeTransactions { id } => pb.set_before_transactions(*id),
             CallInBlock::Transaction { index } => pb.set_transaction(*index),
             CallInBlock::AfterTransactions { id } => pb.set_after_transactions(*id),
+            CallInBlock::__NonExhaustive => unreachable!("Never actually constructed"),
         }
         pb
     }
@@ -433,6 +441,7 @@ impl fmt::Display for CallInBlock {
             CallInBlock::AfterTransactions { id } => {
                 write!(formatter, "`after_transactions` for service with ID {}", id)
             }
+            CallInBlock::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 }

@@ -50,6 +50,22 @@ pub struct ValidatorKeys {
     pub consensus_key: PublicKey,
     /// Service key is used to sign transactions broadcast by the services.
     pub service_key: PublicKey,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl ValidatorKeys {
+    /// Creates a new `ValidatorKeys` object.
+    pub fn new(consensus_key: PublicKey, service_key: PublicKey) -> Self {
+        Self {
+            consensus_key,
+            service_key,
+            non_exhaustive: (),
+        }
+    }
 }
 
 impl ValidateInput for ValidatorKeys {
@@ -120,6 +136,11 @@ pub struct ConsensusConfig {
     /// in a block if the transaction pool is almost empty, and create blocks faster when there are
     /// enough transactions in the pool.
     pub propose_timeout_threshold: u32,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl Default for ConsensusConfig {
@@ -134,6 +155,7 @@ impl Default for ConsensusConfig {
             min_propose_timeout: 10,
             max_propose_timeout: 200,
             propose_timeout_threshold: 500,
+            non_exhaustive: (),
         }
     }
 }
@@ -143,6 +165,38 @@ impl ConsensusConfig {
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
     /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
     pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
+
+    /// Creates a new `ConsensusConfig` object.
+    pub fn new(
+        validator_keys: Vec<ValidatorKeys>,
+        first_round_timeout: Milliseconds,
+        status_timeout: Milliseconds,
+        peers_timeout: Milliseconds,
+        txs_block_limit: u32,
+        max_message_len: u32,
+        min_propose_timeout: Milliseconds,
+        max_propose_timeout: Milliseconds,
+        propose_timeout_threshold: u32,
+    ) -> Self {
+        Self {
+            validator_keys,
+            first_round_timeout,
+            status_timeout,
+            peers_timeout,
+            txs_block_limit,
+            max_message_len,
+            min_propose_timeout,
+            max_propose_timeout,
+            propose_timeout_threshold,
+            non_exhaustive: (),
+        }
+    }
+
+    /// Replaces validator keys in object with provided ones.
+    pub fn with_validator_keys(mut self, validator_keys: Vec<ValidatorKeys>) -> Self {
+        self.validator_keys = validator_keys;
+        self
+    }
 
     /// Generates a consensus configuration for testing and returns it together with the keys
     /// for the first validator.
@@ -165,10 +219,7 @@ impl ConsensusConfig {
                         service_sk,
                     ));
                 }
-                ValidatorKeys {
-                    consensus_key: consensus_pk,
-                    service_key: service_pk,
-                }
+                ValidatorKeys::new(consensus_pk, service_pk)
             })
             .collect();
         let config = Self {
@@ -214,15 +265,15 @@ impl ConsensusConfig {
     /// };
     ///
     /// fn main() {
-    ///     let config = ConsensusConfig {
-    ///         validator_keys: (0..4)
-    ///             .map(|_| ValidatorKeys {
-    ///                 consensus_key: crypto::gen_keypair().0,
-    ///                 service_key: crypto::gen_keypair().0,
-    ///             })
-    ///             .collect(),
-    ///         ..ConsensusConfig::default()
-    ///     };
+    ///     let config = ConsensusConfig::default()
+    ///         .with_validator_keys(
+    ///             (0..4)
+    ///                 .map(|_| ValidatorKeys::new(
+    ///                     crypto::gen_keypair().0,
+    ///                     crypto::gen_keypair().0,
+    ///                 ))
+    ///                 .collect(),
+    ///         );
     ///
     ///     let some_validator_consensus_key = config.validator_keys[2].consensus_key;
     ///     // Try to find validator ID for this key.
@@ -342,6 +393,11 @@ pub struct GenesisConfig {
 
     /// List of services with its configuration parameters that are created directly in the genesis block.
     pub builtin_instances: Vec<InstanceInitParams>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 /// Represents data that is required for initialization of service instance.
@@ -354,6 +410,11 @@ pub struct InstanceInitParams {
     pub instance_spec: InstanceSpec,
     /// Constructor argument for specific `InstanceSpec`.
     pub constructor: Vec<u8>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl InstanceInitParams {
@@ -365,12 +426,9 @@ impl InstanceInitParams {
         constructor: impl BinaryValue,
     ) -> Self {
         InstanceInitParams {
-            instance_spec: InstanceSpec {
-                id,
-                name: name.into(),
-                artifact,
-            },
+            instance_spec: InstanceSpec::from_raw_parts(id, name.into(), artifact),
             constructor: constructor.into_bytes(),
+            non_exhaustive: (),
         }
     }
 
@@ -379,6 +437,17 @@ impl InstanceInitParams {
         InstanceInitParams {
             instance_spec: self.instance_spec,
             constructor: constructor.to_bytes(),
+            non_exhaustive: (),
+        }
+    }
+}
+
+impl From<InstanceSpec> for InstanceInitParams {
+    fn from(instance_spec: InstanceSpec) -> InstanceInitParams {
+        Self {
+            instance_spec,
+            constructor: Vec::new(),
+            non_exhaustive: (),
         }
     }
 }
@@ -435,12 +504,13 @@ impl GenesisConfigBuilder {
         let artifacts = self
             .artifacts
             .into_iter()
-            .map(|(artifact, payload)| ArtifactSpec { artifact, payload })
+            .map(|(artifact, payload)| ArtifactSpec::new(artifact, payload))
             .collect::<Vec<_>>();
         GenesisConfig {
             consensus_config: self.consensus_config,
             artifacts,
             builtin_instances: self.builtin_instances,
+            non_exhaustive: (),
         }
     }
 }
@@ -466,10 +536,10 @@ mod tests {
     }
 
     fn gen_validator_keys(i: u8) -> ValidatorKeys {
-        ValidatorKeys {
-            consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
-            service_key: gen_keypair_from_seed(&Seed::new([u8::max_value() - i; SEED_LENGTH])).0,
-        }
+        ValidatorKeys::new(
+            gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
+            gen_keypair_from_seed(&Seed::new([u8::max_value() - i; SEED_LENGTH])).0,
+        )
     }
 
     fn gen_keys_pool(count: usize) -> Vec<PublicKey> {
@@ -489,10 +559,7 @@ mod tests {
     fn validate_validator_keys_err_same() {
         let pk = crypto::gen_keypair().0;
 
-        let keys = ValidatorKeys {
-            consensus_key: pk,
-            service_key: pk,
-        };
+        let keys = ValidatorKeys::new(pk, pk);
         let e = keys.validate().unwrap_err();
         assert_err_contains(e, "Consensus and service keys must be different");
     }
@@ -518,10 +585,7 @@ mod tests {
             ),
             (
                 ConsensusConfig {
-                    validator_keys: vec![ValidatorKeys {
-                        consensus_key: keys[0],
-                        service_key: keys[0],
-                    }],
+                    validator_keys: vec![ValidatorKeys::new(keys[0], keys[0])],
                     ..ConsensusConfig::default()
                 },
                 "Consensus and service keys must be different",
@@ -529,14 +593,8 @@ mod tests {
             (
                 ConsensusConfig {
                     validator_keys: vec![
-                        ValidatorKeys {
-                            consensus_key: keys[0],
-                            service_key: keys[1],
-                        },
-                        ValidatorKeys {
-                            consensus_key: keys[0],
-                            service_key: keys[2],
-                        },
+                        ValidatorKeys::new(keys[0], keys[1]),
+                        ValidatorKeys::new(keys[0], keys[2]),
                     ],
                     ..ConsensusConfig::default()
                 },
@@ -545,14 +603,8 @@ mod tests {
             (
                 ConsensusConfig {
                     validator_keys: vec![
-                        ValidatorKeys {
-                            consensus_key: keys[0],
-                            service_key: keys[1],
-                        },
-                        ValidatorKeys {
-                            consensus_key: keys[2],
-                            service_key: keys[1],
-                        },
+                        ValidatorKeys::new(keys[0], keys[1]),
+                        ValidatorKeys::new(keys[2], keys[1]),
                     ],
                     ..ConsensusConfig::default()
                 },

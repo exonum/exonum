@@ -90,11 +90,12 @@ impl IncFactory {
 
 impl ServiceFactory for IncFactory {
     fn artifact_id(&self) -> ArtifactId {
-        ArtifactId {
-            runtime_id: RuntimeIdentifier::Rust as _,
-            name: Self::ARTIFACT_NAME.to_owned(),
-            version: self.version.clone(),
-        }
+        ArtifactId::new(
+            RuntimeIdentifier::Rust as u32,
+            Self::ARTIFACT_NAME.to_owned(),
+            self.version.clone(),
+        )
+        .expect("Can't create an ArtifactId")
     }
 
     fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {

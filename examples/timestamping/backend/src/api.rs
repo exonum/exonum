@@ -72,6 +72,7 @@ impl PublicApi {
         let IndexProof {
             block_proof,
             index_proof,
+            ..
         } = state.data().proof_for_service_index("timestamps").unwrap();
 
         let schema = Schema::new(state.service_data());

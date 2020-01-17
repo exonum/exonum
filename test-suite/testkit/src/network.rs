@@ -113,14 +113,12 @@ impl TestNetwork {
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
     pub fn genesis_config(&self) -> ConsensusConfig {
-        ConsensusConfig {
-            validator_keys: self
-                .validators()
-                .iter()
-                .map(TestNode::public_keys)
-                .collect(),
-            ..ConsensusConfig::default()
-        }
+        let validator_keys = self
+            .validators()
+            .iter()
+            .map(TestNode::public_keys)
+            .collect();
+        ConsensusConfig::default().with_validator_keys(validator_keys)
     }
 
     /// Updates the test network by the new set of nodes.
@@ -248,10 +246,7 @@ impl TestNode {
 
     /// Returns public keys of the node.
     pub fn public_keys(&self) -> ValidatorKeys {
-        ValidatorKeys {
-            consensus_key: self.keys.consensus_pk(),
-            service_key: self.keys.service_pk(),
-        }
+        ValidatorKeys::new(self.keys.consensus_pk(), self.keys.service_pk())
     }
 
     /// Returns the current validator id of node if it is validator of the test network.

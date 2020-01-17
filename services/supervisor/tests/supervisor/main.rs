@@ -369,11 +369,12 @@ fn test_bad_artifact_name() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
 
-    let bad_artifact = ArtifactId {
-        runtime_id: RuntimeIdentifier::Rust as _,
-        name: "does-not-exist".to_owned(),
-        version: "1.0.0".parse().unwrap(),
-    };
+    let bad_artifact = ArtifactId::new(
+        RuntimeIdentifier::Rust as u32,
+        "does-not-exist".to_owned(),
+        "1.0.0".parse().unwrap(),
+    )
+    .expect("Can't create an ArtifactId");
     let request = deploy_request(bad_artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);
@@ -395,10 +396,8 @@ fn test_bad_runtime_id() {
     let api = testkit.api();
     let bad_runtime_id = 10_000;
 
-    let artifact = ArtifactId {
-        runtime_id: bad_runtime_id,
-        ..IncService.artifact_id()
-    };
+    let mut artifact = IncService.artifact_id();
+    artifact.runtime_id = bad_runtime_id;
     let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
     let hash = deploy_artifact(&api, request);

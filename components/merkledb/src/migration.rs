@@ -538,6 +538,9 @@ impl MigrationHelper {
 }
 
 /// Errors emitted by `MigrationHelper` methods.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
 pub enum MigrationError {
     /// Failed to merge migration changes to database.
@@ -547,6 +550,11 @@ pub enum MigrationError {
     /// Migration has been aborted.
     #[fail(display = "Migration was aborted")]
     Aborted,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    #[fail(display = "")]
+    __NonExhaustive,
 }
 
 /// Handle allowing to signal to `MigrationHelper` that the migration has been aborted.

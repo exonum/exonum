@@ -138,9 +138,36 @@ pub struct Block {
     pub error_hash: Hash,
     /// Additional information that can be added into the block.
     pub additional_headers: AdditionalHeaders,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl Block {
+    /// Creates a new `Block` object.
+    pub fn new(
+        height: Height,
+        tx_count: u32,
+        prev_hash: Hash,
+        tx_hash: Hash,
+        state_hash: Hash,
+        error_hash: Hash,
+        additional_headers: AdditionalHeaders,
+    ) -> Self {
+        Self {
+            height,
+            tx_count,
+            prev_hash,
+            tx_hash,
+            state_hash,
+            error_hash,
+            additional_headers,
+            non_exhaustive: (),
+        }
+    }
+
     /// Inserts new additional header to the block.
     #[doc(hidden)]
     pub fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
@@ -179,15 +206,15 @@ impl Block {
     /// }
     ///
     /// // Create an empty block.
-    /// let mut block = Block {
-    ///   #  height: Height(0),
-    ///   #  tx_count: 0,
-    ///   #  prev_hash: Hash::zero(),
-    ///   #  tx_hash: Hash::zero(),
-    ///   #  state_hash: Hash::zero(),
-    ///   #  error_hash: Hash::zero(),
-    ///     additional_headers: AdditionalHeaders::new(),
-    /// };
+    /// let mut block = Block::new(
+    ///     Height(0),    // <- sample value
+    ///     0,            // <- sample value
+    ///     Hash::zero(), // <- sample value
+    ///     Hash::zero(), // <- sample value
+    ///     Hash::zero(), // <- sample value
+    ///     Hash::zero(), // <- sample value
+    ///     AdditionalHeaders::new(),
+    /// );
     ///
     /// let services = block.get_header::<ActiveServices>().expect("Entry deserialization error");
     /// assert!(services.is_none())
@@ -217,6 +244,22 @@ pub struct BlockProof {
     pub block: Block,
     /// List of `Precommit` messages for the block.
     pub precommits: Vec<Verified<Precommit>>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl BlockProof {
+    /// Creates a new `BlockProof` object.
+    pub fn new(block: Block, precommits: Vec<Verified<Precommit>>) -> Self {
+        Self {
+            block,
+            precommits,
+            non_exhaustive: (),
+        }
+    }
 }
 
 /// Proof of authenticity for a single index within the database.
@@ -231,6 +274,22 @@ pub struct IndexProof {
     /// in the form `$service_name.$name_within_service`, e.g., `cryptocurrency.wallets`.
     /// The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
     pub index_proof: MapProof<String, Hash>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl IndexProof {
+    /// Creates a new `IndexProof` object.
+    pub fn new(block_proof: BlockProof, index_proof: MapProof<String, Hash>) -> Self {
+        Self {
+            block_proof,
+            index_proof,
+            non_exhaustive: (),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -260,7 +319,7 @@ mod tests {
         let state_hash = hash(&[7, 8, 9]);
 
         let error_hash = hash(&[10, 11]);
-        let block = Block {
+        let block = Block::new(
             height,
             tx_count,
             prev_hash,
@@ -268,7 +327,7 @@ mod tests {
             state_hash,
             error_hash,
             additional_headers,
-        };
+        );
 
         let json_str = ::serde_json::to_string(&block).unwrap();
         let block1: Block = ::serde_json::from_str(&json_str).unwrap();
@@ -289,7 +348,7 @@ mod tests {
         let state_hash = hash(&[7, 8, 9]);
         let error_hash = hash(&[10, 11]);
 
-        Block {
+        Block::new(
             height,
             tx_count,
             prev_hash,
@@ -297,7 +356,7 @@ mod tests {
             state_hash,
             error_hash,
             additional_headers,
-        }
+        )
     }
 
     #[test]
