@@ -853,11 +853,38 @@ impl ProtobufConvert for Caller {
 }
 
 /// Uniform presentation of a `Caller`.
+///
+/// # Converting to Address
+///
+/// The address for a [`Caller`] is defined as the SHA-256 digest of its Protobuf serialization.
+/// This ensures that addresses are unique, collision-resistant and domain-seprated for different
+/// `Caller` types.
+///
+/// For example, to compute an address from a public key, you can use `Caller::address_from_key()`
+/// (in Rust code), or create and hash a `Caller` Protobuf message (in any programming language).
+///
+/// ```
+/// # use exonum::{crypto, merkledb::BinaryValue, runtime::{Caller, CallerAddress}};
+/// let (public_key, _) = crypto::gen_keypair();
+/// let address = Caller::address_from_key(public_key);
+/// let caller = Caller::Transaction { author: public_key };
+/// // Obtain Protobuf serialization of the `Caller`.
+/// let caller_pb = caller.to_bytes();
+/// assert_eq!(address.as_ref(), &crypto::hash(&caller_pb)[..]);
+/// ```
+///
+/// [`Caller`]: struct.Caller.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash)]
 #[serde(transparent)]
 pub struct CallerAddress(Hash);
+
+impl AsRef<[u8]> for CallerAddress {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
 
 impl ProtobufConvert for CallerAddress {
     type ProtoStruct = exonum_crypto::proto::types::Hash;
