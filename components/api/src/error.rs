@@ -14,7 +14,10 @@
 
 //! The set of errors for the Exonum API module.
 
-pub use actix_web::http::StatusCode as HttpStatusCode;
+pub use actix_web::http::{
+    header::{self, HeaderName},
+    HeaderMap as HttpHeaderMap, StatusCode as HttpStatusCode,
+};
 use failure::{format_err, Fail};
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +30,8 @@ pub struct ApiError {
     pub http_code: HttpStatusCode,
     /// API error body.
     pub body: ApiErrorBody,
+    /// Additional HTTP headers.
+    pub headers: HttpHeaderMap,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
@@ -60,6 +65,7 @@ impl ApiError {
         Self {
             http_code,
             body: ApiErrorBody::default(),
+            headers: HttpHeaderMap::new(),
         }
     }
 
@@ -94,6 +100,12 @@ impl ApiError {
         self
     }
 
+    #[doc(hidden)]
+    pub fn header(mut self, key: HeaderName, value: &str) -> Self {
+        self.headers.insert(key, value.parse().unwrap());
+        self
+    }
+
     /// Tries to create `ApiError` from JSON.
     pub fn parse(
         http_code: HttpStatusCode,
@@ -101,7 +113,11 @@ impl ApiError {
     ) -> std::result::Result<Self, failure::Error> {
         let body =
             serde_json::from_str(body).or(Err(format_err!("Failed to deserialize error body.")))?;
-        Ok(Self { http_code, body })
+        Ok(Self {
+            http_code,
+            body,
+            headers: HttpHeaderMap::new(),
+        })
     }
 }
 
@@ -184,6 +200,17 @@ impl From<MovedPermanentlyError> for Error {
         };
 
         Error::MovedPermanently(full_location)
+    }
+}
+
+impl From<MovedPermanentlyError> for ApiError {
+    fn from(e: MovedPermanentlyError) -> Self {
+        let full_location = match e.query_part {
+            Some(query) => format!("{}?{}", e.location, query),
+            None => e.location,
+        };
+
+        ApiError::new(HttpStatusCode::MOVED_PERMANENTLY).header(header::LOCATION, &full_location)
     }
 }
 
