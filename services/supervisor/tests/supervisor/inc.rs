@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::api::{ApiError, ApiResult, HttpStatusCode};
 use exonum::runtime::{CommonError, ExecutionError, InstanceId};
+use exonum_api::{ApiError, ApiResult, HttpStatusCode};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
