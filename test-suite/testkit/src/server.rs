@@ -14,7 +14,7 @@
 
 use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
-use exonum_api::{self as api, ApiAggregator, ApiBuilder, FutureResult};
+use exonum_api::{self as api, ApiAggregator, ApiBuilder, ApiFutureResult};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
@@ -50,15 +50,15 @@ impl TestKitActor {
 
         let addr_ = addr.clone();
         api_scope.endpoint("v1/status", move |()| {
-            Box::new(addr_.send(GetStatus).then(flatten_err)) as FutureResult<_>
+            Box::new(addr_.send(GetStatus).then(flatten_err)) as ApiFutureResult<_>
         });
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
-            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as FutureResult<_>
+            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as ApiFutureResult<_>
         });
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
-            Box::new(addr_.send(query).then(flatten_err)) as FutureResult<_>
+            Box::new(addr_.send(query).then(flatten_err)) as ApiFutureResult<_>
         });
         builder
     }

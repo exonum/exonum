@@ -22,7 +22,6 @@ use exonum::{
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
-use failure::format_err;
 use futures::Future;
 use log::{info, trace};
 use reqwest::{
