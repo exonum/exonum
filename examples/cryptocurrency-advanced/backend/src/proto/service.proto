@@ -44,7 +44,7 @@ message CreateWallet {
 
 // Wallet information stored in the database.
 message Wallet {
-  // `PublicKey` of the wallet.
+  // Address of the wallet's owner.
   exonum.crypto.Hash owner = 1;
   // Name of the wallet.
   string name = 2;

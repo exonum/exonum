@@ -54,7 +54,7 @@ pub enum Error {
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer", serde_pb_convert)]
 pub struct Transfer {
-    /// `PublicKey` of receiver's wallet.
+    /// Address of receiver's wallet.
     pub to: Address,
     /// Amount of currency to transfer.
     pub amount: u64,

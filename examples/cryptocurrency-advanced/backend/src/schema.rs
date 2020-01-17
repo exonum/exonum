@@ -55,8 +55,6 @@ where
     T::Base: RawAccessMut,
 {
     /// Increase balance of the wallet and append new record to its history.
-    ///
-    /// Panics if there is no wallet with given public key.
     pub(crate) fn increase_wallet_balance(
         &mut self,
         wallet: Wallet,
@@ -73,8 +71,6 @@ where
     }
 
     /// Decrease balance of the wallet and append new record to its history.
-    ///
-    /// Panics if there is no wallet with given public key.
     pub(crate) fn decrease_wallet_balance(
         &mut self,
         wallet: Wallet,
