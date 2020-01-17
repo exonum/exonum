@@ -18,10 +18,10 @@
 //! administrators, e.g. shutting down the node.
 
 use exonum::{blockchain::ApiSender, crypto::PublicKey, runtime::InstanceId};
-use exonum_api::{ApiBackend, ApiScope, Error as ApiError, FutureResult};
+use exonum_api::{ApiBackend, ApiResult, ApiScope, Error as ApiError, FutureResult};
 use exonum_node::{ConnectInfo, ExternalMessage, SharedNodeState};
 use futures::Future;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -102,7 +102,7 @@ impl SystemApi {
 
     fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| {
+        api_scope.endpoint(name, move |_query: ()| -> ApiResult<_> {
             let mut outgoing_connections: HashMap<SocketAddr, OutgoingConnection> = HashMap::new();
 
             for connect_info in shared_api_state.outgoing_connections() {
@@ -135,13 +135,15 @@ impl SystemApi {
 
     fn handle_network_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let info = self.info.clone();
-        api_scope.endpoint(name, move |_query: ()| Ok(info.clone()));
+        api_scope.endpoint(name, move |_query: ()| -> ApiResult<_> { Ok(info.clone()) });
         self
     }
 
     fn handle_is_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| Ok(shared_api_state.is_enabled()));
+        api_scope.endpoint(name, move |_query: ()| -> ApiResult<_> {
+            Ok(shared_api_state.is_enabled())
+        });
         self
     }
 
