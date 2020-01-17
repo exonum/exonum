@@ -14,8 +14,7 @@
 
 //! Tests related to the API.
 
-use assert_matches::assert_matches;
-use exonum_api::Error as ApiError;
+use exonum_api as api;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 use pretty_assertions::assert_eq;
 
@@ -92,19 +91,25 @@ fn gone() {
 
     let ping = PingQuery { value: 64 };
 
-    let pong_error: ApiError = api
+    let pong_error: api::Error = api
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .get::<u64>("gone-immutable")
         .expect_err("Request to the `Gone` endpoint succeed");
-    assert_matches!(pong_error, ApiError::Gone);
 
-    let pong_error: ApiError = api
+    let expected_err = api::Error::new(api::HttpStatusCode::GONE)
+        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
+    assert_eq!(pong_error, expected_err);
+
+    let pong_error: api::Error = api
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .post::<u64>("gone-mutable")
         .expect_err("Request to the `Gone` endpoint succeed");
-    assert_matches!(pong_error, ApiError::Gone);
+
+    let expected_err = api::Error::new(api::HttpStatusCode::GONE)
+        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
+    assert_eq!(pong_error, expected_err);
 }
 
 /// Checks that endpoints marked as `MovedPermanently` return the corresponding HTTP error, and
@@ -115,21 +120,26 @@ fn moved() {
 
     let ping = PingQuery { value: 64 };
 
-    let pong_error: ApiError = api
+    let pong_error: api::Error = api
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .expect_header("Location", "../ping-pong?value=64")
         .get::<u64>("moved-immutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
-    assert_matches!(pong_error, ApiError::MovedPermanently(_));
 
-    let pong_error: ApiError = api
+    let expected_err = api::Error::new(api::HttpStatusCode::MOVED_PERMANENTLY)
+        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
+    assert_eq!(pong_error, expected_err);
+
+    let pong_error: api::Error = api
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .expect_header("Location", "../ping-pong-deprecated-mut")
         .post::<u64>("moved-mutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
-    assert_matches!(pong_error, ApiError::MovedPermanently(_));
+    let expected_err = api::Error::new(api::HttpStatusCode::MOVED_PERMANENTLY)
+        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
+    assert_eq!(pong_error, expected_err);
 }
 
 /// Checks response from endpoint with new error type.
@@ -142,24 +152,27 @@ fn endpoint_with_new_error_type() {
     let response: u64 = api
         .public(ApiKind::Service("api-service"))
         .query(&ok_query)
-        .get_new("new-error-type")
+        .get("error")
         .expect("This request should be successful");
     assert_eq!(ok_query.value, response);
 
     // Check error response.
     let err_query = PingQuery { value: 63 };
-    let error: HttpApiError = api
+    let error: api::Error = api
         .public(ApiKind::Service("api-service"))
         .query(&err_query)
-        .get_new::<u64>("new-error-type")
+        .get::<u64>("error")
         .expect_err("Should return error.");
 
-    assert_eq!(error.http_code, HttpStatusCode::BAD_REQUEST);
-    assert_eq!(error.body.docs_uri, "http://some-docs.com");
-    assert_eq!(error.body.title, "Test endpoint error.");
-    assert_eq!(
-        error.body.detail,
-        format!("Test endpoint failed with query: {}", err_query.value)
-    );
-    assert_eq!(error.body.error_code, Some(42));
+    let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+        .docs_uri("http://some-docs.com")
+        .title("Test endpoint error.")
+        .detail(format!(
+            "Test endpoint failed with query: {}",
+            err_query.value
+        ))
+        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID))
+        .error_code(42);
+
+    assert_eq!(error, expected_err);
 }

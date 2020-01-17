@@ -89,7 +89,7 @@ impl Api {
             );
 
         public_scope.endpoint(
-            "new-error-type",
+            "error",
             move |_state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
                 if query.value == 64 {
                     Ok(query.value)

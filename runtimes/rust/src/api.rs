@@ -286,7 +286,8 @@ impl ServiceApiScope {
 /// ```
 /// use serde_derive::{Deserialize, Serialize};
 /// use exonum::{blockchain::Schema, crypto::Hash, merkledb::ObjectHash};
-/// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
+/// use exonum_api as api;
+/// use exonum_rust_runtime::api::{ServiceApiBuilder, ServiceApiState};
 ///
 /// // Declare a type which describes an API specification and implementation.
 /// pub struct MyApi;
