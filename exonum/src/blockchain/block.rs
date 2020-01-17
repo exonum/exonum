@@ -147,6 +147,7 @@ pub struct Block {
 
 impl Block {
     /// Creates a new `Block` object.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         height: Height,
         tx_count: u32,

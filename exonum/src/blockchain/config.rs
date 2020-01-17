@@ -167,6 +167,7 @@ impl ConsensusConfig {
     pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
 
     /// Creates a new `ConsensusConfig` object.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         validator_keys: Vec<ValidatorKeys>,
         first_round_timeout: Milliseconds,
