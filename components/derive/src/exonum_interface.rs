@@ -161,7 +161,7 @@ impl FromMeta for RemovedMethods {
                             Ok(id) => Ok(id),
                             Err(_) => {
                                 let msg = "Incorrect method ID, must be an unsigned integer";
-                                return Err(darling::Error::custom(msg).with_span(&lit));
+                                Err(darling::Error::custom(msg).with_span(&lit))
                             }
                         }
                     } else {
