@@ -34,6 +34,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::HashMap,
     fmt::{self, Display},
+    mem::ManuallyDrop,
+    thread,
+    time::Duration,
 };
 
 use crate::TestKit;
@@ -70,7 +73,10 @@ impl fmt::Display for ApiKind {
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
-    test_server: TestServer,
+    // FIXME: We use this wrapper to take control of server destruction.
+    // This is necessary because the server does not wait for the correct stop of its threads,
+    // which leads to runtime errors. [ECR-4129]
+    test_server: ManuallyDrop<TestServer>,
     test_client: Client,
     api_sender: ApiSender,
 }
@@ -95,7 +101,7 @@ impl TestKitApi {
             .build()
             .unwrap();
         TestKitApi {
-            test_server: create_test_server(aggregator),
+            test_server: ManuallyDrop::new(create_test_server(aggregator)),
             test_client,
             api_sender,
         }
@@ -104,6 +110,11 @@ impl TestKitApi {
     /// Returns the resolved URL for the public API.
     pub fn public_url(&self, url: &str) -> String {
         self.test_server.url(&format!("public/{}", url))
+    }
+
+    /// Returns the base URL for the test server API.
+    fn base_url(&self) -> String {
+        self.test_server.url("")
     }
 
     /// Sends a transaction to the node via `ApiSender`.
@@ -120,7 +131,7 @@ impl TestKitApi {
     /// Creates a requests builder for the public API scope.
     pub fn public(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
-            self.test_server.url(""),
+            self.base_url(),
             &self.test_client,
             ApiAccess::Public,
             kind.to_string(),
@@ -130,7 +141,7 @@ impl TestKitApi {
     /// Creates a requests builder for the private API scope.
     pub fn private(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
-            self.test_server.url(""),
+            self.base_url(),
             &self.test_client,
             ApiAccess::Private,
             kind.to_string(),
@@ -377,4 +388,16 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 
     info!("Test server created on {}", server.addr());
     server
+}
+
+impl Drop for TestKitApi {
+    fn drop(&mut self) {
+        // This is safe because we only perform the server drop operation.
+        #[allow(unsafe_code)]
+        unsafe {
+            ManuallyDrop::drop(&mut self.test_server);
+        }
+        // Sleep enough time to make sure that the server thread has stopped.
+        thread::sleep(Duration::from_millis(150));
+    }
 }
