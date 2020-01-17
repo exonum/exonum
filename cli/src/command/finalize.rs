@@ -15,11 +15,8 @@
 //! Standard Exonum CLI command used to combine a private and all the public parts of the
 //! node configuration in a single file.
 
-use exonum::{
-    blockchain::ConsensusConfig,
-    crypto::PublicKey,
-    node::{ConnectInfo, ConnectListConfig, NodeApiConfig},
-};
+use exonum::{blockchain::ConsensusConfig, crypto::PublicKey};
+use exonum_node::{ConnectInfo, ConnectListConfig, NodeApiConfig};
 use failure::{bail, ensure, format_err, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;

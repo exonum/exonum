@@ -78,6 +78,14 @@ pub(crate) fn poll_latest<S: Stream>(stream: &mut S) -> Option<Result<S::Item, S
     TakeWhileReady::new(stream).wait().last()
 }
 
+/// Polls ready items from the stream. It is assumed that a stream does not error
+/// (e.g., it's an `mpsc::Receiver`).
+#[cfg(feature = "exonum-node")]
+pub(crate) fn poll_all<S: Stream<Error = ()>>(stream: &mut S) -> Vec<S::Item> {
+    let res: Result<Vec<_>, ()> = TakeWhileReady::new(stream).wait().collect();
+    res.unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

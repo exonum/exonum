@@ -19,6 +19,7 @@
 
 use crate::crypto::proto::*;
 use crate::merkledb::proto::*;
+#[cfg(test)]
 use exonum_proto::proto::*;
 
 include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));

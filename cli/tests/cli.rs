@@ -14,7 +14,7 @@
 
 // This is a regression test for exonum configuration.
 
-use exonum::{api::AllowOrigin, blockchain::ValidatorKeys, crypto::gen_keypair};
+use exonum::{blockchain::ValidatorKeys, crypto::gen_keypair};
 use exonum_cli::{
     command::{
         finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
@@ -26,7 +26,6 @@ use exonum_cli::{
 };
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use pretty_assertions::assert_eq;
-use serde_derive::*;
 use structopt::StructOpt;
 use tempfile::TempDir;
 
@@ -219,30 +218,6 @@ fn assert_config_files_eq(path_1: impl AsRef<Path>, path_2: impl AsRef<Path>) {
         "file {:?} doesn't match with {:?}",
         path_1.as_ref(),
         path_2.as_ref()
-    );
-}
-
-#[test]
-fn test_allow_origin_toml() {
-    fn check(text: &str, allow_origin: AllowOrigin) {
-        #[derive(Serialize, Deserialize)]
-        struct Config {
-            allow_origin: AllowOrigin,
-        }
-        let config_toml = format!("allow_origin = {}\n", text);
-        let config: Config = ::toml::from_str(&config_toml).unwrap();
-        assert_eq!(config.allow_origin, allow_origin);
-        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
-    }
-
-    check(r#""*""#, AllowOrigin::Any);
-    check(
-        r#""http://example.com""#,
-        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-    );
-    check(
-        r#"["http://a.org", "http://b.org"]"#,
-        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
     );
 }
 

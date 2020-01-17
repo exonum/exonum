@@ -16,12 +16,15 @@ description = "System API plugin for the Exonum framework"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix-web = { version = "0.7.18", default-features = false }
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum-api = { version = "0.13.0-rc.2", path = "../api" }
+exonum-node = { version = "0.13.0-rc.2", path = "../../exonum-node" }
+
+actix-web = { version = "0.7.18", default-features = false }
 futures = "0.1.25"
 serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit", features = ["exonum-node"] }
 pretty_assertions = "0.6.1"

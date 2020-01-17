@@ -15,10 +15,10 @@
 //! Rust runtime specific API endpoints.
 
 use exonum::{
-    api::{self, ApiBuilder},
     proto::schema::{INCLUDES as EXONUM_INCLUDES, PROTO_SOURCES as EXONUM_PROTO_SOURCES},
     runtime::{versioning::Version, ArtifactId, RuntimeIdentifier},
 };
+use exonum_api::{self as api, ApiBuilder};
 use serde_derive::{Deserialize, Serialize};
 
 use std::collections::HashMap;

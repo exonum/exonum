@@ -29,8 +29,9 @@ use log::warn;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    crypto::PublicKey,
+    crypto::{gen_keypair, PublicKey},
     helpers::{Milliseconds, ValidateInput, ValidatorId},
+    keys::Keys,
     merkledb::BinaryValue,
     messages::SIGNED_MESSAGE_MIN_SIZE,
     proto::schema::{blockchain, runtime},
@@ -142,6 +143,40 @@ impl ConsensusConfig {
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
     /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
     pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
+
+    /// Generates a consensus configuration for testing and returns it together with the keys
+    /// for the first validator.
+    pub fn for_tests(validator_count: u16) -> (Self, Keys) {
+        assert!(
+            validator_count > 0,
+            "Cannot create network without validators"
+        );
+
+        let mut node_keys = None;
+        let validator_keys = (0..validator_count)
+            .map(|i| {
+                let (consensus_pk, consensus_sk) = gen_keypair();
+                let (service_pk, service_sk) = gen_keypair();
+                if i == 0 {
+                    node_keys = Some(Keys::from_keys(
+                        consensus_pk,
+                        consensus_sk,
+                        service_pk,
+                        service_sk,
+                    ));
+                }
+                ValidatorKeys {
+                    consensus_key: consensus_pk,
+                    service_key: service_pk,
+                }
+            })
+            .collect();
+        let config = Self {
+            validator_keys,
+            ..Default::default()
+        };
+        (config, node_keys.unwrap())
+    }
 
     /// Check that validator keys is correct. Configuration should have at least
     /// a single validator key. And each key should meet only once.

@@ -20,13 +20,12 @@
 
 use assert_matches::assert_matches;
 use exonum::{
-    api,
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::ServiceFactory;
+use exonum_rust_runtime::{api::Error as ApiError, ServiceFactory};
 use exonum_testkit::{
     explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi, TestKitBuilder,
 };
@@ -256,7 +255,7 @@ fn test_unknown_wallet_request() {
 
     assert_matches!(
         info,
-        api::Error::NotFound(ref body) if body == "Wallet not found"
+        ApiError::NotFound(ref body) if body == "Wallet not found"
     );
 }
 
@@ -317,7 +316,7 @@ impl CryptocurrencyApi {
 
         assert_matches!(
             err,
-            api::Error::NotFound(ref body) if body == "Wallet not found"
+            ApiError::NotFound(ref body) if body == "Wallet not found"
         );
     }
 

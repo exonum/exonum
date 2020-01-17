@@ -18,13 +18,13 @@
 //! the list of services on the current node.
 
 use exonum::{
-    api::ApiScope,
     blockchain::{Blockchain, Schema},
     helpers::user_agent,
     merkledb::access::AsReadonly,
-    node::SharedNodeState,
     runtime::{ArtifactId, DispatcherSchema, InstanceState, SnapshotExt},
 };
+use exonum_api::ApiScope;
+use exonum_node::SharedNodeState;
 use serde_derive::{Deserialize, Serialize};
 
 /// Information about the current state of the node memory pool.
