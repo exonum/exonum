@@ -283,7 +283,8 @@ pub mod contracts {
 /// Cryptocurrency API implementation.
 pub mod api {
     use exonum::crypto::PublicKey;
-    use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
+    use exonum_api::{ApiError, ApiResult, HttpStatusCode};
+    use exonum_rust_runtime::api::{ServiceApiBuilder, ServiceApiState};
 
     use crate::schema::{CurrencySchema, Wallet};
 
@@ -304,16 +305,16 @@ pub mod api {
             self,
             state: &ServiceApiState<'_>,
             pub_key: PublicKey,
-        ) -> api::Result<Wallet> {
+        ) -> ApiResult<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
             schema
                 .wallets
                 .get(&pub_key)
-                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
+                .ok_or_else(|| ApiError::new(HttpStatusCode::NOT_FOUND).title("Wallet not found"))
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(self, state: &ServiceApiState<'_>) -> api::Result<Vec<Wallet>> {
+        pub fn get_wallets(self, state: &ServiceApiState<'_>) -> ApiResult<Vec<Wallet>> {
             let schema = CurrencySchema::new(state.service_data());
             Ok(schema.wallets.values().collect())
         }

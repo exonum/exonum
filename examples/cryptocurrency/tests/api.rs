@@ -18,17 +18,18 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-use assert_matches::assert_matches;
 use exonum::{
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::{AnyTx, Verified},
 };
+use exonum_api as api;
 use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::{api::Error as ApiError, ServiceFactory};
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{
     explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi, TestKitBuilder,
 };
+use pretty_assertions::assert_eq;
 use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
@@ -253,10 +254,11 @@ fn test_unknown_wallet_request() {
         .get::<Wallet>("v1/wallet")
         .unwrap_err();
 
-    assert_matches!(
-        info,
-        ApiError::NotFound(ref body) if body == "Wallet not found"
-    );
+    let expected_err = api::ApiError::new(api::HttpStatusCode::NOT_FOUND)
+        .title("Wallet not found")
+        .source(format!("{}:{}", INSTANCE_NAME, INSTANCE_ID));
+
+    assert_eq!(info, expected_err);
 }
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
@@ -314,10 +316,11 @@ impl CryptocurrencyApi {
             .get::<Wallet>("v1/wallet")
             .unwrap_err();
 
-        assert_matches!(
-            err,
-            ApiError::NotFound(ref body) if body == "Wallet not found"
-        );
+        let expected_err = api::ApiError::new(api::HttpStatusCode::NOT_FOUND)
+            .title("Wallet not found")
+            .source(format!("{}:{}", INSTANCE_NAME, INSTANCE_ID));
+
+        assert_eq!(err, expected_err);
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
