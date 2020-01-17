@@ -14,7 +14,7 @@
 
 //! Updating node configuration on the fly.
 
-use exonum::node::{ConfigManager, ConnectListConfig};
+use exonum_node::{ConfigManager, ConnectListConfig};
 use failure;
 use log::error;
 
@@ -84,10 +84,8 @@ impl ConfigManager for DefaultConfigManager {
 
 #[cfg(test)]
 mod tests {
-    use exonum::{
-        crypto::gen_keypair,
-        node::{ConnectInfo, ConnectListConfig},
-    };
+    use exonum::crypto::gen_keypair;
+    use exonum_node::{ConnectInfo, ConnectListConfig};
     use exonum_supervisor::mode::Mode;
     use tempfile::tempdir;
 

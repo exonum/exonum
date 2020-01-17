@@ -316,7 +316,6 @@ pub use self::{
 pub mod api;
 
 use exonum::{
-    api::{ApiBuilder, UpdateEndpoints},
     blockchain::{Blockchain, Schema as CoreSchema},
     helpers::Height,
     merkledb::Snapshot,
@@ -329,6 +328,7 @@ use exonum::{
         WellKnownRuntime,
     },
 };
+use exonum_api::{ApiBuilder, UpdateEndpoints};
 use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
 use log::trace;
 

@@ -16,11 +16,7 @@
 
 pub use self::schema::{
     blockchain::{AdditionalHeaders, Block, CallInBlock, TxLocation},
-    consensus::{
-        BlockRequest, BlockResponse, Connect, ExonumMessage, PeersRequest, Precommit, Prevote,
-        PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
-        TransactionsResponse, Verified,
-    },
+    messages::{CoreMessage, Precommit, SignedMessage, Verified},
     proofs::{BlockProof, IndexProof},
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };

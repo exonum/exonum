@@ -20,9 +20,10 @@ use exonum::{
     helpers::ValidatorId,
     keys::Keys,
     merkledb::{BinaryValue, TemporaryDB},
-    node::NodePlugin,
     runtime::{ArtifactId, RuntimeInstance, WellKnownRuntime},
 };
+#[cfg(feature = "exonum-node")]
+use exonum_node::NodePlugin;
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory};
 use futures::sync::mpsc;
 
@@ -117,6 +118,7 @@ pub struct TestKitBuilder {
     rust_runtime: RustRuntimeBuilder,
     api_notifier_channel: ApiNotifierChannel,
     additional_runtimes: Vec<RuntimeInstance>,
+    #[cfg(feature = "exonum-node")]
     plugins: Vec<Box<dyn NodePlugin>>,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
@@ -176,6 +178,7 @@ impl TestKitBuilder {
     }
 
     /// Adds a node plugin to the testkit.
+    #[cfg(feature = "exonum-node")]
     pub fn with_plugin(mut self, plugin: impl NodePlugin + 'static) -> Self {
         self.plugins.push(Box::new(plugin));
         self
@@ -265,14 +268,28 @@ impl TestKitBuilder {
             })
             .build();
 
-        TestKit::assemble(
-            TemporaryDB::new(),
-            network,
-            genesis_config,
-            self.additional_runtimes,
-            self.plugins,
-            self.api_notifier_channel,
-        )
+        #[cfg(feature = "exonum-node")]
+        {
+            let mut testkit = TestKit::assemble(
+                TemporaryDB::new(),
+                network,
+                genesis_config,
+                self.additional_runtimes,
+                self.api_notifier_channel,
+            );
+            testkit.set_plugins(self.plugins);
+            testkit
+        }
+        #[cfg(not(feature = "exonum-node"))]
+        {
+            TestKit::assemble(
+                TemporaryDB::new(),
+                network,
+                genesis_config,
+                self.additional_runtimes,
+                self.api_notifier_channel,
+            )
+        }
     }
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by
@@ -297,6 +314,7 @@ impl TestKitBuilder {
             rust_runtime: RustRuntimeBuilder::new(),
             api_notifier_channel,
             additional_runtimes: vec![],
+            #[cfg(feature = "exonum-node")]
             plugins: vec![],
             instances: vec![],
             artifacts: HashMap::new(),

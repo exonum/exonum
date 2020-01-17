@@ -14,18 +14,17 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum::api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
-
-use futures::IntoFuture;
-use serde::{de::DeserializeOwned, Serialize};
+pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
 
 use exonum::{
-    api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError},
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::PublicKey,
     merkledb::{access::Prefixed, Snapshot},
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
+use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
+use futures::IntoFuture;
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
 
@@ -321,7 +320,7 @@ impl ServiceApiScope {
 ///     builder
 /// }
 /// # use exonum::{
-/// #     blockchain::Blockchain, merkledb::TemporaryDB, node::ApiSender,
+/// #     blockchain::{ApiSender, Blockchain}, merkledb::TemporaryDB,
 /// #     runtime::InstanceDescriptor,
 /// # };
 /// # use futures::sync::mpsc;

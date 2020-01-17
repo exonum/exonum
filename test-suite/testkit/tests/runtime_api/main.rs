@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use assert_matches::assert_matches;
-use exonum::api::Error as ApiError;
-use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
+use exonum_rust_runtime::{api::Error as ApiError, ProtoSourceFile, ProtoSourcesQuery};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
@@ -49,7 +48,7 @@ fn test_exonum_core_protos(api: &TestKitApi) {
     let expected_files: HashSet<String> = vec![
         "key_value_sequence.proto",
         "blockchain.proto",
-        "consensus.proto",
+        "messages.proto",
         "runtime.proto",
         "tests.proto",
         "common.proto",

@@ -20,11 +20,14 @@ use serde::{
     ser::{Serialize, Serializer},
 };
 
-use std::{borrow::Cow, convert::TryFrom};
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+};
 
 use crate::{
     crypto::{self, Hash, PublicKey, SecretKey},
-    messages::types::{ExonumMessage, SignedMessage},
+    messages::types::SignedMessage,
     proto,
 };
 
@@ -76,8 +79,8 @@ impl_serde_hex_for_binary_value! { SignedMessage }
 /// See module [documentation](index.html#examples) for examples.
 #[derive(Clone, Debug)]
 pub struct Verified<T> {
-    pub(super) raw: SignedMessage,
-    pub(super) inner: T,
+    raw: SignedMessage,
+    inner: T,
 }
 
 impl<T> PartialEq for Verified<T> {
@@ -101,6 +104,18 @@ impl<T> Verified<T> {
     pub fn author(&self) -> PublicKey {
         self.raw.author
     }
+
+    /// Downcasts this message to a more specific type. This is only appropriate if the target
+    /// type retains all information about the message.
+    pub fn downcast_map<U>(self, map_fn: impl FnOnce(T) -> U) -> Verified<U>
+    where
+        U: TryFrom<SignedMessage> + IntoMessage,
+    {
+        Verified {
+            raw: self.raw,
+            inner: map_fn(self.inner),
+        }
+    }
 }
 
 impl<T> Verified<T>
@@ -118,18 +133,25 @@ where
     }
 }
 
+/// Message that can be converted into a unambiguous presentation for signing. "Unambiguous"
+/// means that any sequence of bytes produced by serializing `Container` obtained by converting
+/// this message can be interpreted in a single way. In other words, messages of different types
+/// have separated representation domains.
+pub trait IntoMessage: Sized {
+    /// Container for the message.
+    type Container: BinaryValue + From<Self> + TryInto<Self>;
+}
+
 impl<T> Verified<T>
 where
-    T: TryFrom<SignedMessage> + Into<ExonumMessage> + TryFrom<ExonumMessage>,
+    T: TryFrom<SignedMessage> + IntoMessage,
 {
     /// Signs the specified value and creates a new verified message from it.
     pub fn from_value(inner: T, public_key: PublicKey, secret_key: &SecretKey) -> Self {
-        // Curious trick to avoid clone.
-        // Converts inner to the `ExonumMessage` type to proper serialization.
-        let exonum_msg = inner.into();
-        let raw = SignedMessage::new(exonum_msg.to_bytes(), public_key, secret_key);
+        let container: T::Container = inner.into();
+        let raw = SignedMessage::new(container.to_bytes(), public_key, secret_key);
         // Converts back to the inner type.
-        let inner = if let Ok(inner) = T::try_from(exonum_msg) {
+        let inner: T = if let Ok(inner) = container.try_into() {
             inner
         } else {
             unreachable!("We can safely convert `ExonumMessage` back to the inner type.")
@@ -222,75 +244,16 @@ where
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+    use exonum_crypto::{self as crypto, Signature};
     use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::{
-        crypto::{self, Hash},
-        helpers::Height,
-        messages::types::{ExonumMessage, Precommit, Status},
+        helpers::{Height, Round, ValidatorId},
+        messages::Precommit,
         runtime::{AnyTx, CallInfo},
     };
-
-    #[test]
-    fn test_verified_from_signed_correct_signature() {
-        let keypair = crypto::gen_keypair();
-
-        let msg = Status {
-            height: Height(0),
-            last_hash: Hash::zero(),
-            pool_size: 0,
-        };
-        let protocol_message = ExonumMessage::from(msg.clone());
-        let signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
-
-        let verified_protocol = signed.clone().into_verified::<ExonumMessage>().unwrap();
-        assert_eq!(verified_protocol.inner, protocol_message);
-
-        let verified_status = signed.clone().into_verified::<Status>().unwrap();
-        assert_eq!(verified_status.inner, msg);
-
-        // Wrong variant
-        let err = signed.into_verified::<Precommit>().unwrap_err();
-        assert_eq!(err.to_string(), "Failed to decode message from payload.");
-    }
-
-    #[test]
-    fn test_verified_from_signed_incorrect_signature() {
-        let keypair = crypto::gen_keypair();
-
-        let msg = Status {
-            height: Height(0),
-            last_hash: Hash::zero(),
-            pool_size: 0,
-        };
-        let protocol_message = ExonumMessage::from(msg.clone());
-        let mut signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
-        // Update author
-        signed.author = crypto::gen_keypair().0;
-        let err = signed.clone().into_verified::<ExonumMessage>().unwrap_err();
-        assert_eq!(err.to_string(), "Failed to verify signature.");
-    }
-
-    #[test]
-    fn test_verified_status_binary_value() {
-        let keypair = crypto::gen_keypair();
-
-        let msg = Verified::from_value(
-            Status {
-                height: Height(0),
-                last_hash: Hash::zero(),
-                pool_size: 0,
-            },
-            keypair.0,
-            &keypair.1,
-        );
-        assert_eq!(msg.object_hash(), msg.as_raw().object_hash());
-
-        let bytes = msg.to_bytes();
-        let msg2 = Verified::<Status>::from_bytes(bytes.into()).unwrap();
-        assert_eq!(msg, msg2);
-    }
 
     #[test]
     fn test_verified_any_tx_binary_value() {
@@ -334,5 +297,31 @@ mod tests {
         let from_pb = Verified::from_pb(to_pb).expect("Failed to convert from protobuf.");
 
         assert_eq!(msg, from_pb);
+    }
+
+    #[test]
+    #[should_panic(expected = "Failed to verify signature.")]
+    fn test_precommit_serde_wrong_signature() {
+        let (pub_key, secret_key) = crypto::gen_keypair();
+        let ts = Utc::now();
+
+        let mut precommit = Verified::from_value(
+            Precommit::new(
+                ValidatorId(123),
+                Height(15),
+                Round(25),
+                crypto::hash(&[1, 2, 3]),
+                crypto::hash(&[3, 2, 1]),
+                ts,
+            ),
+            pub_key,
+            &secret_key,
+        );
+        // Break signature.
+        precommit.raw.signature = Signature::zero();
+
+        let precommit_json = serde_json::to_string(&precommit).unwrap();
+        let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+        assert_eq!(precommit2, precommit);
     }
 }
