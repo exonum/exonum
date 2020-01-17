@@ -79,10 +79,9 @@ fn call_removed_method() {
         .for_each(|tx| {
             let error = tx
                 .status()
-                .expect_err("Tx for `method_b` should be executed successfully")
-                .clone();
+                .expect_err("Tx for `method_b` should be executed successfully");
 
-            assert_eq!(error, expected_error);
+            assert_eq!(*error, expected_error);
         });
 }
 
@@ -106,12 +105,12 @@ fn call_nonexisting_method() {
     let (mut testkit, _) = init_testkit();
     let tx = generate_tx_for_nonexistent_method();
 
-    let error = testkit.create_block_with_transaction(tx).transactions[0]
+    let block = testkit.create_block_with_transaction(tx);
+    let error = block.transactions[0]
         .status()
-        .expect_err("Tx for `method_b` should be executed successfully")
-        .clone();
+        .expect_err("Tx for `method_b` should be executed successfully");
 
     let expected_error = ErrorMatch::from_fail(&CommonError::NoSuchMethod).for_service(SERVICE_ID);
 
-    assert_eq!(error, expected_error);
+    assert_eq!(*error, expected_error);
 }
