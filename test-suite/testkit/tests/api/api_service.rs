@@ -17,9 +17,10 @@
 
 use chrono::{TimeZone, Utc};
 use exonum::runtime::InstanceId;
+use exonum_api::{ApiError, ApiResult, HttpStatusCode};
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
+    api::{Deprecated, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
@@ -39,13 +40,13 @@ struct Api;
 
 impl Api {
     /// Returns the same number that was in query.
-    fn ping_pong(_state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<u64> {
+    fn ping_pong(_state: &ServiceApiState<'_>, ping: PingQuery) -> ApiResult<u64> {
         Ok(ping.value)
     }
 
     /// Returns `Gone` error.
-    fn gone(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
-        Err(api::Error::Gone)
+    fn gone(_state: &ServiceApiState<'_>, _ping: PingQuery) -> ApiResult<u64> {
+        Err(ApiError::new(HttpStatusCode::GONE))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {
@@ -73,13 +74,13 @@ impl Api {
         public_scope
             .endpoint_mut(
                 "moved-mutable",
-                move |state: &ServiceApiState<'_>, _query: PingQuery| -> api::Result<u64> {
+                move |state: &ServiceApiState<'_>, _query: PingQuery| -> ApiResult<u64> {
                     Err(state.moved_permanently("ping-pong-deprecated-mut").into())
                 },
             )
             .endpoint(
                 "moved-immutable",
-                move |state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
+                move |state: &ServiceApiState<'_>, query: PingQuery| -> ApiResult<u64> {
                     Err(state
                         .moved_permanently("ping-pong")
                         .with_query(query)
@@ -87,13 +88,13 @@ impl Api {
                 },
             );
 
-        public_scope.endpoint_new(
+        public_scope.endpoint(
             "new-error-type",
-            move |_state: &ServiceApiState<'_>, query: PingQuery| -> api::ApiResult<u64> {
+            move |_state: &ServiceApiState<'_>, query: PingQuery| -> ApiResult<u64> {
                 if query.value == 64 {
                     Ok(query.value)
                 } else {
-                    Err(api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+                    Err(ApiError::new(HttpStatusCode::BAD_REQUEST)
                         .docs_uri("http://some-docs.com")
                         .title("Test endpoint error.")
                         .detail(format!("Test endpoint failed with query: {}", query.value))
