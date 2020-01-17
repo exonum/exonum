@@ -84,6 +84,19 @@ pub struct StopService {
     pub instance_id: InstanceId,
 }
 
+/// Request for the resume previously stopped service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::ResumeService")]
+pub struct ResumeService {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+    /// Updated artifact ID.
+    pub artifact: ArtifactId,
+    /// Raw bytes representation of service resume parameters.
+    pub params: Vec<u8>,
+}
+
 impl StartService {
     /// Given the instance ID, splits the `StartService` request into `InstanceSpec`
     /// and config value.
@@ -120,10 +133,12 @@ pub enum ConfigChange {
     Consensus(ConsensusConfig),
     /// New service instance config.
     Service(ServiceConfig),
-    /// New service instance start request.
+    /// Request to start a new service instance.
     StartService(StartService),
-    /// Existing service instance stop request.
+    /// Request to stop an existing service instance.
     StopService(StopService),
+    /// Request to resume a previously stopped service instance.
+    ResumeService(ResumeService),
 }
 
 /// Request for the configuration change
@@ -203,6 +218,22 @@ impl ConfigPropose {
             .push(ConfigChange::StopService(StopService { instance_id }));
         self
     }
+
+    /// Adds service resume request to this proposal.
+    pub fn resume_service(
+        mut self,
+        instance_id: InstanceId,
+        artifact: ArtifactId,
+        params: impl BinaryValue,
+    ) -> Self {
+        self.changes
+            .push(ConfigChange::ResumeService(ResumeService {
+                instance_id,
+                artifact,
+                params: params.into_bytes(),
+            }));
+        self
+    }
 }
 
 /// Confirmation vote for the configuration change
@@ -229,6 +260,7 @@ impl_binary_key_for_binary_value! { DeployRequest }
 impl_binary_key_for_binary_value! { DeployResult }
 impl_binary_key_for_binary_value! { StartService }
 impl_binary_key_for_binary_value! { StopService }
+impl_binary_key_for_binary_value! { ResumeService }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
 
@@ -236,6 +268,7 @@ impl_serde_hex_for_binary_value! { DeployRequest }
 impl_serde_hex_for_binary_value! { DeployResult }
 impl_serde_hex_for_binary_value! { StartService }
 impl_serde_hex_for_binary_value! { StopService }
+impl_serde_hex_for_binary_value! { ResumeService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 

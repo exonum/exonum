@@ -899,9 +899,8 @@ impl<'a> SupervisorExtensions<'a> {
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        match state.status {
-            Some(InstanceStatus::Stopped) => {}
-            _ => return Err(CoreError::ServiceNotStopped.into()),
+        if state.status != Some(InstanceStatus::Stopped) {
+            return Err(CoreError::ServiceNotStopped.into());
         }
 
         let mut spec = state.spec;

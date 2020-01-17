@@ -392,7 +392,7 @@ impl Schema<&Fork> {
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
 
-        if let Some(InstanceStatus::Active) = state.status {
+        if state.status == Some(InstanceStatus::Active) {
             self.add_pending_status(state, InstanceStatus::Stopped, None)
         } else {
             Err(CoreError::ServiceNotActive)
@@ -422,7 +422,7 @@ impl Schema<&Fork> {
             return Err(CoreError::CannotResumeService);
         }
 
-        if let Some(InstanceStatus::Stopped) = state.status {
+        if state.status == Some(InstanceStatus::Stopped) {
             state.spec.artifact = artifact;
             self.add_pending_status(state, InstanceStatus::Active, None)
         } else {
