@@ -119,10 +119,15 @@ impl<T: Access> Schema<T> {
 
     /// Returns a record of errors that occurred during execution of a particular block.
     ///
-    /// This method can be used to retrieve a proof that execution of a certain transaction
-    /// ended up with a particular status. Since the number of transaction in a block is
-    /// mentioned in the block header, a proof of absence of an error for a transaction
-    /// with a particular index means that it was executed successfully.
+    /// This method can be used to build a proof that execution of a certain transaction
+    /// ended up with a particular status.
+    /// For an execution that resulted in an error, this will be an usual proof of existence.
+    /// If transaction was executed successfully, such a proof will be a proof of absence.
+    /// Since the number of transactions in a block is mentioned in the block header, the user
+    /// will be able to distinguish absence of error (meaning successful execution) from
+    /// absence of transaction with such an index: if index is less than amount of transactions
+    /// in block, proof denotes successful execution, otherwise transaction with such an index
+    /// does not exist in the block.
     ///
     /// Similarly, execution errors of the `before_transactions` / `after_transactions` hooks can be proven
     /// to external clients. Discerning successful execution from a non-existing service requires prior knowledge
@@ -348,7 +353,12 @@ where
 /// an error may occur. Since Exonum services may call each other's methods, `CallSite` is
 /// richer than `CallInBlock`.
 ///
+/// One example of difference between these types is [`CallType::Constructor`]: since services
+/// are constructed outside of the block processing routine, this kind of errors cannot be
+/// represented as `CallInBlock`.
+///
 /// [`CallSite`]: ../runtime/error/struct.CallSite.html
+/// [`CallType::Constructor`]: ../runtime/error/enum.CallType.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)] // builtin traits
 #[derive(Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[serde(tag = "type", rename_all = "snake_case")]
