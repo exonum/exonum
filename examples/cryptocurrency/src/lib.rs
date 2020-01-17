@@ -192,9 +192,9 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::runtime::ExecutionError;
+    use exonum::runtime::{CallContext, ExecutionError};
     use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
-    use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
+    use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 
     use crate::{
         api::CryptocurrencyApi,

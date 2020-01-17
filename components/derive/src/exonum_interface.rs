@@ -305,7 +305,7 @@ impl ExonumInterface {
         };
         let match_arms = self.methods.iter().map(impl_match_arm);
 
-        let ctx = quote!(#cr::CallContext<'a>);
+        let ctx = quote!(#cr::_reexports::CallContext<'a>);
         let res = quote!(std::result::Result<(), exonum::runtime::ExecutionError>);
         quote! {
             impl<'a> #cr::Interface<'a> for dyn #trait_name<#ctx, Output = #res> {
@@ -313,7 +313,7 @@ impl ExonumInterface {
 
                 fn dispatch(
                     &self,
-                    context: #cr::CallContext<'a>,
+                    context: #cr::_reexports::CallContext<'a>,
                     method: exonum::runtime::MethodId,
                     payload: &[u8],
                 ) -> #res {

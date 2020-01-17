@@ -93,7 +93,7 @@ impl ToTokens for ServiceDispatcher {
         let service_name = &self.ident;
         let cr = &self.cr;
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
-        let ctx = quote!(#cr::CallContext<'_>);
+        let ctx = quote!(#cr::_reexports::CallContext<'_>);
         let res = quote!(std::result::Result<(), #cr::_reexports::ExecutionError>);
 
         let match_arms = self.implements.0.iter().map(|interface| {

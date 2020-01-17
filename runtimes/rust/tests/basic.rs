@@ -20,7 +20,8 @@ use exonum::{
     helpers::Height,
     merkledb::{access::AccessExt, BinaryValue, SystemSchema},
     runtime::{
-        Caller, CommonError, CoreError, ErrorMatch, ExecutionError, InstanceStatus, SnapshotExt,
+        CallContext, Caller, CommonError, CoreError, ErrorMatch, ExecutionError, InstanceStatus,
+        SnapshotExt,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -29,9 +30,7 @@ use serde_derive::*;
 
 use std::collections::BTreeMap;
 
-use exonum_rust_runtime::{
-    CallContext, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
 use self::inspected::{
     create_block_with_transactions, create_genesis_config_builder, execute_transaction,

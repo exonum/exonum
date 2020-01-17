@@ -64,12 +64,10 @@
 
 use exonum::{
     merkledb::ObjectHash,
-    runtime::{ExecutionError, ExecutionFail},
+    runtime::{CallContext, ExecutionError, ExecutionFail},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, CallContext, DefaultInstance, Service,
-};
+use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
 
 pub mod api;
 

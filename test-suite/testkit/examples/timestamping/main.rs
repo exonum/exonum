@@ -17,10 +17,10 @@
 use exonum::{
     crypto::gen_keypair,
     merkledb::ObjectHash,
-    runtime::{ExecutionError, SnapshotExt},
+    runtime::{CallContext, ExecutionError, SnapshotExt},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 
 #[exonum_interface(auto_ids)]

@@ -137,10 +137,10 @@ mod timestamping {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        runtime::{AnyTx, ExecutionError, InstanceId},
+        runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
+    use exonum_rust_runtime::{DefaultInstance, Service};
     use rand::rngs::StdRng;
 
     use super::gen_keypair_from_rng;
@@ -196,18 +196,18 @@ mod cryptocurrency {
         crypto::PublicKey,
         merkledb::access::AccessExt,
         messages::Verified,
-        runtime::{AnyTx, ErrorKind, ExecutionError, InstanceId},
+        runtime::{AnyTx, CallContext, ErrorKind, ExecutionError, InstanceId},
     };
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
     };
     use exonum_proto::ProtobufConvert;
+    use exonum_rust_runtime::{DefaultInstance, Service};
     use rand::{rngs::StdRng, seq::SliceRandom};
     use serde_derive::{Deserialize, Serialize};
 
     use super::gen_keypair_from_rng;
     use crate::proto;
-    use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 
     const CRYPTOCURRENCY_SERVICE_ID: InstanceId = 255;
 
@@ -353,10 +353,10 @@ mod foreign_interface_call {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        runtime::{AnyTx, ExecutionError, InstanceId},
+        runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-    use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory as _};
+    use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory as _};
     use rand::rngs::StdRng;
     use tempfile::TempDir;
 

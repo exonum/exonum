@@ -20,10 +20,11 @@
 use exonum::{
     crypto::{PublicKey, SecretKey},
     messages::Verified,
-    runtime::{AnyTx, CallInfo, ExecutionError, InstanceId, MethodId},
+    runtime::{
+        AnyTx, CallContext, CallContextUnstable, CallInfo, CoreError, ExecutionError, InstanceId,
+        InstanceQuery, MethodId,
+    },
 };
-
-use crate::CallContext;
 
 /// Descriptor of a method declared as a part of the service interface.
 #[derive(Debug, Clone, Copy)]
@@ -44,6 +45,31 @@ impl<'a> MethodDescriptor<'a> {
             name,
             id,
         }
+    }
+
+    fn make_child_call<'q>(
+        &self,
+        context: &mut CallContext<'_>,
+        called_id: impl Into<InstanceQuery<'q>>,
+        args: Vec<u8>,
+        fallthrough_auth: bool,
+    ) -> Result<(), ExecutionError> {
+        let descriptor = context
+            .get_service(called_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+
+        let call_info = CallInfo {
+            instance_id: descriptor.id,
+            method_id: self.id,
+        };
+
+        let caller = if fallthrough_auth {
+            None
+        } else {
+            Some(context.instance().id)
+        };
+
+        context.make_child_call(self.interface_name, &call_info, &args, caller)
     }
 }
 
@@ -234,5 +260,42 @@ mod explanation {
         assert_eq!(len, 5);
         let len = PayloadSize.transfer((), 42);
         assert_eq!(len, 8);
+    }
+}
+
+impl<'a, I> GenericCallMut<I> for CallContext<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_id: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        method.make_child_call(self, called_id, args, false)
+    }
+}
+
+/// Stub which uses fallthrough auth to authorize calls.
+#[derive(Debug)]
+#[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
+pub struct FallthroughAuth<'a>(pub CallContext<'a>);
+
+impl<'a, I> GenericCallMut<I> for FallthroughAuth<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_id: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        method.make_child_call(&mut self.0, called_id, args, true)
     }
 }

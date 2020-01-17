@@ -252,14 +252,13 @@
 #![deny(unsafe_code, bare_trait_objects)]
 
 pub use self::{
-    call_context::CallContext,
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
     service::{
         AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
         ServiceFactory,
     },
-    stubs::{GenericCall, GenericCallMut, Interface, MethodDescriptor, TxStub},
+    stubs::{FallthroughAuth, GenericCall, GenericCallMut, Interface, MethodDescriptor, TxStub},
 };
 
 pub mod api;
@@ -272,9 +271,9 @@ use exonum::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, ExecutionFail, InstanceDescriptor,
-        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier,
-        WellKnownRuntime,
+        ArtifactId, CallContext, CallInfo, ExecutionContext, ExecutionError, ExecutionFail,
+        InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
+        RuntimeIdentifier, WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -285,7 +284,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use self::api::ServiceApiBuilder;
 
-mod call_context;
 mod error;
 mod runtime_api;
 mod service;
@@ -296,7 +294,7 @@ pub mod _reexports {
     //! Types necessary for `ServiceDispatcher` and `ServiceFactory` derive macros to work.
 
     pub use exonum::runtime::{
-        ArtifactId, CommonError, ExecutionError, MethodId, RuntimeIdentifier,
+        ArtifactId, CallContext, CommonError, ExecutionError, MethodId, RuntimeIdentifier,
     };
 }
 

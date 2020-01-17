@@ -18,12 +18,12 @@ pub use crate::interface::Issue;
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{AnyTx, CallInfo, ExecutionError, InstanceId, SnapshotExt},
+    runtime::{AnyTx, CallContext, CallInfo, ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
 use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
 use exonum_rust_runtime::{
-    CallContext, DefaultInstance, GenericCallMut, MethodDescriptor, Service,
+    DefaultInstance, FallthroughAuth, GenericCallMut, MethodDescriptor, Service,
 };
 use serde_derive::{Deserialize, Serialize};
 
@@ -200,8 +200,7 @@ impl CallAny<CallContext<'_>> for AnyCallService {
         let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
 
         if tx.fallthrough_auth {
-            ctx.with_fallthrough_auth()
-                .generic_call_mut(call_info.instance_id, method, args)
+            FallthroughAuth(ctx).generic_call_mut(call_info.instance_id, method, args)
         } else {
             ctx.generic_call_mut(call_info.instance_id, method, args)
         }

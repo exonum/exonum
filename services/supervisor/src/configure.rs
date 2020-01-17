@@ -14,9 +14,9 @@
 
 //! Configuration interface used by the supervisor to change service configuration.
 
-use exonum::runtime::{CommonError, ExecutionError, InstanceId, MethodId};
+use exonum::runtime::{CallContext, CommonError, ExecutionError, InstanceId, MethodId};
 use exonum_merkledb::BinaryValue;
-use exonum_rust_runtime::{CallContext, GenericCallMut, Interface, MethodDescriptor};
+use exonum_rust_runtime::{GenericCallMut, Interface, MethodDescriptor};
 
 /// Fully qualified name of the ['Configure`] interface.
 ///

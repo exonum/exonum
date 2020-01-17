@@ -40,10 +40,10 @@ pub use crate::{
 
 use exonum::{
     merkledb::BinaryValue,
-    runtime::{CommonError, ExecutionError},
+    runtime::{CallContext, CommonError, ExecutionError},
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 

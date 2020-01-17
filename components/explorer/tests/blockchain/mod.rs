@@ -22,10 +22,10 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     merkledb::{ObjectHash, TemporaryDB},
     messages::Verified,
-    runtime::{AnyTx, ExecutionError, InstanceId},
+    runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, RustRuntime, Service, ServiceFactory};
+use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory};
 use serde_derive::*;
 
 use std::collections::BTreeMap;

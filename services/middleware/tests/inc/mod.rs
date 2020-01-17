@@ -22,11 +22,11 @@ use exonum::{
     },
     runtime::{
         versioning::{ArtifactReq as CoreReq, Version},
-        ArtifactId, CommonError, ExecutionError, RuntimeIdentifier,
+        ArtifactId, CallContext, CommonError, ExecutionError, RuntimeIdentifier,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{ArtifactProtobufSpec, Service, ServiceFactory};
 
 use exonum_middleware_service::ArtifactReq;
 

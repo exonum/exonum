@@ -82,13 +82,12 @@ pub use self::{
 
 use exonum::{
     blockchain::config::InstanceInitParams,
-    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
+    runtime::{CallContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
-    ServiceFactory as _,
+    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
 };
 
 use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};

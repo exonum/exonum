@@ -22,10 +22,10 @@ use exonum::{
         access::{Access, FromAccess},
         ProofMapIndex,
     },
-    runtime::{ExecutionError, InstanceId, SnapshotExt},
+    runtime::{CallContext, ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 use serde_derive::{Deserialize, Serialize};
 

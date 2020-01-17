@@ -14,14 +14,14 @@
 
 use exonum::{
     helpers::Height,
-    runtime::{ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{CallContext, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess},
     Entry, ObjectHash,
 };
-use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{Service, ServiceFactory};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor, SupervisorInterface};

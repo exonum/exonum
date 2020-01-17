@@ -16,7 +16,7 @@
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
     blockchain::{IndexProof, ValidatorKeys},
-    runtime::{ExecutionError, InstanceId},
+    runtime::{CallContext, ExecutionError, InstanceId},
 };
 use exonum_api::{
     self as api,
@@ -31,7 +31,7 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     api::{ServiceApiBuilder, ServiceApiState},
-    CallContext, DefaultInstance, Service,
+    DefaultInstance, Service,
 };
 use futures::{Future, IntoFuture};
 use log::trace;

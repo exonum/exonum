@@ -22,11 +22,12 @@ use exonum::{
     merkledb::access::AccessExt,
     messages::{AnyTx, Verified},
     runtime::{
-        CommonError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        CallContext, CommonError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory as _};
+use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory as _};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{

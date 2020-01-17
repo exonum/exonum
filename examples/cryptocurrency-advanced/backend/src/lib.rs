@@ -28,9 +28,9 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::runtime::ExecutionError;
+use exonum::runtime::{CallContext, ExecutionError};
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 
 use crate::{api::PublicApi as CryptocurrencyApi, schema::SchemaImpl};
 

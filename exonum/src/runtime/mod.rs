@@ -165,6 +165,7 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
+    call_context::{CallContext, CallContextUnstable},
     dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
@@ -197,6 +198,7 @@ use crate::{
 };
 
 mod blockchain_data;
+mod call_context;
 mod dispatcher;
 pub(crate) mod error;
 mod types;

@@ -18,10 +18,10 @@ use exonum::{
         access::{Access, FromAccess, RawAccessMut},
         ProofEntry,
     },
-    runtime::{ExecutionError, InstanceId},
+    runtime::{CallContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
+use exonum_rust_runtime::{DefaultInstance, Service};
 
 pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 100;

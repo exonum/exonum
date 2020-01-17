@@ -15,7 +15,7 @@
 use exonum::{
     crypto::PublicKey,
     helpers::Height,
-    runtime::{ExecutionError, InstanceId},
+    runtime::{CallContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
@@ -24,7 +24,7 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder},
-    CallContext, DefaultInstance, Service,
+    DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
 

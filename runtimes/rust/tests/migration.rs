@@ -22,14 +22,12 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        CommonError, CoreError, ErrorMatch, ExecutionError, ExecutionFail, InstanceStatus,
-        SnapshotExt,
+        CallContext, CommonError, CoreError, ErrorMatch, ExecutionError, ExecutionFail,
+        InstanceStatus, SnapshotExt,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    CallContext, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 use pretty_assertions::assert_eq;
 
 use self::inspected::{
