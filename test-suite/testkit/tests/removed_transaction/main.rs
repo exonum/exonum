@@ -41,7 +41,7 @@ fn generate_txs_for_removed_methods() -> Vec<Verified<AnyTx>> {
     let create_tx = |id| {
         let tx = AnyTx {
             call_info: CallInfo::new(SERVICE_ID, id),
-            arguments: BinaryValue::to_bytes(&0_u64),
+            arguments: 0_u64.to_bytes(),
         };
 
         tx.sign(keypair.0, &keypair.1)
@@ -58,7 +58,7 @@ fn generate_tx_for_nonexistent_method() -> Verified<AnyTx> {
 
     let tx = AnyTx {
         call_info: CallInfo::new(SERVICE_ID, 3),
-        arguments: BinaryValue::to_bytes(&0_u64),
+        arguments: 0_u64.to_bytes(),
     };
 
     tx.sign(keypair.0, &keypair.1)
@@ -73,16 +73,15 @@ fn call_removed_method() {
 
     let expected_error = ErrorMatch::from_fail(&CommonError::MethodRemoved).for_service(SERVICE_ID);
 
-    testkit
-        .create_block_with_transactions(txs)
-        .iter()
-        .for_each(|tx| {
-            let error = tx
-                .status()
-                .expect_err("Tx for `method_b` should be executed successfully");
+    let block = testkit.create_block_with_transactions(txs);
 
-            assert_eq!(*error, expected_error);
-        });
+    for tx in block.iter() {
+        let error = tx
+            .status()
+            .expect_err("Tx for `method_b` should be executed successfully");
+
+        assert_eq!(*error, expected_error);
+    }
 }
 
 /// Checks that attempt to call existing method from service in which one method was removed

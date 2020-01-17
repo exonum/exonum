@@ -181,7 +181,6 @@
 //!     // Method with ID 2 is removed because it wasn't used by anybody.
 //! }
 //!
-//!
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 //! #[service_dispatcher(implements("Transactions"))]
 //! #[service_factory(proto_sources = "exonum::proto::schema")]

@@ -271,8 +271,11 @@ impl ExonumInterface {
         // Process trait methods.
         let mut methods = Vec::with_capacity(item_trait.items.len());
         let mut has_output = false;
-        let mut used_method_ids = HashSet::new();
         let mut next_method_id = 0;
+
+        // Initialize used methods with removed method IDs.
+        let mut used_method_ids: HashSet<u32> =
+            attrs.removed_method_ids.ids.iter().copied().collect();
 
         for trait_item in &item_trait.items {
             match trait_item {
@@ -286,7 +289,7 @@ impl ExonumInterface {
                             let msg = format!("Method ID {} is already used", method_id);
                             return Err(darling::Error::custom(msg).with_span(&method.sig));
                         }
-                        (method_id)
+                        method_id
                     } else {
                         // Auto-increment enabled, assign automatically.
                         let method_id = next_method_id;
