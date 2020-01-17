@@ -22,7 +22,7 @@ use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
 pub const SERVICE_NAME: &str = "sample_service";
 pub const SERVICE_ID: InstanceId = 100;
 
-#[exonum_interface(removed_tx_ids(0, 2))]
+#[exonum_interface(removed_method_ids(0, 2))]
 pub trait SampleServiceInterface<Ctx> {
     type Output;
 

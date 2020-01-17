@@ -250,10 +250,10 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 /// Prefix of the `exonum` crate has two main values - `crate` or `exonum`. The default value
 /// is `exonum`.
 ///
-/// ## `removed_transactions`
+/// ## `removed_method_ids`
 ///
 /// ```text
-/// #[exonum_interface(removed_tx_ids(0, 2, 5))]
+/// #[exonum_interface(removed_method_ids(0, 2, 5))]
 /// ```
 ///
 /// Marks methods with the following IDs as removed. An attempt to invoke

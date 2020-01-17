@@ -189,7 +189,7 @@ struct ExonumInterfaceAttrs {
     cr: RustRuntimeCratePath,
     auto_ids: bool,
     interface: Option<String>,
-    removed_tx_ids: RemovedMethods,
+    removed_method_ids: RemovedMethods,
 }
 
 impl Default for ExonumInterfaceAttrs {
@@ -198,7 +198,7 @@ impl Default for ExonumInterfaceAttrs {
             cr: RustRuntimeCratePath::default(),
             auto_ids: false,
             interface: None,
-            removed_tx_ids: RemovedMethods::default(),
+            removed_method_ids: RemovedMethods::default(),
         }
     }
 }
@@ -247,8 +247,8 @@ impl ExonumInterface {
         // Extract attributes.
         let attrs = ExonumInterfaceAttrs::from_list(&args)?;
 
-        if attrs.auto_ids && !attrs.removed_tx_ids.ids.is_empty() {
-            let msg = "`auto_ids` and `removed_tx_ids` attributes cannot be used together";
+        if attrs.auto_ids && !attrs.removed_method_ids.ids.is_empty() {
+            let msg = "`auto_ids` and `removed_method_ids` attributes cannot be used together";
             return Err(darling::Error::custom(msg).with_span(&item_trait));
         }
 
@@ -371,7 +371,7 @@ impl ExonumInterface {
         };
         let removed_match_arms = self
             .attrs
-            .removed_tx_ids
+            .removed_method_ids
             .ids
             .iter()
             .map(impl_match_arm_for_removed_method);

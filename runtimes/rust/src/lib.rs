@@ -169,7 +169,7 @@
 //! # use exonum::runtime::{ExecutionError};
 //! # use exonum_rust_runtime::{CallContext, Service};
 //! # use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
-//! #[exonum_interface(removed_tx_ids(0, 2))]
+//! #[exonum_interface(removed_method_ids(0, 2))]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
 //!     
