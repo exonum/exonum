@@ -20,7 +20,7 @@ use exonum::{
     merkledb::{BinaryValue, HashTag, ObjectHash},
     runtime::{ErrorKind, ExecutionError},
 };
-use exonum_api::{ApiError, HttpStatusCode};
+use exonum_api as api;
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::{json, Value};
@@ -162,7 +162,7 @@ fn test_explorer_api_block_request() {
         .get::<Value>("v1/block?height=10")
         .unwrap_err();
 
-    let expected_err = ApiError::new(HttpStatusCode::NOT_FOUND)
+    let expected_err = api::Error::new(api::HttpStatusCode::NOT_FOUND)
         .title("Failed to get block info.")
         .detail("Requested block height(10) exceeds the blockchain height (1)")
         .source("explorer:2");
@@ -312,7 +312,7 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(6));
 
     // Check `latest` param is exceed the height.
-    let result: Result<BlocksRange, ApiError> = api
+    let result: Result<BlocksRange, api::Error> = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=6");
     assert!(result.is_err());
@@ -361,7 +361,7 @@ fn test_explorer_transaction_info() {
         ))
         .unwrap_err();
 
-    let expected_err = ApiError::new(HttpStatusCode::NOT_FOUND)
+    let expected_err = api::Error::new(api::HttpStatusCode::NOT_FOUND)
         .title("Failed to get transaction info")
         .detail(serde_json::to_string(&json!({"type": "unknown"})).unwrap())
         .source("explorer:2");
@@ -526,7 +526,7 @@ fn test_explorer_add_invalid_transaction() {
         .post::<TransactionResponse>("v1/transactions")
         .expect_err("Expected transaction send to finish with error.");
 
-    let expected_err = ApiError::new(HttpStatusCode::BAD_REQUEST)
+    let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
         .title("Failed to add transaction")
         .detail(
             "Execution error with code `core:7` occurred: Suitable runtime for the given \

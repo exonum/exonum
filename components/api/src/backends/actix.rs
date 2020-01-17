@@ -36,8 +36,8 @@ use std::{
 
 use crate::{
     manager::{ApiManager, WebServerConfig},
-    Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiError as HttpApiError,
-    ApiFutureResult, ApiScope, EndpointMutability, ExtendApiBackend, NamedWith,
+    Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
+    Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
 };
 
 /// Type alias for the concrete `actix-web` HTTP response.
@@ -114,7 +114,7 @@ impl ExtendApiBackend for actix_web::Scope<()> {
     }
 }
 
-impl ResponseError for HttpApiError {
+impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         HttpResponse::build(self.http_code)
             .header(header::CONTENT_TYPE, "application/problem+json")
@@ -184,16 +184,16 @@ impl From<EndpointMutability> for actix_web::http::Method {
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, crate::ApiResult<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, crate::Result<I>, F>> for RequestHandler
 where
-    F: Fn(Q) -> crate::ApiResult<I> + 'static + Send + Sync + Clone,
+    F: Fn(Q) -> crate::Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, crate::ApiResult<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, crate::Result<I>, F>) -> Self {
         // Convert handler that returns a `Result` into handler that will return `FutureResult`.
         let handler = f.inner.handler;
-        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = HttpApiError>> {
+        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = ApiError>> {
             let future = handler(query).into_future();
             Box::new(future)
         };
@@ -230,13 +230,13 @@ where
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, ApiFutureResult<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
 where
-    F: Fn(Q) -> ApiFutureResult<I> + 'static + Clone + Send + Sync,
+    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, ApiFutureResult<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
         let handler = f.inner.handler;
         let actuality = f.inner.actuality;
         let mutability = f.mutability;

@@ -395,7 +395,7 @@ use exonum::{
     messages::SignedMessage,
     runtime::ExecutionStatus,
 };
-use exonum_api::{ApiError, ApiFutureResult, ApiResult, HttpStatusCode};
+use exonum_api as api;
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
 use exonum_rust_runtime::api::ServiceApiScope;
 use futures::{Future, IntoFuture};
@@ -418,10 +418,10 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> ApiResult<BlocksRange> {
+    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> api::Result<BlocksRange> {
         let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
-            return Err(ApiError::new(HttpStatusCode::BAD_REQUEST)
+            return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                 .title("Invalid block request")
                 .detail(format!(
                     "Max block count per request exceeded ({})",
@@ -431,7 +431,7 @@ impl ExplorerApi {
 
         let (upper, upper_bound) = if let Some(upper) = query.latest {
             if upper > explorer.height() {
-                return Err(ApiError::new(HttpStatusCode::NOT_FOUND)
+                return Err(api::Error::new(api::HttpStatusCode::NOT_FOUND)
                     .title("Block not found")
                     .detail(format!(
                     "Requested latest height {} is greater than the current blockchain height {}",
@@ -485,10 +485,10 @@ impl ExplorerApi {
         })
     }
 
-    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> ApiResult<BlockInfo> {
+    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> api::Result<BlockInfo> {
         let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
-            ApiError::new(HttpStatusCode::NOT_FOUND)
+            api::Error::new(api::HttpStatusCode::NOT_FOUND)
                 .title("Failed to get block info.")
                 .detail(format!(
                     "Requested block height({}) exceeds the blockchain height ({})",
@@ -501,12 +501,12 @@ impl ExplorerApi {
     fn transaction_info(
         schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
-    ) -> ApiResult<TransactionInfo> {
+    ) -> api::Result<TransactionInfo> {
         BlockchainExplorer::from_schema(schema)
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
-                ApiError::new(HttpStatusCode::NOT_FOUND)
+                api::Error::new(api::HttpStatusCode::NOT_FOUND)
                     .title("Failed to get transaction info")
                     .detail(description)
             })
@@ -515,11 +515,11 @@ impl ExplorerApi {
     fn transaction_status(
         schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
-    ) -> ApiResult<CallStatusResponse> {
+    ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
 
         let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
-            ApiError::new(HttpStatusCode::NOT_FOUND)
+            api::Error::new(api::HttpStatusCode::NOT_FOUND)
                 .title("Transaction not found")
                 .detail(format!("Unknown transaction hash ({})", query.hash))
         })?;
@@ -527,7 +527,7 @@ impl ExplorerApi {
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => info,
             TransactionInfo::InPool { .. } => {
-                let err = ApiError::new(HttpStatusCode::NOT_FOUND)
+                let err = api::Error::new(api::HttpStatusCode::NOT_FOUND)
                     .title("Transaction not found")
                     .detail(format!(
                         "Requested transaction ({}) is not executed yet",
@@ -548,7 +548,7 @@ impl ExplorerApi {
     fn before_transactions_status(
         schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
-    ) -> ApiResult<CallStatusResponse> {
+    ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::before_transactions(query.service_id);
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
@@ -559,7 +559,7 @@ impl ExplorerApi {
     fn after_transactions_status(
         schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
-    ) -> ApiResult<CallStatusResponse> {
+    ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::after_transactions(query.service_id);
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
@@ -570,7 +570,7 @@ impl ExplorerApi {
         snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
-    ) -> ApiFutureResult<TransactionResponse> {
+    ) -> api::FutureResult<TransactionResponse> {
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
@@ -585,7 +585,7 @@ impl ExplorerApi {
                 .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
                 .map_err(|e| {
-                    ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                    api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                         .title("Failed to add transaction")
                         .detail(e.to_string())
                 })
@@ -595,7 +595,7 @@ impl ExplorerApi {
             verify_message(snapshot, query.tx_body)
                 .into_future()
                 .map_err(|e| {
-                    ApiError::new(HttpStatusCode::BAD_REQUEST)
+                    api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                         .title("Failed to add transaction")
                         .detail(e.to_string())
                 })

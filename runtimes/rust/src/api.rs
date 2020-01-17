@@ -14,7 +14,7 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum_api::{ApiError, ApiFutureResult, Deprecated, EndpointMutability};
+pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult};
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
@@ -149,12 +149,12 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = ApiError> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         self.inner
-            .endpoint(name, move |query: Q| -> ApiFutureResult<I> {
+            .endpoint(name, move |query: Q| -> FutureResult<I> {
                 let (instance_id, instance_name) = descriptor.clone();
                 let state = ServiceApiState::from_api_context(
                     &blockchain,
@@ -178,12 +178,12 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = ApiError> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         self.inner
-            .endpoint_mut(name, move |query: Q| -> ApiFutureResult<I> {
+            .endpoint_mut(name, move |query: Q| -> FutureResult<I> {
                 let (instance_id, instance_name) = descriptor.clone();
                 let state = ServiceApiState::from_api_context(
                     &blockchain,
@@ -211,12 +211,12 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = ApiError> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let inner = deprecated.handler.clone();
-        let handler = move |query: Q| -> ApiFutureResult<I> {
+        let handler = move |query: Q| -> FutureResult<I> {
             let (instance_id, instance_name) = descriptor.clone();
             let state = ServiceApiState::from_api_context(
                 &blockchain,
@@ -247,12 +247,12 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = ApiError> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let inner = deprecated.handler.clone();
-        let handler = move |query: Q| -> ApiFutureResult<I> {
+        let handler = move |query: Q| -> FutureResult<I> {
             let (instance_id, instance_name) = descriptor.clone();
             let state = ServiceApiState::from_api_context(
                 &blockchain,

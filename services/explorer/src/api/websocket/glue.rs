@@ -17,8 +17,9 @@
 use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse, Query};
 use exonum::blockchain::Blockchain;
 use exonum_api::{
+    self as api,
     backends::actix::{self as actix_backend, HttpRequest, RawHandler, RequestHandler},
-    ApiBackend, ApiError, HttpStatusCode,
+    ApiBackend,
 };
 use exonum_rust_runtime::api::ServiceApiScope;
 use futures::IntoFuture;
@@ -42,7 +43,7 @@ impl ExplorerApi {
         let index = move |request: HttpRequest| -> Result<HttpResponse, ActixError> {
             let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
                 let msg = "Server shut down".to_owned();
-                ApiError::new(HttpStatusCode::NOT_FOUND).title(msg)
+                api::Error::new(api::HttpStatusCode::NOT_FOUND).title(msg)
             })?;
             let query = extract_query(&request)?;
             ws::start(&request, Session::new(address, vec![query]))

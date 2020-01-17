@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height, runtime::ArtifactId};
-use exonum_api::{ApiError, ApiResult, HttpStatusCode};
+use exonum_api as api;
 use exonum_rust_runtime::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
+    api::{ServiceApiBuilder, ServiceApiState},
     Broadcaster,
 };
 use failure::Fail;
@@ -43,16 +43,16 @@ pub struct DeployInfoQuery {
 }
 
 impl TryFrom<DeployInfoQuery> for DeployRequest {
-    type Error = api::ApiError;
+    type Error = api::Error;
 
-    fn try_from(query: DeployInfoQuery) -> ApiResult<Self> {
+    fn try_from(query: DeployInfoQuery) -> Result<Self, Self::Error> {
         let artifact = query.artifact.parse::<ArtifactId>().map_err(|err| {
-            ApiError::new(HttpStatusCode::BAD_REQUEST)
+            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                 .title("Invalid deploy request")
                 .detail(err.to_string())
         })?;
         let spec = hex::decode(query.spec).map_err(|err| {
-            ApiError::new(HttpStatusCode::BAD_REQUEST)
+            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                 .title("Invalid deploy request")
                 .detail(err.to_string())
         })?;
@@ -104,41 +104,41 @@ pub trait PrivateApi {
 
     /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
     /// by the current node, and returns its hash.
-    fn deploy_artifact(&self, artifact: DeployRequest) -> ApiResult<Hash>;
+    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
 
     /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
     /// by the current node, and returns its hash.
-    fn propose_config(&self, proposal: ConfigPropose) -> ApiResult<Hash>;
+    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
 
     /// Creates and broadcasts the `ConfigVote` transaction, which is signed
     /// by the current node, and returns its hash.
-    fn confirm_config(&self, vote: ConfigVote) -> ApiResult<Hash>;
+    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
 
     /// Returns the number of processed configurations.
-    fn configuration_number(&self) -> ApiResult<u64>;
+    fn configuration_number(&self) -> Result<u64, Self::Error>;
 
     /// Returns an actual supervisor config.
-    fn supervisor_config(&self) -> ApiResult<SupervisorConfig>;
+    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
 
     /// Returns the state of deployment for the given deploy request.
-    fn deploy_status(&self, request: DeployInfoQuery) -> ApiResult<DeployResponse>;
+    fn deploy_status(&self, request: DeployInfoQuery) -> Result<DeployResponse, Self::Error>;
 }
 
 pub trait PublicApi {
     /// Error type for the current API implementation.
     type Error: Fail;
     /// Returns an actual consensus configuration of the blockchain.
-    fn consensus_config(&self) -> ApiResult<ConsensusConfig>;
+    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
     /// Returns an pending propose config change.
-    fn config_proposal(&self) -> ApiResult<Option<ConfigProposalWithHash>>;
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 
 impl ApiImpl<'_> {
-    fn broadcaster(&self) -> ApiResult<Broadcaster<'_>> {
+    fn broadcaster(&self) -> Result<Broadcaster<'_>, api::Error> {
         self.0.broadcaster().ok_or_else(|| {
-            ApiError::new(HttpStatusCode::BAD_REQUEST)
+            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                 .title("Invalid broadcast request")
                 .detail("Nod is not a validator")
         })
@@ -146,50 +146,50 @@ impl ApiImpl<'_> {
 }
 
 impl PrivateApi for ApiImpl<'_> {
-    type Error = ApiError;
+    type Error = api::Error;
 
-    fn deploy_artifact(&self, artifact: DeployRequest) -> ApiResult<Hash> {
+    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .request_artifact_deploy((), artifact)
             .map_err(|err| {
-                ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                     .title("Artifact deploy request failed")
                     .detail(err.to_string())
             })
     }
 
-    fn propose_config(&self, proposal: ConfigPropose) -> ApiResult<Hash> {
+    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .propose_config_change((), proposal)
             .map_err(|err| {
-                ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                     .title("Config propose failed")
                     .detail(err.to_string())
             })
     }
 
-    fn confirm_config(&self, vote: ConfigVote) -> ApiResult<Hash> {
+    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .confirm_config_change((), vote)
             .map_err(|err| {
-                ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                     .title("Config vote failed")
                     .detail(err.to_string())
             })
     }
 
-    fn configuration_number(&self) -> ApiResult<u64> {
+    fn configuration_number(&self) -> Result<u64, Self::Error> {
         let configuration_number =
             SchemaImpl::new(self.0.service_data()).get_configuration_number();
         Ok(configuration_number)
     }
 
-    fn supervisor_config(&self) -> ApiResult<SupervisorConfig> {
+    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
         let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
         Ok(config)
     }
 
-    fn deploy_status(&self, query: DeployInfoQuery) -> ApiResult<DeployResponse> {
+    fn deploy_status(&self, query: DeployInfoQuery) -> Result<DeployResponse, Self::Error> {
         let request = DeployRequest::try_from(query)?;
         let schema = SchemaImpl::new(self.0.service_data());
         let status = schema.deploy_states.get(&request);
@@ -199,13 +199,13 @@ impl PrivateApi for ApiImpl<'_> {
 }
 
 impl PublicApi for ApiImpl<'_> {
-    type Error = ApiError;
+    type Error = api::Error;
 
-    fn consensus_config(&self) -> ApiResult<ConsensusConfig> {
+    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
         Ok(self.0.data().for_core().consensus_config())
     }
 
-    fn config_proposal(&self) -> ApiResult<Option<ConfigProposalWithHash>> {
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
         Ok(SchemaImpl::new(self.0.service_data())
             .public
             .pending_proposal

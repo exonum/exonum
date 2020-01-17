@@ -220,7 +220,7 @@ where
 
     /// Sends a get request to the testing API endpoint and decodes response as
     /// the corresponding type.
-    pub fn get<R>(self, endpoint: &str) -> api::ApiResult<R>
+    pub fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -256,7 +256,7 @@ where
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
-    pub fn post<R>(self, endpoint: &str) -> api::ApiResult<R>
+    pub fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -305,7 +305,7 @@ where
     }
 
     /// Converts reqwest Response to `api::ApiResult`.
-    fn response_to_api_result<R>(mut response: Response) -> api::ApiResult<R>
+    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -316,7 +316,7 @@ where
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");
             Ok(value)
         } else {
-            let error = api::ApiError::parse(code, &body).expect("Unable to deserialize API error");
+            let error = api::Error::parse(code, &body).expect("Unable to deserialize API error");
             Err(error)
         }
     }

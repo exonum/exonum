@@ -71,7 +71,7 @@ impl PublicApi {
         self,
         state: &ServiceApiState<'_>,
         pub_key: PublicKey,
-    ) -> api::ApiResult<WalletInfo> {
+    ) -> api::Result<WalletInfo> {
         let IndexProof {
             block_proof,
             index_proof,

@@ -13,14 +13,14 @@
 // limitations under the License.
 
 use exonum::runtime::{CommonError, ExecutionError, InstanceId};
-use exonum_api::{ApiError, ApiResult, HttpStatusCode};
+use exonum_api as api;
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Entry,
 };
 use exonum_rust_runtime::{
-    api::{self, ServiceApiBuilder},
+    api::{ServiceApiBuilder, ServiceApiState},
     CallContext, DefaultInstance, Service,
 };
 
@@ -87,13 +87,13 @@ impl IncInterface<CallContext<'_>> for IncService {
 pub struct PublicApi;
 
 impl PublicApi {
-    fn counter(state: &api::ServiceApiState<'_>, _query: ()) -> ApiResult<u64> {
-        Schema::new(state.service_data())
-            .count()
-            .ok_or_else(|| ApiError::new(HttpStatusCode::NOT_FOUND).title("Counter is not set yet"))
+    fn counter(state: &ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
+        Schema::new(state.service_data()).count().ok_or_else(|| {
+            api::Error::new(api::HttpStatusCode::NOT_FOUND).title("Counter is not set yet")
+        })
     }
 
-    fn ping(_state: &api::ServiceApiState<'_>, _query: ()) -> ApiResult<()> {
+    fn ping(_state: &ServiceApiState<'_>, _query: ()) -> api::Result<()> {
         Ok(())
     }
 

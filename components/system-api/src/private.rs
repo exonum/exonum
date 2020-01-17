@@ -18,7 +18,7 @@
 //! administrators, e.g. shutting down the node.
 
 use exonum::{blockchain::ApiSender, crypto::PublicKey, runtime::InstanceId};
-use exonum_api::{ApiBackend, ApiError, ApiFutureResult, ApiResult, ApiScope, HttpStatusCode};
+use exonum_api::{self as api, ApiBackend, ApiScope};
 use exonum_node::{ConnectInfo, ExternalMessage, SharedNodeState};
 use futures::Future;
 use serde::{Deserialize, Serialize};
@@ -102,7 +102,7 @@ impl SystemApi {
 
     fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| -> ApiResult<_> {
+        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
             let mut outgoing_connections: HashMap<SocketAddr, OutgoingConnection> = HashMap::new();
 
             for connect_info in shared_api_state.outgoing_connections() {
@@ -126,11 +126,11 @@ impl SystemApi {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(
             name,
-            move |connect_info: ConnectInfo| -> ApiFutureResult<()> {
+            move |connect_info: ConnectInfo| -> api::FutureResult<()> {
                 let handler = sender
                     .send_message(ExternalMessage::PeerAdd(connect_info))
                     .map_err(|e| {
-                        ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                        api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                             .title("Failed to add peer")
                             .detail(e.to_string())
                     });
@@ -142,13 +142,15 @@ impl SystemApi {
 
     fn handle_network_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let info = self.info.clone();
-        api_scope.endpoint(name, move |_query: ()| -> ApiResult<_> { Ok(info.clone()) });
+        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
+            Ok(info.clone())
+        });
         self
     }
 
     fn handle_is_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| -> ApiResult<_> {
+        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
             Ok(shared_api_state.is_enabled())
         });
         self
@@ -158,11 +160,11 @@ impl SystemApi {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(
             name,
-            move |query: ConsensusEnabledQuery| -> ApiFutureResult<()> {
+            move |query: ConsensusEnabledQuery| -> api::FutureResult<()> {
                 let handler = sender
                     .send_message(ExternalMessage::Enable(query.enabled))
                     .map_err(|e| {
-                        ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                        api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                             .title("Failed to set consensus enabled")
                             .detail(e.to_string())
                     });
@@ -185,7 +187,7 @@ impl SystemApi {
                 .send_message(ExternalMessage::Shutdown)
                 .map(|()| HttpResponse::Ok().json(()))
                 .map_err(|e| {
-                    let e = ApiError::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+                    let e = api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
                         .title("Failed to handle shutdown")
                         .detail(e.to_string());
                     actix_web::Error::from(e)

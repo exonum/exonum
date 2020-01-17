@@ -14,7 +14,7 @@
 
 use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
-use exonum_api::{self as api, ApiAggregator, ApiBuilder, ApiFutureResult};
+use exonum_api::{self as api, ApiAggregator, ApiBuilder};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
@@ -50,15 +50,15 @@ impl TestKitActor {
 
         let addr_ = addr.clone();
         api_scope.endpoint("v1/status", move |()| {
-            Box::new(addr_.send(GetStatus).then(flatten_err)) as ApiFutureResult<_>
+            Box::new(addr_.send(GetStatus).then(flatten_err)) as api::FutureResult<_>
         });
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
-            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as ApiFutureResult<_>
+            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as api::FutureResult<_>
         });
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
-            Box::new(addr_.send(query).then(flatten_err)) as ApiFutureResult<_>
+            Box::new(addr_.send(query).then(flatten_err)) as api::FutureResult<_>
         });
         builder
     }
@@ -68,13 +68,13 @@ impl Actor for TestKitActor {
     type Context = Context<Self>;
 }
 
-fn flatten_err<T>(res: Result<Result<T, api::ApiError>, MailboxError>) -> Result<T, api::ApiError> {
+fn flatten_err<T>(res: Result<Result<T, api::Error>, MailboxError>) -> Result<T, api::Error> {
     match res {
         Ok(Ok(value)) => Ok(value),
         Ok(Err(e)) => Err(e),
-        Err(e) => Err(
-            api::ApiError::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR).detail(e.to_string()),
-        ),
+        Err(e) => {
+            Err(api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR).detail(e.to_string()))
+        }
     }
 }
 
@@ -82,7 +82,7 @@ fn flatten_err<T>(res: Result<Result<T, api::ApiError>, MailboxError>) -> Result
 struct GetStatus;
 
 impl Message for GetStatus {
-    type Result = api::ApiResult<TestKitStatus>;
+    type Result = api::Result<TestKitStatus>;
 }
 
 /// Testkit status, returned by the corresponding API endpoint.
@@ -95,7 +95,7 @@ pub struct TestKitStatus {
 }
 
 impl Handler<GetStatus> for TestKitActor {
-    type Result = api::ApiResult<TestKitStatus>;
+    type Result = api::Result<TestKitStatus>;
 
     fn handle(&mut self, _msg: GetStatus, _ctx: &mut Self::Context) -> Self::Result {
         Ok(TestKitStatus {
@@ -112,17 +112,17 @@ struct CreateBlock {
 }
 
 impl Message for CreateBlock {
-    type Result = api::ApiResult<BlockWithTransactions>;
+    type Result = api::Result<BlockWithTransactions>;
 }
 
 impl Handler<CreateBlock> for TestKitActor {
-    type Result = api::ApiResult<BlockWithTransactions>;
+    type Result = api::Result<BlockWithTransactions>;
 
     fn handle(&mut self, msg: CreateBlock, _ctx: &mut Self::Context) -> Self::Result {
         let block_info = if let Some(tx_hashes) = msg.tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !self.0.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
-                return Err(api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+                return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                     .title("CreateBlock handler failed.")
                     .detail(format!(
                         "Transaction not in mempool: {}",
@@ -145,15 +145,15 @@ impl Handler<CreateBlock> for TestKitActor {
 struct RollBack(Height);
 
 impl Message for RollBack {
-    type Result = api::ApiResult<Option<BlockWithTransactions>>;
+    type Result = api::Result<Option<BlockWithTransactions>>;
 }
 
 impl Handler<RollBack> for TestKitActor {
-    type Result = api::ApiResult<Option<BlockWithTransactions>>;
+    type Result = api::Result<Option<BlockWithTransactions>>;
 
     fn handle(&mut self, RollBack(height): RollBack, _ctx: &mut Self::Context) -> Self::Result {
         if height == Height(0) {
-            return Err(api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+            return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                 .title("RollBack handler failed.")
                 .detail("Cannot rollback past genesis block"));
         }
@@ -329,7 +329,7 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/create")
             .unwrap_err();
 
-        let expected_err = api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+        let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
             .title("CreateBlock handler failed.")
             .detail(format!("Transaction not in mempool: {}", Hash::zero()));
 
@@ -386,7 +386,7 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap_err();
 
-        let expected_err = api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+        let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
             .title("RollBack handler failed.")
             .detail("Cannot rollback past genesis block");
 

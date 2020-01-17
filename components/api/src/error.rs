@@ -18,22 +18,24 @@ pub use actix_web::http::{
     header::{self, HeaderName},
     HeaderMap as HttpHeaderMap, StatusCode as HttpStatusCode,
 };
-use failure::{format_err, Fail};
+use failure::Fail;
 use serde::{Deserialize, Serialize};
+
+use std::fmt;
 
 /// API HTTP error struct.
 #[derive(Fail, Debug, PartialEq)]
-pub struct ApiError {
+pub struct Error {
     /// HTTP error code.
     pub http_code: HttpStatusCode,
     /// API error body.
-    pub body: ApiErrorBody,
+    pub body: ErrorBody,
     /// Additional HTTP headers.
     pub headers: HttpHeaderMap,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq)]
-pub struct ApiErrorBody {
+pub struct ErrorBody {
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
     pub docs_uri: String,
@@ -51,18 +53,18 @@ pub struct ApiErrorBody {
     pub error_code: Option<u8>,
 }
 
-impl std::fmt::Display for ApiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.body.title, self.body.detail)
     }
 }
 
-impl ApiError {
+impl Error {
     /// Builds a ApiError with the given `http_code`.
     pub fn new(http_code: HttpStatusCode) -> Self {
         Self {
             http_code,
-            body: ApiErrorBody::default(),
+            body: ErrorBody::default(),
             headers: HttpHeaderMap::new(),
         }
     }
@@ -98,6 +100,7 @@ impl ApiError {
         self
     }
 
+    /// Adds HTTP header, which will be added in `HttpResponse`
     #[doc(hidden)]
     pub fn header(mut self, key: HeaderName, value: &str) -> Self {
         self.headers.insert(key, value.parse().unwrap());
@@ -108,9 +111,8 @@ impl ApiError {
     pub fn parse(
         http_code: HttpStatusCode,
         body: &str,
-    ) -> std::result::Result<Self, failure::Error> {
-        let body =
-            serde_json::from_str(body).or(Err(format_err!("Failed to deserialize error body.")))?;
+    ) -> std::result::Result<Self, serde_json::Error> {
+        let body = serde_json::from_str(body)?;
         Ok(Self {
             http_code,
             body,
@@ -149,13 +151,13 @@ impl MovedPermanentlyError {
     }
 }
 
-impl From<MovedPermanentlyError> for ApiError {
+impl From<MovedPermanentlyError> for Error {
     fn from(e: MovedPermanentlyError) -> Self {
         let full_location = match e.query_part {
             Some(query) => format!("{}?{}", e.location, query),
             None => e.location,
         };
 
-        ApiError::new(HttpStatusCode::MOVED_PERMANENTLY).header(header::LOCATION, &full_location)
+        Error::new(HttpStatusCode::MOVED_PERMANENTLY).header(header::LOCATION, &full_location)
     }
 }

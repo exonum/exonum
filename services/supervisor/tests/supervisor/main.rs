@@ -22,7 +22,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_api::ApiResult;
+use exonum_api::Result as ApiResult;
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,

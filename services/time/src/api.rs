@@ -16,7 +16,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::PublicKey;
-use exonum_api::ApiResult;
+use exonum_api::Result;
 use exonum_rust_runtime::api;
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +40,7 @@ impl PublicApi {
     pub fn current_time(
         state: &api::ServiceApiState<'_>,
         _query: (),
-    ) -> ApiResult<Option<DateTime<Utc>>> {
+    ) -> Result<Option<DateTime<Utc>>> {
         Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
@@ -58,7 +58,7 @@ pub struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
-    pub fn all_validators_times(state: &api::ServiceApiState<'_>) -> ApiResult<Vec<ValidatorTime>> {
+    pub fn all_validators_times(state: &api::ServiceApiState<'_>) -> Result<Vec<ValidatorTime>> {
         let schema = TimeSchema::new(state.service_data());
         // All available times of the validators.
         let validators_times = schema
@@ -73,9 +73,7 @@ impl PrivateApi {
     }
 
     /// Endpoint for getting time values for current validators.
-    pub fn current_validators_time(
-        state: &api::ServiceApiState<'_>,
-    ) -> ApiResult<Vec<ValidatorTime>> {
+    pub fn current_validators_time(state: &api::ServiceApiState<'_>) -> Result<Vec<ValidatorTime>> {
         let validator_keys = state.data().for_core().consensus_config().validator_keys;
         let schema = TimeSchema::new(state.service_data());
 

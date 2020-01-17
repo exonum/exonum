@@ -20,9 +20,9 @@ use std::marker::PhantomData;
 use super::{error, EndpointMutability};
 
 /// Type alias for the usual synchronous result.
-pub type ApiResult<I> = std::result::Result<I, error::ApiError>;
+pub type Result<I> = std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
-pub type ApiFutureResult<I> = Box<dyn Future<Item = I, Error = error::ApiError>>;
+pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract a handler from various entities.
 ///
@@ -121,25 +121,25 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 }
 
-impl<Q, I, F> From<F> for Deprecated<Q, I, ApiResult<I>, F>
+impl<Q, I, F> From<F> for Deprecated<Q, I, Result<I>, F>
 where
-    F: Fn(Q) -> ApiResult<I>,
+    F: Fn(Q) -> Result<I>,
 {
     fn from(handler: F) -> Self {
         Self::new(handler)
     }
 }
 
-impl<Q, I, F> From<F> for Deprecated<Q, I, ApiFutureResult<I>, F>
+impl<Q, I, F> From<F> for Deprecated<Q, I, FutureResult<I>, F>
 where
-    F: Fn(Q) -> ApiFutureResult<I>,
+    F: Fn(Q) -> FutureResult<I>,
 {
     fn from(handler: F) -> Self {
         Self::new(handler)
     }
 }
 
-impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, ApiFutureResult<I>, F> {
+impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F> {
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,
@@ -208,9 +208,9 @@ impl<Q, I, R, F> NamedWith<Q, I, R, F> {
 
 // Implementations for `ApiResult` and `query` parameters.
 
-impl<Q, I, F> From<F> for With<Q, I, ApiResult<I>, F>
+impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
 where
-    F: Fn(Q) -> ApiResult<I>,
+    F: Fn(Q) -> Result<I>,
 {
     fn from(handler: F) -> Self {
         Self {
@@ -225,9 +225,9 @@ where
 
 // Implementations for `ApiFutureResult` and `query` parameters.
 
-impl<Q, I, F> From<F> for With<Q, I, ApiFutureResult<I>, F>
+impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where
-    F: Fn(Q) -> ApiFutureResult<I>,
+    F: Fn(Q) -> FutureResult<I>,
 {
     fn from(handler: F) -> Self {
         Self {

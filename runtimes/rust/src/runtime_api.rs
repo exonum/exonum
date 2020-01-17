@@ -143,16 +143,16 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         // This endpoint returns list of protobuf source files of the specified artifact,
         // otherwise it returns source files of Exonum itself.
         .endpoint("proto-sources", {
-            move |query: ProtoSourcesQuery| -> api::ApiResult<Vec<ProtoSourceFile>> {
+            move |query: ProtoSourcesQuery| -> api::Result<Vec<ProtoSourceFile>> {
                 if let ProtoSourcesQuery::Artifact { name, version } = query {
                     let artifact_id = ArtifactId::new(RuntimeIdentifier::Rust, name, version)
                         .map_err(|e| {
-                            api::ApiError::new(api::HttpStatusCode::BAD_REQUEST)
+                            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
                                 .title("Invalid query")
                                 .detail(format!("Invalid artifact query: {}", e))
                         })?;
                     filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
-                        api::ApiError::new(api::HttpStatusCode::NOT_FOUND)
+                        api::Error::new(api::HttpStatusCode::NOT_FOUND)
                             .title("Artifact sources not found")
                             .detail(format!(
                                 "Unable to find sources for artifact {}",

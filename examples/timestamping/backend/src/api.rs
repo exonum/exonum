@@ -59,7 +59,7 @@ impl PublicApi {
         self,
         state: &ServiceApiState<'_>,
         hash: &Hash,
-    ) -> api::ApiResult<Option<TimestampEntry>> {
+    ) -> api::Result<Option<TimestampEntry>> {
         let schema = Schema::new(state.service_data());
         Ok(schema.timestamps.get(hash))
     }
@@ -69,7 +69,7 @@ impl PublicApi {
         self,
         state: &ServiceApiState<'_>,
         hash: Hash,
-    ) -> api::ApiResult<TimestampProof> {
+    ) -> api::Result<TimestampProof> {
         let IndexProof {
             block_proof,
             index_proof,
