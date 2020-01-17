@@ -135,8 +135,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - Service interfaces now have to specify method IDs with either `interface_method`
   attribute or `auto_ids` option. (#1701)
 
-- Service interface methods now can be marked as removed by providing `removed` flag
-  to the `interface_method` macro. (#1707)
+- Service interface methods now can be marked as removed. (#1707)
 
 ### exonum-testkit
 
