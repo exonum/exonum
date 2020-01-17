@@ -411,7 +411,7 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 /// [persistent iterators]: struct.PersistentIter.html
 pub struct MigrationHelper {
     db: Arc<dyn Database>,
-    abort_handle: AbortHandle,
+    abort_handle: Box<dyn AbortMigration>,
     // Only equals `None` during merges.
     fork: Option<Fork>,
     namespace: String,
@@ -429,9 +429,15 @@ impl fmt::Debug for MigrationHelper {
 impl MigrationHelper {
     /// Creates a new helper.
     pub fn new(db: impl Into<Arc<dyn Database>>, namespace: &str) -> Self {
-        let (this, handle) = Self::with_handle(db, namespace);
-        handle.forget();
-        this
+        assert_valid_name_component(namespace);
+
+        let db = db.into();
+        Self {
+            fork: Some(db.fork()),
+            db,
+            abort_handle: Box::new(()),
+            namespace: namespace.to_owned(),
+        }
     }
 
     /// Creates a new helper together with the abort handle. Unlike the `MigrationHelper`,
@@ -439,20 +445,23 @@ impl MigrationHelper {
     /// helper was completed, and allows to abort the migration by preventing further writes
     /// to the database.
     pub fn with_handle(db: impl Into<Arc<dyn Database>>, namespace: &str) -> (Self, AbortHandle) {
-        assert_valid_name_component(namespace);
-
-        let db = db.into();
-        let fork = db.fork();
+        let mut this = Self::new(db, namespace);
         let abort_handle = AbortHandle {
             inner: Arc::new(AtomicBool::default()),
         };
-        let this = Self {
-            db,
-            abort_handle: abort_handle.clone_inner(),
-            fork: Some(fork),
-            namespace: namespace.to_owned(),
-        };
+        this.set_abort_handle(abort_handle.clone_inner());
         (this, abort_handle)
+    }
+
+    /// Sets the abort handle for the helper.
+    ///
+    /// # Stability
+    ///
+    /// This method is considered experimental. Its signature may be changed or it may be removed
+    /// in the future.
+    #[doc(hidden)]
+    pub fn set_abort_handle(&mut self, abort_handle: impl AbortMigration + 'static) {
+        self.abort_handle = Box::new(abort_handle);
     }
 
     fn fork_ref(&self) -> &Fork {
@@ -460,9 +469,9 @@ impl MigrationHelper {
         self.fork.as_ref().unwrap()
     }
 
-    /// Checks if the migration has been aborted via `AbortHandle`.
-    pub fn is_aborted(&self) -> bool {
-        self.abort_handle.inner.load(Ordering::SeqCst)
+    /// Checks if the migration has been aborted.
+    fn is_aborted(&self) -> bool {
+        self.abort_handle.is_aborted()
     }
 
     /// Returns full access to the new version of migrated data.
@@ -547,6 +556,28 @@ pub enum MigrationError {
     /// Migration has been aborted.
     #[fail(display = "Migration was aborted")]
     Aborted,
+}
+
+/// Denotes a communication channel between `MigrationHelper` and the outside world allowing
+/// the helper to understand if the migration is aborted.
+#[doc(hidden)]
+pub trait AbortMigration: Send {
+    /// Has the migration been aborted? `MigrationHelper` calls this method every time it
+    /// merges changes to the database. If the method returns `true`, the merge is cancelled
+    /// and `MigrationHelper` returns `MigrationError::Aborted`.
+    fn is_aborted(&self) -> bool;
+}
+
+impl AbortMigration for () {
+    fn is_aborted(&self) -> bool {
+        false
+    }
+}
+
+impl AbortMigration for AbortHandle {
+    fn is_aborted(&self) -> bool {
+        self.inner.load(Ordering::SeqCst)
+    }
 }
 
 /// Handle allowing to signal to `MigrationHelper` that the migration has been aborted.
