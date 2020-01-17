@@ -392,6 +392,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 struct TestServer {
     addr: net::SocketAddr,
     backend: Addr<Server>,
+    system: System,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -422,12 +423,12 @@ impl TestServer {
         });
 
         let (system, addr, backend) = rx.recv().unwrap();
-        System::set_current(system);
 
         Self {
             addr,
             backend,
             handle: Some(handle),
+            system,
         }
     }
 
@@ -453,7 +454,7 @@ impl Drop for TestServer {
             .backend
             .send(signal::Signal(signal::SignalType::Term))
             .wait();
-        System::current().stop();
+        self.system.stop();
         // Wait server thread.
         let _ = self.handle.take().unwrap().join();
     }
