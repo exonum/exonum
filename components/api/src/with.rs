@@ -125,25 +125,25 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 }
 
-impl<Q, I, F> From<F> for Deprecated<Q, I, Result<I>, F>
+impl<Q, I, F> From<F> for Deprecated<Q, I, ApiResult<I>, F>
 where
-    F: Fn(Q) -> Result<I>,
+    F: Fn(Q) -> ApiResult<I>,
 {
     fn from(handler: F) -> Self {
         Self::new(handler)
     }
 }
 
-impl<Q, I, F> From<F> for Deprecated<Q, I, FutureResult<I>, F>
+impl<Q, I, F> From<F> for Deprecated<Q, I, ApiFutureResult<I>, F>
 where
-    F: Fn(Q) -> FutureResult<I>,
+    F: Fn(Q) -> ApiFutureResult<I>,
 {
     fn from(handler: F) -> Self {
         Self::new(handler)
     }
 }
 
-impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F> {
+impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, ApiFutureResult<I>, F> {
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,
