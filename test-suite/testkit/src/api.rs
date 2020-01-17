@@ -387,7 +387,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     server
 }
 
-/// The custom implementation of the test server, because there is an error in the default 
+/// The custom implementation of the test server, because there is an error in the default
 /// implementation. It does not wait for the http server thread to complete during drop.
 struct TestServer {
     addr: net::SocketAddr,
