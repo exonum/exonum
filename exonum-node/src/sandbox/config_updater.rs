@@ -18,7 +18,7 @@ use exonum::{
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID, CallContext},
+    runtime::{CallContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{DefaultInstance, Service, TxStub};

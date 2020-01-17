@@ -16,7 +16,7 @@ use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     merkledb::access::AccessExt,
     messages::Verified,
-    runtime::{AnyTx, ExecutionError, InstanceId, CallContext},
+    runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{DefaultInstance, Service};

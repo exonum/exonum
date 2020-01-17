@@ -251,6 +251,8 @@
 #![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
+pub use exonum::runtime::CallContext;
+
 pub use self::{
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
@@ -271,9 +273,9 @@ use exonum::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        ArtifactId, CallContext, CallInfo, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime,
-        RuntimeIdentifier, WellKnownRuntime,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, ExecutionFail, InstanceDescriptor,
+        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier,
+        WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
