@@ -27,29 +27,26 @@
 )]
 
 /// Node API.
-pub mod api;
+mod api;
 /// Protobuf generated structs.
-pub mod proto;
+mod proto;
 /// Database schema.
-pub mod schema;
+mod schema;
 /// System time provider.
-pub mod time_provider;
+mod time_provider;
 /// Node transactions.
-pub mod transactions;
+mod transactions;
 
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, Service};
 
 use std::sync::Arc;
 
-use crate::{
+pub use crate::{
     schema::TimeSchema,
-    time_provider::{SystemTimeProvider, TimeProvider},
+    time_provider::{MockTimeProvider, SystemTimeProvider, TimeProvider},
     transactions::{TimeOracleInterface, TxTime},
 };
-
-// TODO there is no way to provide provider for now.
-// It should be configurable through the configuration service.
 
 /// Define the service.
 #[derive(Debug, ServiceDispatcher)]

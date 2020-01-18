@@ -29,11 +29,7 @@ use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 use serde_derive::{Deserialize, Serialize};
 
-use exonum_time::{
-    schema::TimeSchema,
-    time_provider::{MockTimeProvider, TimeProvider},
-    TimeServiceFactory,
-};
+use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
 use std::sync::Arc;
 
 /// The argument of the `MarkerInterface::mark` method.

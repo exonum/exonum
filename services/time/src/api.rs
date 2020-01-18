@@ -23,7 +23,7 @@ use crate::TimeSchema;
 
 /// Structure for saving public key of the validator and last known local time.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ValidatorTime {
+struct ValidatorTime {
     /// Public key of the validator.
     pub public_key: PublicKey,
     /// Time of the validator.
@@ -32,11 +32,11 @@ pub struct ValidatorTime {
 
 /// Implement the public API for Exonum time.
 #[derive(Debug, Clone)]
-pub struct PublicApi;
+pub(super) struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
-    pub fn current_time(
+    fn current_time(
         state: &api::ServiceApiState<'_>,
         _query: (),
     ) -> api::Result<Option<DateTime<Utc>>> {
@@ -53,13 +53,11 @@ impl PublicApi {
 
 /// Implement the private API for Exonum time.
 #[derive(Debug, Clone)]
-pub struct PrivateApi;
+pub(super) struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
-    pub fn all_validators_times(
-        state: &api::ServiceApiState<'_>,
-    ) -> api::Result<Vec<ValidatorTime>> {
+    fn all_validators_times(state: &api::ServiceApiState<'_>) -> api::Result<Vec<ValidatorTime>> {
         let schema = TimeSchema::new(state.service_data());
         // All available times of the validators.
         let validators_times = schema
@@ -74,7 +72,7 @@ impl PrivateApi {
     }
 
     /// Endpoint for getting time values for current validators.
-    pub fn current_validators_time(
+    fn current_validators_time(
         state: &api::ServiceApiState<'_>,
     ) -> api::Result<Vec<ValidatorTime>> {
         let validator_keys = state.data().for_core().consensus_config().validator_keys;
