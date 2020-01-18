@@ -103,6 +103,47 @@ pub enum ScriptStatus {
 /// let value = snapshot.get_proof_entry::<_, u32>("entry").get();
 /// assert_eq!(value, Some(2));
 /// ```
+///
+/// Testing fault tolerance of a script:
+///
+/// ```
+/// # use exonum_derive::*;
+/// # use exonum::runtime::{
+/// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
+/// # };
+/// use exonum::merkledb::access::AccessExt;
+/// # use exonum_rust_runtime::Service;
+/// use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
+///
+/// fn script_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+///     let new_data = ctx.helper.new_data();
+///     let mut counter = new_data.get_entry::<_, u32>("counter").get().unwrap_or(0);
+///     while counter < 5 {
+///         counter += 1;
+///         ctx.helper.new_data().get_entry("counter").set(counter);
+///         ctx.helper.merge()?;
+///     }
+///     Ok(())
+/// }
+///
+/// /// Service under test.
+/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// #[service_factory(artifact_name = "test-service")]
+/// pub struct ServiceUnderTest;
+///
+/// impl Service for ServiceUnderTest {}
+///
+/// let mut test = MigrationTest::new(ServiceUnderTest, Version::new(0, 1, 0));
+/// let end_snapshot = test
+///     .execute_until_flush(
+///         || script_with_merges.with_end_version("0.2.0"),
+///         AbortPolicy::abort_repeatedly(),
+///     )
+///     .end_snapshot();
+/// // The counter value should be set to 5.
+/// let counter = end_snapshot.get_entry::<_, u32>("counter").get();
+/// assert_eq!(counter, Some(5));
+/// ```
 #[derive(Debug)]
 pub struct MigrationTest<S> {
     db: Arc<dyn Database>,
