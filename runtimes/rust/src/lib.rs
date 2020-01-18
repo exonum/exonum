@@ -153,7 +153,7 @@
 //! # impl Service for StatefulService {}
 //! ```
 //!
-//! ## Transactions removing
+//! ## Removing Transactions
 //!
 //! If transaction became obsolete, it can be removed from the service.
 //! Removed transaction will remain its ID, but attempt to invoke it will result

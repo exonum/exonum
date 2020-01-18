@@ -90,7 +90,7 @@
 //! It is expected that service authors will notify users about transaction deprecation via
 //! documentation update or in any other applicable way.
 //!
-//! [`CommonError`]: enum.CommonError.html
+//! [`CommonError::MethodRemoved`]: ../enum.CommonError.html#variant.MethodRemoved
 //!
 //! # Versioning for clients
 //!

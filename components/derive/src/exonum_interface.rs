@@ -175,10 +175,7 @@ impl FromMeta for RemovedMethods {
             })
             .collect();
 
-        match ids {
-            Ok(ids) => Ok(Self { ids }),
-            Err(err) => Err(err),
-        }
+        ids.map(|ids| Self { ids })
     }
 }
 
@@ -273,9 +270,10 @@ impl ExonumInterface {
         let mut has_output = false;
         let mut next_method_id = 0;
 
-        // Initialize used methods with removed method IDs.
-        let mut used_method_ids: HashSet<u32> =
-            attrs.removed_method_ids.ids.iter().copied().collect();
+        // Store methods with removed method IDs.
+        let removed_method_ids: HashSet<_> = attrs.removed_method_ids.ids.iter().copied().collect();
+        // Store & update the list of used method IDs as well.
+        let mut used_method_ids = HashSet::new();
 
         for trait_item in &item_trait.items {
             match trait_item {
@@ -285,9 +283,17 @@ impl ExonumInterface {
                         let id_attr = InterfaceMethodAttrs::try_from(method.attrs.as_ref())?;
                         let method_id = id_attr.id;
 
+                        if removed_method_ids.contains(&method_id) {
+                            let msg = format!(
+                                "Method ID {} is marked as removed and cannot be reused",
+                                method_id
+                            );
+                            return Err(darling::Error::custom(msg).with_span(&method.sig.ident));
+                        }
+
                         if !used_method_ids.insert(method_id) {
                             let msg = format!("Method ID {} is already used", method_id);
-                            return Err(darling::Error::custom(msg).with_span(&method.sig));
+                            return Err(darling::Error::custom(msg).with_span(&method.sig.ident));
                         }
                         method_id
                     } else {
