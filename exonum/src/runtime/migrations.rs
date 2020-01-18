@@ -326,7 +326,7 @@ impl From<InitMigrationError> for ExecutionError {
 ///
 /// # Retaining Old Data Types
 ///
-/// Migration script logic needs retain the knowledge about data structures used in the service
+/// Migration script logic needs retain the knowledge about data types used in the service
 /// in the past. Since these data types may be unused *currently*, retaining them may place
 /// a burden on the service. To mitigate this, you can provide a minimum supported starting version
 /// of the service via [`set_min_version`](#method.set_min_version).

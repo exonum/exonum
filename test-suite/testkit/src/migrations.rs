@@ -347,7 +347,7 @@ where
 
 impl AbortPolicy<iter::Repeat<bool>> {
     /// Creates a policy which aborts the script every other time. This ensures that the script
-    /// makes progress, but tests it failure tolerance in "unfriendly" conditions.
+    /// makes progress, but tests its failure tolerance in "unfriendly" conditions.
     pub fn abort_repeatedly() -> Self {
         Self::new(iter::repeat(true))
     }

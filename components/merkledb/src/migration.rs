@@ -562,7 +562,7 @@ pub enum MigrationError {
 /// the helper to understand if the migration is aborted.
 #[doc(hidden)]
 pub trait AbortMigration: Send {
-    /// Has the migration been aborted? `MigrationHelper` calls this method every time it
+    /// Has the migration been aborted? `MigrationHelper` calls this method every time before it
     /// merges changes to the database. If the method returns `true`, the merge is cancelled
     /// and `MigrationHelper` returns `MigrationError::Aborted`.
     fn is_aborted(&self) -> bool;
