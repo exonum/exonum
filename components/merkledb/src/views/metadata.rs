@@ -687,7 +687,7 @@ where
         self.is_phantom
     }
 
-    pub fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
+    pub(crate) fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
     where
         V: BinaryAttribute,
     {

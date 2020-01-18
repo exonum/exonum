@@ -213,14 +213,24 @@ impl ArtifactId {
         name: impl Into<String>,
         version: Version,
     ) -> Result<Self, failure::Error> {
-        let artifact = Self {
-            runtime_id: runtime_id.into(),
-            name: name.into(),
-            version,
-            non_exhaustive: (),
-        };
+        let artifact = Self::from_raw_parts(runtime_id.into(), name.into(), version);
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    /// Creates a new artifact identifier from prepared parts without any checks.
+    ///
+    /// Since the internal structure of `InstanceSpec` can change, this method is considered
+    /// unstable and can break in the future.
+    ///
+    /// Use this method only if you don't need an artifact verification (e.g. in tests).
+    pub fn from_raw_parts(runtime_id: u32, name: String, version: Version) -> Self {
+        Self {
+            runtime_id,
+            name,
+            version,
+            non_exhaustive: (),
+        }
     }
 
     /// Checks if the specified artifact is an upgraded version of another artifact.

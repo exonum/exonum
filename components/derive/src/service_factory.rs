@@ -61,6 +61,7 @@ impl ServiceFactory {
     fn artifact_name(&self) -> impl ToTokens {
         if let Some(ref artifact_name) = self.artifact_name {
             // Check that artifact name contains only allowed characters and is not empty.
+            // It's better to check it now, than wait for panic in the runtime.
             if !check_artifact_name(artifact_name) {
                 panic!(
                     "Wrong characters used in artifact name. Use only: a-zA-Z0-9 and one of /_.-"

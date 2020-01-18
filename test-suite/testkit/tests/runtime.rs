@@ -73,12 +73,11 @@ impl RuntimeTester {
 impl Default for RuntimeTester {
     fn default() -> Self {
         let state = RuntimeState {
-            deployed_artifact: ArtifactId::new(
-                10_u32,
+            deployed_artifact: ArtifactId::from_raw_parts(
+                10,
                 "test-artifact".to_owned(),
                 "1.0.0".parse().unwrap(),
-            )
-            .expect("Can't create ArtifactId"),
+            ),
             deploy_spec: vec![],
             constructor_params: vec![],
         };

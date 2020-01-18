@@ -199,8 +199,7 @@ mod tests {
 
     impl ServiceFactory for SomeService {
         fn artifact_id(&self) -> ArtifactId {
-            ArtifactId::new(0_u32, "exonum.test.Migrations", Version::new(0, 3, 2))
-                .expect("Can't construct ArtifactId")
+            ArtifactId::from_raw_parts(0, "exonum.test.Migrations".into(), Version::new(0, 3, 2))
         }
 
         fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {

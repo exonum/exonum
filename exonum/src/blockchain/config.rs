@@ -59,6 +59,9 @@ pub struct ValidatorKeys {
 
 impl ValidatorKeys {
     /// Creates a new `ValidatorKeys` object.
+    ///
+    /// Since the inner structure `ValidatorKeys` can change, this method is considered unstable
+    /// and may break in the future.
     pub fn new(consensus_key: PublicKey, service_key: PublicKey) -> Self {
         Self {
             consensus_key,
@@ -166,34 +169,7 @@ impl ConsensusConfig {
     /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
     pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
 
-    /// Creates a new `ConsensusConfig` object.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        validator_keys: Vec<ValidatorKeys>,
-        first_round_timeout: Milliseconds,
-        status_timeout: Milliseconds,
-        peers_timeout: Milliseconds,
-        txs_block_limit: u32,
-        max_message_len: u32,
-        min_propose_timeout: Milliseconds,
-        max_propose_timeout: Milliseconds,
-        propose_timeout_threshold: u32,
-    ) -> Self {
-        Self {
-            validator_keys,
-            first_round_timeout,
-            status_timeout,
-            peers_timeout,
-            txs_block_limit,
-            max_message_len,
-            min_propose_timeout,
-            max_propose_timeout,
-            propose_timeout_threshold,
-            non_exhaustive: (),
-        }
-    }
-
-    /// Replaces validator keys in object with provided ones.
+    /// Replaces validator keys in existing object with provided ones.
     pub fn with_validator_keys(mut self, validator_keys: Vec<ValidatorKeys>) -> Self {
         self.validator_keys = validator_keys;
         self
@@ -327,6 +303,133 @@ impl ConsensusConfig {
                 Self::DEFAULT_MAX_MESSAGE_LEN
             );
         }
+    }
+}
+
+/// Builder for `ConsensusConfig`.
+///
+/// Initially, `ConsensusConfig` in this builder is generated via `ConsensusConfig::default()`.
+/// Only the necessary fields can be updated before obtaining the build config via `build` method.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::blockchain::{ConsensusConfig, ConsensusConfigBuilder};
+/// let consensus_config = ConsensusConfigBuilder::new()
+///     .first_round_timeout(3010)
+///     .min_propose_timeout(20)
+///     .build();
+///
+/// assert_eq!(consensus_config.first_round_timeout, 3010);
+/// assert_eq!(consensus_config.min_propose_timeout, 20);
+/// assert_eq!(consensus_config.status_timeout, ConsensusConfig::default().status_timeout);
+/// ```
+#[derive(Debug, Default)]
+pub struct ConsensusConfigBuilder {
+    config: ConsensusConfig,
+}
+
+impl ConsensusConfigBuilder {
+    /// Creates a new `ConsensusConfigBuilder` with `ConsensusConfig` initialized to its default value.
+    pub fn new() -> Self {
+        Self {
+            config: ConsensusConfig::default(),
+        }
+    }
+
+    /// Finishes the building process, returning the `ConsensusConfig` object.
+    pub fn build(self) -> ConsensusConfig {
+        self.config
+    }
+
+    /// Sets the `validator_keys` field of `ConsensusConfig`.
+    pub fn validator_keys(self, validator_keys: Vec<ValidatorKeys>) -> Self {
+        let config = ConsensusConfig {
+            validator_keys,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `first_round_timeout` field of `ConsensusConfig`.
+    pub fn first_round_timeout(self, first_round_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            first_round_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `status_timeout` field of `ConsensusConfig`.
+    pub fn status_timeout(self, status_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            status_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `peers_timeout` field of `ConsensusConfig`.
+    pub fn peers_timeout(self, peers_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            peers_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `txs_block_limit` field of `ConsensusConfig`.
+    pub fn txs_block_limit(self, txs_block_limit: u32) -> Self {
+        let config = ConsensusConfig {
+            txs_block_limit,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `min_propose_timeout` field of `ConsensusConfig`.
+    pub fn min_propose_timeout(self, min_propose_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            min_propose_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `max_propose_timeout` field of `ConsensusConfig`.
+    pub fn max_propose_timeout(self, max_propose_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            max_propose_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `max_message_len` field of `ConsensusConfig`.
+    pub fn max_message_len(self, max_message_len: u32) -> Self {
+        let config = ConsensusConfig {
+            max_message_len,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `propose_timeout_threshold` field of `ConsensusConfig`.
+    pub fn propose_timeout_threshold(self, propose_timeout_threshold: u32) -> Self {
+        let config = ConsensusConfig {
+            propose_timeout_threshold,
+            ..self.config
+        };
+
+        Self { config }
     }
 }
 
@@ -652,9 +755,9 @@ mod tests {
     fn genesis_config_creation() {
         let consensus = gen_consensus_config();
         let version = "1.0.0".parse().unwrap();
-        let artifact1 = ArtifactId::new(42_u32, "test_artifact1", version).unwrap();
+        let artifact1 = ArtifactId::from_raw_parts(42, "test_artifact1".into(), version);
         let version = "0.2.8".parse().unwrap();
-        let artifact2 = ArtifactId::new(42_u32, "test_artifact2", version).unwrap();
+        let artifact2 = ArtifactId::from_raw_parts(42, "test_artifact2".into(), version);
 
         let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
             .with_artifact(artifact1.clone())

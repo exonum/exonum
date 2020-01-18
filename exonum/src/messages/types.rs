@@ -40,10 +40,6 @@ pub struct SignedMessage {
     pub author: PublicKey,
     /// Digital signature over `payload` created with `SecretKey` of the author of the message.
     pub signature: Signature,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    non_exhaustive: (),
 }
 
 impl SignedMessage {
@@ -55,7 +51,6 @@ impl SignedMessage {
             payload,
             author,
             signature,
-            non_exhaustive: (),
         }
     }
 }

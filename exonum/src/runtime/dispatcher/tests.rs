@@ -50,15 +50,15 @@ pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
     assert!(is_genesis_block);
     dispatcher.activate_pending(&fork);
 
-    let block = Block::new(
-        Height(0),
-        0,
-        Hash::zero(),
-        Hash::zero(),
-        Hash::zero(),
-        Hash::zero(),
-        AdditionalHeaders::new(),
-    );
+    let block = Block {
+        height: Height(0),
+        tx_count: 0,
+        prev_hash: Hash::zero(),
+        tx_hash: Hash::zero(),
+        state_hash: Hash::zero(),
+        error_hash: Hash::zero(),
+        additional_headers: AdditionalHeaders::new(),
+    };
 
     let block_hash = block.object_hash();
     let schema = CoreSchema::new(&fork);
@@ -333,18 +333,16 @@ fn test_dispatcher_simple() {
         .with_runtime(runtime_b.runtime_type, runtime_b.clone())
         .finalize(&blockchain);
 
-    let rust_artifact = ArtifactId::new(
-        SampleRuntimes::First as u32,
+    let rust_artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::First as _,
         "first".to_owned(),
         "0.5.0".parse().unwrap(),
-    )
-    .expect("Can't create an ArtifactId");
-    let java_artifact = ArtifactId::new(
-        SampleRuntimes::Second as u32,
+    );
+    let java_artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::Second as _,
         "second".to_owned(),
         "1.2.1".parse().unwrap(),
-    )
-    .expect("Can't create an ArtifactId");
+    );
 
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
@@ -611,8 +609,7 @@ impl DeploymentRuntime {
         dispatcher: &mut Dispatcher,
         db: &Arc<TemporaryDB>,
     ) -> (ArtifactId, Vec<u8>) {
-        let artifact = ArtifactId::new(2_u32, name.to_owned(), version.parse().unwrap())
-            .expect("Can't create an ArtifactId");
+        let artifact = ArtifactId::from_raw_parts(2, name.to_owned(), version.parse().unwrap());
         self.mailbox_actions
             .lock()
             .unwrap()
@@ -926,8 +923,11 @@ fn stopped_service_workflow() {
         ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
     );
 
-    let artifact = ArtifactId::new(SampleRuntimes::First as u32, "first", Version::new(0, 1, 0))
-        .expect("Can't create an ArtifactId");
+    let artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::First as _,
+        "first".into(),
+        Version::new(0, 1, 0),
+    );
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec::from_raw_parts(instance_id, instance_name.into(), artifact);

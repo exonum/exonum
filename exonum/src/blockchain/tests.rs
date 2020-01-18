@@ -245,7 +245,7 @@ impl RuntimeInspector {
     }
 
     fn default_artifact_id() -> ArtifactId {
-        ArtifactId::new(Self::ID, "runtime-inspector", Version::new(1, 0, 0)).unwrap()
+        ArtifactId::from_raw_parts(Self::ID, "runtime-inspector".into(), Version::new(1, 0, 0))
     }
 }
 
@@ -516,8 +516,11 @@ fn initialize_service_ok() {
 fn deploy_available() {
     let (pk, sk) = exonum_crypto::gen_keypair();
 
-    let artifact_id =
-        ArtifactId::new(RuntimeInspector::ID, "secondary", Version::new(1, 0, 0)).unwrap();
+    let artifact_id = ArtifactId::from_raw_parts(
+        RuntimeInspector::ID,
+        "secondary".into(),
+        Version::new(1, 0, 0),
+    );
     let mut blockchain = create_blockchain(
         RuntimeInspector::default().with_available_artifact(artifact_id.clone()),
         vec![InitAction::Noop.into_default_instance()],
@@ -566,8 +569,11 @@ fn deploy_unavailable_artifact() {
         vec![InitAction::Noop.into_default_instance()],
     );
 
-    let artifact_id =
-        ArtifactId::new(RuntimeInspector::ID, "secondary", Version::new(1, 0, 0)).unwrap();
+    let artifact_id = ArtifactId::from_raw_parts(
+        RuntimeInspector::ID,
+        "secondary".into(),
+        Version::new(1, 0, 0),
+    );
     execute_transaction(
         &mut blockchain,
         Transaction::DeployArtifact(artifact_id).sign(TEST_SERVICE_ID, pk, &sk),

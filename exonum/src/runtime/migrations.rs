@@ -542,12 +542,11 @@ mod tests {
         scripts: Vec<MigrationScript>,
     ) -> Box<dyn Snapshot> {
         let db = Arc::new(db);
-        let artifact = ArtifactId::new(
-            RuntimeIdentifier::Rust as u32,
+        let artifact = ArtifactId::from_raw_parts(
+            RuntimeIdentifier::Rust as _,
             ARTIFACT_NAME.to_owned(),
             start_version.clone(),
-        )
-        .expect("Can't create an ArtifactId");
+        );
         let instance_spec = InstanceSpec::from_raw_parts(100, "test".to_string(), artifact);
         let mut version = start_version;
         let mut migration_hashes = HashSet::new();

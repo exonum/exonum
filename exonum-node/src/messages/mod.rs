@@ -424,15 +424,15 @@ mod tests {
         let txs = [2];
         let tx_count = txs.len() as u32;
 
-        let content = Block::new(
-            Height(500),
+        let content = Block {
+            height: Height(500),
             tx_count,
-            crypto::hash(&[1]),
-            crypto::hash(&txs),
-            crypto::hash(&[3]),
-            crypto::hash(&[4]),
-            AdditionalHeaders::new(),
-        );
+            prev_hash: crypto::hash(&[1]),
+            tx_hash: crypto::hash(&txs),
+            state_hash: crypto::hash(&[3]),
+            error_hash: crypto::hash(&[4]),
+            additional_headers: AdditionalHeaders::new(),
+        };
 
         let precommits = vec![
             Verified::from_value(

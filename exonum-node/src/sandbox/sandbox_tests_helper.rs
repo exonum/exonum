@@ -104,19 +104,20 @@ impl<'a> BlockBuilder<'a> {
             .proposer_id
             .unwrap_or_else(|| self.sandbox.current_leader());
 
-        let mut headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
-        headers.insert::<ProposerId>(proposer_id.into());
+        let mut additional_headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
+        additional_headers.insert::<ProposerId>(proposer_id.into());
 
-        Block::new(
-            self.height.unwrap_or_else(|| self.sandbox.current_height()),
-            self.tx_count.unwrap_or(0),
-            self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
-            self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
-            self.state_hash
+        Block {
+            height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
+            tx_count: self.tx_count.unwrap_or(0),
+            prev_hash: self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
+            tx_hash: self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
+            state_hash: self
+                .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
-            self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
-            headers,
-        )
+            error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
+            additional_headers,
+        }
     }
 }
 

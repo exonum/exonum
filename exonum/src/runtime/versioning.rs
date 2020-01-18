@@ -154,39 +154,33 @@ use crate::runtime::{ArtifactId, CoreError, ExecutionError, ExecutionFail};
 ///
 /// ```
 /// # use exonum::runtime::{versioning::ArtifactReq, ArtifactId, RuntimeIdentifier};
+/// # fn main() -> Result<(), failure::Error> {
 /// // Requirements can be parsed from a string.
-/// let req: ArtifactReq = "some.Service@^1.3.0".parse().unwrap();
+/// let req: ArtifactReq = "some.Service@^1.3.0".parse()?;
 ///
 /// let valid_artifact = ArtifactId::new(
 ///     RuntimeIdentifier::Rust as u32,
 ///     "some.Service".to_owned(),
-///     "1.5.7".parse().unwrap(),
-/// ).unwrap();
-/// req.try_match(&valid_artifact).unwrap();
+///     "1.5.7".parse()?,
+/// )?;
+/// assert!(req.try_match(&valid_artifact).is_ok());
 ///
 /// // This artifact is outdated.
-/// let outdated_artifact = ArtifactId::new(
-///     RuntimeIdentifier::Rust as u32,
-///     "some.Service".to_owned(),
-///     "1.2.0".parse().unwrap(),
-/// ).unwrap();
+/// let mut outdated_artifact = valid_artifact.clone();
+/// outdated_artifact.version = "1.2.0".parse()?;
 /// assert!(req.try_match(&outdated_artifact).is_err());
 ///
 /// // This artifact is too new.
-/// let novel_artifact = ArtifactId::new(
-///     RuntimeIdentifier::Rust as u32,
-///     "some.Service".to_owned(),
-///     "2.0.0".parse().unwrap(),
-/// ).unwrap();
+/// let mut novel_artifact = valid_artifact.clone();
+/// novel_artifact.version = "2.0.0".parse()?;
 /// assert!(req.try_match(&novel_artifact).is_err());
 ///
 /// // This artifact has wrong name.
-/// let other_artifact = ArtifactId::new(
-///     RuntimeIdentifier::Rust as u32,
-///     "other.Service".to_owned(),
-///     "1.5.7".parse().unwrap(),
-/// ).unwrap();
+/// let mut other_artifact = valid_artifact.clone();
+/// other_artifact.name = "other.Service".to_owned();
 /// assert!(req.try_match(&novel_artifact).is_err());
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArtifactReq {

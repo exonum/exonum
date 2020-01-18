@@ -635,8 +635,10 @@ impl Runtime for RustRuntime {
             }
             InstanceStatus::Migrating(_) => { /* Do nothing. */ }
             other => {
-                log::warn!(
-                    "Received non-expected service status: {}; ignoring the request",
+                panic!(
+                    "Received non-expected service status: {}; \
+                     Rust runtime isn't prepared to process this action, \
+                     probably node binary is configured incorrectly",
                     other
                 );
             }

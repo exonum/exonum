@@ -948,21 +948,25 @@ pub struct SandboxBuilder {
 
 impl Default for SandboxBuilder {
     fn default() -> Self {
+        use exonum::blockchain::ConsensusConfigBuilder;
+
+        let consensus_config = ConsensusConfigBuilder::new()
+            .validator_keys(Vec::default())
+            .first_round_timeout(1000)
+            .status_timeout(600_000)
+            .peers_timeout(600_000)
+            .txs_block_limit(1000)
+            .max_message_len(1024 * 1024)
+            .min_propose_timeout(PROPOSE_TIMEOUT)
+            .max_propose_timeout(PROPOSE_TIMEOUT)
+            .propose_timeout_threshold(std::u32::MAX)
+            .build();
+
         Self {
             initialize: true,
             services: Vec::new(),
             validators_count: 4,
-            consensus_config: ConsensusConfig::new(
-                Vec::default(),  // validator_keys
-                1000,            // first_round_timeout
-                600_000,         // status_timeout
-                600_000,         // peers_timeout
-                1000,            // txs_block_limit
-                1024 * 1024,     // max_message_len
-                PROPOSE_TIMEOUT, // min_propose_timeout
-                PROPOSE_TIMEOUT, // max_propose_timeout
-                std::u32::MAX,   // propose_timeout_threshold
-            ),
+            consensus_config,
             rust_runtime: RustRuntimeBuilder::new(),
             instances: Vec::new(),
             artifacts: HashMap::new(),
@@ -1332,16 +1336,16 @@ mod unit_tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
+        let (consensus_key, consensus_secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys::new(public, service_key);
+        let validator_keys = ValidatorKeys::new(consensus_key, service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
-            &public,
+            &consensus_key,
             s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent(),
-            &secret,
+            &consensus_secret,
         ));
         s.send(
             s.public_key(ValidatorId(1)),

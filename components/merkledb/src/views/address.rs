@@ -289,9 +289,6 @@ pub struct ResolvedAddress {
     /// for different views in the same column family. In other words, key spaces for two addresses
     /// with equal `name` and `id`s `Some(x)` and `Some(y)`, `x != y`, must not intersect.
     pub id: Option<NonZeroU64>,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl ResolvedAddress {
@@ -299,7 +296,6 @@ impl ResolvedAddress {
         Self {
             name: name.into(),
             id,
-            non_exhaustive: (),
         }
     }
 

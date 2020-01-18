@@ -277,8 +277,7 @@ impl Rig {
     }
 
     fn deploy_artifact(&mut self, name: &str, version: Version) -> ArtifactId {
-        let artifact = ArtifactId::new(MigrationRuntime::ID, name, version)
-            .expect("Can't create an ArtifactId");
+        let artifact = ArtifactId::from_raw_parts(MigrationRuntime::ID, name.into(), version);
 
         let fork = self.blockchain.fork();
         Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
@@ -450,12 +449,11 @@ fn migration_immediate_errors() {
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Attempt to migrate to unknown artifact.
-    let unknown_artifact = ArtifactId::new(
-        RuntimeIdentifier::Rust as u32,
-        "good",
+    let unknown_artifact = ArtifactId::from_raw_parts(
+        RuntimeIdentifier::Rust as _,
+        "good".into(),
         Version::new(0, 6, 0),
-    )
-    .expect("Can't create an ArtifactId");
+    );
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact.clone(), &old_service.name)
