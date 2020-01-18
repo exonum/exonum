@@ -55,6 +55,14 @@ fn execution_error_binary_value_round_trip() {
         let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
         assert_eq!(err, err2);
 
+        err.call_site = Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Resume,
+        });
+        let bytes = err.to_bytes();
+        let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
+        assert_eq!(err, err2);
+
         err.call_site.as_mut().unwrap().call_type = CallType::Method {
             interface: "exonum.Configure".to_owned(),
             id: 1,
@@ -244,6 +252,28 @@ fn execution_result_serde_presentation() {
             "call_site": {
                 "instance_id": 100,
                 "call_type": "constructor",
+            }
+        })
+    );
+
+    let result = ExecutionStatus(Err(ExecutionError {
+        kind: ErrorKind::Service { code: 3 },
+        description: String::new(),
+        runtime_id: Some(1),
+        call_site: Some(CallSite {
+            instance_id: 100,
+            call_type: CallType::Resume,
+        }),
+    }));
+    assert_eq!(
+        serde_json::to_value(result).unwrap(),
+        json!({
+            "type": "service_error",
+            "code": 3,
+            "runtime_id": 1,
+            "call_site": {
+                "instance_id": 100,
+                "call_type": "resume",
             }
         })
     );

@@ -184,6 +184,7 @@ impl ProtobufConvert for CallSite {
         pb.set_instance_id(self.instance_id);
         match &self.call_type {
             CallType::Constructor => pb.set_call_type(CONSTRUCTOR),
+            CallType::Resume => pb.set_call_type(RESUME),
             CallType::Method { interface, id } => {
                 pb.set_call_type(METHOD);
                 pb.set_interface(interface.clone());
@@ -200,6 +201,7 @@ impl ProtobufConvert for CallSite {
 
         let call_type = match pb.get_call_type() {
             CONSTRUCTOR => CallType::Constructor,
+            RESUME => CallType::Resume,
             BEFORE_TRANSACTIONS => CallType::BeforeTransactions,
             AFTER_TRANSACTIONS => CallType::AfterTransactions,
             METHOD => CallType::Method {
@@ -220,6 +222,8 @@ impl ProtobufConvert for CallSite {
 pub enum CallType {
     /// Service initialization or resuming.
     Constructor,
+    /// Service resuming routine.
+    Resume,
     /// Service method.
     Method {
         /// Name of the interface defining the method. This field is empty for the default service
@@ -240,6 +244,7 @@ impl fmt::Display for CallType {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CallType::Constructor => formatter.write_str("constructor"),
+            CallType::Resume => formatter.write_str("resuming routine"),
             CallType::Method { interface, id } if interface.is_empty() => {
                 write!(formatter, "method {}", id)
             }

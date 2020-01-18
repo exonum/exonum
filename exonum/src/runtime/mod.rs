@@ -885,7 +885,7 @@ impl<'a> SupervisorExtensions<'a> {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite {
                         instance_id,
-                        call_type: CallType::Constructor,
+                        call_type: CallType::Resume,
                     });
                 err
             })?;
