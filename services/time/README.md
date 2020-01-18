@@ -30,7 +30,6 @@ the [examples](examples) folder:
 - [node example]
 - [service example]
 
-
 ## Further Reading
 
 Consult the [service description in Exonum docs](https://exonum.com/doc/version/latest/advanced/time)
@@ -39,7 +38,7 @@ and the proof of correctness.
 
 ## Other languages support
 
-* [Java Time Oracle](https://github.com/exonum/exonum-java-binding/tree/master/exonum-java-binding/time-oracle)
+- [Java Time Oracle](https://github.com/exonum/exonum-java-binding/tree/master/exonum-java-binding/time-oracle)
 
 ## License
 
