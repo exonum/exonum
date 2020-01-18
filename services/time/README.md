@@ -21,109 +21,15 @@ exonum-cli = "0.13.0-rc.2"
 exonum-time = "0.13.0-rc.2"
 ```
 
-Add the time oracle service to the blockchain in the main project file:
+## Examples
 
-```rust
-use exonum::helpers::init_logger;
-use exonum_cli::NodeBuilder;
-use exonum_time::TimeServiceFactory;
-use simple_service::MarkerService;
+Examples of the node with `exonum-time` service, and service using
+`exonum-time` service to obtain current time can be found in
+the [examples](examples) folder:
 
-fn main() -> Result<(), failure::Error> {
-    exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_service(TimeServiceFactory::default())
-        .with_service(MarkerService)
-        .run()
-}
-```
+- [node example]
+- [service example]
 
-### Importing the data schema
-
-Typical usage of the service boils down to importing the schema and calling its
-`time()` or `validators_time()` methods.
-
-Below is an example of a method for processing a transaction,
-which must be executed no later than the specified time
-(this time is written in the transaction body in a separate field):
-
-```rust
-/// The argument of the `MarkerInterface::mark` method.
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxMarker")]
-pub struct TxMarker {
-    mark: i32,
-    time: DateTime<Utc>,
-}
-
-/// Marker service transactions interface definition.
-#[exonum_interface]
-pub trait MarkerTransactions {
-    /// Transaction, which must be executed no later
-    /// than the specified time (field `time`).
-    fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
-}
-
-#[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_factory(
-    artifact_name = "marker",
-    artifact_version = "0.1.0",
-    proto_sources = "proto"
-)]
-#[service_dispatcher(implements("MarkerTransactions"))]
-struct MarkerService;
-
-/// Marker service database schema.
-#[derive(Debug, FromAccess)]
-pub struct MarkerSchema<T: Access> {
-    pub marks: ProofMapIndex<T::Base, PublicKey, i32>,
-}
-
-impl MarkerTransactions for MarkerService {
-    fn mark(
-      &self,
-      context: CallContext<'_>,
-      arg: TxMarker
-    ) -> Result<(), ExecutionError> {
-        let author = context
-            .caller()
-            .author()
-            .expect("Wrong `TxMarker` initiator");
-
-        let data = context.data();
-        let time_service_data = data
-            .for_service(TIME_SERVICE_NAME)
-            .expect("No time service data");
-        let time = TimeSchema::new(time_service_data).time.get();
-        match time {
-            Some(current_time) if current_time <= arg.time => {
-                let mut schema = MarkerSchema::new(context.service_data());
-                schema.marks.put(&author, arg.mark);
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-}
-```
-
-See the full implementation of the [service][service], which uses the time oracle.
-
-You can get the time of each validator node in the same manner
-the consolidated time of the system is obtained:
-
-```rust
-// Gets the data of time service instance
-let data = context.data();
-let time_service_data = data
-    .for_service("time_service_name")
-    .expect("No time service data");
-let time_schema = TimeSchema::new(time_service_data);
-// Gets the times of all validators.
-let validators_time = time_schema.time.get();
-// Gets the time of validator with a public key equal to `public_key`.
-let validator_time = time_schema.validators_times.get(&public_key);
-```
 
 ## Further Reading
 
@@ -140,4 +46,5 @@ and the proof of correctness.
 `exonum-time` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
 
-[service]: examples/simple_service/main.rs
+[node example]: examples/exonum_time.rs
+[service example]: examples/simple_service/main.rs

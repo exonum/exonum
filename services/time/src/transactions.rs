@@ -50,7 +50,10 @@ impl TxTime {
 pub trait TimeOracleInterface<Ctx> {
     /// Output of the methods in this interface.
     type Output;
+
     /// Receives a new time from one of validators.
+    ///
+    /// Transaction sent not by a validator will be discarded.
     #[interface_method(id = 0)]
     fn report_time(&self, ctx: Ctx, arg: TxTime) -> Self::Output;
 }

@@ -14,10 +14,75 @@
 
 //! The time oracle service for Exonum.
 //!
+//! Time service is designed to be a trusted source of actual time for the Exonum blockchain services.
+//! With this service, user services are able to access the calendar time supplied by validator nodes
+//! to the blockchain.
+//!
+//! Basics of the approach:
+//!
+//! Each validator at a specific time sends a transaction indicating its local time
+//! (usually immediately after the commit of each block). The time service maintains an index with the
+//! most current time values indicated separately by each validator. This index is updated after each
+//! transaction from any of the validators. A 1/3 percentile of these values (ordered by decreasing time)
+//! is then picked out from the index; this percentile is considered the actual time and is applied to
+//! determine the exact service time.
+//!
 //! See [the Exonum documentation][docs:time] for a high-level overview of the service,
 //! in particular, its design rationale and the proof of correctness.
 //!
 //! [docs:time]: https://exonum.com/doc/version/latest/advanced/time
+//!
+//! # HTTP API
+//!
+//! REST API of the service is documented in the [`api` module](api/index.html).
+//!
+//! # Examples
+//!
+//! ## Use with TestKit
+//!
+//! ```
+//! use exonum::{
+//!     helpers::Height,
+//!     runtime::{InstanceId, SnapshotExt},
+//! };
+//! use exonum_rust_runtime::ServiceFactory;
+//! use exonum_time::{SystemTimeProvider, TimeProvider, TimeServiceFactory, TimeSchema};
+//! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//!
+//! use std::sync::Arc;
+//!
+//! const TIME_SERVICE_ID: InstanceId = 100;
+//! const TIME_SERVICE_NAME: &'static str = "time-oracle";
+//!
+//! // Time provider for a Time service is chosen at the compile time.
+//! let time_provider = Arc::new(SystemTimeProvider);
+//!
+//! // Factory for Time service will create instances of the service with given
+//! // time provider.
+//! let time_service_factory =
+//!     TimeServiceFactory::with_provider(time_provider.clone() as Arc<dyn TimeProvider>);
+//! let time_service_artifact = time_service_factory.artifact_id();
+//!
+//! // Create testkit with the Time service.
+//! let mut testkit: TestKit = TestKitBuilder::validator()
+//!     .with_artifact(time_service_artifact.clone())
+//!     .with_instance(
+//!            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
+//!        )
+//!     .with_rust_service(time_service_factory)
+//!     // Add other services here
+//!     .create();
+//!
+//! // Create some blocks for time to appear in the blockchain.
+//! testkit.create_blocks_until(Height(2));
+//!
+//! // Obtain Time service schema.
+//! let snapshot = testkit.snapshot();
+//! let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
+//!
+//! // Obtain time from the schema. Service can base its logic on this time.
+//! let time = time_schema.time.get().map(|time| time);
+//! ```
 
 #![deny(
     unsafe_code,
@@ -26,15 +91,11 @@
     missing_debug_implementations
 )]
 
-/// Node API.
-mod api;
-/// Protobuf generated structs.
+pub mod api;
+
 mod proto;
-/// Database schema.
 mod schema;
-/// System time provider.
 mod time_provider;
-/// Node transactions.
 mod transactions;
 
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
@@ -43,22 +104,24 @@ use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, Service};
 use std::sync::Arc;
 
 pub use crate::{
+    api::ValidatorTime,
     schema::TimeSchema,
     time_provider::{MockTimeProvider, SystemTimeProvider, TimeProvider},
-    transactions::{TimeOracleInterface, TxTime},
+    transactions::{Error, TimeOracleInterface, TxTime},
 };
 
-/// Define the service.
+/// Time oracle service.
 #[derive(Debug, ServiceDispatcher)]
 #[service_dispatcher(implements("TimeOracleInterface"))]
 pub struct TimeService {
-    /// Current time.
+    /// Provider of the actual time.
     time: Arc<dyn TimeProvider>,
 }
 
 impl Service for TimeService {
-    /// Creates transaction after commit of the block.
     fn after_commit(&self, context: AfterCommitContext<'_>) {
+        // If current node is a validator, after each block it should broadcast
+        // the transaction with the current time.
         if let Some(broadcast) = context.broadcaster() {
             let time = TxTime::new(self.time.current_time());
             broadcast.report_time((), time).ok();
@@ -71,7 +134,11 @@ impl Service for TimeService {
     }
 }
 
-/// Time oracle service factory implementation.
+/// Time oracle service factory.
+///
+/// By default, it creates Time service instances with [`SystemTimeProvider`].
+///
+/// [`SystemTimeProvider`]: struct.SystemTimeProvider.html
 #[derive(Debug, ServiceFactory)]
 #[service_factory(
     proto_sources = "proto",
@@ -83,6 +150,11 @@ pub struct TimeServiceFactory {
 
 impl TimeServiceFactory {
     /// Create a new `TimeServiceFactory` with the custom time provider.
+    ///
+    /// One can implement a custom time provider by implementing [`TimeProvider`]
+    /// trait.
+    ///
+    /// [`TimeProvider`]: trait.TimeProvider.html
     pub fn with_provider(time_provider: impl Into<Arc<dyn TimeProvider>>) -> Self {
         Self {
             time_provider: time_provider.into(),

@@ -12,7 +12,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum-time API.
+//! HTTP API for the Time service. All APIs are accessible from the public HTTP server
+//! of the node.
+//!
+//! # Get Current Time
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/{INSTANCE_NAME}/v1/current_time` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | `Option<DateTime<Utc>>` |
+//!
+//! Returns the current stored time available in `exonum-time` service.
+//! `None` will be returned if there is no enough data to provide a trusted time yet.
+//!
+//! ```
+//! # use chrono::{DateTime, Utc};
+//! # use exonum::{helpers::Height, runtime::InstanceId};
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_time::{SystemTimeProvider, TimeProvider, TimeServiceFactory, TimeSchema};
+//! # use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! # use std::sync::Arc;
+//! # const TIME_SERVICE_ID: InstanceId = 100;
+//! const TIME_SERVICE_NAME: &'static str = "time-oracle";
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let time_provider = Arc::new(SystemTimeProvider);
+//! let time_service_factory =
+//!     TimeServiceFactory::with_provider(time_provider.clone() as Arc<dyn TimeProvider>);
+//! let time_service_artifact = time_service_factory.artifact_id();
+//! let mut testkit: TestKit = TestKitBuilder::validator()
+//!     .with_artifact(time_service_artifact.clone())
+//!     .with_instance(
+//!            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
+//!        )
+//!     .with_rust_service(time_service_factory)
+//!     .create();
+//! let api = testkit.api();
+//!
+//! // Make request to the `current_time` endpoint.
+//! let response: Option<DateTime<Utc>> = api.public(ApiKind::Service(TIME_SERVICE_NAME))
+//!     .get("v1/current_time")?;
+//!
+//! // Since no blocks were created yet, time is not available.
+//! assert!(response.is_none());
+//!
+//! // Create some blocks and try again.
+//! testkit.create_blocks_until(Height(5));
+//! let response: Option<DateTime<Utc>> = api.public(ApiKind::Service(TIME_SERVICE_NAME))
+//!     .get("v1/current_time")?;
+//!
+//! // At this moment, time should be available.
+//! assert!(response.is_some());
+//! # Ok(())
+//! # }
+//! ```
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::PublicKey;
@@ -23,7 +78,7 @@ use crate::TimeSchema;
 
 /// Structure for saving public key of the validator and last known local time.
 #[derive(Debug, Serialize, Deserialize)]
-struct ValidatorTime {
+pub struct ValidatorTime {
     /// Public key of the validator.
     pub public_key: PublicKey,
     /// Time of the validator.
@@ -32,7 +87,7 @@ struct ValidatorTime {
 
 /// Implement the public API for Exonum time.
 #[derive(Debug, Clone)]
-pub(super) struct PublicApi;
+pub(crate) struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
@@ -53,7 +108,7 @@ impl PublicApi {
 
 /// Implement the private API for Exonum time.
 #[derive(Debug, Clone)]
-pub(super) struct PrivateApi;
+pub(crate) struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
@@ -90,7 +145,7 @@ impl PrivateApi {
         Ok(validators_times)
     }
 
-    /// Used to extend Api.
+    /// Wires Time service API endpoints.
     pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
         builder
             .private_scope()
