@@ -228,17 +228,16 @@ impl<T> ProtobufConvert for Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    type ProtoStruct = proto::Verified;
+    type ProtoStruct = proto::SignedMessage;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        let mut verified = Self::ProtoStruct::new();
-        verified.set_raw(self.as_raw().to_pb());
-        verified
+        let signed_message = self.as_raw();
+        signed_message.to_pb()
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let raw = SignedMessage::from_pb(pb.take_raw())?;
-        raw.into_verified()
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        let signed_message = SignedMessage::from_pb(pb)?;
+        signed_message.into_verified()
     }
 }
 

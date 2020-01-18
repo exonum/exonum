@@ -27,6 +27,7 @@ exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" 
 exonum-node = { version = "0.13.0-rc.2", path = "../../exonum-node", optional = true }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 
+actix-net = "0.2.6"
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }
 chrono = "0.4.6"
