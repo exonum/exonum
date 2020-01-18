@@ -206,14 +206,9 @@ where
     /// satisfies this requirement; after each abort, it allows at least one merge.
     ///
     /// [`AbortPolicy`]: struct.AbortPolicy.html
-    pub fn execute_until_flush<F, T>(
-        &mut self,
-        script_fn: F,
-        script_end_version: &str,
-        aborts: T,
-    ) -> &mut Self
+    pub fn execute_until_flush<F, T>(&mut self, mut script_fn: F, aborts: T) -> &mut Self
     where
-        F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Clone + Send + 'static,
+        F: FnMut() -> MigrationScript,
         T: AbortMigration + Send + Sync + 'static,
     {
         #[derive(Debug)]
@@ -236,7 +231,7 @@ where
 
         let abort_handle = Shared(Arc::new(aborts));
         loop {
-            let script = script_fn.clone().with_end_version(script_end_version);
+            let script = script_fn();
             let res = self.execute_script_with_aborts(script, abort_handle.clone());
             if res == ScriptStatus::Ok {
                 break;
@@ -582,20 +577,18 @@ mod tests {
     fn running_script_until_flush() {
         let abort_policy = AbortPolicy::new(iter::repeat(true));
         let mut test = MigrationTest::new(SomeService::default(), Version::new(0, 1, 0));
-
         let fail_counter = Arc::new(AtomicUsize::new(0));
+
         let fail_counter_ = Arc::clone(&fail_counter);
+        let script = |ctx: &mut MigrationContext| {
+            script_with_merges(ctx).map_err(move |err| {
+                fail_counter_.fetch_add(1, Ordering::SeqCst);
+                err
+            })
+        };
+
         let snapshot = test
-            .execute_until_flush(
-                |ctx| {
-                    script_with_merges(ctx).map_err(move |err| {
-                        fail_counter_.fetch_add(1, Ordering::SeqCst);
-                        err
-                    })
-                },
-                "0.2.0",
-                abort_policy,
-            )
+            .execute_until_flush(|| script.clone().with_end_version("0.2.0"), abort_policy)
             .end_snapshot();
 
         let value = snapshot.get_entry::<_, u32>("entry").get();

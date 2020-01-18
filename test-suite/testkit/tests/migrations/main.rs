@@ -395,8 +395,7 @@ fn migration_testing_detecting_fault_tolerance_error() {
     let snapshot = test
         .setup(|fork| v01::generate_test_data(fork, &users))
         .execute_until_flush(
-            merkelize_wallets_incorrect,
-            "0.2.0",
+            || merkelize_wallets_incorrect.with_end_version("0.2.0"),
             AbortPolicy::abort_repeatedly(),
         )
         .end_snapshot();
