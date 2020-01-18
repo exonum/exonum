@@ -14,7 +14,7 @@
 
 //! Cryptocurrency wallet.
 
-use exonum::crypto::{Hash, PublicKey};
+use exonum::{crypto::Hash, runtime::CallerAddress as Address};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
@@ -24,8 +24,9 @@ use super::proto;
 #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Wallet", serde_pb_convert)]
 pub struct Wallet {
-    /// `PublicKey` of the wallet.
-    pub pub_key: PublicKey,
+    /// Address of the wallet's owner. This address may translate to a Ed25519 public key,
+    /// or to service authorization.
+    pub owner: Address,
     /// Name of the wallet.
     pub name: String,
     /// Current balance of the wallet.
@@ -39,14 +40,14 @@ pub struct Wallet {
 impl Wallet {
     /// Create new Wallet.
     pub fn new(
-        &pub_key: &PublicKey,
+        owner: Address,
         name: &str,
         balance: u64,
         history_len: u64,
         &history_hash: &Hash,
     ) -> Self {
         Self {
-            pub_key,
+            owner,
             name: name.to_owned(),
             balance,
             history_len,
@@ -56,7 +57,7 @@ impl Wallet {
     /// Returns a copy of this wallet with updated balance.
     pub fn set_balance(self, balance: u64, history_hash: &Hash) -> Self {
         Self::new(
-            &self.pub_key,
+            self.owner,
             &self.name,
             balance,
             self.history_len + 1,
