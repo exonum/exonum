@@ -65,6 +65,16 @@ message ServiceConfig {
   bytes params = 2;
 }
 
+// Request to resume a previously stopped service instance.
+message ResumeService {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+  // Updated artifact ID.
+  exonum.runtime.ArtifactId artifact = 2;
+  // Raw bytes representation of service resume parameters.
+  bytes params = 3;
+}
+
 // This message contains one atomic configuration change.
 message ConfigChange {
   oneof kind {
@@ -72,10 +82,12 @@ message ConfigChange {
     exonum.Config consensus = 1;
     // New service instance config.
     ServiceConfig service = 2;
-    // New service instance start request.
+    // Request to start a new service instance.
     StartService start_service = 3;
-    // Existing service instance stop request.
+    // Request to stop an existing service instance.
     StopService stop_service = 4;
+    // Request to resume a previously stopped service instance.
+    ResumeService resume_service = 5;
   }
 }
 
