@@ -201,12 +201,12 @@ where
     }
 }
 
-fn nested_to_bytes(nested: &Vec<Vec<u8>>) -> Vec<u8> {
-    nested
+fn chunks_to_bytes(chunks: &Vec<Vec<u8>>) -> Vec<u8> {
+    chunks
         .iter()
         .flat_map(|value| value.len().to_bytes().into_iter())
         .chain(
-            nested
+            chunks
                 .into_iter()
                 .flat_map(|v| v.iter().map(ToOwned::to_owned)),
         )
@@ -241,7 +241,7 @@ where
     T2: BinaryValue,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        nested_to_bytes(&vec![self.0.to_bytes(), self.1.to_bytes()])
+        chunks_to_bytes(&vec![self.0.to_bytes(), self.1.to_bytes()])
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
@@ -271,7 +271,7 @@ where
     T3: BinaryValue,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        nested_to_bytes(&vec![
+        chunks_to_bytes(&vec![
             self.0.to_bytes(),
             self.1.to_bytes(),
             self.2.to_bytes(),
@@ -308,7 +308,7 @@ where
     T4: BinaryValue,
 {
     fn to_bytes(&self) -> Vec<u8> {
-        nested_to_bytes(&vec![
+        chunks_to_bytes(&vec![
             self.0.to_bytes(),
             self.1.to_bytes(),
             self.2.to_bytes(),
