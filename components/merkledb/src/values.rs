@@ -192,6 +192,15 @@ where
     }
 }
 
+impl<T1> ObjectHash for (T1,)
+where
+    T1: BinaryValue,
+{
+    fn object_hash(&self) -> Hash {
+        exonum_crypto::hash(&self.to_bytes())
+    }
+}
+
 fn nested_to_bytes(nested: &Vec<Vec<u8>>) -> Vec<u8> {
     nested
         .iter()
@@ -251,6 +260,16 @@ where
     }
 }
 
+impl<T1, T2> ObjectHash for (T1, T2)
+where
+    T1: BinaryValue,
+    T2: BinaryValue,
+{
+    fn object_hash(&self) -> Hash {
+        exonum_crypto::hash(&self.to_bytes())
+    }
+}
+
 impl<T1, T2, T3> BinaryValue for (T1, T2, T3)
 where
     T1: BinaryValue,
@@ -273,6 +292,17 @@ where
             T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
             T3::from_bytes(Cow::Borrowed(&nested_bytes[2]))?,
         ))
+    }
+}
+
+impl<T1, T2, T3> ObjectHash for (T1, T2, T3)
+where
+    T1: BinaryValue,
+    T2: BinaryValue,
+    T3: BinaryValue,
+{
+    fn object_hash(&self) -> Hash {
+        exonum_crypto::hash(&self.to_bytes())
     }
 }
 
@@ -301,6 +331,18 @@ where
             T3::from_bytes(Cow::Borrowed(&nested_bytes[2]))?,
             T4::from_bytes(Cow::Borrowed(&nested_bytes[3]))?,
         ))
+    }
+}
+
+impl<T1, T2, T3, T4> ObjectHash for (T1, T2, T3, T4)
+where
+    T1: BinaryValue,
+    T2: BinaryValue,
+    T3: BinaryValue,
+    T4: BinaryValue,
+{
+    fn object_hash(&self) -> Hash {
+        exonum_crypto::hash(&self.to_bytes())
     }
 }
 
