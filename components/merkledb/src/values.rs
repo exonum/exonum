@@ -14,7 +14,7 @@
 
 //! A definition of `BinaryValue` trait and implementations for common types.
 
-use std::{borrow::Cow, io::Read};
+use std::{borrow::Cow, io::Read, mem::size_of};
 
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -111,6 +111,45 @@ macro_rules! impl_binary_value_scalar {
 
         impl_object_hash_for_binary_value! { $type }
     };
+    ($type:tt, $write_32:ident, $read_32:ident, $len_32:expr, $write_64:ident, $read_64:ident, $type_64:tt, $len_64:expr) => {
+        #[cfg(target_pointer_width = "32")]
+        impl BinaryValue for $type {
+            fn to_bytes(&self) -> Vec<u8> {
+                let mut v = vec![0; $len_32];
+                LittleEndian::$write_32(&mut v, *self);
+                v
+            }
+
+            fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+                use byteorder::ReadBytesExt;
+                bytes
+                    .as_ref()
+                    .$read_32::<LittleEndian>()
+                    .map(|v| v as $type)
+                    .map_err(From::from)
+            }
+        }
+
+        #[cfg(target_pointer_width = "64")]
+        impl BinaryValue for $type {
+            fn to_bytes(&self) -> Vec<u8> {
+                let mut v = vec![0; $len_64];
+                LittleEndian::$write_64(&mut v, *self as $type_64);
+                v
+            }
+
+            fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+                use byteorder::ReadBytesExt;
+                bytes
+                    .as_ref()
+                    .$read_64::<LittleEndian>()
+                    .map(|v| v as $type)
+                    .map_err(From::from)
+            }
+        }
+
+        impl_object_hash_for_binary_value! { $type }
+    };
 }
 
 // Unsigned scalar types
@@ -125,6 +164,9 @@ impl_binary_value_scalar! { i16, write_i16, read_i16, 2 }
 impl_binary_value_scalar! { i32, write_i32, read_i32, 4 }
 impl_binary_value_scalar! { i64, write_i64, read_i64, 8 }
 impl_binary_value_scalar! { i128, write_i128, read_i128, 16 }
+// Platform-related types
+impl_binary_value_scalar! { usize, write_u32, read_u32, 4, write_u64, read_u64, u64, 8 }
+impl_binary_value_scalar! { isize, write_i32, read_i32, 4, write_i64, read_i64, i64, 8 }
 
 /// No-op implementation.
 impl BinaryValue for () {
@@ -134,6 +176,131 @@ impl BinaryValue for () {
 
     fn from_bytes(_bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
         Ok(())
+    }
+}
+
+impl<T1> BinaryValue for (T1,)
+where
+    T1: BinaryValue,
+{
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes()
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        Ok((T1::from_bytes(bytes)?,))
+    }
+}
+
+fn nested_to_bytes(nested: &Vec<Vec<u8>>) -> Vec<u8> {
+    nested
+        .iter()
+        .flat_map(|value| value.len().to_bytes().into_iter())
+        .chain(
+            nested
+                .into_iter()
+                .flat_map(|v| v.iter().map(ToOwned::to_owned)),
+        )
+        .collect()
+}
+
+fn bytes_into_sized_chunks<'a>(
+    bytes: &'a Cow<[u8]>,
+    qty: usize,
+) -> Result<Vec<Cow<'a, [u8]>>, failure::Error> {
+    let size = size_of::<usize>() * qty;
+    bytes[..size]
+        .chunks(size_of::<usize>())
+        .scan(size, |prev_idx, count_bytes| {
+            let from_result = usize::from_bytes(Cow::from(count_bytes));
+            let count: usize;
+
+            if let Ok(value) = from_result {
+                count = value;
+            } else {
+                return Some(Err(from_result.unwrap_err()));
+            }
+
+            let val = bytes[*prev_idx..*prev_idx + count]
+                .iter()
+                .map(ToOwned::to_owned)
+                .collect::<Cow<[u8]>>();
+
+            *prev_idx += count;
+            Some(Ok(val))
+        })
+        .collect()
+}
+
+impl<T1, T2> BinaryValue for (T1, T2)
+where
+    T1: BinaryValue,
+    T2: BinaryValue,
+{
+    fn to_bytes(&self) -> Vec<u8> {
+        nested_to_bytes(&vec![self.0.to_bytes(), self.1.to_bytes()])
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let nested_bytes = bytes_into_sized_chunks(&bytes, 2)?;
+
+        Ok((
+            T1::from_bytes(Cow::Borrowed(&nested_bytes[0]))?,
+            T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
+        ))
+    }
+}
+
+impl<T1, T2, T3> BinaryValue for (T1, T2, T3)
+where
+    T1: BinaryValue,
+    T2: BinaryValue,
+    T3: BinaryValue,
+{
+    fn to_bytes(&self) -> Vec<u8> {
+        nested_to_bytes(&vec![
+            self.0.to_bytes(),
+            self.1.to_bytes(),
+            self.2.to_bytes(),
+        ])
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let nested_bytes = bytes_into_sized_chunks(&bytes, 3)?;
+
+        Ok((
+            T1::from_bytes(Cow::Borrowed(&nested_bytes[0]))?,
+            T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
+            T3::from_bytes(Cow::Borrowed(&nested_bytes[2]))?,
+        ))
+    }
+}
+
+impl<T1, T2, T3, T4> BinaryValue for (T1, T2, T3, T4)
+where
+    T1: BinaryValue,
+    T2: BinaryValue,
+    T3: BinaryValue,
+    T4: BinaryValue,
+{
+    fn to_bytes(&self) -> Vec<u8> {
+        nested_to_bytes(&vec![
+            self.0.to_bytes(),
+            self.1.to_bytes(),
+            self.2.to_bytes(),
+            self.3.to_bytes(),
+        ])
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+        let nested_bytes = bytes_into_sized_chunks(&bytes, 4)?;
+
+        Ok((
+            T1::from_bytes(Cow::Borrowed(&nested_bytes[0]))?,
+            T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
+            T3::from_bytes(Cow::Borrowed(&nested_bytes[2]))?,
+            T4::from_bytes(Cow::Borrowed(&nested_bytes[3]))?,
+        ))
     }
 }
 
@@ -386,5 +553,75 @@ mod tests {
     fn test_binary_form_array_hash_size() {
         let values = [[1; HASH_SIZE]];
         assert_round_trip_eq(&values);
+    }
+
+    #[test]
+    fn test_binary_from_1tuple() {
+        assert_round_trip_eq(&[(1,)]);
+        assert_round_trip_eq(&[("abc".to_string(),)]);
+        assert_round_trip_eq(&[(PublicKey::zero(),)]);
+    }
+
+    #[test]
+    fn test_binary_from_2tuple() {
+        assert_round_trip_eq(&[(1, 2)]);
+        assert_round_trip_eq(&[("abc".to_string(), "def".to_string())]);
+        assert_round_trip_eq(&[(1, "def".to_string())]);
+        assert_round_trip_eq(&[("abc".to_string(), 2)]);
+        assert_round_trip_eq(&[(PublicKey::zero(), [1; HASH_SIZE])]);
+    }
+
+    #[test]
+    fn test_binary_from_3tuple() {
+        use chrono::TimeZone;
+
+        assert_round_trip_eq(&[(1, "def".to_string(), Decimal::from_str("3.14").unwrap())]);
+        assert_round_trip_eq(&[(
+            "abc".to_string(),
+            2,
+            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
+        )]);
+        assert_round_trip_eq(&[(
+            Decimal::new(9_497_628_354_687_268, 12),
+            1,
+            "def".to_string(),
+        )]);
+        assert_round_trip_eq(&[("abc".to_string(), 2, Utc.timestamp(0, 999_999_999))]);
+        assert_round_trip_eq(&[(
+            PublicKey::zero(),
+            [1; HASH_SIZE],
+            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+        )]);
+    }
+
+    #[test]
+    fn test_binary_from_4tuple() {
+        use chrono::TimeZone;
+
+        assert_round_trip_eq(&[(
+            u128::max_value(),
+            1,
+            "def".to_string(),
+            Decimal::from_str("3.14").unwrap(),
+        )]);
+        assert_round_trip_eq(&[(
+            "abc".to_string(),
+            u128::max_value(),
+            2,
+            Decimal::from_parts(1_102_470_952, 185_874_565, 1_703_060_790, false, 28),
+        )]);
+        assert_round_trip_eq(&[(
+            Decimal::new(9_497_628_354_687_268, 12),
+            1,
+            u128::max_value(),
+            "def".to_string(),
+        )]);
+        assert_round_trip_eq(&[("abc".to_string(), 2, Utc.timestamp(0, 999_999_999))]);
+        assert_round_trip_eq(&[(
+            PublicKey::zero(),
+            [1; HASH_SIZE],
+            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+            u128::max_value(),
+        )]);
     }
 }
