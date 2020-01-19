@@ -125,13 +125,10 @@ pub enum ScriptStatus {
 ///     }
 ///     Ok(())
 /// }
-///
-/// /// Service under test.
-/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-/// #[service_factory(artifact_name = "test-service")]
-/// pub struct ServiceUnderTest;
-///
-/// impl Service for ServiceUnderTest {}
+/// # #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// # #[service_factory(artifact_name = "test-service")]
+/// # pub struct ServiceUnderTest;
+/// # impl Service for ServiceUnderTest {}
 ///
 /// let mut test = MigrationTest::new(ServiceUnderTest, Version::new(0, 1, 0));
 /// let end_snapshot = test
@@ -143,6 +140,39 @@ pub enum ScriptStatus {
 /// // The counter value should be set to 5.
 /// let counter = end_snapshot.get_entry::<_, u32>("counter").get();
 /// assert_eq!(counter, Some(5));
+/// ```
+///
+/// Testing that a script makes progress (this one doesn't):
+///
+/// ```should_panic
+/// # use exonum_derive::*;
+/// # use exonum::runtime::{
+/// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
+/// # };
+/// # use exonum::merkledb::access::AccessExt;
+/// # use exonum_rust_runtime::Service;
+/// # use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
+/// fn infinite_script(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+///     for counter in 0_u32..5 {
+///         ctx.helper.new_data().get_entry("counter").set(counter);
+///         ctx.helper.merge()?;
+///     }
+///     // To get here, the script requires 5 successive database merges to succeed.
+///     Ok(())
+/// }
+/// # #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// # #[service_factory(artifact_name = "test-service")]
+/// # pub struct ServiceUnderTest;
+/// # impl Service for ServiceUnderTest {}
+///
+/// let mut test = MigrationTest::new(ServiceUnderTest, Version::new(0, 1, 0));
+/// test.execute_until_flush(
+///     || infinite_script.with_end_version("0.2.0"),
+///     // This policy does not generate 5 successful merges in a row, so the script
+///     // doesn't make any progress. Due to `limit_merges`, the test will panic
+///     // rather than hang up.
+///     AbortPolicy::abort_repeatedly().limit_merges(100),
+/// );
 /// ```
 #[derive(Debug)]
 pub struct MigrationTest<S> {
@@ -374,10 +404,27 @@ where
         let inner = AbortPolicyInner {
             iter,
             was_aborted_on_prev_iteration: false,
+            merge_count: 0,
+            max_merges: None,
         };
+
         Self {
             inner: Mutex::new(inner),
         }
+    }
+
+    /// Limits the maximum number of merges that the policy will execute. If this number is exceeded,
+    /// the `AbortPolicy` will panic.
+    ///
+    /// Limiting the number of merges is useful to test that a migration script does not hang up
+    /// with an "unfriendly" abort schedule.
+    pub fn limit_merges(mut self, max_merges: usize) -> Self {
+        let lock = self
+            .inner
+            .get_mut()
+            .expect("Cannot lock `AbortPolicy` mutex");
+        lock.max_merges = Some(max_merges);
+        self
     }
 }
 
@@ -403,18 +450,32 @@ where
 struct AbortPolicyInner<I> {
     iter: I,
     was_aborted_on_prev_iteration: bool,
+    merge_count: usize,
+    max_merges: Option<usize>,
 }
 
 impl<I: Iterator<Item = bool>> AbortPolicyInner<I> {
     fn should_abort(&mut self) -> bool {
-        if self.was_aborted_on_prev_iteration {
+        let should_abort = if self.was_aborted_on_prev_iteration {
             self.was_aborted_on_prev_iteration = false;
             false
         } else {
             let next_value = self.iter.next().unwrap_or(false);
             self.was_aborted_on_prev_iteration = next_value;
             next_value
+        };
+
+        if !should_abort {
+            self.merge_count += 1;
+            if let Some(max_merges) = self.max_merges {
+                assert!(
+                    self.merge_count <= max_merges,
+                    "Migration script has not terminated after {} merges",
+                    max_merges
+                );
+            }
         }
+        should_abort
     }
 }
 
@@ -489,6 +550,15 @@ mod tests {
                 .set(current_value + 1);
             ctx.helper.merge()?;
             current_value += 1;
+        }
+        Ok(())
+    }
+
+    /// This script attempts to count to 10, but fails miserably.
+    fn incorrect_script_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+        for i in 0_u32..10 {
+            ctx.helper.new_data().get_entry("entry").set(i);
+            ctx.helper.merge()?;
         }
         Ok(())
     }
@@ -616,7 +686,7 @@ mod tests {
 
     #[test]
     fn running_script_until_flush() {
-        let abort_policy = AbortPolicy::new(iter::repeat(true));
+        let abort_policy = AbortPolicy::abort_repeatedly();
         let mut test = MigrationTest::new(SomeService::default(), Version::new(0, 1, 0));
         let fail_counter = Arc::new(AtomicUsize::new(0));
 
@@ -635,5 +705,15 @@ mod tests {
         let value = snapshot.get_entry::<_, u32>("entry").get();
         assert_eq!(value, Some(10));
         assert_eq!(fail_counter.load(Ordering::SeqCst), 10);
+    }
+
+    #[test]
+    #[should_panic(expected = "Migration script has not terminated after 100 merges")]
+    fn migration_script_hanging_up() {
+        let mut test = MigrationTest::new(SomeService::default(), Version::new(0, 1, 0));
+        test.execute_until_flush(
+            || incorrect_script_with_merges.with_end_version("0.2.0"),
+            AbortPolicy::abort_repeatedly().limit_merges(100),
+        );
     }
 }
