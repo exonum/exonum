@@ -221,14 +221,7 @@ fn bytes_into_sized_chunks<'a>(
     bytes[..size]
         .chunks(size_of::<usize>())
         .scan(size, |prev_idx, count_bytes| {
-            let from_result = usize::from_bytes(Cow::from(count_bytes));
-            let count: usize;
-
-            if let Ok(value) = from_result {
-                count = value;
-            } else {
-                return Some(Err(from_result.unwrap_err()));
-            }
+            let count: usize = Some(usize::from_bytes(Cow::from(count_bytes)))?.unwrap();
 
             let val = bytes[*prev_idx..*prev_idx + count]
                 .iter()
@@ -236,6 +229,7 @@ fn bytes_into_sized_chunks<'a>(
                 .collect::<Cow<[u8]>>();
 
             *prev_idx += count;
+
             Some(Ok(val))
         })
         .collect()
