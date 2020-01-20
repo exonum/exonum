@@ -433,9 +433,9 @@ impl ExplorerApi {
                 return Err(api::Error::new(api::HttpStatusCode::NOT_FOUND)
                     .title("Block not found")
                     .detail(format!(
-                    "Requested latest height {} is greater than the current blockchain height {}",
-                    upper,
-                    explorer.height()
+                        "Requested latest height {} is greater than the current blockchain height {}",
+                        upper,
+                        explorer.height()
                 )));
             }
             (upper, Bound::Included(upper))
