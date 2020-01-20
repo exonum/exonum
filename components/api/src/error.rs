@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// API HTTP error struct.
-#[derive(Fail, Debug, PartialEq)]
+#[derive(Fail, Debug, PartialEq, Default)]
 pub struct Error {
     /// HTTP error code.
     pub http_code: HttpStatusCode,
@@ -67,6 +67,26 @@ impl Error {
             body: ErrorBody::default(),
             headers: HeaderMap::new(),
         }
+    }
+
+    /// Bilds Bad Request (400) error.
+    pub fn bad_request() -> Self {
+        Error::new(HttpStatusCode::BAD_REQUEST)
+    }
+
+    /// Builds Forbidden (403) error.
+    pub fn forbidden() -> Self {
+        Error::new(HttpStatusCode::FORBIDDEN)
+    }
+
+    /// Builds Not Found (404) error.
+    pub fn not_found() -> Self {
+        Error::new(HttpStatusCode::NOT_FOUND)
+    }
+
+    /// Builds Internal Server Error (500).
+    pub fn internal(cause: impl failure::Fail) -> Self {
+        Error::new(HttpStatusCode::INTERNAL_SERVER_ERROR).detail(cause.to_string())
     }
 
     /// Sets `docs_uri` of an error.
