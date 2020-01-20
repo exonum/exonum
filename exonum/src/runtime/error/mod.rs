@@ -220,7 +220,7 @@ impl ProtobufConvert for CallSite {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
 pub enum CallType {
-    /// Service initialization or resuming.
+    /// Service initialization.
     Constructor,
     /// Service resuming routine.
     Resume,
