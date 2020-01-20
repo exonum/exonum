@@ -250,6 +250,20 @@ pub fn service_factory(input: TokenStream) -> TokenStream {
 /// Prefix of the `exonum` crate has two main values - `crate` or `exonum`. The default value
 /// is `exonum`.
 ///
+/// ## `removed_method_ids`
+///
+/// ```text
+/// #[exonum_interface(removed_method_ids(0, 2, 5))]
+/// ```
+///
+/// Marks methods with the following IDs as removed. An attempt to invoke
+/// the method with corresponding ID will always result in an error.
+///
+/// Using this attribute is a recommended way to remove methods from interface, since it
+/// guarantees that method ID won't be reused.
+///
+/// This attribute cannot be used with `auto_ids` attribute set.
+///
 /// ## `id_auto_increment`
 ///
 /// ```text
@@ -285,6 +299,9 @@ pub fn exonum_interface(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// Numeric identifier of the method. Should be unique for every method in the trait.
+///
+/// Using this attribute is a recommended way to remove methods from interface, since it
+/// guarantees that method ID won't be reused.
 #[proc_macro_attribute]
 pub fn interface_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // We don't modify the input stream, since `interface_method` attribute only
