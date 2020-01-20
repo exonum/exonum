@@ -165,7 +165,7 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    call_context::{CallContext, CallContextUnstable},
+    call_context::{CallContext, CallContextUnstable, SupervisorExtensions},
     dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
@@ -193,7 +193,7 @@ use std::fmt;
 
 use self::migrations::{InitMigrationError, MigrationScript};
 use crate::{
-    blockchain::{Blockchain, Schema as CoreSchema},
+    blockchain::Blockchain,
     crypto::{Hash, PublicKey},
     helpers::ValidateInput,
 };
@@ -806,130 +806,6 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
 impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
     fn from((id, name): (InstanceId, &'a str)) -> Self {
         InstanceDescriptor { id, name }
-    }
-}
-
-/// Execution context extensions required for the Supervisor service implementation.
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct SupervisorExtensions<'a>(ExecutionContext<'a>);
-
-impl<'a> SupervisorExtensions<'a> {
-    /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
-    ///
-    /// If / when a block with this instruction is accepted, artifact deployment becomes
-    /// a requirement for all nodes in the network. A node that did not successfully
-    /// deploy the artifact previously blocks until the artifact is deployed successfully.
-    /// If a node cannot deploy the artifact, it panics.
-    pub fn start_artifact_registration(&self, artifact: ArtifactId, spec: Vec<u8>) {
-        Dispatcher::commit_artifact(self.0.fork, artifact, spec);
-    }
-
-    /// Initiates adding a service instance to the blockchain.
-    ///
-    /// The service is not immediately activated; it activates if / when the block containing
-    /// the activation transaction is committed.
-    pub fn initiate_adding_service(
-        &mut self,
-        instance_spec: InstanceSpec,
-        constructor: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        self.0
-            .child_context(Some(SUPERVISOR_INSTANCE_ID))
-            .initiate_adding_service(instance_spec, constructor)
-    }
-
-    /// Initiates stopping an active service instance in the blockchain.
-    ///
-    /// The service is not immediately stopped; it stops if / when the block containing
-    /// the stopping transaction is committed.
-    pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
-        Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
-    }
-
-    /// Initiates resuming previously stopped service instance in the blockchain.
-    ///
-    /// Provided artifact will be used in attempt to resume service. Artifact name should be equal to
-    /// the artifact name of the previously stopped instance.
-    /// Artifact version should be same as the `data_version` stored in the stopped service
-    /// instance.
-    ///
-    /// This method can be used to resume modified service after successful migration.
-    ///
-    /// The service is not immediately activated; it activates when the block containing
-    /// the activation transaction is committed.
-    pub fn initiate_resuming_service(
-        &mut self,
-        instance_id: InstanceId,
-        artifact: ArtifactId,
-        params: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        let mut context = self.0.child_context(Some(SUPERVISOR_INSTANCE_ID));
-
-        let state = DispatcherSchema::new(&*context.fork)
-            .get_instance(instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
-
-        if state.status != Some(InstanceStatus::Stopped) {
-            return Err(CoreError::ServiceNotStopped.into());
-        }
-
-        let mut spec = state.spec;
-        spec.artifact = artifact;
-
-        let runtime = context
-            .dispatcher
-            .runtime_by_id(spec.artifact.runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
-        runtime
-            .initiate_resuming_service(context.reborrow(), &spec, params.into_bytes())
-            .map_err(|mut err| {
-                err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: CallType::Constructor,
-                    });
-                err
-            })?;
-
-        DispatcherSchema::new(&*context.fork)
-            .initiate_resuming_service(instance_id, spec.artifact)
-            .map_err(From::from)
-    }
-
-    /// Provides writeable access to core schema.
-    pub fn writeable_core_schema(&self) -> CoreSchema<&Fork> {
-        CoreSchema::new(self.0.fork)
-    }
-
-    /// Initiates data migration.
-    pub fn initiate_migration(
-        &self,
-        new_artifact: ArtifactId,
-        old_service: &str,
-    ) -> Result<(), ExecutionError> {
-        self.0
-            .dispatcher
-            .initiate_migration(self.0.fork, new_artifact, old_service)
-    }
-
-    /// Rolls back previously initiated migration.
-    pub fn rollback_migration(&self, service_name: &str) -> Result<(), ExecutionError> {
-        Dispatcher::rollback_migration(self.0.fork, service_name)
-    }
-
-    /// Commits the result of a previously initiated migration.
-    pub fn commit_migration(
-        &self,
-        service_name: &str,
-        migration_hash: Hash,
-    ) -> Result<(), ExecutionError> {
-        Dispatcher::commit_migration(self.0.fork, service_name, migration_hash)
-    }
-
-    /// Flushes a committed migration.
-    pub fn flush_migration(&mut self, service_name: &str) -> Result<(), ExecutionError> {
-        Dispatcher::flush_migration(self.0.fork, service_name)
     }
 }
 
