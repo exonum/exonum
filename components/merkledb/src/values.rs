@@ -228,6 +228,8 @@ fn bytes_into_sized_chunks<'a>(
         .scan(size, |prev_idx, count_bytes| {
             let count: usize = Some(usize::from_bytes(Cow::from(count_bytes)))?.unwrap();
 
+            assert!(bytes.len() >= *prev_idx + count);
+
             let val = bytes[*prev_idx..*prev_idx + count]
                 .iter()
                 .map(ToOwned::to_owned)
