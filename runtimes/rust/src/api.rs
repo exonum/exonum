@@ -164,7 +164,7 @@ impl ServiceApiScope {
                 let result = handler(&state, query);
                 let future = result
                     .into_future()
-                    .map_err(move |err| err.source(format!("{}:{}", instance_name, instance_id)));
+                    .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
                 Box::new(future)
             });
         self
@@ -193,7 +193,7 @@ impl ServiceApiScope {
                 let result = handler(&state, query);
                 let future = result
                     .into_future()
-                    .map_err(move |err| err.source(format!("{}:{}", instance_name, instance_id)));
+                    .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
                 Box::new(future)
             });
         self
@@ -226,7 +226,7 @@ impl ServiceApiScope {
             let result = inner(&state, query);
             let future = result
                 .into_future()
-                .map_err(move |err| err.source(format!("{}:{}", instance_name, instance_id)));
+                .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
             Box::new(future)
         };
         // Mark endpoint as deprecated.
@@ -262,7 +262,7 @@ impl ServiceApiScope {
             let result = inner(&state, query);
             let future = result
                 .into_future()
-                .map_err(move |err| err.source(format!("{}:{}", instance_name, instance_id)));
+                .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
             Box::new(future)
         };
         // Mark endpoint as deprecated.
