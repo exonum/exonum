@@ -21,8 +21,8 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     messages::Verified,
     runtime::{
-        AnyTx, CallContext, CallInfo, CoreError, ExecutionContext, ExecutionContextUnstable,
-        ExecutionError, InstanceId, InstanceQuery, MethodId,
+        AnyTx, CallInfo, CoreError, ExecutionContext, ExecutionContextUnstable, ExecutionError,
+        InstanceId, InstanceQuery, MethodId,
     },
 };
 
@@ -81,7 +81,7 @@ pub trait Interface<'a> {
     /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
-        cx: CallContext<'a>,
+        cx: ExecutionContext<'a>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -182,7 +182,7 @@ mod explanation {
 
     // Our goal is to provide an implementation of this user-defined trait for some generic
     // types, e.g., a keypair (which would generate signed transactions when called), or
-    // `CallContext` (which would call another service on the same blockchain).
+    // `ExecutionContext` (which would call another service on the same blockchain).
 
     // In order to accomplish this, we notice that for all possible service traits,
     // there exists a uniform conversion of arguments: the argument (i.e.,

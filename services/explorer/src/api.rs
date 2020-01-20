@@ -124,7 +124,7 @@
 //! # use exonum::{
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash, runtime::ExecutionError,
 //! # };
-//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionQuery, TransactionInfo}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -140,9 +140,9 @@
 //! #[service_dispatcher(implements("ServiceInterface"))]
 //! struct MyService;
 //! // Some implementations skipped for `MyService`...
-//! # impl ServiceInterface<CallContext<'_>> for MyService {
+//! # impl ServiceInterface<ExecutionContext<'_>> for MyService {
 //! #    type Output = Result<(), ExecutionError>;
-//! #    fn do_nothing(&self, ctx: CallContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
+//! #    fn do_nothing(&self, ctx: ExecutionContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
 //! # }
 //! # impl DefaultInstance for MyService {
 //! #     const INSTANCE_ID: u32 = 100;
@@ -189,7 +189,7 @@
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
 //! #     runtime::{ExecutionError, ExecutionFail},
 //! # };
-//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionQuery, CallStatusResponse}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -205,9 +205,9 @@
 //! #[service_dispatcher(implements("ServiceInterface"))]
 //! struct MyService;
 //! // Some implementations skipped for `MyService`...
-//! # impl ServiceInterface<CallContext<'_>> for MyService {
+//! # impl ServiceInterface<ExecutionContext<'_>> for MyService {
 //! #    type Output = Result<(), ExecutionError>;
-//! #    fn cause_error(&self, ctx: CallContext<'_>, _seed: u32) -> Self::Output {
+//! #    fn cause_error(&self, ctx: ExecutionContext<'_>, _seed: u32) -> Self::Output {
 //! #        Err(ExecutionError::service(0, "Error!"))
 //! #    }
 //! # }
@@ -258,7 +258,7 @@
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
 //! #     runtime::{ExecutionError, ExecutionFail},
 //! # };
-//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{CallStatusQuery, CallStatusResponse}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -271,7 +271,7 @@
 //! #     const INSTANCE_NAME: &'static str = "my-service";
 //! # }
 //! # impl Service for MyService {
-//! #     fn before_transactions(&self, ctx: CallContext<'_>) -> Result<(), ExecutionError> {
+//! #     fn before_transactions(&self, ctx: ExecutionContext<'_>) -> Result<(), ExecutionError> {
 //! #         Err(ExecutionError::service(0, "Not a good start"))
 //! #     }
 //! # }
@@ -331,7 +331,7 @@
 //! #     crypto::gen_keypair, helpers::Height, merkledb::{BinaryValue, ObjectHash},
 //! #     runtime::ExecutionError,
 //! # };
-//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionHex, TransactionResponse}, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
@@ -347,9 +347,9 @@
 //! #[service_dispatcher(implements("ServiceInterface"))]
 //! struct MyService;
 //! // Some implementations skipped for `MyService`...
-//! # impl ServiceInterface<CallContext<'_>> for MyService {
+//! # impl ServiceInterface<ExecutionContext<'_>> for MyService {
 //! #    type Output = Result<(), ExecutionError>;
-//! #    fn do_nothing(&self, ctx: CallContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
+//! #    fn do_nothing(&self, ctx: ExecutionContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
 //! # }
 //! # impl DefaultInstance for MyService {
 //! #     const INSTANCE_ID: u32 = 100;

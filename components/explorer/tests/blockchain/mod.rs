@@ -22,7 +22,7 @@ use exonum::{
     crypto::{self, PublicKey, SecretKey},
     merkledb::{ObjectHash, TemporaryDB},
     messages::Verified,
-    runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
+    runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory};
@@ -80,10 +80,10 @@ pub trait ExplorerTransactions<Ctx> {
 #[service_dispatcher(implements("ExplorerTransactions"))]
 pub struct MyService;
 
-impl ExplorerTransactions<CallContext<'_>> for MyService {
+impl ExplorerTransactions<ExecutionContext<'_>> for MyService {
     type Output = Result<(), ExecutionError>;
 
-    fn create_wallet(&self, _ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
+    fn create_wallet(&self, _ctx: ExecutionContext<'_>, arg: CreateWallet) -> Self::Output {
         if arg.name.starts_with("Al") {
             Ok(())
         } else {
@@ -91,7 +91,7 @@ impl ExplorerTransactions<CallContext<'_>> for MyService {
         }
     }
 
-    fn transfer(&self, _ctx: CallContext<'_>, _arg: Transfer) -> Self::Output {
+    fn transfer(&self, _ctx: ExecutionContext<'_>, _arg: Transfer) -> Self::Output {
         panic!("oops");
     }
 }

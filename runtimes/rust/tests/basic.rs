@@ -20,8 +20,8 @@ use exonum::{
     helpers::Height,
     merkledb::{access::AccessExt, BinaryValue, SystemSchema},
     runtime::{
-        CallContext, Caller, CommonError, CoreError, ErrorMatch, ExecutionError, InstanceStatus,
-        SnapshotExt,
+        Caller, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError,
+        InstanceStatus, SnapshotExt,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -66,10 +66,10 @@ trait Test<Ctx> {
 #[service_factory(artifact_name = "test_service", artifact_version = "0.1.0")]
 pub struct TestServiceImpl;
 
-impl Test<CallContext<'_>> for TestServiceImpl {
+impl Test<ExecutionContext<'_>> for TestServiceImpl {
     type Output = Result<(), ExecutionError>;
 
-    fn method_a(&self, mut ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
+    fn method_a(&self, mut ctx: ExecutionContext<'_>, arg: u64) -> Result<(), ExecutionError> {
         ctx.service_data()
             .get_proof_entry("method_a_entry")
             .set(arg);
@@ -77,7 +77,7 @@ impl Test<CallContext<'_>> for TestServiceImpl {
         ctx.method_b(TestServiceImpl::INSTANCE_NAME, arg)
     }
 
-    fn method_b(&self, ctx: CallContext<'_>, arg: u64) -> Result<(), ExecutionError> {
+    fn method_b(&self, ctx: ExecutionContext<'_>, arg: u64) -> Result<(), ExecutionError> {
         ctx.service_data()
             .get_proof_entry("method_b_entry")
             .set(arg);
@@ -86,7 +86,11 @@ impl Test<CallContext<'_>> for TestServiceImpl {
 }
 
 impl Service for TestServiceImpl {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         let init = Init::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         context
             .service_data()
@@ -112,14 +116,14 @@ impl DefaultInstance for TestServiceImpl {
 #[service_factory(artifact_name = "test_service", artifact_version = "0.2.0")]
 pub struct TestServiceImplV2;
 
-impl Test<CallContext<'_>> for TestServiceImplV2 {
+impl Test<ExecutionContext<'_>> for TestServiceImplV2 {
     type Output = Result<(), ExecutionError>;
 
-    fn method_a(&self, _context: CallContext<'_>, _arg: u64) -> Self::Output {
+    fn method_a(&self, _context: ExecutionContext<'_>, _arg: u64) -> Self::Output {
         Err(CommonError::NoSuchMethod.into())
     }
 
-    fn method_b(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
+    fn method_b(&self, context: ExecutionContext<'_>, arg: u64) -> Self::Output {
         context
             .service_data()
             .get_proof_entry("method_b_entry")
@@ -147,7 +151,11 @@ impl DefaultInstance for TestServiceImplV2 {
 pub struct DependentServiceImpl;
 
 impl Service for DependentServiceImpl {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         // Due to the fact that our toy supervisor immediately executes start / stop requests,
         // caller might be `ToySupervisorService::INSTANCE_ID`.
         match context.caller() {

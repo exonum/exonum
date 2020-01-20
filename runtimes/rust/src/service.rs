@@ -18,8 +18,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
-        ArtifactId, BlockchainData, DispatcherAction, ExecutionError, InstanceDescriptor,
-        InstanceId, Mailbox, MethodId, ExecutionContext,
+        ArtifactId, BlockchainData, DispatcherAction, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceId, Mailbox, MethodId,
     },
 };
 use futures::{Future, IntoFuture};
@@ -29,9 +29,7 @@ use std::{
     fmt::{self, Debug},
 };
 
-use super::{
-    api::ServiceApiBuilder, ArtifactProtobufSpec, GenericCall, MethodDescriptor,
-};
+use super::{api::ServiceApiBuilder, ArtifactProtobufSpec, GenericCall, MethodDescriptor};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -79,7 +77,11 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// **Warning:** please note that you should not change the service data layout,
     /// as this may violate the migration process.
-    fn resume(&self, _context: ExecutionContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn resume(
+        &self,
+        _context: ExecutionContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -90,7 +92,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// Any changes of the storage state will affect `state_hash`, which means this method must
     /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `CallContext`.
+    /// in the provided `ExecutionContext`.
     ///
     /// Services should not rely on a particular ordering of `Service::before_transactions`
     /// invocations among services.

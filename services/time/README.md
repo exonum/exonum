@@ -61,7 +61,7 @@ pub struct TxMarker {
 pub trait MarkerTransactions {
     /// Transaction, which must be executed no later
     /// than the specified time (field `time`).
-    fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
+    fn mark(&self, context: ExecutionContext<'_>, arg: TxMarker) -> Result<(), ExecutionError>;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -82,7 +82,7 @@ pub struct MarkerSchema<T: Access> {
 impl MarkerTransactions for MarkerService {
     fn mark(
       &self,
-      context: CallContext<'_>,
+      context: ExecutionContext<'_>,
       arg: TxMarker
     ) -> Result<(), ExecutionError> {
         let author = context

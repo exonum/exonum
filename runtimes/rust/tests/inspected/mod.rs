@@ -26,9 +26,8 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, CallContext, CallInfo, ExecutionContext, ExecutionError, InstanceId,
-        InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
-        SUPERVISOR_INSTANCE_ID,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -334,12 +333,12 @@ pub trait ToySupervisor<Ctx> {
 #[service_factory(artifact_name = "toy_supervisor", artifact_version = "0.1.0")]
 pub struct ToySupervisorService;
 
-impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
+impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
     type Output = Result<(), ExecutionError>;
 
     fn deploy_artifact(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         request: DeployArtifact,
     ) -> Self::Output {
         context
@@ -348,19 +347,31 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
         Ok(())
     }
 
-    fn start_service(&self, mut context: CallContext<'_>, request: StartService) -> Self::Output {
+    fn start_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: StartService,
+    ) -> Self::Output {
         context
             .supervisor_extensions()
             .initiate_adding_service(request.spec, request.constructor)
     }
 
-    fn stop_service(&self, mut context: CallContext<'_>, request: StopService) -> Self::Output {
+    fn stop_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: StopService,
+    ) -> Self::Output {
         context
             .supervisor_extensions()
             .initiate_stopping_service(request.instance_id)
     }
 
-    fn resume_service(&self, mut context: CallContext<'_>, request: ResumeService) -> Self::Output {
+    fn resume_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: ResumeService,
+    ) -> Self::Output {
         context.supervisor_extensions().initiate_resuming_service(
             request.instance_id,
             request.artifact,
@@ -370,7 +381,7 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
 
     fn migrate_service(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         request: MigrateService,
     ) -> Self::Output {
         context

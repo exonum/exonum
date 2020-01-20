@@ -22,7 +22,7 @@ use exonum::{
     merkledb::access::AccessExt,
     messages::{AnyTx, Verified},
     runtime::{
-        CallContext, CommonError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt,
+        CommonError, ErrorMatch, ExecutionContext, ExecutionError, InstanceId, SnapshotExt,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -75,7 +75,7 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -92,7 +92,7 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context

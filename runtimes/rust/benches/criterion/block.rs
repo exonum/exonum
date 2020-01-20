@@ -137,7 +137,7 @@ mod timestamping {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
+        runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{DefaultInstance, Service};
@@ -159,14 +159,14 @@ mod timestamping {
     #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
 
-    impl TimestampingInterface<CallContext<'_>> for Timestamping {
+    impl TimestampingInterface<ExecutionContext<'_>> for Timestamping {
         type Output = Result<(), ExecutionError>;
 
-        fn timestamp(&self, _ctx: CallContext<'_>, _arg: Hash) -> Self::Output {
+        fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: Hash) -> Self::Output {
             Ok(())
         }
 
-        fn timestamp_panic(&self, _ctx: CallContext<'_>, _arg: Hash) -> Self::Output {
+        fn timestamp_panic(&self, _ctx: ExecutionContext<'_>, _arg: Hash) -> Self::Output {
             panic!("panic text");
         }
     }
@@ -196,7 +196,7 @@ mod cryptocurrency {
         crypto::PublicKey,
         merkledb::access::AccessExt,
         messages::Verified,
-        runtime::{AnyTx, CallContext, ErrorKind, ExecutionError, InstanceId},
+        runtime::{AnyTx, ErrorKind, ExecutionContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
@@ -233,10 +233,10 @@ mod cryptocurrency {
     #[service_factory(artifact_name = "cryptocurrency", proto_sources = "crate::proto")]
     pub struct Cryptocurrency;
 
-    impl CryptocurrencyInterface<CallContext<'_>> for Cryptocurrency {
+    impl CryptocurrencyInterface<ExecutionContext<'_>> for Cryptocurrency {
         type Output = Result<(), ExecutionError>;
 
-        fn transfer(&self, ctx: CallContext<'_>, arg: Tx) -> Self::Output {
+        fn transfer(&self, ctx: ExecutionContext<'_>, arg: Tx) -> Self::Output {
             let from = ctx.caller().author().unwrap();
             let mut index = ctx.service_data().get_proof_map("provable_balances");
 
@@ -248,7 +248,7 @@ mod cryptocurrency {
             Ok(())
         }
 
-        fn transfer_without_proof(&self, ctx: CallContext<'_>, arg: Tx) -> Self::Output {
+        fn transfer_without_proof(&self, ctx: ExecutionContext<'_>, arg: Tx) -> Self::Output {
             let from = ctx.caller().author().unwrap();
             let mut index = ctx.service_data().get_map("balances");
 
@@ -260,7 +260,7 @@ mod cryptocurrency {
             Ok(())
         }
 
-        fn transfer_error_sometimes(&self, ctx: CallContext<'_>, arg: Tx) -> Self::Output {
+        fn transfer_error_sometimes(&self, ctx: ExecutionContext<'_>, arg: Tx) -> Self::Output {
             let from = ctx.caller().author().unwrap();
             let mut index = ctx.service_data().get_map("balances");
 
@@ -353,7 +353,7 @@ mod foreign_interface_call {
         crypto::Hash,
         merkledb::ObjectHash,
         messages::Verified,
-        runtime::{AnyTx, CallContext, ExecutionError, InstanceId},
+        runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory as _};
@@ -407,22 +407,22 @@ mod foreign_interface_call {
     #[service_factory(artifact_name = "timestamping", proto_sources = "crate::proto")]
     pub struct Timestamping;
 
-    impl SelfInterface<CallContext<'_>> for Timestamping {
+    impl SelfInterface<ExecutionContext<'_>> for Timestamping {
         type Output = Result<(), ExecutionError>;
 
-        fn timestamp(&self, _ctx: CallContext<'_>, _arg: Hash) -> Self::Output {
+        fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: Hash) -> Self::Output {
             Ok(())
         }
 
-        fn call_foreign(&self, mut ctx: CallContext<'_>, arg: Hash) -> Self::Output {
+        fn call_foreign(&self, mut ctx: ExecutionContext<'_>, arg: Hash) -> Self::Output {
             ctx.foreign_timestamp(FOREIGN_INTERFACE_SERVICE_ID, arg)
         }
     }
 
-    impl ForeignInterface<CallContext<'_>> for Timestamping {
+    impl ForeignInterface<ExecutionContext<'_>> for Timestamping {
         type Output = Result<(), ExecutionError>;
 
-        fn foreign_timestamp(&self, ctx: CallContext<'_>, _arg: Hash) -> Self::Output {
+        fn foreign_timestamp(&self, ctx: ExecutionContext<'_>, _arg: Hash) -> Self::Output {
             assert_eq!(
                 ctx.caller().as_service().unwrap(),
                 SELF_INTERFACE_SERVICE_ID
@@ -431,15 +431,15 @@ mod foreign_interface_call {
         }
     }
 
-    impl Configure<CallContext<'_>> for Timestamping {
+    impl Configure<ExecutionContext<'_>> for Timestamping {
         type Output = Result<(), ExecutionError>;
     }
 
-    impl Events<CallContext<'_>> for Timestamping {
+    impl Events<ExecutionContext<'_>> for Timestamping {
         type Output = Result<(), ExecutionError>;
     }
 
-    impl ERC30Tokens<CallContext<'_>> for Timestamping {
+    impl ERC30Tokens<ExecutionContext<'_>> for Timestamping {
         type Output = Result<(), ExecutionError>;
     }
 

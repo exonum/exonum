@@ -16,7 +16,7 @@
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
     blockchain::{IndexProof, ValidatorKeys},
-    runtime::{CallContext, ExecutionError, InstanceId},
+    runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_api::{
     self as api,
@@ -93,10 +93,10 @@ pub trait CounterServiceInterface<Ctx> {
     fn reset(&self, ctx: Ctx, _: ()) -> Self::Output;
 }
 
-impl CounterServiceInterface<CallContext<'_>> for CounterService {
+impl CounterServiceInterface<ExecutionContext<'_>> for CounterService {
     type Output = Result<(), ExecutionError>;
 
-    fn increment(&self, context: CallContext<'_>, by: u64) -> Self::Output {
+    fn increment(&self, context: ExecutionContext<'_>, by: u64) -> Self::Output {
         if by == 0 {
             return Err(Error::AddingZero.into());
         }
@@ -106,7 +106,7 @@ impl CounterServiceInterface<CallContext<'_>> for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _: ()) -> Self::Output {
+    fn reset(&self, context: ExecutionContext<'_>, _: ()) -> Self::Output {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -289,7 +289,7 @@ impl DefaultInstance for CounterService {
 }
 
 impl Service for CounterService {
-    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let mut schema = CounterSchema::new(context.service_data());
         if schema.counter.get() == Some(13) {
             schema.counter.set(0);
@@ -299,7 +299,7 @@ impl Service for CounterService {
         }
     }
 
-    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let schema = CounterSchema::new(context.service_data());
         if schema.counter.get() == Some(42) {
             Err(Error::AnswerToTheUltimateQuestion.into())

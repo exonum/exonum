@@ -24,8 +24,11 @@ use crate::{
     },
 };
 
-/// Provides the current state of the blockchain and the caller information for the transaction
+/// Provides the current state of the blockchain and the caller information for the call
 /// which is being executed.
+///
+/// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
+/// or the service constructor invocation.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
@@ -285,24 +288,6 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
     ) -> Result<(), ExecutionError> {
         self.child_context(caller)
             .call(interface_name, call_info, arguments)
-    }
-}
-
-/// Context for the executed call.
-///
-/// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
-/// or the service constructor invocation.
-#[derive(Debug)]
-pub struct CallContext<'a> {
-    /// Underlying execution context.
-    pub inner: ExecutionContext<'a>,
-}
-
-impl<'a> CallContext<'a> {
-    /// Creates a new transaction context for the specified execution context and the instance
-    /// descriptor.
-    pub fn new(context: ExecutionContext<'a>) -> Self {
-        Self { inner: context }
     }
 }
 

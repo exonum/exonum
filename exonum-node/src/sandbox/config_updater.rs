@@ -18,7 +18,7 @@ use exonum::{
     helpers::Height,
     merkledb::BinaryValue,
     messages::{AnyTx, Verified},
-    runtime::{CallContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
+    runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{DefaultInstance, Service, TxStub};
@@ -35,10 +35,10 @@ pub trait ConfigUpdater<Ctx> {
 #[service_factory(artifact_name = "config_updater", artifact_version = "0.1.0")]
 pub struct ConfigUpdaterService;
 
-impl ConfigUpdater<CallContext<'_>> for ConfigUpdaterService {
+impl ConfigUpdater<ExecutionContext<'_>> for ConfigUpdaterService {
     type Output = Result<(), ExecutionError>;
 
-    fn update_config(&self, mut ctx: CallContext<'_>, arg: TxConfig) -> Self::Output {
+    fn update_config(&self, mut ctx: ExecutionContext<'_>, arg: TxConfig) -> Self::Output {
         ctx.supervisor_extensions()
             .writeable_core_schema()
             .consensus_config_entry()

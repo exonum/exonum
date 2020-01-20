@@ -174,7 +174,7 @@ mod tests {
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::{CallContext, ExecutionError},
+        runtime::{ExecutionContext, ExecutionError},
     };
     use exonum_api as api;
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
@@ -205,10 +205,10 @@ mod tests {
         fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
     }
 
-    impl SampleInterface<CallContext<'_>> for SampleService {
+    impl SampleInterface<ExecutionContext<'_>> for SampleService {
         type Output = Result<(), ExecutionError>;
 
-        fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
+        fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: String) -> Self::Output {
             Ok(())
         }
     }

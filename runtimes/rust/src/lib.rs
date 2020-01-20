@@ -38,7 +38,7 @@
 //!
 //! ```
 //! use exonum::runtime::{BlockchainData, ExecutionError};
-//! use exonum_rust_runtime::{CallContext, Service};
+//! use exonum_rust_runtime::{ExecutionContext, Service};
 //! use exonum_derive::*;
 //! use serde_derive::*;
 //!
@@ -89,12 +89,12 @@
 //!
 //! // Do not forget to implement the `Transactions` and `Service` traits
 //! // for the service.
-//! impl Transactions<CallContext<'_>> for WalletService {
+//! impl Transactions<ExecutionContext<'_>> for WalletService {
 //!     type Output = Result<(), ExecutionError>;
 //!
 //!     fn create_wallet(
 //!         &self,
-//!         context: CallContext<'_>,
+//!         context: ExecutionContext<'_>,
 //!         arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
@@ -112,7 +112,7 @@
 //!
 //! ```
 //! # use exonum::runtime::{BlockchainData, ExecutionError};
-//! # use exonum_rust_runtime::{CallContext, Service};
+//! # use exonum_rust_runtime::{ExecutionContext, Service};
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
@@ -146,7 +146,7 @@
 //!         Box::new(StatefulService::default())
 //!     }
 //! }
-//! # impl Transactions<CallContext<'_>> for StatefulService {
+//! # impl Transactions<ExecutionContext<'_>> for StatefulService {
 //! #     type Output = Result<(), ExecutionError>;
 //! # }
 //! #
@@ -165,7 +165,7 @@
 //! | [`TxStub`] | Generates unsigned transactions |
 //! | `(PublicKey, SecretKey)` | Generates signed transactions |
 //! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
-//! | [`CallContext`] | Calls methods of another service during transaction execution **(1)** |
+//! | [`ExecutionContext`] | Calls methods of another service during transaction execution **(1)** |
 //!
 //! 1. Beware that this is experimental functionality which is subject to change in next releases.
 //!
@@ -182,13 +182,13 @@
 //!
 //! Otherwise, the mutable trait is a carbon copy of the original trait.
 //!
-//! The mutable trait is necessary for some stub types (e.g., `CallContext`) because they need
+//! The mutable trait is necessary for some stub types (e.g., `ExecutionContext`) because they need
 //! to mutate their state when processing the calls. Hence, the mutable trait should be
 //! exported from the crate along with the original "immutable" trait.
 //!
 //! [`TxStub`]: struct.TxStub.html
 //! [`Broadcaster`]: struct.Broadcaster.html
-//! [`CallContext`]: struct.CallContext.html
+//! [`ExecutionContext`]: struct.ExecutionContext.html
 //! [`GenericCall`]: trait.GenericCall.html
 //! [`GenericCallMut`]: trait.GenericCallMut.html
 //!
@@ -196,7 +196,7 @@
 //!
 //! ```
 //! # use exonum::runtime::ExecutionError;
-//! # use exonum_rust_runtime::CallContext;
+//! # use exonum_rust_runtime::ExecutionContext;
 //! # use exonum::crypto::gen_keypair;
 //! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
@@ -230,11 +230,11 @@
 //! # impl Service {
 //! fn batch_transfers(
 //!     &self,
-//!     mut ctx: CallContext<'_>,
+//!     mut ctx: ExecutionContext<'_>,
 //!     wallet_count: u64,
 //! ) -> Result<(), ExecutionError> {
 //!     let receiver_service = "token";
-//!     // ^-- `CallContext` allows to use any of service IDs as the context.
+//!     // ^-- `ExecutionContext` allows to use any of service IDs as the context.
 //!     for _ in 0..wallet_count {
 //!         let transfer: Transfer = // ...
 //! #           "transfer".to_owned();

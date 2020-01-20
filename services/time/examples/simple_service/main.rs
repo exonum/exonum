@@ -22,7 +22,7 @@ use exonum::{
         access::{Access, FromAccess},
         ProofMapIndex,
     },
-    runtime::{CallContext, ExecutionError, InstanceId, SnapshotExt},
+    runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{Service, ServiceFactory};
@@ -80,10 +80,10 @@ impl<T: Access> MarkerSchema<T> {
     }
 }
 
-impl MarkerTransactions<CallContext<'_>> for MarkerService {
+impl MarkerTransactions<ExecutionContext<'_>> for MarkerService {
     type Output = Result<(), ExecutionError>;
 
-    fn mark(&self, context: CallContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
+    fn mark(&self, context: ExecutionContext<'_>, arg: TxMarker) -> Result<(), ExecutionError> {
         let author = context
             .caller()
             .author()

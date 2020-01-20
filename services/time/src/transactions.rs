@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::runtime::{CallContext, ExecutionError};
+use exonum::runtime::{ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use serde::{Deserialize, Serialize};
@@ -56,10 +56,10 @@ pub trait TimeOracleInterface<Ctx> {
     fn report_time(&self, ctx: Ctx, arg: TxTime) -> Self::Output;
 }
 
-impl TimeOracleInterface<CallContext<'_>> for TimeService {
+impl TimeOracleInterface<ExecutionContext<'_>> for TimeService {
     type Output = Result<(), ExecutionError>;
 
-    fn report_time(&self, context: CallContext<'_>, arg: TxTime) -> Self::Output {
+    fn report_time(&self, context: ExecutionContext<'_>, arg: TxTime) -> Self::Output {
         let author = context.caller().author().ok_or(Error::UnknownSender)?;
         // Check that the transaction is signed by a validator.
         let core_schema = context.data().for_core();

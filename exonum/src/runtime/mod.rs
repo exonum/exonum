@@ -165,12 +165,12 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    call_context::{CallContext, ExecutionContext, ExecutionContextUnstable, SupervisorExtensions},
     dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
         ExecutionError, ExecutionFail, ExecutionStatus,
     },
+    execution_context::{ExecutionContext, ExecutionContextUnstable, SupervisorExtensions},
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, Caller,
         CallerAddress, InstanceId, InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
@@ -195,9 +195,9 @@ use self::migrations::{InitMigrationError, MigrationScript};
 use crate::blockchain::Blockchain;
 
 mod blockchain_data;
-mod call_context;
 mod dispatcher;
 pub(crate) mod error;
+mod execution_context;
 mod types;
 
 /// Persistent identifier of a supervisor service instance.

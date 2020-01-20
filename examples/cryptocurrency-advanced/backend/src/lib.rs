@@ -28,7 +28,7 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::runtime::{CallContext, ExecutionError};
+use exonum::runtime::{ExecutionContext, ExecutionError};
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 
@@ -44,7 +44,11 @@ pub const INITIAL_BALANCE: u64 = 100;
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         // Initialize indexes. Not doing this may lead to errors in HTTP API, since it relies on
         // `wallets` indexes being initialized for returning corresponding proofs.
         SchemaImpl::new(context.service_data());

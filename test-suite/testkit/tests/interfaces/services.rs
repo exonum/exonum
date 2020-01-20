@@ -18,7 +18,7 @@ pub use crate::interface::Issue;
 
 use exonum::{
     crypto::PublicKey,
-    runtime::{AnyTx, CallContext, CallInfo, ExecutionError, InstanceId, SnapshotExt},
+    runtime::{AnyTx, CallInfo, ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
 use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
@@ -54,10 +54,10 @@ impl WalletService {
 
 impl Service for WalletService {}
 
-impl WalletInterface<CallContext<'_>> for WalletService {
+impl WalletInterface<ExecutionContext<'_>> for WalletService {
     type Output = Result<(), ExecutionError>;
 
-    fn create_wallet(&self, ctx: CallContext<'_>, username: String) -> Self::Output {
+    fn create_wallet(&self, ctx: ExecutionContext<'_>, username: String) -> Self::Output {
         let owner = ctx.caller().author().ok_or(Error::WrongInterfaceCaller)?;
         let mut schema = WalletSchema::new(ctx.service_data());
 
@@ -75,10 +75,10 @@ impl WalletInterface<CallContext<'_>> for WalletService {
     }
 }
 
-impl IssueReceiver<CallContext<'_>> for WalletService {
+impl IssueReceiver<ExecutionContext<'_>> for WalletService {
     type Output = Result<(), ExecutionError>;
 
-    fn issue(&self, ctx: CallContext<'_>, arg: Issue) -> Self::Output {
+    fn issue(&self, ctx: ExecutionContext<'_>, arg: Issue) -> Self::Output {
         let instance_id = ctx
             .caller()
             .as_service()
@@ -126,10 +126,10 @@ impl DepositService {
 
 impl Service for DepositService {}
 
-impl DepositInterface<CallContext<'_>> for DepositService {
+impl DepositInterface<ExecutionContext<'_>> for DepositService {
     type Output = Result<(), ExecutionError>;
 
-    fn deposit(&self, mut ctx: CallContext<'_>, arg: TxIssue) -> Self::Output {
+    fn deposit(&self, mut ctx: ExecutionContext<'_>, arg: TxIssue) -> Self::Output {
         use crate::interface::IssueReceiverMut;
 
         // Check authorization of the call.
@@ -191,16 +191,16 @@ impl AnyCallService {
     pub const ID: InstanceId = 26;
 }
 
-impl CallAny<CallContext<'_>> for AnyCallService {
+impl CallAny<ExecutionContext<'_>> for AnyCallService {
     type Output = Result<(), ExecutionError>;
 
-    fn call_any(&self, mut ctx: CallContext<'_>, tx: AnyCall) -> Self::Output {
+    fn call_any(&self, mut ctx: ExecutionContext<'_>, tx: AnyCall) -> Self::Output {
         let call_info = tx.inner.call_info;
         let args = tx.inner.arguments;
         let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
 
         if tx.fallthrough_auth {
-            FallthroughAuth(ctx.inner).generic_call_mut(call_info.instance_id, method, args)
+            FallthroughAuth(ctx).generic_call_mut(call_info.instance_id, method, args)
         } else {
             ctx.generic_call_mut(call_info.instance_id, method, args)
         }
@@ -208,7 +208,7 @@ impl CallAny<CallContext<'_>> for AnyCallService {
 
     fn call_recursive(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         depth: u64,
     ) -> Result<(), ExecutionError> {
         if depth == 1 {

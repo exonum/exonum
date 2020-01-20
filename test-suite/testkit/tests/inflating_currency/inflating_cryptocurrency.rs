@@ -15,7 +15,7 @@
 use exonum::{
     crypto::PublicKey,
     helpers::Height,
-    runtime::{CallContext, ExecutionError, InstanceId},
+    runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
@@ -139,10 +139,10 @@ pub trait CurrencyInterface<Ctx> {
     fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
-impl CurrencyInterface<CallContext<'_>> for CurrencyService {
+impl CurrencyInterface<ExecutionContext<'_>> for CurrencyService {
     type Output = Result<(), ExecutionError>;
 
-    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
+    fn create_wallet(&self, ctx: ExecutionContext<'_>, arg: CreateWallet) -> Self::Output {
         let author = ctx.caller().author().unwrap();
 
         let height = ctx.data().for_core().height();
@@ -154,7 +154,7 @@ impl CurrencyInterface<CallContext<'_>> for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Self::Output {
+    fn transfer(&self, ctx: ExecutionContext<'_>, arg: Transfer) -> Self::Output {
         let author = ctx.caller().author().unwrap();
         if author == arg.to {
             return Err(Error::SenderSameAsReceiver.into());

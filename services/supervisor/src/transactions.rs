@@ -16,7 +16,7 @@ use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidateInput},
     runtime::{
-        CallContext, CommonError, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
+        CommonError, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus,
     },
 };
@@ -79,7 +79,7 @@ pub trait SupervisorInterface<Ctx> {
 }
 
 impl StartService {
-    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
+    fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
             .validate()
             .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
@@ -116,7 +116,7 @@ impl StartService {
 }
 
 impl StopService {
-    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
+    fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = get_instance(context, self.instance_id)?;
 
         match instance.status {
@@ -132,7 +132,7 @@ impl StopService {
 }
 
 impl ResumeService {
-    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
+    fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = get_instance(context, self.instance_id)?;
 
         if instance.status != Some(InstanceStatus::Stopped) {
@@ -170,7 +170,7 @@ impl ResumeService {
 }
 
 /// Checks if method was called by transaction, and transaction author is a validator.
-fn get_validator(context: &CallContext<'_>) -> Result<PublicKey, ExecutionError> {
+fn get_validator(context: &ExecutionContext<'_>) -> Result<PublicKey, ExecutionError> {
     let author = context
         .caller()
         .author()
@@ -188,7 +188,7 @@ fn get_validator(context: &CallContext<'_>) -> Result<PublicKey, ExecutionError>
 
 /// Returns the information about a service instance by its identifier.
 fn get_instance(
-    context: &CallContext<'_>,
+    context: &ExecutionContext<'_>,
     instance_id: InstanceId,
 ) -> Result<InstanceState, ExecutionError> {
     context
@@ -202,12 +202,12 @@ fn get_instance(
         .map_err(From::from)
 }
 
-impl SupervisorInterface<CallContext<'_>> for Supervisor {
+impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
     type Output = Result<(), ExecutionError>;
 
     fn propose_config_change(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         mut propose: ConfigPropose,
     ) -> Self::Output {
         let author = get_validator(&context)?;
@@ -260,7 +260,11 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         Ok(())
     }
 
-    fn confirm_config_change(&self, context: CallContext<'_>, vote: ConfigVote) -> Self::Output {
+    fn confirm_config_change(
+        &self,
+        context: ExecutionContext<'_>,
+        vote: ConfigVote,
+    ) -> Self::Output {
         let author = get_validator(&context)?;
 
         let core_schema = context.data().for_core();
@@ -300,7 +304,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
     fn request_artifact_deploy(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         deploy: DeployRequest,
     ) -> Self::Output {
         // Verifies that transaction author is validator.
@@ -356,7 +360,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
     fn confirm_artifact_deploy(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         deploy_result: DeployResult,
     ) -> Self::Output {
         // Verifies that transaction author is validator.
@@ -415,7 +419,7 @@ impl Supervisor {
     /// Verifies that each change introduced within config proposal is valid.
     fn verify_config_changeset(
         &self,
-        context: &mut CallContext<'_>,
+        context: &mut ExecutionContext<'_>,
         changes: &[ConfigChange],
     ) -> Result<(), ExecutionError> {
         // To prevent multiple consensus change proposition in one request
@@ -486,7 +490,7 @@ impl Supervisor {
     /// if all the confirmations are collected. If so, starts the artifact registration.
     fn confirm_deploy(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         deploy_request: DeployRequest,
         author: PublicKey,
     ) -> Result<(), ExecutionError> {
@@ -520,7 +524,7 @@ impl Supervisor {
     /// Marks deployment as failed, discarding the further deployment steps.
     fn fail_deploy(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         deploy_request: DeployRequest,
         error: ExecutionError,
     ) {
