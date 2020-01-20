@@ -242,109 +242,36 @@ fn bytes_into_sized_chunks<'a>(
         .collect()
 }
 
-impl<T1, T2> BinaryValue for (T1, T2)
-where
-    T1: BinaryValue,
-    T2: BinaryValue,
-{
+macro_rules! count {
+    () => ( 0_usize );
+    ( $head:tt $($tail:tt)* ) => (1_usize + count!($($tail)*));
+    }
+
+macro_rules! tuple_impls {
+    ($(
+        $Tuple:ident {
+            $(($idx:tt) -> $T:ident)+
+    }
+    )+) => {
+        $(
+            impl<$($T: BinaryValue),+> BinaryValue for ($($T,)+) {
     fn to_bytes(&self) -> Vec<u8> {
-        chunks_to_bytes(&vec![self.0.to_bytes(), self.1.to_bytes()])
+                    chunks_to_bytes(&vec![$(self.$idx.to_bytes()),+])
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let nested_bytes = bytes_into_sized_chunks(&bytes, 2)?;
-
-        Ok((
-            T1::from_bytes(Cow::Borrowed(&nested_bytes[0]))?,
-            T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
-        ))
+                    let nested_bytes = bytes_into_sized_chunks(&bytes, count!($($idx)+))?;            
+                    Ok(($($T::from_bytes(Cow::Borrowed(&nested_bytes[$idx]))?,)+))
     }
 }
 
-impl<T1, T2> ObjectHash for (T1, T2)
-where
-    T1: BinaryValue,
-    T2: BinaryValue,
-{
+            impl<$($T: BinaryValue),+> ObjectHash for ($($T,)+) {
     fn object_hash(&self) -> Hash {
         exonum_crypto::hash(&self.to_bytes())
     }
 }
-
-impl<T1, T2, T3> BinaryValue for (T1, T2, T3)
-where
-    T1: BinaryValue,
-    T2: BinaryValue,
-    T3: BinaryValue,
-{
-    fn to_bytes(&self) -> Vec<u8> {
-        chunks_to_bytes(&vec![
-            self.0.to_bytes(),
-            self.1.to_bytes(),
-            self.2.to_bytes(),
-        ])
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let nested_bytes = bytes_into_sized_chunks(&bytes, 3)?;
-
-        Ok((
-            T1::from_bytes(Cow::Borrowed(&nested_bytes[0]))?,
-            T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
-            T3::from_bytes(Cow::Borrowed(&nested_bytes[2]))?,
-        ))
-    }
-}
-
-impl<T1, T2, T3> ObjectHash for (T1, T2, T3)
-where
-    T1: BinaryValue,
-    T2: BinaryValue,
-    T3: BinaryValue,
-{
-    fn object_hash(&self) -> Hash {
-        exonum_crypto::hash(&self.to_bytes())
-    }
-}
-
-impl<T1, T2, T3, T4> BinaryValue for (T1, T2, T3, T4)
-where
-    T1: BinaryValue,
-    T2: BinaryValue,
-    T3: BinaryValue,
-    T4: BinaryValue,
-{
-    fn to_bytes(&self) -> Vec<u8> {
-        chunks_to_bytes(&vec![
-            self.0.to_bytes(),
-            self.1.to_bytes(),
-            self.2.to_bytes(),
-            self.3.to_bytes(),
-        ])
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
-        let nested_bytes = bytes_into_sized_chunks(&bytes, 4)?;
-
-        Ok((
-            T1::from_bytes(Cow::Borrowed(&nested_bytes[0]))?,
-            T2::from_bytes(Cow::Borrowed(&nested_bytes[1]))?,
-            T3::from_bytes(Cow::Borrowed(&nested_bytes[2]))?,
-            T4::from_bytes(Cow::Borrowed(&nested_bytes[3]))?,
-        ))
-    }
-}
-
-impl<T1, T2, T3, T4> ObjectHash for (T1, T2, T3, T4)
-where
-    T1: BinaryValue,
-    T2: BinaryValue,
-    T3: BinaryValue,
-    T4: BinaryValue,
-{
-    fn object_hash(&self) -> Hash {
-        exonum_crypto::hash(&self.to_bytes())
-    }
+        )+
+    };
 }
 
 impl BinaryValue for bool {
@@ -469,6 +396,109 @@ impl BinaryValue for [u8; HASH_SIZE] {
         let mut value = [0_u8; HASH_SIZE];
         value.copy_from_slice(bytes);
         Ok(value)
+    }
+}
+
+// Implementations for Tuples up to 12 except Tuple1 because it deserializes as is
+tuple_impls!{
+    Tuple2 {
+        (0) -> A
+        (1) -> B
+    }
+    Tuple3 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+    }
+    Tuple4 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+    }
+    Tuple5 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+    }
+    Tuple6 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+    }
+    Tuple7 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+        (6) -> G
+    }
+    Tuple8 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+        (6) -> G
+        (7) -> H
+    }
+    Tuple9 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+        (6) -> G
+        (7) -> H
+        (8) -> I
+    }
+    Tuple10 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+        (6) -> G
+        (7) -> H
+        (8) -> I
+        (9) -> J
+    }
+    Tuple11 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+        (6) -> G
+        (7) -> H
+        (8) -> I
+        (9) -> J
+        (10) -> K
+    }
+    Tuple12 {
+        (0) -> A
+        (1) -> B
+        (2) -> C
+        (3) -> D
+        (4) -> E
+        (5) -> F
+        (6) -> G
+        (7) -> H
+        (8) -> I
+        (9) -> J
+        (10) -> K
+        (11) -> L
     }
 }
 
