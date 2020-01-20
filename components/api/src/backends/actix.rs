@@ -452,4 +452,37 @@ mod tests {
                 .json(123),
         );
     }
+
+    #[test]
+    fn api_error_to_http_response() {
+        let response = ApiError::bad_request()
+            .header(header::LOCATION, "location")
+            .docs_uri("uri")
+            .title("title")
+            .detail("detail")
+            .source("source")
+            .error_code(42)
+            .error_response();
+        let body = crate::error::ErrorBody {
+            docs_uri: "uri".into(),
+            title: "title".into(),
+            detail: "detail".into(),
+            source: "source".into(),
+            error_code: Some(42),
+        };
+        let expected = HttpResponse::build(crate::HttpStatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/problem+json")
+            .header(header::LOCATION, "location")
+            .body(serde_json::to_string(&body).unwrap());
+        assert_responses_eq(response, expected);
+    }
+
+    #[test]
+    fn api_error_to_http_response_without_body() {
+        let response = ApiError::bad_request().error_response();
+        let expected = HttpResponse::build(crate::HttpStatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/problem+json")
+            .finish();
+        assert_responses_eq(response, expected);
+    }
 }
