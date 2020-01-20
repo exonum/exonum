@@ -16,7 +16,7 @@
 
 pub(crate) use self::key::ProofPath;
 pub use self::{
-    key::{Hashed, Raw, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
+    key::{Hashed, Raw, RawKey, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 

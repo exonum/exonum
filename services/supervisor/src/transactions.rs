@@ -15,7 +15,10 @@
 use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidateInput},
-    runtime::{CommonError, ExecutionError, ExecutionFail, InstanceSpec, InstanceStatus},
+    runtime::{
+        CommonError, ExecutionError, ExecutionFail, InstanceId, InstanceSpec, InstanceState,
+        InstanceStatus,
+    },
 };
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
@@ -26,7 +29,8 @@ use std::collections::HashSet;
 use super::{
     configure::ConfigureMut, ArtifactError, CommonError as SupervisorCommonError, ConfigChange,
     ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigurationError, DeployRequest,
-    DeployResult, DeployState, SchemaImpl, ServiceError, StartService, StopService, Supervisor,
+    DeployResult, DeployState, ResumeService, SchemaImpl, ServiceError, StartService, StopService,
+    Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -114,14 +118,7 @@ impl StartService {
 
 impl StopService {
     fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
-        let instance = context
-            .data()
-            .for_dispatcher()
-            .get_instance(self.instance_id)
-            .ok_or_else(|| {
-                ConfigurationError::MalformedConfigPropose
-                    .with_description("Instance with the specified ID is absent.")
-            })?;
+        let instance = get_instance(context, self.instance_id)?;
 
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
@@ -132,6 +129,44 @@ impl StopService {
                 )),
             ),
         }
+    }
+}
+
+impl ResumeService {
+    fn validate(&self, context: &CallContext<'_>) -> Result<(), ExecutionError> {
+        let instance = get_instance(context, self.instance_id)?;
+
+        if instance.status != Some(InstanceStatus::Stopped) {
+            return Err(
+                ConfigurationError::MalformedConfigPropose.with_description(format!(
+                    "Discarded an attempt to resume not stopped service instance: {}",
+                    instance.spec.name
+                )),
+            );
+        }
+
+        if instance.data_version() != &self.artifact.version {
+            return Err(
+                ConfigurationError::MalformedConfigPropose.with_description(format!(
+                    "Discarded an attempt to resume service with incorrect artifact version: \
+                     got {}, expected {}",
+                    self.artifact.version,
+                    instance.data_version()
+                )),
+            );
+        }
+
+        if instance.spec.artifact.name != self.artifact.name {
+            return Err(
+                ConfigurationError::MalformedConfigPropose.with_description(format!(
+                    "Discarded an attempt to resume service with different \
+                     artifact name: got {}, expected {}",
+                    self.artifact.name, instance.spec.artifact.name
+                )),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -150,6 +185,22 @@ fn get_validator(context: &CallContext<'_>) -> Result<PublicKey, ExecutionError>
         .ok_or(CommonError::UnauthorizedCaller)?;
 
     Ok(author)
+}
+
+/// Returns the information about a service instance by its identifier.
+fn get_instance(
+    context: &CallContext<'_>,
+    instance_id: InstanceId,
+) -> Result<InstanceState, ExecutionError> {
+    context
+        .data()
+        .for_dispatcher()
+        .get_instance(instance_id)
+        .ok_or_else(|| {
+            ConfigurationError::MalformedConfigPropose
+                .with_description("Instance with the specified ID is absent.")
+        })
+        .map_err(From::from)
 }
 
 impl SupervisorInterface<CallContext<'_>> for Supervisor {
@@ -416,6 +467,16 @@ impl Supervisor {
                         ));
                     }
                     stop_service.validate(&context)?;
+                }
+
+                ConfigChange::ResumeService(resume_service) => {
+                    if !modified_instances.insert(resume_service.instance_id) {
+                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
+                            "Discarded multiple instances with the same name in one request.",
+                        ));
+                    }
+
+                    resume_service.validate(&context)?;
                 }
             }
         }

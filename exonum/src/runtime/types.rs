@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{Hash, PublicKey, SecretKey};
+use exonum_crypto::{Hash, PublicKey, SecretKey, HASH_SIZE};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
+    indexes::proof_map::RawKey,
     validation::{is_allowed_index_name_char, is_valid_index_name_component},
-    BinaryValue,
+    BinaryKey, BinaryValue, ObjectHash,
 };
 use exonum_proto::ProtobufConvert;
 use failure::{bail, ensure, format_err};
@@ -107,7 +108,7 @@ impl CallInfo {
 /// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert)]
+#[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::runtime::AnyTx")]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
@@ -835,12 +836,205 @@ impl ProtobufConvert for MigrationStatus {
     }
 }
 
+/// The authorization information for a service call.
+///
+/// `Caller` provides authorization details about the call. The called service may use `Caller`
+/// to decide whether to proceed with the processing, or to return an error because the caller
+/// has insufficient privileges. In some other cases (e.g., crypto-tokens), `Caller` may be used
+/// to get or modify information about the caller in the blockchain state (e.g., the current token
+/// balance).
+///
+/// Authorization info is not purely determined by the call stack. While outermost
+/// transactions calls always have `Transaction` auth, services may make internal
+/// calls, which either inherit the parent authorization or authorize a child call in their
+/// name (`Service` auth). This is decided by the service; both kinds of auth may make sense
+/// depending on the use case. Inherited auth makes sense for "middleware" (e.g.,
+/// batched calls), while service auth makes sense for stateful authorization (e.g.,
+/// multi-signatures).
+///
+/// Note that `Caller` has a forward-compatible uniform representation obtained via
+/// [`address()`](#method.address) method. Services may use this representation to compare
+/// or index callers without the necessity to care about all possible kinds of authorization
+/// supported by the framework.
+///
+/// This enum is not supposed to be exhaustively matched, so that new variants may be added to it
+/// without breaking semver compatibility.
+#[derive(Debug, PartialEq, Clone)]
+#[derive(BinaryValue, ObjectHash)]
+pub enum Caller {
+    /// A usual transaction from the Exonum client authorized by its key pair.
+    Transaction {
+        /// Public key of the user who signed this transaction.
+        author: PublicKey,
+    },
+
+    /// The call is invoked with the authority of a blockchain service.
+    Service {
+        /// Identifier of the service instance which invoked the call.
+        instance_id: InstanceId,
+    },
+
+    /// The call is invoked by one of the blockchain lifecycle events.
+    ///
+    /// This kind of authorization is used for `before_transactions` / `after_transactions`
+    /// calls to the service instances, and for initialization of the built-in services.
+    Blockchain,
+
+    // Hidden variant to prevent exhaustive matching.
+    #[doc(hidden)]
+    __NonExhaustive,
+}
+
+impl Caller {
+    /// Returns the author's public key, if it exists.
+    pub fn author(&self) -> Option<PublicKey> {
+        if let Caller::Transaction { author } = self {
+            Some(*author)
+        } else {
+            None
+        }
+    }
+
+    /// Tries to reinterpret the caller as a service.
+    pub fn as_service(&self) -> Option<InstanceId> {
+        if let Caller::Service { instance_id } = self {
+            Some(*instance_id)
+        } else {
+            None
+        }
+    }
+
+    /// Verifies that the caller of this method is a supervisor service.
+    pub fn as_supervisor(&self) -> Option<()> {
+        self.as_service().and_then(|instance_id| {
+            if instance_id == super::SUPERVISOR_INSTANCE_ID {
+                Some(())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Returns a uniform, forward-compatible presentation of the `Caller` that can be used
+    /// as the account *address*. Different addresses are guaranteed to correspond to
+    /// different `Caller`s.
+    pub fn address(&self) -> CallerAddress {
+        CallerAddress(self.object_hash())
+    }
+}
+
+impl ProtobufConvert for Caller {
+    type ProtoStruct = schema::runtime::Caller;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        match self {
+            Caller::Transaction { author } => pb.set_transaction_author(author.to_pb()),
+            Caller::Service { instance_id } => pb.set_instance_id(*instance_id),
+            Caller::Blockchain => pb.set_blockchain(Default::default()),
+            Caller::__NonExhaustive => unreachable!("variant is never constructed"),
+        }
+        pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Ok(if pb.has_transaction_author() {
+            let author = PublicKey::from_pb(pb.take_transaction_author())?;
+            Caller::Transaction { author }
+        } else if pb.has_instance_id() {
+            Caller::Service {
+                instance_id: pb.get_instance_id(),
+            }
+        } else if pb.has_blockchain() {
+            Caller::Blockchain
+        } else {
+            bail!("No variant specified for `Caller`");
+        })
+    }
+}
+
+/// Uniform presentation of a `Caller`.
+///
+/// # Converting to Address
+///
+/// The address for a [`Caller`] is defined as the SHA-256 digest of its Protobuf serialization.
+/// This ensures that addresses are unique, collision-resistant and domain-separated for different
+/// `Caller` types.
+///
+/// For example, to compute an address from a public key, you can use `CallerAddress::from_key()`
+/// (in Rust code), or create and hash a `Caller` Protobuf message (in any programming language).
+///
+/// ```
+/// # use exonum::{crypto, merkledb::BinaryValue, runtime::{Caller, CallerAddress}};
+/// let (public_key, _) = crypto::gen_keypair();
+/// let address = CallerAddress::from_key(public_key);
+/// let caller = Caller::Transaction { author: public_key };
+/// // Obtain Protobuf serialization of the `Caller`.
+/// let caller_pb = caller.to_bytes();
+/// assert_eq!(address.as_ref(), &crypto::hash(&caller_pb)[..]);
+/// ```
+///
+/// [`Caller`]: enum.Caller.html
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(BinaryValue, ObjectHash)]
+#[serde(transparent)]
+pub struct CallerAddress(Hash);
+
+impl CallerAddress {
+    /// Converts a public key to an address.
+    pub fn from_key(public_key: PublicKey) -> Self {
+        Caller::Transaction { author: public_key }.address()
+    }
+}
+
+impl AsRef<[u8]> for CallerAddress {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl ProtobufConvert for CallerAddress {
+    type ProtoStruct = exonum_crypto::proto::types::Hash;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        self.0.to_pb()
+    }
+
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        Hash::from_pb(pb).map(CallerAddress)
+    }
+}
+
+impl BinaryKey for CallerAddress {
+    fn size(&self) -> usize {
+        self.0.size()
+    }
+
+    fn write(&self, buffer: &mut [u8]) -> usize {
+        self.0.write(buffer)
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        CallerAddress(Hash::read(buffer))
+    }
+}
+
+// SAFETY: We proxy `Hash` implementation of raw keys which satisfies expected invariants.
+#[allow(unsafe_code)]
+unsafe impl RawKey for CallerAddress {
+    fn to_raw_key(&self) -> [u8; HASH_SIZE] {
+        self.0.as_bytes()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
-    use super::{ArtifactId, InstanceSpec, Version};
+    use super::*;
+    use exonum_crypto as crypto;
 
     #[test]
     fn parse_artifact_id_correct() {
@@ -933,34 +1127,34 @@ mod tests {
     #[test]
     fn test_instance_spec_validate_incorrect() {
         let specs = [
-        (
-            InstanceSpec::new(1, "", "0:my-service:1.0.0"),
-            "Service instance name should not be empty",
-        ),
-        (
-            InstanceSpec::new(2,
-                "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
-                "0:my-service:1.0.0"
+            (
+                InstanceSpec::new(1, "", "0:my-service:1.0.0"),
+                "Service instance name should not be empty",
             ),
-            "Service instance name (\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}) contains illegal character",
-        ),
-        (
-            InstanceSpec::new(3, "space service", "1:java.runtime.service:1.0.0"),
-            "Service instance name (space service) contains illegal character",
-        ),
-        (
-            InstanceSpec::new(4, "foo_service", ""),
-            "Wrong `ArtifactId` format",
-        ),
-        (
-            InstanceSpec::new(5, "dot.service", "1:java.runtime.service:1.0.0"),
-            "Service instance name (dot.service) contains illegal character",
-        ),
-        (
-            InstanceSpec::new(6, "foo_service", ":test:1.0.0"),
-            "cannot parse integer from empty string",
-        ),
-    ];
+            (
+                InstanceSpec::new(2,
+                    "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
+                    "0:my-service:1.0.0"
+                ),
+                "Service instance name (\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}) contains illegal character",
+            ),
+            (
+                InstanceSpec::new(3, "space service", "1:java.runtime.service:1.0.0"),
+                "Service instance name (space service) contains illegal character",
+            ),
+            (
+                InstanceSpec::new(4, "foo_service", ""),
+                "Wrong `ArtifactId` format",
+            ),
+            (
+                InstanceSpec::new(5, "dot.service", "1:java.runtime.service:1.0.0"),
+                "Service instance name (dot.service) contains illegal character",
+            ),
+            (
+                InstanceSpec::new(6, "foo_service", ":test:1.0.0"),
+                "cannot parse integer from empty string",
+            ),
+        ];
 
         for (instance_spec, expected_err) in &specs {
             let actual_err = instance_spec.as_ref().unwrap_err().to_string();
@@ -971,5 +1165,16 @@ mod tests {
                 expected_err,
             );
         }
+    }
+
+    /// As per Protobuf spec, `Caller` serialization used to compute `address` contains
+    /// at least the tag, thus providing domain separation.
+    #[test]
+    fn caller_addresses() {
+        let blockchain_addr = Caller::Blockchain.address();
+        let supervisor_addr = Caller::Service { instance_id: 0 }.address();
+        assert_ne!(blockchain_addr.0, crypto::hash(&[]));
+        assert_ne!(supervisor_addr.0, crypto::hash(&[]));
+        assert_ne!(blockchain_addr, supervisor_addr);
     }
 }
