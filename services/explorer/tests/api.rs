@@ -162,12 +162,13 @@ fn test_explorer_api_block_request() {
         .get::<Value>("v1/block?height=10")
         .unwrap_err();
 
-    let expected_err = api::Error::not_found()
-        .title("Failed to get block info.")
-        .detail("Requested block height(10) exceeds the blockchain height (1)")
-        .source("explorer:2");
-
-    assert_eq!(response, expected_err);
+    assert_eq!(response.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(response.body.title, "Failed to get block info");
+    assert_eq!(
+        response.body.detail,
+        "Requested block height(10) exceeds the blockchain height (1)"
+    );
+    assert_eq!(response.body.source, "2:explorer");
 }
 
 fn create_sample_block(testkit: &mut TestKit) {
@@ -361,11 +362,13 @@ fn test_explorer_transaction_info() {
         ))
         .unwrap_err();
 
-    let expected_err = api::Error::not_found()
-        .title("Failed to get transaction info")
-        .detail(serde_json::to_string(&json!({"type": "unknown"})).unwrap())
-        .source("explorer:2");
-    assert_eq!(info, expected_err);
+    assert_eq!(info.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(info.body.title, "Failed to get transaction info");
+    assert_eq!(
+        info.body.detail,
+        serde_json::to_string(&json!({"type": "unknown"})).unwrap()
+    );
+    assert_eq!(info.body.source, "2:explorer");
 
     api.send(tx.clone());
     testkit.poll_events();
@@ -526,15 +529,16 @@ fn test_explorer_add_invalid_transaction() {
         .post::<TransactionResponse>("v1/transactions")
         .expect_err("Expected transaction send to finish with error.");
 
-    let expected_err = api::Error::bad_request()
-        .title("Failed to add transaction")
-        .detail(
-            "Execution error with code `core:7` occurred: Suitable runtime for the given \
-             service instance ID is not found.",
-        )
-        .source("explorer:2");
-
-    assert_eq!(response, expected_err);
+    assert_eq!(response.http_code, api::HttpStatusCode::BAD_REQUEST);
+    assert_eq!(
+        response.body.title,
+        "Failed to add transaction to memory pool"
+    );
+    assert!(response
+        .body
+        .detail
+        .starts_with("Execution error with code"));
+    assert_eq!(response.body.source, "2:explorer");
 }
 
 #[test]

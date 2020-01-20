@@ -97,9 +97,11 @@ fn gone() {
         .get::<u64>("gone-immutable")
         .expect_err("Request to the `Gone` endpoint succeed");
 
-    let expected_err = api::Error::new(api::HttpStatusCode::GONE)
-        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
-    assert_eq!(pong_error, expected_err);
+    assert_eq!(pong_error.http_code, api::HttpStatusCode::GONE);
+    assert_eq!(
+        pong_error.body.source,
+        format!("{}:{}", SERVICE_ID, SERVICE_NAME)
+    );
 
     let pong_error: api::Error = api
         .public(ApiKind::Service("api-service"))
@@ -107,9 +109,11 @@ fn gone() {
         .post::<u64>("gone-mutable")
         .expect_err("Request to the `Gone` endpoint succeed");
 
-    let expected_err = api::Error::new(api::HttpStatusCode::GONE)
-        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
-    assert_eq!(pong_error, expected_err);
+    assert_eq!(pong_error.http_code, api::HttpStatusCode::GONE);
+    assert_eq!(
+        pong_error.body.source,
+        format!("{}:{}", SERVICE_ID, SERVICE_NAME)
+    );
 }
 
 /// Checks that endpoints marked as `MovedPermanently` return the corresponding HTTP error, and
@@ -127,9 +131,11 @@ fn moved() {
         .get::<u64>("moved-immutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
 
-    let expected_err = api::Error::new(api::HttpStatusCode::MOVED_PERMANENTLY)
-        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
-    assert_eq!(pong_error, expected_err);
+    assert_eq!(pong_error.http_code, api::HttpStatusCode::MOVED_PERMANENTLY);
+    assert_eq!(
+        pong_error.body.source,
+        format!("{}:{}", SERVICE_ID, SERVICE_NAME)
+    );
 
     let pong_error: api::Error = api
         .public(ApiKind::Service("api-service"))
@@ -137,9 +143,12 @@ fn moved() {
         .expect_header("Location", "../ping-pong-deprecated-mut")
         .post::<u64>("moved-mutable")
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
-    let expected_err = api::Error::new(api::HttpStatusCode::MOVED_PERMANENTLY)
-        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID));
-    assert_eq!(pong_error, expected_err);
+
+    assert_eq!(pong_error.http_code, api::HttpStatusCode::MOVED_PERMANENTLY);
+    assert_eq!(
+        pong_error.body.source,
+        format!("{}:{}", SERVICE_ID, SERVICE_NAME)
+    );
 }
 
 /// Checks response from endpoint with new error type.
@@ -164,15 +173,16 @@ fn endpoint_with_new_error_type() {
         .get::<u64>("error")
         .expect_err("Should return error.");
 
-    let expected_err = api::Error::bad_request()
-        .docs_uri("http://some-docs.com")
-        .title("Test endpoint error.")
-        .detail(format!(
-            "Test endpoint failed with query: {}",
-            err_query.value
-        ))
-        .source(format!("{}:{}", SERVICE_NAME, SERVICE_ID))
-        .error_code(42);
-
-    assert_eq!(error, expected_err);
+    assert_eq!(error.http_code, api::HttpStatusCode::BAD_REQUEST);
+    assert_eq!(error.body.docs_uri, "http://some-docs.com");
+    assert_eq!(error.body.title, "Test endpoint error");
+    assert_eq!(
+        error.body.detail,
+        format!("Test endpoint failed with query: {}", err_query.value)
+    );
+    assert_eq!(
+        error.body.source,
+        format!("{}:{}", SERVICE_ID, SERVICE_NAME)
+    );
+    assert_eq!(error.body.error_code, Some(42));
 }

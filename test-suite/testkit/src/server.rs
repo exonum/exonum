@@ -324,11 +324,12 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/create")
             .unwrap_err();
 
-        let expected_err = api::Error::bad_request()
-            .title("CreateBlock handler failed.")
-            .detail(format!("Transaction not in mempool: {}", Hash::zero()));
-
-        assert_eq!(err, expected_err);
+        assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
+        assert_eq!(err.body.title, "Creating block failed");
+        assert_eq!(
+            err.body.detail,
+            format!("Transaction not in mempool: {}", Hash::zero())
+        );
     }
 
     #[test]
@@ -381,10 +382,7 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap_err();
 
-        let expected_err = api::Error::bad_request()
-            .title("RollBack handler failed.")
-            .detail("Cannot rollback past genesis block");
-
-        assert_eq!(err, expected_err);
+        assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
+        assert_eq!(err.body.title, "Cannot rollback past genesis block");
     }
 }

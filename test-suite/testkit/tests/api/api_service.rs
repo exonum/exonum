@@ -95,7 +95,7 @@ impl Api {
                 } else {
                     Err(api::Error::bad_request()
                         .docs_uri("http://some-docs.com")
-                        .title("Test endpoint error.")
+                        .title("Test endpoint error")
                         .detail(format!("Test endpoint failed with query: {}", query.value))
                         .error_code(42))
                 }

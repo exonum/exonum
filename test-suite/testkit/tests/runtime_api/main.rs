@@ -111,9 +111,10 @@ fn service_protos_with_incorrect_service() {
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect_err("Rust runtime Api returns a fake source!");
 
-    let expected_err = api::Error::not_found()
-        .title("Artifact sources not found")
-        .detail("Unable to find sources for artifact 0:invalid-service:0.0.1");
-
-    assert_eq!(err, expected_err)
+    assert_eq!(err.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(err.body.title, "Artifact sources not found");
+    assert_eq!(
+        err.body.detail,
+        "Unable to find sources for artifact 0:invalid-service:0.0.1"
+    );
 }

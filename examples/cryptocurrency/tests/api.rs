@@ -253,11 +253,12 @@ fn test_unknown_wallet_request() {
         .get::<Wallet>("v1/wallet")
         .unwrap_err();
 
-    let expected_err = api::Error::not_found()
-        .title("Wallet not found")
-        .source(format!("{}:{}", INSTANCE_NAME, INSTANCE_ID));
-
-    assert_eq!(info, expected_err);
+    assert_eq!(info.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(info.body.title, "Wallet not found");
+    assert_eq!(
+        info.body.source,
+        format!("{}:{}", INSTANCE_ID, INSTANCE_NAME)
+    );
 }
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
@@ -315,11 +316,12 @@ impl CryptocurrencyApi {
             .get::<Wallet>("v1/wallet")
             .unwrap_err();
 
-        let expected_err = api::Error::not_found()
-            .title("Wallet not found")
-            .source(format!("{}:{}", INSTANCE_NAME, INSTANCE_ID));
-
-        assert_eq!(err, expected_err);
+        assert_eq!(err.http_code, api::HttpStatusCode::NOT_FOUND);
+        assert_eq!(err.body.title, "Wallet not found");
+        assert_eq!(
+            err.body.source,
+            format!("{}:{}", INSTANCE_ID, INSTANCE_NAME)
+        );
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
