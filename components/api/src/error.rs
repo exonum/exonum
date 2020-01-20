@@ -69,7 +69,7 @@ impl Error {
         }
     }
 
-    /// Bilds Bad Request (400) error.
+    /// Builds Bad Request (400) error.
     pub fn bad_request() -> Self {
         Error::new(HttpStatusCode::BAD_REQUEST)
     }
