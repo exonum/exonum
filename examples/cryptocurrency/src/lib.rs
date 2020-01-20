@@ -306,9 +306,10 @@ pub mod api {
             pub_key: PublicKey,
         ) -> api::Result<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
-            schema.wallets.get(&pub_key).ok_or_else(|| {
-                api::Error::new(api::HttpStatusCode::NOT_FOUND).title("Wallet not found")
-            })
+            schema
+                .wallets
+                .get(&pub_key)
+                .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
         }
 
         /// Endpoint for dumping all wallets from the storage.

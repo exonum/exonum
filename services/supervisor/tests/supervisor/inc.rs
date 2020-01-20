@@ -87,9 +87,9 @@ pub struct PublicApi;
 
 impl PublicApi {
     fn counter(state: &ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
-        Schema::new(state.service_data()).count().ok_or_else(|| {
-            api::Error::new(api::HttpStatusCode::NOT_FOUND).title("Counter is not set yet")
-        })
+        Schema::new(state.service_data())
+            .count()
+            .ok_or_else(|| api::Error::not_found().title("Counter is not set yet"))
     }
 
     fn ping(_state: &ServiceApiState<'_>, _query: ()) -> api::Result<()> {

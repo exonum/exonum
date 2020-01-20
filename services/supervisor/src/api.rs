@@ -46,12 +46,12 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
 
     fn try_from(query: DeployInfoQuery) -> Result<Self, Self::Error> {
         let artifact = query.artifact.parse::<ArtifactId>().map_err(|err| {
-            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+            api::Error::bad_request()
                 .title("Invalid deploy request")
                 .detail(err.to_string())
         })?;
         let spec = hex::decode(query.spec).map_err(|err| {
-            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+            api::Error::bad_request()
                 .title("Invalid deploy request")
                 .detail(err.to_string())
         })?;
@@ -137,7 +137,7 @@ struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 impl ApiImpl<'_> {
     fn broadcaster(&self) -> Result<Broadcaster<'_>, api::Error> {
         self.0.broadcaster().ok_or_else(|| {
-            api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+            api::Error::bad_request()
                 .title("Invalid broadcast request")
                 .detail("Nod is not a validator")
         })
@@ -150,31 +150,19 @@ impl PrivateApi for ApiImpl<'_> {
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .request_artifact_deploy((), artifact)
-            .map_err(|err| {
-                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                    .title("Artifact deploy request failed")
-                    .detail(err.to_string())
-            })
+            .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .propose_config_change((), proposal)
-            .map_err(|err| {
-                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                    .title("Config propose failed")
-                    .detail(err.to_string())
-            })
+            .map_err(|err| api::Error::internal(err).title("Config propose failed"))
     }
 
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .confirm_config_change((), vote)
-            .map_err(|err| {
-                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                    .title("Config vote failed")
-                    .detail(err.to_string())
-            })
+            .map_err(|err| api::Error::internal(err).title("Config vote failed"))
     }
 
     fn configuration_number(&self) -> Result<u64, Self::Error> {

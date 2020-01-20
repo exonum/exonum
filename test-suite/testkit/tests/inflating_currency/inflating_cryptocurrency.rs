@@ -198,9 +198,7 @@ impl CryptocurrencyApi {
                 let height = snapshot.for_core().height();
                 wallet.actual_balance(height)
             })
-            .ok_or_else(|| {
-                api::Error::new(api::HttpStatusCode::NOT_FOUND).title("Wallet not found")
-            })
+            .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {

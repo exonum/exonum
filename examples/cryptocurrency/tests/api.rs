@@ -253,7 +253,7 @@ fn test_unknown_wallet_request() {
         .get::<Wallet>("v1/wallet")
         .unwrap_err();
 
-    let expected_err = api::Error::new(api::HttpStatusCode::NOT_FOUND)
+    let expected_err = api::Error::not_found()
         .title("Wallet not found")
         .source(format!("{}:{}", INSTANCE_NAME, INSTANCE_ID));
 
@@ -315,7 +315,7 @@ impl CryptocurrencyApi {
             .get::<Wallet>("v1/wallet")
             .unwrap_err();
 
-        let expected_err = api::Error::new(api::HttpStatusCode::NOT_FOUND)
+        let expected_err = api::Error::not_found()
             .title("Wallet not found")
             .source(format!("{}:{}", INSTANCE_NAME, INSTANCE_ID));
 

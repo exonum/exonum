@@ -43,7 +43,7 @@ impl ExplorerApi {
         let index = move |request: HttpRequest| -> Result<HttpResponse, ActixError> {
             let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
                 let msg = "Server shut down".to_owned();
-                api::Error::new(api::HttpStatusCode::NOT_FOUND).title(msg)
+                api::Error::not_found().title(msg)
             })?;
             let query = extract_query(&request)?;
             ws::start(&request, Session::new(address, vec![query]))

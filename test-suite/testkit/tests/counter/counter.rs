@@ -186,11 +186,7 @@ impl CounterApi {
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
-            .map_err(|e| {
-                api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                    .title("Failed to increment counter")
-                    .detail(e.to_string())
-            })?;
+            .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -203,9 +199,7 @@ impl CounterApi {
         let proof = state
             .data()
             .proof_for_service_index("counter")
-            .ok_or_else(|| {
-                api::Error::new(api::HttpStatusCode::NOT_FOUND).title("Counter not initialized")
-            })?;
+            .ok_or_else(|| api::Error::not_found().title("Counter not initialized"))?;
         let schema = CounterSchema::new(state.service_data());
         Ok(CounterWithProof {
             counter: schema.counter.get(),
@@ -216,11 +210,10 @@ impl CounterApi {
     fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
         // The first `()` is the empty context, the second one is the `reset` arg.
-        let tx_hash = state.generic_broadcaster().reset((), ()).map_err(|e| {
-            api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                .title("Failed to reset counter")
-                .detail(e.to_string())
-        })?;
+        let tx_hash = state
+            .generic_broadcaster()
+            .reset((), ())
+            .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -254,10 +247,7 @@ impl CounterApi {
                 .get("Authorization")
                 .ok_or_else(|| api::Error::new(api::HttpStatusCode::UNAUTHORIZED))?
                 .to_str()
-                .map_err(|_| {
-                    api::Error::new(api::HttpStatusCode::BAD_REQUEST)
-                        .title("Malformed `Authorization`")
-                })?;
+                .map_err(|_| api::Error::bad_request().title("Malformed `Authorization`"))?;
             if auth_header != "Bearer SUPER_SECRET_111" {
                 return Err(api::Error::new(api::HttpStatusCode::UNAUTHORIZED));
             }

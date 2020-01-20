@@ -93,7 +93,7 @@ impl Api {
                 if query.value == 64 {
                     Ok(query.value)
                 } else {
-                    Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+                    Err(api::Error::bad_request()
                         .docs_uri("http://some-docs.com")
                         .title("Test endpoint error.")
                         .detail(format!("Test endpoint failed with query: {}", query.value))

@@ -164,7 +164,7 @@ fn endpoint_with_new_error_type() {
         .get::<u64>("error")
         .expect_err("Should return error.");
 
-    let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+    let expected_err = api::Error::bad_request()
         .docs_uri("http://some-docs.com")
         .title("Test endpoint error.")
         .detail(format!(

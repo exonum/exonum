@@ -129,11 +129,7 @@ impl SystemApi {
             move |connect_info: ConnectInfo| -> api::FutureResult<()> {
                 let handler = sender
                     .send_message(ExternalMessage::PeerAdd(connect_info))
-                    .map_err(|e| {
-                        api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                            .title("Failed to add peer")
-                            .detail(e.to_string())
-                    });
+                    .map_err(|e| api::Error::internal(e).title("Failed to add peer"));
                 Box::new(handler)
             },
         );
@@ -163,11 +159,7 @@ impl SystemApi {
             move |query: ConsensusEnabledQuery| -> api::FutureResult<()> {
                 let handler = sender
                     .send_message(ExternalMessage::Enable(query.enabled))
-                    .map_err(|e| {
-                        api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                            .title("Failed to set consensus enabled")
-                            .detail(e.to_string())
-                    });
+                    .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"));
                 Box::new(handler)
             },
         );
@@ -187,9 +179,7 @@ impl SystemApi {
                 .send_message(ExternalMessage::Shutdown)
                 .map(|()| HttpResponse::Ok().json(()))
                 .map_err(|e| {
-                    let e = api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR)
-                        .title("Failed to handle shutdown")
-                        .detail(e.to_string());
+                    let e = api::Error::internal(e).title("Failed to handle shutdown");
                     actix_web::Error::from(e)
                 });
             Box::new(handler)

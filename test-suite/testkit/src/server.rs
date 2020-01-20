@@ -72,9 +72,7 @@ fn flatten_err<T>(res: Result<Result<T, api::Error>, MailboxError>) -> Result<T,
     match res {
         Ok(Ok(value)) => Ok(value),
         Ok(Err(e)) => Err(e),
-        Err(e) => {
-            Err(api::Error::new(api::HttpStatusCode::INTERNAL_SERVER_ERROR).detail(e.to_string()))
-        }
+        Err(e) => Err(api::Error::internal(e)),
     }
 }
 
@@ -122,7 +120,7 @@ impl Handler<CreateBlock> for TestKitActor {
         let block_info = if let Some(tx_hashes) = msg.tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !self.0.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
-                return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+                return Err(api::Error::bad_request()
                     .title("Creating block failed")
                     .detail(format!(
                         "Transaction not in mempool: {}",
@@ -153,8 +151,7 @@ impl Handler<RollBack> for TestKitActor {
 
     fn handle(&mut self, RollBack(height): RollBack, _ctx: &mut Self::Context) -> Self::Result {
         if height == Height(0) {
-            return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
-                .title("Cannot rollback past genesis block"));
+            return Err(api::Error::bad_request().title("Cannot rollback past genesis block"));
         }
 
         if self.0.height() >= height {
@@ -327,7 +324,7 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/create")
             .unwrap_err();
 
-        let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+        let expected_err = api::Error::bad_request()
             .title("CreateBlock handler failed.")
             .detail(format!("Transaction not in mempool: {}", Hash::zero()));
 
@@ -384,7 +381,7 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap_err();
 
-        let expected_err = api::Error::new(api::HttpStatusCode::BAD_REQUEST)
+        let expected_err = api::Error::bad_request()
             .title("RollBack handler failed.")
             .detail("Cannot rollback past genesis block");
 
