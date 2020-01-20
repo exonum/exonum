@@ -165,7 +165,10 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    call_context::{CallContext, CallContextUnstable, SupervisorExtensions},
+    call_context::{
+        CallContext, CallContextUnstable, ExecutionContext, ExecutionContextUnstable,
+        SupervisorExtensions,
+    },
     dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
@@ -185,18 +188,14 @@ pub use error::execution_error::ExecutionErrorSerde;
 pub mod migrations;
 pub mod versioning;
 
-use exonum_merkledb::{BinaryValue, Fork, Snapshot};
+use exonum_merkledb::Snapshot;
 use futures::Future;
 use semver::Version;
 
 use std::fmt;
 
 use self::migrations::{InitMigrationError, MigrationScript};
-use crate::{
-    blockchain::Blockchain,
-    crypto::{Hash, PublicKey},
-    helpers::ValidateInput,
-};
+use crate::blockchain::Blockchain;
 
 mod blockchain_data;
 mod call_context;
@@ -624,162 +623,6 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
     }
 }
 
-/// Provides the current state of the blockchain and the caller information for the transaction
-/// which is being executed.
-#[derive(Debug)]
-pub struct ExecutionContext<'a> {
-    /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
-    /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a mut Fork,
-    /// The initiator of the transaction execution.
-    pub caller: Caller,
-    /// Identifier of the service interface required for the call. Keep in mind that this field, in
-    /// fact, is a part of an unfinished "interfaces" feature. It will be replaced in future releases.
-    /// At the moment this field is always empty for the primary service interface.
-    pub interface_name: &'a str,
-    /// Hash of the currently executing transaction, or `None` for non-transaction calls.
-    transaction_hash: Option<Hash>,
-    /// Reference to the dispatcher.
-    dispatcher: &'a Dispatcher,
-    /// Depth of the call stack.
-    call_stack_depth: usize,
-}
-
-impl<'a> ExecutionContext<'a> {
-    /// Maximum depth of the call stack.
-    const MAX_CALL_STACK_DEPTH: usize = 256;
-
-    pub(crate) fn for_transaction(
-        dispatcher: &'a Dispatcher,
-        fork: &'a mut Fork,
-        author: PublicKey,
-        transaction_hash: Hash,
-    ) -> Self {
-        Self::new(
-            dispatcher,
-            fork,
-            Caller::Transaction { author },
-            Some(transaction_hash),
-        )
-    }
-
-    pub(crate) fn for_block_call(dispatcher: &'a Dispatcher, fork: &'a mut Fork) -> Self {
-        Self::new(dispatcher, fork, Caller::Blockchain, None)
-    }
-
-    fn new(
-        dispatcher: &'a Dispatcher,
-        fork: &'a mut Fork,
-        caller: Caller,
-        transaction_hash: Option<Hash>,
-    ) -> Self {
-        Self {
-            dispatcher,
-            fork,
-            caller,
-            transaction_hash,
-            interface_name: "",
-            call_stack_depth: 0,
-        }
-    }
-
-    /// Returns the hash of the currently executing transaction, or `None` for non-transaction
-    /// root calls (e.g., `before_transactions` / `after_transactions` service hooks).
-    pub fn transaction_hash(&self) -> Option<Hash> {
-        self.transaction_hash
-    }
-
-    /// Returns extensions required for the Supervisor service implementation.
-    ///
-    /// Make sure that this method invoked by the instance with the [`SUPERVISOR_INSTANCE_ID`]
-    /// identifier.
-    ///
-    /// [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
-    #[doc(hidden)]
-    pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
-        SupervisorExtensions(self.reborrow())
-    }
-
-    pub(crate) fn child_context(
-        &mut self,
-        caller_service_id: Option<InstanceId>,
-    ) -> ExecutionContext<'_> {
-        ExecutionContext {
-            caller: caller_service_id
-                .map(|instance_id| Caller::Service { instance_id })
-                .unwrap_or_else(|| self.caller.clone()),
-            transaction_hash: self.transaction_hash,
-            dispatcher: self.dispatcher,
-            fork: self.fork,
-            interface_name: "",
-            call_stack_depth: self.call_stack_depth + 1,
-        }
-    }
-
-    pub(crate) fn call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
-            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
-            return Err(err);
-        }
-
-        let (runtime_id, runtime) = self
-            .dispatcher
-            .runtime_for_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
-        let reborrowed = self.reborrow_with_interface(interface_name);
-        runtime
-            .execute(reborrowed, call_info, arguments)
-            .map_err(|mut err| {
-                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                    instance_id: call_info.instance_id,
-                    call_type: CallType::Method {
-                        interface: interface_name.to_owned(),
-                        id: call_info.method_id,
-                    },
-                });
-                err
-            })
-    }
-
-    /// Initiates adding a new service instance to the blockchain. The created service is not active
-    /// (i.e., does not process transactions or the `after_transactions` hook)
-    /// until the block built on top of the provided `fork` is committed.
-    ///
-    /// This method should be called for the exact context passed to the runtime.
-    pub(crate) fn initiate_adding_service(
-        &mut self,
-        spec: InstanceSpec,
-        constructor: impl BinaryValue,
-    ) -> Result<(), ExecutionError> {
-        // TODO: revise dispatcher integrity checks [ECR-3743]
-        debug_assert!(spec.validate().is_ok(), "{:?}", spec.validate());
-        let runtime = self
-            .dispatcher
-            .runtime_by_id(spec.artifact.runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
-        runtime
-            .initiate_adding_service(self.reborrow(), &spec, constructor.into_bytes())
-            .map_err(|mut err| {
-                err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id: spec.id,
-                        call_type: CallType::Constructor,
-                    });
-                err
-            })?;
-
-        // Add a service instance to the dispatcher schema.
-        DispatcherSchema::new(&*self.fork)
-            .initiate_adding_service(spec)
-            .map_err(From::from)
-    }
-}
-
 /// Instance descriptor contains information to access the running service instance.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct InstanceDescriptor<'a> {
@@ -806,57 +649,5 @@ impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
 impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
     fn from((id, name): (InstanceId, &'a str)) -> Self {
         InstanceDescriptor { id, name }
-    }
-}
-
-/// Collection of unstable execution context features.
-#[doc(hidden)]
-pub trait ExecutionContextUnstable {
-    /// Re-borrows an execution context with the same interface name.
-    fn reborrow(&mut self) -> ExecutionContext<'_>;
-    /// Re-borrows an execution context with the specified interface name.
-    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s>;
-    /// Returns the service matching the specified query.
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
-    /// Invokes the interface method of the instance with the specified ID.
-    /// You may override the instance ID of the one who calls this method by the given one.
-    fn make_child_call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-        caller: Option<InstanceId>,
-    ) -> Result<(), ExecutionError>;
-}
-
-impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
-    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
-        ExecutionContext {
-            fork: &mut *self.fork,
-            caller: self.caller.clone(),
-            transaction_hash: self.transaction_hash,
-            interface_name,
-            dispatcher: self.dispatcher,
-            call_stack_depth: self.call_stack_depth,
-        }
-    }
-
-    fn reborrow(&mut self) -> ExecutionContext<'_> {
-        self.reborrow_with_interface(self.interface_name)
-    }
-
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
-        self.dispatcher.get_service(id)
-    }
-
-    fn make_child_call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-        caller: Option<InstanceId>,
-    ) -> Result<(), ExecutionError> {
-        self.child_context(caller)
-            .call(interface_name, call_info, arguments)
     }
 }
