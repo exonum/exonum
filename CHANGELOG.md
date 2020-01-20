@@ -106,6 +106,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This method is used to resume a previously stopped services.
   (#1693)
 
+- `ExecutionContext` has been extended by the methods from the
+  `exonum_rust_runtime::CallContext` so there is no need to use `CallContext`
+   anymore. (#1711)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
@@ -214,6 +218,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Rust runtime module was moved from the `exonum` crate into the separate
   `exonum-rust-runtime` crate. (#1641)
+
+- `CallContext` has been replaced by the `ExecutionContext`. (#1711)
 
 #### exonum-supervisor
 
