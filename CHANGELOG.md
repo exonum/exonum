@@ -133,7 +133,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 #### exonum-rust-runtime
 
 - Service interfaces now have to specify method IDs with either `interface_method`
-  attribute or `id_auto_increment` option. (#1701)
+  attribute or `auto_ids` option. (#1701)
+
+- Service interface methods now can be marked as removed. (#1707)
 
 ### exonum-testkit
 

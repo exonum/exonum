@@ -33,6 +33,8 @@ pub enum CommonError {
     UnauthorizedCaller = 2,
     /// Malformed arguments for calling a service interface method.
     MalformedArguments = 3,
+    /// Method with provided ID existed in the past, but now is removed.
+    MethodRemoved = 4,
 }
 
 impl CommonError {
