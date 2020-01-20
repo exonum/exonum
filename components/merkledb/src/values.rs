@@ -245,31 +245,31 @@ fn bytes_into_sized_chunks<'a>(
 macro_rules! count {
     () => ( 0_usize );
     ( $head:tt $($tail:tt)* ) => (1_usize + count!($($tail)*));
-    }
+}
 
 macro_rules! tuple_impls {
     ($(
         $Tuple:ident {
             $(($idx:tt) -> $T:ident)+
-    }
+        }
     )+) => {
         $(
             impl<$($T: BinaryValue),+> BinaryValue for ($($T,)+) {
-    fn to_bytes(&self) -> Vec<u8> {
+                fn to_bytes(&self) -> Vec<u8> {
                     chunks_to_bytes(&vec![$(self.$idx.to_bytes()),+])
-    }
+                }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+                fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
                     let nested_bytes = bytes_into_sized_chunks(&bytes, count!($($idx)+))?;            
                     Ok(($($T::from_bytes(Cow::Borrowed(&nested_bytes[$idx]))?,)+))
-    }
-}
+                }
+            }
 
             impl<$($T: BinaryValue),+> ObjectHash for ($($T,)+) {
-    fn object_hash(&self) -> Hash {
-        exonum_crypto::hash(&self.to_bytes())
-    }
-}
+                fn object_hash(&self) -> Hash {
+                    exonum_crypto::hash(&self.to_bytes())
+                }
+            }
         )+
     };
 }
@@ -696,5 +696,23 @@ mod tests {
             Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
             u128::max_value(),
         )]);
+    }
+    
+    #[test]
+    fn test_binary_from_12tuple() {
+        assert_round_trip_eq(&[(
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+            u128::max_value(),
+        )])
     }
 }
