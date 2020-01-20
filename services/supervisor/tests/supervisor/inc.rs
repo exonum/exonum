@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use exonum::runtime::{CommonError, ExecutionError, InstanceId};
-use exonum_api as api;
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     Entry,
 };
 use exonum_rust_runtime::{
-    api::{ServiceApiBuilder, ServiceApiState},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     CallContext, DefaultInstance, Service,
 };
 

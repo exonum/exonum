@@ -19,9 +19,8 @@ use exonum::{
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
 };
-use exonum_api as api;
 use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
-use exonum_rust_runtime::api::{ServiceApiBuilder, ServiceApiState};
+use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
 use crate::{schema::SchemaImpl, wallet::Wallet};
 

@@ -179,11 +179,10 @@ mod tests {
         messages::{AnyTx, Verified},
         runtime::ExecutionError,
     };
-    use exonum_api as api;
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, CallContext, Service, ServiceFactory};
     use pretty_assertions::assert_eq;
 
     use std::time::Duration;

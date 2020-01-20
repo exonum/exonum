@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_api as api;
-use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
+use exonum_rust_runtime::{api, ProtoSourceFile, ProtoSourcesQuery};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;

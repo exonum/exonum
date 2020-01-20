@@ -14,7 +14,7 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult};
+pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult, HttpStatusCode, Result};
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
@@ -286,8 +286,7 @@ impl ServiceApiScope {
 /// ```
 /// use serde_derive::{Deserialize, Serialize};
 /// use exonum::{blockchain::Schema, crypto::Hash, merkledb::ObjectHash};
-/// use exonum_api as api;
-/// use exonum_rust_runtime::api::{ServiceApiBuilder, ServiceApiState};
+/// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 ///
 /// // Declare a type which describes an API specification and implementation.
 /// pub struct MyApi;

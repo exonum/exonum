@@ -19,7 +19,6 @@ use exonum::{
     runtime::{ExecutionError, InstanceId},
 };
 use exonum_api::{
-    self as api,
     backends::actix::{HttpRequest, RawHandler, RequestHandler},
     ApiBackend,
 };
@@ -30,7 +29,7 @@ use exonum_merkledb::{
     ObjectHash, ProofEntry,
 };
 use exonum_rust_runtime::{
-    api::{ServiceApiBuilder, ServiceApiState},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     CallContext, DefaultInstance, Service,
 };
 use futures::{Future, IntoFuture};

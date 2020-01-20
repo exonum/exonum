@@ -283,8 +283,7 @@ pub mod contracts {
 /// Cryptocurrency API implementation.
 pub mod api {
     use exonum::crypto::PublicKey;
-    use exonum_api as api;
-    use exonum_rust_runtime::api::{ServiceApiBuilder, ServiceApiState};
+    use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
     use crate::schema::{CurrencySchema, Wallet};
 

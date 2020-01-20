@@ -17,14 +17,13 @@ use exonum::{
     helpers::Height,
     runtime::{ExecutionError, InstanceId},
 };
-use exonum_api as api;
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess},
     MapIndex,
 };
 use exonum_rust_runtime::{
-    api::{ServiceApiBuilder, ServiceApiState},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     CallContext, DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};

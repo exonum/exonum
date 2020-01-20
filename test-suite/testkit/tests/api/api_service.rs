@@ -17,10 +17,9 @@
 
 use chrono::{TimeZone, Utc};
 use exonum::runtime::InstanceId;
-use exonum_api as api;
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    api::{Deprecated, ServiceApiBuilder, ServiceApiState},
+    api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};

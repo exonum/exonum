@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height, runtime::ArtifactId};
-use exonum_api as api;
 use exonum_rust_runtime::{
-    api::{ServiceApiBuilder, ServiceApiState},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
 };
 use failure::Fail;
