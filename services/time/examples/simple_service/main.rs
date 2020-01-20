@@ -143,10 +143,7 @@ fn main() {
 
     let snapshot = testkit.snapshot();
     let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
-    assert_eq!(
-        time_schema.time.get().map(|time| time),
-        Some(mock_provider.time())
-    );
+    assert_eq!(time_schema.time.get(), Some(mock_provider.time()));
 
     let keypair1 = gen_keypair();
     let keypair2 = gen_keypair();

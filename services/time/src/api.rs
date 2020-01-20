@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! HTTP API for the Time service. All APIs are accessible from the public HTTP server
+//! HTTP API for the time service. All APIs are accessible from the public HTTP server
 //! of the node.
 //!
 //! # Get Current Time
@@ -31,28 +31,26 @@
 //! # use chrono::{DateTime, Utc};
 //! # use exonum::{helpers::Height, runtime::InstanceId};
 //! # use exonum_rust_runtime::ServiceFactory;
-//! # use exonum_time::{SystemTimeProvider, TimeProvider, TimeServiceFactory, TimeSchema};
+//! # use exonum_time::{TimeServiceFactory, TimeSchema};
 //! # use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
-//! # use std::sync::Arc;
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let time_provider = Arc::new(SystemTimeProvider);
-//! let time_service_factory =
-//!     TimeServiceFactory::with_provider(time_provider.clone() as Arc<dyn TimeProvider>);
+//! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with_artifact(time_service_artifact.clone())
 //!     .with_instance(
-//!            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-//!        )
+//!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
+//!     )
 //!     .with_rust_service(time_service_factory)
 //!     .create();
 //! let api = testkit.api();
 //!
 //! // Make request to the `current_time` endpoint.
-//! let response: Option<DateTime<Utc>> = api.public(ApiKind::Service(TIME_SERVICE_NAME))
+//! let response: Option<DateTime<Utc>> = api
+//!     .public(ApiKind::Service(TIME_SERVICE_NAME))
 //!     .get("v1/current_time")?;
 //!
 //! // Since no blocks were created yet, time is not available.
@@ -145,7 +143,7 @@ impl PrivateApi {
         Ok(validators_times)
     }
 
-    /// Wires Time service API endpoints.
+    /// Wires time service API endpoints.
     pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
         builder
             .private_scope()

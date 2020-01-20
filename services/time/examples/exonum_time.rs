@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This example shows how to run the Exonum node with the Time service available.
+//! This example shows how to run the Exonum node with the time service available.
 //!
-//! Though the Time service artifact will be available within node, it should be
+//! Though the time service artifact will be available within node, it should be
 //! deployed and instantiated before it will become available for interaction.
 //!
 //! For details on deploy & init process, see the [runtime docs].

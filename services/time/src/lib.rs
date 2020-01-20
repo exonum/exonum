@@ -18,13 +18,13 @@
 //! With this service, user services are able to access the calendar time supplied by validator nodes
 //! to the blockchain.
 //!
-//! Basics of the approach:
+//! # Basics of the Approach
 //!
 //! Each validator at a specific time sends a transaction indicating its local time
 //! (usually immediately after the commit of each block). The time service maintains an index with the
 //! most current time values indicated separately by each validator. This index is updated after each
-//! transaction from any of the validators. A 1/3 percentile of these values (ordered by decreasing time)
-//! is then picked out from the index; this percentile is considered the actual time and is applied to
+//! transaction from any of the validators. A 1/3 quantile of these values (ordered by decreasing time)
+//! is then picked out from the index; this quantile is considered the actual time and is applied to
 //! determine the exact service time.
 //!
 //! See [the Exonum documentation][docs:time] for a high-level overview of the service,
@@ -41,12 +41,13 @@
 //! ## Use with TestKit
 //!
 //! ```
+//! use chrono::{TimeZone, Duration, Utc};
 //! use exonum::{
 //!     helpers::Height,
 //!     runtime::{InstanceId, SnapshotExt},
 //! };
 //! use exonum_rust_runtime::ServiceFactory;
-//! use exonum_time::{SystemTimeProvider, TimeProvider, TimeServiceFactory, TimeSchema};
+//! use exonum_time::{MockTimeProvider, TimeProvider, TimeServiceFactory, TimeSchema};
 //! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 //!
 //! use std::sync::Arc;
@@ -54,16 +55,19 @@
 //! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! // Time provider for a Time service is chosen at the compile time.
-//! let time_provider = Arc::new(SystemTimeProvider);
+//! // Time provider for a time service is chosen at the compile time.
+//! // Here we use `MockTimeProvider` to get controllable results.
+//! // In real world it makes sense to use `SystemTimeProvider` or your own implementation
+//! // of `TimeProvider`.
+//! let time_provider = Arc::new(MockTimeProvider::default());
 //!
-//! // Factory for Time service will create instances of the service with given
+//! // Factory for time service will create instances of the service with given
 //! // time provider.
 //! let time_service_factory =
 //!     TimeServiceFactory::with_provider(time_provider.clone() as Arc<dyn TimeProvider>);
 //! let time_service_artifact = time_service_factory.artifact_id();
 //!
-//! // Create testkit with the Time service.
+//! // Create testkit with the time service.
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with_artifact(time_service_artifact.clone())
 //!     .with_instance(
@@ -73,16 +77,28 @@
 //!     // Add other services here
 //!     .create();
 //!
+//! // Set time in `MockTimeProvider`.
+//! time_provider.set_time(Utc.timestamp(10, 0));
+//!
 //! // Create some blocks for time to appear in the blockchain.
 //! testkit.create_blocks_until(Height(2));
 //!
-//! // Obtain Time service schema.
+//! // Obtain time service schema.
 //! let snapshot = testkit.snapshot();
 //! let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
 //!
 //! // Obtain time from the schema. Service can base its logic on this time.
-//! let time = time_schema.time.get().map(|time| time);
+//! let time = time_schema.time.get();
+//!
+//! // With `MockServiceProvider` we can ensure that time is based on data provided by `TimeProvider`.
+//! assert_eq!(time, Some(time_provider.time()));
 //! ```
+//!
+//! ## Interaction with other service
+//!
+//! Example of interaction with the time service can be found [at github].
+//!
+//! [at github]: https://github.com/exonum/exonum/blob/master/services/time/examples/simple_service/main.rs
 
 #![deny(
     unsafe_code,
@@ -107,7 +123,7 @@ pub use crate::{
     api::ValidatorTime,
     schema::TimeSchema,
     time_provider::{MockTimeProvider, SystemTimeProvider, TimeProvider},
-    transactions::{Error, TimeOracleInterface, TxTime},
+    transactions::{Error, TimeOracleInterface, TimeOracleInterfaceMut, TxTime},
 };
 
 /// Time oracle service.
@@ -136,7 +152,7 @@ impl Service for TimeService {
 
 /// Time oracle service factory.
 ///
-/// By default, it creates Time service instances with [`SystemTimeProvider`].
+/// By default, it creates time service instances with [`SystemTimeProvider`].
 ///
 /// [`SystemTimeProvider`]: struct.SystemTimeProvider.html
 #[derive(Debug, ServiceFactory)]
