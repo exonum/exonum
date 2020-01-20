@@ -37,45 +37,55 @@ pub struct ExecutionContext<'a> {
     /// fact, is a part of an unfinished "interfaces" feature. It will be replaced in future releases.
     /// At the moment this field is always empty for the primary service interface.
     pub interface_name: &'a str,
+    /// ID of the executing service.
+    pub instance: InstanceDescriptor<'a>,
     /// Hash of the currently executing transaction, or `None` for non-transaction calls.
     transaction_hash: Option<Hash>,
     /// Reference to the dispatcher.
     dispatcher: &'a Dispatcher,
     /// Depth of the call stack.
-    call_stack_depth: usize,
+    call_stack_depth: u64,
 }
 
 impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
-    const MAX_CALL_STACK_DEPTH: usize = 256;
+    pub const MAX_CALL_STACK_DEPTH: u64 = 128;
 
     pub(crate) fn for_transaction(
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
+        instance: InstanceDescriptor<'a>,
         author: PublicKey,
         transaction_hash: Hash,
     ) -> Self {
         Self::new(
             dispatcher,
             fork,
+            instance,
             Caller::Transaction { author },
             Some(transaction_hash),
         )
     }
 
-    pub(crate) fn for_block_call(dispatcher: &'a Dispatcher, fork: &'a mut Fork) -> Self {
-        Self::new(dispatcher, fork, Caller::Blockchain, None)
+    pub(crate) fn for_block_call(
+        dispatcher: &'a Dispatcher,
+        fork: &'a mut Fork,
+        instance: InstanceDescriptor<'a>,
+    ) -> Self {
+        Self::new(dispatcher, fork, instance, Caller::Blockchain, None)
     }
 
     fn new(
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
+        instance: InstanceDescriptor<'a>,
         caller: Caller,
         transaction_hash: Option<Hash>,
     ) -> Self {
         Self {
             dispatcher,
             fork,
+            instance,
             caller,
             transaction_hash,
             interface_name: "",
@@ -110,6 +120,8 @@ impl<'a> ExecutionContext<'a> {
                 .unwrap_or_else(|| self.caller.clone()),
             transaction_hash: self.transaction_hash,
             dispatcher: self.dispatcher,
+            // TODO It would be better to replace instance here. [ECR-4075]
+            instance: self.instance,
             fork: self.fork,
             interface_name: "",
             call_stack_depth: self.call_stack_depth + 1,
@@ -131,7 +143,13 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectRuntime)?;
-        let reborrowed = self.reborrow_with_interface(interface_name);
+        let instance = self
+            .dispatcher
+            .get_service(call_info.instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+        // TODO Simplify code. [ECR-4075]
+        let mut reborrowed = self.reborrow_with_interface(interface_name);
+        reborrowed.instance = instance;
         runtime
             .execute(reborrowed, call_info, arguments)
             .map_err(|mut err| {
@@ -162,8 +180,11 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(CoreError::IncorrectRuntime)?;
+
+        let mut context = self.reborrow();
+        context.instance = spec.as_descriptor();
         runtime
-            .initiate_adding_service(self.reborrow(), &spec, constructor.into_bytes())
+            .initiate_adding_service(context, &spec, constructor.into_bytes())
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite {
@@ -206,6 +227,7 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
             fork: &mut *self.fork,
             caller: self.caller.clone(),
             transaction_hash: self.transaction_hash,
+            instance: self.instance,
             interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
@@ -248,6 +270,7 @@ impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
     pub fn new(context: ExecutionContext<'a>, instance: InstanceDescriptor<'a>) -> Self {
+        assert_eq!(context.instance, instance);
         Self {
             inner: context,
             instance,
@@ -409,6 +432,9 @@ impl<'a> SupervisorExtensions<'a> {
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(CoreError::IncorrectRuntime)?;
+
+        // TODO Simplify [ECR-4075]
+        context.instance = spec.as_descriptor();
         runtime
             .initiate_resuming_service(context.reborrow(), &spec, params.into_bytes())
             .map_err(|mut err| {
@@ -421,7 +447,7 @@ impl<'a> SupervisorExtensions<'a> {
             })?;
 
         DispatcherSchema::new(&*context.fork)
-            .initiate_resuming_service(instance_id, spec.artifact)
+            .initiate_resuming_service(instance_id, spec.artifact.clone())
             .map_err(From::from)
     }
 

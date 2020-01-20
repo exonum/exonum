@@ -78,10 +78,13 @@ impl Dispatcher {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
+        let instance = self
+            .get_service(call_info.instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::for_block_call(self, fork);
+        let context = ExecutionContext::for_block_call(self, fork, instance);
         runtime.execute(context, call_info, arguments)
     }
 
@@ -358,9 +361,10 @@ fn test_dispatcher_simple() {
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context =
+        ExecutionContext::for_block_call(&dispatcher, &mut fork, rust_service.as_descriptor());
     context
-        .initiate_adding_service(rust_service, vec![])
+        .initiate_adding_service(rust_service.clone(), vec![])
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service = InstanceSpec {
@@ -389,9 +393,13 @@ fn test_dispatcher_simple() {
         name: "inconspicuous-name".to_owned(),
     };
 
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        conflicting_rust_service.as_descriptor(),
+    );
     let err = context
-        .initiate_adding_service(conflicting_rust_service, vec![])
+        .initiate_adding_service(conflicting_rust_service.clone(), vec![])
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
@@ -942,7 +950,8 @@ fn stopped_service_workflow() {
         id: instance_id,
         name: instance_name.into(),
     };
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context =
+        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
     context
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
@@ -1040,9 +1049,10 @@ fn stopped_service_workflow() {
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context =
+        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
     context
-        .initiate_adding_service(service, vec![])
+        .initiate_adding_service(service.clone(), vec![])
         .expect_err("`initiate_adding_service` should failed");
 
     // Check that it is impossible to stop service twice.

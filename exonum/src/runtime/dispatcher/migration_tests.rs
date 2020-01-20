@@ -298,7 +298,8 @@ impl Rig {
         self.next_service_id += 1;
 
         let mut fork = self.blockchain.fork();
-        let mut context = ExecutionContext::for_block_call(self.dispatcher(), &mut fork);
+        let mut context =
+            ExecutionContext::for_block_call(self.dispatcher(), &mut fork, service.as_descriptor());
         context
             .initiate_adding_service(service.clone(), vec![])
             .expect("`initiate_adding_service` failed");
