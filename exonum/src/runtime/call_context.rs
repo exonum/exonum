@@ -298,20 +298,6 @@ pub struct CallContext<'a> {
     pub inner: ExecutionContext<'a>,
 }
 
-impl<'a> std::ops::Deref for CallContext<'a> {
-    type Target = ExecutionContext<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<'a> std::ops::DerefMut for CallContext<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.

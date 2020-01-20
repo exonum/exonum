@@ -251,7 +251,7 @@
 #![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
-pub use exonum::runtime::CallContext;
+pub use exonum::runtime::ExecutionContext;
 
 pub use self::{
     error::Error,
@@ -273,9 +273,8 @@ use exonum::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, ExecutionFail, InstanceDescriptor,
-        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier,
-        WellKnownRuntime,
+        ArtifactId, CallInfo, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId,
+        InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -296,7 +295,7 @@ pub mod _reexports {
     //! Types necessary for `ServiceDispatcher` and `ServiceFactory` derive macros to work.
 
     pub use exonum::runtime::{
-        ArtifactId, CallContext, CommonError, ExecutionError, MethodId, RuntimeIdentifier,
+        ArtifactId, CommonError, ExecutionContext, ExecutionError, MethodId, RuntimeIdentifier,
     };
 }
 
@@ -603,7 +602,6 @@ impl Runtime for RustRuntime {
     ) -> Result<(), ExecutionError> {
         let instance = self.new_service(spec)?;
         let service = instance.as_ref();
-        let context = CallContext::new(context);
         catch_panic(|| service.initialize(context, parameters))
     }
 
@@ -615,7 +613,6 @@ impl Runtime for RustRuntime {
     ) -> Result<(), ExecutionError> {
         let instance = self.new_service(spec)?;
         let service = instance.as_ref();
-        let context = CallContext::new(context);
         catch_panic(|| service.resume(context, parameters))
     }
 
@@ -678,12 +675,9 @@ impl Runtime for RustRuntime {
 
         let id = call_info.method_id;
         catch_panic(|| {
-            instance.as_ref().call(
-                context.interface_name,
-                id,
-                CallContext::new(context),
-                payload,
-            )
+            instance
+                .as_ref()
+                .call(context.interface_name, id, context, payload)
         })
     }
 
@@ -693,10 +687,7 @@ impl Runtime for RustRuntime {
             .get(&context.instance().id)
             .expect("`before_transactions` called with non-existing `instance_id`");
 
-        catch_panic(|| {
-            let context = CallContext::new(context);
-            instance.as_ref().before_transactions(context)
-        })
+        catch_panic(|| instance.as_ref().before_transactions(context))
     }
 
     fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
@@ -705,10 +696,7 @@ impl Runtime for RustRuntime {
             .get(&context.instance().id)
             .expect("`after_transactions` called with non-existing `instance_id`");
 
-        catch_panic(|| {
-            let context = CallContext::new(context);
-            instance.as_ref().after_transactions(context)
-        })
+        catch_panic(|| instance.as_ref().after_transactions(context))
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
