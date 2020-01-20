@@ -24,7 +24,6 @@ log = "0.4.6"
 hex = "0.4"
 
 exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-api = { version = "0.13.0-rc.2", path = "../../components/api" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
