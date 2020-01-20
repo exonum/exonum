@@ -261,19 +261,11 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -545,19 +537,11 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -746,19 +730,11 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 

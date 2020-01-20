@@ -571,7 +571,7 @@ impl Dispatcher {
                     _ => unreachable!(),
                 };
 
-                let res = call_fn(self.runtimes[&runtime_id].as_ref(), context, instance.id);
+                let res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
                 if let Err(mut err) = res {
                     fork.rollback();
                     err.set_runtime_id(runtime_id).set_call_site(|| CallSite {

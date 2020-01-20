@@ -329,19 +329,11 @@ impl Runtime for RuntimeInspector {
         })
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        _instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         catch_panic(|| {
             if let Some(action) = self.after_transactions.borrow_mut().pop_front() {
                 action.execute(context)

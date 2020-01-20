@@ -603,8 +603,7 @@ impl Runtime for RustRuntime {
     ) -> Result<(), ExecutionError> {
         let instance = self.new_service(spec)?;
         let service = instance.as_ref();
-        let descriptor = instance.descriptor();
-        let context = CallContext::new(context, descriptor);
+        let context = CallContext::new(context);
         catch_panic(|| service.initialize(context, parameters))
     }
 
@@ -616,8 +615,7 @@ impl Runtime for RustRuntime {
     ) -> Result<(), ExecutionError> {
         let instance = self.new_service(spec)?;
         let service = instance.as_ref();
-        let descriptor = instance.descriptor();
-        let context = CallContext::new(context, descriptor);
+        let context = CallContext::new(context);
         catch_panic(|| service.resume(context, parameters))
     }
 
@@ -678,48 +676,37 @@ impl Runtime for RustRuntime {
             .get(&call_info.instance_id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
-        let descriptor = instance.descriptor();
         let id = call_info.method_id;
         catch_panic(|| {
             instance.as_ref().call(
                 context.interface_name,
                 id,
-                CallContext::new(context, descriptor),
+                CallContext::new(context),
                 payload,
             )
         })
     }
 
-    fn before_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = self
             .started_services
-            .get(&instance_id)
+            .get(&context.instance().id)
             .expect("`before_transactions` called with non-existing `instance_id`");
 
-        let descriptor = instance.descriptor();
         catch_panic(|| {
-            let context = CallContext::new(context, descriptor);
+            let context = CallContext::new(context);
             instance.as_ref().before_transactions(context)
         })
     }
 
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = self
             .started_services
-            .get(&instance_id)
+            .get(&context.instance().id)
             .expect("`after_transactions` called with non-existing `instance_id`");
 
-        let descriptor = instance.descriptor();
         catch_panic(|| {
-            let context = CallContext::new(context, descriptor);
+            let context = CallContext::new(context);
             instance.as_ref().after_transactions(context)
         })
     }

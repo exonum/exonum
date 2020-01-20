@@ -200,7 +200,7 @@ impl CallAny<CallContext<'_>> for AnyCallService {
         let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
 
         if tx.fallthrough_auth {
-            FallthroughAuth(ctx).generic_call_mut(call_info.instance_id, method, args)
+            FallthroughAuth(ctx.inner).generic_call_mut(call_info.instance_id, method, args)
         } else {
             ctx.generic_call_mut(call_info.instance_id, method, args)
         }
@@ -214,7 +214,8 @@ impl CallAny<CallContext<'_>> for AnyCallService {
         if depth == 1 {
             return Ok(());
         }
-        context.call_recursive(context.instance().id, depth - 1)
+        let id = context.instance().id;
+        context.call_recursive(id, depth - 1)
     }
 }
 

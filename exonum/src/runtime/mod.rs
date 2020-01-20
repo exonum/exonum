@@ -165,10 +165,7 @@
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    call_context::{
-        CallContext, CallContextUnstable, ExecutionContext, ExecutionContextUnstable,
-        SupervisorExtensions,
-    },
+    call_context::{CallContext, ExecutionContext, ExecutionContextUnstable, SupervisorExtensions},
     dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
@@ -538,11 +535,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// An error returned from this method will lead to the rollback of all changes
     /// in the fork enclosed in the `context`.
-    fn before_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError>;
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError>;
 
     /// Notifies a service stored in this runtime about the end of the block. Allows the method
     /// to modify the blockchain state after all transactions in the block are processed.
@@ -556,11 +549,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// An error returned from this method will lead to the rollback of all changes
     /// in the fork enclosed in the `context`.
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError>;
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError>;
 
     /// Notifies the runtime about commit of a new block.
     ///

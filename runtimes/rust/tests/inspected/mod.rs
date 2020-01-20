@@ -248,27 +248,23 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.runtime.execute(context, call_info, arguments)
     }
 
-    fn before_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: u32,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let height = CoreSchema::new(&*context.fork).next_height();
-        self.events
-            .push(RuntimeEvent::BeforeTransactions(height, instance_id));
-        self.runtime.after_transactions(context, instance_id)
+        self.events.push(RuntimeEvent::BeforeTransactions(
+            height,
+            context.instance().id,
+        ));
+        self.runtime.after_transactions(context)
     }
 
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: u32,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let schema = CoreSchema::new(&*context.fork);
         let height = schema.next_height();
-        self.events
-            .push(RuntimeEvent::AfterTransactions(height, instance_id));
-        self.runtime.after_transactions(context, instance_id)
+        self.events.push(RuntimeEvent::AfterTransactions(
+            height,
+            context.instance().id,
+        ));
+        self.runtime.after_transactions(context)
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {

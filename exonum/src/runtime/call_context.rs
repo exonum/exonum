@@ -38,7 +38,7 @@ pub struct ExecutionContext<'a> {
     /// At the moment this field is always empty for the primary service interface.
     pub interface_name: &'a str,
     /// ID of the executing service.
-    pub instance: InstanceDescriptor<'a>,
+    instance: InstanceDescriptor<'a>,
     /// Hash of the currently executing transaction, or `None` for non-transaction calls.
     transaction_hash: Option<Hash>,
     /// Reference to the dispatcher.
@@ -99,15 +99,44 @@ impl<'a> ExecutionContext<'a> {
         self.transaction_hash
     }
 
+    /// Provides access to blockchain data.
+    pub fn data(&self) -> BlockchainData<'a, &Fork> {
+        BlockchainData::new(self.fork, self.instance)
+    }
+
+    /// Provides access to the data of the executing service.
+    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
+        self.data().for_executing_service()
+    }
+
+    /// Returns the authorization information about this call.
+    pub fn caller(&self) -> &Caller {
+        &self.caller
+    }
+
+    /// Returns a descriptor of the executing service instance.
+    pub fn instance(&self) -> InstanceDescriptor<'_> {
+        self.instance
+    }
+
+    /// Returns `true` if currently processed block is a genesis block.
+    pub fn in_genesis_block(&self) -> bool {
+        let core_schema = self.data().for_core();
+        core_schema.next_height() == Height(0)
+    }
+
     /// Returns extensions required for the Supervisor service implementation.
     ///
     /// Make sure that this method invoked by the instance with the [`SUPERVISOR_INSTANCE_ID`]
-    /// identifier.
+    /// identifier; the call will panic otherwise.
     ///
     /// [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
     #[doc(hidden)]
     pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
-        SupervisorExtensions(self.reborrow())
+        if self.instance.id != SUPERVISOR_INSTANCE_ID {
+            panic!("`supervisor_extensions` called within a non-supervisor service");
+        }
+        SupervisorExtensions(self.reborrow(self.instance))
     }
 
     pub(crate) fn child_context(
@@ -147,9 +176,7 @@ impl<'a> ExecutionContext<'a> {
             .dispatcher
             .get_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        // TODO Simplify code. [ECR-4075]
-        let mut reborrowed = self.reborrow_with_interface(interface_name);
-        reborrowed.instance = instance;
+        let reborrowed = self.reborrow_with_interface(interface_name, instance);
         runtime
             .execute(reborrowed, call_info, arguments)
             .map_err(|mut err| {
@@ -181,8 +208,7 @@ impl<'a> ExecutionContext<'a> {
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(CoreError::IncorrectRuntime)?;
 
-        let mut context = self.reborrow();
-        context.instance = spec.as_descriptor();
+        let context = self.reborrow(spec.as_descriptor());
         runtime
             .initiate_adding_service(context, &spec, constructor.into_bytes())
             .map_err(|mut err| {
@@ -205,9 +231,13 @@ impl<'a> ExecutionContext<'a> {
 #[doc(hidden)]
 pub trait ExecutionContextUnstable {
     /// Re-borrows an execution context with the same interface name.
-    fn reborrow(&mut self) -> ExecutionContext<'_>;
+    fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d>;
     /// Re-borrows an execution context with the specified interface name.
-    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s>;
+    fn reborrow_with_interface<'s>(
+        &'s mut self,
+        interface_name: &'s str,
+        instance: InstanceDescriptor<'s>,
+    ) -> ExecutionContext<'s>;
     /// Returns the service matching the specified query.
     fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
     /// Invokes the interface method of the instance with the specified ID.
@@ -222,20 +252,24 @@ pub trait ExecutionContextUnstable {
 }
 
 impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
-    fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s> {
+    fn reborrow_with_interface<'s>(
+        &'s mut self,
+        interface_name: &'s str,
+        instance: InstanceDescriptor<'s>,
+    ) -> ExecutionContext<'s> {
         ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller.clone(),
             transaction_hash: self.transaction_hash,
-            instance: self.instance,
+            instance,
             interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
         }
     }
 
-    fn reborrow(&mut self) -> ExecutionContext<'_> {
-        self.reborrow_with_interface(self.interface_name)
+    fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d> {
+        self.reborrow_with_interface(self.interface_name, instance)
     }
 
     fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
@@ -261,102 +295,28 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
 #[derive(Debug)]
 pub struct CallContext<'a> {
     /// Underlying execution context.
-    inner: ExecutionContext<'a>,
-    /// ID of the executing service.
-    instance: InstanceDescriptor<'a>,
+    pub inner: ExecutionContext<'a>,
+}
+
+impl<'a> std::ops::Deref for CallContext<'a> {
+    type Target = ExecutionContext<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a> std::ops::DerefMut for CallContext<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
-    pub fn new(context: ExecutionContext<'a>, instance: InstanceDescriptor<'a>) -> Self {
-        assert_eq!(context.instance, instance);
-        Self {
-            inner: context,
-            instance,
-        }
-    }
-
-    /// Provides access to blockchain data.
-    pub fn data(&self) -> BlockchainData<'a, &Fork> {
-        BlockchainData::new(self.inner.fork, self.instance)
-    }
-
-    /// Provides access to the data of the executing service.
-    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
-        self.data().for_executing_service()
-    }
-
-    /// Returns the authorization information about this call.
-    pub fn caller(&self) -> &Caller {
-        &self.inner.caller
-    }
-
-    /// Returns the hash of the currently executing transaction, or `None` for non-transaction
-    /// root calls (e.g., `before_transactions` / `after_transactions` service hooks).
-    pub fn transaction_hash(&self) -> Option<Hash> {
-        self.inner.transaction_hash()
-    }
-
-    /// Returns a descriptor of the executing service instance.
-    pub fn instance(&self) -> InstanceDescriptor<'_> {
-        self.instance
-    }
-
-    /// Returns `true` if currently processed block is a genesis block.
-    pub fn in_genesis_block(&self) -> bool {
-        let core_schema = self.data().for_core();
-        core_schema.next_height() == Height(0)
-    }
-
-    /// Returns extensions required for the Supervisor service implementation.
-    ///
-    /// This method can only be called by the supervisor; the call will panic otherwise.
-    #[doc(hidden)]
-    pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`supervisor_extensions` called within a non-supervisor service");
-        }
-        self.inner.supervisor_extensions()
-    }
-}
-
-/// Collection of unstable call context features.
-#[doc(hidden)]
-pub trait CallContextUnstable {
-    /// Re-borrows an call context with the same interface name.
-    fn reborrow(&mut self) -> CallContext<'_>;
-    /// Returns the service matching the specified query.
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
-    /// Invokes the interface method of the instance with the specified ID.
-    /// You may override the instance ID of the one who calls this method by the given one.
-    fn make_child_call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-        caller: Option<InstanceId>,
-    ) -> Result<(), ExecutionError>;
-}
-
-impl<'a> CallContextUnstable for CallContext<'a> {
-    fn reborrow(&mut self) -> CallContext<'_> {
-        CallContext::new(self.inner.reborrow(), self.instance)
-    }
-
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
-        self.inner.get_service(id)
-    }
-
-    fn make_child_call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-        caller: Option<InstanceId>,
-    ) -> Result<(), ExecutionError> {
-        self.inner
-            .make_child_call(interface_name, call_info, arguments, caller)
+    pub fn new(context: ExecutionContext<'a>) -> Self {
+        Self { inner: context }
     }
 }
 
@@ -433,10 +393,12 @@ impl<'a> SupervisorExtensions<'a> {
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(CoreError::IncorrectRuntime)?;
 
-        // TODO Simplify [ECR-4075]
-        context.instance = spec.as_descriptor();
         runtime
-            .initiate_resuming_service(context.reborrow(), &spec, params.into_bytes())
+            .initiate_resuming_service(
+                context.reborrow(spec.as_descriptor()),
+                &spec,
+                params.into_bytes(),
+            )
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite {

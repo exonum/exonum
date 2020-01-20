@@ -118,19 +118,11 @@ impl Runtime for MigrationRuntime {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _instance_id: u32,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _instance_id: u32,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 

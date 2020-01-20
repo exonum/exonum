@@ -44,8 +44,8 @@ mod failing_runtime {
     use exonum::runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
+        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus,
+        Mailbox, Runtime, WellKnownRuntime,
     };
     use exonum_derive::ExecutionFail;
     use futures::{Future, IntoFuture};
@@ -171,16 +171,11 @@ mod failing_runtime {
         fn before_transactions(
             &self,
             _context: ExecutionContext<'_>,
-            _id: InstanceId,
         ) -> Result<(), ExecutionError> {
             Ok(())
         }
 
-        fn after_transactions(
-            &self,
-            _context: ExecutionContext<'_>,
-            _id: InstanceId,
-        ) -> Result<(), ExecutionError> {
+        fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
             Ok(())
         }
 

@@ -21,8 +21,8 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     messages::Verified,
     runtime::{
-        AnyTx, CallContext, CallContextUnstable, CallInfo, CoreError, ExecutionError, InstanceId,
-        InstanceQuery, MethodId,
+        AnyTx, CallContext, CallInfo, CoreError, ExecutionContext, ExecutionContextUnstable,
+        ExecutionError, InstanceId, InstanceQuery, MethodId,
     },
 };
 
@@ -49,7 +49,7 @@ impl<'a> MethodDescriptor<'a> {
 
     fn make_child_call<'q>(
         &self,
-        context: &mut CallContext<'_>,
+        context: &mut ExecutionContext<'_>,
         called_id: impl Into<InstanceQuery<'q>>,
         args: Vec<u8>,
         fallthrough_auth: bool,
@@ -263,7 +263,7 @@ mod explanation {
     }
 }
 
-impl<'a, I> GenericCallMut<I> for CallContext<'a>
+impl<'a, I> GenericCallMut<I> for ExecutionContext<'a>
 where
     I: Into<InstanceQuery<'a>>,
 {
@@ -282,7 +282,7 @@ where
 /// Stub which uses fallthrough auth to authorize calls.
 #[derive(Debug)]
 #[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
-pub struct FallthroughAuth<'a>(pub CallContext<'a>);
+pub struct FallthroughAuth<'a>(pub ExecutionContext<'a>);
 
 impl<'a, I> GenericCallMut<I> for FallthroughAuth<'a>
 where
