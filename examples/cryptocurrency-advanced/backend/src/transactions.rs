@@ -15,8 +15,8 @@
 //! Cryptocurrency transactions.
 
 use exonum::{
-    crypto::PublicKey,
-    runtime::{CommonError, ExecutionError},
+    crypto::Hash,
+    runtime::{CallerAddress as Address, CommonError, ExecutionError},
 };
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -54,8 +54,8 @@ pub enum Error {
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Transfer", serde_pb_convert)]
 pub struct Transfer {
-    /// `PublicKey` of receiver's wallet.
-    pub to: PublicKey,
+    /// Address of receiver's wallet.
+    pub to: Address,
     /// Amount of currency to transfer.
     pub amount: u64,
     /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
@@ -116,11 +116,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     type Output = Result<(), ExecutionError>;
 
     fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Self::Output {
-        let (tx_hash, from) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
-
+        let (from, tx_hash) = extract_info(&context)?;
         let mut schema = SchemaImpl::new(context.service_data());
 
         let to = arg.to;
@@ -149,10 +145,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     }
 
     fn issue(&self, context: CallContext<'_>, arg: Issue) -> Self::Output {
-        let (tx_hash, from) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
+        let (from, tx_hash) = extract_info(&context)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         if let Some(wallet) = schema.public.wallets.get(&from) {
@@ -165,18 +158,23 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     }
 
     fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Self::Output {
-        let (tx_hash, from) = context
-            .caller()
-            .as_transaction()
-            .ok_or(CommonError::UnauthorizedCaller)?;
+        let (from, tx_hash) = extract_info(&context)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
         if schema.public.wallets.get(&from).is_none() {
             let name = &arg.name;
-            schema.create_wallet(&from, name, tx_hash);
+            schema.create_wallet(from, name, tx_hash);
             Ok(())
         } else {
             Err(Error::WalletAlreadyExists.into())
         }
     }
+}
+
+fn extract_info(context: &CallContext<'_>) -> Result<(Address, Hash), ExecutionError> {
+    let tx_hash = context
+        .transaction_hash()
+        .ok_or(CommonError::UnauthorizedCaller)?;
+    let from = context.caller().address();
+    Ok((from, tx_hash))
 }

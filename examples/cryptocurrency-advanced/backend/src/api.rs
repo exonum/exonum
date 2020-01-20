@@ -18,6 +18,7 @@ use exonum::{
     blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
+    runtime::{Caller, CallerAddress as Address},
 };
 use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
@@ -37,7 +38,7 @@ pub struct WalletProof {
     /// Proof of the whole wallets table.
     pub to_table: MapProof<String, Hash>,
     /// Proof of the specific wallet in this table.
-    pub to_wallet: MapProof<PublicKey, Wallet, Raw>,
+    pub to_wallet: MapProof<Address, Wallet, Raw>,
 }
 
 /// Wallet history.
@@ -77,16 +78,17 @@ impl PublicApi {
         } = state.data().proof_for_service_index("wallets").unwrap();
 
         let currency_schema = SchemaImpl::new(state.service_data());
-        let to_wallet = currency_schema.public.wallets.get_proof(pub_key);
+        let address = Caller::Transaction { author: pub_key }.address();
+        let to_wallet = currency_schema.public.wallets.get_proof(address);
         let wallet_proof = WalletProof {
             to_table: index_proof,
             to_wallet,
         };
-        let wallet = currency_schema.public.wallets.get(&pub_key);
+        let wallet = currency_schema.public.wallets.get(&address);
 
         let wallet_history = wallet.map(|_| {
             // `history` is always present for existing wallets.
-            let history = currency_schema.wallet_history.get(&pub_key);
+            let history = currency_schema.wallet_history.get(&address);
             let proof = history.get_range_proof(..);
 
             let transactions = state.data().for_core().transactions();

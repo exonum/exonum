@@ -16,7 +16,12 @@
 
 pub use exonum_api::ApiAccess;
 
-use actix_web::{test::TestServer, App};
+use actix::{actors::signal, Addr, System};
+use actix_net::server::Server;
+use actix_web::{
+    server::{HttpServer, IntoHttpHandler},
+    App,
+};
 use exonum::{
     blockchain::ApiSender,
     messages::{AnyTx, Verified},
@@ -32,6 +37,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::HashMap,
     fmt::{self, Display},
+    net,
+    sync::mpsc,
+    thread::{self, JoinHandle},
 };
 
 use crate::TestKit;
@@ -338,4 +346,77 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 
     info!("Test server created on {}", server.addr());
     server
+}
+
+/// The custom implementation of the test server, because there is an error in the default
+/// implementation. It does not wait for the http server thread to complete during drop.
+struct TestServer {
+    addr: net::SocketAddr,
+    backend: Addr<Server>,
+    system: System,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl TestServer {
+    /// Start new test server with application factory
+    fn with_factory<F, H>(factory: F) -> Self
+    where
+        F: Fn() -> H + Send + Clone + 'static,
+        H: IntoHttpHandler + 'static,
+    {
+        let (tx, rx) = mpsc::channel();
+
+        // run server in separate thread
+        let handle = thread::spawn(move || {
+            let sys = System::new("actix-test-server");
+            let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let local_addr = tcp.local_addr().unwrap();
+
+            let srv = HttpServer::new(factory)
+                .disable_signals()
+                .listen(tcp)
+                .keep_alive(5)
+                .workers(1)
+                .start();
+
+            tx.send((System::current(), local_addr, srv)).unwrap();
+            sys.run();
+        });
+
+        let (system, addr, backend) = rx.recv().unwrap();
+
+        Self {
+            addr,
+            backend,
+            handle: Some(handle),
+            system,
+        }
+    }
+
+    /// Construct test server url.
+    fn url(&self, uri: &str) -> String {
+        if uri.starts_with('/') {
+            format!("http://localhost:{}{}", self.addr.port(), uri)
+        } else {
+            format!("http://localhost:{}/{}", self.addr.port(), uri)
+        }
+    }
+
+    /// Construct test server url.
+    fn addr(&self) -> net::SocketAddr {
+        self.addr
+    }
+}
+
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        // Stop http server.
+        let _ = self
+            .backend
+            .send(signal::Signal(signal::SignalType::Term))
+            .wait();
+        self.system.stop();
+        // Wait server thread.
+        let _ = self.handle.take().unwrap().join();
+    }
 }
