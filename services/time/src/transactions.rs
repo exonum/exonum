@@ -17,7 +17,7 @@ use exonum::runtime::ExecutionError;
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::CallContext;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
