@@ -488,7 +488,7 @@ impl ExplorerApi {
         let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             api::Error::new(api::HttpStatusCode::NOT_FOUND)
-                .title("Failed to get block info.")
+                .title("Failed to get block info")
                 .detail(format!(
                     "Requested block height({}) exceeds the blockchain height ({})",
                     query.height,
@@ -595,7 +595,7 @@ impl ExplorerApi {
                 .into_future()
                 .map_err(|e| {
                     api::Error::new(api::HttpStatusCode::BAD_REQUEST)
-                        .title("Failed to add transaction")
+                        .title("Failed to add transaction to memory pool")
                         .detail(e.to_string())
                 })
                 .and_then(send_transaction),

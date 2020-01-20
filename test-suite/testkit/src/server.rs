@@ -123,7 +123,7 @@ impl Handler<CreateBlock> for TestKitActor {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !self.0.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
                 return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
-                    .title("CreateBlock handler failed.")
+                    .title("Creating block failed")
                     .detail(format!(
                         "Transaction not in mempool: {}",
                         missing_tx.to_string()
@@ -154,8 +154,7 @@ impl Handler<RollBack> for TestKitActor {
     fn handle(&mut self, RollBack(height): RollBack, _ctx: &mut Self::Context) -> Self::Result {
         if height == Height(0) {
             return Err(api::Error::new(api::HttpStatusCode::BAD_REQUEST)
-                .title("RollBack handler failed.")
-                .detail("Cannot rollback past genesis block"));
+                .title("Cannot rollback past genesis block"));
         }
 
         if self.0.height() >= height {
