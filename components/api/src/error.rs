@@ -122,7 +122,7 @@ impl Error {
 
     /// Adds HTTP header, which will be added in `HttpResponse`
     #[doc(hidden)]
-    pub fn header(mut self, key: HeaderName, value: &str) -> Self {
+    fn header(mut self, key: HeaderName, value: &str) -> Self {
         self.headers.insert(key, value.parse().unwrap());
         self
     }
