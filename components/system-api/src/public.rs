@@ -23,7 +23,7 @@ use exonum::{
     merkledb::access::AsReadonly,
     runtime::{ArtifactId, DispatcherSchema, InstanceState, SnapshotExt},
 };
-use exonum_api::{self as api, ApiScope};
+use exonum_api::ApiScope;
 use exonum_node::SharedNodeState;
 use serde_derive::{Deserialize, Serialize};
 
@@ -97,7 +97,7 @@ impl SystemApi {
 
     fn handle_stats_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
+        api_scope.endpoint(name, move |_query: ()| {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             Ok(StatsInfo {
@@ -110,15 +110,13 @@ impl SystemApi {
     }
 
     fn handle_user_agent_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
-            Ok(user_agent())
-        });
+        api_scope.endpoint(name, move |_query: ()| Ok(user_agent()));
         self
     }
 
     fn handle_healthcheck_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
+        api_scope.endpoint(name, move |_query: ()| {
             Ok(HealthCheckInfo {
                 consensus_status: self.get_consensus_status(),
                 connected_peers: self.get_number_of_connected_peers(),
@@ -129,7 +127,7 @@ impl SystemApi {
 
     fn handle_list_services_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let self_ = self.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
+        api_scope.endpoint(name, move |_query: ()| {
             let snapshot = self_.blockchain.snapshot();
             Ok(DispatcherInfo::load(&snapshot.for_dispatcher()))
         });
