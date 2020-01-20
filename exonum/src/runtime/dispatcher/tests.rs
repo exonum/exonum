@@ -36,8 +36,8 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
-        ArtifactId, BlockchainData, CallInfo, Caller, CoreError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
+        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceStatus, MethodId, Runtime, RuntimeInstance,
     },
 };
@@ -71,18 +71,17 @@ pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
 }
 
 impl Dispatcher {
-    /// Similar to `Dispatcher::execute()`, but accepts universal `caller` and `call_info`.
+    /// Similar to `Dispatcher::execute()`, but accepts arbitrary `call_info`.
     pub(crate) fn call(
         &self,
         fork: &mut Fork,
-        caller: Caller,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::new(self, fork, caller);
+        let context = ExecutionContext::for_block_call(self, fork);
         runtime.execute(context, call_info, arguments)
     }
 
@@ -359,7 +358,7 @@ fn test_dispatcher_simple() {
         id: RUST_SERVICE_ID,
         name: RUST_SERVICE_NAME.into(),
     };
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     context
         .initiate_adding_service(rust_service, vec![])
         .expect("`initiate_adding_service` failed for rust");
@@ -378,7 +377,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -391,7 +389,7 @@ fn test_dispatcher_simple() {
         name: "inconspicuous-name".to_owned(),
     };
 
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
@@ -416,7 +414,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -424,7 +421,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
             &tx_payload,
         )
@@ -432,7 +428,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
             &tx_payload,
         )
@@ -440,7 +435,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -948,7 +942,7 @@ fn stopped_service_workflow() {
         id: instance_id,
         name: instance_name.into(),
     };
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     context
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
@@ -972,12 +966,7 @@ fn stopped_service_workflow() {
 
     // Check if transactions are still ready for execution.
     dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
-            &[],
-        )
+        .call(&mut fork, &CallInfo::new(instance_id, 0), &[])
         .expect("Service is not stopped yet, transaction should be processed");
 
     let dummy_descriptor = InstanceDescriptor {
@@ -998,12 +987,7 @@ fn stopped_service_workflow() {
 
     // Check if transactions become incorrect.
     dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
-            &[],
-        )
+        .call(&mut fork, &CallInfo::new(instance_id, 0), &[])
         .expect_err("Service was stopped, transaction shouldn't be processed");
 
     // Check that service schema is now unreachable.
@@ -1044,12 +1028,7 @@ fn stopped_service_workflow() {
     // Check if transactions is incorrect.
     let mut fork = db.fork();
     dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
-            &[],
-        )
+        .call(&mut fork, &CallInfo::new(instance_id, 0), &[])
         .expect_err("Service was stopped before restart, transaction shouldn't be processed");
 
     // Check that service schema is now unreachable.
@@ -1061,7 +1040,7 @@ fn stopped_service_workflow() {
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     context
         .initiate_adding_service(service, vec![])
         .expect_err("`initiate_adding_service` should failed");

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::{
+    crypto::Hash,
     helpers::Height,
     merkledb::{access::Prefixed, Fork},
     runtime::{
@@ -54,9 +55,15 @@ impl<'a> CallContext<'a> {
         self.data().for_executing_service()
     }
 
-    /// Returns the initiator of the actual transaction execution.
+    /// Returns the authorization information about this call.
     pub fn caller(&self) -> &Caller {
         &self.inner.caller
+    }
+
+    /// Returns the hash of the currently executing transaction, or `None` for non-transaction
+    /// root calls (e.g., `before_transactions` / `after_transactions` service hooks).
+    pub fn transaction_hash(&self) -> Option<Hash> {
+        self.inner.transaction_hash()
     }
 
     /// Returns a descriptor of the executing service instance.
