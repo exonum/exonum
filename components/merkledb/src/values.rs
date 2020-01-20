@@ -201,6 +201,9 @@ where
     }
 }
 
+/// Converts vector of byte vectors into flat byte vector. Also keeps their
+/// sizes as converted usize values and writes them before the vectors
+/// themselves to the output vector to be able to convert it back
 fn chunks_to_bytes(chunks: &Vec<Vec<u8>>) -> Vec<u8> {
     chunks
         .iter()
@@ -213,6 +216,8 @@ fn chunks_to_bytes(chunks: &Vec<Vec<u8>>) -> Vec<u8> {
         .collect()
 }
 
+/// Converts flat byte vector (produced by `chunks_to_bytes` function) into vector
+/// of serialized byte vectors. Size of output vector supposed equal `qty` param.
 fn bytes_into_sized_chunks<'a>(
     bytes: &'a Cow<[u8]>,
     qty: usize,
