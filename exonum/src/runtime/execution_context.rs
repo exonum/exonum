@@ -228,33 +228,13 @@ impl<'a> ExecutionContext<'a> {
             .initiate_adding_service(spec)
             .map_err(From::from)
     }
-}
 
-/// Collection of unstable execution context features.
-#[doc(hidden)]
-pub trait ExecutionContextUnstable {
     /// Re-borrows an execution context with the same interface name.
-    fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d>;
-    /// Re-borrows an execution context with the specified interface name.
-    fn reborrow_with_interface<'s>(
-        &'s mut self,
-        interface_name: &'s str,
-        instance: InstanceDescriptor<'s>,
-    ) -> ExecutionContext<'s>;
-    /// Returns the service matching the specified query.
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
-    /// Invokes the interface method of the instance with the specified ID.
-    /// You may override the instance ID of the one who calls this method by the given one.
-    fn make_child_call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-        caller: Option<InstanceId>,
-    ) -> Result<(), ExecutionError>;
-}
+    fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d> {
+        self.reborrow_with_interface(self.interface_name, instance)
+    }
 
-impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
+    /// Re-borrows an execution context with the specified interface name.
     fn reborrow_with_interface<'s>(
         &'s mut self,
         interface_name: &'s str,
@@ -270,11 +250,25 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
             call_stack_depth: self.call_stack_depth,
         }
     }
+}
 
-    fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d> {
-        self.reborrow_with_interface(self.interface_name, instance)
-    }
+/// Collection of unstable execution context features.
+#[doc(hidden)]
+pub trait ExecutionContextUnstable {
+    /// Returns the service matching the specified query.
+    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
+    /// Invokes the interface method of the instance with the specified ID.
+    /// You may override the instance ID of the one who calls this method by the given one.
+    fn make_child_call(
+        &mut self,
+        interface_name: &str,
+        call_info: &CallInfo,
+        arguments: &[u8],
+        caller: Option<InstanceId>,
+    ) -> Result<(), ExecutionError>;
+}
 
+impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
     fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
         self.dispatcher.get_service(id)
     }
