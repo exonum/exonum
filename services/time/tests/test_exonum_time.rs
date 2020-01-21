@@ -16,7 +16,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
-    runtime::{ErrorMatch, InstanceId, SnapshotExt},
+    runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, Snapshot};
 use exonum_rust_runtime::ServiceFactory;
@@ -366,8 +366,6 @@ fn test_selected_time_less_than_time_in_storage() {
 
 #[test]
 fn test_creating_transaction_is_not_validator() {
-    use exonum::runtime::CommonError;
-
     let mut testkit = create_testkit_with_validators(1);
 
     let keypair = gen_keypair();

@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! HTTP API for the time service. All APIs are accessible from the public HTTP server
-//! of the node.
+//! HTTP API for the time service. All APIs are accessible from the public HTTP
+//! server of the node.
 //!
-//! # Get Current Time
+//! # Public API Endpoints
+//!
+//! ## Get Current Time
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -25,14 +27,15 @@
 //! | Return type | `Option<DateTime<Utc>>` |
 //!
 //! Returns the current stored time available in `exonum-time` service.
-//! `None` will be returned if there is no enough data to provide a trusted time yet.
+//! `None` will be returned if there is no enough data to provide a trusted
+//! time yet.
 //!
 //! ```
 //! # use chrono::{DateTime, Utc};
 //! # use exonum::{helpers::Height, runtime::InstanceId};
 //! # use exonum_rust_runtime::ServiceFactory;
-//! # use exonum_time::{TimeServiceFactory, TimeSchema};
 //! # use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! # use exonum_time::TimeServiceFactory;
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
@@ -52,20 +55,85 @@
 //! let response: Option<DateTime<Utc>> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
 //!     .get("v1/current_time")?;
-//!
 //! // Since no blocks were created yet, time is not available.
 //! assert!(response.is_none());
 //!
 //! // Create some blocks and try again.
 //! testkit.create_blocks_until(Height(5));
-//! let response: Option<DateTime<Utc>> = api.public(ApiKind::Service(TIME_SERVICE_NAME))
+//! let response: Option<DateTime<Utc>> = api
+//!     .public(ApiKind::Service(TIME_SERVICE_NAME))
 //!     .get("v1/current_time")?;
-//!
 //! // At this moment, time should be available.
 //! assert!(response.is_some());
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # Private API Endpoints
+//!
+//! ## Get Validators Times
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/{INSTANCE_NAME}/v1/validators_times` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | Vec<[`ValidatorTime`]> |
+//!
+//! [`ValidatorTime`]: struct.ValidatorTime.html
+//!
+//! Returns the list of `ValidatorTime` objects for every node that is currently
+//! a validator.
+//!
+//! ```
+//! # use chrono::{DateTime, Utc};
+//! # use exonum::{helpers::Height, runtime::InstanceId};
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! # use exonum_time::{TimeServiceFactory, ValidatorTime};
+//! # const TIME_SERVICE_ID: InstanceId = 100;
+//! const TIME_SERVICE_NAME: &'static str = "time-oracle";
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let time_service_factory = TimeServiceFactory::default();
+//! let time_service_artifact = time_service_factory.artifact_id();
+//! let mut testkit: TestKit = TestKitBuilder::validator()
+//!     .with_artifact(time_service_artifact.clone())
+//!     .with_instance(
+//!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
+//!     )
+//!     .with_rust_service(time_service_factory)
+//!     .create();
+//! let api = testkit.api();
+//! testkit.create_blocks_until(Height(5));
+//!
+//! // Obtain validator times.
+//! let response: Vec<ValidatorTime> = api
+//!     .private(ApiKind::Service(TIME_SERVICE_NAME))
+//!     .get("v1/validators_times")?;
+//! for validator in response {
+//!     assert!(validator.time.is_some());
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Get All Times
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/{INSTANCE_NAME}/v1/validators_times/all` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | Vec<[`ValidatorTime`]> |
+//!
+//! Similar to [`/validator_times`] endpoint, but returns a list of
+//! `ValidatorTime` objects for every node that participated in the
+//! time consolidating process (some of them may not be validators
+//! anymore).
+//!
+//! [`ValidatorTime`]: struct.ValidatorTime.html
+//! [`/validator_times`]: #get-validator-times
 
 use chrono::{DateTime, Utc};
 use exonum::crypto::PublicKey;

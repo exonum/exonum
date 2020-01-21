@@ -14,21 +14,23 @@
 
 //! The time oracle service for Exonum.
 //!
-//! Time service is designed to be a trusted source of actual time for the Exonum blockchain services.
-//! With this service, user services are able to access the calendar time supplied by validator nodes
-//! to the blockchain.
+//! Time service is designed to be a trusted source of actual time for the
+//! Exonum blockchain services.
+//! With this service, user services are able to access the calendar time
+//! supplied by validator nodes to the blockchain.
 //!
 //! # Basics of the Approach
 //!
-//! Each validator at a specific time sends a transaction indicating its local time
-//! (usually immediately after the commit of each block). The time service maintains an index with the
-//! most current time values indicated separately by each validator. This index is updated after each
-//! transaction from any of the validators. A 1/3 quantile of these values (ordered by decreasing time)
-//! is then picked out from the index; this quantile is considered the actual time and is applied to
-//! determine the exact service time.
+//! Each validator at a specific time sends a transaction indicating its local
+//! time (usually immediately after the commit of each block). The time service
+//! maintains an index with the most current time values indicated separately by
+//! each validator. This index is updated after each transaction from any of the
+//! validators. A 1/3 quantile of these values (ordered by decreasing time) is
+//! then picked out from the index; this quantile is considered the actual time
+//! and is applied to determine the exact service time.
 //!
-//! See [the Exonum documentation][docs:time] for a high-level overview of the service,
-//! in particular, its design rationale and the proof of correctness.
+//! See [the Exonum documentation][docs:time] for a high-level overview of the
+//! service, in particular, its design rationale and the proof of correctness.
 //!
 //! [docs:time]: https://exonum.com/doc/version/latest/advanced/time
 //!
@@ -41,14 +43,14 @@
 //! ## Use with TestKit
 //!
 //! ```
-//! use chrono::{TimeZone, Duration, Utc};
+//! use chrono::{TimeZone, Utc};
 //! use exonum::{
 //!     helpers::Height,
 //!     runtime::{InstanceId, SnapshotExt},
 //! };
 //! use exonum_rust_runtime::ServiceFactory;
-//! use exonum_time::{MockTimeProvider, TimeProvider, TimeServiceFactory, TimeSchema};
-//! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! use exonum_testkit::{TestKit, TestKitBuilder};
+//! use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
 //!
 //! use std::sync::Arc;
 //!
@@ -57,8 +59,8 @@
 //!
 //! // Time provider for a time service is chosen at the compile time.
 //! // Here we use `MockTimeProvider` to get controllable results.
-//! // In real world it makes sense to use `SystemTimeProvider` or your own implementation
-//! // of `TimeProvider`.
+//! // In real world it makes sense to use `SystemTimeProvider` or your
+//! // own implementation of `TimeProvider`.
 //! let time_provider = Arc::new(MockTimeProvider::default());
 //!
 //! // Factory for time service will create instances of the service with given
@@ -71,8 +73,8 @@
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with_artifact(time_service_artifact.clone())
 //!     .with_instance(
-//!            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-//!        )
+//!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
+//!     )
 //!     .with_rust_service(time_service_factory)
 //!     // Add other services here
 //!     .create();
@@ -90,15 +92,16 @@
 //! // Obtain time from the schema. Service can base its logic on this time.
 //! let time = time_schema.time.get();
 //!
-//! // With `MockServiceProvider` we can ensure that time is based on data provided by `TimeProvider`.
+//! // With `MockServiceProvider` we can ensure that time is based on data
+//! // provided by `TimeProvider`.
 //! assert_eq!(time, Some(time_provider.time()));
 //! ```
 //!
 //! ## Interaction with other service
 //!
-//! Example of interaction with the time service can be found [at github].
+//! Example of interaction with the time service can be found [at GitHub].
 //!
-//! [at github]: https://github.com/exonum/exonum/blob/master/services/time/examples/simple_service/main.rs
+//! [at GitHub]: https://github.com/exonum/exonum/blob/master/services/time/examples/simple_service/main.rs
 
 #![deny(
     unsafe_code,
@@ -167,8 +170,8 @@ pub struct TimeServiceFactory {
 impl TimeServiceFactory {
     /// Create a new `TimeServiceFactory` with the custom time provider.
     ///
-    /// One can implement a custom time provider by implementing [`TimeProvider`]
-    /// trait.
+    /// One can implement a custom time provider by implementing
+    /// [`TimeProvider`] trait.
     ///
     /// [`TimeProvider`]: trait.TimeProvider.html
     pub fn with_provider(time_provider: impl Into<Arc<dyn TimeProvider>>) -> Self {
