@@ -16,8 +16,8 @@
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
-    exonum_merkledb::DbOptions,
     keys::{read_keys_from_file, Keys},
+    merkledb::DbOptions,
 };
 use exonum_node::{
     ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig,
