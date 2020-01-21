@@ -69,6 +69,29 @@
 //!
 //! [semantically versioned]: https://semver.org/
 //!
+//! ## Transactions versioning
+//!
+//! To be able to process transactions, service must have a static mapping between numeric
+//! identifier of transaction and logic of transaction processing. Logic of transaction processing
+//! may include deserializing input parameters from byte array, processing the input and reporting
+//! the execution result (which can be either successful or unsuccessful).
+//!
+//! **Important:** Transaction numeric identifier is considered a constant during all the time of
+//! service existence. It means that if transaction was declared with certain ID, its logic can
+//! be updated (e.g., to fix a bug) or be removed, but it **never** should be replaced with other
+//! transaction.
+//!
+//! If transaction was removed from service, attempt to invoke it should always
+//! result in returning an `ExecutionError`.
+//!
+//! You should use [`CommonError::MethodRemoved`] to report the error in case a method was removed.
+//!
+//! At the same time, Exonum core does not provide a tool for marking transaction as deprecated.
+//! It is expected that service authors will notify users about transaction deprecation via
+//! documentation update or in any other applicable way.
+//!
+//! [`CommonError::MethodRemoved`]: ../enum.CommonError.html#variant.MethodRemoved
+//!
 //! # Versioning for clients
 //!
 //! To defend against these scenarios, Exonum provides following defences.
