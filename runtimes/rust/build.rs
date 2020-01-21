@@ -21,4 +21,10 @@ fn main() {
         .with_crypto()
         .with_common()
         .generate();
+
+    // API Tests.
+    ProtobufGenerator::with_mod_name("test_runtime_api_protobuf_mod.rs")
+        .with_input_dir("tests/runtime_api/proto")
+        .with_includes(&["tests/runtime_api/proto".into()])
+        .generate();
 }
