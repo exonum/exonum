@@ -724,9 +724,10 @@ impl<'a> ExecutionContext<'a> {
         caller_service_id: Option<InstanceId>,
     ) -> ExecutionContext<'_> {
         ExecutionContext {
-            caller: caller_service_id
-                .map(|instance_id| Caller::Service { instance_id })
-                .unwrap_or_else(|| self.caller.clone()),
+            caller: caller_service_id.map_or_else(
+                || self.caller.clone(),
+                |instance_id| Caller::Service { instance_id },
+            ),
             transaction_hash: self.transaction_hash,
             dispatcher: self.dispatcher,
             fork: self.fork,

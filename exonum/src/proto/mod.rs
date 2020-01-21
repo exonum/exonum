@@ -24,6 +24,8 @@ pub use self::schema::{
 use exonum_proto::ProtobufConvert;
 use failure::{ensure, Error};
 
+use std::convert::TryFrom;
+
 use crate::helpers::{Height, Round, ValidatorId};
 
 pub mod schema;
@@ -64,7 +66,7 @@ impl ProtobufConvert for ValidatorId {
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         ensure!(
-            pb <= u32::from(u16::max_value()),
+            u16::try_from(pb).is_ok(),
             "{} is out of range for valid ValidatorId",
             pb
         );

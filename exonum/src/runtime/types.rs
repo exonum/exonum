@@ -197,6 +197,7 @@ pub struct ArtifactId {
 mod pb_version {
     use super::*;
 
+    #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
     pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
         pb.parse().map_err(From::from)
     }
@@ -748,6 +749,7 @@ pub struct InstanceState {
 mod pb_optional_version {
     use super::*;
 
+    #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
     pub fn from_pb(pb: String) -> Result<Option<Version>, failure::Error> {
         if pb.is_empty() {
             Ok(None)

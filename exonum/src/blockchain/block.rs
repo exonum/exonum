@@ -95,12 +95,12 @@ impl AdditionalHeaders {
 
     /// Insert new header to the map.
     pub fn insert<K: BlockHeaderKey>(&mut self, value: K::Value) {
-        self.headers.0.insert(K::NAME.into(), value.to_bytes());
+        self.headers.0.insert(K::NAME.into(), value.into_bytes());
     }
 
     /// Get header from the map.
     pub fn get<K: BlockHeaderKey>(&self) -> Option<&[u8]> {
-        self.headers.0.get(K::NAME).map(|v| v.as_slice())
+        self.headers.0.get(K::NAME).map(Vec::as_slice)
     }
 }
 
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn block() {
         let mut additional_headers = AdditionalHeaders::new();
-        additional_headers.insert::<Hash>(hash(&[0u8; 10]));
+        additional_headers.insert::<Hash>(hash(&[0_u8; 10]));
 
         let txs = [4, 5, 6];
         let height = Height(123_345);
@@ -338,7 +338,7 @@ mod tests {
         let hash_without_entries = block_without_entries.object_hash();
 
         let mut entries = AdditionalHeaders::new();
-        entries.insert::<Hash>(hash(&[0u8; 10]));
+        entries.insert::<Hash>(hash(&[0_u8; 10]));
 
         let block_with_entries = create_block(entries);
         let hash_with_entries = block_with_entries.object_hash();

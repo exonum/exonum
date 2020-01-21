@@ -297,6 +297,7 @@ fn test_builder() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // Adequate for a test
 fn test_dispatcher_simple() {
     const RUST_SERVICE_ID: InstanceId = 2;
     const JAVA_SERVICE_ID: InstanceId = 3;
@@ -780,7 +781,7 @@ fn delayed_deployment() {
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 }
 
-fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, artifact_name: &str) {
+fn test_failed_deployment(db: &Arc<TemporaryDB>, runtime: &DeploymentRuntime, artifact_name: &str) {
     let blockchain = Blockchain::new(
         Arc::clone(&db) as Arc<dyn Database>,
         gen_keypair(),
@@ -810,16 +811,14 @@ fn test_failed_deployment(db: Arc<TemporaryDB>, runtime: DeploymentRuntime, arti
 fn failed_deployment() {
     let db = Arc::new(TemporaryDB::new());
     let runtime = DeploymentRuntime::default();
-    test_failed_deployment(db, runtime, "bad");
+    test_failed_deployment(&db, &runtime, "bad");
 }
 
 #[test]
 fn failed_deployment_with_node_restart() {
     let db = Arc::new(TemporaryDB::new());
     let runtime = DeploymentRuntime::default();
-    let db_ = Arc::clone(&db);
-    let runtime_ = runtime.clone();
-    panic::catch_unwind(|| test_failed_deployment(db_, runtime_, "recoverable_after_restart"))
+    panic::catch_unwind(|| test_failed_deployment(&db, &runtime, "recoverable_after_restart"))
         .expect_err("Node didn't stop after unsuccessful sync deployment");
 
     let snapshot = db.snapshot();
@@ -888,6 +887,7 @@ fn recoverable_error_during_deployment() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)] // Adequate for a test
 fn stopped_service_workflow() {
     let instance_id = 0;
     let instance_name = "supervisor";

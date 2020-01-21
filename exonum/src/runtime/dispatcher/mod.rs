@@ -97,8 +97,8 @@ impl CommittedServices {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
             InstanceQuery::Name(name) => {
-                let id = *self.instance_names.get(name)?;
-                (id, self.instances.get(&id)?)
+                let resolved_id = *self.instance_names.get(name)?;
+                (resolved_id, self.instances.get(&resolved_id)?)
             }
 
             InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
@@ -542,7 +542,7 @@ impl Dispatcher {
     fn call_service_hooks(
         &self,
         fork: &mut Fork,
-        call_type: CallType,
+        call_type: &CallType,
     ) -> Vec<(CallInBlock, ExecutionError)> {
         self.service_infos
             .active_instances()
@@ -584,7 +584,7 @@ impl Dispatcher {
         &self,
         fork: &mut Fork,
     ) -> Vec<(CallInBlock, ExecutionError)> {
-        self.call_service_hooks(fork, CallType::BeforeTransactions)
+        self.call_service_hooks(fork, &CallType::BeforeTransactions)
     }
 
     /// Calls `after_transactions` for all currently active services, isolating each call.
@@ -593,7 +593,7 @@ impl Dispatcher {
     /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
-        let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
+        let errors = self.call_service_hooks(fork, &CallType::AfterTransactions);
         self.activate_pending(fork);
         errors
     }

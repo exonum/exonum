@@ -540,7 +540,7 @@ impl InstanceInitParams {
     pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
         InstanceInitParams {
             instance_spec: self.instance_spec,
-            constructor: constructor.to_bytes(),
+            constructor: constructor.into_bytes(),
             non_exhaustive: (),
         }
     }
