@@ -1,0 +1,27 @@
+[package]
+name = "exonum-rust-runtime-api-tests"
+version = "0.0.0"
+edition = "2018"
+authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["exonum", "runtime", "api", "tests"]
+categories = ["cryptography"]
+description = "The test crate for testing rust runtime API endpoints."
+
+[badges]
+travis-ci = { repository = "exonum/exonum" }
+
+[dependencies]
+exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
+exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+
+protobuf = "2.10.1"
+assert_matches = "1.3.0"
+pretty_assertions = "0.6.1"
+
+[build-dependencies]
+exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }

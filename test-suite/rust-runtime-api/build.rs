@@ -14,11 +14,10 @@
 
 use exonum_build::ProtobufGenerator;
 
+// API Tests.
 fn main() {
-    // Benchmarks.
-    ProtobufGenerator::with_mod_name("benches_proto_mod.rs")
-        .with_input_dir("benches/criterion/proto")
-        .with_crypto()
-        .with_common()
+    ProtobufGenerator::with_mod_name("test_runtime_api_protobuf_mod.rs")
+        .with_input_dir("src/proto")
+        .with_includes(&["src/proto".into()])
         .generate();
 }
