@@ -378,7 +378,7 @@ fn test_explorer_transaction_info() {
         info,
         json!({
             "type": "in_pool",
-            "content": tx,
+            "message": tx,
         })
     );
 

@@ -257,7 +257,7 @@ mod tests {
 
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx);
+        assert_eq!(block_info.transactions[0].message(), &tx);
 
         let block_info: BlockWithTransactions = api
             .private("api/testkit")
@@ -275,7 +275,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx);
+        assert_eq!(block_info.transactions[0].message(), &tx);
     }
 
     #[test]
@@ -297,7 +297,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx_foo);
+        assert_eq!(block_info.transactions[0].message(), &tx_foo);
 
         let body = CreateBlock {
             tx_hashes: Some(vec![tx_bar.object_hash()]),
@@ -309,7 +309,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(2));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx_bar);
+        assert_eq!(block_info.transactions[0].message(), &tx_bar);
     }
 
     #[test]
