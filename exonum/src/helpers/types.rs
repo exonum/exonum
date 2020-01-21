@@ -284,11 +284,8 @@ impl Round {
     /// assert_eq!(Some(Round(1)), iter.next());
     /// assert_eq!(None, iter.next());
     /// ```
-    pub fn iter_to(self, to: Self) -> RoundRangeIter {
-        RoundRangeIter {
-            next: self,
-            last: to,
-        }
+    pub fn iter_to(self, to: Self) -> impl Iterator<Item = Self> {
+        (self.0..to.0).map(Round)
     }
 }
 
@@ -367,27 +364,5 @@ impl From<ValidatorId> for u16 {
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
         val.0 as usize
-    }
-}
-
-/// Iterator over rounds range.
-#[derive(Debug)]
-pub struct RoundRangeIter {
-    next: Round,
-    last: Round,
-}
-
-// TODO: Add (or replace by) `Step` implementation. (ECR-165)
-impl Iterator for RoundRangeIter {
-    type Item = Round;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.next < self.last {
-            let res = Some(self.next);
-            self.next.increment();
-            res
-        } else {
-            None
-        }
     }
 }
