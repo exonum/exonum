@@ -19,12 +19,12 @@
 //! The core type in this module is the [`Access`] trait, which provides ability to access
 //! [indexes] from the database. The `Access` trait has several implementations:
 //!
-//! - `Access` is implemented for [`RawAccess`]es, that is, types that provides access to the
+//! - `Access` is implemented for [`RawAccess`]es, that is, types that provide access to the
 //!   entire database. [`Snapshot`], [`Fork`] and [`ReadonlyFork`] fall into this category.
 //! - [`Prefixed`] restricts an access to a single *namespace*.
 //! - [`Migration`]s are used for data created during [migrations]. Similar to `Prefixed`, migrations
 //!   are separated by namespaces.
-//! - [`Scratchpad`]s can be used for temporary data. They too are distinguished by a namespace.
+//! - [`Scratchpad`]s can be used for temporary data. They are distinguished by namespaces as well.
 //!
 //! [`AccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
 //! is useful in quick-and-dirty testing. For more complex applications, consider deriving
