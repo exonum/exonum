@@ -377,7 +377,7 @@ fn execute_transaction(
     };
 
     let (block_hash, patch) = blockchain.create_patch(
-        ValidatorId::zero().into(),
+        ValidatorId::zero(),
         height,
         &[tx_hash],
         &mut BTreeMap::new(),
@@ -779,7 +779,7 @@ fn blockchain_height() {
 
     // Create one block.
     let (_, patch) = blockchain.create_patch(
-        ValidatorId::zero().into(),
+        ValidatorId::zero(),
         Height::zero(),
         &[],
         &mut BTreeMap::new(),

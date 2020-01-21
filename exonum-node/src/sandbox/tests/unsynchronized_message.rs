@@ -96,7 +96,7 @@ fn test_queue_propose_message_from_next_height() {
     let sandbox_state = SandboxState::new();
     let tx = gen_timestamping_tx();
     let mut block_at_first_height = sandbox.create_block(&[tx.clone()]);
-    block_at_first_height.add_header::<ProposerId>(ValidatorId(0).into());
+    block_at_first_height.add_header::<ProposerId>(ValidatorId(0));
 
     let future_propose = sandbox.create_propose(
         ValidatorId(0),

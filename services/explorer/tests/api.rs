@@ -83,7 +83,7 @@ fn test_explorer_blocks_basic() {
         .unwrap();
 
     let mut headers = AdditionalHeaders::new();
-    headers.insert::<ProposerId>(ValidatorId(0).into());
+    headers.insert::<ProposerId>(ValidatorId(0));
 
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(1));

@@ -258,7 +258,7 @@ fn main() {
     let block_count = explorer
         .blocks(Height(1)..) // skip genesis block
         .filter(|block| {
-            block.header().get_header::<ProposerId>().unwrap().unwrap() == ValidatorId(0).into()
+            block.header().get_header::<ProposerId>().unwrap() == Some(ValidatorId(0))
         })
         .count();
     assert_eq!(block_count, 1);

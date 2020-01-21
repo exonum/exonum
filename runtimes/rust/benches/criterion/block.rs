@@ -121,7 +121,7 @@ fn create_consensus_config_and_blockchain_base(
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
     blockchain.create_patch(
-        ValidatorId::zero().into(),
+        ValidatorId::zero(),
         Height(height),
         txs,
         &mut BTreeMap::new(),

@@ -15,9 +15,8 @@
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{BinaryValue, MapProof};
 use exonum_proto::ProtobufConvert;
-use failure::Error;
 
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
 
 use crate::{
     crypto::Hash,
@@ -41,35 +40,13 @@ pub trait BlockHeaderKey {
     type Value: BinaryValue;
 }
 
-/// Proposer identifier.
+/// Identifier of a proposer of the block.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ProposerId(pub ValidatorId);
-
-impl fmt::Display for ProposerId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl BinaryValue for ProposerId {
-    fn to_bytes(&self) -> Vec<u8> {
-        (self.0).0.to_bytes()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-        Ok(Self(ValidatorId(u16::from_bytes(bytes)?)))
-    }
-}
-
-impl From<ValidatorId> for ProposerId {
-    fn from(validator_id: ValidatorId) -> Self {
-        ProposerId(validator_id)
-    }
-}
+pub struct ProposerId(());
 
 impl BlockHeaderKey for ProposerId {
     const NAME: &'static str = "proposer_id";
-    type Value = Self;
+    type Value = ValidatorId;
 }
 
 /// Expandable set of headers allowed to be added to the block.

@@ -259,7 +259,7 @@ impl BlockchainMut {
         self.merge(patch).unwrap();
 
         let (_, patch) = self.create_patch(
-            ValidatorId::zero().into(),
+            ValidatorId::zero(),
             Height::zero(),
             &[],
             &mut BTreeMap::new(),
@@ -279,7 +279,7 @@ impl BlockchainMut {
     /// from the current storage state and returns them with the hash of the resulting block.
     pub fn create_patch(
         &self,
-        proposer_id: ProposerId,
+        proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
@@ -291,7 +291,7 @@ impl BlockchainMut {
     pub(crate) fn create_patch_inner(
         &self,
         mut fork: Fork,
-        proposer_id: ProposerId,
+        proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
@@ -336,7 +336,7 @@ impl BlockchainMut {
     fn create_block_header(
         &self,
         fork: Fork,
-        proposer_id: ProposerId,
+        proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Patch, Block) {
