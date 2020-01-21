@@ -27,7 +27,7 @@ use crate::{
     proto::schema::messages,
 };
 
-/// Protobuf based container for any signed messages.
+/// Protobuf-based container for an arbitrary signed message.
 ///
 /// See module [documentation](index.html#examples) for examples.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
@@ -38,7 +38,7 @@ pub struct SignedMessage {
     pub payload: Vec<u8>,
     /// `PublicKey` of the author of the message.
     pub author: PublicKey,
-    /// Digital signature over `payload` created with `SecretKey` of the author of the message.
+    /// Digital signature over `payload` created with th secret key of the author of the message.
     pub signature: Signature,
 }
 
