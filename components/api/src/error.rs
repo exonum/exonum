@@ -121,7 +121,6 @@ impl Error {
     }
 
     /// Adds HTTP header, which will be added in `HttpResponse`
-    #[doc(hidden)]
     pub(crate) fn header(mut self, key: HeaderName, value: &str) -> Self {
         self.headers.insert(key, value.parse().unwrap());
         self
