@@ -689,7 +689,7 @@ impl Runtime for RustRuntime {
                 panic!(
                     "Received non-expected service status: {}; \
                      Rust runtime isn't prepared to process this action, \
-                     probably node binary is configured incorrectly",
+                     probably Rust runtime is outdated relative to the core library",
                     other
                 );
             }

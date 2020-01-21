@@ -221,7 +221,7 @@ impl ArtifactId {
 
     /// Creates a new artifact identifier from prepared parts without any checks.
     ///
-    /// Since the internal structure of `InstanceSpec` can change, this method is considered
+    /// Since the internal structure of `ArtifactId` can change, this method is considered
     /// unstable and can break in the future.
     ///
     /// Use this method only if you don't need an artifact verification (e.g. in tests).
