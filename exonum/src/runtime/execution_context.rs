@@ -229,7 +229,7 @@ impl<'a> ExecutionContext<'a> {
 pub trait ExecutionContextUnstable {
     /// Invokes the interface method of the instance with the specified ID.
     ///
-    /// See explanation about [`fallthrough_auth`](struct.ExecutionContext.html#fallthrough_auth).
+    /// See explanation about [`fallthrough_auth`](struct.ExecutionContext.html#child_context).
     fn make_child_call<'q>(
         &mut self,
         called_instance: impl Into<InstanceQuery<'q>>,
