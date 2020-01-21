@@ -16,7 +16,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{gen_keypair, PublicKey},
     helpers::Height,
-    runtime::{ErrorMatch, InstanceId, SnapshotExt},
+    runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt},
 };
 use exonum_merkledb::{access::Access, Snapshot};
 use exonum_rust_runtime::ServiceFactory;
@@ -27,11 +27,8 @@ use pretty_assertions::assert_eq;
 use std::{collections::HashMap, iter::FromIterator};
 
 use exonum_time::{
-    api::ValidatorTime,
-    schema::TimeSchema,
-    time_provider::MockTimeProvider,
-    transactions::{Error, TimeOracleInterface, TxTime},
-    TimeServiceFactory,
+    Error, MockTimeProvider, TimeOracleInterface, TimeSchema, TimeServiceFactory, TxTime,
+    ValidatorTime,
 };
 
 const INSTANCE_ID: InstanceId = 112;
@@ -377,7 +374,7 @@ fn test_creating_transaction_is_not_validator() {
     let block = testkit.create_block_with_transaction(tx);
     assert_eq!(
         *block[0].status().unwrap_err(),
-        ErrorMatch::from_fail(&Error::UnknownSender).for_service(INSTANCE_ID)
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(INSTANCE_ID)
     );
 
     let snapshot = testkit.snapshot();

@@ -46,7 +46,7 @@ impl TimeProvider for SystemTimeProvider {
 /// use chrono::{Utc, Duration, TimeZone};
 /// use exonum::{helpers::Height, runtime::SnapshotExt};
 /// use exonum_testkit::TestKit;
-/// use exonum_time::{time_provider::MockTimeProvider, schema::TimeSchema, TimeServiceFactory};
+/// use exonum_time::{MockTimeProvider, TimeSchema, TimeServiceFactory};
 ///
 /// # fn main() {
 /// let service_name = "time";
@@ -73,7 +73,7 @@ impl TimeProvider for SystemTimeProvider {
 /// ```
 ///
 /// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
-/// [`TimeService`]: ../struct.TimeService.html
+/// [`TimeService`]: struct.TimeService.html
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.

@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Service which uses the time oracle.
+//! Example of service which uses the time oracle.
+//!
+//! This example shows an implementation of a simple service which interacts
+//! with `exonum-time` service to obtain time.
+//!
+//! `main` function of example runs the `testkit` with both `exonum-time` and
+//! example services, and demonstrates their interaction.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
@@ -29,11 +35,7 @@ use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 use serde_derive::{Deserialize, Serialize};
 
-use exonum_time::{
-    schema::TimeSchema,
-    time_provider::{MockTimeProvider, TimeProvider},
-    TimeServiceFactory,
-};
+use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
 use std::sync::Arc;
 
 /// The argument of the `MarkerInterface::mark` method.
@@ -141,10 +143,7 @@ fn main() {
 
     let snapshot = testkit.snapshot();
     let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
-    assert_eq!(
-        time_schema.time.get().map(|time| time),
-        Some(mock_provider.time())
-    );
+    assert_eq!(time_schema.time.get(), Some(mock_provider.time()));
 
     let keypair1 = gen_keypair();
     let keypair2 = gen_keypair();

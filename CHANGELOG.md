@@ -148,6 +148,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   - `txvec` macro;
   - `TestKit::probe_all` and `TestKit::probe` methods.
 
+### exonum-time
+
+- Modules were made private, crate now provides re-exports of necessary types
+  instead (#1716)
+
 ### New features
 
 #### exonum
