@@ -26,7 +26,7 @@ use exonum_merkledb::{
 pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
     pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
-    /// Consolidated time.
+    /// Consolidated blockchain time, approved by validators.
     pub time: ProofEntry<T::Base, DateTime<Utc>>,
 }
 

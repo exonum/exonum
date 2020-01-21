@@ -165,10 +165,7 @@ pub struct AnyCall {
 impl AnyCall {
     pub fn new(call_info: CallInfo, arguments: impl BinaryValue) -> Self {
         Self {
-            inner: AnyTx {
-                call_info,
-                arguments: arguments.into_bytes(),
-            },
+            inner: AnyTx::new(call_info, arguments.into_bytes()),
             fallthrough_auth: false,
             interface_name: String::default(),
         }

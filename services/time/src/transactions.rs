@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::runtime::{ExecutionContext, ExecutionError};
+use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use serde::{Deserialize, Serialize};
@@ -23,10 +23,8 @@ use crate::{proto, schema::TimeSchema, TimeService};
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, ExecutionFail)]
 pub enum Error {
-    /// The sender of the transaction is not among the active validators.
-    UnknownSender = 0,
     /// The validator time that is stored in storage is greater than the proposed one.
-    ValidatorTimeIsGreater = 1,
+    ValidatorTimeIsGreater = 0,
 }
 
 /// Transaction that is sent by the validator after the commit of the block.
@@ -51,7 +49,10 @@ impl TxTime {
 pub trait TimeOracleInterface<Ctx> {
     /// Output of the methods in this interface.
     type Output;
+
     /// Receives a new time from one of validators.
+    ///
+    /// Transaction sent not by a validator will be discarded.
     #[interface_method(id = 0)]
     fn report_time(&self, ctx: Ctx, arg: TxTime) -> Self::Output;
 }
@@ -60,12 +61,15 @@ impl TimeOracleInterface<ExecutionContext<'_>> for TimeService {
     type Output = Result<(), ExecutionError>;
 
     fn report_time(&self, context: ExecutionContext<'_>, arg: TxTime) -> Self::Output {
-        let author = context.caller().author().ok_or(Error::UnknownSender)?;
+        let author = context
+            .caller()
+            .author()
+            .ok_or(CommonError::UnauthorizedCaller)?;
         // Check that the transaction is signed by a validator.
         let core_schema = context.data().for_core();
         core_schema
             .validator_id(author)
-            .ok_or(Error::UnknownSender)?;
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = TimeSchema::new(context.service_data());
         schema

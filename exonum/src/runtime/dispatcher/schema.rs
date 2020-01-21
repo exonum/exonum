@@ -150,6 +150,8 @@ impl<T: Access> Schema<T> {
                 .and_then(|instance_name| instances.get(&instance_name)),
 
             InstanceQuery::Name(instance_name) => instances.get(instance_name),
+
+            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 
@@ -194,10 +196,7 @@ impl Schema<&Fork> {
         // Add artifact to registry with pending status.
         self.artifacts().put(
             &artifact,
-            ArtifactState {
-                deploy_spec,
-                status: ArtifactStatus::Pending,
-            },
+            ArtifactState::new(deploy_spec, ArtifactStatus::Pending),
         );
         // Add artifact to pending artifacts queue.
         self.pending_artifacts().insert(artifact);
@@ -368,12 +367,7 @@ impl Schema<&Fork> {
         }
         instance_ids.put(&spec.id, spec.name.clone());
 
-        let new_instance = InstanceState {
-            spec,
-            data_version: None,
-            status: None,
-            pending_status: None,
-        };
+        let new_instance = InstanceState::from_raw_parts(spec, None, None, None);
         self.add_pending_status(new_instance, InstanceStatus::Active, None)
     }
 

@@ -224,10 +224,7 @@ fn checked_call_in_json() {
     let mut checked_call = CheckedCall {
         artifact_name: "test-artifact".to_string(),
         artifact_version: "^1.0.0".parse().unwrap(),
-        inner: AnyTx {
-            call_info: CallInfo::new(100, 0),
-            arguments: vec![],
-        },
+        inner: AnyTx::new(CallInfo::new(100, 0), vec![]),
     };
     assert_eq!(
         serde_json::to_value(&checked_call).unwrap(),

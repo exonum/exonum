@@ -279,13 +279,13 @@ impl CowInstanceDescriptor<'_> {
     fn as_ref(&self) -> InstanceDescriptor<'_> {
         match self {
             CowInstanceDescriptor::Borrowed(descriptor) => *descriptor,
-            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
+            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor::new(*id, name),
         }
     }
 
     fn into_owned(self) -> CowInstanceDescriptor<'static> {
         match self {
-            CowInstanceDescriptor::Borrowed(InstanceDescriptor { id, name }) => {
+            CowInstanceDescriptor::Borrowed(InstanceDescriptor { id, name, .. }) => {
                 CowInstanceDescriptor::Owned {
                     id,
                     name: name.to_owned(),

@@ -269,11 +269,7 @@ impl Rig {
     }
 
     fn deploy_artifact(&mut self, name: &str, version: Version) -> ArtifactId {
-        let artifact = ArtifactId {
-            runtime_id: MigrationRuntime::ID,
-            name: name.to_owned(),
-            version,
-        };
+        let artifact = ArtifactId::from_raw_parts(MigrationRuntime::ID, name.into(), version);
 
         let fork = self.blockchain.fork();
         Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
@@ -282,11 +278,7 @@ impl Rig {
     }
 
     fn initialize_service(&mut self, artifact: ArtifactId, name: &str) -> InstanceSpec {
-        let service = InstanceSpec {
-            artifact,
-            id: self.next_service_id,
-            name: name.to_owned(),
-        };
+        let service = InstanceSpec::from_raw_parts(self.next_service_id, name.to_owned(), artifact);
         self.next_service_id += 1;
 
         let mut fork = self.blockchain.fork();
@@ -450,11 +442,11 @@ fn migration_immediate_errors() {
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Attempt to migrate to unknown artifact.
-    let unknown_artifact = ArtifactId {
-        runtime_id: RuntimeIdentifier::Rust as _,
-        name: "good".to_owned(),
-        version: Version::new(0, 6, 0),
-    };
+    let unknown_artifact = ArtifactId::from_raw_parts(
+        RuntimeIdentifier::Rust as _,
+        "good".into(),
+        Version::new(0, 6, 0),
+    );
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact.clone(), &old_service.name)
@@ -888,11 +880,11 @@ fn migration_commit_workflow() {
     let res = schema.local_migration_result(&service.name).unwrap();
     assert_eq!(res.0.unwrap(), HashTag::empty_map_hash());
     let state = schema.get_instance(service.id).unwrap();
-    let expected_status = InstanceStatus::migrating(InstanceMigration {
-        target: new_artifact,
-        end_version: Version::new(0, 5, 0),
-        completed_hash: Some(HashTag::empty_map_hash()),
-    });
+    let expected_status = InstanceStatus::migrating(InstanceMigration::from_raw_parts(
+        new_artifact,
+        Version::new(0, 5, 0),
+        Some(HashTag::empty_map_hash()),
+    ));
     assert_eq!(state.status, Some(expected_status));
 }
 
@@ -1060,11 +1052,11 @@ fn migration_commit_without_completing_script_locally() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     let state = schema.get_instance(service.id).unwrap();
-    let expected_status = InstanceStatus::migrating(InstanceMigration {
-        target: new_artifact,
-        end_version: Version::new(0, 5, 0),
-        completed_hash: Some(migration_hash),
-    });
+    let expected_status = InstanceStatus::migrating(InstanceMigration::from_raw_parts(
+        new_artifact,
+        Version::new(0, 5, 0),
+        Some(migration_hash),
+    ));
     assert_eq!(state.status, Some(expected_status));
 
     // Flush the migration.

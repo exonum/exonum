@@ -133,6 +133,8 @@ message CallSite {
     BEFORE_TRANSACTIONS = 2;
     // Hook executing after processing transactions in a block.
     AFTER_TRANSACTIONS = 3;
+    // Service resuming routine.
+    RESUME = 4;
   }
 
   // Type of the call.

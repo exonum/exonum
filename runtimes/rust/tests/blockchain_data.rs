@@ -154,10 +154,7 @@ fn proof_for_index_in_snapshot() {
 #[test]
 fn proof_for_service_index() {
     let snapshot = setup_blockchain_for_index_proofs();
-    let instance = InstanceDescriptor {
-        id: 100,
-        name: "test",
-    };
+    let instance = InstanceDescriptor::new(100, "test");
     let data = BlockchainData::new(snapshot.as_ref(), instance);
     let proof = data.proof_for_service_index("list").unwrap();
     check_list_proof(&proof);
@@ -176,7 +173,7 @@ fn access_to_service_schema() {
         schema.private.set("Some value".to_owned());
     }
 
-    let instance = InstanceDescriptor { id: 0, name: "who" };
+    let instance = InstanceDescriptor::new(0, "who");
     let data = BlockchainData::new(&fork, instance);
     {
         let schema: Schema<_> = data.service_schema("token").unwrap();

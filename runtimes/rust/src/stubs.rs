@@ -109,10 +109,7 @@ impl GenericCall<InstanceId> for TxStub {
         }
 
         let call_info = CallInfo::new(instance_id, method.id);
-        AnyTx {
-            call_info,
-            arguments: args,
-        }
+        AnyTx::new(call_info, args)
     }
 }
 

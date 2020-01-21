@@ -948,21 +948,25 @@ pub struct SandboxBuilder {
 
 impl Default for SandboxBuilder {
     fn default() -> Self {
+        use exonum::blockchain::ConsensusConfigBuilder;
+
+        let consensus_config = ConsensusConfigBuilder::new()
+            .validator_keys(Vec::default())
+            .first_round_timeout(1000)
+            .status_timeout(600_000)
+            .peers_timeout(600_000)
+            .txs_block_limit(1000)
+            .max_message_len(1024 * 1024)
+            .min_propose_timeout(PROPOSE_TIMEOUT)
+            .max_propose_timeout(PROPOSE_TIMEOUT)
+            .propose_timeout_threshold(std::u32::MAX)
+            .build();
+
         Self {
             initialize: true,
             services: Vec::new(),
             validators_count: 4,
-            consensus_config: ConsensusConfig {
-                first_round_timeout: 1000,
-                status_timeout: 600_000,
-                peers_timeout: 600_000,
-                txs_block_limit: 1000,
-                max_message_len: 1024 * 1024,
-                min_propose_timeout: PROPOSE_TIMEOUT,
-                max_propose_timeout: PROPOSE_TIMEOUT,
-                propose_timeout_threshold: std::u32::MAX,
-                validator_keys: Vec::default(),
-            },
+            consensus_config,
             rust_runtime: RustRuntimeBuilder::new(),
             instances: Vec::new(),
             artifacts: HashMap::new(),
@@ -1130,16 +1134,11 @@ fn sandbox_with_services_uninitialized(
         })
         .collect();
 
-    let genesis = ConsensusConfig {
-        validator_keys: keys
-            .iter()
-            .map(|keys| ValidatorKeys {
-                consensus_key: keys.consensus_pk(),
-                service_key: keys.service_pk(),
-            })
-            .collect(),
-        ..consensus
-    };
+    let validator_keys = keys
+        .iter()
+        .map(|keys| ValidatorKeys::new(keys.consensus_pk(), keys.service_pk()))
+        .collect();
+    let genesis = consensus.with_validator_keys(validator_keys);
 
     let connect_list_config =
         ConnectListConfig::from_validator_keys(&genesis.validator_keys, &str_addresses);
@@ -1280,10 +1279,7 @@ mod unit_tests {
         // keypair.
         let consensus = gen_keypair();
         let service = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: consensus.0,
-            service_key: service.0,
-        };
+        let validator_keys = ValidatorKeys::new(consensus.0, service.0);
 
         let new_peer_addr = gen_primitive_socket_addr(2);
         // We also need to add public key from this keypair to the ConnectList.
@@ -1340,19 +1336,16 @@ mod unit_tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
+        let (consensus_key, consensus_secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key,
-        };
+        let validator_keys = ValidatorKeys::new(consensus_key, service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
-            &public,
+            &consensus_key,
             s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent(),
-            &secret,
+            &consensus_secret,
         ));
         s.send(
             s.public_key(ValidatorId(1)),
@@ -1373,10 +1366,7 @@ mod unit_tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key,
-        };
+        let validator_keys = ValidatorKeys::new(public, service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,
@@ -1394,10 +1384,7 @@ mod unit_tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key,
-        };
+        let validator_keys = ValidatorKeys::new(public, service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,
@@ -1423,10 +1410,7 @@ mod unit_tests {
         // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys {
-            consensus_key: public,
-            service_key,
-        };
+        let validator_keys = ValidatorKeys::new(public, service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
             &public,

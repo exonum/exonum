@@ -109,6 +109,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ExecutionContext` has been extended by the methods from the
   `exonum_rust_runtime::CallContext` so there is no need to use `CallContext`
    anymore. (#1711)
+- Public structures and enums were made non-exhaustive. (#1710)
 
 #### exonum-cli
 
@@ -134,6 +135,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
 
+- Public structures and enums were made non-exhaustive. (#1710)
+
 #### exonum-rust-runtime
 
 - Service interfaces now have to specify method IDs with either `interface_method`
@@ -147,6 +150,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   - `compare` module;
   - `txvec` macro;
   - `TestKit::probe_all` and `TestKit::probe` methods.
+
+### exonum-time
+
+- Modules were made private, crate now provides re-exports of necessary types
+  instead (#1716)
 
 ### New features
 

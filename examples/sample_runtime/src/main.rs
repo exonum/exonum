@@ -162,6 +162,10 @@ impl Runtime for SampleRuntime {
             InstanceStatus::Migrating(_) => {
                 // We don't migrate service data in this demo.
             }
+
+            _ => {
+                // We aren't interested in other possible statuses.
+            }
         }
     }
 
@@ -250,13 +254,8 @@ fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
 
-    let consensus = ConsensusConfig {
-        validator_keys: vec![ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
-        }],
-        ..ConsensusConfig::default()
-    };
+    let validator_keys = vec![ValidatorKeys::new(consensus_public_key, service_public_key)];
+    let consensus = ConsensusConfig::default().with_validator_keys(validator_keys);
 
     let keys = Keys::from_keys(
         consensus_public_key,
@@ -364,11 +363,8 @@ fn main() {
         blockchain_ref
             .sender()
             .broadcast_transaction(
-                AnyTx {
-                    call_info: CallInfo::new(instance_id, 0),
-                    arguments: 1_000_u64.into_bytes(),
-                }
-                .sign(service_keypair.0, &service_keypair.1),
+                AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes())
+                    .sign(service_keypair.0, &service_keypair.1),
             )
             .wait()
             .unwrap();
@@ -377,11 +373,8 @@ fn main() {
         blockchain_ref
             .sender()
             .broadcast_transaction(
-                AnyTx {
-                    call_info: CallInfo::new(instance_id, 1),
-                    arguments: Vec::default(),
-                }
-                .sign(service_keypair.0, &service_keypair.1),
+                AnyTx::new(CallInfo::new(instance_id, 1), Vec::default())
+                    .sign(service_keypair.0, &service_keypair.1),
             )
             .wait()
             .unwrap();

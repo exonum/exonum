@@ -104,6 +104,9 @@ use crate::runtime::{CoreError, ExecutionError, ExecutionFail, InstanceSpec};
 type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
 
 /// Errors that can occur in a migration script.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
 pub enum MigrationError {
     /// Error has occurred in the helper code, due to either a database-level failure (e.g.,
@@ -116,6 +119,10 @@ pub enum MigrationError {
     /// Custom error signalling that the migration cannot be completed.
     #[fail(display = "{}", _0)]
     Custom(String),
+
+    #[doc(hidden)]
+    #[fail(display = "")] // Never actually generated.
+    __NonExhaustive,
 }
 
 impl MigrationError {
@@ -234,6 +241,26 @@ pub struct MigrationContext {
     /// [`MigrationScript`]: struct.MigrationScript.html
     /// [`MigrateData`]: trait.MigrateData.html
     pub data_version: Version,
+
+    /// No-op field for forward compatibility.
+    non_exhaustive: (),
+}
+
+impl MigrationContext {
+    /// Creates a new `MigrationContext`. Public for `testkit`.
+    #[doc(hidden)]
+    pub fn new(
+        helper: MigrationHelper,
+        instance_spec: InstanceSpec,
+        data_version: Version,
+    ) -> Self {
+        Self {
+            helper,
+            instance_spec,
+            data_version,
+            non_exhaustive: (),
+        }
+    }
 }
 
 /// Encapsulates data migration logic.
@@ -515,24 +542,21 @@ mod tests {
         scripts: Vec<MigrationScript>,
     ) -> Box<dyn Snapshot> {
         let db = Arc::new(db);
-        let instance_spec = InstanceSpec {
-            id: 100,
-            name: "test".to_string(),
-            artifact: ArtifactId {
-                runtime_id: RuntimeIdentifier::Rust as _,
-                name: ARTIFACT_NAME.to_owned(),
-                version: start_version.clone(),
-            },
-        };
+        let artifact = ArtifactId::from_raw_parts(
+            RuntimeIdentifier::Rust as _,
+            ARTIFACT_NAME.to_owned(),
+            start_version.clone(),
+        );
+        let instance_spec = InstanceSpec::from_raw_parts(100, "test".to_string(), artifact);
         let mut version = start_version;
         let mut migration_hashes = HashSet::new();
 
         for script in scripts {
-            let mut context = MigrationContext {
-                helper: MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test"),
-                instance_spec: instance_spec.clone(),
-                data_version: version.clone(),
-            };
+            let mut context = MigrationContext::new(
+                MigrationHelper::new(Arc::clone(&db) as Arc<dyn Database>, "test"),
+                instance_spec.clone(),
+                version.clone(),
+            );
 
             let next_version = script.end_version().to_owned();
             assert!(

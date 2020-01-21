@@ -20,9 +20,11 @@ use crate::runtime::{ErrorKind, ExecutionError};
 
 /// List of possible core errors.
 ///
-/// Note that in most cases you don't need to spawn a core error,
-/// unless your service is providing some wrapper for core logic and
-/// should behave just like core.
+/// Note that in most cases you don't need to spawn a core error, unless your service is
+/// providing some wrapper for core logic and should behave just like core.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "core")]
@@ -57,6 +59,10 @@ pub enum CoreError {
     /// An attempt to resume the service instance with the wrong artifact. The specified
     /// artifact has a different name or an inappropriate version.
     CannotResumeService = 13,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive = 255,
 }
 
 impl CoreError {

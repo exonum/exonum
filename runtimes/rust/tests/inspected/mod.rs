@@ -184,11 +184,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     ) -> Result<(), ExecutionError> {
         let instance = context.instance();
         self.events.push(RuntimeEvent::StartAddingService(
-            InstanceSpec {
-                artifact: artifact.clone(),
-                id: instance.id,
-                name: instance.name.to_owned(),
-            },
+            InstanceSpec::from_raw_parts(instance.id, instance.name.to_owned(), artifact.clone()),
             parameters.clone(),
         ));
 
@@ -204,11 +200,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     ) -> Result<(), ExecutionError> {
         let instance = context.instance();
         self.events.push(RuntimeEvent::StartResumingService(
-            InstanceSpec {
-                artifact: artifact.clone(),
-                id: instance.id,
-                name: instance.name.to_owned(),
-            },
+            InstanceSpec::from_raw_parts(instance.id, instance.name.to_owned(), artifact.clone()),
             parameters.clone(),
         ));
 

@@ -32,10 +32,7 @@ const PREFIXED_IDX: (&str, u64) = ("idx", 42);
 // is not used in the main code, so it's intentionally placed here.
 impl From<(&str, u64)> for ResolvedAddress {
     fn from((name, id): (&str, u64)) -> Self {
-        Self {
-            name: name.to_owned(),
-            id: NonZeroU64::new(id),
-        }
+        Self::new(name, NonZeroU64::new(id))
     }
 }
 

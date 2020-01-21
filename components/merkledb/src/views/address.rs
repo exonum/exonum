@@ -292,12 +292,16 @@ pub struct ResolvedAddress {
 }
 
 impl ResolvedAddress {
-    /// Creates a system view. System views are low-level (i.e., they are not wrapped in indexes).
-    pub(crate) fn system(name: impl Into<String>) -> Self {
+    pub(crate) fn new(name: impl Into<String>, id: Option<NonZeroU64>) -> Self {
         Self {
             name: name.into(),
-            id: None,
+            id,
         }
+    }
+
+    /// Creates a system view. System views are low-level (i.e., they are not wrapped in indexes).
+    pub(crate) fn system(name: impl Into<String>) -> Self {
+        Self::new(name, None)
     }
 
     pub(crate) fn id_to_bytes(&self) -> Option<[u8; 8]> {

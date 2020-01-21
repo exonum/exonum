@@ -46,14 +46,14 @@
 //! # fn send<T>(_: T) {}
 //! let keypair = crypto::gen_keypair();
 //! // For example, get some `Status` message.
-//! let payload = Precommit {
-//!     validator: ValidatorId(0),
-//!     height: Height(15),
-//!     round: Round::first(),
-//!     propose_hash: crypto::hash(b"propose_hash"),
-//!     block_hash: crypto::hash(b"block_hash"),
-//!     time: Utc::now(),
-//! };
+//! let payload = Precommit::new(
+//!     ValidatorId(0),
+//!     Height(15),
+//!     Round::first(),
+//!     crypto::hash(b"propose_hash"),
+//!     crypto::hash(b"block_hash"),
+//!     Utc::now(),
+//! );
 //! // Sign the message with some keypair to get a trusted `Precommit` message.
 //! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
 //! // Further, convert the trusted message into a raw signed message and send
@@ -74,14 +74,14 @@
 //! # };
 //! # fn get_signed_message() -> SignedMessage {
 //! #     let keypair = crypto::gen_keypair();
-//! #     let payload = Precommit {
-//! #         validator: ValidatorId(0),
-//! #         height: Height(15),
-//! #         round: Round::first(),
-//! #         propose_hash: crypto::hash(b"propose_hash"),
-//! #         block_hash: crypto::hash(b"block_hash"),
-//! #         time: Utc::now(),
-//! #     };
+//! #     let payload = Precommit::new(
+//! #         ValidatorId(0),
+//! #         Height(15),
+//! #         Round::first(),
+//! #         crypto::hash(b"propose_hash"),
+//! #         crypto::hash(b"block_hash"),
+//! #         Utc::now(),
+//! #     );
 //! #     Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
 //! # }
 //! // Assume you have some signed message.
