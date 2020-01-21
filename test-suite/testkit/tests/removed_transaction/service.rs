@@ -17,7 +17,7 @@
 
 use exonum::runtime::{ExecutionError, InstanceId};
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
+use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service};
 
 pub const SERVICE_NAME: &str = "sample_service";
 pub const SERVICE_ID: InstanceId = 100;
@@ -35,10 +35,10 @@ pub trait SampleServiceInterface<Ctx> {
     // Method with ID 2 was removed.
 }
 
-impl SampleServiceInterface<CallContext<'_>> for SampleService {
+impl SampleServiceInterface<ExecutionContext<'_>> for SampleService {
     type Output = Result<(), ExecutionError>;
 
-    fn method_b(&self, _context: CallContext<'_>, _arg: u64) -> Self::Output {
+    fn method_b(&self, _context: ExecutionContext<'_>, _arg: u64) -> Self::Output {
         Ok(())
     }
 }

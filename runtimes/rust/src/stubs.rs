@@ -21,8 +21,8 @@ use exonum::{
     crypto::{PublicKey, SecretKey},
     messages::Verified,
     runtime::{
-        AnyTx, CallInfo, CoreError, ExecutionContext, ExecutionContextUnstable, ExecutionError,
-        InstanceId, InstanceQuery, MethodId,
+        AnyTx, CallInfo, ExecutionContext, ExecutionContextUnstable, ExecutionError, InstanceId,
+        InstanceQuery, MethodId,
     },
 };
 
@@ -45,31 +45,6 @@ impl<'a> MethodDescriptor<'a> {
             name,
             id,
         }
-    }
-
-    fn make_child_call<'q>(
-        &self,
-        context: &mut ExecutionContext<'_>,
-        called_id: impl Into<InstanceQuery<'q>>,
-        args: Vec<u8>,
-        fallthrough_auth: bool,
-    ) -> Result<(), ExecutionError> {
-        let descriptor = context
-            .get_service(called_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
-
-        let call_info = CallInfo {
-            instance_id: descriptor.id,
-            method_id: self.id,
-        };
-
-        let caller = if fallthrough_auth {
-            None
-        } else {
-            Some(context.instance().id)
-        };
-
-        context.make_child_call(self.interface_name, &call_info, &args, caller)
     }
 }
 
@@ -271,11 +246,17 @@ where
 
     fn generic_call_mut(
         &mut self,
-        called_id: I,
+        called_instance: I,
         method: MethodDescriptor<'_>,
         args: Vec<u8>,
     ) -> Self::Output {
-        method.make_child_call(self, called_id, args, false)
+        self.make_child_call(
+            called_instance,
+            method.interface_name,
+            method.id,
+            args.as_ref(),
+            false,
+        )
     }
 }
 
@@ -292,10 +273,16 @@ where
 
     fn generic_call_mut(
         &mut self,
-        called_id: I,
+        called_instance: I,
         method: MethodDescriptor<'_>,
         args: Vec<u8>,
     ) -> Self::Output {
-        method.make_child_call(&mut self.0, called_id, args, true)
+        self.0.make_child_call(
+            called_instance,
+            method.interface_name,
+            method.id,
+            args.as_ref(),
+            true,
+        )
     }
 }

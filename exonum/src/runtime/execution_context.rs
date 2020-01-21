@@ -20,7 +20,7 @@ use crate::{
     runtime::{
         ArtifactId, BlockchainData, CallInfo, CallSite, CallType, Caller, CoreError, Dispatcher,
         DispatcherSchema, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, InstanceStatus, SUPERVISOR_INSTANCE_ID,
+        InstanceSpec, InstanceStatus, MethodId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -142,58 +142,6 @@ impl<'a> ExecutionContext<'a> {
         SupervisorExtensions(self.reborrow(self.instance))
     }
 
-    pub(crate) fn child_context(
-        &mut self,
-        caller_service_id: Option<InstanceId>,
-    ) -> ExecutionContext<'_> {
-        ExecutionContext {
-            caller: caller_service_id
-                .map(|instance_id| Caller::Service { instance_id })
-                .unwrap_or_else(|| self.caller.clone()),
-            transaction_hash: self.transaction_hash,
-            dispatcher: self.dispatcher,
-            // TODO It would be better to replace instance here. [ECR-4075]
-            instance: self.instance,
-            fork: self.fork,
-            interface_name: "",
-            call_stack_depth: self.call_stack_depth + 1,
-        }
-    }
-
-    pub(crate) fn call(
-        &mut self,
-        interface_name: &str,
-        call_info: &CallInfo,
-        arguments: &[u8],
-    ) -> Result<(), ExecutionError> {
-        if self.call_stack_depth >= Self::MAX_CALL_STACK_DEPTH {
-            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
-            return Err(err);
-        }
-
-        let (runtime_id, runtime) = self
-            .dispatcher
-            .runtime_for_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
-        let instance = self
-            .dispatcher
-            .get_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
-        let reborrowed = self.reborrow_with_interface(interface_name, instance);
-        runtime
-            .execute(reborrowed, call_info, arguments)
-            .map_err(|mut err| {
-                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                    instance_id: call_info.instance_id,
-                    call_type: CallType::Method {
-                        interface: interface_name.to_owned(),
-                        id: call_info.method_id,
-                    },
-                });
-                err
-            })
-    }
-
     /// Initiates adding a new service instance to the blockchain. The created service is not active
     /// (i.e., does not process transactions or the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
@@ -250,38 +198,92 @@ impl<'a> ExecutionContext<'a> {
             call_stack_depth: self.call_stack_depth,
         }
     }
+
+    /// Creates context for the `make_child_call` invocation.
+    fn child_context<'s>(
+        &'s mut self,
+        interface_name: &'s str,
+        instance: InstanceDescriptor<'s>,
+        fallthrough_auth: bool,
+    ) -> ExecutionContext<'s> {
+        let caller = if fallthrough_auth {
+            self.caller.clone()
+        } else {
+            Caller::Service {
+                instance_id: self.instance.id,
+            }
+        };
+
+        ExecutionContext {
+            caller,
+            transaction_hash: self.transaction_hash,
+            dispatcher: self.dispatcher,
+            instance,
+            fork: &mut *self.fork,
+            interface_name,
+            call_stack_depth: self.call_stack_depth + 1,
+        }
+    }
 }
 
 /// Collection of unstable execution context features.
 #[doc(hidden)]
 pub trait ExecutionContextUnstable {
-    /// Returns the service matching the specified query.
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
     /// Invokes the interface method of the instance with the specified ID.
-    /// You may override the instance ID of the one who calls this method by the given one.
-    fn make_child_call(
+    /// 
+    /// 
+    fn make_child_call<'q>(
         &mut self,
+        called_instance: impl Into<InstanceQuery<'q>>,
         interface_name: &str,
-        call_info: &CallInfo,
+        method_id: MethodId,
         arguments: &[u8],
-        caller: Option<InstanceId>,
+        fallthrough_auth: bool,
     ) -> Result<(), ExecutionError>;
 }
 
 impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
-        self.dispatcher.get_service(id)
-    }
-
-    fn make_child_call(
+    fn make_child_call<'q>(
         &mut self,
+        called_instance: impl Into<InstanceQuery<'q>>,
         interface_name: &str,
-        call_info: &CallInfo,
+        method_id: MethodId,
         arguments: &[u8],
-        caller: Option<InstanceId>,
+        fallthrough_auth: bool,
     ) -> Result<(), ExecutionError> {
-        self.child_context(caller)
-            .call(interface_name, call_info, arguments)
+        if self.call_stack_depth + 1 >= Self::MAX_CALL_STACK_DEPTH {
+            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            return Err(err);
+        }
+
+        let descriptor = self
+            .dispatcher
+            .get_service(called_instance)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+
+        let call_info = CallInfo {
+            instance_id: descriptor.id,
+            method_id,
+        };
+
+        let (runtime_id, runtime) = self
+            .dispatcher
+            .runtime_for_service(call_info.instance_id)
+            .ok_or(CoreError::IncorrectRuntime)?;
+
+        let context = self.child_context(interface_name, descriptor, fallthrough_auth);
+        runtime
+            .execute(context, &call_info, arguments)
+            .map_err(|mut err| {
+                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
+                    instance_id: call_info.instance_id,
+                    call_type: CallType::Method {
+                        interface: interface_name.to_owned(),
+                        id: call_info.method_id,
+                    },
+                });
+                err
+            })
     }
 }
 
@@ -311,7 +313,7 @@ impl<'a> SupervisorExtensions<'a> {
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         self.0
-            .child_context(Some(SUPERVISOR_INSTANCE_ID))
+            .child_context("", self.0.instance, false)
             .initiate_adding_service(instance_spec, constructor)
     }
 
@@ -340,7 +342,7 @@ impl<'a> SupervisorExtensions<'a> {
         artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        let mut context = self.0.child_context(Some(SUPERVISOR_INSTANCE_ID));
+        let mut context = self.0.child_context("", self.0.instance, false);
 
         let state = DispatcherSchema::new(&*context.fork)
             .get_instance(instance_id)

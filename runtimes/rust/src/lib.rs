@@ -167,7 +167,7 @@
 //!
 //! ```
 //! # use exonum::runtime::{ExecutionError};
-//! # use exonum_rust_runtime::{CallContext, Service};
+//! # use exonum_rust_runtime::{ExecutionContext, Service};
 //! # use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
 //! #[exonum_interface(removed_method_ids(0, 2))]
 //! pub trait Transactions<Ctx> {
@@ -186,13 +186,13 @@
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
 //! pub struct SampleService;
 //!
-//! impl Transactions<CallContext<'_>> for SampleService {
+//! impl Transactions<ExecutionContext<'_>> for SampleService {
 //!     type Output = Result<(), ExecutionError>;
 //!
 //!     // Implement only existing methods in trait.
 //!     fn actual_method(
 //!         &self,
-//!         context: CallContext<'_>,
+//!         context: ExecutionContext<'_>,
 //!         arg: u64,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
