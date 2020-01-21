@@ -106,6 +106,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This method is used to resume a previously stopped services.
   (#1693)
 
+- Public structures and enums were made non-exhaustive. (#1710)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
@@ -129,6 +131,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
 
 - `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
+
+- Public structures and enums were made non-exhaustive. (#1710)
 
 #### exonum-rust-runtime
 

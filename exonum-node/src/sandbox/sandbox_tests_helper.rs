@@ -104,8 +104,8 @@ impl<'a> BlockBuilder<'a> {
             .proposer_id
             .unwrap_or_else(|| self.sandbox.current_leader());
 
-        let mut headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
-        headers.insert::<ProposerId>(proposer_id.into());
+        let mut additional_headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
+        additional_headers.insert::<ProposerId>(proposer_id.into());
 
         Block {
             height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
@@ -116,7 +116,7 @@ impl<'a> BlockBuilder<'a> {
                 .state_hash
                 .unwrap_or_else(|| self.sandbox.last_state_hash()),
             error_hash: self.error_hash.unwrap_or_else(HashTag::empty_map_hash),
-            additional_headers: headers,
+            additional_headers,
         }
     }
 }

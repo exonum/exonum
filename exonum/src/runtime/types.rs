@@ -58,6 +58,11 @@ pub struct CallInfo {
     pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl CallInfo {
@@ -66,6 +71,7 @@ impl CallInfo {
         Self {
             instance_id,
             method_id,
+            non_exhaustive: (),
         }
     }
 }
@@ -84,18 +90,18 @@ impl CallInfo {
 /// };
 ///
 /// let keypair = crypto::gen_keypair();
+/// // Service instance which we want to call.
+/// let instance_id = 1024;
+/// // Specific method of the service interface.
+/// let method_id = 0;
+/// let call_info = CallInfo::new(instance_id, method_id);
+///
+/// // `AnyTx` object created from `CallInfo` and payload.
+/// let arguments = "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes();
+/// let any_tx = AnyTx::new(call_info, arguments);
+///
 /// let transaction = Verified::from_value(
-///     AnyTx {
-///         call_info: CallInfo {
-///             // Service instance which we want to call.
-///             instance_id: 1024,
-///             // Specific method of the service interface.
-///             method_id: 0,
-///             ..CallInfo::default()
-///         },
-///         // Transaction payload.
-///         arguments: "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes()
-///     },
+///     any_tx,
 ///     keypair.0,
 ///     &keypair.1
 /// );
@@ -109,9 +115,23 @@ pub struct AnyTx {
     pub call_info: CallInfo,
     /// Serialized transaction arguments.
     pub arguments: Vec<u8>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl AnyTx {
+    /// Creates a new `AnyTx` object.
+    pub fn new(call_info: CallInfo, arguments: Vec<u8>) -> Self {
+        Self {
+            call_info,
+            arguments,
+            non_exhaustive: (),
+        }
+    }
+
     /// Signs a transaction with the specified Ed25519 keypair.
     pub fn sign(self, public_key: PublicKey, secret_key: &SecretKey) -> Verified<Self> {
         Verified::from_value(self, public_key, secret_key)
@@ -167,6 +187,11 @@ pub struct ArtifactId {
     /// Semantic version of the artifact.
     #[protobuf_convert(with = "self::pb_version")]
     pub version: Version,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 mod pb_version {
@@ -189,13 +214,24 @@ impl ArtifactId {
         name: impl Into<String>,
         version: Version,
     ) -> Result<Self, failure::Error> {
-        let artifact = Self {
-            runtime_id: runtime_id.into(),
-            name: name.into(),
-            version,
-        };
+        let artifact = Self::from_raw_parts(runtime_id.into(), name.into(), version);
         artifact.validate()?;
         Ok(artifact)
+    }
+
+    /// Creates a new artifact identifier from prepared parts without any checks.
+    ///
+    /// Since the internal structure of `ArtifactId` can change, this method is considered
+    /// unstable and can break in the future.
+    ///
+    /// Use this method only if you don't need an artifact verification (e.g. in tests).
+    pub fn from_raw_parts(runtime_id: u32, name: String, version: Version) -> Self {
+        Self {
+            runtime_id,
+            name,
+            version,
+            non_exhaustive: (),
+        }
     }
 
     /// Checks if the specified artifact is an upgraded version of another artifact.
@@ -255,11 +291,11 @@ impl FromStr for ArtifactId {
         let split = s.splitn(3, ':').collect::<Vec<_>>();
         match &split[..] {
             [runtime_id, name, version] => {
-                let artifact = Self {
-                    runtime_id: runtime_id.parse()?,
-                    name: name.to_string(),
-                    version: version.parse()?,
-                };
+                let artifact = Self::new(
+                    u32::from_str(runtime_id)?,
+                    name.to_string(),
+                    version.parse()?,
+                )?;
                 artifact.validate()?;
                 Ok(artifact)
             }
@@ -280,6 +316,11 @@ pub struct ArtifactSpec {
     pub artifact: ArtifactId,
     /// Runtime-specific artifact payload.
     pub payload: Vec<u8>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl ArtifactSpec {
@@ -288,6 +329,7 @@ impl ArtifactSpec {
         Self {
             artifact,
             payload: deploy_spec.into_bytes(),
+            non_exhaustive: (),
         }
     }
 }
@@ -314,23 +356,34 @@ pub struct InstanceSpec {
 
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl InstanceSpec {
-    /// Create a new instance specification or return an error
+    /// Creates a new instance specification or return an error
     /// if the resulting specification is not correct.
     pub fn new(
         id: InstanceId,
         name: impl Into<String>,
         artifact: impl AsRef<str>,
     ) -> Result<Self, failure::Error> {
-        let spec = Self {
-            id,
-            artifact: artifact.as_ref().parse()?,
-            name: name.into(),
-        };
+        let spec = Self::from_raw_parts(id, name.into(), artifact.as_ref().parse()?);
         spec.validate()?;
         Ok(spec)
+    }
+
+    /// Creates a new instance specification from prepared parts without any checks.
+    pub fn from_raw_parts(id: InstanceId, name: String, artifact: ArtifactId) -> Self {
+        Self {
+            id,
+            name,
+            artifact,
+            non_exhaustive: (),
+        }
     }
 
     /// Checks that the instance name contains only allowed characters and is not empty.
@@ -349,10 +402,7 @@ impl InstanceSpec {
 
     /// Return the corresponding descriptor of this instance specification.
     pub fn as_descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor {
-            id: self.id,
-            name: self.name.as_ref(),
-        }
+        InstanceDescriptor::new(self.id, self.name.as_ref())
     }
 }
 
@@ -372,12 +422,19 @@ impl Display for InstanceSpec {
 }
 
 /// Allows to query a service instance by either of the two identifiers.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum InstanceQuery<'a> {
     /// Query by an instance ID.
     Id(InstanceId),
     /// Query by an instance name.
     Name(&'a str),
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl From<InstanceId> for InstanceQuery<'_> {
@@ -393,12 +450,19 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 }
 
 /// Status of an artifact deployment.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArtifactStatus {
     /// The artifact is pending deployment.
     Pending = 1,
     /// The artifact has been successfully deployed.
     Active = 2,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl Display for ArtifactStatus {
@@ -406,6 +470,7 @@ impl Display for ArtifactStatus {
         match self {
             ArtifactStatus::Active => f.write_str("active"),
             ArtifactStatus::Pending => f.write_str("pending"),
+            ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 }
@@ -417,6 +482,7 @@ impl ProtobufConvert for ArtifactStatus {
         match self {
             ArtifactStatus::Active => schema::runtime::ArtifactState_Status::ACTIVE,
             ArtifactStatus::Pending => schema::runtime::ArtifactState_Status::PENDING,
+            ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 
@@ -452,14 +518,28 @@ pub struct InstanceMigration {
     #[protobuf_convert(with = "self::pb_optional_hash")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl InstanceMigration {
     pub(super) fn new(target: ArtifactId, end_version: Version) -> Self {
+        Self::from_raw_parts(target, end_version, None)
+    }
+
+    pub(super) fn from_raw_parts(
+        target: ArtifactId,
+        end_version: Version,
+        completed_hash: Option<Hash>,
+    ) -> Self {
         Self {
             target,
             end_version,
-            completed_hash: None,
+            completed_hash,
+            non_exhaustive: (),
         }
     }
 
@@ -492,6 +572,9 @@ mod pb_optional_hash {
 }
 
 /// Status of a service instance.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(BinaryValue)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -502,6 +585,10 @@ pub enum InstanceStatus {
     Stopped,
     /// The service instance is migrating to the specified artifact.
     Migrating(Box<InstanceMigration>),
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl InstanceStatus {
@@ -537,6 +624,7 @@ impl Display for InstanceStatus {
             InstanceStatus::Active => "active",
             InstanceStatus::Stopped => "stopped",
             InstanceStatus::Migrating(..) => "migrating",
+            InstanceStatus::__NonExhaustive => unreachable!("Never actually constructed"),
         })
     }
 }
@@ -557,6 +645,7 @@ impl InstanceStatus {
             Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
             Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
             Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
+            Some(InstanceStatus::__NonExhaustive) => unreachable!("Never actually constructed"),
         }
         pb
     }
@@ -597,6 +686,7 @@ impl ProtobufConvert for InstanceStatus {
 
 /// Current state of artifact in dispatcher.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::runtime::ArtifactState")]
 pub struct ArtifactState {
@@ -604,6 +694,11 @@ pub struct ArtifactState {
     pub deploy_spec: Vec<u8>,
     /// Artifact deployment status.
     pub status: ArtifactStatus,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl ArtifactState {
@@ -612,6 +707,7 @@ impl ArtifactState {
         Self {
             deploy_spec,
             status,
+            non_exhaustive: (),
         }
     }
 }
@@ -642,6 +738,11 @@ pub struct InstanceState {
     /// Pending status of instance if the value is not `None`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 mod pb_optional_version {
@@ -665,13 +766,18 @@ mod pb_optional_version {
 }
 
 impl InstanceState {
-    /// Creates a new instance state with the given specification and status.
-    pub fn new(spec: InstanceSpec, status: InstanceStatus) -> Self {
+    pub(crate) fn from_raw_parts(
+        spec: InstanceSpec,
+        data_version: Option<Version>,
+        status: Option<InstanceStatus>,
+        pending_status: Option<InstanceStatus>,
+    ) -> Self {
         Self {
             spec,
-            data_version: None,
-            status: Some(status),
-            pending_status: None,
+            data_version,
+            status,
+            pending_status,
+            non_exhaustive: (),
         }
     }
 

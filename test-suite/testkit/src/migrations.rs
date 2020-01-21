@@ -98,17 +98,17 @@ where
     }
 
     fn do_execute_script(&mut self, script: MigrationScript) {
-        let instance_spec = InstanceSpec {
-            id: 100,
-            name: Self::SERVICE_NAME.to_owned(),
-            artifact: self.service_factory.artifact_id(),
-        };
+        let instance_spec = InstanceSpec::from_raw_parts(
+            100,
+            Self::SERVICE_NAME.to_owned(),
+            self.service_factory.artifact_id(),
+        );
 
-        let mut context = MigrationContext {
-            helper: MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
+        let mut context = MigrationContext::new(
+            MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
             instance_spec,
-            data_version: self.data_version.clone(),
-        };
+            self.data_version.clone(),
+        );
         let end_version = script.end_version().to_owned();
         script.execute(&mut context).unwrap();
         context.helper.finish().unwrap();
@@ -199,11 +199,7 @@ mod tests {
 
     impl ServiceFactory for SomeService {
         fn artifact_id(&self) -> ArtifactId {
-            ArtifactId {
-                runtime_id: 0,
-                name: "exonum.test.Migrations".to_owned(),
-                version: Version::new(0, 3, 2),
-            }
+            ArtifactId::from_raw_parts(0, "exonum.test.Migrations".into(), Version::new(0, 3, 2))
         }
 
         fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {

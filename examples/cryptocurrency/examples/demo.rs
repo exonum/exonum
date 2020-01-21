@@ -28,13 +28,8 @@ fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
     let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
 
-    let consensus = ConsensusConfig {
-        validator_keys: vec![ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
-        }],
-        ..ConsensusConfig::default()
-    };
+    let validator_keys = vec![ValidatorKeys::new(consensus_public_key, service_public_key)];
+    let consensus = ConsensusConfig::default().with_validator_keys(validator_keys);
 
     let api_address = "0.0.0.0:8000".parse().unwrap();
     let api_cfg = NodeApiConfig {

@@ -89,20 +89,11 @@ impl EventHandler for MessagesHandler {
 }
 
 fn gen_messages(count: u64, tx_size: usize) -> Vec<Vec<u8>> {
-    let (p, s) = crypto::gen_keypair();
+    let (pk, sk) = crypto::gen_keypair();
     (0..count)
         .map(|_| {
-            let msg = Verified::from_value(
-                AnyTx {
-                    call_info: CallInfo {
-                        instance_id: 0,
-                        method_id: 0,
-                    },
-                    arguments: vec![0; tx_size],
-                },
-                p,
-                &s,
-            );
+            let any_tx = AnyTx::new(CallInfo::new(0, 0), vec![0; tx_size]);
+            let msg = Verified::from_value(any_tx, pk, &sk);
             msg.into_bytes()
         })
         .collect()

@@ -61,6 +61,7 @@ impl ServiceFactory {
     fn artifact_name(&self) -> impl ToTokens {
         if let Some(ref artifact_name) = self.artifact_name {
             // Check that artifact name contains only allowed characters and is not empty.
+            // It's better to check it now, than wait for panic in the runtime.
             if !check_artifact_name(artifact_name) {
                 panic!(
                     "Wrong characters used in artifact name. Use only: a-zA-Z0-9 and one of /_.-"
@@ -124,11 +125,11 @@ impl ToTokens for ServiceFactory {
         let expanded = quote! {
             impl #impl_generics #cr::ServiceFactory for #name #ty_generics #where_clause {
                 fn artifact_id(&self) -> #cr::_reexports::ArtifactId {
-                    #cr::_reexports::ArtifactId {
-                        runtime_id: #cr::_reexports::RuntimeIdentifier::Rust as _,
-                        name: #artifact_name.to_string(),
-                        version: #artifact_version.parse().expect("Cannot parse artifact version"),
-                    }
+                    #cr::_reexports::ArtifactId::new(
+                        #cr::_reexports::RuntimeIdentifier::Rust as u32,
+                        #artifact_name.to_string(),
+                        #artifact_version.parse().expect("Cannot parse artifact version"),
+                    ).expect("Invalid artifact identifier")
                 }
 
                 fn artifact_protobuf_spec(&self) -> #cr::ArtifactProtobufSpec {

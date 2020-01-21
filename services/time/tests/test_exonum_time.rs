@@ -324,9 +324,10 @@ fn test_selected_time_less_than_time_in_storage() {
 
     let cfg_change_height = Height(5);
     let new_cfg = {
-        let mut cfg = testkit.consensus_config();
-        cfg.validator_keys = vec![testkit.network_mut().add_node().public_keys()];
-        cfg
+        let validator_keys = vec![testkit.network_mut().add_node().public_keys()];
+        testkit
+            .consensus_config()
+            .with_validator_keys(validator_keys)
     };
 
     testkit.create_block_with_transaction(
@@ -537,13 +538,14 @@ fn test_endpoint_api() {
     let (public_key_0, secret_key_0) = validators[0].service_keypair();
     let cfg_change_height = Height(10);
     let new_cfg = {
-        let mut cfg = testkit.consensus_config();
-        cfg.validator_keys = vec![
+        let validator_keys = vec![
             testkit.network_mut().add_node().public_keys(),
             validators[1].public_keys(),
             validators[2].public_keys(),
         ];
-        cfg
+        testkit
+            .consensus_config()
+            .with_validator_keys(validator_keys)
     };
     testkit.create_block_with_transaction(
         ConfigPropose::new(0, cfg_change_height)

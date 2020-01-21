@@ -180,12 +180,12 @@ impl Block {
     ///
     /// // Create an empty block.
     /// let mut block = Block {
-    ///   #  height: Height(0),
-    ///   #  tx_count: 0,
-    ///   #  prev_hash: Hash::zero(),
-    ///   #  tx_hash: Hash::zero(),
-    ///   #  state_hash: Hash::zero(),
-    ///   #  error_hash: Hash::zero(),
+    ///     # height: Height(0),
+    ///     # tx_count: 0,
+    ///     # prev_hash: Hash::zero(),
+    ///     # tx_hash: Hash::zero(),
+    ///     # state_hash: Hash::zero(),
+    ///     # error_hash: Hash::zero(),
     ///     additional_headers: AdditionalHeaders::new(),
     /// };
     ///
@@ -217,6 +217,22 @@ pub struct BlockProof {
     pub block: Block,
     /// List of `Precommit` messages for the block.
     pub precommits: Vec<Verified<Precommit>>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl BlockProof {
+    /// Creates a new `BlockProof` object.
+    pub fn new(block: Block, precommits: Vec<Verified<Precommit>>) -> Self {
+        Self {
+            block,
+            precommits,
+            non_exhaustive: (),
+        }
+    }
 }
 
 /// Proof of authenticity for a single index within the database.
@@ -231,6 +247,22 @@ pub struct IndexProof {
     /// in the form `$service_name.$name_within_service`, e.g., `cryptocurrency.wallets`.
     /// The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
     pub index_proof: MapProof<String, Hash>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl IndexProof {
+    /// Creates a new `IndexProof` object.
+    pub fn new(block_proof: BlockProof, index_proof: MapProof<String, Hash>) -> Self {
+        Self {
+            block_proof,
+            index_proof,
+            non_exhaustive: (),
+        }
+    }
 }
 
 #[cfg(test)]
