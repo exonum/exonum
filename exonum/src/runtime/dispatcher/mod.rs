@@ -889,6 +889,7 @@ impl Mailbox {
 type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError> + Send>;
 
 /// Action to be performed by the dispatcher.
+// FIXME: Non-exhaustive
 pub enum Action {
     /// Start artifact deployment.
     StartDeploy {

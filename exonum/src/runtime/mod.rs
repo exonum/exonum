@@ -21,6 +21,15 @@
 //!
 //! # Artifacts
 //!
+//! An artifact creates service instances similar to classes in object-oriented programming.
+//! Artifacts reflect the assumption that deploying business logic onto the blockchain
+//! may take a long time, may fail, end up with differing results on different nodes, etc.
+//! Thus, artifacts decouple the complex *deployment* of the business logic from its instantiation
+//! (which we assume is simple / non-fallible).
+//!
+//! Depending on the runtime, an artifact may have an additional specification required
+//! for its deployment; e.g., files to be compiled.
+//!
 //! Each runtime has its own [artifacts] registry. Users can create services from the stored
 //! artifacts. An artifact identifier is required by the runtime to construct service instances.
 //! In other words, an artifact identifier is similar to a class name, and a specific
@@ -93,6 +102,18 @@
 //!
 //! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
 //!
+//! ## Service Hooks
+//!
+//! Each active service is called before any transactions in the block are processed;
+//! we call this `before_transactions` hook. The service may modify the blockchain state in this hook.
+//! Likewise, each active service is called after all transactions in the block have been processed
+//! (we call this `after_transactions` hook). These calls are quite similar to transactions:
+//!
+//! - Each call is isolated
+//! - Service logic may return an error, meaning that all state changes made within the hook
+//!   are rolled back
+//! - The service may call other services within the hook
+//!
 //! ## Service State Transitions
 //!
 //! Transitions between service states (including service creation) occur once the block
@@ -164,6 +185,8 @@
 //! [`Mailbox`]: struct.Mailbox.html
 //! [`ExecutionError`]: struct.ExecutionError.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.method_id
+
+// FIXME: remove `Dispatcher`?
 
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
@@ -252,18 +275,13 @@ impl fmt::Display for RuntimeIdentifier {
     }
 }
 
-/// Runtime environment for the Exonum services.
+/// Runtime environment for Exonum services.
 ///
 /// You can read more about the life cycle of services and transactions
-/// [above](index.html#service-life-cycle).
+/// [in the module docs](index.html#service-life-cycle).
 ///
 /// Using this trait, you can extend the Exonum blockchain with the services written in
-/// different languages. It assumes that the deployment procedure of a new service may be
-/// complex and long and even may fail. Therefore, an additional entity is introduced - *artifacts*.
-/// Each artifact has a unique identifier. Depending on the runtime, an artifact may have an
-/// additional specification required for its deployment; e.g., files to be compiled.
-/// An artifact creates corresponding service instances similar to classes in object-oriented
-/// programming.
+/// different languages.
 ///
 /// # Call Ordering
 ///
@@ -290,6 +308,7 @@ impl fmt::Display for RuntimeIdentifier {
 /// - `execute`
 /// - `after_transactions`
 /// - `initiate_adding_service`
+/// - `initiate_resuming_service`
 ///
 /// All these methods should also produce the same changes to the storage via
 /// the provided `ExecutionContext`. Discrepancy in node behavior within these methods may lead
@@ -343,6 +362,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
+    // FIXME: remove?
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
 
     /// Runs the constructor of a new service instance with the given specification
@@ -643,8 +663,7 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
     }
 }
 
-/// Provides the current state of the blockchain and the caller information for the transaction
-/// which is being executed.
+/// Provides the current state of the blockchain and the caller information for the call handler.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
@@ -652,9 +671,13 @@ pub struct ExecutionContext<'a> {
     pub fork: &'a mut Fork,
     /// The initiator of the transaction execution.
     pub caller: Caller,
-    /// Identifier of the service interface required for the call. Keep in mind that this field, in
-    /// fact, is a part of an unfinished "interfaces" feature. It will be replaced in future releases.
-    /// At the moment this field is always empty for the primary service interface.
+    /// Identifier of the service interface required for the call.
+    ///
+    /// # Stability
+    ///
+    /// This field is a part of an unfinished "interfaces" feature. It will be removed
+    /// in future releases. At the moment this field is empty for the primary
+    /// service interface.
     pub interface_name: &'a str,
     /// Hash of the currently executing transaction, or `None` for non-transaction calls.
     transaction_hash: Option<Hash>,

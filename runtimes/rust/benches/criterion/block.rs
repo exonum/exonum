@@ -192,7 +192,7 @@ mod cryptocurrency {
         crypto::PublicKey,
         merkledb::access::AccessExt,
         messages::Verified,
-        runtime::{AnyTx, ErrorKind, ExecutionError, InstanceId},
+        runtime::{AnyTx, ExecutionError, InstanceId},
     };
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
@@ -270,8 +270,7 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                let error_kind = ErrorKind::Service { code: 15 };
-                Err(ExecutionError::new(error_kind, ""))
+                Err(ExecutionError::service(15, ""))
             }
         }
     }

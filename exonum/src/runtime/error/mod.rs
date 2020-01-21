@@ -107,8 +107,7 @@ pub trait ExecutionFail {
 /// though.
 ///
 /// The error kind and call info affect the blockchain state hash, while the description does not.
-/// Therefore descriptions are mostly used for developer purposes, not for interaction of
-/// the system with users.
+/// Therefore descriptions are mostly used for developer purposes, not for interaction with users.
 ///
 /// [`ErrorKind`]: enum.ErrorKind.html
 /// [`CallSite`]: struct.CallSite.html
@@ -155,9 +154,10 @@ where
 ///
 /// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
 /// or in the service code, depending on the `kind` of the error.
+// FIXME: non-exhaustive
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
 pub struct CallSite {
-    /// ID of the service instance that has generated an error.
+    /// ID of the service instance handling the call.
     pub instance_id: InstanceId,
     /// Type of a call.
     #[serde(flatten)]
@@ -217,6 +217,7 @@ impl ProtobufConvert for CallSite {
 }
 
 /// Type of a call to a service.
+// FIXME: non-exhaustive
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
 pub enum CallType {
