@@ -28,5 +28,5 @@ message KeyValue {
 
 // A sequence of key-value pairs.
 message KeyValueSequence {
-  repeated KeyValue entry = 1;
+  repeated KeyValue entries = 1;
 }
