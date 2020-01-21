@@ -194,7 +194,7 @@ impl<'a> ExecutionContext<'a> {
     ///
     /// `fallthrough_auth` defines the rules of the caller authority for child calls:
     ///
-    /// - `true` means that caller do not authorize the request; caller field for child calls
+    /// - `true` means that caller does not authorize the request; caller field for child calls
     ///   will not be changed.
     /// - `false` value means than caller authorize themselves as initiator of child call;
     ///   caller field will be changed to the initiator of this call.
