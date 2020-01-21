@@ -117,7 +117,7 @@ pub struct Prefixed<'a, T> {
     prefix: Cow<'a, str>,
 }
 
-impl<'a, T: Access> Prefixed<'a, T> {
+impl<'a, T: RawAccess> Prefixed<'a, T> {
     /// Creates a new prefixed access.
     ///
     /// # Panics
