@@ -158,10 +158,7 @@ pub(crate) struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
-    fn current_time(
-        state: &api::ServiceApiState<'_>,
-        _query: (),
-    ) -> Result<Option<DateTime<Utc>>> {
+    fn current_time(state: &api::ServiceApiState<'_>, _query: ()) -> Result<Option<DateTime<Utc>>> {
         Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
