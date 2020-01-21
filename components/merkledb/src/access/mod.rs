@@ -13,6 +13,47 @@
 // limitations under the License.
 
 //! High-level access to database.
+//!
+//! # Overview
+//!
+//! The core type in this module is the [`Access`] trait, which provides ability to access
+//! [indexes] from the database. The `Access` trait has several implementations:
+//!
+//! - `Access` is implemented for [`RawAccess`]es, that is, types that provides access to the
+//!   entire database. [`Snapshot`], [`Fork`] and [`ReadonlyFork`] fall into this category.
+//! - [`Prefixed`] restricts an access to a single *namespace*.
+//! - [`Migration`]s are used for data created during [migrations]. Similar to `Prefixed`, migrations
+//!   are separated by namespaces.
+//! - [`Scratchpad`]s can be used for temporary data. They too are distinguished by a namespace.
+//!
+//! [`AccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
+//! is useful in quick-and-dirty testing. For more complex applications, consider deriving
+//! data schema via [`FromAccess`].
+//!
+//! # Guarantees
+//!
+//! - Namespaced accesses (`Prefixed`, `Migration`s and `Scratchpad`s) do not intersect (i.e.,
+//!   do not have common indexes) for different namespaces. They also do not intersect for
+//!   different access types, even for the same namespace; for example, a `Prefixed` access
+//!   can never access an index from a `Migration` or a `Scratchpad` and vice versa.
+//! - For all listed `Access` implementations, different addresses *within* an `Access` correspond
+//!   to different indexes.
+//! - However, if we consider multiple accesses, indexes can alias. For example, an index
+//!   with address `bar` from a `Prefixed<&Fork>` in namespace `foo` can also be accessed via
+//!   address `foo.bar` from the underlying `Fork`.
+//!
+//! [`Access`]: trait.Access.html
+//! [indexes]: ../index.html#indexes
+//! [`RawAccess`]: trait.RawAccess.html
+//! [`Snapshot`]: ../trait.Snapshot.html
+//! [`Fork`]: ../struct.Fork.html
+//! [`ReadonlyFork`]: ../struct.ReadonlyFork.html
+//! [`Prefixed`]: struct.Prefixed.html
+//! [`Migration`]: ../migration/struct.Migration.html
+//! [migrations]: ../migration/index.html
+//! [`Scratchpad`]: ../migration/struct.Scratchpad.html
+//! [`AccessExt`]: trait.AccessExt.html
+//! [`FromAccess`]: trait.FromAccess.html
 
 use failure::{Error, Fail};
 
@@ -111,7 +152,12 @@ impl<T: RawAccess> Access for T {
 ///
 /// Since the prefix itself cannot contain a dot, `Prefixed` accesses provide namespace
 /// separation. A set of indexes to which `Prefixed` provides access does not intersect
-/// with a set of indexes accessed by a `Prefixed` instance with another prefix.
+/// with a set of indexes accessed by a `Prefixed` instance with another prefix. Additionally,
+/// index in `Prefixed` accesses do not intersect with indexes in special-purpose `Access`
+/// implementations ([`Migration`]s and [`Scratchpad`]s).
+///
+/// [`Migration`]: ../migration/struct.Migration.html
+/// [`Scratchpad`]: ../migration/struct.Scratchpad.html
 ///
 /// # Examples
 ///
