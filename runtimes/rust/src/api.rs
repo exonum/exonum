@@ -137,7 +137,7 @@ impl ServiceApiScope {
         Self {
             inner: ApiScope::new(),
             blockchain,
-            descriptor: instance.into(),
+            descriptor: (instance.id, instance.name.to_owned()),
         }
     }
 
@@ -149,14 +149,14 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         self.inner
-            .endpoint(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let descriptor = (descriptor.0, descriptor.1.as_ref());
-                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            .endpoint(name, move |query: Q| -> FutureResult<I> {
+                let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
@@ -171,14 +171,14 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         self.inner
-            .endpoint_mut(name, move |query: Q| -> crate::api::FutureResult<I> {
-                let descriptor = (descriptor.0, descriptor.1.as_ref());
-                let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+            .endpoint_mut(name, move |query: Q| -> FutureResult<I> {
+                let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
                 let result = handler(&state, query);
                 Box::new(result.into_future())
             });
@@ -197,14 +197,14 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         let inner = deprecated.handler.clone();
-        let handler = move |query: Q| -> crate::api::FutureResult<I> {
-            let descriptor = (descriptor.0, descriptor.1.as_ref());
-            let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+        let handler = move |query: Q| -> FutureResult<I> {
+            let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
             let result = inner(&state, query);
             Box::new(result.into_future())
         };
@@ -226,14 +226,14 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = crate::api::Error> + 'static,
+        R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         let inner = deprecated.handler.clone();
-        let handler = move |query: Q| -> crate::api::FutureResult<I> {
-            let descriptor = (descriptor.0, descriptor.1.as_ref());
-            let state = ServiceApiState::from_api_context(&blockchain, descriptor.into(), name);
+        let handler = move |query: Q| -> FutureResult<I> {
+            let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
             let result = inner(&state, query);
             Box::new(result.into_future())
         };

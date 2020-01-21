@@ -851,20 +851,8 @@ impl<'a> InstanceDescriptor<'a> {
 }
 
 impl fmt::Display for InstanceDescriptor<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.id, self.name)
-    }
-}
-
-impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
-    fn from(descriptor: InstanceDescriptor<'_>) -> Self {
-        (descriptor.id, descriptor.name.to_owned())
-    }
-}
-
-impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
-    fn from((id, name): (InstanceId, &'a str)) -> Self {
-        InstanceDescriptor::new(id, name)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}:{}", self.id, self.name)
     }
 }
 
