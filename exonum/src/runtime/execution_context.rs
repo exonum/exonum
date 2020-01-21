@@ -196,7 +196,7 @@ impl<'a> ExecutionContext<'a> {
     ///
     /// - `true` means that caller does not authorize the request; caller field for child calls
     ///   will not be changed.
-    /// - `false` value means than caller authorize themselves as initiator of child call;
+    /// - `false` value means that caller authorizes themselves as initiator of child call;
     ///   caller field will be changed to the initiator of this call.
     fn child_context<'s>(
         &'s mut self,
