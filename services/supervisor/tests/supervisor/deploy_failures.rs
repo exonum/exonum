@@ -44,8 +44,8 @@ mod failing_runtime {
     use exonum::runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus,
-        Mailbox, Runtime, WellKnownRuntime,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus, Mailbox,
+        MethodId, Runtime, WellKnownRuntime,
     };
     use exonum_derive::ExecutionFail;
     use futures::{Future, IntoFuture};
@@ -126,7 +126,7 @@ mod failing_runtime {
         fn initiate_adding_service(
             &self,
             _context: ExecutionContext<'_>,
-            _spec: &InstanceSpec,
+            _artifact: &ArtifactId,
             _params: Vec<u8>,
         ) -> Result<(), ExecutionError> {
             unimplemented!("This runtime does not support service instantiation");
@@ -135,7 +135,7 @@ mod failing_runtime {
         fn initiate_resuming_service(
             &self,
             _context: ExecutionContext<'_>,
-            _spec: &InstanceSpec,
+            _artifact: &ArtifactId,
             _params: Vec<u8>,
         ) -> Result<(), ExecutionError> {
             unimplemented!("This runtime does not support service resuming");
@@ -162,7 +162,7 @@ mod failing_runtime {
         fn execute(
             &self,
             _context: ExecutionContext<'_>,
-            _call_info: &CallInfo,
+            _method_id: MethodId,
             _payload: &[u8],
         ) -> Result<(), ExecutionError> {
             unimplemented!("This runtime does not support service instantiation");

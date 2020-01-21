@@ -24,8 +24,8 @@ use exonum::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
         AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime,
-        SUPERVISOR_INSTANCE_ID,
+        InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, Mailbox, MethodId, Runtime,
+        SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -63,13 +63,17 @@ enum SampleRuntimeError {
 
 impl SampleRuntime {
     /// Create a new service instance with the given specification.
-    fn start_service(&self, spec: &InstanceSpec) -> Result<SampleService, ExecutionError> {
+    fn start_service(
+        &self,
+        artifact: &ArtifactId,
+        instance: InstanceDescriptor<'_>,
+    ) -> Result<SampleService, ExecutionError> {
         // Invariants guaranteed by the core.
-        assert!(self.deployed_artifacts.contains_key(&spec.artifact));
-        assert!(!self.started_services.contains_key(&spec.id));
+        assert!(self.deployed_artifacts.contains_key(artifact));
+        assert!(!self.started_services.contains_key(&instance.id));
 
         Ok(SampleService {
-            name: spec.name.clone(),
+            name: instance.name.to_owned(),
             ..SampleService::default()
         })
     }
@@ -106,21 +110,26 @@ impl Runtime for SampleRuntime {
     /// Initiates adding a new service and sets the counter value for this.
     fn initiate_adding_service(
         &self,
-        _context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        context: ExecutionContext<'_>,
+        artifact: &ArtifactId,
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let service_instance = self.start_service(spec)?;
+        let service_instance = self.start_service(artifact, context.instance())?;
         let new_value = u64::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         service_instance.counter.set(new_value);
-        println!("Initializing service {} with value {}", spec, new_value);
+        println!(
+            "Initializing service {}: {} with value {}",
+            artifact,
+            context.instance(),
+            new_value
+        );
         Ok(())
     }
 
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         unreachable!("We don't resume services in this example.")
@@ -138,7 +147,9 @@ impl Runtime for SampleRuntime {
                 // Unwrap here is safe, since by invocation of this method
                 // `exonum` guarantees that `initiate_adding_service` was invoked
                 // before and it returned `Ok(..)`.
-                let instance = self.start_service(spec).unwrap();
+                let instance = self
+                    .start_service(&spec.artifact, spec.as_descriptor())
+                    .unwrap();
                 println!("Starting service {}: {:?}", spec, instance);
                 self.started_services.insert(spec.id, instance);
             }
@@ -165,21 +176,23 @@ impl Runtime for SampleRuntime {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        method_id: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let service = self
             .started_services
-            .get(&call_info.instance_id)
+            .get(&context.instance().id)
             .ok_or(SampleRuntimeError::IncorrectCallInfo)?;
 
         println!(
             "Executing method {}#{} of service {}",
-            context.interface_name, call_info.method_id, call_info.instance_id
+            context.interface_name,
+            method_id,
+            context.instance().id
         );
 
         const SERVICE_INTERFACE: &str = "";
-        match (context.interface_name, call_info.method_id) {
+        match (context.interface_name, method_id) {
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())

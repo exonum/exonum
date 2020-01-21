@@ -324,8 +324,8 @@ use exonum::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId,
-        InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier, WellKnownRuntime,
+        ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -539,28 +539,36 @@ impl RustRuntime {
         Ok(())
     }
 
-    fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
-        if !self.deployed_artifacts.contains(&spec.artifact) {
+    fn new_service(
+        &self,
+        artifact: &ArtifactId,
+        instance: InstanceDescriptor<'_>,
+    ) -> Result<Instance, ExecutionError> {
+        if !self.deployed_artifacts.contains(artifact) {
             panic!(
-                "BUG: Core requested service instance start ({:?}) of not deployed artifact {:?}",
-                spec.name, spec.artifact
+                "BUG: Core requested service instance start ({}) of not deployed artifact {}",
+                instance.name, artifact
             );
         }
-        if self.started_services.contains_key(&spec.id) {
+        if self.started_services.contains_key(&instance.id) {
             panic!(
-                "BUG: Core requested service service instance start ({:?}) with already taken ID",
-                spec
+                "BUG: Core requested service service instance start ({}) with already taken ID",
+                instance
             );
         }
-        if self.started_services_by_name.contains_key(&spec.name) {
+        if self.started_services_by_name.contains_key(instance.name) {
             panic!(
-                "BUG: Core requested service service instance start ({:?}) with already taken name",
-                spec
+                "BUG: Core requested service service instance start ({}) with already taken name",
+                instance
             );
         }
 
-        let service = self.available_artifacts[&spec.artifact].create_instance();
-        Ok(Instance::new(spec.id, spec.name.clone(), service))
+        let service = self.available_artifacts[artifact].create_instance();
+        Ok(Instance::new(
+            instance.id,
+            instance.name.to_owned(),
+            service,
+        ))
     }
 
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
@@ -648,10 +656,10 @@ impl Runtime for RustRuntime {
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(spec)?;
+        let instance = self.new_service(artifact, context.instance())?;
         let service = instance.as_ref();
         catch_panic(|| service.initialize(context, parameters))
     }
@@ -659,10 +667,10 @@ impl Runtime for RustRuntime {
     fn initiate_resuming_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(spec)?;
+        let instance = self.new_service(artifact, context.instance())?;
         let service = instance.as_ref();
         catch_panic(|| service.resume(context, parameters))
     }
@@ -675,7 +683,9 @@ impl Runtime for RustRuntime {
     ) {
         match status {
             InstanceStatus::Active => {
-                let instance = self.new_service(spec).expect(
+                let instance = self
+                    .new_service(&spec.artifact, spec.as_descriptor())
+                    .expect(
                     "BUG: Attempt to create a new service instance failed; \
                      within `instantiate_adding_service` we were able to create a new instance, \
                      but now we are not.",
@@ -716,19 +726,18 @@ impl Runtime for RustRuntime {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        method_id: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let instance = self
             .started_services
-            .get(&call_info.instance_id)
+            .get(&context.instance().id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
-        let id = call_info.method_id;
         catch_panic(|| {
             instance
                 .as_ref()
-                .call(context.interface_name, id, context, payload)
+                .call(context.interface_name, method_id, context, payload)
         })
     }
 

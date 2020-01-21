@@ -26,8 +26,8 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
+        Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -179,29 +179,41 @@ impl<T: Runtime> Runtime for Inspected<T> {
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        let instance = context.instance();
         self.events.push(RuntimeEvent::StartAddingService(
-            spec.to_owned(),
+            InstanceSpec {
+                artifact: artifact.clone(),
+                id: instance.id,
+                name: instance.name.to_owned(),
+            },
             parameters.clone(),
         ));
+
         self.runtime
-            .initiate_adding_service(context, spec, parameters)
+            .initiate_adding_service(context, artifact, parameters)
     }
 
     fn initiate_resuming_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        let instance = context.instance();
         self.events.push(RuntimeEvent::StartResumingService(
-            spec.to_owned(),
+            InstanceSpec {
+                artifact: artifact.clone(),
+                id: instance.id,
+                name: instance.name.to_owned(),
+            },
             parameters.clone(),
         ));
+
         self.runtime
-            .initiate_resuming_service(context, spec, parameters)
+            .initiate_resuming_service(context, artifact, parameters)
     }
 
     fn update_service_status(
@@ -241,10 +253,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        method_id: MethodId,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        self.runtime.execute(context, call_info, arguments)
+        self.runtime.execute(context, method_id, arguments)
     }
 
     fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {

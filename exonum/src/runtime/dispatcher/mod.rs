@@ -537,7 +537,7 @@ impl Dispatcher {
             .ok_or(CoreError::IncorrectInstanceId)?;
         let context = ExecutionContext::for_transaction(self, fork, instance, tx.author(), tx_id);
 
-        let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);
+        let mut res = runtime.execute(context, call_info.method_id, &tx.as_ref().arguments);
         if let Err(ref mut err) = res {
             fork.rollback();
 

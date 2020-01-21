@@ -383,7 +383,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
@@ -401,7 +401,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     fn initiate_resuming_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError>;
 
@@ -522,7 +522,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        method_id: MethodId,
         arguments: &[u8],
     ) -> Result<(), ExecutionError>;
 

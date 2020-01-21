@@ -26,7 +26,7 @@ use crate::{
     helpers::ValidatorId,
     runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
-        CallInfo, CoreError, DispatcherSchema, ErrorMatch, RuntimeIdentifier, WellKnownRuntime,
+        CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 
@@ -55,7 +55,7 @@ impl Runtime for MigrationRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -64,7 +64,7 @@ impl Runtime for MigrationRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -112,7 +112,7 @@ impl Runtime for MigrationRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())

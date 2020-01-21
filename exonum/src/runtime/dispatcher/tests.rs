@@ -85,7 +85,7 @@ impl Dispatcher {
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
         let context = ExecutionContext::for_block_call(self, fork, instance);
-        runtime.execute(context, call_info, arguments)
+        runtime.execute(context, call_info.method_id, arguments)
     }
 
     /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
@@ -202,7 +202,7 @@ impl Runtime for SampleRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -211,7 +211,7 @@ impl Runtime for SampleRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -249,11 +249,11 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        context: ExecutionContext<'_>,
+        method_id: MethodId,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
-        if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
+        if context.instance().id == self.instance_id && method_id == self.method_id {
             Ok(())
         } else {
             let kind = ErrorKind::Service { code: 15 };
@@ -497,7 +497,7 @@ impl Runtime for ShutdownRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -506,7 +506,7 @@ impl Runtime for ShutdownRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -531,7 +531,7 @@ impl Runtime for ShutdownRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -690,7 +690,7 @@ impl Runtime for DeploymentRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -699,7 +699,7 @@ impl Runtime for DeploymentRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -724,7 +724,7 @@ impl Runtime for DeploymentRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())

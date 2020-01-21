@@ -18,7 +18,7 @@ use crate::{
     helpers::{Height, ValidateInput},
     merkledb::{access::Prefixed, BinaryValue, Fork},
     runtime::{
-        ArtifactId, BlockchainData, CallInfo, CallSite, CallType, Caller, CoreError, Dispatcher,
+        ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
         DispatcherSchema, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
         InstanceSpec, InstanceStatus, MethodId, SUPERVISOR_INSTANCE_ID,
     },
@@ -161,7 +161,7 @@ impl<'a> ExecutionContext<'a> {
 
         let context = self.reborrow(spec.as_descriptor());
         runtime
-            .initiate_adding_service(context, &spec, constructor.into_bytes())
+            .initiate_adding_service(context, &spec.artifact, constructor.into_bytes())
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite {
@@ -259,25 +259,20 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
             .get_service(called_instance)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        let call_info = CallInfo {
-            instance_id: descriptor.id,
-            method_id,
-        };
-
         let (runtime_id, runtime) = self
             .dispatcher
-            .runtime_for_service(call_info.instance_id)
+            .runtime_for_service(descriptor.id)
             .ok_or(CoreError::IncorrectRuntime)?;
 
         let context = self.child_context(interface_name, descriptor, fallthrough_auth);
         runtime
-            .execute(context, &call_info, arguments)
+            .execute(context, method_id, arguments)
             .map_err(|mut err| {
                 err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                    instance_id: call_info.instance_id,
+                    instance_id: descriptor.id,
                     call_type: CallType::Method {
                         interface: interface_name.to_owned(),
-                        id: call_info.method_id,
+                        id: method_id,
                     },
                 });
                 err
@@ -360,7 +355,7 @@ impl<'a> SupervisorExtensions<'a> {
         runtime
             .initiate_resuming_service(
                 self.0.child_context("", spec.as_descriptor(), false),
-                &spec,
+                &spec.artifact,
                 params.into_bytes(),
             )
             .map_err(|mut err| {
