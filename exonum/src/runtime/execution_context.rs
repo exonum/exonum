@@ -177,29 +177,27 @@ impl<'a> ExecutionContext<'a> {
             .map_err(From::from)
     }
 
-    /// Re-borrows an execution context with the same interface name.
+    /// Re-borrows an execution context with the given instance descriptor.
     fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d> {
-        self.reborrow_with_interface(self.interface_name, instance)
-    }
-
-    /// Re-borrows an execution context with the specified interface name.
-    fn reborrow_with_interface<'s>(
-        &'s mut self,
-        interface_name: &'s str,
-        instance: InstanceDescriptor<'s>,
-    ) -> ExecutionContext<'s> {
         ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller.clone(),
             transaction_hash: self.transaction_hash,
             instance,
-            interface_name,
+            interface_name: self.interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
         }
     }
 
     /// Creates context for the `make_child_call` invocation.
+    ///
+    /// `fallthrough_auth` defines the rules of the caller authority for child calls:
+    ///
+    /// - `true` means that caller do not authorize the request; caller field for child calls
+    ///   will not be changed.
+    /// - `false` value means than caller authorize themselves as initiator of child call;
+    ///   caller field will be changed to the initiator of this call.
     fn child_context<'s>(
         &'s mut self,
         interface_name: &'s str,
@@ -230,8 +228,8 @@ impl<'a> ExecutionContext<'a> {
 #[doc(hidden)]
 pub trait ExecutionContextUnstable {
     /// Invokes the interface method of the instance with the specified ID.
-    /// 
-    /// 
+    ///
+    /// See explanation about [`fallthrough_auth`](struct.ExecutionContext.html#fallthrough_auth).
     fn make_child_call<'q>(
         &mut self,
         called_instance: impl Into<InstanceQuery<'q>>,
@@ -342,9 +340,7 @@ impl<'a> SupervisorExtensions<'a> {
         artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
-        let mut context = self.0.child_context("", self.0.instance, false);
-
-        let state = DispatcherSchema::new(&*context.fork)
+        let state = DispatcherSchema::new(&*self.0.fork)
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
@@ -355,14 +351,15 @@ impl<'a> SupervisorExtensions<'a> {
         let mut spec = state.spec;
         spec.artifact = artifact;
 
-        let runtime = context
+        let runtime = self
+            .0
             .dispatcher
             .runtime_by_id(spec.artifact.runtime_id)
             .ok_or(CoreError::IncorrectRuntime)?;
 
         runtime
             .initiate_resuming_service(
-                context.reborrow(spec.as_descriptor()),
+                self.0.child_context("", spec.as_descriptor(), false),
                 &spec,
                 params.into_bytes(),
             )
@@ -375,7 +372,7 @@ impl<'a> SupervisorExtensions<'a> {
                 err
             })?;
 
-        DispatcherSchema::new(&*context.fork)
+        DispatcherSchema::new(&*self.0.fork)
             .initiate_resuming_service(instance_id, spec.artifact.clone())
             .map_err(From::from)
     }

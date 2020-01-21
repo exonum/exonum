@@ -17,7 +17,7 @@
 
 use exonum::runtime::{ExecutionError, InstanceId};
 use exonum_derive::*;
-use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service};
+use exonum_rust_runtime::{DefaultInstance, ExecutionContext, Service};
 
 pub const SERVICE_NAME: &str = "sample_service";
 pub const SERVICE_ID: InstanceId = 100;
