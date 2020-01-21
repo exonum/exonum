@@ -112,7 +112,7 @@ impl Blockchain {
     }
 
     /// Returns the transactions pool size.
-    #[doc(hidden)] // FIXME: move to separate schema
+    #[doc(hidden)]
     pub fn pool_size(&self) -> u64 {
         Schema::new(&self.snapshot()).transactions_pool_len()
     }

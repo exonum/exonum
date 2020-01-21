@@ -154,7 +154,6 @@ where
 ///
 /// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
 /// or in the service code, depending on the `kind` of the error.
-// FIXME: non-exhaustive
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
 pub struct CallSite {
     /// ID of the service instance handling the call.
@@ -162,6 +161,19 @@ pub struct CallSite {
     /// Type of a call.
     #[serde(flatten)]
     pub call_type: CallType,
+
+    #[serde(default, skip)]
+    non_exhaustive: (),
+}
+
+impl CallSite {
+    pub(crate) fn new(instance_id: InstanceId, call_type: CallType) -> Self {
+        Self {
+            instance_id,
+            call_type,
+            non_exhaustive: (),
+        }
+    }
 }
 
 impl fmt::Display for CallSite {
@@ -192,6 +204,7 @@ impl ProtobufConvert for CallSite {
             }
             CallType::BeforeTransactions => pb.set_call_type(BEFORE_TRANSACTIONS),
             CallType::AfterTransactions => pb.set_call_type(AFTER_TRANSACTIONS),
+            CallType::__NonExhaustive => unreachable!(),
         }
         pb
     }
@@ -209,15 +222,14 @@ impl ProtobufConvert for CallSite {
                 id: pb.get_method_id(),
             },
         };
-        Ok(Self {
-            instance_id: pb.get_instance_id(),
-            call_type,
-        })
+        Ok(Self::new(pb.get_instance_id(), call_type))
     }
 }
 
 /// Type of a call to a service.
-// FIXME: non-exhaustive
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
 pub enum CallType {
@@ -239,6 +251,11 @@ pub enum CallType {
     BeforeTransactions,
     /// Hook executing after processing transactions in a block.
     AfterTransactions,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    #[serde(skip)]
+    __NonExhaustive,
 }
 
 impl fmt::Display for CallType {
@@ -254,6 +271,7 @@ impl fmt::Display for CallType {
             }
             CallType::BeforeTransactions => formatter.write_str("before_transactions hook"),
             CallType::AfterTransactions => formatter.write_str("after_transactions hook"),
+            CallType::__NonExhaustive => unreachable!(),
         }
     }
 }

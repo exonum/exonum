@@ -778,12 +778,14 @@ impl<'a> ExecutionContext<'a> {
         runtime
             .execute(reborrowed, call_info, arguments)
             .map_err(|mut err| {
-                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                    instance_id: call_info.instance_id,
-                    call_type: CallType::Method {
-                        interface: interface_name.to_owned(),
-                        id: call_info.method_id,
-                    },
+                err.set_runtime_id(runtime_id).set_call_site(|| {
+                    CallSite::new(
+                        call_info.instance_id,
+                        CallType::Method {
+                            interface: interface_name.to_owned(),
+                            id: call_info.method_id,
+                        },
+                    )
                 });
                 err
             })
@@ -809,10 +811,7 @@ impl<'a> ExecutionContext<'a> {
             .initiate_adding_service(self.reborrow(), &spec, constructor.into_bytes())
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id: spec.id,
-                        call_type: CallType::Constructor,
-                    });
+                    .set_call_site(|| CallSite::new(spec.id, CallType::Constructor));
                 err
             })?;
 
@@ -942,10 +941,7 @@ impl<'a> SupervisorExtensions<'a> {
             .initiate_resuming_service(context.reborrow(), &spec, params.into_bytes())
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: CallType::Resume,
-                    });
+                    .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
                 err
             })?;
 
