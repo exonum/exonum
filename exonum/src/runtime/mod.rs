@@ -15,7 +15,7 @@
 //! Common building blocks that compose runtimes for the Exonum blockchain.
 //!
 //! Each runtime contains specific services that execute transactions, process events,
-//! provide user APIs, etc. A unified dispatcher redirects all the calls
+//! provide user APIs, etc. A unified *dispatcher* redirects all the calls
 //! and requests to an appropriate runtime environment. Thus, a blockchain interacts with the
 //! dispatcher, and not with specific runtime instances.
 //!
@@ -93,14 +93,14 @@
 //!   the transition to the "active" state is not immediate;
 //!   see [*Service State Transitions*](#service-state-transitions) section below.)
 //!
-//! 4. Active service instances can be stopped by a corresponding request to [`Dispatcher`].
+//! 4. Active service instances can be stopped by a corresponding request to the dispatcher.
 //!   A stopped service no longer participates in business logic, i.e. it does not process
 //!   transactions, events, does not interact with the users in any way.
 //!   Service data becomes unavailable for the other services, but still exists. The service name
 //!   and identifier remain reserved for the stopped service and can't be used again for
 //!   adding new services.
 //!
-//! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
+//! The dispatcher is responsible for persisting artifacts and services across node restarts.
 //!
 //! ## Service Hooks
 //!
@@ -142,7 +142,7 @@
 //!   the other network nodes if it is correct.
 //!
 //! 4. When the consensus algorithm finds a feasible candidate for the next block
-//!   of transactions, transactions in this block are passed to the [`Dispatcher`] for execution.
+//!   of transactions, transactions in this block are passed to the dispatcher for execution.
 //!
 //! 5. The dispatcher uses a lookup table to find the corresponding [`Runtime`] for each transaction
 //!   by the [`instance_id`] recorded in the transaction message. If the corresponding runtime exists,
@@ -174,7 +174,6 @@
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
-//! [`Dispatcher`]: struct.Dispatcher.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
 //! [`Runtime`]: trait.Runtime.html
 //! [execution]: trait.Runtime.html#execute
@@ -186,11 +185,10 @@
 //! [`ExecutionError`]: struct.ExecutionError.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.method_id
 
-// FIXME: remove `Dispatcher`?
-
+pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{Action as DispatcherAction, Dispatcher, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{Action as DispatcherAction, Mailbox, Schema as DispatcherSchema},
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
         ExecutionError, ExecutionFail, ExecutionStatus,
