@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The module containing building blocks for creating blockchains powered by the Exonum framework.
+//! Building blocks for creating blockchains powered by the Exonum framework.
 
 pub use self::{
     api_sender::{ApiSender, SendError},
@@ -198,8 +198,7 @@ impl BlockchainMut {
         self.inner.db.fork()
     }
 
-    /// Commits changes from the patch to the blockchain storage.
-    /// See [`Fork`](../../exonum_merkledb/struct.Fork.html) for details.
+    /// Commits changes from the `patch` to the blockchain storage.
     pub fn merge(&mut self, patch: Patch) -> StorageResult<()> {
         self.inner.db.merge(patch)
     }
@@ -459,7 +458,8 @@ impl BlockchainMut {
             .expect("Cannot update transaction pool");
     }
 
-    /// Shuts down the dispatcher. This should be the last operation performed on this instance.
+    /// Shuts down the service dispatcher enclosed by this blockchain. This must be
+    /// the last operation performed on the blockchain.
     pub fn shutdown(&mut self) {
         self.dispatcher.shutdown();
     }

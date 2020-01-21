@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum global variables which are stored in the blockchain as UTF-8 encoded
-//! JSON.
+//! Exonum blockchain configuration.
 //!
-//! This module includes all the elements of the `StoredConfiguration` which is
-//! used as the global configuration of the blockchain and should be the same for
-//! all validators in the network. The configuration includes the public keys of
-//! validators, consensus related parameters, hash of the previous configuration,
-//! etc.
+//! This module includes the components of the global configuration of the blockchain
+//! The configuration includes the public keys of validators, consensus related parameters,
+//! and built-in services (services deployed at the blockchain start).
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;

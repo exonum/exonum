@@ -57,9 +57,8 @@ define_names!(
     CONSENSUS_CONFIG => "consensus_config";
 );
 
-/// Transaction location in a block.
-/// The given entity defines the block where the transaction was
-/// included and the position of this transaction in that block.
+/// Transaction location in a block. Defines the block where the transaction was
+/// included and the position of this transaction in the block.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -122,16 +121,16 @@ impl<T: Access> Schema<T> {
     /// This method can be used to build a proof that execution of a certain transaction
     /// ended up with a particular status.
     /// For an execution that resulted in an error, this will be an usual proof of existence.
-    /// If transaction was executed successfully, such a proof will be a proof of absence.
+    /// If the transaction was executed successfully, such a proof will be a proof of absence.
     /// Since the number of transactions in a block is mentioned in the block header, the user
     /// will be able to distinguish absence of error (meaning successful execution) from
-    /// absence of transaction with such an index: if index is less than amount of transactions
-    /// in block, proof denotes successful execution, otherwise transaction with such an index
-    /// does not exist in the block.
+    /// the absence of a transaction with such an index. Indeed, if the index is less
+    /// than amount of transactions in block, the proof denotes successful execution;
+    /// otherwise, the transaction with the given index does not exist in the block.
     ///
-    /// Similarly, execution errors of the `before_transactions` / `after_transactions` hooks can be proven
-    /// to external clients. Discerning successful execution from a non-existing service requires prior knowledge
-    /// though.
+    /// Similarly, execution errors of the `before_transactions` / `after_transactions`
+    /// hooks can be proven to external clients. Discerning successful execution
+    /// from a non-existing service requires prior knowledge though.
     // TODO: Retain historic information about services [ECR-3922]
     pub fn call_errors(
         &self,
@@ -160,11 +159,11 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
-    pub(crate) fn transactions_len_index(&self) -> Entry<T::Base, u64> {
+    fn transactions_len_index(&self) -> Entry<T::Base, u64> {
         self.access.clone().get_entry(TRANSACTIONS_LEN)
     }
 
-    /// Returns the number of transactions in the blockchain.
+    /// Returns the number of committed transactions in the blockchain.
     pub fn transactions_len(&self) -> u64 {
         // TODO: Change a count of tx logic after replacement storage to MerkleDB. ECR-3087
         let pool = self.transactions_len_index();
@@ -218,6 +217,7 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an actual consensus configuration entry.
+    #[doc(hidden)]
     pub fn consensus_config_entry(&self) -> ProofEntry<T::Base, ConsensusConfig> {
         self.access.clone().get_proof_entry(CONSENSUS_CONFIG)
     }
@@ -239,7 +239,7 @@ impl<T: Access> Schema<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the "genesis block" was not created.
+    /// Panics if the genesis block was not created.
     pub fn last_block(&self) -> Block {
         let hash = self
             .block_hashes_by_height()
@@ -275,7 +275,7 @@ impl<T: Access> Schema<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the "genesis block" was not created.
+    /// Panics if the genesis block was not created.
     pub fn consensus_config(&self) -> ConsensusConfig {
         self.consensus_config_entry()
             .get()
