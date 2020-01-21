@@ -18,7 +18,7 @@ use exonum::runtime::{CommonError, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::CallContext;
-use exonum_time::schema::TimeSchema;
+use exonum_time::TimeSchema;
 use log::trace;
 
 use crate::{
@@ -57,9 +57,8 @@ impl TimestampingInterface<CallContext<'_>> for TimestampingService {
     type Output = Result<(), ExecutionError>;
 
     fn timestamp(&self, context: CallContext<'_>, arg: Timestamp) -> Self::Output {
-        let (tx_hash, _) = context
-            .caller()
-            .as_transaction()
+        let tx_hash = context
+            .transaction_hash()
             .ok_or(CommonError::UnauthorizedCaller)?;
 
         let mut schema = Schema::new(context.service_data());

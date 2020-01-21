@@ -49,7 +49,7 @@ use super::{
     migrations::{
         InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
     },
-    ArtifactId, Caller, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
+    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
 };
 
 #[cfg(test)]
@@ -100,9 +100,11 @@ impl CommittedServices {
                 let id = *self.instance_names.get(name)?;
                 (id, self.instances.get(&id)?)
             }
+
+            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
         let name = info.name.as_str();
-        Some((InstanceDescriptor { id, name }, &info.status))
+        Some((InstanceDescriptor::new(id, name), &info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -131,6 +133,7 @@ impl MigrationThread {
                 // TODO: Is panicking OK here?
                 panic!("Migration terminated with database error: {}", e);
             }
+            Ok(Err(MigrationError::__NonExhaustive)) => unreachable!("Never actually constructed"),
             Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
         MigrationStatus(result)
@@ -169,11 +172,7 @@ impl Migrations {
             let (helper, abort_handle) =
                 MigrationHelper::with_handle(Arc::clone(&db), &instance_spec.name);
             handle_tx.send(abort_handle).unwrap();
-            let mut context = MigrationContext {
-                helper,
-                data_version,
-                instance_spec,
-            };
+            let mut context = MigrationContext::new(helper, instance_spec, data_version);
 
             script.execute(&mut context)?;
             let migration_hash = context.helper.finish()?;
@@ -319,8 +318,7 @@ impl Dispatcher {
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // Start the built-in service instance.
-        ExecutionContext::new(self, fork, Caller::Blockchain)
-            .initiate_adding_service(spec, constructor)?;
+        ExecutionContext::for_block_call(self, fork).initiate_adding_service(spec, constructor)?;
         Ok(())
     }
 
@@ -516,15 +514,11 @@ impl Dispatcher {
         tx_index: u32,
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
-        let caller = Caller::Transaction {
-            author: tx.author(),
-            hash: tx_id,
-        };
         let call_info = &tx.as_ref().call_info;
         let (runtime_id, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::new(self, fork, caller);
+        let context = ExecutionContext::for_transaction(self, fork, tx.author(), tx_id);
 
         let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);
         if let Err(ref mut err) = res {
@@ -553,7 +547,7 @@ impl Dispatcher {
         self.service_infos
             .active_instances()
             .filter_map(|(instance_id, runtime_id)| {
-                let context = ExecutionContext::new(self, fork, Caller::Blockchain);
+                let context = ExecutionContext::for_block_call(self, fork);
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
                     CallType::AfterTransactions => Runtime::after_transactions,

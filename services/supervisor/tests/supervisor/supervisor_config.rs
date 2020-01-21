@@ -16,10 +16,7 @@
 //! `Supervisor` service initialization, using `Configure` interface
 //! and API endpoints associated with configuration.
 
-use exonum::{
-    blockchain::config::InstanceInitParams,
-    runtime::{InstanceSpec, SnapshotExt, SUPERVISOR_INSTANCE_ID},
-};
+use exonum::runtime::{SnapshotExt, SUPERVISOR_INSTANCE_ID};
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
@@ -66,15 +63,10 @@ fn initial_configuration() {
 #[should_panic(expected = "Invalid configuration for supervisor.")]
 fn incorrect_configuration() {
     let incorrect_config = vec![0x12, 0x34]; // Obviously incorrect config.
-    let instance_spec = InstanceSpec {
-        id: SUPERVISOR_INSTANCE_ID,
-        name: Supervisor::NAME.into(),
-        artifact: Supervisor.artifact_id(),
-    };
-    let incorrect_instance = InstanceInitParams {
-        instance_spec,
-        constructor: incorrect_config,
-    };
+    let incorrect_instance = Supervisor
+        .artifact_id()
+        .into_default_instance(SUPERVISOR_INSTANCE_ID, Supervisor::NAME)
+        .with_constructor(incorrect_config);
 
     let _testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)

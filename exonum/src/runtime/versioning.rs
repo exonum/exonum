@@ -69,6 +69,29 @@
 //!
 //! [semantically versioned]: https://semver.org/
 //!
+//! ## Transactions versioning
+//!
+//! To be able to process transactions, service must have a static mapping between numeric
+//! identifier of transaction and logic of transaction processing. Logic of transaction processing
+//! may include deserializing input parameters from byte array, processing the input and reporting
+//! the execution result (which can be either successful or unsuccessful).
+//!
+//! **Important:** Transaction numeric identifier is considered a constant during all the time of
+//! service existence. It means that if transaction was declared with certain ID, its logic can
+//! be updated (e.g., to fix a bug) or be removed, but it **never** should be replaced with other
+//! transaction.
+//!
+//! If transaction was removed from service, attempt to invoke it should always
+//! result in returning an `ExecutionError`.
+//!
+//! You should use [`CommonError::MethodRemoved`] to report the error in case a method was removed.
+//!
+//! At the same time, Exonum core does not provide a tool for marking transaction as deprecated.
+//! It is expected that service authors will notify users about transaction deprecation via
+//! documentation update or in any other applicable way.
+//!
+//! [`CommonError::MethodRemoved`]: ../enum.CommonError.html#variant.MethodRemoved
+//!
 //! # Versioning for clients
 //!
 //! To defend against these scenarios, Exonum provides following defences.
@@ -154,36 +177,33 @@ use crate::runtime::{ArtifactId, CoreError, ExecutionError, ExecutionFail};
 ///
 /// ```
 /// # use exonum::runtime::{versioning::ArtifactReq, ArtifactId, RuntimeIdentifier};
+/// # fn main() -> Result<(), failure::Error> {
 /// // Requirements can be parsed from a string.
-/// let req: ArtifactReq = "some.Service@^1.3.0".parse().unwrap();
+/// let req: ArtifactReq = "some.Service@^1.3.0".parse()?;
 ///
-/// let valid_artifact = ArtifactId {
-///     runtime_id: RuntimeIdentifier::Rust as _,
-///     name: "some.Service".to_owned(),
-///     version: "1.5.7".parse().unwrap(),
-/// };
-/// req.try_match(&valid_artifact).unwrap();
+/// let valid_artifact = ArtifactId::new(
+///     RuntimeIdentifier::Rust as u32,
+///     "some.Service".to_owned(),
+///     "1.5.7".parse()?,
+/// )?;
+/// assert!(req.try_match(&valid_artifact).is_ok());
 ///
 /// // This artifact is outdated.
-/// let outdated_artifact = ArtifactId {
-///     version: "1.2.0".parse().unwrap(),
-///     ..valid_artifact.clone()
-/// };
+/// let mut outdated_artifact = valid_artifact.clone();
+/// outdated_artifact.version = "1.2.0".parse()?;
 /// assert!(req.try_match(&outdated_artifact).is_err());
 ///
 /// // This artifact is too new.
-/// let novel_artifact = ArtifactId {
-///     version: "2.0.0".parse().unwrap(),
-///     ..valid_artifact.clone()
-/// };
+/// let mut novel_artifact = valid_artifact.clone();
+/// novel_artifact.version = "2.0.0".parse()?;
 /// assert!(req.try_match(&novel_artifact).is_err());
 ///
 /// // This artifact has wrong name.
-/// let other_artifact = ArtifactId {
-///     name: "other.Service".to_owned(),
-///     ..valid_artifact
-/// };
+/// let mut other_artifact = valid_artifact.clone();
+/// other_artifact.name = "other.Service".to_owned();
 /// assert!(req.try_match(&novel_artifact).is_err());
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArtifactReq {
@@ -191,6 +211,9 @@ pub struct ArtifactReq {
     pub name: String,
     /// Allowed artifact versions.
     pub version: VersionReq,
+
+    /// No-op field for forward compatibility.
+    non_exhaustive: (),
 }
 
 impl ArtifactReq {
@@ -199,6 +222,7 @@ impl ArtifactReq {
         Self {
             name: name.into(),
             version,
+            non_exhaustive: (),
         }
     }
 
@@ -225,10 +249,7 @@ impl FromStr for ArtifactReq {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.splitn(2, '@').collect();
         match &parts[..] {
-            [name, version] => Ok(Self {
-                name: name.to_string(),
-                version: version.parse()?,
-            }),
+            [name, version] => Ok(Self::new(name.to_string(), version.parse()?)),
             _ => Err(format_err!(
                 "Invalid artifact requirement. Use `name@version` format, \
                  e.g., `exonum.Token@^1.3.0`"

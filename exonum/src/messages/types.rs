@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::runtime::AnyTx;
+pub use crate::{proto::schema, runtime::AnyTx};
 
 use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
@@ -22,7 +22,7 @@ use exonum_proto::ProtobufConvert;
 use std::convert::TryFrom;
 
 use crate::{
-    crypto::{Hash, PublicKey, Signature},
+    crypto::{self, Hash, PublicKey, SecretKey, Signature},
     helpers::{Height, Round, ValidatorId},
     proto::schema::messages,
 };
@@ -40,6 +40,19 @@ pub struct SignedMessage {
     pub author: PublicKey,
     /// Digital signature over `payload` created with `SecretKey` of the author of the message.
     pub signature: Signature,
+}
+
+impl SignedMessage {
+    /// Creates a new signed message from the given binary value.
+    pub fn new(payload: impl BinaryValue, author: PublicKey, secret_key: &SecretKey) -> Self {
+        let payload = payload.into_bytes();
+        let signature = crypto::sign(payload.as_ref(), secret_key);
+        Self {
+            payload,
+            author,
+            signature,
+        }
+    }
 }
 
 /// Pre-commit for a block, essentially meaning that a validator node endorses the block.
@@ -63,6 +76,10 @@ pub struct Precommit {
     pub block_hash: Hash,
     /// Local time of the validator node when the `Precommit` was created.
     pub time: DateTime<Utc>,
+
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    non_exhaustive: (),
 }
 
 impl Precommit {
@@ -82,6 +99,7 @@ impl Precommit {
             propose_hash,
             block_hash,
             time,
+            non_exhaustive: (),
         }
     }
     /// The validator id.
@@ -115,18 +133,88 @@ impl Precommit {
 /// This type is intentionally kept as minimal as possible to ensure compatibility
 /// even if the consensus details change. Most of consensus messages are defined separately
 /// in the `exonum-node` crate; they are not public.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(
-    source = "messages::CoreMessage",
-    rename(case = "snake_case"),
-    impl_from_trait
-)]
+#[derive(BinaryValue, ObjectHash)]
 pub enum CoreMessage {
     /// Transaction message.
     AnyTx(AnyTx),
     /// Precommit message.
     Precommit(Precommit),
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
+}
+
+impl ProtobufConvert for CoreMessage {
+    type ProtoStruct = schema::messages::CoreMessage;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut pb = Self::ProtoStruct::new();
+        match self {
+            CoreMessage::AnyTx(any_tx) => {
+                pb.set_any_tx(any_tx.to_pb());
+            }
+            CoreMessage::Precommit(precommit) => {
+                pb.set_precommit(precommit.to_pb());
+            }
+            CoreMessage::__NonExhaustive => unreachable!("Never actually constructed"),
+        }
+        pb
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        let msg = if pb.has_any_tx() {
+            let tx = AnyTx::from_pb(pb.take_any_tx())?;
+            CoreMessage::AnyTx(tx)
+        } else if pb.has_precommit() {
+            let precommit = Precommit::from_pb(pb.take_precommit())?;
+            CoreMessage::Precommit(precommit)
+        } else {
+            failure::bail!("Incorrect protobuf representation of CoreMessage")
+        };
+
+        Ok(msg)
+    }
+}
+
+impl From<AnyTx> for CoreMessage {
+    fn from(tx: AnyTx) -> Self {
+        CoreMessage::AnyTx(tx)
+    }
+}
+
+impl From<Precommit> for CoreMessage {
+    fn from(precommit: Precommit) -> Self {
+        CoreMessage::Precommit(precommit)
+    }
+}
+
+impl TryFrom<CoreMessage> for AnyTx {
+    type Error = failure::Error;
+
+    fn try_from(msg: CoreMessage) -> Result<Self, failure::Error> {
+        if let CoreMessage::AnyTx(tx) = msg {
+            Ok(tx)
+        } else {
+            failure::bail!("Not an `AnyTx` variant")
+        }
+    }
+}
+
+impl TryFrom<CoreMessage> for Precommit {
+    type Error = failure::Error;
+
+    fn try_from(msg: CoreMessage) -> Result<Self, failure::Error> {
+        if let CoreMessage::Precommit(precommit) = msg {
+            Ok(precommit)
+        } else {
+            failure::bail!("Not a `Precommit` variant")
+        }
+    }
 }
 
 impl TryFrom<SignedMessage> for CoreMessage {

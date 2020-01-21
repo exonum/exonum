@@ -21,6 +21,9 @@ use std::fmt::Display;
 use crate::runtime::{ExecutionError, ExecutionFail};
 
 /// List of possible common errors.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "common")]
@@ -33,6 +36,12 @@ pub enum CommonError {
     UnauthorizedCaller = 2,
     /// Malformed arguments for calling a service interface method.
     MalformedArguments = 3,
+    /// Method with provided ID existed in the past, but now is removed.
+    MethodRemoved = 4,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive = 255,
 }
 
 impl CommonError {

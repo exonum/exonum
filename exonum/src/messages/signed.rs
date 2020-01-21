@@ -32,17 +32,6 @@ use crate::{
 };
 
 impl SignedMessage {
-    /// Creates a new signed message from the given binary value.
-    pub fn new(payload: impl BinaryValue, author: PublicKey, secret_key: &SecretKey) -> Self {
-        let payload = payload.into_bytes();
-        let signature = crypto::sign(payload.as_ref(), secret_key);
-        Self {
-            payload,
-            author,
-            signature,
-        }
-    }
-
     /// Verifies message signature and returns the corresponding checked message.
     pub fn into_verified<T>(self) -> Result<Verified<T>, failure::Error>
     where
@@ -259,13 +248,7 @@ mod tests {
         let keypair = crypto::gen_keypair();
 
         let msg = Verified::from_value(
-            AnyTx {
-                call_info: CallInfo {
-                    instance_id: 5,
-                    method_id: 2,
-                },
-                arguments: vec![1, 2, 3, 4],
-            },
+            AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]),
             keypair.0,
             &keypair.1,
         );
@@ -281,13 +264,7 @@ mod tests {
         let keypair = crypto::gen_keypair();
 
         let msg = Verified::from_value(
-            AnyTx {
-                call_info: CallInfo {
-                    instance_id: 5,
-                    method_id: 2,
-                },
-                arguments: vec![1, 2, 3, 4],
-            },
+            AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]),
             keypair.0,
             &keypair.1,
         );

@@ -133,6 +133,8 @@ message CallSite {
     BEFORE_TRANSACTIONS = 2;
     // Hook executing after processing transactions in a block.
     AFTER_TRANSACTIONS = 3;
+    // Service resuming routine.
+    RESUME = 4;
   }
 
   // Type of the call.
@@ -245,4 +247,17 @@ message ModifiedInstanceInfo {
   }
 
   MigrationTransition migration_transition = 1;
+}
+
+// The authorization information for a call to the service.
+message Caller {
+  oneof caller {
+    // The caller is identified by the specified Ed25519 public key.
+    exonum.crypto.PublicKey transaction_author = 1;
+    // The call is invoked with the authority of a blockchain service
+    // with the specified identifier.
+    uint32 instance_id = 2;
+    // The call is invoked by one of the blockchain lifecycle events.
+    google.protobuf.Empty blockchain = 3;
+  }
 }

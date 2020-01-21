@@ -25,7 +25,7 @@ use exonum_testkit::{
     explorer::api::{TransactionQuery, TransactionResponse},
     ApiKind, TestKit, TestKitApi, TestKitBuilder,
 };
-use exonum_time::{time_provider::MockTimeProvider, TimeServiceFactory};
+use exonum_time::{MockTimeProvider, TimeServiceFactory};
 use serde_json::json;
 
 use std::time::SystemTime;

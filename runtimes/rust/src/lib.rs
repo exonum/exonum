@@ -153,6 +153,56 @@
 //! # impl Service for StatefulService {}
 //! ```
 //!
+//! ## Removing Transactions
+//!
+//! If transaction became obsolete, it can be removed from the service.
+//! Removed transaction will remain its ID, but attempt to invoke it will result
+//! in returning [`CommonError::NoSuchMethod`].
+//!
+//! Note to service authors: when removing transaction from interface, leave a comment
+//! why this method was removed and which ID it has. It is not required, but seeing the service
+//! history may be helpful, and it's easier to see than ID in the macro above the trait.
+//!
+//! Example:
+//!
+//! ```
+//! # use exonum::runtime::{ExecutionError};
+//! # use exonum_rust_runtime::{CallContext, Service};
+//! # use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
+//! #[exonum_interface(removed_method_ids(0, 2))]
+//! pub trait Transactions<Ctx> {
+//!     type Output;
+//!     
+//!     // Method with ID 0 is removed because it was buggy.
+//!
+//!     #[interface_method(id = 1)]
+//!     fn actual_method(&self, context: Ctx, arg: u64) -> Self::Output;
+//!
+//!     // Method with ID 2 is removed because it wasn't used by anybody.
+//! }
+//!
+//! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+//! #[service_dispatcher(implements("Transactions"))]
+//! #[service_factory(proto_sources = "exonum::proto::schema")]
+//! pub struct SampleService;
+//!
+//! impl Transactions<CallContext<'_>> for SampleService {
+//!     type Output = Result<(), ExecutionError>;
+//!
+//!     // Implement only existing methods in trait.
+//!     fn actual_method(
+//!         &self,
+//!         context: CallContext<'_>,
+//!         arg: u64,
+//!     ) -> Result<(), ExecutionError> {
+//!         // Some business logic...
+//!         Ok(())
+//!     }
+//! }
+//!
+//! impl Service for SampleService {}
+//! ```
+//!
 //! # Interfaces
 //!
 //! By bringing an interface trait into scope, you can use its methods with any stub type.
@@ -191,6 +241,7 @@
 //! [`CallContext`]: struct.CallContext.html
 //! [`GenericCall`]: trait.GenericCall.html
 //! [`GenericCallMut`]: trait.GenericCallMut.html
+//! [`CommonError::NoSuchMethod`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CommonError.html
 //!
 //! ## Interface usage
 //!
@@ -364,10 +415,7 @@ impl Instance {
     }
 
     fn descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor {
-            id: self.id,
-            name: &self.name,
-        }
+        InstanceDescriptor::new(self.id, &self.name)
     }
 }
 
@@ -519,10 +567,7 @@ impl RustRuntime {
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
                     self.blockchain().clone(),
-                    InstanceDescriptor {
-                        id: instance.id,
-                        name: instance.name.as_ref(),
-                    },
+                    InstanceDescriptor::new(instance.id, instance.name.as_ref()),
                 );
                 instance.as_ref().wire_api(&mut builder);
                 let root_path = builder
@@ -640,6 +685,14 @@ impl Runtime for RustRuntime {
                 self.remove_started_service(spec);
             }
             InstanceStatus::Migrating(_) => { /* Do nothing. */ }
+            other => {
+                panic!(
+                    "Received non-expected service status: {}; \
+                     Rust runtime isn't prepared to process this action, \
+                     probably Rust runtime is outdated relative to the core library",
+                    other
+                );
+            }
         }
         self.changed_services_since_last_block = true;
     }

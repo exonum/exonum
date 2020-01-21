@@ -90,11 +90,11 @@ impl IncFactory {
 
 impl ServiceFactory for IncFactory {
     fn artifact_id(&self) -> ArtifactId {
-        ArtifactId {
-            runtime_id: RuntimeIdentifier::Rust as _,
-            name: Self::ARTIFACT_NAME.to_owned(),
-            version: self.version.clone(),
-        }
+        ArtifactId::from_raw_parts(
+            RuntimeIdentifier::Rust as _,
+            Self::ARTIFACT_NAME.to_owned(),
+            self.version.clone(),
+        )
     }
 
     fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {

@@ -121,6 +121,7 @@ pub mod serde {
                     ErrorKind::Core { code } => (ExecutionType::CoreError, Some(code)),
                     ErrorKind::Runtime { code } => (ExecutionType::RuntimeError, Some(code)),
                     ErrorKind::Service { code } => (ExecutionType::ServiceError, Some(code)),
+                    ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
                 };
 
                 ExecutionStatus {

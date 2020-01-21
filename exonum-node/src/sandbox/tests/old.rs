@@ -74,8 +74,8 @@ fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
 }
 
 fn create_block(sandbox: &Sandbox) -> Block {
-    let mut headers = AdditionalHeaders::new();
-    headers.insert::<ProposerId>(ValidatorId(2).into());
+    let mut additional_headers = AdditionalHeaders::new();
+    additional_headers.insert::<ProposerId>(ValidatorId(2).into());
 
     Block {
         height: Height(1),
@@ -84,7 +84,7 @@ fn create_block(sandbox: &Sandbox) -> Block {
         tx_hash: HashTag::empty_list_hash(),
         state_hash: sandbox.last_state_hash(),
         error_hash: HashTag::empty_map_hash(),
-        additional_headers: headers,
+        additional_headers,
     }
 }
 

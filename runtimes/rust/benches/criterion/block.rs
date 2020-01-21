@@ -109,13 +109,9 @@ fn create_consensus_config_and_blockchain_base(
 ) -> (ConsensusConfig, Blockchain) {
     let service_keypair = (PublicKey::zero(), SecretKey::zero());
     let consensus_keypair = crypto::gen_keypair();
-    let consensus_config = ConsensusConfig {
-        validator_keys: vec![ValidatorKeys {
-            consensus_key: consensus_keypair.0,
-            service_key: service_keypair.0,
-        }],
-        ..ConsensusConfig::default()
-    };
+    let mut consensus_config = ConsensusConfig::default();
+    consensus_config.validator_keys =
+        vec![ValidatorKeys::new(consensus_keypair.0, service_keypair.0)];
 
     let api_sender = ApiSender::closed();
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);

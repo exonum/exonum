@@ -18,7 +18,7 @@ pub use self::{
     api_sender::{ApiSender, SendError},
     block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
     builder::BlockchainBuilder,
-    config::{ConsensusConfig, ValidatorKeys},
+    config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
 };
 
@@ -41,7 +41,7 @@ use crate::{
     crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidateInput, ValidatorId},
     messages::{AnyTx, Precommit, Verified},
-    runtime::{ArtifactSpec, Dispatcher},
+    runtime::Dispatcher,
 };
 
 mod api_sender;
@@ -220,10 +220,10 @@ impl BlockchainMut {
             .consensus_config_entry()
             .set(genesis_config.consensus_config);
 
-        for ArtifactSpec { artifact, payload } in genesis_config.artifacts {
-            Dispatcher::commit_artifact(&fork, artifact.clone(), payload.clone());
+        for spec in genesis_config.artifacts {
+            Dispatcher::commit_artifact(&fork, spec.artifact.clone(), spec.payload.clone());
             self.dispatcher
-                .deploy_artifact(artifact, payload)
+                .deploy_artifact(spec.artifact, spec.payload)
                 .wait()
                 .expect("Cannot deploy an artifact");
         }

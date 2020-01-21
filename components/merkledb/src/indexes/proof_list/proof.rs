@@ -588,6 +588,9 @@ impl<'a, V> CheckedListProof<'a, V> {
 }
 
 /// An error that is returned when the list proof is invalid.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Fail)]
 pub enum ListProofError {
     /// Proof contains a hash in a place where a value was expected.
@@ -619,6 +622,11 @@ pub enum ListProofError {
     /// or hashes from.
     #[fail(display = "non-empty proof for an empty list")]
     NonEmptyProof,
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    #[fail(display = "")]
+    __NonExhaustive,
 }
 
 #[cfg(test)]

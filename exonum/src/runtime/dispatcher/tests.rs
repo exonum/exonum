@@ -36,8 +36,8 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
-        ArtifactId, BlockchainData, CallInfo, Caller, CoreError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
+        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceStatus, MethodId, Runtime, RuntimeInstance,
     },
 };
@@ -71,18 +71,17 @@ pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
 }
 
 impl Dispatcher {
-    /// Similar to `Dispatcher::execute()`, but accepts universal `caller` and `call_info`.
+    /// Similar to `Dispatcher::execute()`, but accepts arbitrary `call_info`.
     pub(crate) fn call(
         &self,
         fork: &mut Fork,
-        caller: Caller,
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::new(self, fork, caller);
+        let context = ExecutionContext::for_block_call(self, fork);
         runtime.execute(context, call_info, arguments)
     }
 
@@ -117,10 +116,7 @@ impl DispatcherBuilder {
     }
 
     pub fn with_runtime(mut self, id: u32, runtime: impl Into<Box<dyn Runtime>>) -> Self {
-        self.runtimes.push(RuntimeInstance {
-            id,
-            instance: runtime.into(),
-        });
+        self.runtimes.push(RuntimeInstance::new(id, runtime.into()));
         self
     }
 
@@ -336,16 +332,16 @@ fn test_dispatcher_simple() {
         .with_runtime(runtime_b.runtime_type, runtime_b.clone())
         .finalize(&blockchain);
 
-    let rust_artifact = ArtifactId {
-        runtime_id: SampleRuntimes::First as u32,
-        name: "first".to_owned(),
-        version: "0.5.0".parse().unwrap(),
-    };
-    let java_artifact = ArtifactId {
-        runtime_id: SampleRuntimes::Second as u32,
-        name: "second".to_owned(),
-        version: "1.2.1".parse().unwrap(),
-    };
+    let rust_artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::First as _,
+        "first".to_owned(),
+        "0.5.0".parse().unwrap(),
+    );
+    let java_artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::Second as _,
+        "second".to_owned(),
+        "1.2.1".parse().unwrap(),
+    );
 
     // Check if the services are ready for deploy.
     let mut fork = db.fork();
@@ -354,21 +350,18 @@ fn test_dispatcher_simple() {
 
     // Check if the services are ready for initiation. Note that the artifacts are pending at this
     // point.
-    let rust_service = InstanceSpec {
-        artifact: rust_artifact.clone(),
-        id: RUST_SERVICE_ID,
-        name: RUST_SERVICE_NAME.into(),
-    };
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let rust_service = InstanceSpec::from_raw_parts(
+        RUST_SERVICE_ID,
+        RUST_SERVICE_NAME.into(),
+        rust_artifact.clone(),
+    );
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     context
         .initiate_adding_service(rust_service, vec![])
         .expect("`initiate_adding_service` failed for rust");
 
-    let java_service = InstanceSpec {
-        artifact: java_artifact,
-        id: JAVA_SERVICE_ID,
-        name: JAVA_SERVICE_NAME.into(),
-    };
+    let java_service =
+        InstanceSpec::from_raw_parts(JAVA_SERVICE_ID, JAVA_SERVICE_NAME.into(), java_artifact);
     context
         .initiate_adding_service(java_service, vec![])
         .expect("`initiate_adding_service` failed for java");
@@ -378,30 +371,26 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
         .expect_err("Rust service should not be active yet");
 
     // Check that we cannot start adding a service with conflicting IDs.
-    let conflicting_rust_service = InstanceSpec {
-        artifact: rust_artifact.clone(),
-        id: RUST_SERVICE_ID,
-        name: "inconspicuous-name".to_owned(),
-    };
+    let conflicting_rust_service = InstanceSpec::from_raw_parts(
+        RUST_SERVICE_ID,
+        "inconspicuous-name".into(),
+        rust_artifact.clone(),
+    );
 
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
-    let conflicting_rust_service = InstanceSpec {
-        artifact: rust_artifact,
-        id: RUST_SERVICE_ID + 1,
-        name: RUST_SERVICE_NAME.to_owned(),
-    };
+    let conflicting_rust_service =
+        InstanceSpec::from_raw_parts(RUST_SERVICE_ID + 1, RUST_SERVICE_NAME.into(), rust_artifact);
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
@@ -416,7 +405,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -424,7 +412,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(RUST_SERVICE_ID, JAVA_METHOD_ID),
             &tx_payload,
         )
@@ -432,7 +419,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(JAVA_SERVICE_ID, JAVA_METHOD_ID),
             &tx_payload,
         )
@@ -440,7 +426,6 @@ fn test_dispatcher_simple() {
     dispatcher
         .call(
             &mut fork,
-            Caller::Service { instance_id: 1 },
             &CallInfo::new(JAVA_SERVICE_ID, RUST_METHOD_ID),
             &tx_payload,
         )
@@ -618,11 +603,7 @@ impl DeploymentRuntime {
         dispatcher: &mut Dispatcher,
         db: &Arc<TemporaryDB>,
     ) -> (ArtifactId, Vec<u8>) {
-        let artifact = ArtifactId {
-            runtime_id: 2,
-            name: name.to_owned(),
-            version: version.parse().unwrap(),
-        };
+        let artifact = ArtifactId::from_raw_parts(2, name.to_owned(), version.parse().unwrap());
         self.mailbox_actions
             .lock()
             .unwrap()
@@ -936,19 +917,15 @@ fn stopped_service_workflow() {
         ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
     );
 
-    let artifact = ArtifactId {
-        runtime_id: SampleRuntimes::First as u32,
-        name: "first".into(),
-        version: Version::new(0, 1, 0),
-    };
+    let artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::First as _,
+        "first".into(),
+        Version::new(0, 1, 0),
+    );
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
-    let service = InstanceSpec {
-        artifact,
-        id: instance_id,
-        name: instance_name.into(),
-    };
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let service = InstanceSpec::from_raw_parts(instance_id, instance_name.into(), artifact);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     context
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
@@ -972,18 +949,10 @@ fn stopped_service_workflow() {
 
     // Check if transactions are still ready for execution.
     dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
-            &[],
-        )
+        .call(&mut fork, &CallInfo::new(instance_id, 0), &[])
         .expect("Service is not stopped yet, transaction should be processed");
 
-    let dummy_descriptor = InstanceDescriptor {
-        id: 2,
-        name: "dummy",
-    };
+    let dummy_descriptor = InstanceDescriptor::new(2, "dummy");
 
     // Check that service schema is still reachable.
     BlockchainData::new(&fork, dummy_descriptor)
@@ -998,12 +967,7 @@ fn stopped_service_workflow() {
 
     // Check if transactions become incorrect.
     dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
-            &[],
-        )
+        .call(&mut fork, &CallInfo::new(instance_id, 0), &[])
         .expect_err("Service was stopped, transaction shouldn't be processed");
 
     // Check that service schema is now unreachable.
@@ -1044,12 +1008,7 @@ fn stopped_service_workflow() {
     // Check if transactions is incorrect.
     let mut fork = db.fork();
     dispatcher
-        .call(
-            &mut fork,
-            Caller::Service { instance_id: 1 },
-            &CallInfo::new(instance_id, 0),
-            &[],
-        )
+        .call(&mut fork, &CallInfo::new(instance_id, 0), &[])
         .expect_err("Service was stopped before restart, transaction shouldn't be processed");
 
     // Check that service schema is now unreachable.
@@ -1061,7 +1020,7 @@ fn stopped_service_workflow() {
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context = ExecutionContext::new(&dispatcher, &mut fork, Caller::Blockchain);
+    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
     context
         .initiate_adding_service(service, vec![])
         .expect_err("`initiate_adding_service` should failed");

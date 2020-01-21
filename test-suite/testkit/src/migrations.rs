@@ -316,17 +316,17 @@ where
         script: MigrationScript,
         abort_handle: impl AbortMigration + 'static,
     ) -> ScriptStatus {
-        let instance_spec = InstanceSpec {
-            id: 100,
-            name: Self::SERVICE_NAME.to_owned(),
-            artifact: self.service_factory.artifact_id(),
-        };
+        let instance_spec = InstanceSpec::from_raw_parts(
+            100,
+            Self::SERVICE_NAME.to_owned(),
+            self.service_factory.artifact_id(),
+        );
 
-        let mut context = MigrationContext {
-            helper: MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
+        let mut context = MigrationContext::new(
+            MigrationHelper::new(Arc::clone(&self.db), Self::SERVICE_NAME),
             instance_spec,
-            data_version: self.data_version.clone(),
-        };
+            self.data_version.clone(),
+        );
         context.helper.set_abort_handle(abort_handle);
         let end_version = script.end_version().to_owned();
 
@@ -344,16 +344,11 @@ where
                 self.data_version = end_version;
                 ScriptStatus::Ok
             }
-            Err(MigrationError::Custom(err)) => {
-                panic!("Script has generated a user-defined error: {}", err)
-            }
-            Err(MigrationError::Helper(DbMigrationError::Merge(err))) => {
-                panic!("MerkleDB error during migration script execution: {}", err)
-            }
             Err(MigrationError::Helper(DbMigrationError::Aborted)) => {
                 // We've successfully emulated script abortion!
                 ScriptStatus::Aborted
             }
+            Err(err) => panic!("Script has generated a fatal error: {}", err),
         }
     }
 }
@@ -570,11 +565,7 @@ mod tests {
 
     impl ServiceFactory for SomeService {
         fn artifact_id(&self) -> ArtifactId {
-            ArtifactId {
-                runtime_id: 0,
-                name: "exonum.test.Migrations".to_owned(),
-                version: Version::new(0, 3, 2),
-            }
+            ArtifactId::from_raw_parts(0, "exonum.test.Migrations".into(), Version::new(0, 3, 2))
         }
 
         fn artifact_protobuf_spec(&self) -> ArtifactProtobufSpec {

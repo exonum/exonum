@@ -39,7 +39,7 @@ mod tests;
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
 #[derive(Debug)]
-pub enum View<T: RawAccess> {
+pub(crate) enum View<T: RawAccess> {
     Real(ViewInner<T>),
     Phantom,
 }

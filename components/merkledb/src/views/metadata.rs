@@ -163,6 +163,10 @@ impl Default for IndexType {
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V = Vec<u8>> {
+    // A globally unique numeric index identifier. MerkleDB assigns a unique numeric ID for each
+    // fully-qualified index name.
+    //
+    // MerkleDB never re-uses the identifiers.
     identifier: u64,
     index_type: IndexType,
     // `state` may be empty for any possible type. `None` option usually represents
@@ -377,10 +381,7 @@ impl<T: RawAccessMut> IndexesPool<T> {
             if let Some(old_metadata) = self.0.get::<_, IndexMetadata>(migrated_key) {
                 let (name, is_in_group) =
                     IndexAddress::parse_fully_qualified_name(migrated_key, min_name_len);
-                let resolved = ResolvedAddress {
-                    name,
-                    id: NonZeroU64::new(old_metadata.identifier),
-                };
+                let resolved = ResolvedAddress::new(name, NonZeroU64::new(old_metadata.identifier));
                 let is_removed_from_aggregation = !is_in_group
                     && old_metadata.index_type.is_merkelized()
                     && !metadata.index_type.is_merkelized();
@@ -429,10 +430,8 @@ impl<T: RawAccessMut> IndexesPool<T> {
             .0
             .iter::<_, Vec<u8>, IndexMetadata>(prefix)
             .map(|(key, metadata)| {
-                let resolved = ResolvedAddress {
-                    name: extract_name(&key),
-                    id: NonZeroU64::new(metadata.identifier),
-                };
+                let resolved =
+                    ResolvedAddress::new(extract_name(&key), NonZeroU64::new(metadata.identifier));
                 (key, resolved)
             })
             .unzip();
@@ -648,10 +647,7 @@ where
         );
 
         let real_index_type = metadata.index_type;
-        let addr = ResolvedAddress {
-            name: index_name,
-            id: NonZeroU64::new(metadata.identifier),
-        };
+        let addr = ResolvedAddress::new(index_name, NonZeroU64::new(metadata.identifier));
 
         let is_aggregated =
             !is_phantom && real_index_type.is_merkelized() && index_address.id_in_group.is_none();
@@ -695,7 +691,7 @@ where
         self.is_phantom
     }
 
-    pub fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
+    pub(crate) fn into_parts<V>(self) -> (View<T>, IndexState<T, V>)
     where
         V: BinaryAttribute,
     {
