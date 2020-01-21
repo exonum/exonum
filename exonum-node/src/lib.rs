@@ -1223,16 +1223,12 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
         .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
         .collect();
 
-    let consensus = ConsensusConfig {
-        validator_keys: keys
-            .iter()
-            .map(|keys| ValidatorKeys {
-                consensus_key: keys.consensus_pk(),
-                service_key: keys.service_pk(),
-            })
-            .collect(),
-        ..ConsensusConfig::default()
-    };
+    let validator_keys = keys
+        .iter()
+        .map(|keys| ValidatorKeys::new(keys.consensus_pk(), keys.service_pk()))
+        .collect();
+    let consensus = ConsensusConfig::default().with_validator_keys(validator_keys);
+
     let peers = (0..keys.len())
         .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
         .collect::<Vec<_>>();

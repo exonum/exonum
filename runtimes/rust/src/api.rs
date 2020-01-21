@@ -360,10 +360,7 @@ impl ServiceApiScope {
 /// #     );
 /// #     let mut builder = ServiceApiBuilder::new(
 /// #         blockchain,
-/// #         InstanceDescriptor {
-/// #             id: 1100,
-/// #             name: "example",
-/// #         },
+/// #         InstanceDescriptor::new(1100, "example"),
 /// #     );
 /// #     wire_api(&mut builder);
 /// # }

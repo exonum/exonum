@@ -73,8 +73,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 self.assertEqual(
                     crypto_client.get_wallet_info(alice_keys).status_code, 200
                 )
-                alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
-                alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                alice_balance = crypto_client.get_balance(alice_keys)
                 self.assertEqual(alice_balance, 100)
 
     def test_token_issue(self):
@@ -90,8 +89,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     crypto_client.issue(alice_keys, 100)
                     subscriber.wait_for_new_event()
-                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
-                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                    alice_balance = crypto_client.get_balance(alice_keys)
                     self.assertEqual(alice_balance, 200)
 
     def test_transfer_funds(self):
@@ -108,12 +106,10 @@ class CryptoAdvancedTest(unittest.TestCase):
                     subscriber.wait_for_new_event()
                     crypto_client.create_wallet(bob_keys, "Bob" + str(validator_id))
                     subscriber.wait_for_new_event()
-                    crypto_client.transfer(20, alice_keys, bob_keys.public_key.value)
+                    crypto_client.transfer(20, alice_keys, bob_keys.public_key)
                     subscriber.wait_for_new_event()
-                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
-                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
-                    bob_wallet = crypto_client.get_wallet_info(bob_keys).json()
-                    bob_balance = bob_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                    alice_balance = crypto_client.get_balance(alice_keys)
+                    bob_balance = crypto_client.get_balance(bob_keys)
                     self.assertEqual(alice_balance, 80)
                     self.assertEqual(bob_balance, 120)
 
@@ -128,10 +124,9 @@ class CryptoAdvancedTest(unittest.TestCase):
                 crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
                 with client.create_subscriber("transactions") as subscriber:
                     subscriber.wait_for_new_event()
-                    crypto_client.transfer(10, alice_keys, alice_keys.public_key.value)
+                    crypto_client.transfer(10, alice_keys, alice_keys.public_key)
                     subscriber.wait_for_new_event()
-                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
-                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                    alice_balance = crypto_client.get_balance(alice_keys)
                     self.assertEqual(alice_balance, 100)
 
     def test_create_wallet_same_name(self):
@@ -190,16 +185,14 @@ class CryptoAdvancedTest(unittest.TestCase):
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
                     tx_response = crypto_client.transfer(
-                        110, alice_keys, bob_keys.public_key.value
+                        110, alice_keys, bob_keys.public_key
                     )
                     subscriber.wait_for_new_event()
                     tx_info = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()
                     tx_status = tx_info["status"]["type"]
                     self.assertEqual(tx_status, "service_error")
-                    alice_wallet = crypto_client.get_wallet_info(alice_keys).json()
-                    alice_balance = alice_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
-                    bob_wallet = crypto_client.get_wallet_info(bob_keys).json()
-                    bob_balance = bob_wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+                    alice_balance = crypto_client.get_balance(alice_keys)
+                    bob_balance = crypto_client.get_balance(bob_keys)
                     self.assertEqual(alice_balance, 100)
                     self.assertEqual(bob_balance, 100)
 

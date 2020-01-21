@@ -100,9 +100,11 @@ impl CommittedServices {
                 let id = *self.instance_names.get(name)?;
                 (id, self.instances.get(&id)?)
             }
+
+            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
         let name = info.name.as_str();
-        Some((InstanceDescriptor { id, name }, &info.status))
+        Some((InstanceDescriptor::new(id, name), &info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -131,6 +133,7 @@ impl MigrationThread {
                 // TODO: Is panicking OK here?
                 panic!("Migration terminated with database error: {}", e);
             }
+            Ok(Err(MigrationError::__NonExhaustive)) => unreachable!("Never actually constructed"),
             Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
         MigrationStatus(result)
@@ -169,11 +172,7 @@ impl Migrations {
             let (helper, abort_handle) =
                 MigrationHelper::with_handle(Arc::clone(&db), &instance_spec.name);
             handle_tx.send(abort_handle).unwrap();
-            let mut context = MigrationContext {
-                helper,
-                data_version,
-                instance_spec,
-            };
+            let mut context = MigrationContext::new(helper, instance_spec, data_version);
 
             script.execute(&mut context)?;
             let migration_hash = context.helper.finish()?;

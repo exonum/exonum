@@ -73,11 +73,11 @@ impl RuntimeTester {
 impl Default for RuntimeTester {
     fn default() -> Self {
         let state = RuntimeState {
-            deployed_artifact: ArtifactId {
-                runtime_id: 10,
-                name: "test-artifact".to_owned(),
-                version: "1.0.0".parse().unwrap(),
-            },
+            deployed_artifact: ArtifactId::from_raw_parts(
+                10,
+                "test-artifact".to_owned(),
+                "1.0.0".parse().unwrap(),
+            ),
             deploy_spec: vec![],
             constructor_params: vec![],
         };
@@ -198,10 +198,8 @@ fn test_runtime_factory() {
     )
     .unwrap();
 
-    let inst_cfg = InstanceInitParams {
-        instance_spec: instance_spec.clone(),
-        constructor: constructor.clone(),
-    };
+    let inst_cfg =
+        InstanceInitParams::from(instance_spec.clone()).with_constructor(constructor.clone());
     let artifact = instance_spec.artifact.clone();
 
     // This causes artifact deploying and service instantiation.

@@ -75,6 +75,7 @@ impl PublicApi {
         let IndexProof {
             block_proof,
             index_proof,
+            ..
         } = state.data().proof_for_service_index("wallets").unwrap();
 
         let currency_schema = SchemaImpl::new(state.service_data());

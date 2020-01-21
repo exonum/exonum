@@ -39,10 +39,7 @@ fn generate_txs_for_removed_methods() -> Vec<Verified<AnyTx>> {
     let keypair = gen_keypair();
 
     let create_tx = |id| {
-        let tx = AnyTx {
-            call_info: CallInfo::new(SERVICE_ID, id),
-            arguments: 0_u64.to_bytes(),
-        };
+        let tx = AnyTx::new(CallInfo::new(SERVICE_ID, id), 0_u64.to_bytes());
 
         tx.sign(keypair.0, &keypair.1)
     };
@@ -56,10 +53,7 @@ fn generate_txs_for_removed_methods() -> Vec<Verified<AnyTx>> {
 fn generate_tx_for_nonexistent_method() -> Verified<AnyTx> {
     let keypair = gen_keypair();
 
-    let tx = AnyTx {
-        call_info: CallInfo::new(SERVICE_ID, 3),
-        arguments: 0_u64.to_bytes(),
-    };
+    let tx = AnyTx::new(CallInfo::new(SERVICE_ID, 3), 0_u64.to_bytes());
 
     tx.sign(keypair.0, &keypair.1)
 }

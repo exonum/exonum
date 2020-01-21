@@ -153,6 +153,7 @@ rtype
 runtimes
 rustfmt
 rustup
+quantile
 scalarmult
 scrypt
 seedable
