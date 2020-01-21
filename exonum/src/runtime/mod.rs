@@ -281,6 +281,12 @@ impl fmt::Display for RuntimeIdentifier {
 /// Using this trait, you can extend the Exonum blockchain with the services written in
 /// different languages.
 ///
+/// # Stability
+///
+/// This trait is considered unstable; breaking changes may be introduced to it within
+/// semantically non-breaking releases. However, it is guaranteed that such changes
+/// will require reasonable amount of updates from the `Runtime` implementations.
+///
 /// # Call Ordering
 ///
 /// Within the lifetime of a `Runtime`, calls to its methods have the following order:
@@ -360,7 +366,6 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
-    // FIXME: remove?
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
 
     /// Runs the constructor of a new service instance with the given specification
