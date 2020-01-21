@@ -153,7 +153,7 @@ impl Runtime for SampleRuntime {
             }
 
             _ => {
-                // We aren't interesting in other possible statuses.
+                // We aren't interested in other possible statuses.
             }
         }
     }
