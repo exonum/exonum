@@ -106,9 +106,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This method is used to resume a previously stopped services.
   (#1693)
 
-- `ExecutionContext` has been extended by the methods from the
-  `exonum_rust_runtime::CallContext` so there is no need to use `CallContext`
-   anymore. (#1711)
+- `ExecutionContext` has been reworked (#1711)
+
+  - `ExecutionContext` has been extended by the methods from the
+   `exonum_rust_runtime::CallContext` so there is no need to use `CallContext`
+    anymore.
+    Public fields in `ExecutionData` has been replaced by the corresponding
+    getters.
+  - Direct `fork` access in `ExecutionContext` has been replaced by the
+    `BlockchainData::raw_access` which returns readonly access to
+    whole blockchain data.
+
 - Public structures and enums were made non-exhaustive. (#1710)
 
 #### exonum-cli
