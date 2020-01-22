@@ -44,7 +44,8 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     ///
     /// # Safety
     ///
-    /// Trying to get access the executing service data can lead to panic.
+    /// Trying to access data of the executing service through the returned access
+    /// can lead to a panic because of borrowing checks performed by the database.
     /// Check that your wrapper prevent such attempts to access.
     #[doc(hidden)]
     pub fn unstructured_assess(&self) -> T::Readonly {
