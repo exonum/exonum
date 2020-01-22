@@ -190,13 +190,13 @@ impl Runtime for SampleRuntime {
 
         println!(
             "Executing method {}#{} of service {}",
-            context.interface_name,
+            context.interface_name(),
             method_id,
             context.instance().id
         );
 
         const SERVICE_INTERFACE: &str = "";
-        match (context.interface_name, method_id) {
+        match (context.interface_name(), method_id) {
             // Increment counter.
             (SERVICE_INTERFACE, 0) => {
                 let value = u64::from_bytes(payload.into())

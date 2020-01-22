@@ -252,7 +252,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     }
 
     fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        let height = CoreSchema::new(&*context.fork).next_height();
+        let height = context.data().for_core().next_height();
         self.events.push(RuntimeEvent::BeforeTransactions(
             height,
             context.instance().id,
@@ -261,7 +261,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
     }
 
     fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        let schema = CoreSchema::new(&*context.fork);
+        let schema = context.data().for_core();
         let height = schema.next_height();
         self.events.push(RuntimeEvent::AfterTransactions(
             height,

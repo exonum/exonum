@@ -40,14 +40,19 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
         }
     }
 
+    /// Returns unstructured readonly access to blockchain data.
+    pub fn raw_assess(&self) -> T::Readonly {
+        self.access.as_readonly()
+    }
+
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::new(self.access.as_readonly())
+        CoreSchema::new(self.raw_assess())
     }
 
     /// Returns dispatcher schema.
     pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
-        DispatcherSchema::new(self.access.as_readonly())
+        DispatcherSchema::new(self.raw_assess())
     }
 
     /// Returns a mount point for another service. If the service with `id` does not exist,

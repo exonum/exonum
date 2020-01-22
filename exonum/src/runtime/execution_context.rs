@@ -33,13 +33,11 @@ use crate::{
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
     /// the database made by the previous transactions already executed in this block.
-    pub fork: &'a mut Fork,
+    pub(crate) fork: &'a mut Fork,
     /// The initiator of the transaction execution.
-    pub caller: Caller,
-    /// Identifier of the service interface required for the call. Keep in mind that this field, in
-    /// fact, is a part of an unfinished "interfaces" feature. It will be replaced in future releases.
-    /// At the moment this field is always empty for the primary service interface.
-    pub interface_name: &'a str,
+    caller: Caller,
+    /// Identifier of the service interface required for the call.
+    interface_name: &'a str,
     /// ID of the executing service.
     instance: InstanceDescriptor<'a>,
     /// Hash of the currently executing transaction, or `None` for non-transaction calls.
@@ -126,6 +124,15 @@ impl<'a> ExecutionContext<'a> {
     pub fn in_genesis_block(&self) -> bool {
         let core_schema = self.data().for_core();
         core_schema.next_height() == Height(0)
+    }
+
+    /// Returns identifier of the service interface required for the call.
+    ///
+    /// Keep in mind that this getter, in fact, is a part of an unfinished "interfaces" feature.
+    /// It will be replaced in future releases. At the moment this field is always empty for
+    /// the primary service interface.
+    pub fn interface_name(&self) -> &str {
+        self.interface_name
     }
 
     /// Returns extensions required for the Supervisor service implementation.

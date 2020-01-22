@@ -116,12 +116,11 @@ impl ToTokens for ServiceDispatcher {
             impl #impl_generics #cr::ServiceDispatcher for #service_name #ty_generics #where_clause  {
                 fn call(
                     &self,
-                    interface_name: &str,
-                    method: #cr::_reexports::MethodId,
                     ctx: #ctx,
+                    method: #cr::_reexports::MethodId,
                     payload: &[u8],
                 ) -> Result<(), #cr::_reexports::ExecutionError> {
-                    match interface_name {
+                    match ctx.interface_name() {
                         #( #match_arms )*
                         other => Err(#cr::_reexports::CommonError::NoSuchInterface.into()),
                     }

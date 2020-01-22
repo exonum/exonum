@@ -736,11 +736,7 @@ impl Runtime for RustRuntime {
             .get(&context.instance().id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
-        catch_panic(|| {
-            instance
-                .as_ref()
-                .call(context.interface_name, method_id, context, payload)
-        })
+        catch_panic(|| instance.as_ref().call(context, method_id, payload))
     }
 
     fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
