@@ -107,10 +107,11 @@ impl CommittedServices {
         Some((InstanceDescriptor::new(id, name), &info.status))
     }
 
-    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
+    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceDescriptor<'a>, u32)> + 'a {
         self.instances.iter().filter_map(|(&id, info)| {
             if info.status.is_active() {
-                Some((id, info.runtime_id))
+                let descriptor = InstanceDescriptor::new(id, &info.name);
+                Some((descriptor, info.runtime_id))
             } else {
                 None
             }
@@ -318,8 +319,9 @@ impl Dispatcher {
         constructor: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // Start the built-in service instance.
-        ExecutionContext::for_block_call(self, fork).initiate_adding_service(spec, constructor)?;
-        Ok(())
+        let name = spec.name.clone();
+        ExecutionContext::for_block_call(self, fork, InstanceDescriptor::new(spec.id, &name))
+            .initiate_adding_service(spec, constructor)
     }
 
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
@@ -518,9 +520,13 @@ impl Dispatcher {
         let (runtime_id, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::for_transaction(self, fork, tx.author(), tx_id);
 
-        let mut res = runtime.execute(context, call_info, &tx.as_ref().arguments);
+        let instance = self
+            .get_service(call_info.instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+        let context = ExecutionContext::for_transaction(self, fork, instance, tx.author(), tx_id);
+
+        let mut res = runtime.execute(context, call_info.method_id, &tx.as_ref().arguments);
         if let Err(ref mut err) = res {
             fork.rollback();
 
@@ -546,27 +552,27 @@ impl Dispatcher {
     ) -> Vec<(CallInBlock, ExecutionError)> {
         self.service_infos
             .active_instances()
-            .filter_map(|(instance_id, runtime_id)| {
-                let context = ExecutionContext::for_block_call(self, fork);
+            .filter_map(|(instance, runtime_id)| {
+                let context = ExecutionContext::for_block_call(self, fork, instance);
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
                     CallType::AfterTransactions => Runtime::after_transactions,
                     _ => unreachable!(),
                 };
 
-                let res = call_fn(self.runtimes[&runtime_id].as_ref(), context, instance_id);
+                let res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
                 if let Err(mut err) = res {
                     fork.rollback();
                     err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                        instance_id,
+                        instance_id: instance.id,
                         call_type: call_type.clone(),
                     });
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
-                            CallInBlock::before_transactions(instance_id)
+                            CallInBlock::before_transactions(instance.id)
                         }
-                        CallType::AfterTransactions => CallInBlock::after_transactions(instance_id),
+                        CallType::AfterTransactions => CallInBlock::after_transactions(instance.id),
                         _ => unreachable!(),
                     };
                     Self::report_error(&err, fork, call);

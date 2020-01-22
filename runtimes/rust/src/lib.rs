@@ -38,7 +38,7 @@
 //!
 //! ```
 //! use exonum::runtime::{BlockchainData, ExecutionError};
-//! use exonum_rust_runtime::{CallContext, Service};
+//! use exonum_rust_runtime::{ExecutionContext, Service};
 //! use exonum_derive::*;
 //! use serde_derive::*;
 //!
@@ -89,12 +89,12 @@
 //!
 //! // Do not forget to implement the `Transactions` and `Service` traits
 //! // for the service.
-//! impl Transactions<CallContext<'_>> for WalletService {
+//! impl Transactions<ExecutionContext<'_>> for WalletService {
 //!     type Output = Result<(), ExecutionError>;
 //!
 //!     fn create_wallet(
 //!         &self,
-//!         context: CallContext<'_>,
+//!         context: ExecutionContext<'_>,
 //!         arg: CreateWallet,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
@@ -112,7 +112,7 @@
 //!
 //! ```
 //! # use exonum::runtime::{BlockchainData, ExecutionError};
-//! # use exonum_rust_runtime::{CallContext, Service};
+//! # use exonum_rust_runtime::{ExecutionContext, Service};
 //! # use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 //! #[exonum_interface]
 //! pub trait Transactions<Ctx> {
@@ -146,7 +146,7 @@
 //!         Box::new(StatefulService::default())
 //!     }
 //! }
-//! # impl Transactions<CallContext<'_>> for StatefulService {
+//! # impl Transactions<ExecutionContext<'_>> for StatefulService {
 //! #     type Output = Result<(), ExecutionError>;
 //! # }
 //! #
@@ -167,7 +167,7 @@
 //!
 //! ```
 //! # use exonum::runtime::{ExecutionError};
-//! # use exonum_rust_runtime::{CallContext, Service};
+//! # use exonum_rust_runtime::{ExecutionContext, Service};
 //! # use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
 //! #[exonum_interface(removed_method_ids(0, 2))]
 //! pub trait Transactions<Ctx> {
@@ -186,13 +186,13 @@
 //! #[service_factory(proto_sources = "exonum::proto::schema")]
 //! pub struct SampleService;
 //!
-//! impl Transactions<CallContext<'_>> for SampleService {
+//! impl Transactions<ExecutionContext<'_>> for SampleService {
 //!     type Output = Result<(), ExecutionError>;
 //!
 //!     // Implement only existing methods in trait.
 //!     fn actual_method(
 //!         &self,
-//!         context: CallContext<'_>,
+//!         context: ExecutionContext<'_>,
 //!         arg: u64,
 //!     ) -> Result<(), ExecutionError> {
 //!         // Some business logic...
@@ -215,7 +215,7 @@
 //! | [`TxStub`] | Generates unsigned transactions |
 //! | `(PublicKey, SecretKey)` | Generates signed transactions |
 //! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
-//! | [`CallContext`] | Calls methods of another service during transaction execution **(1)** |
+//! | [`ExecutionContext`] | Calls methods of another service during transaction execution **(1)** |
 //!
 //! 1. Beware that this is experimental functionality which is subject to change in next releases.
 //!
@@ -232,13 +232,13 @@
 //!
 //! Otherwise, the mutable trait is a carbon copy of the original trait.
 //!
-//! The mutable trait is necessary for some stub types (e.g., `CallContext`) because they need
+//! The mutable trait is necessary for some stub types (e.g., `ExecutionContext`) because they need
 //! to mutate their state when processing the calls. Hence, the mutable trait should be
 //! exported from the crate along with the original "immutable" trait.
 //!
 //! [`TxStub`]: struct.TxStub.html
 //! [`Broadcaster`]: struct.Broadcaster.html
-//! [`CallContext`]: struct.CallContext.html
+//! [`ExecutionContext`]: struct.ExecutionContext.html
 //! [`GenericCall`]: trait.GenericCall.html
 //! [`GenericCallMut`]: trait.GenericCallMut.html
 //! [`CommonError::NoSuchMethod`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CommonError.html
@@ -247,7 +247,7 @@
 //!
 //! ```
 //! # use exonum::runtime::ExecutionError;
-//! # use exonum_rust_runtime::CallContext;
+//! # use exonum_rust_runtime::ExecutionContext;
 //! # use exonum::crypto::gen_keypair;
 //! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
@@ -281,11 +281,11 @@
 //! # impl Service {
 //! fn batch_transfers(
 //!     &self,
-//!     mut ctx: CallContext<'_>,
+//!     mut ctx: ExecutionContext<'_>,
 //!     wallet_count: u64,
 //! ) -> Result<(), ExecutionError> {
 //!     let receiver_service = "token";
-//!     // ^-- `CallContext` allows to use any of service IDs as the context.
+//!     // ^-- `ExecutionContext` allows to use any of service IDs as the context.
 //!     for _ in 0..wallet_count {
 //!         let transfer: Transfer = // ...
 //! #           "transfer".to_owned();
@@ -302,15 +302,16 @@
 #![warn(missing_debug_implementations, missing_docs)]
 #![deny(unsafe_code, bare_trait_objects)]
 
+pub use exonum::runtime::ExecutionContext;
+
 pub use self::{
-    call_context::CallContext,
     error::Error,
     runtime_api::{ArtifactProtobufSpec, ProtoSourceFile, ProtoSourcesQuery},
     service::{
         AfterCommitContext, Broadcaster, DefaultInstance, Service, ServiceDispatcher,
         ServiceFactory,
     },
-    stubs::{GenericCall, GenericCallMut, Interface, MethodDescriptor, TxStub},
+    stubs::{FallthroughAuth, GenericCall, GenericCallMut, Interface, MethodDescriptor, TxStub},
 };
 
 pub mod api;
@@ -323,9 +324,8 @@ use exonum::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, ExecutionFail, InstanceDescriptor,
-        InstanceId, InstanceSpec, InstanceStatus, Mailbox, Runtime, RuntimeIdentifier,
-        WellKnownRuntime,
+        ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
+        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -336,7 +336,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use self::api::ServiceApiBuilder;
 
-mod call_context;
 mod error;
 mod runtime_api;
 mod service;
@@ -347,7 +346,7 @@ pub mod _reexports {
     //! Types necessary for `ServiceDispatcher` and `ServiceFactory` derive macros to work.
 
     pub use exonum::runtime::{
-        ArtifactId, CommonError, ExecutionError, MethodId, RuntimeIdentifier,
+        ArtifactId, CommonError, ExecutionContext, ExecutionError, MethodId, RuntimeIdentifier,
     };
 }
 
@@ -537,28 +536,36 @@ impl RustRuntime {
         Ok(())
     }
 
-    fn new_service(&self, spec: &InstanceSpec) -> Result<Instance, ExecutionError> {
-        if !self.deployed_artifacts.contains(&spec.artifact) {
+    fn new_service(
+        &self,
+        artifact: &ArtifactId,
+        instance: InstanceDescriptor<'_>,
+    ) -> Result<Instance, ExecutionError> {
+        if !self.deployed_artifacts.contains(artifact) {
             panic!(
-                "BUG: Core requested service instance start ({:?}) of not deployed artifact {:?}",
-                spec.name, spec.artifact
+                "BUG: Core requested service instance start ({}) of not deployed artifact {}",
+                instance.name, artifact
             );
         }
-        if self.started_services.contains_key(&spec.id) {
+        if self.started_services.contains_key(&instance.id) {
             panic!(
-                "BUG: Core requested service service instance start ({:?}) with already taken ID",
-                spec
+                "BUG: Core requested service service instance start ({}) with already taken ID",
+                instance
             );
         }
-        if self.started_services_by_name.contains_key(&spec.name) {
+        if self.started_services_by_name.contains_key(instance.name) {
             panic!(
-                "BUG: Core requested service service instance start ({:?}) with already taken name",
-                spec
+                "BUG: Core requested service service instance start ({}) with already taken name",
+                instance
             );
         }
 
-        let service = self.available_artifacts[&spec.artifact].create_instance();
-        Ok(Instance::new(spec.id, spec.name.clone(), service))
+        let service = self.available_artifacts[artifact].create_instance();
+        Ok(Instance::new(
+            instance.id,
+            instance.name.to_owned(),
+            service,
+        ))
     }
 
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
@@ -643,26 +650,22 @@ impl Runtime for RustRuntime {
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(spec)?;
+        let instance = self.new_service(artifact, context.instance())?;
         let service = instance.as_ref();
-        let descriptor = instance.descriptor();
-        let context = CallContext::new(context, descriptor);
         catch_panic(|| service.initialize(context, parameters))
     }
 
     fn initiate_resuming_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(spec)?;
+        let instance = self.new_service(artifact, context.instance())?;
         let service = instance.as_ref();
-        let descriptor = instance.descriptor();
-        let context = CallContext::new(context, descriptor);
         catch_panic(|| service.resume(context, parameters))
     }
 
@@ -674,7 +677,9 @@ impl Runtime for RustRuntime {
     ) {
         match status {
             InstanceStatus::Active => {
-                let instance = self.new_service(spec).expect(
+                let instance = self
+                    .new_service(&spec.artifact, spec.as_descriptor())
+                    .expect(
                     "BUG: Attempt to create a new service instance failed; \
                      within `instantiate_adding_service` we were able to create a new instance, \
                      but now we are not.",
@@ -723,58 +728,33 @@ impl Runtime for RustRuntime {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        method_id: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
         let instance = self
             .started_services
-            .get(&call_info.instance_id)
+            .get(&context.instance().id)
             .expect("BUG: an attempt to execute transaction of unknown service.");
 
-        let descriptor = instance.descriptor();
-        let id = call_info.method_id;
-        catch_panic(|| {
-            instance.as_ref().call(
-                context.interface_name,
-                id,
-                CallContext::new(context, descriptor),
-                payload,
-            )
-        })
+        catch_panic(|| instance.as_ref().call(context, method_id, payload))
     }
 
-    fn before_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = self
             .started_services
-            .get(&instance_id)
+            .get(&context.instance().id)
             .expect("`before_transactions` called with non-existing `instance_id`");
 
-        let descriptor = instance.descriptor();
-        catch_panic(|| {
-            let context = CallContext::new(context, descriptor);
-            instance.as_ref().before_transactions(context)
-        })
+        catch_panic(|| instance.as_ref().before_transactions(context))
     }
 
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = self
             .started_services
-            .get(&instance_id)
+            .get(&context.instance().id)
             .expect("`after_transactions` called with non-existing `instance_id`");
 
-        let descriptor = instance.descriptor();
-        catch_panic(|| {
-            let context = CallContext::new(context, descriptor);
-            instance.as_ref().after_transactions(context)
-        })
+        catch_panic(|| instance.as_ref().after_transactions(context))
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {

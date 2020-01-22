@@ -22,11 +22,11 @@ use exonum::{
     },
     runtime::{
         versioning::{ArtifactReq as CoreReq, Version},
-        ArtifactId, CommonError, ExecutionError, RuntimeIdentifier,
+        ArtifactId, CommonError, ExecutionContext, ExecutionError, RuntimeIdentifier,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{ArtifactProtobufSpec, CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{ArtifactProtobufSpec, Service, ServiceFactory};
 
 use exonum_middleware_service::ArtifactReq;
 
@@ -56,10 +56,10 @@ pub struct IncService;
 
 impl Service for IncService {}
 
-impl IncInterface<CallContext<'_>> for IncService {
+impl IncInterface<ExecutionContext<'_>> for IncService {
     type Output = Result<(), ExecutionError>;
 
-    fn increment(&self, context: CallContext<'_>, _seed: u8) -> Self::Output {
+    fn increment(&self, context: ExecutionContext<'_>, _seed: u8) -> Self::Output {
         let author = context
             .caller()
             .author()

@@ -14,9 +14,9 @@
 
 //! Configuration interface used by the supervisor to change service configuration.
 
-use exonum::runtime::{CommonError, ExecutionError, InstanceId, MethodId};
+use exonum::runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId, MethodId};
 use exonum_merkledb::BinaryValue;
-use exonum_rust_runtime::{CallContext, GenericCallMut, Interface, MethodDescriptor};
+use exonum_rust_runtime::{GenericCallMut, Interface, MethodDescriptor};
 
 /// Fully qualified name of the ['Configure`] interface.
 ///
@@ -54,7 +54,7 @@ pub trait Configure {
     /// In other words, only a method with numeric ID 0 can call this method.
     fn verify_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
 
@@ -73,7 +73,7 @@ pub trait Configure {
     /// In other words, only a method with numeric ID 0 can call this method.
     fn apply_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError>;
 }
@@ -83,7 +83,7 @@ impl<'a, T: BinaryValue> Interface<'a> for dyn Configure<Params = T> {
 
     fn dispatch(
         &self,
-        context: CallContext<'a>,
+        context: ExecutionContext<'a>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError> {
@@ -114,7 +114,7 @@ pub(crate) trait ConfigureMut<Ctx> {
     fn apply_config(&mut self, context: Ctx, params: Vec<u8>) -> Self::Output;
 }
 
-impl ConfigureMut<InstanceId> for CallContext<'_> {
+impl ConfigureMut<InstanceId> for ExecutionContext<'_> {
     type Output = Result<(), ExecutionError>;
 
     fn verify_config(&mut self, instance_id: InstanceId, params: Vec<u8>) -> Self::Output {

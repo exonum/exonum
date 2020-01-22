@@ -16,11 +16,10 @@
 
 use exonum::{
     crypto::Hash,
-    runtime::{CallerAddress as Address, CommonError, ExecutionError},
+    runtime::{CallerAddress as Address, CommonError, ExecutionContext, ExecutionError},
 };
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::CallContext;
 
 use super::{proto, schema::SchemaImpl, CryptocurrencyService};
 
@@ -112,10 +111,10 @@ pub trait CryptocurrencyInterface<Ctx> {
     fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
 }
 
-impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
+impl CryptocurrencyInterface<ExecutionContext<'_>> for CryptocurrencyService {
     type Output = Result<(), ExecutionError>;
 
-    fn transfer(&self, context: CallContext<'_>, arg: Transfer) -> Self::Output {
+    fn transfer(&self, context: ExecutionContext<'_>, arg: Transfer) -> Self::Output {
         let (from, tx_hash) = extract_info(&context)?;
         let mut schema = SchemaImpl::new(context.service_data());
 
@@ -144,7 +143,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
         }
     }
 
-    fn issue(&self, context: CallContext<'_>, arg: Issue) -> Self::Output {
+    fn issue(&self, context: ExecutionContext<'_>, arg: Issue) -> Self::Output {
         let (from, tx_hash) = extract_info(&context)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
@@ -157,7 +156,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
         }
     }
 
-    fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Self::Output {
+    fn create_wallet(&self, context: ExecutionContext<'_>, arg: CreateWallet) -> Self::Output {
         let (from, tx_hash) = extract_info(&context)?;
 
         let mut schema = SchemaImpl::new(context.service_data());
@@ -171,7 +170,7 @@ impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
     }
 }
 
-fn extract_info(context: &CallContext<'_>) -> Result<(Address, Hash), ExecutionError> {
+fn extract_info(context: &ExecutionContext<'_>) -> Result<(Address, Hash), ExecutionError> {
     let tx_hash = context
         .transaction_hash()
         .ok_or(CommonError::UnauthorizedCaller)?;

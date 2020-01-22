@@ -66,7 +66,7 @@ pub enum CoreError {
 }
 
 impl CoreError {
-    pub(crate) fn stack_overflow(max_depth: usize) -> ExecutionError {
+    pub(crate) fn stack_overflow(max_depth: u64) -> ExecutionError {
         let description = format!(
             "Maximum depth of call stack ({}) has been reached.",
             max_depth

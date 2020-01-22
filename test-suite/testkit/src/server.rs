@@ -173,12 +173,12 @@ mod tests {
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::ExecutionError,
+        runtime::{ExecutionContext, ExecutionError},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{api, CallContext, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, Service, ServiceFactory};
     use pretty_assertions::assert_eq;
 
     use std::time::Duration;
@@ -204,10 +204,10 @@ mod tests {
         fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
     }
 
-    impl SampleInterface<CallContext<'_>> for SampleService {
+    impl SampleInterface<ExecutionContext<'_>> for SampleService {
         type Output = Result<(), ExecutionError>;
 
-        fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
+        fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: String) -> Self::Output {
             Ok(())
         }
     }

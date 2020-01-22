@@ -18,8 +18,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
-        ArtifactId, BlockchainData, DispatcherAction, ExecutionError, InstanceDescriptor,
-        InstanceId, Mailbox, MethodId,
+        ArtifactId, BlockchainData, DispatcherAction, ExecutionContext, ExecutionError,
+        InstanceDescriptor, InstanceId, Mailbox, MethodId,
     },
 };
 use futures::{Future, IntoFuture};
@@ -29,9 +29,7 @@ use std::{
     fmt::{self, Debug},
 };
 
-use super::{
-    api::ServiceApiBuilder, ArtifactProtobufSpec, CallContext, GenericCall, MethodDescriptor,
-};
+use super::{api::ServiceApiBuilder, ArtifactProtobufSpec, GenericCall, MethodDescriptor};
 
 /// Describes how the service instance should dispatch specific method calls
 /// with consideration of the interface where the method belongs.
@@ -42,9 +40,8 @@ pub trait ServiceDispatcher: Send {
     /// Dispatches the interface method call within the specified context.
     fn call(
         &self,
-        interface_name: &str,
+        context: ExecutionContext<'_>,
         method: MethodId,
-        ctx: CallContext<'_>,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
 }
@@ -63,7 +60,7 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// automatically, hence the user must do it manually, if needed.
     fn initialize(
         &self,
-        _context: CallContext<'_>,
+        _context: ExecutionContext<'_>,
         _params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -79,7 +76,11 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// **Warning:** please note that you should not change the service data layout,
     /// as this may violate the migration process.
-    fn resume(&self, _context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn resume(
+        &self,
+        _context: ExecutionContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -90,11 +91,11 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// Any changes of the storage state will affect `state_hash`, which means this method must
     /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `CallContext`.
+    /// in the provided `ExecutionContext`.
     ///
     /// Services should not rely on a particular ordering of `Service::before_transactions`
     /// invocations among services.
-    fn before_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -105,12 +106,12 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// Any changes of the storage state will affect `state_hash`, which means this method must
     /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `CallContext`.
+    /// in the provided `ExecutionContext`.
     ///
     /// Note that if service was added in the genesis block, it will be activated immediately and
     /// thus `after_transactions` will be invoked for such a service after the genesis block creation.
     /// If you aren't interested in the processing of for the genesis block, you can use
-    /// [`CallContext::in_genesis_block`] method and exit early if `true` is returned.
+    /// [`ExecutionContext::in_genesis_block`] method and exit early if `true` is returned.
     ///
     /// Invocation of the `height()` method of the core blockchain schema will **panic**
     /// if invoked within `after_transactions` of the genesis block. If you are going
@@ -120,8 +121,8 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// Services should not rely on a particular ordering of `Service::after_transactions`
     /// invocations among services.
     ///
-    /// [`CallContext::in_genesis_block`]: struct.CallContext.html#method.in_genesis_block
-    fn after_transactions(&self, _context: CallContext<'_>) -> Result<(), ExecutionError> {
+    /// [`ExecutionContext::in_genesis_block`]: struct.ExecutionContext.html#method.in_genesis_block
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 

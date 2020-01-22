@@ -20,10 +20,11 @@
 use exonum::{
     crypto::{PublicKey, SecretKey},
     messages::Verified,
-    runtime::{AnyTx, CallInfo, ExecutionError, InstanceId, MethodId},
+    runtime::{
+        AnyTx, CallInfo, ExecutionContext, ExecutionContextUnstable, ExecutionError, InstanceId,
+        InstanceQuery, MethodId,
+    },
 };
-
-use crate::CallContext;
 
 /// Descriptor of a method declared as a part of the service interface.
 #[derive(Debug, Clone, Copy)]
@@ -55,7 +56,7 @@ pub trait Interface<'a> {
     /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
-        cx: CallContext<'a>,
+        context: ExecutionContext<'a>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
@@ -153,7 +154,7 @@ mod explanation {
 
     // Our goal is to provide an implementation of this user-defined trait for some generic
     // types, e.g., a keypair (which would generate signed transactions when called), or
-    // `CallContext` (which would call another service on the same blockchain).
+    // `ExecutionContext` (which would call another service on the same blockchain).
 
     // In order to accomplish this, we notice that for all possible service traits,
     // there exists a uniform conversion of arguments: the argument (i.e.,
@@ -231,5 +232,54 @@ mod explanation {
         assert_eq!(len, 5);
         let len = PayloadSize.transfer((), 42);
         assert_eq!(len, 8);
+    }
+}
+
+impl<'a, I> GenericCallMut<I> for ExecutionContext<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_instance: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        self.make_child_call(
+            called_instance,
+            method.interface_name,
+            method.id,
+            args.as_ref(),
+            false,
+        )
+    }
+}
+
+/// Stub which uses fallthrough auth to authorize calls.
+#[derive(Debug)]
+#[doc(hidden)] // TODO: Hidden until fully tested in next releases. [ECR-3494]
+pub struct FallthroughAuth<'a>(pub ExecutionContext<'a>);
+
+impl<'a, I> GenericCallMut<I> for FallthroughAuth<'a>
+where
+    I: Into<InstanceQuery<'a>>,
+{
+    type Output = Result<(), ExecutionError>;
+
+    fn generic_call_mut(
+        &mut self,
+        called_instance: I,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        self.0.make_child_call(
+            called_instance,
+            method.interface_name,
+            method.id,
+            args.as_ref(),
+            true,
+        )
     }
 }
