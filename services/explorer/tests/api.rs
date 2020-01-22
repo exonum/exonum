@@ -18,10 +18,10 @@ use exonum::{
     crypto::{gen_keypair, Hash},
     helpers::{Height, ValidatorId},
     merkledb::{BinaryValue, HashTag, ObjectHash},
-    runtime::{CoreError, ErrorKind, ExecutionError},
+    runtime::{ErrorKind, ExecutionError},
 };
+use exonum_api as api;
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
-use exonum_rust_runtime::api::Error as ApiError;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::{json, Value};
 
@@ -162,10 +162,13 @@ fn test_explorer_api_block_request() {
         .get::<Value>("v1/block?height=10")
         .unwrap_err();
 
-    assert_matches!(
-        response,
-        ApiError::NotFound(ref body) if body == "Requested block height (10) exceeds the blockchain height (1)"
+    assert_eq!(response.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(response.body.title, "Failed to get block info");
+    assert_eq!(
+        response.body.detail,
+        "Requested block height(10) exceeds the blockchain height (1)"
     );
+    assert_eq!(response.body.source, "2:explorer");
 }
 
 fn create_sample_block(testkit: &mut TestKit) {
@@ -310,7 +313,7 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(6));
 
     // Check `latest` param is exceed the height.
-    let result: Result<BlocksRange, ApiError> = api
+    let result: Result<BlocksRange, api::Error> = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=6");
     assert!(result.is_err());
@@ -358,11 +361,14 @@ fn test_explorer_transaction_info() {
             &tx.object_hash().to_hex()
         ))
         .unwrap_err();
-    let error_body = json!({ "type": "unknown" });
-    assert_matches!(
-        info,
-        ApiError::NotFound(ref body) if serde_json::from_str::<Value>(body).unwrap() == error_body
+
+    assert_eq!(info.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(info.body.title, "Failed to get transaction info");
+    assert_eq!(
+        info.body.detail,
+        serde_json::to_string(&json!({"type": "unknown"})).unwrap()
     );
+    assert_eq!(info.body.source, "2:explorer");
 
     api.send(tx.clone());
     testkit.poll_events();
@@ -522,11 +528,17 @@ fn test_explorer_add_invalid_transaction() {
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
         .expect_err("Expected transaction send to finish with error.");
-    let error_body = ExecutionError::from(CoreError::IncorrectInstanceId).to_string();
-    assert_matches!(
-        response,
-        ApiError::BadRequest(ref body) if *body == error_body
+
+    assert_eq!(response.http_code, api::HttpStatusCode::BAD_REQUEST);
+    assert_eq!(
+        response.body.title,
+        "Failed to add transaction to memory pool"
     );
+    assert!(response
+        .body
+        .detail
+        .starts_with("Execution error with code"));
+    assert_eq!(response.body.source, "2:explorer");
 }
 
 #[test]

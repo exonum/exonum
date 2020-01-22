@@ -23,7 +23,7 @@ use exonum_merkledb::{
     MapIndex,
 };
 use exonum_rust_runtime::{
-    api::{self, ServiceApiBuilder},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     CallContext, DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
@@ -189,7 +189,7 @@ struct BalanceQuery {
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
-    fn balance(state: &api::ServiceApiState<'_>, query: BalanceQuery) -> api::Result<u64> {
+    fn balance(state: &ServiceApiState<'_>, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.data();
         let schema = CurrencySchema::new(snapshot.for_executing_service());
         schema
@@ -198,7 +198,7 @@ impl CryptocurrencyApi {
                 let height = snapshot.for_core().height();
                 wallet.actual_balance(height)
             })
-            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
+            .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {

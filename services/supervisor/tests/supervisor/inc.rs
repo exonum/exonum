@@ -19,7 +19,7 @@ use exonum_merkledb::{
     Entry,
 };
 use exonum_rust_runtime::{
-    api::{self, ServiceApiBuilder},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     CallContext, DefaultInstance, Service,
 };
 
@@ -86,13 +86,13 @@ impl IncInterface<CallContext<'_>> for IncService {
 pub struct PublicApi;
 
 impl PublicApi {
-    fn counter(state: &api::ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
+    fn counter(state: &ServiceApiState<'_>, _query: ()) -> api::Result<u64> {
         Schema::new(state.service_data())
             .count()
-            .ok_or_else(|| api::Error::NotFound("Counter is not set yet".to_owned()))
+            .ok_or_else(|| api::Error::not_found().title("Counter is not set yet"))
     }
 
-    fn ping(_state: &api::ServiceApiState<'_>, _query: ()) -> api::Result<()> {
+    fn ping(_state: &ServiceApiState<'_>, _query: ()) -> api::Result<()> {
         Ok(())
     }
 

@@ -309,7 +309,7 @@ pub mod api {
             schema
                 .wallets
                 .get(&pub_key)
-                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
+                .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
         }
 
         /// Endpoint for dumping all wallets from the storage.

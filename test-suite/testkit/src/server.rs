@@ -14,7 +14,7 @@
 
 use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
-use exonum_api::{self as api, ApiAggregator, ApiBuilder, FutureResult};
+use exonum_api::{self as api, ApiAggregator, ApiBuilder};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use futures::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
@@ -50,15 +50,15 @@ impl TestKitActor {
 
         let addr_ = addr.clone();
         api_scope.endpoint("v1/status", move |()| {
-            Box::new(addr_.send(GetStatus).then(flatten_err)) as FutureResult<_>
+            Box::new(addr_.send(GetStatus).then(flatten_err)) as api::FutureResult<_>
         });
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
-            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as FutureResult<_>
+            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as api::FutureResult<_>
         });
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
-            Box::new(addr_.send(query).then(flatten_err)) as FutureResult<_>
+            Box::new(addr_.send(query).then(flatten_err)) as api::FutureResult<_>
         });
         builder
     }
@@ -72,7 +72,7 @@ fn flatten_err<T>(res: Result<Result<T, api::Error>, MailboxError>) -> Result<T,
     match res {
         Ok(Ok(value)) => Ok(value),
         Ok(Err(e)) => Err(e),
-        Err(e) => Err(api::Error::InternalError(e.into())),
+        Err(e) => Err(api::Error::internal(e)),
     }
 }
 
@@ -120,10 +120,12 @@ impl Handler<CreateBlock> for TestKitActor {
         let block_info = if let Some(tx_hashes) = msg.tx_hashes {
             let maybe_missing_tx = tx_hashes.iter().find(|h| !self.0.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
-                return Err(api::Error::BadRequest(format!(
-                    "Transaction not in mempool: {}",
-                    missing_tx.to_string()
-                )));
+                return Err(api::Error::bad_request()
+                    .title("Creating block failed")
+                    .detail(format!(
+                        "Transaction not in mempool: {}",
+                        missing_tx.to_string()
+                    )));
             }
 
             // NB: checkpoints must correspond 1-to-1 to blocks.
@@ -149,9 +151,7 @@ impl Handler<RollBack> for TestKitActor {
 
     fn handle(&mut self, RollBack(height): RollBack, _ctx: &mut Self::Context) -> Self::Result {
         if height == Height(0) {
-            return Err(api::Error::BadRequest(
-                "Cannot rollback past genesis block".into(),
-            ));
+            return Err(api::Error::bad_request().title("Cannot rollback past genesis block"));
         }
 
         if self.0.height() >= height {
@@ -169,18 +169,17 @@ impl Handler<RollBack> for TestKitActor {
 
 #[cfg(test)]
 mod tests {
-    use assert_matches::assert_matches;
     use exonum::{
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
         runtime::ExecutionError,
     };
-    use exonum_api as api;
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, CallContext, Service, ServiceFactory};
+    use pretty_assertions::assert_eq;
 
     use std::time::Duration;
 
@@ -324,9 +323,12 @@ mod tests {
             .query(&body)
             .post::<BlockWithTransactions>("v1/blocks/create")
             .unwrap_err();
-        assert_matches!(
-            err,
-            api::Error::BadRequest(ref body) if body.starts_with("Transaction not in mempool")
+
+        assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
+        assert_eq!(err.body.title, "Creating block failed");
+        assert_eq!(
+            err.body.detail,
+            format!("Transaction not in mempool: {}", Hash::zero())
         );
     }
 
@@ -380,9 +382,7 @@ mod tests {
             .post::<BlockWithTransactions>("v1/blocks/rollback")
             .unwrap_err();
 
-        assert_matches!(
-            err,
-            api::Error::BadRequest(ref body) if body == "Cannot rollback past genesis block"
-        );
+        assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
+        assert_eq!(err.body.title, "Cannot rollback past genesis block");
     }
 }
