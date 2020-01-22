@@ -25,7 +25,7 @@ exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 failure = "0.1.5"
 futures = "0.1.25"
 log = "0.4.8"
-protobuf = "2.8.0"
+protobuf = "2.10.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 
