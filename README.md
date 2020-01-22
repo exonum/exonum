@@ -101,3 +101,4 @@ Some Exonum stuff that is *not* in this repository:
 - [JavaScript light client](https://github.com/exonum/exonum-client)
 - [Python light client](https://github.com/exonum/exonum-python-client)
 - [High-level documentation](https://github.com/exonum/exonum-doc)
+- [Dynamic service launcher for Exonum](https://github.com/exonum/exonum-launcher)
