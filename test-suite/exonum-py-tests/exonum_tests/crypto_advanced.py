@@ -12,6 +12,7 @@ from suite import (
     run_4_nodes,
     wait_network_to_start,
     ExonumCryptoAdvancedClient,
+    generate_config
 )
 
 
@@ -22,18 +23,10 @@ class CryptoAdvancedTest(unittest.TestCase):
         try:
             self.network = run_4_nodes("exonum-cryptocurrency-advanced")
             wait_network_to_start(self.network)
-            cryptocurrency_advanced_config_dict = {
-                "networks": launcher_networks(self.network),
-                "deadline_height": 10000,
-                "artifacts": {
-                    "cryptocurrency": {
-                        "runtime": "rust",
-                        "name": "exonum-cryptocurrency-advanced",
-                        "version": "0.13.0-rc.2",
-                    }
-                },
-                "instances": {"crypto": {"artifact": "cryptocurrency", "action": "start"}},
-            }
+
+            instances = {"crypto": {"artifact": "cryptocurrency"}}
+            cryptocurrency_advanced_config_dict = generate_config(self.network,
+                                                                  instances=instances)
 
             cryptocurrency_advanced_config = Configuration(
                 cryptocurrency_advanced_config_dict

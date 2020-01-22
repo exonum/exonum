@@ -10,6 +10,8 @@ from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 from requests.exceptions import ConnectionError
 
 RETRIES_AMOUNT = 20
+ARTIFACT_NAME="exonum-cryptocurrency-advanced"
+ARTIFACT_VERSION="0.13.0-rc.2"
 
 
 def run_dev_node(application: str) -> ExonumNetwork:
@@ -123,3 +125,25 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
                 break
             except ConnectionError:
                 time.sleep(0.5)
+
+
+def generate_config(network: ExonumNetwork,
+                    deadline_height: int = 10000,
+                    consensus: dict = None,
+                    artifact_name: str = ARTIFACT_NAME,
+                    instances: dict = {}) -> dict:
+    cryptocurrency_advanced_config_dict = {
+      "networks": launcher_networks(network),
+      "deadline_height": deadline_height,
+      "consensus": consensus,
+      "artifacts": {
+        "cryptocurrency": {
+          "runtime": "rust",
+          "name": artifact_name,
+          "version": ARTIFACT_VERSION,
+        }
+      },
+      "instances": instances,
+    }
+
+    return cryptocurrency_advanced_config_dict
