@@ -14,7 +14,6 @@
 
 use exonum_build::ProtobufGenerator;
 
-// API Tests.
 fn main() {
     ProtobufGenerator::with_mod_name("test_runtime_api_protobuf_mod.rs")
         .with_input_dir("src/proto")

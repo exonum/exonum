@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
-
 use exonum_derive::*;
+use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
 /// Define the service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

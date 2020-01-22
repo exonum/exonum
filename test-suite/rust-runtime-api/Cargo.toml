@@ -6,13 +6,8 @@ authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
 readme = "README.md"
-license = "Apache-2.0"
-keywords = ["exonum", "runtime", "api", "tests"]
-categories = ["cryptography"]
 description = "The test crate for testing rust runtime API endpoints."
-
-[badges]
-travis-ci = { repository = "exonum/exonum" }
+publish = false
 
 [dependencies]
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
