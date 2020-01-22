@@ -27,12 +27,10 @@ use exonum::{
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
-use failure::format_err;
 use futures::Future;
 use log::{info, trace};
 use reqwest::{
-    header, Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response,
-    StatusCode,
+    Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -314,58 +312,21 @@ where
         }
     }
 
-    /// Converts reqwest Response to api::Result.
+    /// Converts reqwest Response to `api::ApiResult`.
     fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
-        trace!("Response status: {}", response.status());
-
-        fn extract_description(body: &str) -> Option<String> {
-            trace!("Error: {}", body);
-            match serde_json::from_str::<serde_json::Value>(body).ok()? {
-                serde_json::Value::Object(ref object) if object.contains_key("description") => {
-                    Some(object["description"].as_str()?.to_owned())
-                }
-                serde_json::Value::String(string) => Some(string),
-                _ => None,
-            }
+        let code = response.status();
+        let body = response.text().expect("Unable to get response text");
+        trace!("Body: {}", body);
+        if code == StatusCode::OK {
+            let value = serde_json::from_str(&body).expect("Unable to deserialize body");
+            Ok(value)
+        } else {
+            let error = api::Error::parse(code, &body).expect("Unable to deserialize API error");
+            Err(error)
         }
-
-        fn error(mut response: Response) -> String {
-            let body = response.text().expect("Unable to get response text");
-            extract_description(&body).unwrap_or(body)
-        }
-
-        let error = match response.status() {
-            StatusCode::OK => {
-                let body = response.text().expect("Unable to get response text");
-                trace!("Body: {}", body);
-                let value = serde_json::from_str(&body).expect("Unable to deserialize body");
-
-                return Ok(value);
-            }
-            StatusCode::FORBIDDEN | StatusCode::UNAUTHORIZED => api::Error::Unauthorized,
-            StatusCode::BAD_REQUEST => api::Error::BadRequest(error(response)),
-            StatusCode::NOT_FOUND => api::Error::NotFound(error(response)),
-            StatusCode::MOVED_PERMANENTLY => {
-                let location = response
-                    .headers()
-                    .get(header::LOCATION)
-                    .expect("Received a MOVED_PERMANENTLY response without location header")
-                    .to_str()
-                    .unwrap()
-                    .to_owned();
-                api::Error::MovedPermanently(location)
-            }
-            StatusCode::GONE => api::Error::Gone,
-            s if s.is_server_error() => {
-                api::Error::InternalError(format_err!("{}", error(response)))
-            }
-            s => panic!("Received non-error response status: {}", s.as_u16()),
-        };
-
-        Err(error)
     }
 }
 

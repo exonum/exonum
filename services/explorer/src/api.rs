@@ -396,7 +396,7 @@ use exonum::{
     runtime::ExecutionStatus,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::api::{Error as ApiError, FutureResult, ServiceApiScope};
+use exonum_rust_runtime::api::{self, ServiceApiScope};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
 use serde_json::json;
@@ -417,22 +417,27 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
+    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> api::Result<BlocksRange> {
         let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
-            return Err(ApiError::BadRequest(format!(
-                "Max block count per request exceeded ({})",
-                MAX_BLOCKS_PER_REQUEST
-            )));
+            return Err(api::Error::bad_request()
+                .title("Invalid block request")
+                .detail(format!(
+                    "Max block count per request exceeded ({})",
+                    MAX_BLOCKS_PER_REQUEST
+                )));
         }
 
         let (upper, upper_bound) = if let Some(upper) = query.latest {
             if upper > explorer.height() {
-                return Err(ApiError::NotFound(format!(
+                let detail = format!(
                     "Requested latest height {} is greater than the current blockchain height {}",
                     upper,
                     explorer.height()
-                )));
+                );
+                return Err(api::Error::not_found()
+                    .title("Block not found")
+                    .detail(detail));
             }
             (upper, Bound::Included(upper))
         } else {
@@ -480,46 +485,54 @@ impl ExplorerApi {
         })
     }
 
-    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> Result<BlockInfo, ApiError> {
+    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> api::Result<BlockInfo> {
         let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
-            ApiError::NotFound(format!(
-                "Requested block height ({}) exceeds the blockchain height ({})",
-                query.height,
-                explorer.height()
-            ))
+            api::Error::not_found()
+                .title("Failed to get block info")
+                .detail(format!(
+                    "Requested block height({}) exceeds the blockchain height ({})",
+                    query.height,
+                    explorer.height()
+                ))
         })
     }
 
     fn transaction_info(
         schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
-    ) -> Result<TransactionInfo, ApiError> {
+    ) -> api::Result<TransactionInfo> {
         BlockchainExplorer::from_schema(schema)
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
-                ApiError::NotFound(description)
+                api::Error::not_found()
+                    .title("Failed to get transaction info")
+                    .detail(description)
             })
     }
 
     fn transaction_status(
         schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
-    ) -> Result<CallStatusResponse, ApiError> {
+    ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
 
         let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
-            ApiError::NotFound(format!("Unknown transaction hash ({})", query.hash))
+            api::Error::not_found()
+                .title("Transaction not found")
+                .detail(format!("Unknown transaction hash ({})", query.hash))
         })?;
 
         let tx_info = match tx_info {
             TransactionInfo::Committed(info) => info,
             TransactionInfo::InPool { .. } => {
-                let err = ApiError::NotFound(format!(
-                    "Requested transaction ({}) is not executed yet",
-                    query.hash
-                ));
+                let err = api::Error::not_found()
+                    .title("Transaction not found")
+                    .detail(format!(
+                        "Requested transaction ({}) is not executed yet",
+                        query.hash
+                    ));
                 return Err(err);
             }
         };
@@ -535,7 +548,7 @@ impl ExplorerApi {
     fn before_transactions_status(
         schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
-    ) -> Result<CallStatusResponse, ApiError> {
+    ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::before_transactions(query.service_id);
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
@@ -546,7 +559,7 @@ impl ExplorerApi {
     fn after_transactions_status(
         schema: Schema<&dyn Snapshot>,
         query: CallStatusQuery,
-    ) -> Result<CallStatusResponse, ApiError> {
+    ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::after_transactions(query.service_id);
         let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
@@ -557,7 +570,7 @@ impl ExplorerApi {
         snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
-    ) -> FutureResult<TransactionResponse> {
+    ) -> api::FutureResult<TransactionResponse> {
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
@@ -571,13 +584,17 @@ impl ExplorerApi {
             sender
                 .broadcast_transaction(verified)
                 .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| ApiError::InternalError(e.into()))
+                .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))
         };
 
         Box::new(
             verify_message(snapshot, query.tx_body)
                 .into_future()
-                .map_err(|e| ApiError::BadRequest(e.to_string()))
+                .map_err(|e| {
+                    api::Error::bad_request()
+                        .title("Failed to add transaction to memory pool")
+                        .detail(e.to_string())
+                })
                 .and_then(send_transaction),
         )
     }

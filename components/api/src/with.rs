@@ -206,7 +206,7 @@ impl<Q, I, R, F> NamedWith<Q, I, R, F> {
     }
 }
 
-// Implementations for `Result` and `query` parameters.
+// Implementations for `ApiResult` and `query` parameters.
 
 impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
 where
@@ -223,7 +223,7 @@ where
     }
 }
 
-// Implementations for `FutureResult` and `query` parameters.
+// Implementations for `ApiFutureResult` and `query` parameters.
 
 impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where

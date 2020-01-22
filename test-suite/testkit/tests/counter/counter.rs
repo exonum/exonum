@@ -19,7 +19,6 @@ use exonum::{
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_api::{
-    self as api,
     backends::actix::{HttpRequest, RawHandler, RequestHandler},
     ApiBackend,
 };
@@ -30,7 +29,7 @@ use exonum_merkledb::{
     ObjectHash, ProofEntry,
 };
 use exonum_rust_runtime::{
-    api::{ServiceApiBuilder, ServiceApiState},
+    api::{self, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
 use futures::{Future, IntoFuture};
@@ -187,7 +186,7 @@ impl CounterApi {
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
-            .map_err(|e| api::Error::InternalError(e.into()))?;
+            .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -200,7 +199,7 @@ impl CounterApi {
         let proof = state
             .data()
             .proof_for_service_index("counter")
-            .ok_or_else(|| api::Error::NotFound("counter not initialized".to_owned()))?;
+            .ok_or_else(|| api::Error::not_found().title("Counter not initialized"))?;
         let schema = CounterSchema::new(state.service_data());
         Ok(CounterWithProof {
             counter: schema.counter.get(),
@@ -214,7 +213,7 @@ impl CounterApi {
         let tx_hash = state
             .generic_broadcaster()
             .reset((), ())
-            .map_err(|e| api::Error::InternalError(e.into()))?;
+            .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -246,11 +245,11 @@ impl CounterApi {
             let auth_header = request
                 .headers()
                 .get("Authorization")
-                .ok_or_else(|| api::Error::Unauthorized)?
+                .ok_or_else(|| api::Error::new(api::HttpStatusCode::UNAUTHORIZED))?
                 .to_str()
-                .map_err(|_| api::Error::BadRequest("Malformed `Authorization`".to_owned()))?;
+                .map_err(|_| api::Error::bad_request().title("Malformed `Authorization`"))?;
             if auth_header != "Bearer SUPER_SECRET_111" {
-                return Err(api::Error::Unauthorized);
+                return Err(api::Error::new(api::HttpStatusCode::UNAUTHORIZED));
             }
 
             let snapshot = blockchain.snapshot();

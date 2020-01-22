@@ -116,20 +116,19 @@ impl ExtendApiBackend for actix_web::Scope<()> {
 
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
-        match self {
-            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err.to_string()),
-            ApiError::InternalError(err) => {
-                HttpResponse::InternalServerError().body(err.to_string())
-            }
-            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
-            ApiError::Gone => HttpResponse::Gone().finish(),
-            ApiError::MovedPermanently(new_location) => HttpResponse::MovedPermanently()
-                .header(header::LOCATION, new_location.clone())
-                .finish(),
-            ApiError::NotFound(err) => HttpResponse::NotFound().body(err.to_string()),
-            ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
-        }
+        let body = serde_json::to_value(&self.body).unwrap();
+        let body = if body == serde_json::json!({}) {
+            actix_web::Body::Empty
+        } else {
+            serde_json::to_string(&self.body).unwrap().into()
+        };
+
+        let mut response = HttpResponse::build(self.http_code)
+            .header(header::CONTENT_TYPE, "application/problem+json")
+            .body(body);
+
+        response.headers_mut().extend(self.headers.clone());
+        response
     }
 }
 
@@ -452,5 +451,38 @@ mod tests {
                 .header(header::WARNING, expected_warning)
                 .json(123),
         );
+    }
+
+    #[test]
+    fn api_error_to_http_response() {
+        let response = ApiError::bad_request()
+            .header(header::LOCATION, "location")
+            .docs_uri("uri")
+            .title("title")
+            .detail("detail")
+            .source("source")
+            .error_code(42)
+            .error_response();
+        let body = crate::error::ErrorBody {
+            docs_uri: "uri".into(),
+            title: "title".into(),
+            detail: "detail".into(),
+            source: "source".into(),
+            error_code: Some(42),
+        };
+        let expected = HttpResponse::build(crate::HttpStatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/problem+json")
+            .header(header::LOCATION, "location")
+            .body(serde_json::to_string(&body).unwrap());
+        assert_responses_eq(response, expected);
+    }
+
+    #[test]
+    fn api_error_to_http_response_without_body() {
+        let response = ApiError::bad_request().error_response();
+        let expected = HttpResponse::build(crate::HttpStatusCode::BAD_REQUEST)
+            .header(header::CONTENT_TYPE, "application/problem+json")
+            .finish();
+        assert_responses_eq(response, expected);
     }
 }

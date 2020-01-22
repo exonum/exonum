@@ -133,7 +133,7 @@ fn allow_origin_from_str() {
 
 #[test]
 fn test_allow_origin_toml() {
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
     struct Config {

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use assert_matches::assert_matches;
-use exonum_rust_runtime::{api::Error as ApiError, ProtoSourceFile, ProtoSourcesQuery};
+use exonum_rust_runtime::{api, ProtoSourceFile, ProtoSourcesQuery};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
@@ -112,9 +111,10 @@ fn service_protos_with_incorrect_service() {
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect_err("Rust runtime Api returns a fake source!");
 
-    const EXPECTED_ERROR: &str = "Unable to find sources for artifact";
-    assert_matches!(
-        err,
-        ApiError::NotFound(ref actual_error) if actual_error.contains(EXPECTED_ERROR)
-    )
+    assert_eq!(err.http_code, api::HttpStatusCode::NOT_FOUND);
+    assert_eq!(err.body.title, "Artifact sources not found");
+    assert_eq!(
+        err.body.detail,
+        "Unable to find sources for artifact 0:invalid-service:0.0.1"
+    );
 }
