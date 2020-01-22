@@ -21,7 +21,7 @@ use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::{
     command::{ExonumCommand, StandardResult},
@@ -58,7 +58,7 @@ pub enum Action {
 }
 
 impl Action {
-    fn clear_cache(node_config: PathBuf, db_path: PathBuf) -> Result<(), Error> {
+    fn clear_cache(node_config: &Path, db_path: &Path) -> Result<(), Error> {
         let node_config: NodeConfig = load_config_file(node_config)?;
         let db: Box<dyn Database> = Box::new(RocksDB::open(
             db_path,
@@ -71,8 +71,8 @@ impl Action {
     }
 
     fn restart_migration(
-        node_config: PathBuf,
-        db_path: PathBuf,
+        node_config: &Path,
+        db_path: &Path,
         service_name: &str,
     ) -> Result<(), Error> {
         let node_config: NodeConfig = load_config_file(node_config)?;
@@ -92,14 +92,10 @@ impl Action {
 impl ExonumCommand for Maintenance {
     fn execute(self) -> Result<StandardResult, Error> {
         match self.action {
-            Action::ClearCache => {
-                Action::clear_cache(self.node_config.clone(), self.db_path.clone())?
+            Action::ClearCache => Action::clear_cache(&self.node_config, &self.db_path)?,
+            Action::RestartMigration { ref service_name } => {
+                Action::restart_migration(&self.node_config, &self.db_path, service_name)?
             }
-            Action::RestartMigration { ref service_name } => Action::restart_migration(
-                self.node_config.clone(),
-                self.db_path.clone(),
-                service_name,
-            )?,
         }
         Ok(StandardResult::Maintenance {
             node_config_path: self.node_config,
