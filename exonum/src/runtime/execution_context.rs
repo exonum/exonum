@@ -185,7 +185,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Re-borrows an execution context with the given instance descriptor.
-    fn reborrow<'d>(&'d mut self, instance: InstanceDescriptor<'d>) -> ExecutionContext<'d> {
+    fn reborrow<'s>(&'s mut self, instance: InstanceDescriptor<'s>) -> ExecutionContext<'s> {
         ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller.clone(),
@@ -247,7 +247,7 @@ pub trait ExecutionContextUnstable {
     ) -> Result<(), ExecutionError>;
 }
 
-impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
+impl ExecutionContextUnstable for ExecutionContext<'_> {
     fn make_child_call<'q>(
         &mut self,
         called_instance: impl Into<InstanceQuery<'q>>,

@@ -56,7 +56,7 @@ pub trait Interface<'a> {
     /// Invokes the specified method handler of the service instance.
     fn dispatch(
         &self,
-        cx: ExecutionContext<'a>,
+        context: ExecutionContext<'a>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;

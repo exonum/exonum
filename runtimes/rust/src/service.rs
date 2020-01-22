@@ -40,7 +40,7 @@ pub trait ServiceDispatcher: Send {
     /// Dispatches the interface method call within the specified context.
     fn call(
         &self,
-        ctx: ExecutionContext<'_>,
+        context: ExecutionContext<'_>,
         method: MethodId,
         payload: &[u8],
     ) -> Result<(), ExecutionError>;
