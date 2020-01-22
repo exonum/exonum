@@ -77,7 +77,7 @@ Exonum crates follow [semantic versioning](https://semver.org/).
 The `exonum` crate and its re-exported dependencies
 (`exonum-crypto`, `exonum-merkledb` and `exonum-keys`) are released
 at the same time; their version is considered *the* version of the Exonum framework.
-On the other hand, the crates downstream to `exonum` (e.g., `exonum-node`)
+On the other hand, the crates downstream of `exonum` (e.g., `exonum-node`)
 or independent of it (e.g., `exonum-api`) may evolve at different speeds,
 including major releases not tied to a major Exonum release.
 
@@ -85,6 +85,9 @@ Throughout the Exonum codebase, certain APIs are described in the API docs
 as unstable or experimental. Such APIs may be removed or changed
 in a semantically non-breaking release (for example, a minor release)
 of the corresponding crate.
+Similarly, nominally public APIs that are hidden from the docs
+via `#[doc(hidden)]` are considered unstable and thus exempt from semantic
+versioning limitations.
 
 ## Contributing
 
