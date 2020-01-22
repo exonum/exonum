@@ -374,8 +374,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// | `status` | (custom; see below) | Execution status |
 /// | `time` | [`DateTime`]`<`[`Utc`]`>` | Commitment time* |
 /// \* By commitment time we mean an approximate commitment time of the block
-/// which includes the transaction. This time is calculated as the arithmetic average
-/// of the precommit local times of each validator.
+/// which includes the transaction. This time is a median time of the precommit local times
+/// of each validator.
 ///
 /// ## `status` field
 ///
