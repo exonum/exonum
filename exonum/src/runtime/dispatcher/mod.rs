@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::schema::Schema;
+pub use self::{helpers::remove_local_migration_result, schema::Schema};
 
 use exonum_merkledb::{
     migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
@@ -52,6 +52,7 @@ use super::{
     ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
 };
 
+mod helpers;
 #[cfg(test)]
 mod migration_tests;
 mod schema;

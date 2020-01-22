@@ -135,7 +135,7 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
-    fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
+    pub(crate) fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
         self.access.clone().get_map(LOCAL_MIGRATION_RESULTS)
     }
 
