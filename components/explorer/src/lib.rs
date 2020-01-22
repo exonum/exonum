@@ -489,7 +489,7 @@ impl CommittedTransaction {
 /// Transactions in pool are represented with a 2-field object:
 ///
 /// - `type` field contains transaction type (`"in-pool"`).
-/// - `message` is the transaction payload.
+/// - `message` is the full transaction message serialized to the hexadecimal form.
 ///
 /// # Examples
 ///
