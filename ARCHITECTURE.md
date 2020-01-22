@@ -32,7 +32,7 @@ the `Database` trait. The keys and values can be represented as slices of bytes:
 To transform raw bytes into native Rust data structures and vice versa, the
 `BinaryKey` and `BinaryValue` traits are used.
 
-On top of raw storage, collections like sets, lists and maps are provided: see
+On top of raw storage, collections like sets, lists and maps are provided; see
 various `*Index` structs. Of particular interest are `ProofMapIndex` and `ProofListIndex`,
 which provide *Merkelized* collections. These collections are capable
 of providing compact proofs for search queries. See the corresponding modules
@@ -66,12 +66,12 @@ The interface between `Dispatcher` and `BlockchainMut` is relatively small (esse
 two main operations: creating and committing blocks), but it maps to a richer
 service lifecycle defined within `Dispatcher`. Of particular note is the data
 migration framework (`migrations` submodule), allowing to execute `MigrationScript`s
-in background and ensure that the migration outcome is the same among all nodes
+in background and to ensure that the migration outcome is the same among all nodes
 in the network.
 
 Note that `Dispatcher` manages lifecycle events, but does not *control* them; e.g.,
 it does not initiate instantiating new services. This task is performed by
-the *supervisor* (a service with additional privileges). One supervisor implementation
+the supervisor (a service with additional privileges). One supervisor implementation
 can be found in the [`exonum-supervisor`] crate. The goal of this separation
 is to allow controlling the blockchain via ordinary service interface (e.g., transactions);
 this minimizes the need to support this control in the core and makes lifecycle
@@ -99,7 +99,7 @@ the `messages` module, with the exception of transactions and precommits.
 The latter are used by the core logic and are are thus defined
 in the `exonum` crate.
 
-HTTP API is *not* a part of service interface recognized by the core,
+HTTP API is not a part of service interface recognized by the core,
 but rather is a runtime-specific interface. The Rust runtime uses the `exonum-api`
 to obtain endpoint handlers from its services and sends them to the node via
 an `mpsc` channel. Thus, Rust services (but not other services) share the HTTP
