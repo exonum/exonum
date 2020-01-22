@@ -23,7 +23,7 @@ use std::{borrow::Cow, fmt, num::ParseIntError, str::FromStr};
 /// Number of milliseconds.
 pub type Milliseconds = u64;
 
-/// Blockchain height, that is, the number of blocks in it.
+/// Blockchain height, that is, the number of committed blocks in it.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(ObjectHash)]
 pub struct Height(pub u64);

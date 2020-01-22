@@ -38,7 +38,7 @@ pub struct SignedMessage {
     pub payload: Vec<u8>,
     /// `PublicKey` of the author of the message.
     pub author: PublicKey,
-    /// Digital signature over `payload` created with th secret key of the author of the message.
+    /// Digital signature over `payload` created with the secret key of the author of the message.
     pub signature: Signature,
 }
 
