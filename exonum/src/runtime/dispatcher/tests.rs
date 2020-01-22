@@ -78,11 +78,14 @@ impl Dispatcher {
         call_info: &CallInfo,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
+        let instance = self
+            .get_service(call_info.instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::for_block_call(self, fork);
-        runtime.execute(context, call_info, arguments)
+        let context = ExecutionContext::for_block_call(self, fork, instance);
+        runtime.execute(context, call_info.method_id, arguments)
     }
 
     /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
@@ -196,7 +199,7 @@ impl Runtime for SampleRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -205,7 +208,7 @@ impl Runtime for SampleRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -243,11 +246,11 @@ impl Runtime for SampleRuntime {
 
     fn execute(
         &self,
-        _context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        context: ExecutionContext<'_>,
+        method_id: MethodId,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
-        if call_info.instance_id == self.instance_id && call_info.method_id == self.method_id {
+        if context.instance().id == self.instance_id && method_id == self.method_id {
             Ok(())
         } else {
             let kind = ErrorKind::Service { code: 15 };
@@ -255,19 +258,11 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -356,9 +351,10 @@ fn test_dispatcher_simple() {
         RUST_SERVICE_NAME.into(),
         rust_artifact.clone(),
     );
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context =
+        ExecutionContext::for_block_call(&dispatcher, &mut fork, rust_service.as_descriptor());
     context
-        .initiate_adding_service(rust_service, vec![])
+        .initiate_adding_service(rust_service.clone(), vec![])
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service =
@@ -384,9 +380,13 @@ fn test_dispatcher_simple() {
         rust_artifact.clone(),
     );
 
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        conflicting_rust_service.as_descriptor(),
+    );
     let err = context
-        .initiate_adding_service(conflicting_rust_service, vec![])
+        .initiate_adding_service(conflicting_rust_service.clone(), vec![])
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
@@ -489,7 +489,7 @@ impl Runtime for ShutdownRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -498,7 +498,7 @@ impl Runtime for ShutdownRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -523,25 +523,17 @@ impl Runtime for ShutdownRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -686,7 +678,7 @@ impl Runtime for DeploymentRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -695,7 +687,7 @@ impl Runtime for DeploymentRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -720,25 +712,17 @@ impl Runtime for DeploymentRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _parameters: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -925,7 +909,8 @@ fn stopped_service_workflow() {
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec::from_raw_parts(instance_id, instance_name.into(), artifact);
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context =
+        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
     context
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
@@ -1020,9 +1005,10 @@ fn stopped_service_workflow() {
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context = ExecutionContext::for_block_call(&dispatcher, &mut fork);
+    let mut context =
+        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
     context
-        .initiate_adding_service(service, vec![])
+        .initiate_adding_service(service.clone(), vec![])
         .expect_err("`initiate_adding_service` should failed");
 
     // Check that it is impossible to stop service twice.

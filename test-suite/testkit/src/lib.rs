@@ -28,7 +28,7 @@
 //! use exonum_derive::*;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
-//! use exonum_rust_runtime::{ServiceFactory, CallContext, Service};
+//! use exonum_rust_runtime::{ServiceFactory, ExecutionContext, Service};
 //!
 //! // Simple service implementation.
 //!
@@ -51,10 +51,10 @@
 //!     fn timestamp(&self, _: Ctx, arg: String) -> Self::Output;
 //! }
 //!
-//! impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+//! impl TimestampingInterface<ExecutionContext<'_>> for TimestampingService {
 //!     type Output = Result<(), ExecutionError>;
 //!
-//!     fn timestamp(&self, _: CallContext<'_>, arg: String) -> Self::Output {
+//!     fn timestamp(&self, _: ExecutionContext<'_>, arg: String) -> Self::Output {
 //!         Ok(())
 //!     }
 //! }
@@ -343,7 +343,7 @@ impl TestKit {
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{crypto::{PublicKey, Hash, SecretKey}, runtime::ExecutionError};
-    /// # use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+    /// # use exonum_rust_runtime::{ExecutionContext, Service, ServiceFactory};
     /// #
     /// // Suppose we test this service interface:
     /// #[exonum_interface]
@@ -363,9 +363,9 @@ impl TestKit {
     /// pub struct ExampleService;
     /// impl Service for ExampleService {}
     /// #
-    /// # impl ExampleInterface<CallContext<'_>> for ExampleService {
+    /// # impl ExampleInterface<ExecutionContext<'_>> for ExampleService {
     /// #     type Output = Result<(), ExecutionError>;
-    /// #     fn example_tx(&self, _: CallContext<'_>, _: String) -> Self::Output {
+    /// #     fn example_tx(&self, _: ExecutionContext<'_>, _: String) -> Self::Output {
     /// #         Ok(())
     /// #     }
     /// # }

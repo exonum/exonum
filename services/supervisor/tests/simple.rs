@@ -22,11 +22,12 @@ use exonum::{
     merkledb::access::AccessExt,
     messages::{AnyTx, Verified},
     runtime::{
-        CommonError, ErrorMatch, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
+        CommonError, ErrorMatch, ExecutionContext, ExecutionError, InstanceId, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory as _};
+use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory as _};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -74,7 +75,7 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -91,7 +92,7 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context

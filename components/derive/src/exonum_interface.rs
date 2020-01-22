@@ -346,7 +346,7 @@ impl ExonumInterface {
     }
 
     /// Generates `Interface` implementation for the trait object with matching params
-    /// (`CallContext` context and `Result<(), ExecutionError>` output). This will allow to call
+    /// (`ExecutionContext` context and `Result<(), ExecutionError>` output). This will allow to call
     /// implementation methods from the dispatcher.
     fn impl_interface(&self) -> impl ToTokens {
         let cr = &self.attrs.cr;
@@ -385,7 +385,7 @@ impl ExonumInterface {
             .iter()
             .map(impl_match_arm_for_removed_method);
 
-        let ctx = quote!(#cr::CallContext<'a>);
+        let ctx = quote!(#cr::_reexports::ExecutionContext<'a>);
         let res = quote!(std::result::Result<(), exonum::runtime::ExecutionError>);
         quote! {
             impl<'a> #cr::Interface<'a> for dyn #trait_name<#ctx, Output = #res> {
@@ -393,7 +393,7 @@ impl ExonumInterface {
 
                 fn dispatch(
                     &self,
-                    context: #cr::CallContext<'a>,
+                    context: #cr::_reexports::ExecutionContext<'a>,
                     method: exonum::runtime::MethodId,
                     payload: &[u8],
                 ) -> #res {

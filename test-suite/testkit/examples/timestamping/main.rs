@@ -17,10 +17,10 @@
 use exonum::{
     crypto::gen_keypair,
     merkledb::ObjectHash,
-    runtime::{ExecutionError, SnapshotExt},
+    runtime::{ExecutionContext, ExecutionError, SnapshotExt},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{Service, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 
 #[exonum_interface(auto_ids)]
@@ -34,10 +34,10 @@ trait TimestampingInterface<Ctx> {
 #[service_dispatcher(implements("TimestampingInterface"))]
 struct TimestampingService;
 
-impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+impl TimestampingInterface<ExecutionContext<'_>> for TimestampingService {
     type Output = Result<(), ExecutionError>;
 
-    fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
+    fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: String) -> Self::Output {
         Ok(())
     }
 }

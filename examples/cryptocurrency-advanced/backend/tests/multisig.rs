@@ -25,7 +25,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
-    CallContext, GenericCallMut, MethodDescriptor, Service, ServiceFactory, TxStub,
+    ExecutionContext, GenericCallMut, MethodDescriptor, Service, ServiceFactory, TxStub,
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 use serde_derive::{Deserialize, Serialize};
@@ -85,7 +85,11 @@ impl<T: Access> MultisigSchema<T> {
 struct MultisigService;
 
 impl Service for MultisigService {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         let config = Config::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
         let mut schema = MultisigSchema::new(context.service_data());
         schema.config.set(config);
@@ -111,10 +115,10 @@ trait MultisigInterface<Ctx> {
     fn support_action(&self, context: Ctx, action_hash: Hash) -> Self::Output;
 }
 
-impl MultisigInterface<CallContext<'_>> for MultisigService {
+impl MultisigInterface<ExecutionContext<'_>> for MultisigService {
     type Output = Result<(), ExecutionError>;
 
-    fn propose_action(&self, context: CallContext<'_>, action: AnyTx) -> Self::Output {
+    fn propose_action(&self, context: ExecutionContext<'_>, action: AnyTx) -> Self::Output {
         let caller = context.caller().address();
         // Note that identifying a proposal by the enclosing transaction hash is not always sound.
         // Indeed, multiple proposals may be created in the same transaction, e.g., if
@@ -139,7 +143,7 @@ impl MultisigInterface<CallContext<'_>> for MultisigService {
         Ok(())
     }
 
-    fn support_action(&self, mut context: CallContext<'_>, action_hash: Hash) -> Self::Output {
+    fn support_action(&self, mut context: ExecutionContext<'_>, action_hash: Hash) -> Self::Output {
         let caller = context.caller().address();
 
         let (config, mut proposal) = {

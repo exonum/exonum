@@ -14,49 +14,135 @@
 
 //! The set of errors for the Exonum API module.
 
+pub use actix_web::http::{
+    header::{self, HeaderName},
+    HeaderMap, StatusCode as HttpStatusCode,
+};
 use failure::Fail;
-use serde::Serialize;
-use std::io;
+use serde::{Deserialize, Serialize};
 
-/// List of possible API errors.
-#[derive(Fail, Debug)]
-pub enum Error {
-    /// Storage error. This type includes errors related to the database, caused
-    /// by, for example, serialization issues.
-    #[fail(display = "Storage error: {}", _0)]
-    Storage(#[cause] failure::Error),
+use std::fmt;
 
-    /// Input/output error. This type includes errors related to files that are not
-    /// a part of the Exonum storage.
-    #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] io::Error),
+/// API HTTP error struct.
+#[derive(Fail, Debug, Default)]
+pub struct Error {
+    /// HTTP error code.
+    pub http_code: HttpStatusCode,
+    /// API error body.
+    pub body: ErrorBody,
+    /// Additional HTTP headers.
+    pub headers: HeaderMap,
+}
 
-    /// Bad request. This error occurs when the request contains invalid syntax.
-    #[fail(display = "Bad request: {}", _0)]
-    BadRequest(String),
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ErrorBody {
+    /// A URI reference to the documentation or possible solutions for the problem.
+    #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
+    pub docs_uri: String,
+    /// Short description of the error.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub title: String,
+    /// Detailed description of the error.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub detail: String,
+    /// Source of the error.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub source: String,
+    /// Internal error code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<u8>,
+}
 
-    /// Moved permanently. This error means that resource existed at the specified
-    /// location, but now is moved to the other place.
-    #[fail(display = "Moved permanently; Location: {}", _0)]
-    MovedPermanently(String),
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.body.title, self.body.detail)
+    }
+}
 
-    /// Gone. This error means that resource existed in the past, but now is not present.
-    #[fail(display = "Gone")]
-    Gone,
+impl Error {
+    /// Builds a ApiError with the given `http_code`.
+    pub fn new(http_code: HttpStatusCode) -> Self {
+        Self {
+            http_code,
+            body: ErrorBody::default(),
+            headers: HeaderMap::new(),
+        }
+    }
 
-    /// Not found. This error occurs when the server cannot locate the requested
-    /// resource.
-    #[fail(display = "Not found: {}", _0)]
-    NotFound(String),
+    /// Builds Bad Request (400) error.
+    pub fn bad_request() -> Self {
+        Error::new(HttpStatusCode::BAD_REQUEST)
+    }
 
-    /// Internal server error. This type can return any internal server error to the user.
-    #[fail(display = "Internal server error: {}", _0)]
-    InternalError(failure::Error),
+    /// Builds Forbidden (403) error.
+    pub fn forbidden() -> Self {
+        Error::new(HttpStatusCode::FORBIDDEN)
+    }
 
-    /// Unauthorized error. This error occurs when the request lacks valid
-    /// authentication credentials.
-    #[fail(display = "Unauthorized")]
-    Unauthorized,
+    /// Builds Not Found (404) error.
+    pub fn not_found() -> Self {
+        Error::new(HttpStatusCode::NOT_FOUND)
+    }
+
+    /// Builds Internal Server Error (500).
+    pub fn internal(cause: impl failure::Fail) -> Self {
+        Error::new(HttpStatusCode::INTERNAL_SERVER_ERROR).detail(cause.to_string())
+    }
+
+    /// Sets `docs_uri` of an error.
+    pub fn docs_uri(mut self, docs_uri: impl Into<String>) -> Self {
+        self.body.docs_uri = docs_uri.into();
+        self
+    }
+
+    /// Sets `title` of an error.
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.body.title = title.into();
+        self
+    }
+
+    /// Sets `detail` of an error.
+    pub fn detail(mut self, detail: impl Into<String>) -> Self {
+        self.body.detail = detail.into();
+        self
+    }
+
+    /// Sets `source` of an error.
+    #[doc(hidden)]
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.body.source = source.into();
+        self
+    }
+
+    /// Sets `error_code` of an error.
+    pub fn error_code(mut self, error_code: u8) -> Self {
+        self.body.error_code = Some(error_code);
+        self
+    }
+
+    /// Adds HTTP header, which will be added in `HttpResponse`
+    pub(crate) fn header(mut self, key: HeaderName, value: &str) -> Self {
+        self.headers.insert(key, value.parse().unwrap());
+        self
+    }
+
+    /// Tries to create `ApiError` from JSON.
+    pub fn parse(
+        http_code: HttpStatusCode,
+        body: &str,
+    ) -> std::result::Result<Self, serde_json::Error> {
+        let body = if !body.is_empty() {
+            serde_json::from_str(body)?
+        } else {
+            ErrorBody::default()
+        };
+
+        Ok(Self {
+            http_code,
+            body,
+            headers: HeaderMap::new(),
+        })
+    }
 }
 
 /// A helper structure allowing to build `MovedPermanently` response from the
@@ -96,19 +182,6 @@ impl From<MovedPermanentlyError> for Error {
             None => e.location,
         };
 
-        Error::MovedPermanently(full_location)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::Io(e)
-    }
-}
-
-/// Converts the provided error into an internal server error.
-impl From<failure::Error> for Error {
-    fn from(e: failure::Error) -> Self {
-        Error::InternalError(e)
+        Error::new(HttpStatusCode::MOVED_PERMANENTLY).header(header::LOCATION, &full_location)
     }
 }

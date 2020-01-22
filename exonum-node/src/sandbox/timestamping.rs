@@ -16,10 +16,10 @@ use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
     merkledb::access::AccessExt,
     messages::Verified,
-    runtime::{AnyTx, ExecutionError, InstanceId},
+    runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
-use exonum_rust_runtime::{CallContext, DefaultInstance, Service};
+use exonum_rust_runtime::{DefaultInstance, Service};
 use rand::{rngs::ThreadRng, thread_rng, RngCore};
 
 pub const DATA_SIZE: usize = 64;
@@ -35,16 +35,20 @@ pub trait Timestamping<Ctx> {
 #[service_factory(artifact_name = "timestamping", artifact_version = "0.1.0")]
 pub struct TimestampingService;
 
-impl Timestamping<CallContext<'_>> for TimestampingService {
+impl Timestamping<ExecutionContext<'_>> for TimestampingService {
     type Output = Result<(), ExecutionError>;
 
-    fn timestamp(&self, _ctx: CallContext<'_>, _arg: Vec<u8>) -> Self::Output {
+    fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: Vec<u8>) -> Self::Output {
         Ok(())
     }
 }
 
 impl Service for TimestampingService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         context
             .service_data()
             .get_proof_entry("first")

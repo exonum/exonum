@@ -64,12 +64,10 @@
 
 use exonum::{
     merkledb::ObjectHash,
-    runtime::{ExecutionError, ExecutionFail},
+    runtime::{ExecutionContext, ExecutionError, ExecutionFail},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, CallContext, DefaultInstance, Service,
-};
+use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
 
 pub mod api;
 
@@ -89,7 +87,11 @@ pub struct ExplorerService {
 }
 
 impl Service for ExplorerService {
-    fn initialize(&self, context: CallContext<'_>, _params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         // Check that there are no other explorer services.
         let instances = context.data().for_dispatcher().service_instances();
         for instance in instances.values() {

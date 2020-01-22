@@ -26,8 +26,8 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
+        Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -39,7 +39,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use exonum_rust_runtime::{CallContext, DefaultInstance, RustRuntime, Service, ServiceFactory};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, Service, ServiceFactory};
 
 pub fn execute_transaction(
     blockchain: &mut BlockchainMut,
@@ -179,29 +179,33 @@ impl<T: Runtime> Runtime for Inspected<T> {
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        let instance = context.instance();
         self.events.push(RuntimeEvent::StartAddingService(
-            spec.to_owned(),
+            InstanceSpec::from_raw_parts(instance.id, instance.name.to_owned(), artifact.clone()),
             parameters.clone(),
         ));
+
         self.runtime
-            .initiate_adding_service(context, spec, parameters)
+            .initiate_adding_service(context, artifact, parameters)
     }
 
     fn initiate_resuming_service(
         &self,
         context: ExecutionContext<'_>,
-        spec: &InstanceSpec,
+        artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        let instance = context.instance();
         self.events.push(RuntimeEvent::StartResumingService(
-            spec.to_owned(),
+            InstanceSpec::from_raw_parts(instance.id, instance.name.to_owned(), artifact.clone()),
             parameters.clone(),
         ));
+
         self.runtime
-            .initiate_resuming_service(context, spec, parameters)
+            .initiate_resuming_service(context, artifact, parameters)
     }
 
     fn update_service_status(
@@ -241,33 +245,29 @@ impl<T: Runtime> Runtime for Inspected<T> {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        call_info: &CallInfo,
+        method_id: MethodId,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
-        self.runtime.execute(context, call_info, arguments)
+        self.runtime.execute(context, method_id, arguments)
     }
 
-    fn before_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: u32,
-    ) -> Result<(), ExecutionError> {
-        let height = CoreSchema::new(&*context.fork).next_height();
-        self.events
-            .push(RuntimeEvent::BeforeTransactions(height, instance_id));
-        self.runtime.after_transactions(context, instance_id)
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        let height = context.data().for_core().next_height();
+        self.events.push(RuntimeEvent::BeforeTransactions(
+            height,
+            context.instance().id,
+        ));
+        self.runtime.after_transactions(context)
     }
 
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        instance_id: u32,
-    ) -> Result<(), ExecutionError> {
-        let schema = CoreSchema::new(&*context.fork);
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        let schema = context.data().for_core();
         let height = schema.next_height();
-        self.events
-            .push(RuntimeEvent::AfterTransactions(height, instance_id));
-        self.runtime.after_transactions(context, instance_id)
+        self.events.push(RuntimeEvent::AfterTransactions(
+            height,
+            context.instance().id,
+        ));
+        self.runtime.after_transactions(context)
     }
 
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
@@ -337,12 +337,12 @@ pub trait ToySupervisor<Ctx> {
 #[service_factory(artifact_name = "toy_supervisor", artifact_version = "0.1.0")]
 pub struct ToySupervisorService;
 
-impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
+impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
     type Output = Result<(), ExecutionError>;
 
     fn deploy_artifact(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         request: DeployArtifact,
     ) -> Self::Output {
         context
@@ -351,19 +351,31 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
         Ok(())
     }
 
-    fn start_service(&self, mut context: CallContext<'_>, request: StartService) -> Self::Output {
+    fn start_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: StartService,
+    ) -> Self::Output {
         context
             .supervisor_extensions()
             .initiate_adding_service(request.spec, request.constructor)
     }
 
-    fn stop_service(&self, mut context: CallContext<'_>, request: StopService) -> Self::Output {
+    fn stop_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: StopService,
+    ) -> Self::Output {
         context
             .supervisor_extensions()
             .initiate_stopping_service(request.instance_id)
     }
 
-    fn resume_service(&self, mut context: CallContext<'_>, request: ResumeService) -> Self::Output {
+    fn resume_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: ResumeService,
+    ) -> Self::Output {
         context.supervisor_extensions().initiate_resuming_service(
             request.instance_id,
             request.artifact,
@@ -373,7 +385,7 @@ impl ToySupervisor<CallContext<'_>> for ToySupervisorService {
 
     fn migrate_service(
         &self,
-        mut context: CallContext<'_>,
+        mut context: ExecutionContext<'_>,
         request: MigrateService,
     ) -> Self::Output {
         context

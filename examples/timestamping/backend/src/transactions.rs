@@ -14,10 +14,9 @@
 
 //! Timestamping transactions.
 
-use exonum::runtime::{CommonError, ExecutionError};
+use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::CallContext;
 use exonum_time::TimeSchema;
 use log::trace;
 
@@ -53,10 +52,10 @@ pub trait TimestampingInterface<Ctx> {
     fn timestamp(&self, ctx: Ctx, arg: Timestamp) -> Self::Output;
 }
 
-impl TimestampingInterface<CallContext<'_>> for TimestampingService {
+impl TimestampingInterface<ExecutionContext<'_>> for TimestampingService {
     type Output = Result<(), ExecutionError>;
 
-    fn timestamp(&self, context: CallContext<'_>, arg: Timestamp) -> Self::Output {
+    fn timestamp(&self, context: ExecutionContext<'_>, arg: Timestamp) -> Self::Output {
         let tx_hash = context
             .transaction_hash()
             .ok_or(CommonError::UnauthorizedCaller)?;

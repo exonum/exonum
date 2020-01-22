@@ -14,7 +14,7 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult, Result};
+pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult, HttpStatusCode, Result};
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
@@ -23,7 +23,7 @@ use exonum::{
     runtime::{BlockchainData, InstanceDescriptor, InstanceId},
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
-use futures::IntoFuture;
+use futures::{Future, IntoFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
@@ -158,7 +158,12 @@ impl ServiceApiScope {
                 let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
                 let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
                 let result = handler(&state, query);
-                Box::new(result.into_future())
+
+                let instance_name = instance_name.clone();
+                let future = result
+                    .into_future()
+                    .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+                Box::new(future)
             });
         self
     }
@@ -180,7 +185,12 @@ impl ServiceApiScope {
                 let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
                 let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
                 let result = handler(&state, query);
-                Box::new(result.into_future())
+
+                let instance_name = instance_name.clone();
+                let future = result
+                    .into_future()
+                    .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+                Box::new(future)
             });
         self
     }
@@ -206,7 +216,12 @@ impl ServiceApiScope {
             let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
             let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
             let result = inner(&state, query);
-            Box::new(result.into_future())
+
+            let instance_name = instance_name.clone();
+            let future = result
+                .into_future()
+                .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+            Box::new(future)
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
@@ -235,7 +250,12 @@ impl ServiceApiScope {
             let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
             let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
             let result = inner(&state, query);
-            Box::new(result.into_future())
+
+            let instance_name = instance_name.clone();
+            let future = result
+                .into_future()
+                .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+            Box::new(future)
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);

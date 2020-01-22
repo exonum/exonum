@@ -14,14 +14,13 @@
 
 //! Cryptocurrency API.
 
-use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
-
 use exonum::{
     blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
     runtime::{Caller, CallerAddress as Address},
 };
+use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
 use crate::{schema::SchemaImpl, wallet::Wallet};

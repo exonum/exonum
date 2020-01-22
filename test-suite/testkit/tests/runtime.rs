@@ -17,8 +17,8 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, CallInfo, ExecutionContext, ExecutionError, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, WellKnownRuntime,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus, Mailbox,
+        MethodId, Runtime, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -116,7 +116,7 @@ impl Runtime for TestRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         self.tester.construct_service(parameters);
@@ -126,7 +126,7 @@ impl Runtime for TestRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -151,25 +151,17 @@ impl Runtime for TestRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
