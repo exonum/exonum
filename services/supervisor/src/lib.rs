@@ -69,13 +69,14 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, DeployResponse},
+    api::{DeployInfoQuery, MigrationInfoQuery, ProcessStateResponse},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
-    deploy_state::DeployState,
-    errors::{ArtifactError, CommonError, ConfigurationError, ServiceError},
+    errors::{ArtifactError, CommonError, ConfigurationError, MigrationError, ServiceError},
+    event_state::AsyncEventState,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
-        DeployResult, ResumeService, ServiceConfig, StartService, StopService, SupervisorConfig,
+        DeployResult, MigrationRequest, MigrationResult, ResumeService, ServiceConfig,
+        StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -98,8 +99,9 @@ pub mod mode;
 
 mod api;
 mod configure;
-mod deploy_state;
 mod errors;
+mod event_state;
+mod migration_state;
 mod multisig;
 mod proto;
 mod proto_structures;
@@ -315,36 +317,10 @@ impl Service for Supervisor {
         Ok(())
     }
 
-    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
-        // Perform a cleanup for outdated requests.
-        let mut schema = SchemaImpl::new(context.service_data());
-        let core_schema = context.data().for_core();
-        let height = core_schema.height();
-
-        // Remove pending deploy requests for which deadline was exceeded.
-        let requests_to_remove = schema
-            .pending_deployments
-            .values()
-            .filter(|request| request.deadline_height <= height)
-            .collect::<Vec<_>>();
-
-        for request in requests_to_remove {
-            schema.pending_deployments.remove(&request.artifact);
-            if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
-                // If state is marked as pending, change it to failed as well.
-                schema.deploy_states.put(&request, DeployState::Timeout);
-            }
-            log::trace!("Removed outdated deployment request {:?}", request);
-        }
-
-        let entry = schema.public.pending_proposal.get();
-        if let Some(entry) = entry {
-            if entry.config_propose.actual_from <= height {
-                // Remove pending config proposal for which deadline was exceeded.
-                log::trace!("Removed outdated config proposal");
-                schema.public.pending_proposal.remove();
-            }
-        }
+    fn before_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
+        self.remove_outdated_deployments(&context);
+        self.remove_outdated_config_proposal(&context);
+        self.remove_outdated_migrations(&mut context)?;
         Ok(())
     }
 
@@ -387,6 +363,58 @@ impl Service for Supervisor {
 
     /// Sends confirmation transaction for unconfirmed deployment requests.
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
+        self.process_unconfirmed_deployments(&mut context);
+        self.process_incomplete_migrations(&mut context);
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
+    }
+}
+
+impl Supervisor {
+    /// Removes deployments for which deadline height is already exceeded.
+    fn remove_outdated_deployments(&self, context: &CallContext<'_>) {
+        let mut schema = SchemaImpl::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let height = core_schema.height();
+
+        // Collect pending deploy requests for which deadline was exceeded.
+        let requests_to_remove = schema
+            .pending_deployments
+            .values()
+            .filter(|request| request.deadline_height <= height)
+            .collect::<Vec<_>>();
+
+        for request in requests_to_remove {
+            schema.pending_deployments.remove(&request.artifact);
+            if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
+                // If state is marked as pending, change it to failed as well.
+                schema.deploy_states.put(&request, AsyncEventState::Timeout);
+            }
+            log::trace!("Removed outdated deployment request {:?}", request);
+        }
+    }
+
+    /// Removes pending config proposal if it's outdated.
+    fn remove_outdated_config_proposal(&self, context: &CallContext<'_>) {
+        let mut schema = SchemaImpl::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let height = core_schema.height();
+
+        let entry = schema.public.pending_proposal.get();
+        if let Some(entry) = entry {
+            if entry.config_propose.actual_from <= height {
+                // Remove pending config proposal for which deadline was exceeded.
+                log::trace!("Removed outdated config proposal");
+                schema.public.pending_proposal.remove();
+            }
+        }
+    }
+
+    /// Goes through pending deployments, chooses ones that we're not confirmed by our node
+    /// and starts the local deployment routine for them.
+    fn process_unconfirmed_deployments(&self, context: &mut AfterCommitContext<'_>) {
         let service_key = context.service_key();
 
         let deployments: Vec<_> = {
@@ -395,7 +423,7 @@ impl Service for Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
+                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
                         // From all pending requests we are interested only in ones not
                         // confirmed by us.
                         !schema
@@ -420,7 +448,7 @@ impl Service for Supervisor {
                 if let Some(tx_sender) = tx_sender {
                     log::trace!("Sending deployment result report {:?}", unconfirmed_request);
                     let confirmation = DeployResult::new(unconfirmed_request, result);
-                    if let Err(e) = tx_sender.confirm_artifact_deploy((), confirmation) {
+                    if let Err(e) = tx_sender.report_deploy_result((), confirmation) {
                         log::error!("Cannot send `DeployResult`: {}", e);
                     }
                 }
@@ -429,8 +457,105 @@ impl Service for Supervisor {
         }
     }
 
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::wire(builder)
+    /// Rollbacks and removes migrations for which deadline height is already exceeded.
+    fn remove_outdated_migrations(
+        &self,
+        context: &mut CallContext<'_>,
+    ) -> Result<(), ExecutionError> {
+        let height = context.data().for_core().height();
+
+        // Collect pending migration requests for which deadline was exceeded.
+        let requests_to_remove = SchemaImpl::new(context.service_data())
+            .pending_migrations
+            .iter()
+            .filter_map(|(_, request)| {
+                if request.deadline_height <= height {
+                    Some(request)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        for request in requests_to_remove {
+            let mut schema = SchemaImpl::new(context.service_data());
+            schema.pending_migrations.remove(&request);
+
+            let mut state = schema
+                .migration_states
+                .get(&request)
+                .expect("BUG: State for pending migration request is not stored");
+            if state.inner.is_pending() {
+                // If state is marked as pending, change it to failed as well.
+                state.update(AsyncEventState::Timeout);
+                schema.migration_states.put(&request, state);
+
+                // Then, rollback the migration.
+                drop(schema);
+                context
+                    .supervisor_extensions()
+                    .rollback_migration(request.service.as_ref())?;
+            }
+            log::trace!("Removed outdated migration request {:?}", request);
+        }
+
+        Ok(())
+    }
+
+    /// Goes through incomplete migrations, checking their statuses.
+    fn process_incomplete_migrations(&self, context: &mut AfterCommitContext<'_>) {
+        let service_key = context.service_key();
+
+        // First of all, check all the new migrations and request core to start them.
+        let pending_migrations: Vec<_> = {
+            let schema = SchemaImpl::new(context.service_data());
+            schema
+                .pending_migrations
+                .iter()
+                .filter_map(|(_, request)| {
+                    let state = schema
+                        .migration_states
+                        .get(&request)
+                        .expect("BUG: State for pending migration request is not stored");
+
+                    let confirmed_by_us = schema
+                        .migration_confirmations
+                        .confirmed_by(&request, &service_key);
+
+                    // We are interested in requests that are both pending and not yet confirmed.
+                    // Despite the fact that `migration_confirmations` stores only successful
+                    // outcomes, receiving any failure report will immediately change the state
+                    // to `Failed`.
+                    // Thus if request is `pending` and there is no out signature in
+                    // `migration_confirmations` index, it means than we did not send the
+                    // result report, and should do it once core will provide this result.
+                    if state.inner.is_pending() && !confirmed_by_us {
+                        Some(request)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+
+        for request in pending_migrations {
+            let local_migration_result = context
+                .data()
+                .for_dispatcher()
+                .local_migration_result(request.service.as_ref());
+            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
+
+            if let Some(result) = local_migration_result {
+                // We've got a result, broadcast it if our node is a validator.
+                if let Some(tx_sender) = tx_sender {
+                    let confirmation = MigrationResult { request, result };
+
+                    if let Err(e) = tx_sender.report_migration_result((), confirmation) {
+                        log::error!("Cannot send `MigrationResult`: {}", e);
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::PublicKey,
+    crypto::{Hash, PublicKey},
     helpers::{Height, ValidateInput},
     runtime::{
         CommonError, ExecutionError, ExecutionFail, InstanceId, InstanceSpec, InstanceState,
@@ -27,9 +27,10 @@ use exonum_rust_runtime::CallContext;
 use std::collections::HashSet;
 
 use super::{
-    configure::ConfigureMut, ArtifactError, CommonError as SupervisorCommonError, ConfigChange,
-    ConfigProposalWithHash, ConfigPropose, ConfigVote, ConfigurationError, DeployRequest,
-    DeployResult, DeployState, ResumeService, SchemaImpl, ServiceError, StartService, StopService,
+    configure::ConfigureMut, migration_state::MigrationState, ArtifactError, AsyncEventState,
+    CommonError as SupervisorCommonError, ConfigChange, ConfigProposalWithHash, ConfigPropose,
+    ConfigVote, ConfigurationError, DeployRequest, DeployResult, MigrationError, MigrationRequest,
+    MigrationResult, ResumeService, SchemaImpl, ServiceError, StartService, StopService,
     Supervisor,
 };
 
@@ -44,19 +45,19 @@ pub trait SupervisorInterface<Ctx> {
     /// This request should be initiated by the validator (and depending on the `Supervisor`
     /// mode several other actions can be required, e.g. sending the same request by majority
     /// of other validators as well).
-    /// After that, the supervisor will try to deploy the artifact, and if this procedure
-    /// will be successful it will send `confirm_artifact_deploy` transaction.
+    /// After that, the supervisor will try to deploy the artifact, and once this procedure
+    /// is completed, it will send `report_deploy_result` transaction.
     #[interface_method(id = 0)]
     fn request_artifact_deploy(&self, context: Ctx, artifact: DeployRequest) -> Self::Output;
 
-    /// Confirmation that the artifact was successfully deployed by the validator.
+    /// Confirms that the artifact deployment was completed by the validator.
     ///
-    /// The artifact is registered in the dispatcher if all validators send this confirmation.
-    /// This confirmation is sent automatically by the node if the deploy succeeds.
+    /// The artifact is registered in the dispatcher once all validators send successful confirmation.
+    /// This transaction is sent automatically by the node when the local deployment process completes.
     #[interface_method(id = 1)]
-    fn confirm_artifact_deploy(&self, context: Ctx, artifact: DeployResult) -> Self::Output;
+    fn report_deploy_result(&self, context: Ctx, artifact: DeployResult) -> Self::Output;
 
-    /// Propose config change
+    /// Proposes config change
     ///
     /// This request should be sent by one of validators as the proposition to change
     /// current configuration to new one. All another validators are able to vote for this
@@ -69,7 +70,7 @@ pub trait SupervisorInterface<Ctx> {
     #[interface_method(id = 2)]
     fn propose_config_change(&self, context: Ctx, propose: ConfigPropose) -> Self::Output;
 
-    /// Confirm config change
+    /// Confirms config change
     ///
     /// This confirm should be sent by validators to vote for proposed configuration.
     /// Vote of the author of the `propose_config_change` transaction is taken into
@@ -77,6 +78,23 @@ pub trait SupervisorInterface<Ctx> {
     /// The configuration application rules depend on the `Supervisor` mode.
     #[interface_method(id = 3)]
     fn confirm_config_change(&self, context: Ctx, vote: ConfigVote) -> Self::Output;
+
+    /// Requests the data migration.
+    ///
+    /// This request should be initiated by the validator (and depending on the `Supervisor`
+    /// mode several other actions can be required, e.g. sending the same request by majority
+    /// of other validators as well).
+    /// After that, the core will try to perform the requested migration, and once the migration
+    /// is finished, supervisor will send `report_deploy_result` transaction.
+    #[interface_method(id = 4)]
+    fn request_migration(&self, context: Ctx, request: MigrationRequest) -> Self::Output;
+
+    /// Confirms that migration was completed by the validator.
+    ///
+    /// The migration is applied in the core once all validators send successful confirmation.
+    /// This transaction is sent automatically by the node when the local migration process completes.
+    #[interface_method(id = 5)]
+    fn report_migration_result(&self, context: Ctx, result: MigrationResult) -> Self::Output;
 }
 
 impl StartService {
@@ -177,7 +195,7 @@ fn get_validator(context: &CallContext<'_>) -> Result<PublicKey, ExecutionError>
         .author()
         .ok_or(CommonError::UnauthorizedCaller)?;
 
-    // Verifies that transaction author is validator.
+    // Verify that transaction author is validator.
     context
         .data()
         .for_core()
@@ -272,13 +290,13 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
             .get()
             .ok_or(ConfigurationError::ConfigProposeNotRegistered)?;
 
-        // Verifies that this config proposal is registered.
+        // Verify that this config proposal is registered.
         if entry.propose_hash != vote.propose_hash {
             return Err(ConfigurationError::ConfigProposeNotRegistered.into());
         }
 
         let config_propose = entry.config_propose;
-        // Verifies that we didn't reach the deadline height.
+        // Verify that we didn't reach the deadline height.
         if config_propose.actual_from <= core_schema.height() {
             return Err(SupervisorCommonError::DeadlineExceeded.into());
         }
@@ -304,7 +322,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         context: CallContext<'_>,
         deploy: DeployRequest,
     ) -> Self::Output {
-        // Verifies that transaction author is validator.
+        // Verify that transaction author is validator.
         let author = get_validator(&context)?;
 
         deploy
@@ -314,13 +332,13 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
 
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
-        // Verifies that we doesn't reach deadline height.
+        // Check that we didn't reach the deadline height.
         if deploy.deadline_height < core_schema.height() {
             return Err(SupervisorCommonError::ActualFromIsPast.into());
         }
         let mut schema = SchemaImpl::new(context.service_data());
 
-        // Verifies that the artifact is not deployed yet.
+        // Verify that the artifact is not deployed yet.
         if context
             .data()
             .for_dispatcher()
@@ -347,7 +365,7 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         schema.deploy_requests.confirm(&deploy, author);
         let supervisor_mode = schema.supervisor_config().mode;
         if supervisor_mode.deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
-            schema.deploy_states.put(&deploy, DeployState::Pending);
+            schema.deploy_states.put(&deploy, AsyncEventState::Pending);
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
             let artifact = deploy.artifact.clone();
             schema.pending_deployments.put(&artifact, deploy);
@@ -355,12 +373,12 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         Ok(())
     }
 
-    fn confirm_artifact_deploy(
+    fn report_deploy_result(
         &self,
         context: CallContext<'_>,
         deploy_result: DeployResult,
     ) -> Self::Output {
-        // Verifies that transaction author is validator.
+        // Verify that transaction author is validator.
         let author = get_validator(&context)?;
 
         deploy_result
@@ -407,6 +425,125 @@ impl SupervisorInterface<CallContext<'_>> for Supervisor {
         match deploy_result.result.0 {
             Ok(()) => self.confirm_deploy(context, deploy_request, author)?,
             Err(error) => self.fail_deploy(context, deploy_request, error),
+        }
+        Ok(())
+    }
+
+    fn request_migration(
+        &self,
+        mut context: CallContext<'_>,
+        request: MigrationRequest,
+    ) -> Self::Output {
+        // Verify that transaction author is validator.
+        let author = get_validator(&context)?;
+
+        request
+            .new_artifact
+            .validate()
+            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
+
+        let core_schema = context.data().for_core();
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+
+        // Check that we didn't reach the deadline height.
+        if request.deadline_height < core_schema.height() {
+            return Err(SupervisorCommonError::ActualFromIsPast.into());
+        }
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        schema.migration_requests.confirm(&request, author);
+        let supervisor_mode = schema.supervisor_config().mode;
+        if supervisor_mode.migration_approved(&request, &schema.migration_requests, validator_count)
+        {
+            log::trace!(
+                "Migration request for instance {} accepted",
+                request.service
+            );
+            // Store initial state of the request.
+            let state = MigrationState::new(AsyncEventState::Pending);
+            schema.migration_states.put(&request, state);
+            // Store the migration as pending. It will be removed in `before_transactions` hook
+            // once the migration will be completed (either successfully or unsuccessfully).
+            schema.pending_migrations.insert(request.clone());
+
+            // Finally, request core to start the migration.
+            // If migration initialization will fail now, it won't be a transaction execution error,
+            // since migration failure is one of possible outcomes of migration process. Instead of
+            // returning an error, we will just mark this migration as failed.
+            drop(schema);
+            let result = context
+                .supervisor_extensions()
+                .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
+
+            match result {
+                Ok(()) => {
+                    // Migration started, no actions needed.
+                }
+                Err(error) => {
+                    // Migration failed even before start, softly mark it as failed.
+                    let initiate_rollback = false;
+                    return self.fail_migration(context, request, error, initiate_rollback);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn report_migration_result(
+        &self,
+        context: CallContext<'_>,
+        result: MigrationResult,
+    ) -> Self::Output {
+        // Verifies that transaction author is validator.
+        let author = get_validator(&context)?;
+
+        result
+            .request
+            .new_artifact
+            .validate()
+            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
+
+        let core_schema = context.data().for_core();
+        let current_height = core_schema.height();
+
+        let schema = SchemaImpl::new(context.service_data());
+
+        // Verify that this migration is registered.
+        schema
+            .migration_states
+            .get(&result.request)
+            .ok_or(MigrationError::MigrationRequestNotRegistered)?;
+
+        // Check if migration already failed.
+        if schema
+            .migration_states
+            .get(&result.request)
+            .map(|state| state.is_failed())
+            .unwrap_or_default()
+        {
+            // This migration is already resulted in failure, no further
+            // processing needed.
+            return Ok(());
+        }
+
+        // Verify that we didn't reach deadline height.
+        if result.request.deadline_height < current_height {
+            return Err(SupervisorCommonError::DeadlineExceeded.into());
+        }
+
+        drop(schema);
+
+        match result.result.0 {
+            Ok(hash) => self.confirm_migration(context, result.request, hash, author)?,
+            Err(error) => {
+                // Since the migration process error is represented as a string rather than
+                // `ExecutionError`, we use our service error code, but set the description
+                // to the actual error.
+                let fail_cause =
+                    ExecutionError::service(MigrationError::MigrationFailed as u8, error);
+                let initiate_rollback = true;
+                self.fail_migration(context, result.request, fail_cause, initiate_rollback)?;
+            }
         }
         Ok(())
     }
@@ -507,7 +644,7 @@ impl Supervisor {
             schema.pending_deployments.remove(&deploy_request.artifact);
             schema
                 .deploy_states
-                .put(&deploy_request, DeployState::Succeed);
+                .put(&deploy_request, AsyncEventState::Succeed);
             drop(schema);
             // We have enough confirmations to register the deployed artifact in the dispatcher;
             // if this action fails, this transaction will be canceled.
@@ -531,11 +668,115 @@ impl Supervisor {
         // Mark deploy as failed.
         schema
             .deploy_states
-            .put(&deploy_request, DeployState::Failed { height, error });
+            .put(&deploy_request, AsyncEventState::Failed { height, error });
 
         // Remove artifact from pending deployments: since we require
         // a confirmation from every node, failure for one node means failure
         // for the whole network.
         schema.pending_deployments.remove(&deploy_request.artifact);
+    }
+
+    /// Confirms a local migration success by the given author's public key and checks
+    /// if all the confirmations are collected. If so, commits the migration.
+    /// If migration state hash differs from the expected one, migration fails though,
+    /// and `fail_migration` method is invoked.
+    fn confirm_migration(
+        &self,
+        mut context: CallContext<'_>,
+        request: MigrationRequest,
+        state_hash: Hash,
+        author: PublicKey,
+    ) -> Result<(), ExecutionError> {
+        let core_schema = context.data().for_core();
+
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        let mut state = schema
+            .migration_states
+            .get(&request)
+            .expect("BUG: Attempt to confirm a migration which does not have a stored state");
+
+        // Verify that state hash does match expected one.
+        match state.add_state_hash(state_hash) {
+            Ok(()) => {
+                // Hash is OK, process further.
+            }
+            Err(error) => {
+                // Hashes do not match, rollback the migration.
+                drop(schema); // Required for the context reborrow.
+                let initiate_rollback = true;
+                return self.fail_migration(context, request, error, initiate_rollback);
+            }
+        }
+
+        // Check if we have enough confirmations to confirm the migration.
+        let confirmations = schema.migration_confirmations.confirm(&request, author);
+        let validator_count = core_schema.consensus_config().validator_keys.len();
+        if confirmations == validator_count {
+            log::trace!(
+                "Confirming commit of migration request {:?}. Result state hash: {:?}",
+                request,
+                state_hash
+            );
+
+            // Mark migration as succeed.
+            state.update(AsyncEventState::Succeed);
+            schema.migration_states.put(&request, state);
+
+            // Migration is not pending anymore, remove it.
+            schema.pending_migrations.remove(&request);
+
+            drop(schema);
+
+            // Commit and flush the migration.
+            let mut supervisor_extensions = context.supervisor_extensions();
+            supervisor_extensions.commit_migration(request.service.as_ref(), state_hash)?;
+            supervisor_extensions.flush_migration(request.service.as_ref())?;
+        }
+        Ok(())
+    }
+
+    /// Marks migration as failed, discarding the further migration steps.
+    /// If `initiate_rollback` argument is `true`, ongoing migration will
+    /// be rolled back after the invocation of this method.
+    /// This argument is required, since migration can fail on the init step.
+    fn fail_migration(
+        &self,
+        mut context: CallContext<'_>,
+        request: MigrationRequest,
+        error: ExecutionError,
+        initiate_rollback: bool,
+    ) -> Result<(), ExecutionError> {
+        log::warn!(
+            "Migration for a request {:?} failed. Error: '{}'. \
+             This migration is going to be rolled back.",
+            request,
+            error
+        );
+
+        let height = context.data().for_core().height();
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        // Mark deploy as failed.
+        let mut state = schema
+            .migration_states
+            .get(&request)
+            .expect("BUG: Attempt to rollback a migration which does not have a stored state");
+
+        state.update(AsyncEventState::Failed { height, error });
+        schema.migration_states.put(&request, state);
+
+        // Migration is not pending anymore, remove it.
+        schema.pending_migrations.remove(&request);
+
+        // Rollback the migration.
+        drop(schema);
+        if initiate_rollback {
+            context
+                .supervisor_extensions()
+                .rollback_migration(request.service.as_ref())?;
+        }
+
+        Ok(())
     }
 }

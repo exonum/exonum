@@ -19,11 +19,12 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, Prefixed},
-    Entry, Fork, ProofEntry, ProofMapIndex,
+    Entry, Fork, ProofEntry, ProofMapIndex, ValueSetIndex,
 };
 
 use super::{
-    multisig::MultisigIndex, ConfigProposalWithHash, DeployRequest, DeployState, SupervisorConfig,
+    migration_state::MigrationState, multisig::MultisigIndex, AsyncEventState,
+    ConfigProposalWithHash, DeployRequest, MigrationRequest, SupervisorConfig,
 };
 
 /// Service information schema.
@@ -33,6 +34,9 @@ pub(crate) struct SchemaImpl<T: Access> {
     #[from_access(flatten)]
     pub public: Schema<T>,
 
+    /// The following free instance ID for assignment.
+    pub vacant_instance_id: Entry<T::Base, InstanceId>,
+
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
     /// Validator confirmations on successful deployments.
@@ -40,15 +44,25 @@ pub(crate) struct SchemaImpl<T: Access> {
     /// distinguish several attempts of the same artifact deployment.
     pub deploy_confirmations: MultisigIndex<T, DeployRequest>,
     /// Deployment failures.
-    pub deploy_states: ProofMapIndex<T::Base, DeployRequest, DeployState>,
+    pub deploy_states: ProofMapIndex<T::Base, DeployRequest, AsyncEventState>,
     /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
+
     /// Votes for a configuration change.
     pub config_confirms: MultisigIndex<T, Hash>,
     /// Number of the processed configurations. Used to avoid conflicting configuration proposals.
     pub configuration_number: Entry<T::Base, u64>,
-    /// The following free instance ID for assignment.
-    pub vacant_instance_id: Entry<T::Base, InstanceId>,
+
+    /// Stored migration requests with the confirmations from the validators.
+    pub migration_requests: MultisigIndex<T, MigrationRequest>,
+    /// States of all the migration requests.
+    pub migration_states: ProofMapIndex<T::Base, MigrationRequest, MigrationState>,
+    /// Validator confirmations on successful local migrations.
+    /// Note that `MigrationRequest`s are stored instead of `ArtifactId` to
+    /// distinguish several attempts of the same migration.
+    pub migration_confirmations: MultisigIndex<T, MigrationRequest>,
+    /// Migrations that are not yet completed.
+    pub pending_migrations: ValueSetIndex<T::Base, MigrationRequest>,
 }
 
 /// Public part of the supervisor service.

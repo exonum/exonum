@@ -143,7 +143,7 @@ fn deploy_confirmation(
     testkit
         .validator(validator_id)
         .service_keypair()
-        .confirm_artifact_deploy(SUPERVISOR_INSTANCE_ID, confirmation)
+        .report_deploy_result(SUPERVISOR_INSTANCE_ID, confirmation)
 }
 
 fn deploy_confirmation_hash(
@@ -728,7 +728,7 @@ fn test_auditor_cant_send_requests() {
         testkit
             .us()
             .service_keypair()
-            .confirm_artifact_deploy(SUPERVISOR_INSTANCE_ID, confirmation)
+            .report_deploy_result(SUPERVISOR_INSTANCE_ID, confirmation)
     };
     testkit.add_tx(deploy_request_from_auditor.clone());
 

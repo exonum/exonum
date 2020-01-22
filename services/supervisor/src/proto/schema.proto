@@ -33,21 +33,28 @@ message ErrorInfo {
     exonum.runtime.ExecutionError error = 2;
 }
 
-// Deployment state.
-message DeployState {
+// Asynchronous event (e.g. deploy or migration) state.
+message AsyncEventState {
     enum Type {
-        // Deploy is in process.
+        // Event is in process.
         PENDING = 0;
-        // Deployment errored.
+        // Event errored.
         FAIL = 1;
         // Deadline was reached.
         TIMEOUT = 2;
-        // Deployment succeed.
+        // Event succeed.
         SUCCESS = 3;
     }
 
-    // Deploy state.
+    // Event state.
     Type state = 1;
     // Set only for `type == FAIL`.
     ErrorInfo error = 2;
+}
+
+// Migration state.
+message MigrationState {
+    AsyncEventState inner = 1;
+    uint64 request_origin_height = 2;
+    exonum.crypto.Hash expected_state_hash = 3;
 }

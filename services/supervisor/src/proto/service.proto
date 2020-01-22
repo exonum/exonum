@@ -33,9 +33,10 @@ message DeployRequest {
   uint64 deadline_height = 3;
 }
 
-// Confirmation that the artifact was successfully deployed by the validator.
+// Confirmation that artifact deployment has ended for a validator.
+// Result can be either successful or unsuccessful.
 message DeployResult {
-  // Artifact identifier.
+  // Corresponding request.
   DeployRequest request = 1;
   // Result of deployment.
   exonum.runtime.ExecutionStatus result = 2;
@@ -116,6 +117,25 @@ message ConfigVote {
 enum SupervisorMode {
   SIMPLE = 0;
   DECENTRALIZED = 1;
+}
+
+// Request for the service data migration.
+message MigrationRequest {
+  // NNew artifact identifier.
+  exonum.runtime.ArtifactId new_artifact = 1;
+  // Name of service for a migration.
+  string service = 2;
+  // The height until which the migration procedure should be completed.
+  uint64 deadline_height = 3;
+}
+
+// Confirmation that migration has ended for a validator.
+// Result can be either successful or unsuccessful.
+message MigrationResult {
+  // Corresponding request.
+  MigrationRequest request = 1;
+  // Result of migration.
+  exonum.runtime.MigrationStatus result = 2;
 }
 
 // Supervisor service configuration (not to be confused with `ConfigPropose`,
