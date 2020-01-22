@@ -113,6 +113,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
   (#1598)
 
+- Added maintenance command `restart-migration` to restart migration.
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
