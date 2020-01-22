@@ -15,7 +15,6 @@ exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
 
 protobuf = "2.10.1"
-assert_matches = "1.3.0"
 pretty_assertions = "0.6.1"
 
 [build-dependencies]
