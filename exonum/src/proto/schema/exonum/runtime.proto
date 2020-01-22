@@ -215,9 +215,25 @@ message InstanceMigration {
 message InstanceState {
   // Service instance specification.
   exonum.runtime.InstanceSpec spec = 1;
-  // Service instance activity status.
+  // Service instance activity status. 
+  //
+  // The `NONE` value means that it is initiated the addition of this instance to the blockchain
+  // and at the moment it is not yet completed. In this case, `pending_status` is `ACTIVE`.
+  //
+  // Note that status can be `NONE` only during the block execution.
   InstanceStatus status = 2;
-  // Pending status of instance if the value is not `NONE`.
+  // Pending status of instance.
+  //
+  // If this state is not `NONE`, then this instance is in the process of initiating addition,
+  // resuming, or migration. After the block execution this status becomes an actual instance 
+  // status. 
+  //
+  // Note that this status can be not `NONE` only during the block execution.
+  //
+  // The purpose of this field is to keep information about further service status during the
+  // block execution because the service status can be changed only after that block is 
+  // committed. This approach is needed because there is no guarantee that the executed 
+  // block will be committed.
   InstanceStatus pending_status = 3;
   // Version of the service data. The empty value means that the data version
   // is the same as the `spec.artifact`. Non-empty value means that one or more

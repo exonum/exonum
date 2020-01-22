@@ -732,10 +732,27 @@ pub struct InstanceState {
     pub data_version: Option<Version>,
 
     /// Service instance activity status.
+    ///
+    /// The `None` value means that it is initiated the addition of this instance to the blockchain
+    /// and at the moment it is not yet completed. In this case, `pending_status` is
+    /// `Some(InstanceStatus::Active)`.
+    ///
+    /// Note that status can be `None` only during the block execution.
     #[protobuf_convert(with = "InstanceStatus")]
     pub status: Option<InstanceStatus>,
 
-    /// Pending status of instance if the value is not `None`.
+    /// Pending status of instance.
+    ///
+    /// If this state is not `None`, then this instance is in the process of initiating addition,
+    /// resuming, or migration. After the block execution this status becomes an actual instance
+    /// status.
+    ///
+    /// Note that this status can be not `None` only during the block execution.
+    /// 
+    /// The purpose of this field is to keep information about further service status during the
+    /// block execution because the service status can be changed only after that block is 
+    /// committed. This approach is needed because there is no guarantee that the executed 
+    /// block will be committed.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
 
