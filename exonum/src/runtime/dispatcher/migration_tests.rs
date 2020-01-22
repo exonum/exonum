@@ -181,8 +181,8 @@ fn not_good_then_ok(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     static SUCCESS: AtomicBool = AtomicBool::new(false);
 
     thread::sleep(DELAY);
-    if SUCCESS.load(Ordering::SeqCst) {
-        SUCCESS.store(false, Ordering::SeqCst);
+    if !SUCCESS.load(Ordering::SeqCst) {
+        SUCCESS.store(true, Ordering::SeqCst);
         Err(MigrationError::new("This migration is unsuccessful!"))
     } else {
         Ok(())
