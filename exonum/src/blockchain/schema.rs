@@ -131,6 +131,10 @@ impl<T: Access> Schema<T> {
     /// Similarly, execution errors of the `before_transactions` / `after_transactions`
     /// hooks can be proven to external clients. Discerning successful execution
     /// from a non-existing service requires prior knowledge though.
+    ///
+    /// Proofs obtained with this method should not be mixed up with a proof of transaction
+    /// commitment. To verify that a certain transaction was committed, use a proof from
+    /// the `block_transactions` index.
     // TODO: Retain historic information about services [ECR-3922]
     pub fn call_errors(
         &self,

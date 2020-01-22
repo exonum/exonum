@@ -28,7 +28,9 @@
 //!
 //! # Crate Overview
 //!
-//! This crate provides the tools necessary to work with the Exonum framework.
+//! This crate provides the fundamentals for Exonum nodes, such as tools to store and access
+//! data in the blockchain, means for handling transactions and evolve the blockchain with time
+//! (e.g., add new business logic or perform data migrations).
 //!
 //! ## Re-exports
 //!

@@ -57,8 +57,10 @@ pub struct ValidatorKeys {
 impl ValidatorKeys {
     /// Creates a new `ValidatorKeys` object.
     ///
-    /// Since the inner structure `ValidatorKeys` can change, this method is considered unstable
-    /// and may break in the future.
+    /// # Stability
+    ///
+    /// Since more keys may be added to `ValidatorKeys` in the future, this method is considered
+    /// unstable.
     pub fn new(consensus_key: PublicKey, service_key: PublicKey) -> Self {
         Self {
             consensus_key,
