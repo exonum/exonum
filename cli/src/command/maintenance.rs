@@ -15,6 +15,7 @@
 //! Standard Exonum CLI command used to perform different maintenance actions.
 
 use exonum::merkledb::{Database, RocksDB};
+use exonum::runtime::remove_local_migration_result;
 use exonum_node::helpers::clear_consensus_messages_cache;
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
@@ -48,6 +49,12 @@ pub enum Action {
     /// Clear consensus messages cache.
     #[structopt(name = "clear-cache")]
     ClearCache,
+    /// Restart migration script.
+    #[structopt(name = "restart-migration")]
+    RestartMigration {
+        /// Name of the service to restart.
+        service_name: String,
+    },
 }
 
 impl Action {
@@ -62,6 +69,24 @@ impl Action {
         db.merge_sync(fork.into_patch())?;
         Ok(())
     }
+
+    fn restart_migration(
+        node_config: PathBuf,
+        db_path: PathBuf,
+        service_name: &str,
+    ) -> Result<(), Error> {
+        let node_config: NodeConfig = load_config_file(node_config)?;
+        let db: Box<dyn Database> = Box::new(RocksDB::open(
+            db_path,
+            &node_config.private_config.database,
+        )?);
+        let fork = db.fork();
+
+        remove_local_migration_result(&fork, service_name);
+        db.merge_sync(fork.into_patch())?;
+
+        Ok(())
+    }
 }
 
 impl ExonumCommand for Maintenance {
@@ -70,6 +95,11 @@ impl ExonumCommand for Maintenance {
             Action::ClearCache => {
                 Action::clear_cache(self.node_config.clone(), self.db_path.clone())?
             }
+            Action::RestartMigration { ref service_name } => Action::restart_migration(
+                self.node_config.clone(),
+                self.db_path.clone(),
+                service_name,
+            )?,
         }
         Ok(StandardResult::Maintenance {
             node_config_path: self.node_config,
