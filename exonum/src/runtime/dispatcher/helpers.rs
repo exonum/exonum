@@ -19,6 +19,7 @@ use exonum_merkledb::Fork;
 use crate::runtime::dispatcher::Schema;
 
 /// Removes local migration result for specified service.
+#[doc(hidden)]
 pub fn remove_local_migration_result(fork: &Fork, service_name: &str) {
     Schema::new(fork)
         .local_migration_results()
