@@ -55,6 +55,41 @@
 //! The operation of starting or resuming a service is treated similarly to a configuration change
 //! and follows the same rules.
 //!
+//! ## Migrations management
+//!
+//! Supervisor service provides a functionality to perform data migrations for services.
+//! Request for migration is sent through private REST API and contains the name of instance
+//! to migrate, end artifact version to achieve after migration, and deadline height until which
+//! migration should be completed.
+//!
+//! The following pre-requirements should be satisfied in order to start a migration:
+//!
+//! - Target service instance should exist and be stopped.
+//! - End artifact for a migration should be a superior version of the artifact of target instance.
+//! - New (end) version of artifact should be deployed
+//!   (if migration will contain several steps, all the intermediate artifacts should
+//!   be deployed as well).
+//! - Service should have all the migration scripts required to migrate to the end artifact version.
+//!
+//! Violation of any of requirements listed above will result in a request failure without
+//! actual start of migration.
+//!
+//! Migration starts in the next block relative to the actual block at the moment of receiving a
+//! request, and performed asynchronously.
+//!
+//! After the local migration completion, validator nodes report the result of migration, which can
+//! be either successful or unsuccessful.
+//!
+//! If all validators report the successful local migration result, and the resulting state hashes
+//! match, migration is committed.
+//!
+//! In any other case (e.g. migration failure for at least one node, resulting state hash divergence,
+//! lack of report at the deadline height), migration is considered failed and rolled back.
+//!
+//! After fixing the reason for migration failure, the migration attempt can be performed once again.
+//! It will require a different deadline height though, since `MigrationRequest` objects are considered
+//! unique and supervisor won't attempt to perform the same `MigrationRequest` again.
+//!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 //! [`DeployRequest`]: struct.DeployRequest.html
