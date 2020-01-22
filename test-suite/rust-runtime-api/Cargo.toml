@@ -10,6 +10,7 @@ description = "The test crate for testing rust runtime API endpoints."
 publish = false
 
 [dependencies]
+exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
 exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }

@@ -99,8 +99,7 @@ fn service_protos_with_service() {
 /// Rust-runtime API should return error in case of an incorrect artifact.
 #[test]
 fn service_protos_with_incorrect_service() {
-    use exonum_rust_runtime::_reexports::{ArtifactId, RuntimeIdentifier};
-    use exonum_rust_runtime::api::Error;
+    use exonum::runtime::{ArtifactId, RuntimeIdentifier};
 
     let (_, api) = testkit_with_rust_service();
 
@@ -120,13 +119,9 @@ fn service_protos_with_incorrect_service() {
         .get::<Vec<ProtoSourceFile>>("proto-sources")
         .expect_err("Rust runtime Api returns a fake source!");
 
+    assert_eq!(&error.body.title, "Artifact sources not found");
     assert_eq!(
-        error,
-        Error::not_found()
-            .title("Artifact sources not found")
-            .detail(format!(
-                "Unable to find sources for artifact {}",
-                artifact_id
-            ))
+        error.body.detail,
+        format!("Unable to find sources for artifact {}", artifact_id)
     );
 }
