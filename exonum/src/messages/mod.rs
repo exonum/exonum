@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tools for messages authenticated with the Ed25519 public-key cryptosystem.
+//! Tools for messages authenticated with the Ed25519 public-key crypto system.
 //! These messages are used by the P2P networking and for transaction authentication by external
 //! clients.
 //!

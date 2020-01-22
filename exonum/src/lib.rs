@@ -37,7 +37,7 @@
 //! | Crate | Exported name | Description |
 //! |-------|---------------|-------------|
 //! | [`exonum-crypto`] | `crypto` | Cryptographic utils used by Exonum |
-//! | [`exonum-merkledb`] | `merkledb` | Storage engine with automatic data merkelization |
+//! | [`exonum-merkledb`] | `merkledb` | Storage engine with Merkelized data |
 //! | [`exonum-keys`] | `keys` | Key tools for Exonum nodes |
 //!
 //! [`exonum-crypto`]: https://docs.rs/exonum-crypto/
