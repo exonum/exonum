@@ -35,7 +35,7 @@ fn test_after_commit() {
     for i in 1..5 {
         let block = testkit.create_block();
         if i > 1 {
-            let arguments = &block[0].content().payload().arguments;
+            let arguments = &block[0].message().payload().arguments;
             let height_from_tx = u64::from_bytes(arguments.into()).unwrap();
             assert_eq!(height_from_tx, i - 1);
         }

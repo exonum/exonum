@@ -151,7 +151,13 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 ### exonum-time
 
 - Modules were made private, crate now provides re-exports of necessary types
-  instead (#1716)
+  instead. (#1716)
+
+### exonum-explorer
+
+- The field `content` of the `CommittedTransaction` struct and
+  the `InPool` variant of the `TransactionInfo` enum has been renamed
+  to `message`. (#1721)
 
 ### New features
 

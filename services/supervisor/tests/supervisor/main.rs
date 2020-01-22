@@ -738,10 +738,10 @@ fn test_auditor_cant_send_requests() {
 
     let block = testkit.create_block();
     for tx in &block {
-        if tx.content().object_hash() == deploy_artifact_validator_tx_hash {
+        if tx.message().object_hash() == deploy_artifact_validator_tx_hash {
             // Emulated request executed as fine...
             tx.status().unwrap();
-        } else if *tx.content() == deploy_request_from_auditor {
+        } else if *tx.message() == deploy_request_from_auditor {
             // ... but the auditor's request is failed as expected.
             let expected_err = ErrorMatch::from_fail(&CommonError::UnauthorizedCaller)
                 .for_service(SUPERVISOR_INSTANCE_ID);
