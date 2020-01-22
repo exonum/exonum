@@ -14,14 +14,14 @@
 
 use exonum::{
     helpers::Height,
-    runtime::{ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess},
     Entry, ObjectHash,
 };
-use exonum_rust_runtime::{CallContext, Service, ServiceFactory};
+use exonum_rust_runtime::{Service, ServiceFactory};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor, SupervisorInterface};
@@ -54,7 +54,7 @@ impl Configure for ConfigChangeService {
 
     fn verify_config(
         &self,
-        _context: CallContext<'_>,
+        _context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         println!("Verify config called with params {}", params);
@@ -63,7 +63,7 @@ impl Configure for ConfigChangeService {
 
     fn apply_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         println!("Apply config called with params {}", params);

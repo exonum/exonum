@@ -173,12 +173,12 @@ mod tests {
         crypto::{gen_keypair, Hash},
         helpers::Height,
         messages::{AnyTx, Verified},
-        runtime::ExecutionError,
+        runtime::{ExecutionContext, ExecutionError},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{api, CallContext, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, Service, ServiceFactory};
     use pretty_assertions::assert_eq;
 
     use std::time::Duration;
@@ -204,10 +204,10 @@ mod tests {
         fn timestamp(&self, ctx: Ctx, arg: String) -> Self::Output;
     }
 
-    impl SampleInterface<CallContext<'_>> for SampleService {
+    impl SampleInterface<ExecutionContext<'_>> for SampleService {
         type Output = Result<(), ExecutionError>;
 
-        fn timestamp(&self, _ctx: CallContext<'_>, _arg: String) -> Self::Output {
+        fn timestamp(&self, _ctx: ExecutionContext<'_>, _arg: String) -> Self::Output {
             Ok(())
         }
     }
@@ -256,7 +256,7 @@ mod tests {
 
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx);
+        assert_eq!(block_info.transactions[0].message(), &tx);
 
         let block_info: BlockWithTransactions = api
             .private("api/testkit")
@@ -274,7 +274,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx);
+        assert_eq!(block_info.transactions[0].message(), &tx);
     }
 
     #[test]
@@ -296,7 +296,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx_foo);
+        assert_eq!(block_info.transactions[0].message(), &tx_foo);
 
         let body = CreateBlock {
             tx_hashes: Some(vec![tx_bar.object_hash()]),
@@ -308,7 +308,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(2));
         assert_eq!(block_info.transactions.len(), 1);
-        assert_eq!(block_info.transactions[0].content(), &tx_bar);
+        assert_eq!(block_info.transactions[0].message(), &tx_bar);
     }
 
     #[test]

@@ -91,7 +91,7 @@ impl<'a> From<crate::BlockInfo<'a>> for BlockInfo {
                         call_info: inner
                             .transaction(idx)
                             .unwrap()
-                            .content()
+                            .message()
                             .payload()
                             .call_info
                             .clone(),

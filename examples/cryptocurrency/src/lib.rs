@@ -192,9 +192,9 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::runtime::ExecutionError;
+    use exonum::runtime::{ExecutionContext, ExecutionError};
     use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
-    use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
+    use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 
     use crate::{
         api::CryptocurrencyApi,
@@ -226,10 +226,10 @@ pub mod contracts {
     #[service_factory(proto_sources = "crate::proto")]
     pub struct CryptocurrencyService;
 
-    impl CryptocurrencyInterface<CallContext<'_>> for CryptocurrencyService {
+    impl CryptocurrencyInterface<ExecutionContext<'_>> for CryptocurrencyService {
         type Output = Result<(), ExecutionError>;
 
-        fn create_wallet(&self, context: CallContext<'_>, arg: CreateWallet) -> Self::Output {
+        fn create_wallet(&self, context: ExecutionContext<'_>, arg: CreateWallet) -> Self::Output {
             let author = context
                 .caller()
                 .author()
@@ -246,7 +246,7 @@ pub mod contracts {
             }
         }
 
-        fn transfer(&self, context: CallContext<'_>, arg: TxTransfer) -> Self::Output {
+        fn transfer(&self, context: ExecutionContext<'_>, arg: TxTransfer) -> Self::Output {
             let author = context
                 .caller()
                 .author()

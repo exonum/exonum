@@ -105,7 +105,7 @@
 //! ```
 //! # use assert_matches::assert_matches;
 //! # use exonum::{crypto::gen_keypair, runtime::ExecutionError};
-//! # use exonum_rust_runtime::{CallContext, DefaultInstance, Service, ServiceFactory};
+//! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::ExplorerFactory;
 //! # use exonum_explorer_service::api::{
@@ -138,9 +138,9 @@
 //! #[service_dispatcher(implements("ServiceInterface"))]
 //! struct MyService;
 //! // Some implementations skipped for `MyService`...
-//! # impl ServiceInterface<CallContext<'_>> for MyService {
+//! # impl ServiceInterface<ExecutionContext<'_>> for MyService {
 //! #    type Output = Result<(), ExecutionError>;
-//! #    fn do_nothing(&self, ctx: CallContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
+//! #    fn do_nothing(&self, ctx: ExecutionContext<'_>, _seed: u32) -> Self::Output { Ok(()) }
 //! # }
 //! # impl DefaultInstance for MyService {
 //! #     const INSTANCE_ID: u32 = 100;

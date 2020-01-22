@@ -29,7 +29,7 @@ use crate::{
     helpers::ValidatorId,
     runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
-        CallInfo, CoreError, DispatcherSchema, ErrorMatch, RuntimeIdentifier, WellKnownRuntime,
+        CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier, WellKnownRuntime,
     },
 };
 
@@ -58,7 +58,7 @@ impl Runtime for MigrationRuntime {
     fn initiate_adding_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -67,7 +67,7 @@ impl Runtime for MigrationRuntime {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -116,25 +116,17 @@ impl Runtime for MigrationRuntime {
     fn execute(
         &self,
         _context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         _arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _instance_id: u32,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _instance_id: u32,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
@@ -323,7 +315,8 @@ impl Rig {
         self.next_service_id += 1;
 
         let mut fork = self.blockchain.fork();
-        let mut context = ExecutionContext::for_block_call(self.dispatcher(), &mut fork);
+        let mut context =
+            ExecutionContext::for_block_call(self.dispatcher(), &mut fork, service.as_descriptor());
         context
             .initiate_adding_service(service.clone(), vec![])
             .expect("`initiate_adding_service` failed");

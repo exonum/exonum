@@ -65,16 +65,16 @@ fn test_explorer_basics() {
     let tx_info = block.transaction(0).unwrap();
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
     tx_info.status().unwrap();
-    assert_eq!(tx_info.content(), &tx_alice);
+    assert_eq!(tx_info.message(), &tx_alice);
     assert_eq!(
-        tx_info.content().object_hash(),
+        tx_info.message().object_hash(),
         block.transaction_hashes()[0]
     );
 
     let tx_info = explorer.transaction(&tx_alice.object_hash()).unwrap();
     assert!(!tx_info.is_in_pool());
     assert!(tx_info.is_committed());
-    assert_eq!(tx_info.content(), &tx_alice);
+    assert_eq!(tx_info.message(), &tx_alice);
 
     let tx_info = match tx_info {
         TransactionInfo::Committed(info) => info,
@@ -84,7 +84,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": tx_alice,
+            "message": tx_alice,
             "location": {
                 "block_height": 1,
                 "position_in_block": 0,
@@ -112,7 +112,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": tx_bob,
+            "message": tx_bob,
             "location": {
                 "block_height": 2,
                 "position_in_block": 0,
@@ -140,7 +140,7 @@ fn test_explorer_basics() {
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
-            "content": tx_transfer,
+            "message": tx_transfer,
             "location": {
                 "block_height": 2,
                 "position_in_block": 1,
@@ -228,7 +228,7 @@ fn test_explorer_pool_transaction() {
     let tx_info = explorer.transaction(&tx_hash).unwrap();
     assert!(tx_info.is_in_pool());
     assert!(!tx_info.is_committed());
-    assert_eq!(tx_info.content(), &tx_alice);
+    assert_eq!(tx_info.message(), &tx_alice);
 }
 
 fn tx_generator() -> impl Iterator<Item = Verified<AnyTx>> {
@@ -239,7 +239,7 @@ fn tx_generator() -> impl Iterator<Item = Verified<AnyTx>> {
 
 // TODO Implement method id getter in CreateWallet. [ECR-3254]
 fn is_create_wallet(tx: &CommittedTransaction) -> bool {
-    let raw_tx = tx.content().payload();
+    let raw_tx = tx.message().payload();
     if raw_tx.call_info.method_id == 0 {
         raw_tx
             .parse::<CreateWallet>()
@@ -377,7 +377,7 @@ fn test_transaction_iterator() {
         tx.status().unwrap();
     }
     for (i, tx) in block.iter().enumerate() {
-        let raw_tx = tx.content();
+        let raw_tx = tx.message();
         let parsed_tx = raw_tx
             .payload()
             .parse::<CreateWallet>()
@@ -403,7 +403,7 @@ fn test_transaction_iterator() {
     let failed_tx_hashes: Vec<_> = block
         .iter()
         .filter(|tx| tx.status().is_err())
-        .map(|tx| tx.content().object_hash())
+        .map(|tx| tx.message().object_hash())
         .collect();
     assert_eq!(
         failed_tx_hashes,
@@ -460,7 +460,7 @@ fn test_committed_transaction_roundtrip() {
     let json = serde_json::to_value(tx_copy).unwrap();
     let tx_copy: CommittedTransaction = serde_json::from_value(json).unwrap();
 
-    assert_eq!(tx_copy.content(), &tx);
+    assert_eq!(tx_copy.message(), &tx);
 }
 
 #[test]
@@ -475,7 +475,7 @@ fn test_transaction_info_roundtrip() {
     let json = serde_json::to_value(&info).unwrap();
     let info: TransactionInfo = serde_json::from_value(json).unwrap();
 
-    assert_eq!(info.content(), &tx);
+    assert_eq!(info.message(), &tx);
 }
 
 #[test]
@@ -489,5 +489,5 @@ fn test_block_with_transactions_roundtrip() {
     let block = explorer.block_with_txs(Height(1)).unwrap();
     let block_json = serde_json::to_value(&block).unwrap();
     let block_copy: BlockWithTransactions = serde_json::from_value(block_json).unwrap();
-    assert_eq!(block_copy[0].content(), block[0].content());
+    assert_eq!(block_copy[0].message(), block[0].message());
 }
