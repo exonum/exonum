@@ -97,7 +97,7 @@ To contribute to Exonum, please see [CONTRIBUTING](CONTRIBUTING.md).
 
 Some Exonum stuff that is *not* in this repository:
 
-- [Java language support](https://github.com/exonum/exonum-java-binding) 
+- [Java language support](https://github.com/exonum/exonum-java-binding)
 - [JavaScript light client](https://github.com/exonum/exonum-client)
 - [Python light client](https://github.com/exonum/exonum-python-client)
 - [High-level documentation](https://github.com/exonum/exonum-doc)

@@ -47,7 +47,8 @@ service-specific data.
 
 ## Blockchain
 
-The fundamentals for managing the blockchain are in the [`exonum`] crate (aka *the core*).
+The fundamentals for managing the blockchain are in the [`exonum`] crate
+(aka *the core*).
 
 The `blockchain` module defines data schema used by the core (`schema` submodule)
 and related stuff like blocks (`block` submodule), configurations (`config`) and
