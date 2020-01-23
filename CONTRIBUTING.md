@@ -1,7 +1,7 @@
 # Contributing to Exonum
 
-Exonum welcomes contribution from everyone in the form of [suggestions], [bug
-reports] or pull requests. This document gives some guidance if you are
+Exonum welcomes contribution from everyone in the form of [suggestions],
+[bug reports] or pull requests. This document gives some guidance if you are
 thinking of helping us.
 
 [Project overview] and [documentation] can help you to better understand current
@@ -29,12 +29,11 @@ The [good first issue :heart:] label can be used to find the easy issues.
 
 Notice that the repository uses a set of linters for static analysis:
 
-- [clippy]
-- [cargo audit]
-- [cargo-deadlinks]
-- [rustfmt]
-- [cspell]
-- [markdownlint-cli]
+- [`clippy`]
+- [`cargo-deadlinks`]
+- [`rustfmt`]
+- [`cspell`]
+- [`markdownlint-cli`]
 
 You can set up and run these tools locally (see [Travis script] for the details).
 
@@ -47,7 +46,7 @@ but we have several additional conventions:
   integrate.
 
   Additionally, we merge pull requests using the "squash and merge" strategy, so
-  feel free to merge `master` branch instead of rebasing.
+  feel free to merge `master` branch in order to update instead of rebasing.
 
 - Don't use `debug!` log level.
 
@@ -57,14 +56,13 @@ but we have several additional conventions:
 - Don't use `_` in public APIs, instead use full variable names and
   `#[allow(unused_variables)]`.
 
-  Public method should be documented, but meaningful parameter names are also
+  Public APIs should be documented, but meaningful parameter names are also
   helpful for better understanding.
 
 - Use [Rust 2018 edition].
 
   - Avoid `extern crate` unless it is required.
-
-  - Avoid `mod.rs` files, simply use directories for nested modules.
+  - Use [anonymous lifetime].
 
 - Prefer [nested imports] whenever possible.
 
@@ -102,12 +100,12 @@ but we have several additional conventions:
 [gitter-ru]: https://gitter.im/exonum/ruExonum
 [installation guide]: https://exonum.com/doc/version/latest/get-started/install/
 [good first issue :heart:]: https://github.com/exonum/exonum/labels/good%20first%20issue%20%3Aheart%3A
-[clippy]: https://github.com/rust-lang-nursery/rust-clippy
-[cargo audit]: https://github.com/RustSec/cargo-audit
-[cargo-deadlinks]: https://github.com/deadlinks/cargo-deadlinks
-[rustfmt]: https://github.com/rust-lang-nursery/rustfmt
-[cspell]: https://github.com/Jason3S/cspell
-[markdownlint-cli]: https://github.com/igorshubovych/markdownlint-cli
+[`clippy`]: https://github.com/rust-lang-nursery/rust-clippy
+[`cargo-deadlinks`]: https://github.com/deadlinks/cargo-deadlinks
+[`rustfmt`]: https://github.com/rust-lang-nursery/rustfmt
+[`cspell`]: https://github.com/Jason3S/cspell
+[`markdownlint-cli`]: https://github.com/igorshubovych/markdownlint-cli
 [Travis script]: .travis.yml
+[anonymous lifetime]: https://doc.rust-lang.org/edition-guide/rust-2018/ownership-and-lifetimes/the-anonymous-lifetime.html
 [nested imports]: http://rust-lang.github.io/rfcs/2128-use-nested-groups.html
 [Rust 2018 edition]: https://rust-lang-nursery.github.io/edition-guide/rust-2018/index.html
