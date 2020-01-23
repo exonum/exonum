@@ -13,17 +13,21 @@
 // limitations under the License.
 
 use exonum::{
+    blockchain::config::InstanceInitParams,
     crypto,
     messages::{AnyTx, Verified},
     runtime::{CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError},
 };
+use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use crate::{
     error::Error,
+    interface::IssueReceiverMut,
     services::{
-        AnyCall, AnyCallService, CallAny, DepositInterface, DepositService, TxIssue,
+        AnyCall, AnyCallService, CallAny, CustomCallInterface,
+        CustomCallServiceFactory, DepositInterface, DepositService, Issue, TxIssue,
         WalletInterface, WalletService,
     },
 };
@@ -388,4 +392,87 @@ fn test_any_call_panic_recursion_limit() {
             ExecutionContext::MAX_CALL_STACK_DEPTH
         ))
     );
+}
+
+fn execute_custom_call<F>(f: F) -> Result<(), ExecutionError>
+where
+    F: Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Clone + Send + 'static,
+{
+    let custom_call_factory = CustomCallServiceFactory::new(f);
+    let custom_call_artifact = custom_call_factory.artifact_id();
+
+    let custom_call_instance = InstanceInitParams::new(
+        CustomCallServiceFactory::INSTANCE_ID,
+        CustomCallServiceFactory::INSTANCE_NAME,
+        custom_call_artifact.clone(),
+        vec![],
+    );
+
+    let mut testkit = TestKitBuilder::validator()
+        .with_logger()
+        .with_default_rust_service(WalletService)
+        .with_artifact(custom_call_artifact)
+        .with_rust_service(custom_call_factory)
+        .with_instance(custom_call_instance)
+        .create();
+
+    let keypair = crypto::gen_keypair();
+    execute_transaction(
+        &mut testkit,
+        keypair.custom_call(CustomCallServiceFactory::INSTANCE_ID, vec![]),
+    )
+}
+
+fn assert_access_blockchain_data(err: ExecutionError) {
+    assert_eq!(
+        err,
+        ErrorMatch::any_unexpected().with_description_containing(
+            "An attempt to access blockchain data after execution error"
+        )
+    );
+}
+
+#[test]
+fn custom_call_ok() {
+    execute_custom_call(|context| {
+        context.service_data();
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn custom_call_err_interface_call() {
+    let err = execute_custom_call(|mut context| {
+        let to = context.caller().author().unwrap();
+        // Ignore child call error.
+        let err = context
+            .issue(WalletService::ID, Issue { to, amount: 0 })
+            .unwrap_err();
+        assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
+        // Try to access service data.
+        context.service_data();
+        Ok(())
+    })
+    .unwrap_err();
+
+    assert_access_blockchain_data(err);
+}
+
+#[test]
+fn custom_call_err_incorrect_instance_id() {
+    let err = execute_custom_call(|mut context| {
+        let to = context.caller().author().unwrap();
+        // Ignore child call error.
+        let err = context
+            .issue(WalletService::ID + 1, Issue { to, amount: 0 })
+            .unwrap_err();
+        assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+        // Try to access blockchain data.
+        context.data();
+        Ok(())
+    })
+    .unwrap_err();
+
+    assert_access_blockchain_data(err);
 }
