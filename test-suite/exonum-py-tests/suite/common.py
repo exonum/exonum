@@ -140,9 +140,11 @@ def generate_config(
     network: ExonumNetwork,
     deadline_height: int = 10000,
     consensus: dict = None,
-    artifact_name: str = ARTIFACT_NAME,
+    artifact_name: str = None,
     instances: dict = {},
 ) -> dict:
+    if artifact_name is None:
+        artifact_name = ARTIFACT_NAME
     cryptocurrency_advanced_config_dict = {
         "networks": launcher_networks(network),
         "deadline_height": deadline_height,
