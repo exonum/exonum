@@ -52,7 +52,7 @@ pub enum Action {
     /// Restart migration script.
     #[structopt(name = "restart-migration")]
     RestartMigration {
-        /// Name of the service to restart.
+        /// Name of the service to restart, e.g. explorer, time-oracle, my-service etc.
         service_name: String,
     },
 }
