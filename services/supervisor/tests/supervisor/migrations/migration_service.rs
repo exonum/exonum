@@ -144,7 +144,10 @@ pub(super) mod v02 {
         let schema = Schema::new(snapshot);
         for user in users {
             let (key, _) = user.keypair();
-            let wallet = schema.wallets.get(&key).unwrap();
+            let wallet = schema
+                .wallets
+                .get(&key)
+                .expect("V02: User wallet not found");
             assert_eq!(wallet.balance, user.balance);
             assert_eq!(wallet.username, user.full_name);
         }
@@ -202,7 +205,10 @@ pub(super) mod v05 {
         let schema = Schema::new(snapshot.clone());
         for user in users {
             let (key, _) = user.keypair();
-            let wallet = schema.wallets.get(&key).unwrap();
+            let wallet = schema
+                .wallets
+                .get(&key)
+                .expect("V05: User wallet not found");
             assert_eq!(wallet.balance, user.balance);
             assert_eq!(wallet.first_name, user.first_name);
             assert_eq!(wallet.last_name, user.last_name);
@@ -210,7 +216,7 @@ pub(super) mod v05 {
         assert_eq!(schema.wallets.iter().count(), users.len());
 
         let summary = schema.summary.get().unwrap();
-        assert_eq!(summary.ticker, "test");
+        assert_eq!(summary.ticker, super::SERVICE_NAME);
         assert_eq!(
             summary.total_balance,
             users.iter().map(|user| user.balance).sum::<u64>()

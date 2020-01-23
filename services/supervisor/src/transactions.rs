@@ -474,9 +474,23 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             // since migration failure is one of possible outcomes of migration process. Instead of
             // returning an error, we will just mark this migration as failed.
             drop(schema);
-            let result = context
-                .supervisor_extensions()
-                .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
+            let supervisor_extensions = context.supervisor_extensions();
+            let result = supervisor_extensions
+                .exactly_one_migration_script(
+                    request.new_artifact.clone(),
+                    request.service.as_ref(),
+                )
+                .and_then(|simple_migration| {
+                    // Currently supervisor supports only migrations with one script.
+                    if simple_migration {
+                        supervisor_extensions.initiate_migration(
+                            request.new_artifact.clone(),
+                            request.service.as_ref(),
+                        )
+                    } else {
+                        Err(MigrationError::ComplexMigration.into())
+                    }
+                });
 
             // Check whether migration started successfully.
             if let Err(error) = result {

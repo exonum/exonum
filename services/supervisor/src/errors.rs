@@ -83,4 +83,7 @@ pub enum MigrationError {
     MigrationFailed = 65,
     /// Several nodes reported different state hashes.
     StateHashDivergence = 66,
+    /// Migration requires more than one execution script to be executed.
+    /// This feature is not supported by supervsior yet.
+    ComplexMigration = 67,
 }

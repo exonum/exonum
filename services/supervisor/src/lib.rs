@@ -68,6 +68,10 @@
 //! - End artifact for a migration should be a superior version of the artifact of target instance.
 //! - New (end) version of artifact should be deployed.
 //! - Service should have all the migration scripts required to migrate to the end artifact version.
+//! - Migration contains only one migration script. It means that if you need to migrate service from
+//!   version 0.1 to version 0.3, and this will include execution of two migration scripts (0.1 -> 0.2
+//!   and 0.2 -> 0.3), you should request two separate migrations, an attempt to directly migrate from
+//!   version 0.1 to 0.3 will fail.
 //!
 //! Violation of any of requirements listed above will result in a request failure without
 //! actual start of migration.

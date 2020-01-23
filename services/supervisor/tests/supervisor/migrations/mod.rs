@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::Hash, helpers::Height, merkledb::access::Prefixed, runtime::InstanceId};
+use exonum::{
+    crypto::Hash,
+    helpers::Height,
+    merkledb::access::Prefixed,
+    runtime::{ErrorMatch, ExecutionError, InstanceId},
+};
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    AsyncEventState, ConfigPropose, MigrationInfoQuery, MigrationRequest, ProcessStateResponse,
-    Supervisor,
+    AsyncEventState, ConfigPropose, MigrationError, MigrationInfoQuery, MigrationRequest,
+    ProcessStateResponse, Supervisor,
 };
 
 use crate::service_lifecycle::execute_transaction;
@@ -47,7 +52,7 @@ fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
 
     // Add artifact for version 0.5.
     let builder = builder
-        .with_rust_service(MigratedServiceV05)
+        .with_migrating_rust_service(MigratedServiceV05)
         .with_artifact(MigratedServiceV05.artifact_id());
 
     builder.create()
@@ -84,33 +89,13 @@ fn stop_service(testkit: &mut TestKit, id: InstanceId) {
     .expect("Stop service transaction should be processed");
 }
 
-const DEADLINE_HEIGHT: Height = Height(10);
-
-/// Basic test scenario for a simple migration workflow.
-#[test]
-fn migration() {
-    let mut testkit = testkit_with_supervisor_and_service(1);
-
-    // Stop service instance before running the migration.
-    stop_service(&mut testkit, MigratedService::INSTANCE_ID);
-
-    // Request migration.
-    let request = MigrationRequest {
-        new_artifact: MigratedServiceV02.artifact_id(),
-        service: MigratedService::INSTANCE_NAME.into(),
-        deadline_height: DEADLINE_HEIGHT,
-    };
-
-    let api = testkit.api();
-    let tx_hash = request_migration(&api, request.clone());
-    let block = testkit.create_block();
-
-    block[tx_hash]
-        .status()
-        .expect("Transaction should be executed successfully");
-
+fn wait_for_migration_success(
+    testkit: &mut TestKit,
+    deadline_height: Height,
+    request: MigrationRequest,
+) {
     let mut success = false;
-    while testkit.height() <= DEADLINE_HEIGHT.next() {
+    while testkit.height() <= deadline_height.next() {
         testkit.create_block();
         let api = testkit.api();
         let migration_state = migration_state(&api, request.clone())
@@ -134,9 +119,165 @@ fn migration() {
 
     assert!(success, "Migration did not end");
 
-    testkit.create_block(); // TODO do we need it?
+    // Migration is flushed at the next block after its success.
+    testkit.create_block();
+}
+
+fn wait_for_migration_fail(
+    testkit: &mut TestKit,
+    deadline_height: Height,
+    request: MigrationRequest,
+) -> ExecutionError {
+    while testkit.height() <= deadline_height.next() {
+        testkit.create_block();
+        let api = testkit.api();
+        let migration_state = migration_state(&api, request.clone())
+            .state
+            .expect("State for requested migration is not stored");
+
+        match migration_state {
+            AsyncEventState::Pending => {
+                // Not ready yet.
+            }
+            AsyncEventState::Succeed => panic!("Migration succeed, but was expected to fail"),
+            AsyncEventState::Failed { error, .. } => {
+                return error;
+            }
+            AsyncEventState::Timeout => {
+                panic!("Migration was killed due to timeout, but was expected to fail explicitly")
+            }
+        }
+    }
+
+    panic!("Migration is pending after reaching deadline height");
+}
+
+const DEADLINE_HEIGHT: Height = Height(5);
+
+/// Basic test scenario for a simple migration workflow.
+///
+/// Here we perform a migration with one migration script and one validator in
+/// the network.
+///
+/// Expected behavior is that migration is completed successfully and schema
+/// is updated to the next version of data.
+#[test]
+fn migration() {
+    let mut testkit = testkit_with_supervisor_and_service(1);
+
+    // Stop service instance before running the migration.
+    stop_service(&mut testkit, MigratedService::INSTANCE_ID);
+
+    // Request migration.
+    let deadline_height = DEADLINE_HEIGHT;
+    let request = MigrationRequest {
+        new_artifact: MigratedServiceV02.artifact_id(),
+        service: MigratedService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    wait_for_migration_success(&mut testkit, deadline_height, request);
+
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigratedService::INSTANCE_NAME, &snapshot);
 
     migration_service::v02::verify_schema(prefixed);
+}
+
+/// This test applies two migrations to one service, one after another.
+#[test]
+fn migration_two_scripts_sequential() {
+    let mut testkit = testkit_with_supervisor_and_service(1);
+
+    // Stop service instance before running the migration.
+    stop_service(&mut testkit, MigratedService::INSTANCE_ID);
+
+    // Request migration to 0.2.
+    let deadline_height = DEADLINE_HEIGHT;
+    let request = MigrationRequest {
+        new_artifact: MigratedServiceV02.artifact_id(),
+        service: MigratedService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    wait_for_migration_success(&mut testkit, deadline_height, request);
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigratedService::INSTANCE_NAME, &snapshot);
+
+    migration_service::v02::verify_schema(prefixed);
+
+    // Request migration to 0.5.
+    let deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
+    let request = MigrationRequest {
+        new_artifact: MigratedServiceV05.artifact_id(),
+        service: MigratedService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    wait_for_migration_success(&mut testkit, deadline_height, request);
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigratedService::INSTANCE_NAME, &snapshot);
+
+    migration_service::v05::verify_schema(prefixed);
+}
+
+/// This test checks that attempt to request a complex migration (which will require
+/// multiple migration scripts to be executed) results in a migration failure.
+#[test]
+fn comlplex_migration_fails() {
+    let mut testkit = testkit_with_supervisor_and_service(1);
+
+    // Stop service instance before running the migration.
+    stop_service(&mut testkit, MigratedService::INSTANCE_ID);
+
+    // Request migration.
+    let deadline_height = DEADLINE_HEIGHT;
+    let request = MigrationRequest {
+        new_artifact: MigratedServiceV05.artifact_id(),
+        service: MigratedService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    // Despite the fact that migration should fail, the transaction with request
+    // should be executed successfully.
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    let error = wait_for_migration_fail(&mut testkit, deadline_height, request);
+
+    assert_eq!(
+        error,
+        ErrorMatch::from_fail(&MigrationError::ComplexMigration).with_any_description()
+    )
 }
