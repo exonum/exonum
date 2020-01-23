@@ -505,3 +505,11 @@ impl Schema<&Fork> {
         self.add_pending_status(instance_state, InstanceStatus::Stopped, None)
     }
 }
+
+/// Removes local migration result for specified service.
+#[doc(hidden)]
+pub fn remove_local_migration_result(fork: &Fork, service_name: &str) {
+    Schema::new(fork)
+        .local_migration_results()
+        .remove(service_name);
+}
