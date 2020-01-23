@@ -189,7 +189,7 @@ pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{
-        remove_local_migration_result, Action as DispatcherAction, Dispatcher, Mailbox,
+        remove_local_migration_result, Action as DispatcherAction, Mailbox,
         Schema as DispatcherSchema,
     },
     error::{
