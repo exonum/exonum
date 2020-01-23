@@ -478,16 +478,14 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 .supervisor_extensions()
                 .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
 
-            match result {
-                Ok(()) => {
-                    // Migration started, no actions needed.
-                }
-                Err(error) => {
-                    // Migration failed even before start, softly mark it as failed.
-                    let initiate_rollback = false;
-                    return self.fail_migration(context, request, error, initiate_rollback);
-                }
+            // Check whether migration started successfully.
+            if let Err(error) = result {
+                // Migration failed even before start, softly mark it as failed.
+                let initiate_rollback = false;
+                return self.fail_migration(context, request, error, initiate_rollback);
             }
+
+            // Migration started, no more actions needed.
         }
         Ok(())
     }
@@ -728,10 +726,9 @@ impl Supervisor {
 
             drop(schema);
 
-            // Commit and flush the migration.
-            let mut supervisor_extensions = context.supervisor_extensions();
+            // Commit the migration.
+            let supervisor_extensions = context.supervisor_extensions();
             supervisor_extensions.commit_migration(request.service.as_ref(), state_hash)?;
-            supervisor_extensions.flush_migration(request.service.as_ref())?;
         }
         Ok(())
     }

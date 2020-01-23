@@ -357,6 +357,7 @@ impl Service for Supervisor {
         self.remove_outdated_deployments(&context);
         self.remove_outdated_config_proposal(&context);
         self.remove_outdated_migrations(&mut context)?;
+        self.flush_completed_migrations(&mut context)?;
         Ok(())
     }
 
@@ -491,6 +492,51 @@ impl Supervisor {
                 Ok(())
             });
         }
+    }
+
+    /// Flushes completed migrations and removes them from the list of pending.
+    ///
+    /// This has to be done in the block other than one in which migration was committed,
+    /// so this method is invoked in `before_transactions` of the next block.
+    fn flush_completed_migrations(
+        &self,
+        context: &mut ExecutionContext<'_>,
+    ) -> Result<(), ExecutionError> {
+        let schema = SchemaImpl::new(context.service_data());
+
+        // Collect pending migration requests which are successfully completed.
+        let finished_migrations = SchemaImpl::new(context.service_data())
+            .pending_migrations
+            .iter()
+            .filter_map(|(_, request)| {
+                let state = schema
+                    .migration_states
+                    .get(&request)
+                    .expect("BUG: State for pending migration request is not stored");
+
+                if state.inner.is_succeed() {
+                    Some(request)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        drop(schema);
+        for request in finished_migrations {
+            // Remove the migration from the list of pending.
+            let mut schema = SchemaImpl::new(context.service_data());
+            schema.pending_migrations.remove(&request);
+
+            // Flush the migration.
+            drop(schema);
+            context
+                .supervisor_extensions()
+                .flush_migration(request.service.as_ref())?;
+            log::trace!("Flushed and finished migration with request {:?}", request);
+        }
+
+        Ok(())
     }
 
     /// Rollbacks and removes migrations for which deadline height is already exceeded.

@@ -79,6 +79,14 @@ impl AsyncEventState {
             _ => false,
         }
     }
+
+    /// Returns `true` if current state is `AsyncEventState::Succeed`.
+    pub fn is_succeed(&self) -> bool {
+        match self {
+            AsyncEventState::Succeed => true,
+            _ => false,
+        }
+    }
 }
 
 impl ProtobufConvert for AsyncEventState {
