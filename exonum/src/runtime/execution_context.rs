@@ -24,6 +24,8 @@ use crate::{
     },
 };
 
+const ACCESS_ERROR_STR: &str = "An attempt to access blockchain data after execution error.";
+
 /// Provides the current state of the blockchain and the caller information for the call
 /// which is being executed.
 ///
@@ -46,6 +48,8 @@ pub struct ExecutionContext<'a> {
     dispatcher: &'a Dispatcher,
     /// Depth of the call stack.
     call_stack_depth: u64,
+    /// Flag indicates that there was an error occurred during the child call.
+    has_child_call_error: bool,
 }
 
 impl<'a> ExecutionContext<'a> {
@@ -91,6 +95,7 @@ impl<'a> ExecutionContext<'a> {
             transaction_hash,
             interface_name: "",
             call_stack_depth: 0,
+            has_child_call_error: false,
         }
     }
 
@@ -102,6 +107,10 @@ impl<'a> ExecutionContext<'a> {
 
     /// Provides access to blockchain data.
     pub fn data(&self) -> BlockchainData<'a, &Fork> {
+        if self.has_child_call_error {
+            panic!(ACCESS_ERROR_STR);
+        }
+
         BlockchainData::new(self.fork, self.instance)
     }
 
@@ -185,6 +194,10 @@ impl<'a> ExecutionContext<'a> {
 
     /// Re-borrows an execution context with the given instance descriptor.
     fn reborrow<'s>(&'s mut self, instance: InstanceDescriptor<'s>) -> ExecutionContext<'s> {
+        if self.has_child_call_error {
+            panic!(ACCESS_ERROR_STR);
+        }
+
         ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller.clone(),
@@ -193,6 +206,7 @@ impl<'a> ExecutionContext<'a> {
             interface_name: self.interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
+            has_child_call_error: false,
         }
     }
 
@@ -210,6 +224,10 @@ impl<'a> ExecutionContext<'a> {
         instance: InstanceDescriptor<'s>,
         fallthrough_auth: bool,
     ) -> ExecutionContext<'s> {
+        if self.has_child_call_error {
+            panic!(ACCESS_ERROR_STR);
+        }
+
         let caller = if fallthrough_auth {
             self.caller.clone()
         } else {
@@ -226,6 +244,7 @@ impl<'a> ExecutionContext<'a> {
             fork: &mut *self.fork,
             interface_name,
             call_stack_depth: self.call_stack_depth + 1,
+            has_child_call_error: false,
         }
     }
 }
@@ -236,6 +255,11 @@ pub trait ExecutionContextUnstable {
     /// Invokes the interface method of the instance with the specified ID.
     ///
     /// See explanation about [`fallthrough_auth`](struct.ExecutionContext.html#child_context).
+    ///
+    /// # Panics
+    ///
+    /// If this method returns an error, do not access the blockchain data through this context
+    /// methods, this will lead to panic.
     fn make_child_call<'q>(
         &mut self,
         called_instance: impl Into<InstanceQuery<'q>>,
@@ -255,36 +279,44 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
         arguments: &[u8],
         fallthrough_auth: bool,
     ) -> Result<(), ExecutionError> {
-        if self.call_stack_depth + 1 >= Self::MAX_CALL_STACK_DEPTH {
-            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
-            return Err(err);
-        }
+        // Move logic to closure to catch execution errors in uniform way.
+        let child_call = || {
+            if self.call_stack_depth + 1 >= Self::MAX_CALL_STACK_DEPTH {
+                let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+                return Err(err);
+            }
 
-        let descriptor = self
-            .dispatcher
-            .get_service(called_instance)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+            let descriptor = self
+                .dispatcher
+                .get_service(called_instance)
+                .ok_or(CoreError::IncorrectInstanceId)?;
 
-        let (runtime_id, runtime) = self
-            .dispatcher
-            .runtime_for_service(descriptor.id)
-            .ok_or(CoreError::IncorrectRuntime)?;
+            let (runtime_id, runtime) = self
+                .dispatcher
+                .runtime_for_service(descriptor.id)
+                .ok_or(CoreError::IncorrectRuntime)?;
 
-        let context = self.child_context(interface_name, descriptor, fallthrough_auth);
-        runtime
-            .execute(context, method_id, arguments)
-            .map_err(|mut err| {
-                err.set_runtime_id(runtime_id).set_call_site(|| {
-                    CallSite::new(
-                        descriptor.id,
-                        CallType::Method {
-                            interface: interface_name.to_owned(),
-                            id: method_id,
-                        },
-                    )
-                });
-                err
-            })
+            let context = self.child_context(interface_name, descriptor, fallthrough_auth);
+            runtime
+                .execute(context, method_id, arguments)
+                .map_err(|mut err| {
+                    err.set_runtime_id(runtime_id).set_call_site(|| {
+                        CallSite::new(
+                            descriptor.id,
+                            CallType::Method {
+                                interface: interface_name.to_owned(),
+                                id: method_id,
+                            },
+                        )
+                    });
+                    err
+                })
+        };
+        // Set has_child_call_error if an execution error occurs.
+        child_call().map_err(|e| {
+            self.has_child_call_error = true;
+            e
+        })
     }
 }
 
