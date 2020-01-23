@@ -205,11 +205,8 @@ impl Rig {
     }
 
     fn with_db_and_flag(db: Arc<TemporaryDB>, flag: bool) -> Self {
-        let blockchain = Blockchain::new(
-            Arc::clone(&db) as Arc<dyn Database>,
-            gen_keypair(),
-            ApiSender::closed(),
-        );
+        let blockchain =
+            Blockchain::new(db as Arc<dyn Database>, gen_keypair(), ApiSender::closed());
         let blockchain = blockchain
             .into_mut_with_dummy_config()
             .with_runtime(MigrationRuntime::with_script_flag(flag))
