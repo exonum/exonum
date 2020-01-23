@@ -733,7 +733,6 @@ impl Dispatcher {
         // a consensus failure.
         let res = local_result.0.as_ref();
         let local_hash = *res.unwrap_or_else(|err| {
-            // FIXME: Add a maintenance command for removing local migration result (ECR-4095).
             panic!(
                 "Migration for service `{}` is committed with migration hash {:?}, \
                  but locally it has finished with an error: {}. You can remove local \
@@ -744,7 +743,8 @@ impl Dispatcher {
         assert!(
             local_hash == global_hash,
             "Migration for service `{}` is committed with migration hash {:?}, \
-             but locally it has finished with another hash {:?}",
+             but locally it has finished with another hash {:?}. You can remove local \
+             migration result with CLI maintenance command `restart-migration`.",
             namespace,
             global_hash,
             local_hash
