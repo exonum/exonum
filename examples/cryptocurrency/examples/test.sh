@@ -95,7 +95,7 @@ function check-request {
 function check-create-tx {
     if [[ \
       ( `echo $3 | jq .type` == \"committed\" ) && \
-      ( `echo $3 | jq ".content == $2"` == "true") \
+      ( `echo $3 | jq ".message == $2"` == "true") \
     ]]; then
         echo "OK, got expected TxCreateWallet for user $1"
     else
@@ -112,7 +112,7 @@ function check-create-tx {
 function check-transfer-tx {
     if [[ \
       ( `echo $2 | jq .type` == \"committed\" ) && \
-      ( `echo $2 | jq ".content == $1"` == "true" ) \
+      ( `echo $2 | jq ".message == $1"` == "true" ) \
     ]]; then
         echo "OK, got expected TxTransfer between wallets"
     else
