@@ -75,7 +75,7 @@ where
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut proto_struct = Self::ProtoStruct::new();
-        proto_struct.entry = self
+        proto_struct.entries = self
             .0
             .iter()
             .map(pair_to_key_value_pb)
@@ -87,7 +87,7 @@ where
 
     fn from_pb(proto_struct: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let values = proto_struct
-            .entry
+            .entries
             .into_iter()
             .map(key_value_pb_to_pair)
             .collect::<Result<Vec<(K, V)>, failure::Error>>()?;
@@ -166,7 +166,7 @@ mod tests {
 
         // Unordered keys.
         let mut map = PbKeyValueSequence::new();
-        map.set_entry(RepeatedField::from_vec(vec![kv.clone(), kv2.clone()]));
+        map.set_entries(RepeatedField::from_vec(vec![kv.clone(), kv2.clone()]));
 
         let res: Result<OrderedMap<String, Vec<u8>>, failure::Error> =
             ProtobufConvert::from_pb(map);
@@ -176,7 +176,7 @@ mod tests {
 
         // Duplicate keys.
         let mut map = PbKeyValueSequence::new();
-        map.set_entry(RepeatedField::from_vec(vec![kv2.clone(), kv, kv2]));
+        map.set_entries(RepeatedField::from_vec(vec![kv2.clone(), kv, kv2]));
 
         let res: Result<OrderedMap<String, Vec<u8>>, failure::Error> =
             ProtobufConvert::from_pb(map);

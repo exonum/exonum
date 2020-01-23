@@ -41,6 +41,7 @@ pub struct ExecutionErrorSerde;
 impl ExecutionError {
     /// Creates a new execution error instance with the specified error kind
     /// and an optional description.
+    #[doc(hidden)] // used by `derive(ExecutionFail)`
     pub fn new(kind: ErrorKind, description: impl Into<String>) -> Self {
         Self {
             kind,
@@ -96,7 +97,7 @@ impl ExecutionError {
     }
 
     /// Returns the ID of a runtime in which this error has occurred. If the runtime is not known
-    /// (e.g. error originates in the core code), returns `None`.
+    /// (e.g., the error originates in the core code), returns `None`.
     pub fn runtime_id(&self) -> Option<u32> {
         self.runtime_id
     }

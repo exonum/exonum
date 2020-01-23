@@ -92,7 +92,7 @@ pub use structopt;
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
-    exonum_merkledb::RocksDB,
+    merkledb::RocksDB,
     runtime::{RuntimeInstance, WellKnownRuntime},
 };
 use exonum_explorer_service::ExplorerFactory;

@@ -15,9 +15,8 @@
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{BinaryValue, MapProof};
 use exonum_proto::ProtobufConvert;
-use failure::Error;
 
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
 
 use crate::{
     crypto::Hash,
@@ -26,12 +25,12 @@ use crate::{
     proto,
 };
 
-/// Trait that represents key in block header entry map. Provide
-/// mapping between `NAME` of the entry and its value.
+/// Trait that represents a key in block header entry map. Provides
+/// a mapping between `NAME` of the entry and its value.
 ///
-/// # Usage
+/// # Examples
 ///
-/// see [`Block::get_entry()`].
+/// See [`Block::get_entry()`].
 ///
 /// [`Block::get_entry()`]: struct.Block.html#method.get_entry
 pub trait BlockHeaderKey {
@@ -41,35 +40,13 @@ pub trait BlockHeaderKey {
     type Value: BinaryValue;
 }
 
-/// Proposer identifier.
+/// Identifier of a proposer of the block.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ProposerId(pub ValidatorId);
-
-impl fmt::Display for ProposerId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl BinaryValue for ProposerId {
-    fn to_bytes(&self) -> Vec<u8> {
-        (self.0).0.to_bytes()
-    }
-
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
-        Ok(Self(ValidatorId(u16::from_bytes(bytes)?)))
-    }
-}
-
-impl From<ValidatorId> for ProposerId {
-    fn from(validator_id: ValidatorId) -> Self {
-        ProposerId(validator_id)
-    }
-}
+pub struct ProposerId(());
 
 impl BlockHeaderKey for ProposerId {
     const NAME: &'static str = "proposer_id";
-    type Value = Self;
+    type Value = ValidatorId;
 }
 
 /// Expandable set of headers allowed to be added to the block.
@@ -95,27 +72,26 @@ impl AdditionalHeaders {
 
     /// Insert new header to the map.
     pub fn insert<K: BlockHeaderKey>(&mut self, value: K::Value) {
-        self.headers.0.insert(K::NAME.into(), value.to_bytes());
+        self.headers.0.insert(K::NAME.into(), value.into_bytes());
     }
 
     /// Get header from the map.
     pub fn get<K: BlockHeaderKey>(&self) -> Option<&[u8]> {
-        self.headers.0.get(K::NAME).map(|v| v.as_slice())
+        self.headers.0.get(K::NAME).map(Vec::as_slice)
     }
 }
 
-/// Exonum block header data structure.
+/// Header of a block.
 ///
-/// A block is essentially a list of transactions, which is
+/// A block is essentially a list of transactions. Blocks are produced as
 /// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
-/// and is applied atomically to the blockchain state.
-///
-/// The header only contains the amount of transactions and the transactions root hash as well as
-/// other information, but not the transactions themselves.
+/// and are applied atomically to the blockchain state. The header contains a block summary,
+/// such as the number of transactions and the transactions root hash, but not
+/// the transactions themselves.
 ///
 /// Note that this structure is export-only, meaning that one can rely on the serialization format
-/// provided by corresponding `protobuf` definitions, but cannot expect `exonum` to accept
-/// and process `Block` structure created outside of the `exonum` core.
+/// provided by corresponding Protobuf definitions, but cannot expect Exonum nodes
+/// or the `exonum` crate to accept and process `Block`s created externally.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -147,10 +123,10 @@ impl Block {
         self.additional_headers.insert::<K>(value);
     }
 
-    /// Get block additional header value for specified key type. Key type is specified via
-    /// type parameter.
+    /// Gets the value of an additional header for the specified key type, which is specified via
+    /// the type parameter.
     ///
-    /// # Usage
+    /// # Examples
     ///
     /// ```
     /// # use exonum::crypto::Hash;
@@ -159,18 +135,18 @@ impl Block {
     /// # use exonum::merkledb::BinaryValue;
     /// # use failure::Error;
     /// # use std::borrow::Cow;
-    ///
     /// // Suppose we store a list of active service IDs in a block.
     /// // We can do this by defining a corresponding BlockHeaderKey implementation.
     /// struct ActiveServices {
-    ///     service_id: u32,
+    ///     service_ids: Vec<u32>,
     /// }
     ///
     /// # impl BinaryValue for ActiveServices {
-    /// #    fn to_bytes(&self) -> Vec<u8> { vec![] }
-    /// #    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> { Ok(Self { service_id: 0 }) }
+    /// #     fn to_bytes(&self) -> Vec<u8> { vec![] }
+    /// #     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
+    /// #         Ok(Self { service_ids: vec![] })
+    /// #     }
     /// # }
-    ///
     /// // To implement `BlockHeaderKey` we need to provide the key name and a corresponding
     /// // value type. In this case it's `Self`.
     /// impl BlockHeaderKey for ActiveServices {
@@ -179,23 +155,21 @@ impl Block {
     /// }
     ///
     /// // Create an empty block.
-    /// let mut block = Block {
+    /// let block = Block {
     ///     # height: Height(0),
     ///     # tx_count: 0,
     ///     # prev_hash: Hash::zero(),
     ///     # tx_hash: Hash::zero(),
     ///     # state_hash: Hash::zero(),
     ///     # error_hash: Hash::zero(),
+    ///     // other fields skipped...
     ///     additional_headers: AdditionalHeaders::new(),
     /// };
     ///
-    /// let services = block.get_header::<ActiveServices>().expect("Entry deserialization error");
-    /// assert!(services.is_none())
+    /// let services = block.get_header::<ActiveServices>().unwrap();
+    /// assert!(services.is_none());
     /// ```
-    pub fn get_header<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error>
-    where
-        K::Value: BinaryValue,
-    {
+    pub fn get_header<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error> {
         self.additional_headers
             .get::<K>()
             .map(|bytes: &[u8]| K::Value::from_bytes(Cow::Borrowed(bytes)))
@@ -282,7 +256,7 @@ mod tests {
     #[test]
     fn block() {
         let mut additional_headers = AdditionalHeaders::new();
-        additional_headers.insert::<Hash>(hash(&[0u8; 10]));
+        additional_headers.insert::<Hash>(hash(&[0_u8; 10]));
 
         let txs = [4, 5, 6];
         let height = Height(123_345);
@@ -338,7 +312,7 @@ mod tests {
         let hash_without_entries = block_without_entries.object_hash();
 
         let mut entries = AdditionalHeaders::new();
-        entries.insert::<Hash>(hash(&[0u8; 10]));
+        entries.insert::<Hash>(hash(&[0_u8; 10]));
 
         let block_with_entries = create_block(entries);
         let hash_with_entries = block_with_entries.object_hash();

@@ -15,11 +15,20 @@
 //! Common building blocks that compose runtimes for the Exonum blockchain.
 //!
 //! Each runtime contains specific services that execute transactions, process events,
-//! provide user APIs, etc. A unified dispatcher redirects all the calls
+//! provide user APIs, etc. A unified *dispatcher* redirects all the calls
 //! and requests to an appropriate runtime environment. Thus, a blockchain interacts with the
 //! dispatcher, and not with specific runtime instances.
 //!
 //! # Artifacts
+//!
+//! An artifact creates service instances similar to classes in object-oriented programming.
+//! Artifacts reflect the assumption that deploying business logic onto the blockchain
+//! may take a long time, may fail, end up with differing results on different nodes, etc.
+//! Thus, artifacts decouple the complex *deployment* of the business logic from its instantiation
+//! (which we assume is simple / non-fallible).
+//!
+//! Depending on the runtime, an artifact may have an additional specification required
+//! for its deployment; e.g., files to be compiled.
 //!
 //! Each runtime has its own [artifacts] registry. Users can create services from the stored
 //! artifacts. An artifact identifier is required by the runtime to construct service instances.
@@ -84,14 +93,26 @@
 //!   the transition to the "active" state is not immediate;
 //!   see [*Service State Transitions*](#service-state-transitions) section below.)
 //!
-//! 4. Active service instances can be stopped by a corresponding request to [`Dispatcher`].
+//! 4. Active service instances can be stopped by a corresponding request to the dispatcher.
 //!   A stopped service no longer participates in business logic, i.e. it does not process
 //!   transactions, events, does not interact with the users in any way.
 //!   Service data becomes unavailable for the other services, but still exists. The service name
 //!   and identifier remain reserved for the stopped service and can't be used again for
 //!   adding new services.
 //!
-//! The [`Dispatcher`] is responsible for persisting artifacts and services across node restarts.
+//! The dispatcher is responsible for persisting artifacts and services across node restarts.
+//!
+//! ## Service Hooks
+//!
+//! Each active service is called before any transactions in the block are processed;
+//! we call this `before_transactions` hook. The service may modify the blockchain state in this hook.
+//! Likewise, each active service is called after all transactions in the block have been processed
+//! (we call this `after_transactions` hook). These calls are quite similar to transactions:
+//!
+//! - Each call is isolated
+//! - Service logic may return an error, meaning that all state changes made within the hook
+//!   are rolled back
+//! - The service may call other services within the hook
 //!
 //! ## Service State Transitions
 //!
@@ -121,7 +142,7 @@
 //!   the other network nodes if it is correct.
 //!
 //! 4. When the consensus algorithm finds a feasible candidate for the next block
-//!   of transactions, transactions in this block are passed to the [`Dispatcher`] for execution.
+//!   of transactions, transactions in this block are passed to the dispatcher for execution.
 //!
 //! 5. The dispatcher uses a lookup table to find the corresponding [`Runtime`] for each transaction
 //!   by the [`instance_id`] recorded in the transaction message. If the corresponding runtime exists,
@@ -153,7 +174,6 @@
 //!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
-//! [`Dispatcher`]: struct.Dispatcher.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
 //! [`Runtime`]: trait.Runtime.html
 //! [execution]: trait.Runtime.html#execute
@@ -165,6 +185,7 @@
 //! [`ExecutionError`]: struct.ExecutionError.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.method_id
 
+pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{
@@ -253,18 +274,19 @@ impl fmt::Display for RuntimeIdentifier {
     }
 }
 
-/// Runtime environment for the Exonum services.
+/// Runtime environment for Exonum services.
 ///
 /// You can read more about the life cycle of services and transactions
-/// [above](index.html#service-life-cycle).
+/// [in the module docs](index.html#service-life-cycle).
 ///
 /// Using this trait, you can extend the Exonum blockchain with the services written in
-/// different languages. It assumes that the deployment procedure of a new service may be
-/// complex and long and even may fail. Therefore, an additional entity is introduced - *artifacts*.
-/// Each artifact has a unique identifier. Depending on the runtime, an artifact may have an
-/// additional specification required for its deployment; e.g., files to be compiled.
-/// An artifact creates corresponding service instances similar to classes in object-oriented
-/// programming.
+/// different languages.
+///
+/// # Stability
+///
+/// This trait is considered unstable; breaking changes may be introduced to it within
+/// semantically non-breaking releases. However, it is guaranteed that such changes
+/// will require reasonable amount of updates from the `Runtime` implementations.
 ///
 /// # Call Ordering
 ///
@@ -291,6 +313,7 @@ impl fmt::Display for RuntimeIdentifier {
 /// - `execute`
 /// - `after_transactions`
 /// - `initiate_adding_service`
+/// - `initiate_resuming_service`
 ///
 /// All these methods should also produce the same changes to the storage via
 /// the provided `ExecutionContext`. Discrepancy in node behavior within these methods may lead
@@ -662,19 +685,7 @@ impl<'a> InstanceDescriptor<'a> {
 }
 
 impl fmt::Display for InstanceDescriptor<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.id, self.name)
-    }
-}
-
-impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
-    fn from(descriptor: InstanceDescriptor<'_>) -> Self {
-        (descriptor.id, descriptor.name.to_owned())
-    }
-}
-
-impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
-    fn from((id, name): (InstanceId, &'a str)) -> Self {
-        InstanceDescriptor::new(id, name)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}:{}", self.id, self.name)
     }
 }

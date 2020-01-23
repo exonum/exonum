@@ -177,6 +177,7 @@ structs
 subcommand
 subcommands
 subfolders
+submodule
 submodules
 subprefix
 subsec

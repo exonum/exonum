@@ -47,18 +47,12 @@ fn execution_error_binary_value_round_trip() {
         let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
         assert_eq!(err, err2);
 
-        err.call_site = Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Constructor,
-        });
+        err.call_site = Some(CallSite::new(100, CallType::Constructor));
         let bytes = err.to_bytes();
         let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
         assert_eq!(err, err2);
 
-        err.call_site = Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Resume,
-        });
+        err.call_site = Some(CallSite::new(100, CallType::Resume));
         let bytes = err.to_bytes();
         let err2 = ExecutionError::from_bytes(bytes.into()).unwrap();
         assert_eq!(err, err2);
@@ -108,64 +102,52 @@ fn execution_error_object_hash_description() {
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
     let mut second_err = first_err.clone();
-    second_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Constructor,
-    });
+    second_err.call_site = Some(CallSite::new(100, CallType::Constructor));
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
-    first_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Constructor,
-    });
+    first_err.call_site = Some(CallSite::new(100, CallType::Constructor));
     assert_eq!(first_err.object_hash(), second_err.object_hash());
 
-    second_err.call_site = Some(CallSite {
-        instance_id: 101,
-        call_type: CallType::Constructor,
-    });
+    second_err.call_site = Some(CallSite::new(101, CallType::Constructor));
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
-    second_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::AfterTransactions,
-    });
+    second_err.call_site = Some(CallSite::new(100, CallType::AfterTransactions));
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
-    second_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Method {
+    second_err.call_site = Some(CallSite::new(
+        100,
+        CallType::Method {
             interface: String::new(),
             id: 0,
         },
-    });
+    ));
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
-    first_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Method {
+    first_err.call_site = Some(CallSite::new(
+        100,
+        CallType::Method {
             interface: String::new(),
             id: 0,
         },
-    });
+    ));
     assert_eq!(first_err.object_hash(), second_err.object_hash());
 
-    second_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Method {
+    second_err.call_site = Some(CallSite::new(
+        100,
+        CallType::Method {
             interface: String::new(),
             id: 1,
         },
-    });
+    ));
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 
-    second_err.call_site = Some(CallSite {
-        instance_id: 100,
-        call_type: CallType::Method {
+    second_err.call_site = Some(CallSite::new(
+        100,
+        CallType::Method {
             interface: "foo".to_owned(),
             id: 0,
         },
-    });
+    ));
     assert_ne!(first_err.object_hash(), second_err.object_hash());
 }
 
@@ -175,10 +157,7 @@ fn execution_error_display() {
         kind: ErrorKind::Service { code: 3 },
         description: String::new(),
         runtime_id: Some(1),
-        call_site: Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Constructor,
-        }),
+        call_site: Some(CallSite::new(100, CallType::Constructor)),
     };
     let err_string = err.to_string();
     assert!(err_string.contains("Execution error with code `service:3`"));
@@ -188,24 +167,24 @@ fn execution_error_display() {
     err.description = "Error description!".to_owned();
     assert!(err.to_string().ends_with(": Error description!"));
 
-    err.call_site = Some(CallSite {
-        instance_id: 200,
-        call_type: CallType::Method {
+    err.call_site = Some(CallSite::new(
+        200,
+        CallType::Method {
             interface: "exonum.Configure".to_owned(),
             id: 0,
         },
-    });
+    ));
     assert!(err
         .to_string()
         .contains("in exonum.Configure::(method 0) of service 200"));
 
-    err.call_site = Some(CallSite {
-        instance_id: 300,
-        call_type: CallType::Method {
+    err.call_site = Some(CallSite::new(
+        300,
+        CallType::Method {
             interface: String::new(),
             id: 2,
         },
-    });
+    ));
     assert!(err.to_string().contains("in method 2 of service 300"));
 
     err.call_site = None;
@@ -238,10 +217,7 @@ fn execution_result_serde_presentation() {
         kind: ErrorKind::Service { code: 3 },
         description: String::new(),
         runtime_id: Some(1),
-        call_site: Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Constructor,
-        }),
+        call_site: Some(CallSite::new(100, CallType::Constructor)),
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),
@@ -260,10 +236,7 @@ fn execution_result_serde_presentation() {
         kind: ErrorKind::Service { code: 3 },
         description: String::new(),
         runtime_id: Some(1),
-        call_site: Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Resume,
-        }),
+        call_site: Some(CallSite::new(100, CallType::Resume)),
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),
@@ -282,13 +255,13 @@ fn execution_result_serde_presentation() {
         kind: ErrorKind::Core { code: 8 },
         description: "!".to_owned(),
         runtime_id: Some(0),
-        call_site: Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Method {
+        call_site: Some(CallSite::new(
+            100,
+            CallType::Method {
                 interface: "exonum.Configure".to_owned(),
                 id: 1,
             },
-        }),
+        )),
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),
@@ -334,23 +307,20 @@ fn execution_result_serde_roundtrip() {
         }
 
         if let Err(err) = res.0.as_mut() {
-            err.call_site = Some(CallSite {
-                instance_id: 1_000,
-                call_type: CallType::AfterTransactions,
-            });
+            err.call_site = Some(CallSite::new(1_000, CallType::AfterTransactions));
             let json = serde_json::to_string_pretty(&res).unwrap();
             let res2 = serde_json::from_str(&json).unwrap();
             assert_eq!(res, res2);
         }
 
         if let Err(err) = res.0.as_mut() {
-            err.call_site = Some(CallSite {
-                instance_id: 1_000,
-                call_type: CallType::Method {
+            err.call_site = Some(CallSite::new(
+                1_000,
+                CallType::Method {
                     interface: "exonum.Configure".to_owned(),
                     id: 1,
                 },
-            });
+            ));
             let json = serde_json::to_string_pretty(&res).unwrap();
             let res2 = serde_json::from_str(&json).unwrap();
             assert_eq!(res, res2);

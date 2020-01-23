@@ -70,7 +70,7 @@ pub fn create_block_with_transactions(
     };
 
     blockchain.create_patch(
-        ValidatorId::zero().into(),
+        ValidatorId::zero(),
         height,
         &tx_hashes,
         &mut BTreeMap::new(),

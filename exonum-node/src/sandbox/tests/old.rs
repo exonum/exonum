@@ -75,7 +75,7 @@ fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
 
 fn create_block(sandbox: &Sandbox) -> Block {
     let mut additional_headers = AdditionalHeaders::new();
-    additional_headers.insert::<ProposerId>(ValidatorId(2).into());
+    additional_headers.insert::<ProposerId>(ValidatorId(2));
 
     Block {
         height: Height(1),

@@ -126,11 +126,13 @@ impl<'a> ExecutionContext<'a> {
         core_schema.next_height() == Height(0)
     }
 
-    /// Returns identifier of the service interface required for the call.
+    /// Returns an identifier of the service interface required for the call.
+    /// This identifier is always empty for the primary service interface.
     ///
-    /// Keep in mind that this getter, in fact, is a part of an unfinished "interfaces" feature.
-    /// It will be replaced in future releases. At the moment this field is always empty for
-    /// the primary service interface.
+    /// # Stability
+    ///
+    /// This getter is a part of an unfinished "interfaces" feature. It is exempt
+    /// from semantic versioning and will be replaced in the future releases.
     pub fn interface_name(&self) -> &str {
         self.interface_name
     }
@@ -171,10 +173,7 @@ impl<'a> ExecutionContext<'a> {
             .initiate_adding_service(context, &spec.artifact, constructor.into_bytes())
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id: spec.id,
-                        call_type: CallType::Constructor,
-                    });
+                    .set_call_site(|| CallSite::new(spec.id, CallType::Constructor));
                 err
             })?;
 
@@ -275,12 +274,14 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
         runtime
             .execute(context, method_id, arguments)
             .map_err(|mut err| {
-                err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                    instance_id: descriptor.id,
-                    call_type: CallType::Method {
-                        interface: interface_name.to_owned(),
-                        id: method_id,
-                    },
+                err.set_runtime_id(runtime_id).set_call_site(|| {
+                    CallSite::new(
+                        descriptor.id,
+                        CallType::Method {
+                            interface: interface_name.to_owned(),
+                            id: method_id,
+                        },
+                    )
                 });
                 err
             })
@@ -367,10 +368,7 @@ impl<'a> SupervisorExtensions<'a> {
             )
             .map_err(|mut err| {
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: CallType::Constructor,
-                    });
+                    .set_call_site(|| CallSite::new(instance_id, CallType::Constructor));
                 err
             })?;
 

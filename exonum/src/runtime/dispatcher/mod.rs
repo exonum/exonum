@@ -97,8 +97,8 @@ impl CommittedServices {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
             InstanceQuery::Name(name) => {
-                let id = *self.instance_names.get(name)?;
-                (id, self.instances.get(&id)?)
+                let resolved_id = *self.instance_names.get(name)?;
+                (resolved_id, self.instances.get(&resolved_id)?)
             }
 
             InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
@@ -530,12 +530,14 @@ impl Dispatcher {
         if let Err(ref mut err) = res {
             fork.rollback();
 
-            err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                instance_id: call_info.instance_id,
-                call_type: CallType::Method {
-                    interface: String::new(),
-                    id: call_info.method_id,
-                },
+            err.set_runtime_id(runtime_id).set_call_site(|| {
+                CallSite::new(
+                    call_info.instance_id,
+                    CallType::Method {
+                        interface: String::new(),
+                        id: call_info.method_id,
+                    },
+                )
             });
             Self::report_error(err, fork, CallInBlock::transaction(tx_index));
         } else {
@@ -548,7 +550,7 @@ impl Dispatcher {
     fn call_service_hooks(
         &self,
         fork: &mut Fork,
-        call_type: CallType,
+        call_type: &CallType,
     ) -> Vec<(CallInBlock, ExecutionError)> {
         self.service_infos
             .active_instances()
@@ -563,10 +565,8 @@ impl Dispatcher {
                 let res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
                 if let Err(mut err) = res {
                     fork.rollback();
-                    err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                        instance_id: instance.id,
-                        call_type: call_type.clone(),
-                    });
+                    err.set_runtime_id(runtime_id)
+                        .set_call_site(|| CallSite::new(instance.id, call_type.clone()));
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
@@ -590,7 +590,7 @@ impl Dispatcher {
         &self,
         fork: &mut Fork,
     ) -> Vec<(CallInBlock, ExecutionError)> {
-        self.call_service_hooks(fork, CallType::BeforeTransactions)
+        self.call_service_hooks(fork, &CallType::BeforeTransactions)
     }
 
     /// Calls `after_transactions` for all currently active services, isolating each call.
@@ -599,7 +599,7 @@ impl Dispatcher {
     /// indexes of the dispatcher information scheme. Thus, these statuses will be equally
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
-        let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
+        let errors = self.call_service_hooks(fork, &CallType::AfterTransactions);
         self.activate_pending(fork);
         errors
     }
@@ -896,6 +896,9 @@ impl Mailbox {
 type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError> + Send>;
 
 /// Action to be performed by the dispatcher.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 pub enum Action {
     /// Start artifact deployment.
     StartDeploy {
@@ -907,6 +910,10 @@ pub enum Action {
         /// For example, this closure may create a transaction with the deployment confirmation.
         then: Box<dyn FnOnce(Result<(), ExecutionError>) -> ExecutionFuture + Send>,
     },
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    __NonExhaustive,
 }
 
 impl fmt::Debug for Action {
@@ -917,6 +924,7 @@ impl fmt::Debug for Action {
                 .field("artifact", artifact)
                 .field("spec", spec)
                 .finish(),
+            Action::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -937,6 +945,8 @@ impl Action {
                         error!("Deploying artifact {:?} failed: {}", artifact, e);
                     });
             }
+
+            Action::__NonExhaustive => unreachable!(),
         }
     }
 }

@@ -283,7 +283,7 @@ impl Rig {
         let height = CoreSchema::new(&fork).next_height();
         let (block_hash, patch) = self.blockchain.create_patch_inner(
             fork,
-            ValidatorId(0).into(),
+            ValidatorId(0),
             height,
             &[],
             &mut BTreeMap::new(),

@@ -12,14 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum global variables which are stored in the blockchain as UTF-8 encoded
-//! JSON.
+//! Exonum blockchain configuration.
 //!
-//! This module includes all the elements of the `StoredConfiguration` which is
-//! used as the global configuration of the blockchain and should be the same for
-//! all validators in the network. The configuration includes the public keys of
-//! validators, consensus related parameters, hash of the previous configuration,
-//! etc.
+//! This module includes the components of the global configuration of the blockchain
+//! The configuration includes the public keys of validators, consensus related parameters,
+//! and built-in services (services deployed at the blockchain start).
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -60,8 +57,10 @@ pub struct ValidatorKeys {
 impl ValidatorKeys {
     /// Creates a new `ValidatorKeys` object.
     ///
-    /// Since the inner structure `ValidatorKeys` can change, this method is considered unstable
-    /// and may break in the future.
+    /// # Stability
+    ///
+    /// Since more keys may be added to `ValidatorKeys` in the future, this method is considered
+    /// unstable.
     pub fn new(consensus_key: PublicKey, service_key: PublicKey) -> Self {
         Self {
             consensus_key,
@@ -540,7 +539,7 @@ impl InstanceInitParams {
     pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
         InstanceInitParams {
             instance_spec: self.instance_spec,
-            constructor: constructor.to_bytes(),
+            constructor: constructor.into_bytes(),
             non_exhaustive: (),
         }
     }
