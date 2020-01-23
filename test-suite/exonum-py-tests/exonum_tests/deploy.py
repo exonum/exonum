@@ -17,6 +17,7 @@ from suite import (
     wait_network_to_start,
     ExonumCryptoAdvancedClient,
     generate_config,
+    find_service_status,
 )
 
 
@@ -237,9 +238,8 @@ class RegularDeployTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             available_services = client.public_api.available_services().json()
             # crypto instance always first element in array
-            self.assertEqual(
-                available_services["services"][0]["status"]["type"], "stopped"
-            )
+            service_status = find_service_status(available_services, "crypto")
+            self.assertEqual(service_status, "stopped")
             with ExonumCryptoAdvancedClient(client) as crypto_client:
                 alice_keys = KeyPair.generate()
                 tx_response = crypto_client.create_wallet(
@@ -272,9 +272,8 @@ class RegularDeployTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             available_services = client.public_api.available_services().json()
             # crypto instance always first element in array
-            self.assertEqual(
-                available_services["services"][0]["status"]["type"], "active"
-            )
+            service_status = find_service_status(available_services, "crypto")
+            self.assertEqual(service_status, "active")
             with ExonumCryptoAdvancedClient(client) as crypto_client:
                 alice_keys = KeyPair.generate()
                 tx_response = crypto_client.create_wallet(
