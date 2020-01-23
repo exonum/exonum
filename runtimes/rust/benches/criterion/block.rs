@@ -197,7 +197,7 @@ mod cryptocurrency {
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
     };
-    use exonum_proto::ProtobufConvert;
+    use exonum_proto::{failure, ProtobufConvert};
     use exonum_rust_runtime::{DefaultInstance, Service};
     use rand::{rngs::StdRng, seq::SliceRandom};
     use serde_derive::{Deserialize, Serialize};
