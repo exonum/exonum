@@ -39,6 +39,7 @@
 #[macro_use]
 extern crate serde_derive; // Required for Protobuf.
 
+pub use failure;
 pub use protobuf_convert::*;
 
 pub mod proto;
