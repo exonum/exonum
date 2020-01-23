@@ -121,7 +121,7 @@ fn create_consensus_config_and_blockchain_base(
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
     blockchain.create_patch(
-        ValidatorId::zero().into(),
+        ValidatorId::zero(),
         Height(height),
         txs,
         &mut BTreeMap::new(),
@@ -192,7 +192,7 @@ mod cryptocurrency {
         crypto::PublicKey,
         merkledb::access::AccessExt,
         messages::Verified,
-        runtime::{AnyTx, ErrorKind, ExecutionContext, ExecutionError, InstanceId},
+        runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{
         exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory,
@@ -270,8 +270,7 @@ mod cryptocurrency {
             if arg.seed % 2 == 0 {
                 Ok(())
             } else {
-                let error_kind = ErrorKind::Service { code: 15 };
-                Err(ExecutionError::new(error_kind, ""))
+                Err(ExecutionError::service(15, ""))
             }
         }
     }

@@ -137,7 +137,7 @@ impl ServiceApiScope {
         Self {
             inner: ApiScope::new(),
             blockchain,
-            descriptor: instance.into(),
+            descriptor: (instance.id, instance.name.to_owned()),
         }
     }
 
@@ -152,16 +152,14 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         self.inner
             .endpoint(name, move |query: Q| -> FutureResult<I> {
-                let (instance_id, instance_name) = descriptor.clone();
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    (instance_id, instance_name.as_ref()).into(),
-                    name,
-                );
+                let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
                 let result = handler(&state, query);
+
+                let instance_name = instance_name.clone();
                 let future = result
                     .into_future()
                     .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
@@ -181,16 +179,14 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         self.inner
             .endpoint_mut(name, move |query: Q| -> FutureResult<I> {
-                let (instance_id, instance_name) = descriptor.clone();
-                let state = ServiceApiState::from_api_context(
-                    &blockchain,
-                    (instance_id, instance_name.as_ref()).into(),
-                    name,
-                );
+                let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+                let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
                 let result = handler(&state, query);
+
+                let instance_name = instance_name.clone();
                 let future = result
                     .into_future()
                     .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
@@ -214,16 +210,14 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         let inner = deprecated.handler.clone();
         let handler = move |query: Q| -> FutureResult<I> {
-            let (instance_id, instance_name) = descriptor.clone();
-            let state = ServiceApiState::from_api_context(
-                &blockchain,
-                (instance_id, instance_name.as_ref()).into(),
-                name,
-            );
+            let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
             let result = inner(&state, query);
+
+            let instance_name = instance_name.clone();
             let future = result
                 .into_future()
                 .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
@@ -250,16 +244,14 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
+        let (instance_id, instance_name) = self.descriptor.clone();
         let inner = deprecated.handler.clone();
         let handler = move |query: Q| -> FutureResult<I> {
-            let (instance_id, instance_name) = descriptor.clone();
-            let state = ServiceApiState::from_api_context(
-                &blockchain,
-                (instance_id, instance_name.as_ref()).into(),
-                name,
-            );
+            let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
+            let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
             let result = inner(&state, query);
+
+            let instance_name = instance_name.clone();
             let future = result
                 .into_future()
                 .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));

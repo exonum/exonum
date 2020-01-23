@@ -52,20 +52,25 @@ impl SignedMessage {
 
 impl_serde_hex_for_binary_value! { SignedMessage }
 
-/// Wraps a `Payload` together with the corresponding `SignedMessage`.
+/// Wraps a payload together with the corresponding `SignedMessage`.
 ///
-/// Usually one wants to work with fully parsed and verified messages (i.e., `Payload`).
-/// However, occasionally we have to retransmit the message into the network or
+/// Usually one wants to work with fully parsed and verified messages (i.e., the type param
+/// from the `Verified` definition).
+/// However, occasionally we need to retransmit the message into the network or
 /// save its serialized form. We could serialize the `Payload` back,
 /// but Protobuf does not have a canonical form so the resulting payload may
-/// have different binary representation (thus invalidating the message signature).
+/// have a different binary representation (thus invalidating the message signature).
 ///
 /// So we use `Verified` to keep the original byte buffer around with the parsed `Payload`.
 ///
-/// Be careful with `BinaryValue::from_bytes` method!
-/// It for performance reasons skips signature verification.
+/// Be careful with `BinaryValue::from_bytes` method! It skips signature verification
+/// for performance reasons. This is OK in a typical use case (a previously verified message
+/// is loaded from the blockchain storage), but should not be used to deserialize messages
+/// from an untrusted source.
 ///
-/// See module [documentation](index.html#examples) for examples.
+/// # Examples
+///
+/// See [module documentation](index.html#examples) for examples.
 #[derive(Clone, Debug)]
 pub struct Verified<T> {
     raw: SignedMessage,
@@ -89,7 +94,7 @@ impl<T> Verified<T> {
         self.raw
     }
 
-    /// Returns message author key.
+    /// Returns the public key of the message author.
     pub fn author(&self) -> PublicKey {
         self.raw.author
     }
@@ -111,7 +116,7 @@ impl<T> Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    /// Returns reference to the underlying message payload.
+    /// Returns a reference to the underlying message payload.
     pub fn payload(&self) -> &T {
         &self.inner
     }
@@ -122,10 +127,11 @@ where
     }
 }
 
-/// Message that can be converted into a unambiguous presentation for signing. "Unambiguous"
-/// means that any sequence of bytes produced by serializing `Container` obtained by converting
-/// this message can be interpreted in a single way. In other words, messages of different types
-/// have separated representation domains.
+/// Message that can be converted into a unambiguous presentation for signing.
+///
+/// "Unambiguous" above means that any sequence of bytes produced by serializing `Container`
+/// obtained by converting this message can be interpreted in a single way.
+/// In other words, messages of different types have separated representation domains.
 pub trait IntoMessage: Sized {
     /// Container for the message.
     type Container: BinaryValue + From<Self> + TryInto<Self>;

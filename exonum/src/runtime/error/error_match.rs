@@ -234,10 +234,7 @@ mod tests {
         assert_eq!(error, matcher);
 
         // Check `instance_id` matching.
-        error.call_site = Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Constructor,
-        });
+        error.call_site = Some(CallSite::new(100, CallType::Constructor));
         assert_eq!(error, matcher);
         matcher.instance_id = Some(99);
         assert_ne!(error, matcher);
@@ -250,13 +247,13 @@ mod tests {
         matcher.call_type = Some(CallType::Constructor);
         assert_eq!(error, matcher);
 
-        error.call_site = Some(CallSite {
-            instance_id: 100,
-            call_type: CallType::Method {
+        error.call_site = Some(CallSite::new(
+            100,
+            CallType::Method {
                 interface: "exonum.Configure".to_owned(),
                 id: 1,
             },
-        });
+        ));
         matcher.call_type = None;
         assert_eq!(error, matcher);
         matcher.call_type = Some(CallType::Method {
