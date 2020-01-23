@@ -49,7 +49,7 @@
 //!     .create();
 //! let api = testkit.api();
 //! let info: PeersInfo = api.private(ApiKind::System).get("v1/peers")?;
-//! #   Ok(())
+//! # Ok(())
 //! # }
 //! ```
 //!

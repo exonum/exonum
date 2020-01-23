@@ -14,6 +14,12 @@
 
 //! System API of an Exonum node, packaged as a node plugin.
 //!
+//! # HTTP API
+//!
+//! REST API of the service is documented in the corresponding modules:
+//! - [public API](public/index.html)
+//! - [private API](private/index.html)
+//!
 //! # Examples
 //!
 //! Use with the real node builder:
