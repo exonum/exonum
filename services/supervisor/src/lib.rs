@@ -356,8 +356,8 @@ impl Service for Supervisor {
     fn before_transactions(&self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         self.remove_outdated_deployments(&context);
         self.remove_outdated_config_proposal(&context);
-        self.remove_outdated_migrations(&mut context)?;
         self.flush_completed_migrations(&mut context)?;
+        self.remove_outdated_migrations(&mut context)?;
         Ok(())
     }
 

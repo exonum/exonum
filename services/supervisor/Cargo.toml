@@ -32,6 +32,7 @@ exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 [dev-dependencies]
 futures = "0.1.25"
 exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+bincode = "1.2.1"
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }

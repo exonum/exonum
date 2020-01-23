@@ -649,7 +649,6 @@ impl Supervisor {
             );
 
             // Remove artifact from pending deployments.
-            schema.pending_deployments.remove(&deploy_request.artifact);
             schema
                 .deploy_states
                 .put(&deploy_request, AsyncEventState::Succeed);
@@ -734,11 +733,10 @@ impl Supervisor {
             );
 
             // Mark migration as succeed.
+            // Migration will be flushed and removed from pending in `before_transactions`
+            // hook of the next block.
             state.update(AsyncEventState::Succeed);
             schema.migration_states.put(&request, state);
-
-            // Migration is not pending anymore, remove it.
-            schema.pending_migrations.remove(&request);
 
             drop(schema);
 

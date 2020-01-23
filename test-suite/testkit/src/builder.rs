@@ -20,7 +20,7 @@ use exonum::{
     helpers::ValidatorId,
     keys::Keys,
     merkledb::{BinaryValue, TemporaryDB},
-    runtime::{ArtifactId, RuntimeInstance, WellKnownRuntime},
+    runtime::{migrations::MigrateData, ArtifactId, RuntimeInstance, WellKnownRuntime},
 };
 #[cfg(feature = "exonum-node")]
 use exonum_node::NodePlugin;
@@ -169,12 +169,32 @@ impl TestKitBuilder {
         self
     }
 
+    /// Adds a Rust service with support of migrations to the testkit.
+    pub fn with_migrating_rust_service<S>(mut self, service: S) -> Self
+    where
+        S: ServiceFactory + MigrateData,
+    {
+        self.rust_runtime = self.rust_runtime.with_migrating_factory(service);
+        self
+    }
+
     /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
     /// artifact and default instance are added implicitly.
     pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
         self.with_artifact(service.artifact_id())
             .with_instance(service.default_instance())
             .with_rust_service(service)
+    }
+
+    /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
+    /// artifact and default instance are added implicitly.
+    pub fn with_default_migrating_rust_service<S>(self, service: S) -> Self
+    where
+        S: DefaultInstance + MigrateData,
+    {
+        self.with_artifact(service.artifact_id())
+            .with_instance(service.default_instance())
+            .with_migrating_rust_service(service)
     }
 
     /// Adds a node plugin to the testkit.
