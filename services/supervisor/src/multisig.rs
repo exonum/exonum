@@ -88,7 +88,7 @@ where
     /// This method is intended to be called before comparing the amount of
     /// confirmations and amount of validators, so confirmations of nodes which
     /// are not validators anymore won't be taken into account.
-    pub fn intersect(&mut self, id: &V, validator_keys: impl IntoIterator<Item = PublicKey>) {
+    fn intersect(&mut self, id: &V, validator_keys: BTreeSet<PublicKey>) {
         let mut confirmations = self.index.get(id).unwrap_or_default();
         let validator_keys: BTreeSet<PublicKey> = validator_keys.into_iter().collect();
 
@@ -99,6 +99,23 @@ where
             .collect();
 
         self.index.put(id, confirmations);
+    }
+
+    /// Checks whether all validators agreed on provided item.
+    ///
+    /// This method updates the list of confirmation, leaving confirmations only from
+    /// the actual validators.
+    pub fn all_validators_confirmed(
+        &mut self,
+        id: &V,
+        validator_keys: impl IntoIterator<Item = PublicKey>,
+    ) -> bool {
+        let validator_keys: BTreeSet<PublicKey> = validator_keys.into_iter().collect();
+        let validators_amount = validator_keys.len();
+
+        self.intersect(id, validator_keys);
+
+        self.confirmations(id) == validators_amount
     }
 }
 

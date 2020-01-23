@@ -633,16 +633,16 @@ impl Supervisor {
 
         let mut schema = SchemaImpl::new(context.service_data());
 
+        schema.deploy_confirmations.confirm(&deploy_request, author);
+
         // Check if we have enough confirmations for the deployment.
-        let validator_keys = core_schema.consensus_config().validator_keys;
-        let validator_count = validator_keys.len();
-        // Before check, update the confirmations to match actual list of validators.
-        schema.deploy_confirmations.intersect(
-            &deploy_request,
-            validator_keys.iter().map(|keys| keys.service_key),
-        );
-        let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
-        if confirmations == validator_count {
+        let config = core_schema.consensus_config();
+        let validator_keys = config.validator_keys.iter().map(|keys| keys.service_key);
+
+        if schema
+            .deploy_confirmations
+            .all_validators_confirmed(&deploy_request, validator_keys)
+        {
             log::trace!(
                 "Registering deployed artifact in dispatcher {:?}",
                 deploy_request.artifact
@@ -714,15 +714,19 @@ impl Supervisor {
 
         // Hash is OK, process further.
 
+        schema.migration_confirmations.confirm(&request, author);
+
         // Check if we have enough confirmations to finish the migration.
-        let validator_keys = core_schema.consensus_config().validator_keys;
-        let validator_count = validator_keys.len();
-        // Before check, update the confirmations to match actual list of validators.
-        schema
+        let consensus_config = core_schema.consensus_config();
+        let validator_keys = consensus_config
+            .validator_keys
+            .iter()
+            .map(|keys| keys.service_key);
+
+        if schema
             .migration_confirmations
-            .intersect(&request, validator_keys.iter().map(|keys| keys.service_key));
-        let confirmations = schema.migration_confirmations.confirm(&request, author);
-        if confirmations == validator_count {
+            .all_validators_confirmed(&request, validator_keys)
+        {
             log::trace!(
                 "Confirming commit of migration request {:?}. Result state hash: {:?}",
                 request,
