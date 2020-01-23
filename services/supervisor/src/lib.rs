@@ -117,13 +117,12 @@ pub use self::{
 
 use exonum::{
     blockchain::config::InstanceInitParams,
-    runtime::{ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
+    runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, CallContext, Service,
-    ServiceFactory as _,
+    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
 };
 
 use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};
@@ -153,7 +152,7 @@ const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged 
 /// Applies configuration changes.
 /// Upon any failure, execution of this method stops and `Err(())` is returned.
 fn update_configs(
-    context: &mut CallContext<'_>,
+    context: &mut ExecutionContext<'_>,
     changes: Vec<ConfigChange>,
 ) -> Result<(), ExecutionError> {
     for change in changes.into_iter() {
@@ -255,7 +254,7 @@ fn update_configs(
 
 /// Assigns the instance ID for a new service, initializing the schema `vacant_instance_id`
 /// entry if needed.
-fn assign_instance_id(context: &CallContext<'_>) -> InstanceId {
+fn assign_instance_id(context: &ExecutionContext<'_>) -> InstanceId {
     let mut schema = SchemaImpl::new(context.service_data());
     match schema.assign_instance_id() {
         Some(id) => id,
@@ -335,7 +334,11 @@ impl Supervisor {
 }
 
 impl Service for Supervisor {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         use std::borrow::Cow;
 
         // Load configuration from bytes and store it.
@@ -350,14 +353,14 @@ impl Service for Supervisor {
         Ok(())
     }
 
-    fn before_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         self.remove_outdated_deployments(&context);
         self.remove_outdated_config_proposal(&context);
         self.remove_outdated_migrations(&mut context)?;
         Ok(())
     }
 
-    fn after_transactions(&self, mut context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let mut schema = SchemaImpl::new(context.service_data());
         let configuration = schema.supervisor_config();
         let core_schema = context.data().for_core();
@@ -407,7 +410,7 @@ impl Service for Supervisor {
 
 impl Supervisor {
     /// Removes deployments for which deadline height is already exceeded.
-    fn remove_outdated_deployments(&self, context: &CallContext<'_>) {
+    fn remove_outdated_deployments(&self, context: &ExecutionContext<'_>) {
         let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
@@ -430,7 +433,7 @@ impl Supervisor {
     }
 
     /// Removes pending config proposal if it's outdated.
-    fn remove_outdated_config_proposal(&self, context: &CallContext<'_>) {
+    fn remove_outdated_config_proposal(&self, context: &ExecutionContext<'_>) {
         let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
@@ -493,7 +496,7 @@ impl Supervisor {
     /// Rollbacks and removes migrations for which deadline height is already exceeded.
     fn remove_outdated_migrations(
         &self,
-        context: &mut CallContext<'_>,
+        context: &mut ExecutionContext<'_>,
     ) -> Result<(), ExecutionError> {
         let height = context.data().for_core().height();
 
@@ -597,7 +600,7 @@ impl Configure for Supervisor {
 
     fn verify_config(
         &self,
-        _context: CallContext<'_>,
+        _context: ExecutionContext<'_>,
         _params: Self::Params,
     ) -> Result<(), ExecutionError> {
         // If config was decoded, it's OK.
@@ -606,7 +609,7 @@ impl Configure for Supervisor {
 
     fn apply_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         let mut schema = SchemaImpl::new(context.service_data());

@@ -45,7 +45,7 @@ impl Api {
 
     /// Returns `Gone` error.
     fn gone(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
-        Err(api::Error::Gone)
+        Err(api::Error::new(api::HttpStatusCode::GONE))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {
@@ -86,6 +86,21 @@ impl Api {
                         .into())
                 },
             );
+
+        public_scope.endpoint(
+            "error",
+            move |_state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
+                if query.value == 64 {
+                    Ok(query.value)
+                } else {
+                    Err(api::Error::bad_request()
+                        .docs_uri("http://some-docs.com")
+                        .title("Test endpoint error")
+                        .detail(format!("Test endpoint failed with query: {}", query.value))
+                        .error_code(42))
+                }
+            },
+        );
     }
 }
 

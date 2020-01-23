@@ -13,9 +13,9 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-use exonum::runtime::{ExecutionError, InstanceId};
+use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::*;
-use exonum_rust_runtime::{AfterCommitContext, CallContext, DefaultInstance, Service};
+use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -42,10 +42,10 @@ pub struct AfterCommitService {
     counter: Arc<AtomicUsize>,
 }
 
-impl AfterCommitInterface<CallContext<'_>> for AfterCommitService {
+impl AfterCommitInterface<ExecutionContext<'_>> for AfterCommitService {
     type Output = Result<(), ExecutionError>;
 
-    fn after_commit(&self, _ctx: CallContext<'_>, _height: u64) -> Self::Output {
+    fn after_commit(&self, _ctx: ExecutionContext<'_>, _height: u64) -> Self::Output {
         Ok(())
     }
 }

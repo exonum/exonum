@@ -106,6 +106,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This method is used to resume a previously stopped services.
   (#1693)
 
+- `ExecutionContext` has been reworked (#1711)
+
+  - `ExecutionContext` has been extended by the methods from the
+   `exonum_rust_runtime::CallContext` so there is no need to use `CallContext`
+    anymore.
+    Public fields in `ExecutionData` has been replaced by the corresponding
+    getters.
+  - Direct `fork` access in `ExecutionContext` has been replaced by the
+    `BlockchainData::unstructured_assess` which returns readonly access to
+    whole blockchain data.
+
 - Public structures and enums were made non-exhaustive. (#1710)
 
 #### exonum-cli
@@ -147,6 +158,17 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   - `compare` module;
   - `txvec` macro;
   - `TestKit::probe_all` and `TestKit::probe` methods.
+
+### exonum-time
+
+- Modules were made private, crate now provides re-exports of necessary types
+  instead. (#1716)
+
+### exonum-explorer
+
+- The field `content` of the `CommittedTransaction` struct and
+  the `InPool` variant of the `TransactionInfo` enum has been renamed
+  to `message`. (#1721)
 
 ### New features
 
@@ -220,6 +242,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Rust runtime module was moved from the `exonum` crate into the separate
   `exonum-rust-runtime` crate. (#1641)
+
+- `CallContext` has been replaced by the `ExecutionContext`. (#1711)
 
 #### exonum-supervisor
 

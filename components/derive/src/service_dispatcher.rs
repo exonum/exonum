@@ -93,7 +93,7 @@ impl ToTokens for ServiceDispatcher {
         let service_name = &self.ident;
         let cr = &self.cr;
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
-        let ctx = quote!(#cr::CallContext<'_>);
+        let ctx = quote!(#cr::_reexports::ExecutionContext<'_>);
         let res = quote!(std::result::Result<(), #cr::_reexports::ExecutionError>);
 
         let match_arms = self.implements.0.iter().map(|interface| {
@@ -116,12 +116,11 @@ impl ToTokens for ServiceDispatcher {
             impl #impl_generics #cr::ServiceDispatcher for #service_name #ty_generics #where_clause  {
                 fn call(
                     &self,
-                    interface_name: &str,
-                    method: #cr::_reexports::MethodId,
                     ctx: #ctx,
+                    method: #cr::_reexports::MethodId,
                     payload: &[u8],
                 ) -> Result<(), #cr::_reexports::ExecutionError> {
-                    match interface_name {
+                    match ctx.interface_name() {
                         #( #match_arms )*
                         other => Err(#cr::_reexports::CommonError::NoSuchInterface.into()),
                     }

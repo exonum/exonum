@@ -15,7 +15,7 @@
 use exonum::{
     crypto,
     messages::{AnyTx, Verified},
-    runtime::{CallInfo, CommonError, CoreError, ErrorMatch, ExecutionError},
+    runtime::{CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError},
 };
 use exonum_testkit::{TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
@@ -368,19 +368,24 @@ fn test_any_call_panic_recursion_limit() {
 
     execute_transaction(
         &mut testkit,
-        keypair.call_recursive(AnyCallService::ID, 256),
+        keypair.call_recursive(AnyCallService::ID, ExecutionContext::MAX_CALL_STACK_DEPTH),
     )
     .expect("Call stack depth is enough");
 
     let err = execute_transaction(
         &mut testkit,
-        keypair.call_recursive(AnyCallService::ID, 300),
+        keypair.call_recursive(
+            AnyCallService::ID,
+            ExecutionContext::MAX_CALL_STACK_DEPTH + 1,
+        ),
     )
     .unwrap_err();
 
     assert_eq!(
         err,
-        ErrorMatch::from_fail(&CoreError::StackOverflow)
-            .with_description_containing("Maximum depth of call stack (256)")
+        ErrorMatch::from_fail(&CoreError::StackOverflow).with_description_containing(&format!(
+            "Maximum depth of call stack ({})",
+            ExecutionContext::MAX_CALL_STACK_DEPTH
+        ))
     );
 }

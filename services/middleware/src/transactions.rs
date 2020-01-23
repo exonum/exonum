@@ -14,10 +14,10 @@
 
 //! Transaction logic for `MiddlewareService`.
 
-use exonum::runtime::{AnyTx, CoreError, ExecutionError, InstanceId};
+use exonum::runtime::{AnyTx, CoreError, ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::{CallContext, GenericCall, GenericCallMut, MethodDescriptor, TxStub};
+use exonum_rust_runtime::{FallthroughAuth, GenericCall, GenericCallMut, MethodDescriptor, TxStub};
 use semver::VersionReq;
 use serde_derive::*;
 
@@ -178,10 +178,10 @@ pub trait MiddlewareInterface<Ctx> {
     fn batch(&self, context: Ctx, arg: Batch) -> Self::Output;
 }
 
-impl MiddlewareInterface<CallContext<'_>> for MiddlewareService {
+impl MiddlewareInterface<ExecutionContext<'_>> for MiddlewareService {
     type Output = Result<(), ExecutionError>;
 
-    fn checked_call(&self, mut context: CallContext<'_>, arg: CheckedCall) -> Self::Output {
+    fn checked_call(&self, context: ExecutionContext<'_>, arg: CheckedCall) -> Self::Output {
         let instance_id = arg.inner.call_info.instance_id;
         let dispatcher_schema = context.data().for_dispatcher();
         let state = dispatcher_schema
@@ -198,16 +198,15 @@ impl MiddlewareInterface<CallContext<'_>> for MiddlewareService {
 
         // TODO: use interface name from `call_info` once it's added there
         let method = MethodDescriptor::new("", "", arg.inner.call_info.method_id);
-        context
-            .with_fallthrough_auth()
-            .generic_call_mut(instance_id, method, arg.inner.arguments)
+        FallthroughAuth(context).generic_call_mut(instance_id, method, arg.inner.arguments)
     }
 
-    fn batch(&self, mut context: CallContext<'_>, arg: Batch) -> Self::Output {
+    fn batch(&self, context: ExecutionContext<'_>, arg: Batch) -> Self::Output {
+        let mut fallthrough_auth = FallthroughAuth(context);
         for call in arg.inner {
             // TODO: use interface name from `call_info` once it's added there
             let method = MethodDescriptor::new("", "", call.call_info.method_id);
-            context.with_fallthrough_auth().generic_call_mut(
+            fallthrough_auth.generic_call_mut(
                 call.call_info.instance_id,
                 method,
                 call.arguments,

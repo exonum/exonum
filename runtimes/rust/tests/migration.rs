@@ -22,14 +22,12 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
-        CommonError, CoreError, ErrorMatch, ExecutionError, ExecutionFail, InstanceStatus,
-        SnapshotExt,
+        CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail,
+        InstanceStatus, SnapshotExt,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    CallContext, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
-};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 use pretty_assertions::assert_eq;
 
 use self::inspected::{
@@ -67,10 +65,10 @@ trait Withdrawal<Ctx> {
 #[service_factory(artifact_name = "withdrawal", artifact_version = "0.1.0")]
 struct WithdrawalServiceV1;
 
-impl Withdrawal<CallContext<'_>> for WithdrawalServiceV1 {
+impl Withdrawal<ExecutionContext<'_>> for WithdrawalServiceV1 {
     type Output = Result<(), ExecutionError>;
 
-    fn withdraw(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
+    fn withdraw(&self, context: ExecutionContext<'_>, arg: u64) -> Self::Output {
         let mut schema = Schema::new(context.service_data());
         schema.balance.set(schema.balance.get().unwrap() + arg);
         schema.withdrawals.push(arg);
@@ -79,7 +77,11 @@ impl Withdrawal<CallContext<'_>> for WithdrawalServiceV1 {
 }
 
 impl Service for WithdrawalServiceV1 {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.service_data());
         schema.balance.set(u64::from_bytes(params.into()).unwrap());
         Ok(())
@@ -104,10 +106,10 @@ impl DefaultInstance for WithdrawalServiceV1 {
 #[service_factory(artifact_name = "withdrawal", artifact_version = "0.2.0")]
 struct WithdrawalServiceV2;
 
-impl Withdrawal<CallContext<'_>> for WithdrawalServiceV2 {
+impl Withdrawal<ExecutionContext<'_>> for WithdrawalServiceV2 {
     type Output = Result<(), ExecutionError>;
 
-    fn withdraw(&self, context: CallContext<'_>, arg: u64) -> Self::Output {
+    fn withdraw(&self, context: ExecutionContext<'_>, arg: u64) -> Self::Output {
         let mut schema = Schema::new(context.service_data());
         schema.balance.set(schema.balance.get().unwrap() - arg);
         schema.withdrawals.push(arg);
@@ -116,13 +118,17 @@ impl Withdrawal<CallContext<'_>> for WithdrawalServiceV2 {
 }
 
 impl Service for WithdrawalServiceV2 {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(context.service_data());
         schema.balance.set(u64::from_bytes(params.into()).unwrap());
         Ok(())
     }
 
-    fn resume(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn resume(&self, context: ExecutionContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
         if !params.is_empty() {
             return Err(CommonError::MalformedArguments
                 .with_description("Resuming parameters should be empty."));

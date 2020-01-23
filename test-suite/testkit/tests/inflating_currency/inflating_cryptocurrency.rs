@@ -15,7 +15,7 @@
 use exonum::{
     crypto::PublicKey,
     helpers::Height,
-    runtime::{ExecutionError, InstanceId},
+    runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_merkledb::{
@@ -23,8 +23,8 @@ use exonum_merkledb::{
     MapIndex,
 };
 use exonum_rust_runtime::{
-    api::{self, ServiceApiBuilder},
-    CallContext, DefaultInstance, Service,
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
 
@@ -139,10 +139,10 @@ pub trait CurrencyInterface<Ctx> {
     fn transfer(&self, ctx: Ctx, arg: Transfer) -> Self::Output;
 }
 
-impl CurrencyInterface<CallContext<'_>> for CurrencyService {
+impl CurrencyInterface<ExecutionContext<'_>> for CurrencyService {
     type Output = Result<(), ExecutionError>;
 
-    fn create_wallet(&self, ctx: CallContext<'_>, arg: CreateWallet) -> Self::Output {
+    fn create_wallet(&self, ctx: ExecutionContext<'_>, arg: CreateWallet) -> Self::Output {
         let author = ctx.caller().author().unwrap();
 
         let height = ctx.data().for_core().height();
@@ -154,7 +154,7 @@ impl CurrencyInterface<CallContext<'_>> for CurrencyService {
         Ok(())
     }
 
-    fn transfer(&self, ctx: CallContext<'_>, arg: Transfer) -> Self::Output {
+    fn transfer(&self, ctx: ExecutionContext<'_>, arg: Transfer) -> Self::Output {
         let author = ctx.caller().author().unwrap();
         if author == arg.to {
             return Err(Error::SenderSameAsReceiver.into());
@@ -189,7 +189,7 @@ struct BalanceQuery {
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
-    fn balance(state: &api::ServiceApiState<'_>, query: BalanceQuery) -> api::Result<u64> {
+    fn balance(state: &ServiceApiState<'_>, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.data();
         let schema = CurrencySchema::new(snapshot.for_executing_service());
         schema
@@ -198,7 +198,7 @@ impl CryptocurrencyApi {
                 let height = snapshot.for_core().height();
                 wallet.actual_balance(height)
             })
-            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
+            .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {

@@ -16,10 +16,9 @@
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
     blockchain::{IndexProof, ValidatorKeys},
-    runtime::{ExecutionError, InstanceId},
+    runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_api::{
-    self as api,
     backends::actix::{HttpRequest, RawHandler, RequestHandler},
     ApiBackend,
 };
@@ -30,8 +29,8 @@ use exonum_merkledb::{
     ObjectHash, ProofEntry,
 };
 use exonum_rust_runtime::{
-    api::{ServiceApiBuilder, ServiceApiState},
-    CallContext, DefaultInstance, Service,
+    api::{self, ServiceApiBuilder, ServiceApiState},
+    DefaultInstance, Service,
 };
 use futures::{Future, IntoFuture};
 use log::trace;
@@ -93,10 +92,10 @@ pub trait CounterServiceInterface<Ctx> {
     fn reset(&self, ctx: Ctx, _: ()) -> Self::Output;
 }
 
-impl CounterServiceInterface<CallContext<'_>> for CounterService {
+impl CounterServiceInterface<ExecutionContext<'_>> for CounterService {
     type Output = Result<(), ExecutionError>;
 
-    fn increment(&self, context: CallContext<'_>, by: u64) -> Self::Output {
+    fn increment(&self, context: ExecutionContext<'_>, by: u64) -> Self::Output {
         if by == 0 {
             return Err(Error::AddingZero.into());
         }
@@ -106,7 +105,7 @@ impl CounterServiceInterface<CallContext<'_>> for CounterService {
         Ok(())
     }
 
-    fn reset(&self, context: CallContext<'_>, _: ()) -> Self::Output {
+    fn reset(&self, context: ExecutionContext<'_>, _: ()) -> Self::Output {
         let mut schema = CounterSchema::new(context.service_data());
         schema.counter.set(0);
         Ok(())
@@ -187,7 +186,7 @@ impl CounterApi {
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
-            .map_err(|e| api::Error::InternalError(e.into()))?;
+            .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -200,7 +199,7 @@ impl CounterApi {
         let proof = state
             .data()
             .proof_for_service_index("counter")
-            .ok_or_else(|| api::Error::NotFound("counter not initialized".to_owned()))?;
+            .ok_or_else(|| api::Error::not_found().title("Counter not initialized"))?;
         let schema = CounterSchema::new(state.service_data());
         Ok(CounterWithProof {
             counter: schema.counter.get(),
@@ -214,7 +213,7 @@ impl CounterApi {
         let tx_hash = state
             .generic_broadcaster()
             .reset((), ())
-            .map_err(|e| api::Error::InternalError(e.into()))?;
+            .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
 
@@ -246,11 +245,11 @@ impl CounterApi {
             let auth_header = request
                 .headers()
                 .get("Authorization")
-                .ok_or_else(|| api::Error::Unauthorized)?
+                .ok_or_else(|| api::Error::new(api::HttpStatusCode::UNAUTHORIZED))?
                 .to_str()
-                .map_err(|_| api::Error::BadRequest("Malformed `Authorization`".to_owned()))?;
+                .map_err(|_| api::Error::bad_request().title("Malformed `Authorization`"))?;
             if auth_header != "Bearer SUPER_SECRET_111" {
-                return Err(api::Error::Unauthorized);
+                return Err(api::Error::new(api::HttpStatusCode::UNAUTHORIZED));
             }
 
             let snapshot = blockchain.snapshot();
@@ -289,7 +288,7 @@ impl DefaultInstance for CounterService {
 }
 
 impl Service for CounterService {
-    fn before_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let mut schema = CounterSchema::new(context.service_data());
         if schema.counter.get() == Some(13) {
             schema.counter.set(0);
@@ -299,7 +298,7 @@ impl Service for CounterService {
         }
     }
 
-    fn after_transactions(&self, context: CallContext<'_>) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let schema = CounterSchema::new(context.service_data());
         if schema.counter.get() == Some(42) {
             Err(Error::AnswerToTheUltimateQuestion.into())

@@ -30,7 +30,7 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use std::borrow::Cow;
 
-use exonum_testkit::migrations::{MigrationTest, ScriptExt};
+use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
 
 #[derive(Debug, Clone)]
 struct TestUser {
@@ -287,7 +287,29 @@ fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationErro
     Ok(())
 }
 
-// FIXME: add incorrect migration with DB merges and test it (ECR-4080)
+/// Incorrect version of `merkelize_wallets_with_merges`.
+fn merkelize_wallets_incorrect(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    const CHUNK_SIZE: usize = 500;
+
+    // Moving the balance initialization outside of the loop is an error! Indeed,
+    // if the script is restarted, the accumulated balance is forgotten.
+    let mut total_balance = 0;
+
+    ctx.helper.iter_loop(|helper, iters| {
+        let old_schema = v01::Schema::new(helper.old_data());
+        let mut new_schema = v02::Schema::new(helper.new_data());
+
+        let iter = iters.create("wallets", &old_schema.wallets);
+        for (key, wallet) in iter.take(CHUNK_SIZE) {
+            total_balance += wallet.balance;
+            new_schema.wallets.put(&key, wallet);
+        }
+    })?;
+
+    let mut new_schema = v02::Schema::new(ctx.helper.new_data());
+    new_schema.total_balance.set(total_balance);
+    Ok(())
+}
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.6.2")]
@@ -360,4 +382,27 @@ fn migration_with_large_data_and_merges() {
         .execute_script(merkelize_wallets_with_merges.with_end_version("0.2.0"))
         .end_snapshot();
     v02::verify_schema(snapshot, &users);
+}
+
+#[test]
+fn migration_testing_detecting_fault_tolerance_error() {
+    const USER_COUNT: usize = 2_345;
+
+    let mut rng = thread_rng();
+    let users = generate_users(&mut rng, USER_COUNT);
+
+    let mut test = MigrationTest::new(MigratedService, Version::new(0, 1, 0));
+    let snapshot = test
+        .setup(|fork| v01::generate_test_data(fork, &users))
+        .execute_until_flush(
+            || merkelize_wallets_incorrect.with_end_version("0.2.0"),
+            AbortPolicy::abort_repeatedly(),
+        )
+        .end_snapshot();
+
+    let schema = v02::Schema::new(snapshot);
+    let total_balance = schema.total_balance.get().unwrap();
+    let expected_balance = users.iter().map(|user| user.balance).sum::<u64>();
+    assert!(total_balance > 0);
+    assert!(total_balance < expected_balance); // We've forgotten about ~80% of account balances!
 }

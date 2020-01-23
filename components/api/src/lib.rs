@@ -31,7 +31,7 @@
 //!
 //! ```
 //! use exonum_api::{ApiBuilder};
-//! # use serde_derive::{Deserialize, Serialize};
+//! # use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Serialize, Deserialize)]
 //! pub struct SomeQuery {
@@ -63,7 +63,7 @@
 
 pub use self::{
     cors::AllowOrigin,
-    error::{Error, MovedPermanentlyError},
+    error::{Error, HttpStatusCode, MovedPermanentlyError},
     manager::{ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
     with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };

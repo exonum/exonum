@@ -346,7 +346,7 @@ impl Index<Hash> for BlockWithTransactions {
     fn index(&self, index: Hash) -> &CommittedTransaction {
         self.transactions
             .iter()
-            .find(|&tx| tx.content.object_hash() == index)
+            .find(|&tx| tx.message.object_hash() == index)
             .unwrap_or_else(|| {
                 panic!("No transaction with hash {} in the block", index);
             })
@@ -368,7 +368,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// | Name | Equivalent type | Description |
 /// |------|-------|--------|
-/// | `content` | `Verified<AnyTx>` | Transaction as recorded in the blockchain |
+/// | `message` | `Verified<AnyTx>` | Transaction as recorded in the blockchain |
 /// | `location` | [`TxLocation`] | Location of the transaction in the block |
 /// | `location_proof` | [`ListProof`]`<`[`Hash`]`>` | Proof of transaction inclusion into a block |
 /// | `status` | (custom; see below) | Execution status |
@@ -439,7 +439,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [TypeScript]: https://www.typescriptlang.org/
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
-    content: Verified<AnyTx>,
+    message: Verified<AnyTx>,
     location: TxLocation,
     location_proof: ListProof<Hash>,
     status: ExecutionStatus,
@@ -448,8 +448,8 @@ pub struct CommittedTransaction {
 
 impl CommittedTransaction {
     /// Returns the content of the transaction.
-    pub fn content(&self) -> &Verified<AnyTx> {
-        &self.content
+    pub fn message(&self) -> &Verified<AnyTx> {
+        &self.message
     }
 
     /// Returns the transaction location in block.
@@ -489,7 +489,7 @@ impl CommittedTransaction {
 /// Transactions in pool are represented with a 2-field object:
 ///
 /// - `type` field contains transaction type (`"in-pool"`).
-/// - `content` is the transaction contents serialized to the hexadecimal form.
+/// - `message` is the full transaction message serialized to the hexadecimal form.
 ///
 /// # Examples
 ///
@@ -516,7 +516,7 @@ impl CommittedTransaction {
 /// // This transaction in pool will be represented as follows:
 /// let json = json!({
 ///     "type": "in_pool",
-///     "content": tx,
+///     "message": tx,
 /// });
 /// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
 /// assert!(parsed.is_in_pool());
@@ -527,8 +527,8 @@ impl CommittedTransaction {
 pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
-        /// Transaction contents.
-        content: Verified<AnyTx>,
+        /// A content of the uncommitted transaction.
+        message: Verified<AnyTx>,
     },
 
     /// Transaction is already committed to the blockchain.
@@ -537,10 +537,10 @@ pub enum TransactionInfo {
 
 impl TransactionInfo {
     /// Returns the content of this transaction.
-    pub fn content(&self) -> &Verified<AnyTx> {
+    pub fn message(&self) -> &Verified<AnyTx> {
         match *self {
-            TransactionInfo::InPool { ref content } => content,
-            TransactionInfo::Committed(ref tx) => tx.content(),
+            TransactionInfo::InPool { ref message } => message,
+            TransactionInfo::Committed(ref tx) => tx.message(),
         }
     }
 
@@ -598,12 +598,12 @@ impl<'a> BlockchainExplorer<'a> {
 
     /// Returns information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
-        let content = self.transaction_without_proof(tx_hash)?;
+        let message = self.transaction_without_proof(tx_hash)?;
         if self.schema.transactions_pool().contains(tx_hash) {
-            return Some(TransactionInfo::InPool { content });
+            return Some(TransactionInfo::InPool { message });
         }
 
-        let tx = self.committed_transaction(tx_hash, Some(content));
+        let tx = self.committed_transaction(tx_hash, Some(message));
         Some(TransactionInfo::Committed(tx))
     }
 
@@ -668,7 +668,7 @@ impl<'a> BlockchainExplorer<'a> {
         let status = self.schema.transaction_result(location).unwrap();
 
         CommittedTransaction {
-            content: maybe_content.unwrap_or_else(|| {
+            message: maybe_content.unwrap_or_else(|| {
                 self.schema
                     .transactions()
                     .get(tx_hash)

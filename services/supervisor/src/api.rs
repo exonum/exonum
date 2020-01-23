@@ -45,12 +45,16 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
     type Error = api::Error;
 
     fn try_from(query: DeployInfoQuery) -> Result<Self, Self::Error> {
-        let artifact = query
-            .artifact
-            .parse::<ArtifactId>()
-            .map_err(|err| api::Error::BadRequest(err.to_string()))?;
-        let spec =
-            hex::decode(query.spec).map_err(|err| api::Error::BadRequest(err.to_string()))?;
+        let artifact = query.artifact.parse::<ArtifactId>().map_err(|err| {
+            api::Error::bad_request()
+                .title("Invalid deploy request query")
+                .detail(err.to_string())
+        })?;
+        let spec = hex::decode(query.spec).map_err(|err| {
+            api::Error::bad_request()
+                .title("Invalid deploy request query")
+                .detail(err.to_string())
+        })?;
         let deadline_height = Height(query.deadline_height);
 
         let request = Self {
@@ -95,10 +99,11 @@ impl TryFrom<MigrationInfoQuery> for MigrationRequest {
     type Error = api::Error;
 
     fn try_from(query: MigrationInfoQuery) -> Result<Self, Self::Error> {
-        let new_artifact = query
-            .new_artifact
-            .parse::<ArtifactId>()
-            .map_err(|err| api::Error::BadRequest(err.to_string()))?;
+        let new_artifact = query.new_artifact.parse::<ArtifactId>().map_err(|err| {
+            api::Error::bad_request()
+                .title("Invalid migration request query")
+                .detail(err.to_string())
+        })?;
         let deadline_height = Height(query.deadline_height);
 
         let request = Self {
@@ -189,9 +194,11 @@ struct ApiImpl<'a>(&'a ServiceApiState<'a>);
 
 impl ApiImpl<'_> {
     fn broadcaster(&self) -> Result<Broadcaster<'_>, api::Error> {
-        self.0
-            .broadcaster()
-            .ok_or_else(|| api::Error::BadRequest("Node is not a validator".to_owned()))
+        self.0.broadcaster().ok_or_else(|| {
+            api::Error::bad_request()
+                .title("Invalid broadcast request")
+                .detail("Nod is not a validator")
+        })
     }
 }
 
@@ -201,25 +208,25 @@ impl PrivateApi for ApiImpl<'_> {
     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .request_artifact_deploy((), artifact)
-            .map_err(|e| api::Error::InternalError(e.into()))
+            .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
 
     fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .request_migration((), request)
-            .map_err(|e| api::Error::InternalError(e.into()))
+            .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
     }
 
     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .propose_config_change((), proposal)
-            .map_err(|e| api::Error::InternalError(e.into()))
+            .map_err(|err| api::Error::internal(err).title("Config propose failed"))
     }
 
     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
         self.broadcaster()?
             .confirm_config_change((), vote)
-            .map_err(|e| api::Error::InternalError(e.into()))
+            .map_err(|err| api::Error::internal(err).title("Config vote failed"))
     }
 
     fn configuration_number(&self) -> Result<u64, Self::Error> {

@@ -12,11 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_build::ProtobufGenerator;
+use exonum_derive::*;
+use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
-fn main() {
-    ProtobufGenerator::with_mod_name("test_runtime_api_protobuf_mod.rs")
-        .with_input_dir("tests/runtime_api/proto")
-        .with_includes(&["tests/runtime_api/proto".into()])
-        .generate();
+/// Define the service.
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(
+    artifact_name = "test-runtime-api",
+    artifact_version = "0.0.1",
+    proto_sources = "crate::proto"
+)]
+pub struct TestRuntimeApiService;
+
+impl Service for TestRuntimeApiService {
+    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
+}
+
+impl DefaultInstance for TestRuntimeApiService {
+    const INSTANCE_ID: u32 = 101;
+    const INSTANCE_NAME: &'static str = "test-runtime-api";
 }

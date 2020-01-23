@@ -341,9 +341,24 @@ impl From<InitMigrationError> for ExecutionError {
 
 /// Linearly ordered migrations.
 ///
-/// FIXME: more details, examples (ECR-4081)
+/// This type allows to construct a [`MigrateData`] implementation that will follow migrations
+/// performed during service evolution. In this way, the mechanism is similar to how migrations
+/// are implemented in apps involving relational databases:
 ///
-/// # Limitations
+/// - Migration scripts will be applied to service data in a specific order during evolution
+///   of a particular service instance. Each script will be applied exactly once.
+/// - Several migration scripts may be applied sequentially if the instance is old enough.
+/// - Migrations for different service instances are independent, and migration scripts
+///   for them are fully reusable.
+///
+/// # Retaining Old Data Types
+///
+/// Migration script logic needs retain the knowledge about data types used in the service
+/// in the past. Since these data types may be unused *currently*, retaining them may place
+/// a burden on the service. To mitigate this, you can provide a minimum supported starting version
+/// of the service via [`set_min_version`](#method.set_min_version).
+///
+/// # Pre-releases
 ///
 /// Special care must be taken to support pre-release versions (i.e., versions like `0.2.0-pre.2` or
 /// `1.2.34-rc.5`). As per the semver specification:
@@ -355,6 +370,82 @@ impl From<InitMigrationError> for ExecutionError {
 /// [`with_prereleases`](#method.with_prereleases) constructor. Otherwise, a prerelease mentioned
 /// in the builder stage will lead to a panic, and [`select`](#method.select) will return an error
 /// if a prerelease is specified as a `start_version`.
+///
+/// [`MigrateData`]: trait.MigrateData.html
+///
+/// # Examples
+///
+/// Consider the following hypothetical evolution of a crypto-token service:
+///
+/// | Version | Migration |
+/// |---------|-----------|
+/// | 0.2.0   | #1: Split `name` in user accounts into `first_name` and `last_name` |
+/// | 0.3.0   | - |
+/// | 0.4.0   | #2: Consolidate token metadata into a single `Entry` |
+/// | 0.4.1   | - |
+/// | 0.4.2   | #3: Compute total number of tokens and add it to metadata |
+///
+/// In this case:
+///
+/// - If a service instance is migrated from version 0.1.0 to the newest version 0.4.2, all three
+///   scripts need to be executed.
+/// - If an instance is migrated from 0.2.0 or 0.3.0, only scripts #2 and #3 need to be executed.
+/// - If an instance is migrated from 0.4.0 or 0.4.1, only script #3 needs to be executed.
+/// - If the instance version is 0.4.2, no scripts need to be executed.
+///
+/// The migrations can be described in the service code as follows:
+///
+/// ```
+/// # use exonum::runtime::{
+/// #     migrations::{
+/// #         LinearMigrations, MigrateData, MigrationContext, MigrationError, MigrationScript,
+/// #         InitMigrationError,
+/// #     },
+/// #     versioning::Version,
+/// # };
+/// # use exonum_derive::*;
+/// fn split_account_name(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+///     // script logic...
+/// #   Ok(())
+/// }
+///
+/// fn consolidate_metadata(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+///     // script logic...
+/// #   Ok(())
+/// }
+///
+/// fn compute_total_tokens(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+///     // script logic...
+/// #   Ok(())
+/// }
+///
+/// fn migrations() -> LinearMigrations {
+///     LinearMigrations::new(Version::new(0, 4, 3))
+///         .add_script(Version::new(0, 2, 0), split_account_name)
+///         .add_script(Version::new(0, 4, 0), consolidate_metadata)
+///         .add_script(Version::new(0, 4, 2), compute_total_tokens)
+/// }
+///
+/// /// Service with migrations.
+/// pub struct TokenService;
+///
+/// impl MigrateData for TokenService {
+///     fn migration_scripts(
+///         &self,
+///         start_version: &Version,
+///     ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+///         migrations().select(start_version)
+///     }
+/// }
+///
+/// // Check that the migration scripts are selected properly.
+/// # fn main() -> Result<(), failure::Error> {
+/// let scripts = TokenService.migration_scripts(&Version::new(0, 3, 0))?;
+/// assert_eq!(scripts.len(), 2);
+/// assert_eq!(*scripts[0].end_version(), Version::new(0, 4, 0));
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct LinearMigrations {
     min_start_version: Option<Version>,

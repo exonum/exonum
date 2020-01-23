@@ -40,14 +40,26 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
         }
     }
 
+    /// Returns unstructured readonly access to blockchain data.
+    ///
+    /// # Safety
+    ///
+    /// Trying to access data of the executing service through the returned access
+    /// can lead to a panic because of borrowing checks performed by the database.
+    /// Check that your wrapper prevent such attempts to access.
+    #[doc(hidden)]
+    pub fn unstructured_assess(&self) -> T::Readonly {
+        self.access.as_readonly()
+    }
+
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::new(self.access.as_readonly())
+        CoreSchema::new(self.unstructured_assess())
     }
 
     /// Returns dispatcher schema.
     pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
-        DispatcherSchema::new(self.access.as_readonly())
+        DispatcherSchema::new(self.unstructured_assess())
     }
 
     /// Returns a mount point for another service. If the service with `id` does not exist,

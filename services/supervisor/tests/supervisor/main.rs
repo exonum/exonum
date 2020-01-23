@@ -22,7 +22,7 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_rust_runtime::{api::Result as ApiResult, RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{api, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,
@@ -61,7 +61,7 @@ fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u6
 
 /// Check that the service's counter isn't started yet (no Inc txs were received).
 fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
-    let response: ApiResult<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
+    let response: api::Result<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
     assert!(response.is_err());
 }
 
@@ -739,10 +739,10 @@ fn test_auditor_cant_send_requests() {
 
     let block = testkit.create_block();
     for tx in &block {
-        if tx.content().object_hash() == deploy_artifact_validator_tx_hash {
+        if tx.message().object_hash() == deploy_artifact_validator_tx_hash {
             // Emulated request executed as fine...
             tx.status().unwrap();
-        } else if *tx.content() == deploy_request_from_auditor {
+        } else if *tx.message() == deploy_request_from_auditor {
             // ... but the auditor's request is failed as expected.
             let expected_err = ErrorMatch::from_fail(&CommonError::UnauthorizedCaller)
                 .for_service(SUPERVISOR_INSTANCE_ID);
