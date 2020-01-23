@@ -476,10 +476,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             drop(schema);
             let supervisor_extensions = context.supervisor_extensions();
             let result = supervisor_extensions
-                .exactly_one_migration_script(
-                    request.new_artifact.clone(),
-                    request.service.as_ref(),
-                )
+                .exactly_one_migration_script(&request.new_artifact, request.service.as_ref())
                 .and_then(|simple_migration| {
                     // Currently supervisor supports only migrations with one script.
                     if simple_migration {

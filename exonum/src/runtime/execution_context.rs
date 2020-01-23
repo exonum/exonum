@@ -402,7 +402,7 @@ impl<'a> SupervisorExtensions<'a> {
     /// contain more than one script automatically.
     pub fn exactly_one_migration_script(
         &self,
-        new_artifact: ArtifactId,
+        new_artifact: &ArtifactId,
         old_service: &str,
     ) -> Result<bool, ExecutionError> {
         self.0

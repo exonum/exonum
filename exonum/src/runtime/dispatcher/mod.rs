@@ -423,7 +423,7 @@ impl Dispatcher {
     pub(crate) fn exactly_one_migration_script(
         &self,
         fork: &Fork,
-        new_artifact: ArtifactId,
+        new_artifact: &ArtifactId,
         service_name: &str,
     ) -> Result<bool, ExecutionError> {
         let schema = Schema::new(fork);
@@ -436,9 +436,9 @@ impl Dispatcher {
         let result = runtime
             .migrate(&new_artifact, instance_state.data_version())
             .map(|maybe_script| {
-                maybe_script
-                    .map(|script| new_artifact.version == *script.end_version())
-                    .unwrap_or(false)
+                maybe_script.map_or(false, |script| {
+                    new_artifact.version == *script.end_version()
+                })
             })?;
 
         Ok(result)
