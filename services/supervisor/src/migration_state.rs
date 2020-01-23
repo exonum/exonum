@@ -41,20 +41,17 @@ impl MigrationState {
     }
 
     pub fn add_state_hash(&mut self, state_hash: Hash) -> Result<(), ExecutionError> {
-        match self.expected_state_hash {
-            None => {
-                // No state hash yet, initialize it with the provided value.
-                self.expected_state_hash = Some(state_hash);
+        if let Some(expected_hash) = self.expected_state_hash {
+            // We already have an expected hash, so we compare a new one against it.
+            if expected_hash == state_hash {
+                // Hashes match, that's OK.
+            } else {
+                // Hashes do not match, report an error.
+                return Err(MigrationError::StateHashDivergence.into());
             }
-            Some(expected_hash) => {
-                // We already have an expected hash, so we compare a new one against it.
-                if expected_hash == state_hash {
-                    // Hashes match, that's OK.
-                } else {
-                    // Hashes do not match, report an error.
-                    return Err(MigrationError::StateHashDivergence.into());
-                }
-            }
+        } else {
+            // No state hash yet, initialize it with the provided value.
+            self.expected_state_hash = Some(state_hash);
         }
         Ok(())
     }

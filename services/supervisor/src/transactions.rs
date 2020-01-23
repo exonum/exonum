@@ -697,17 +697,14 @@ impl Supervisor {
             .expect("BUG: Attempt to confirm a migration which does not have a stored state");
 
         // Verify that state hash does match expected one.
-        match state.add_state_hash(state_hash) {
-            Ok(()) => {
-                // Hash is OK, process further.
-            }
-            Err(error) => {
-                // Hashes do not match, rollback the migration.
-                drop(schema); // Required for the context reborrow.
-                let initiate_rollback = true;
-                return self.fail_migration(context, request, error, initiate_rollback);
-            }
+        if let Err(error) = state.add_state_hash(state_hash) {
+            // Hashes do not match, rollback the migration.
+            drop(schema); // Required for the context reborrow.
+            let initiate_rollback = true;
+            return self.fail_migration(context, request, error, initiate_rollback);
         }
+
+        // Hash is OK, process further.
 
         // Check if we have enough confirmations to confirm the migration.
         let confirmations = schema.migration_confirmations.confirm(&request, author);
@@ -747,12 +744,20 @@ impl Supervisor {
         error: ExecutionError,
         initiate_rollback: bool,
     ) -> Result<(), ExecutionError> {
-        log::warn!(
-            "Migration for a request {:?} failed. Error: '{}'. \
-             This migration is going to be rolled back.",
-            request,
-            error
-        );
+        if initiate_rollback {
+            log::warn!(
+                "Migration for a request {:?} failed. Error: '{}'. \
+                 This migration is going to be rolled back.",
+                request,
+                error
+            );
+        } else {
+            log::warn!(
+                "Migration for a request {:?} failed to start. Error: '{}'.",
+                request,
+                error
+            );
+        }
 
         let height = context.data().for_core().height();
         let mut schema = SchemaImpl::new(context.service_data());

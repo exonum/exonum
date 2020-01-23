@@ -66,9 +66,7 @@
 //!
 //! - Target service instance should exist and be stopped.
 //! - End artifact for a migration should be a superior version of the artifact of target instance.
-//! - New (end) version of artifact should be deployed
-//!   (if migration will contain several steps, all the intermediate artifacts should
-//!   be deployed as well).
+//! - New (end) version of artifact should be deployed.
 //! - Service should have all the migration scripts required to migrate to the end artifact version.
 //!
 //! Violation of any of requirements listed above will result in a request failure without
