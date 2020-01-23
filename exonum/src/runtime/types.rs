@@ -20,8 +20,10 @@ use exonum_merkledb::{
     validation::{is_allowed_index_name_char, is_valid_index_name_component},
     BinaryKey, BinaryValue, ObjectHash,
 };
-use exonum_proto::ProtobufConvert;
-use failure::{bail, ensure, format_err};
+use exonum_proto::{
+    failure::{self, bail, ensure, format_err},
+    ProtobufConvert,
+};
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 

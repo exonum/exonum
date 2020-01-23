@@ -23,7 +23,7 @@ use exonum::{
     runtime::{ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 use exonum_rust_runtime::TxStub;
 use serde_derive::{Deserialize, Serialize};
 

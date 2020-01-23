@@ -21,7 +21,7 @@ use exonum::merkledb::{
     Entry, RawProofMapIndex,
 };
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 
 use crate::{proto, transactions::Config};
 

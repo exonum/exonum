@@ -21,8 +21,10 @@ pub use self::schema::{
     runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
 };
 
-use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
+use exonum_proto::{
+    failure::{ensure, Error},
+    ProtobufConvert,
+};
 
 use std::convert::TryFrom;
 

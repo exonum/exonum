@@ -16,7 +16,7 @@
 
 use exonum::runtime::{AnyTx, CoreError, ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::*;
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 use exonum_rust_runtime::{FallthroughAuth, GenericCall, GenericCallMut, MethodDescriptor, TxStub};
 use semver::VersionReq;
 use serde_derive::*;

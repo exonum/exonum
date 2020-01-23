@@ -20,7 +20,7 @@ use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly},
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 use semver::Version;
 
 use crate::{

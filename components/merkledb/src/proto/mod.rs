@@ -20,8 +20,10 @@
 pub use self::{list_proof::*, map_proof::*};
 
 use exonum_crypto::proto::*;
-use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
+use exonum_proto::{
+    failure::{ensure, Error},
+    ProtobufConvert,
+};
 use protobuf::{well_known_types::Empty, RepeatedField};
 
 use std::borrow::Cow;

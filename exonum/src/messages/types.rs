@@ -17,7 +17,7 @@ pub use crate::{proto::schema, runtime::AnyTx};
 use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 
 use std::convert::TryFrom;
 

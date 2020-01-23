@@ -16,7 +16,7 @@
 
 use exonum::{crypto::Hash, runtime::CallerAddress as Address};
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 
 use super::proto;
 

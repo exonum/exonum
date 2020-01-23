@@ -17,8 +17,7 @@
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
-use failure::bail;
+use exonum_proto::{failure::bail, ProtobufConvert};
 
 use std::{
     any::Any,

@@ -18,8 +18,7 @@ use exonum_merkledb::{
     impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofEntry, ProofListIndex, ProofMapIndex,
 };
-use exonum_proto::ProtobufConvert;
-use failure::format_err;
+use exonum_proto::{failure, ProtobufConvert};
 
 use std::fmt;
 
@@ -419,7 +418,7 @@ impl ProtobufConvert for CallInBlock {
                 id: pb.get_after_transactions(),
             })
         } else {
-            Err(format_err!("Invalid location format"))
+            Err(failure::format_err!("Invalid location format"))
         }
     }
 }

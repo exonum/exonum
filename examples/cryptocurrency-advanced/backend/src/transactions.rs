@@ -19,7 +19,7 @@ use exonum::{
     runtime::{CallerAddress as Address, CommonError, ExecutionContext, ExecutionError},
 };
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 
 use super::{proto, schema::SchemaImpl, CryptocurrencyService};
 

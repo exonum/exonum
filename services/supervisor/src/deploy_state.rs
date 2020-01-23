@@ -17,8 +17,7 @@ use exonum::{
     runtime::{ExecutionError, ExecutionErrorSerde},
 };
 use exonum_derive::*;
-use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
+use exonum_proto::{failure, ProtobufConvert};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto as pb_supervisor;
@@ -105,7 +104,7 @@ impl ProtobufConvert for DeployState {
             TIMEOUT => DeployState::Timeout,
             FAIL => {
                 if !pb.has_error() {
-                    let error = format_err!(
+                    let error = failure::format_err!(
                         "Protobuf representation of `DeployState` has type \
                          `FAIL` but has no cause set"
                     );

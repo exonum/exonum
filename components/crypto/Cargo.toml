@@ -17,7 +17,6 @@ links = "exonum_protobuf_crypto"
 hex = "0.4"
 serde = "1.0.101"
 serde_derive = "1.0.101"
-failure = "0.1.5"
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
 exonum-proto = { path = "../proto", version = "0.13.0-rc.2", optional = true }
 protobuf = { version = "2.8.1", features = ["with-serde"], optional = true }

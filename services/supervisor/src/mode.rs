@@ -23,8 +23,7 @@
 
 use exonum::{crypto::Hash, helpers::byzantine_quorum};
 use exonum_merkledb::access::Access;
-use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
+use exonum_proto::{failure, ProtobufConvert};
 use serde_derive::{Deserialize, Serialize};
 
 use std::str::FromStr;
@@ -113,7 +112,7 @@ impl FromStr for Mode {
         match input {
             "simple" => Ok(Mode::Simple),
             "decentralized" => Ok(Mode::Decentralized),
-            _ => Err(format_err!(
+            _ => Err(failure::format_err!(
                 "Invalid supervisor mode: {}. Could be 'simple' or 'decentralized'",
                 input
             )),

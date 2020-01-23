@@ -19,8 +19,10 @@
 //! and built-in services (services deployed at the blockchain start).
 
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
-use failure::{bail, ensure};
+use exonum_proto::{
+    failure::{self, bail, ensure},
+    ProtobufConvert,
+};
 use log::warn;
 
 use std::collections::{HashMap, HashSet};

@@ -14,8 +14,7 @@
 
 use exonum_derive::*;
 use exonum_merkledb::ObjectHash;
-use exonum_proto::ProtobufConvert;
-use failure::ensure;
+use exonum_proto::{failure::ensure, ProtobufConvert};
 
 use crate::{crypto::Hash, proto::schema::runtime as runtime_proto};
 

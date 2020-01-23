@@ -14,7 +14,7 @@
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{BinaryValue, MapProof};
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 
 use std::borrow::Cow;
 

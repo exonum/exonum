@@ -48,7 +48,7 @@ pub mod schema {
         },
     };
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use exonum_proto::ProtobufConvert;
+    use exonum_proto::{failure, ProtobufConvert};
 
     use super::proto;
 
@@ -116,7 +116,7 @@ pub mod schema {
 pub mod transactions {
     use exonum::crypto::PublicKey;
     use exonum_derive::{BinaryValue, ObjectHash};
-    use exonum_proto::ProtobufConvert;
+    use exonum_proto::{failure, ProtobufConvert};
 
     use super::proto;
 

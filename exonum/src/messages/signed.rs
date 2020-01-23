@@ -13,8 +13,10 @@
 // limitations under the License.
 
 use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
+use exonum_proto::{
+    failure::{ensure, Error},
+    ProtobufConvert,
+};
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},

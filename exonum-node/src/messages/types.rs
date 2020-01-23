@@ -23,7 +23,7 @@ use exonum::{
     messages::{AnyTx, Precommit, SignedMessage},
 };
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
+use exonum_proto::{failure, ProtobufConvert};
 
 use std::convert::TryFrom;
 

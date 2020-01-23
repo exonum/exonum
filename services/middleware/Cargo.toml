@@ -22,7 +22,6 @@ exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" 
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 
-failure = "0.1.5"
 protobuf = "2.8.0"
 semver = { version = "0.9.0", features = ["serde"] }
 serde = "1.0.101"

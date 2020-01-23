@@ -22,7 +22,6 @@ exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
 exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
 exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 
-failure = "0.1.5"
 futures = "0.1.25"
 log = "0.4.8"
 protobuf = "2.10.1"

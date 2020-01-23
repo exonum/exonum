@@ -15,8 +15,7 @@
 use crate::proto;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
-use failure::ensure;
+use exonum_proto::{failure, ProtobufConvert};
 use protobuf::Message;
 
 use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
@@ -97,7 +96,7 @@ where
             prev_key < key
         };
 
-        ensure!(
+        failure::ensure!(
             values.windows(2).all(check_key_ordering),
             "Invalid keys ordering or duplicate keys found in BinaryMap"
         );
