@@ -10,8 +10,8 @@ from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 from requests.exceptions import ConnectionError
 
 RETRIES_AMOUNT = 20
-ARTIFACT_NAME="exonum-cryptocurrency-advanced"
-ARTIFACT_VERSION="0.13.0-rc.2"
+ARTIFACT_NAME = "exonum-cryptocurrency-advanced"
+ARTIFACT_VERSION = "0.13.0-rc.2"
 
 
 def run_dev_node(application: str) -> ExonumNetwork:
@@ -77,11 +77,15 @@ def run_4_nodes(application: str) -> ExonumNetwork:
     return run_n_nodes(application, 4)
 
 
-def assert_processes_exited_successfully(test: unittest.TestCase, outputs: List[ProcessOutput]) -> None:
+def assert_processes_exited_successfully(
+    test: unittest.TestCase, outputs: List[ProcessOutput]
+) -> None:
     """Asserts that all the processes exited successfully."""
     for output in outputs:
         test.assertEqual(output.exit_result, ProcessExitResult.Ok)
-        test.assertEqual(output.exit_code, 0, f"Process exited with non-zero code: {output.stderr}")
+        test.assertEqual(
+            output.exit_code, 0, f"Process exited with non-zero code: {output.stderr}"
+        )
 
 
 def launcher_networks(network: ExonumNetwork) -> List[Dict[str, Any]]:
@@ -90,7 +94,12 @@ def launcher_networks(network: ExonumNetwork) -> List[Dict[str, Any]]:
     networks = []
     for validator_id in range(network.validators_count()):
         host, public_port, private_port = network.api_address(validator_id)
-        node_network = {"host": host, "ssl": False, "public-api-port": public_port, "private-api-port": private_port}
+        node_network = {
+            "host": host,
+            "ssl": False,
+            "public-api-port": public_port,
+            "private-api-port": private_port,
+        }
         networks.append(node_network)
 
     # Temporary workaround: supervisor works in simple mode and we need only one node.
@@ -127,23 +136,25 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
                 time.sleep(0.5)
 
 
-def generate_config(network: ExonumNetwork,
-                    deadline_height: int = 10000,
-                    consensus: dict = None,
-                    artifact_name: str = ARTIFACT_NAME,
-                    instances: dict = {}) -> dict:
+def generate_config(
+    network: ExonumNetwork,
+    deadline_height: int = 10000,
+    consensus: dict = None,
+    artifact_name: str = ARTIFACT_NAME,
+    instances: dict = {},
+) -> dict:
     cryptocurrency_advanced_config_dict = {
-      "networks": launcher_networks(network),
-      "deadline_height": deadline_height,
-      "consensus": consensus,
-      "artifacts": {
-        "cryptocurrency": {
-          "runtime": "rust",
-          "name": artifact_name,
-          "version": ARTIFACT_VERSION,
-        }
-      },
-      "instances": instances,
+        "networks": launcher_networks(network),
+        "deadline_height": deadline_height,
+        "consensus": consensus,
+        "artifacts": {
+            "cryptocurrency": {
+                "runtime": "rust",
+                "name": artifact_name,
+                "version": ARTIFACT_VERSION,
+            }
+        },
+        "instances": instances,
     }
 
     return cryptocurrency_advanced_config_dict
