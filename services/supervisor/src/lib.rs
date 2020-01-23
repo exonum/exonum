@@ -505,7 +505,7 @@ impl Supervisor {
         let schema = SchemaImpl::new(context.service_data());
 
         // Collect pending migration requests which are successfully completed.
-        let finished_migrations = SchemaImpl::new(context.service_data())
+        let finished_migrations = schema
             .pending_migrations
             .iter()
             .filter_map(|(_, request)| {

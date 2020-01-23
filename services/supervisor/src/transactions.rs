@@ -633,8 +633,15 @@ impl Supervisor {
 
         let mut schema = SchemaImpl::new(context.service_data());
 
+        // Check if we have enough confirmations for the deployment.
+        let validator_keys = core_schema.consensus_config().validator_keys;
+        let validator_count = validator_keys.len();
+        // Before check, update the confirmations to match actual list of validators.
+        schema.deploy_confirmations.intersect(
+            &deploy_request,
+            validator_keys.iter().map(|keys| keys.service_key),
+        );
         let confirmations = schema.deploy_confirmations.confirm(&deploy_request, author);
-        let validator_count = core_schema.consensus_config().validator_keys.len();
         if confirmations == validator_count {
             log::trace!(
                 "Registering deployed artifact in dispatcher {:?}",
@@ -707,9 +714,14 @@ impl Supervisor {
 
         // Hash is OK, process further.
 
-        // Check if we have enough confirmations to confirm the migration.
+        // Check if we have enough confirmations to finish the migration.
+        let validator_keys = core_schema.consensus_config().validator_keys;
+        let validator_count = validator_keys.len();
+        // Before check, update the confirmations to match actual list of validators.
+        schema
+            .migration_confirmations
+            .intersect(&request, validator_keys.iter().map(|keys| keys.service_key));
         let confirmations = schema.migration_confirmations.confirm(&request, author);
-        let validator_count = core_schema.consensus_config().validator_keys.len();
         if confirmations == validator_count {
             log::trace!(
                 "Confirming commit of migration request {:?}. Result state hash: {:?}",
