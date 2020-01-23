@@ -222,7 +222,7 @@ message InstanceState {
   //
   // Note that status can be `NONE` only during the block execution.
   InstanceStatus status = 2;
-  // Pending status of instance.
+  // Pending status of the instance.
   //
   // If this state is not `NONE`, then this instance is in the process of initiating addition,
   // resuming, or migration. After the block execution this status becomes an actual instance 
