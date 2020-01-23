@@ -748,10 +748,10 @@ pub struct InstanceState {
     /// status.
     ///
     /// Note that this status can be not `None` only during the block execution.
-    /// 
+    ///
     /// The purpose of this field is to keep information about further service status during the
-    /// block execution because the service status can be changed only after that block is 
-    /// committed. This approach is needed because there is no guarantee that the executed 
+    /// block execution because the service status can be changed only after that block is
+    /// committed. This approach is needed because there is no guarantee that the executed
     /// block will be committed.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
