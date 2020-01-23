@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::{CommonError, ExecutionError, InstanceId};
+use exonum::runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
@@ -20,7 +20,7 @@ use exonum_merkledb::{
 };
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
-    CallContext, DefaultInstance, Service,
+    DefaultInstance, Service,
 };
 
 use exonum_supervisor::Configure;
@@ -73,10 +73,10 @@ pub trait IncInterface<Ctx> {
 #[service_factory(artifact_name = "inc", artifact_version = "1.0.0")]
 pub struct IncService;
 
-impl IncInterface<CallContext<'_>> for IncService {
+impl IncInterface<ExecutionContext<'_>> for IncService {
     type Output = Result<(), ExecutionError>;
 
-    fn inc(&self, context: CallContext<'_>, _seed: u64) -> Self::Output {
+    fn inc(&self, context: ExecutionContext<'_>, _seed: u64) -> Self::Output {
         Schema::new(context.service_data()).inc();
         Ok(())
     }
@@ -120,7 +120,7 @@ impl Configure for IncService {
 
     fn verify_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context
@@ -140,7 +140,7 @@ impl Configure for IncService {
 
     fn apply_config(
         &self,
-        context: CallContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         context

@@ -173,9 +173,13 @@ class ApiTest(unittest.TestCase):
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            tx_response = client.public_api.get_tx_info("b2d09e1bddca851bee8faf8ffdcfc18cb87fbde167a29bd049fa2eee4a82c1ca")
+            tx_response = client.public_api.get_tx_info(
+              "b2d09e1bddca851bee8faf8ffdcfc18cb87fbde167a29bd049fa2eee4a82c1ca"
+            )
             self.assertEqual(tx_response.status_code, 404)
-            self.assertEqual(tx_response.json()['type'], "unknown")
+            response_info = tx_response.json()
+            self.assertEqual(response_info["title"], "Failed to get transaction info")
+            self.assertEqual(response_info["detail"], r'{"type":"unknown"}')
 
     def test_zero_initial_stats(self):
         """Tests the `stats` endpoint. Check initial stats values"""

@@ -78,7 +78,7 @@ fn main() {
 
     // Iterate over transactions in the block
     for tx in &block {
-        println!("{:?}: {:?}", tx.location(), tx.content());
+        println!("{:?}: {:?}", tx.location(), tx.message());
     }
 
     // `BlockInfo`: JSON presentation
@@ -101,7 +101,7 @@ fn main() {
 
     // Iterate over transactions in the block
     for tx in &block {
-        println!("{:?}: {:?}", tx.location(), tx.content());
+        println!("{:?}: {:?}", tx.location(), tx.message());
     }
     // Compared to `BlockInfo`, you can access transactions in a block using indexes
     let tx: &CommittedTransaction = &block[1];
@@ -112,9 +112,9 @@ fn main() {
     assert_eq!(tx.location().block_height(), Height(1));
     assert_eq!(tx.location().position_in_block(), 0);
 
-    // It is possible to access transaction content
-    let content = tx.content();
-    println!("{:?}", content);
+    // It is possible to access transaction message
+    let message = tx.message();
+    println!("{:?}", message);
     // ...and transaction status as well
     let status = tx.status();
     assert!(status.is_ok());
@@ -124,7 +124,7 @@ fn main() {
         serde_json::to_value(&tx).unwrap(),
         json!({
             // `Transaction` JSON presentation
-            "content": serde_json::to_value(tx.content()).unwrap(),
+            "message": serde_json::to_value(tx.message()).unwrap(),
             // Position in block
             "location": {
                 "block_height": 1,
@@ -156,7 +156,7 @@ fn main() {
                 },
             },
             // Other fields...
-            "content": serde_json::to_value(erroneous_tx.content()).unwrap(),
+            "message": serde_json::to_value(erroneous_tx.message()).unwrap(),
             "location": erroneous_tx.location(),
             "location_proof": erroneous_tx.location_proof(),
             "time": erroneous_tx.time(),
@@ -207,7 +207,7 @@ fn main() {
                 },
             },
             // Other fields...
-            "content": serde_json::to_value(panicked_tx.content()).unwrap(),
+            "message": serde_json::to_value(panicked_tx.message()).unwrap(),
             "location": panicked_tx.location(),
             "location_proof": panicked_tx.location_proof(),
             "time": panicked_tx.time(),
@@ -218,18 +218,18 @@ fn main() {
     let hash = mempool_transaction().object_hash();
     let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
     assert!(tx.is_in_pool());
-    println!("{:?}", tx.content());
+    println!("{:?}", tx.message());
 
     // JSON serialization for committed transactions
     let committed_tx: TransactionInfo = explorer
-        .transaction(&block[0].content().object_hash())
+        .transaction(&block[0].message().object_hash())
         .unwrap();
     let tx_ref = committed_tx.as_committed().unwrap();
     assert_eq!(
         serde_json::to_value(&committed_tx).unwrap(),
         json!({
             "type": "committed",
-            "content": serde_json::to_value(committed_tx.content()).unwrap(),
+            "message": serde_json::to_value(committed_tx.message()).unwrap(),
             "status": { "type": "success" },
             "location": tx_ref.location(),
             "location_proof": tx_ref.location_proof(),
@@ -245,7 +245,7 @@ fn main() {
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({
             "type": "in_pool",
-            "content": serde_json::to_value(tx_in_pool.content()).unwrap(),
+            "message": serde_json::to_value(tx_in_pool.message()).unwrap(),
         })
     );
 

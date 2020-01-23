@@ -16,6 +16,7 @@ members = [
 
     "test-suite/testkit",
     "test-suite/testkit/server",
+    "test-suite/rust-runtime-api",
 
     "runtimes/rust",
 

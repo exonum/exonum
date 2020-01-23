@@ -40,10 +40,10 @@ pub use crate::{
 
 use exonum::{
     merkledb::BinaryValue,
-    runtime::{CommonError, ExecutionError},
+    runtime::{CommonError, ExecutionContext, ExecutionError},
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_rust_runtime::{api::ServiceApiBuilder, CallContext, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
@@ -53,7 +53,11 @@ use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 pub struct TimestampingService;
 
 impl Service for TimestampingService {
-    fn initialize(&self, context: CallContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
         let config = Config::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
 
         if context

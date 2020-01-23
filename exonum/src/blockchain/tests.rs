@@ -40,7 +40,8 @@ use crate::{
         migrations::{InitMigrationError, MigrationScript},
         AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
         ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -278,7 +279,7 @@ impl Runtime for RuntimeInspector {
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         catch_panic(|| {
@@ -291,7 +292,7 @@ impl Runtime for RuntimeInspector {
     fn initiate_resuming_service(
         &self,
         _context: ExecutionContext<'_>,
-        _spec: &InstanceSpec,
+        _artifact: &ArtifactId,
         _parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         Ok(())
@@ -316,7 +317,7 @@ impl Runtime for RuntimeInspector {
     fn execute(
         &self,
         context: ExecutionContext<'_>,
-        _call_info: &CallInfo,
+        _method_id: MethodId,
         arguments: &[u8],
     ) -> Result<(), ExecutionError> {
         catch_panic(|| {
@@ -326,19 +327,11 @@ impl Runtime for RuntimeInspector {
         })
     }
 
-    fn before_transactions(
-        &self,
-        _context: ExecutionContext<'_>,
-        _instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         Ok(())
     }
 
-    fn after_transactions(
-        &self,
-        context: ExecutionContext<'_>,
-        _instance_id: InstanceId,
-    ) -> Result<(), ExecutionError> {
+    fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         catch_panic(|| {
             if let Some(action) = self.after_transactions.borrow_mut().pop_front() {
                 action.execute(context)
