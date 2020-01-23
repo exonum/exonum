@@ -736,7 +736,8 @@ impl Dispatcher {
             // FIXME: Add a maintenance command for removing local migration result (ECR-4095).
             panic!(
                 "Migration for service `{}` is committed with migration hash {:?}, \
-                 but locally it has finished with an error: {}",
+                 but locally it has finished with an error: {}. You can remove local \
+                 migration result with CLI maintenance command `restart-migration`.",
                 namespace, global_hash, err
             );
         });
