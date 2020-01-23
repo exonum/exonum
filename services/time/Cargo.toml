@@ -24,6 +24,7 @@ exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
+failure = "0.1.5"
 protobuf = "2.8.0"
 serde = "1.0"
 serde_derive = "1.0"
