@@ -28,8 +28,9 @@ use super::{
 };
 
 /// Service information schema.
+#[doc(hidden)] // Public for tests, logically not public.
 #[derive(Debug, FromAccess)]
-pub(crate) struct SchemaImpl<T: Access> {
+pub struct SchemaImpl<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
     pub public: Schema<T>,
@@ -75,6 +76,7 @@ pub struct Schema<T: Access> {
 }
 
 impl<T: Access> SchemaImpl<T> {
+    /// Creates a new `SchemaImpl` object.
     pub fn new(access: T) -> Self {
         Self::from_root(access).unwrap()
     }

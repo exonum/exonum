@@ -22,9 +22,6 @@
 
 // cspell:ignore Trillian, Vogon
 
-// TODO temporary
-#![allow(dead_code)]
-
 use exonum::{
     crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
     runtime::{
@@ -90,8 +87,8 @@ pub(super) mod v01 {
     use exonum::{
         crypto::PublicKey,
         merkledb::{
-            access::{Access, FromAccess},
-            MapIndex,
+            access::{Access, FromAccess, Prefixed},
+            MapIndex, Snapshot,
         },
     };
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
@@ -113,6 +110,21 @@ pub(super) mod v01 {
     impl<T: Access> Schema<T> {
         pub fn new(access: T) -> Self {
             Self::from_root(access).unwrap()
+        }
+    }
+
+    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &Box<dyn Snapshot>>) {
+        let users = super::USERS;
+
+        let schema = Schema::new(snapshot.clone());
+        for user in users {
+            let (key, _) = user.keypair();
+            let wallet = schema
+                .wallets
+                .get(&key)
+                .expect("V01: User wallet not found");
+            assert_eq!(wallet.username, user.full_name.to_string());
+            assert_eq!(wallet.balance, user.balance);
         }
     }
 }
@@ -241,26 +253,6 @@ fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     Ok(())
 }
 
-/// The alternative version of the previous migration script, which uses database merges.
-fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    const CHUNK_SIZE: usize = 500;
-
-    ctx.helper.iter_loop(|helper, iters| {
-        let old_schema = v01::Schema::new(helper.old_data());
-        let mut new_schema = v02::Schema::new(helper.new_data());
-
-        let iter = iters.create("wallets", &old_schema.wallets);
-        let mut total_balance = 0;
-        for (key, wallet) in iter.take(CHUNK_SIZE) {
-            total_balance += wallet.balance;
-            new_schema.wallets.put(&key, wallet);
-        }
-        let prev_balance = new_schema.total_balance.get().unwrap_or(0);
-        new_schema.total_balance.set(prev_balance + total_balance);
-    })?;
-    Ok(())
-}
-
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
 fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v02::Schema::new(ctx.helper.old_data());
@@ -290,35 +282,16 @@ fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationErro
     Ok(())
 }
 
-/// Incorrect version of `merkelize_wallets_with_merges`.
-fn merkelize_wallets_incorrect(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    const CHUNK_SIZE: usize = 500;
-
-    // Moving the balance initialization outside of the loop is an error! Indeed,
-    // if the script is restarted, the accumulated balance is forgotten.
-    let mut total_balance = 0;
-
-    ctx.helper.iter_loop(|helper, iters| {
-        let old_schema = v01::Schema::new(helper.old_data());
-        let mut new_schema = v02::Schema::new(helper.new_data());
-
-        let iter = iters.create("wallets", &old_schema.wallets);
-        for (key, wallet) in iter.take(CHUNK_SIZE) {
-            total_balance += wallet.balance;
-            new_schema.wallets.put(&key, wallet);
-        }
-    })?;
-
-    let mut new_schema = v02::Schema::new(ctx.helper.new_data());
-    new_schema.total_balance.set(total_balance);
-    Ok(())
+/// Third migration script. Always fails.
+fn failing_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    Err(MigrationError::Custom("This migration always fails".into()))
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.1.0")]
-pub struct MigratedService;
+pub struct MigrationService;
 
-impl Service for MigratedService {
+impl Service for MigrationService {
     fn initialize(
         &self,
         context: ExecutionContext<'_>,
@@ -342,25 +315,25 @@ impl Service for MigratedService {
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.2.0")]
-pub struct MigratedServiceV02;
+pub struct MigrationServiceV02;
 
-impl Service for MigratedServiceV02 {}
+impl Service for MigrationServiceV02 {}
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.5.0")]
-pub struct MigratedServiceV05;
+pub struct MigrationServiceV05;
 
-impl Service for MigratedServiceV05 {}
+impl Service for MigrationServiceV05 {}
 
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "migration-service";
 
-impl DefaultInstance for MigratedService {
+impl DefaultInstance for MigrationService {
     const INSTANCE_ID: InstanceId = SERVICE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
 }
 
-impl MigrateData for MigratedServiceV02 {
+impl MigrateData for MigrationServiceV02 {
     fn migration_scripts(
         &self,
         start_version: &Version,
@@ -371,7 +344,7 @@ impl MigrateData for MigratedServiceV02 {
     }
 }
 
-impl MigrateData for MigratedServiceV05 {
+impl MigrateData for MigrationServiceV05 {
     fn migration_scripts(
         &self,
         start_version: &Version,
@@ -379,6 +352,23 @@ impl MigrateData for MigratedServiceV05 {
         LinearMigrations::new(self.artifact_id().version)
             .add_script(Version::new(0, 2, 0), merkelize_wallets)
             .add_script(Version::new(0, 5, 0), transform_wallet_type)
+            .select(start_version)
+    }
+}
+
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.7.0")]
+pub struct FailingMigrationServiceV07;
+
+impl Service for FailingMigrationServiceV07 {}
+
+impl MigrateData for FailingMigrationServiceV07 {
+    fn migration_scripts(
+        &self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        LinearMigrations::new(self.artifact_id().version)
+            .add_script(Version::new(0, 7, 0), failing_migration)
             .select(start_version)
     }
 }

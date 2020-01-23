@@ -18,6 +18,7 @@
 //! - Service instances creation;
 //! - Changing consensus configuration;
 //! - Changing service instances configuration.
+//! - Migrating service data.
 //!
 //! More information on the artifact/service lifecycle can be found in the documentation for
 //! the Exonum [runtime module][runtime-docs].
@@ -55,7 +56,7 @@
 //! The operation of starting or resuming a service is treated similarly to a configuration change
 //! and follows the same rules.
 //!
-//! ## Migrations management
+//! ## Migrations Management
 //!
 //! Supervisor service provides a functionality to perform data migrations for services.
 //! Request for migration is sent through private REST API and contains the name of instance
@@ -83,7 +84,8 @@
 //! be either successful or unsuccessful.
 //!
 //! If all validators report the successful local migration result, and the resulting state hashes
-//! match, migration is committed.
+//! match, migration is committed and flushed in the block, next to block with the last required
+//! migration confirmation.
 //!
 //! In any other case (e.g. migration failure for at least one node, resulting state hash divergence,
 //! lack of report at the deadline height), migration is considered failed and rolled back.
@@ -119,6 +121,9 @@ pub use self::{
     transactions::SupervisorInterface,
 };
 
+#[doc(hidden)] // Public for migration tests.
+pub use self::schema::SchemaImpl;
+
 use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
@@ -129,7 +134,7 @@ use exonum_rust_runtime::{
     api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
 };
 
-use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};
+use crate::{configure::ConfigureMut, mode::Mode};
 
 pub mod mode;
 
@@ -629,6 +634,7 @@ impl Supervisor {
                 .data()
                 .for_dispatcher()
                 .local_migration_result(request.service.as_ref());
+
             let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
 
             if let Some(result) = local_migration_result {

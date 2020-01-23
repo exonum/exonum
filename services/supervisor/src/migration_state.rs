@@ -18,10 +18,11 @@ use exonum_proto::ProtobufConvert;
 
 use super::{proto, AsyncEventState, MigrationError};
 
-#[derive(Debug)]
+#[doc(hidden)]
+#[derive(Debug, Clone)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "proto::MigrationState")]
-pub(crate) struct MigrationState {
+pub struct MigrationState {
     /// Migration process state.
     pub inner: AsyncEventState,
     /// Expected state hash. Equals to the first obtained local migration state hash.

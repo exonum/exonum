@@ -727,6 +727,8 @@ impl Supervisor {
 
         // Hash is OK, process further.
 
+        // Update state and add a confirmation.
+        schema.migration_states.put(&request, state.clone());
         schema.migration_confirmations.confirm(&request, author);
 
         // Check if we have enough confirmations to finish the migration.

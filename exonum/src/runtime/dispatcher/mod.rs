@@ -439,8 +439,7 @@ impl Dispatcher {
                 maybe_script
                     .map(|script| new_artifact.version == *script.end_version())
                     .unwrap_or(false)
-            })
-            .unwrap_or(false);
+            })?;
 
         Ok(result)
     }
