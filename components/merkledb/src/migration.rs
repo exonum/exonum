@@ -623,7 +623,7 @@ impl AbortHandle {
 ///
 /// # Safety
 ///
-/// Flushing a migration needs to be performed on a `fork` which contains the final migration
+/// Flushing a migration must be performed on a `fork` which contains the final migration
 /// changes. Not doing so **may break the state aggregation in the database.** A scenario when
 /// this requirement would be violated is as follows:
 ///

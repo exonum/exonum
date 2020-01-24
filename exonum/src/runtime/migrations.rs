@@ -81,7 +81,7 @@
 //! returns to the [`Stopped`] status. The local migration result is ignored; if the migration
 //! script has not completed locally, it is aborted.
 //!
-//! Note that commitment and flushing are separate operations and need to be performed in
+//! Note that commitment and flushing are separate operations and must be performed in
 //! different blocks. When a migration is flushed, the migrated data needs to have a definite
 //! state, which is ensured by an earlier commitment acting as a [Great Filter]. The requirement
 //! for different blocks is more nuanced and is related to implementation details of the database
