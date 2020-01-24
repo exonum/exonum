@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::schema::Schema;
+pub use self::schema::{remove_local_migration_result, Schema};
 
 use exonum_merkledb::{
     migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
@@ -733,17 +733,18 @@ impl Dispatcher {
         // a consensus failure.
         let res = local_result.0.as_ref();
         let local_hash = *res.unwrap_or_else(|err| {
-            // FIXME: Add a maintenance command for removing local migration result (ECR-4095).
             panic!(
                 "Migration for service `{}` is committed with migration hash {:?}, \
-                 but locally it has finished with an error: {}",
+                 but locally it has finished with an error: {}. You can remove local \
+                 migration result with CLI maintenance command `restart-migration`.",
                 namespace, global_hash, err
             );
         });
         assert!(
             local_hash == global_hash,
             "Migration for service `{}` is committed with migration hash {:?}, \
-             but locally it has finished with another hash {:?}",
+             but locally it has finished with another hash {:?}. You can remove local \
+             migration result with CLI maintenance command `restart-migration`.",
             namespace,
             global_hash,
             local_hash

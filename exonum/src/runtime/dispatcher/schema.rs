@@ -135,7 +135,7 @@ impl<T: Access> Schema<T> {
         self.access.clone().get_map(PENDING_INSTANCES)
     }
 
-    fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
+    pub(crate) fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
         self.access.clone().get_map(LOCAL_MIGRATION_RESULTS)
     }
 
@@ -504,4 +504,12 @@ impl Schema<&Fork> {
         instance_state.data_version = Some(end_version);
         self.add_pending_status(instance_state, InstanceStatus::Stopped, None)
     }
+}
+
+/// Removes local migration result for specified service.
+#[doc(hidden)]
+pub fn remove_local_migration_result(fork: &Fork, service_name: &str) {
+    Schema::new(fork)
+        .local_migration_results()
+        .remove(service_name);
 }

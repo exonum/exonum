@@ -32,8 +32,19 @@ use crate::{
 
 const DELAY: Duration = Duration::from_millis(40);
 
-#[derive(Debug)]
-struct MigrationRuntime;
+#[derive(Default, Debug, Clone)]
+struct MigrationRuntime {
+    /// Flag to run good or erroneous migration script for `good-or-not-good` artifact.
+    run_good_script: bool,
+}
+
+impl MigrationRuntime {
+    fn with_script_flag(flag: bool) -> Self {
+        Self {
+            run_good_script: flag,
+        }
+    }
+}
 
 impl WellKnownRuntime for MigrationRuntime {
     const ID: u32 = 2;
@@ -103,6 +114,13 @@ impl Runtime for MigrationRuntime {
             "bad" => panicking_migration,
             "with-state" => migration_modifying_state_hash,
             "none" => return Ok(None),
+            "good-or-not-good" => {
+                if self.run_good_script {
+                    simple_delayed_migration
+                } else {
+                    erroneous_migration
+                }
+            }
             _ => return Err(InitMigrationError::NotSupported),
         };
         let script = MigrationScript::new(script, end_version);
@@ -183,10 +201,15 @@ struct Rig {
 
 impl Rig {
     fn new() -> Self {
-        let blockchain = Blockchain::new(TemporaryDB::new(), gen_keypair(), ApiSender::closed());
+        Self::with_db_and_flag(Arc::new(TemporaryDB::new()), false)
+    }
+
+    fn with_db_and_flag(db: Arc<TemporaryDB>, flag: bool) -> Self {
+        let blockchain =
+            Blockchain::new(db as Arc<dyn Database>, gen_keypair(), ApiSender::closed());
         let blockchain = blockchain
             .into_mut_with_dummy_config()
-            .with_runtime(MigrationRuntime)
+            .with_runtime(MigrationRuntime::with_script_flag(flag))
             .build();
 
         Self {
@@ -215,7 +238,7 @@ impl Rig {
         let blockchain = self.blockchain.as_ref().to_owned();
         let blockchain = blockchain
             .into_mut_with_dummy_config()
-            .with_runtime(MigrationRuntime)
+            .with_runtime(MigrationRuntime::default())
             .build();
         self.blockchain = blockchain;
     }
@@ -934,10 +957,13 @@ fn migration_commit_invariants() {
 
 /// Tests that a migration commit after the migration script finished locally with an error
 /// leads to node stopping.
-fn test_migration_commit_with_local_error(local_result: LocalResult) {
-    let mut rig = Rig::new();
-    let old_artifact = rig.deploy_artifact("not-good", "0.3.0".parse().unwrap());
-    let new_artifact = rig.deploy_artifact("not-good", "0.5.2".parse().unwrap());
+fn test_migration_commit_with_local_error(
+    rig: &mut Rig,
+    local_result: LocalResult,
+    artifact_name: &str,
+) {
+    let old_artifact = rig.deploy_artifact(artifact_name, "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact(artifact_name, "0.5.2".parse().unwrap());
     let service = rig.initialize_service(old_artifact.clone(), "service");
     rig.stop_service(&service);
 
@@ -957,25 +983,95 @@ fn test_migration_commit_with_local_error(local_result: LocalResult) {
 #[test]
 #[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
 fn migration_commit_with_local_error_blocking() {
-    test_migration_commit_with_local_error(LocalResult::None);
+    test_migration_commit_with_local_error(&mut Rig::new(), LocalResult::None, "not-good");
 }
 
 #[test]
 #[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
 fn migration_commit_with_local_error_in_memory() {
-    test_migration_commit_with_local_error(LocalResult::InMemory);
+    test_migration_commit_with_local_error(&mut Rig::new(), LocalResult::InMemory, "not-good");
 }
 
 #[test]
 #[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
 fn migration_commit_with_local_error_saved() {
-    test_migration_commit_with_local_error(LocalResult::Saved);
+    test_migration_commit_with_local_error(&mut Rig::new(), LocalResult::Saved, "not-good");
 }
 
 #[test]
 #[should_panic(expected = "locally it has finished with an error: This migration is unsuccessful")]
 fn migration_commit_with_local_error_saved_and_node_restart() {
-    test_migration_commit_with_local_error(LocalResult::SavedWithNodeRestart);
+    test_migration_commit_with_local_error(
+        &mut Rig::new(),
+        LocalResult::SavedWithNodeRestart,
+        "not-good",
+    );
+}
+
+#[test]
+fn test_migration_restart() {
+    let artifact_name = "good-or-not-good";
+    let service_name = "service";
+    let db = Arc::new(TemporaryDB::new());
+
+    // Running migration that should fail.
+    std::panic::catch_unwind(|| {
+        // Set script flag to fail migration.
+        let mut rig = Rig::with_db_and_flag(Arc::clone(&db), false);
+        test_migration_commit_with_local_error(&mut rig, LocalResult::Saved, artifact_name)
+    })
+    .expect_err("Node should panic on unsuccessful migration commit");
+
+    // Check that we have failed result locally.
+    let snapshot = db.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let res = schema
+        .local_migration_result(service_name)
+        .expect("Schema does not have local result");
+    assert_eq!(res.0.unwrap_err(), "This migration is unsuccessful!");
+
+    // Remove local migration result.
+    let mut fork = db.fork();
+    rollback_migration(&mut fork, service_name);
+    remove_local_migration_result(&fork, service_name);
+    db.merge_sync(fork.into_patch())
+        .expect("Failed to merge patch after local migration result remove");
+
+    // Check that local result is removed.
+    let snapshot = db.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.local_migration_result(service_name).is_none());
+
+    // Set script flag to migrate successfully.
+    let mut rig = Rig::with_db_and_flag(Arc::clone(&db), true);
+
+    let fork = rig.blockchain.fork();
+    Dispatcher::commit_migration(&fork, service_name, HashTag::empty_map_hash())
+        .expect("Failed to commit migration");
+    rig.create_block(fork);
+
+    // Check that the migration script has finished.
+    rig.assert_no_migration_threads();
+
+    // Check that local migration result is erased.
+    let snapshot = rig.blockchain.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    let res = schema.local_migration_result(service_name).unwrap();
+    assert_eq!(res.0.unwrap(), HashTag::empty_map_hash());
+
+    // Check current instance migration status.
+    let state = schema.get_instance(100).unwrap();
+    let artifact = ArtifactId::from_raw_parts(
+        MigrationRuntime::ID,
+        artifact_name.to_string(),
+        "0.5.2".parse().unwrap(),
+    );
+    let expected_status = InstanceStatus::migrating(InstanceMigration::from_raw_parts(
+        artifact,
+        Version::new(0, 5, 0),
+        Some(HashTag::empty_map_hash()),
+    ));
+    assert_eq!(state.status, Some(expected_status));
 }
 
 /// Tests that a migration commit after the migration script finished locally with another hash
