@@ -14,7 +14,7 @@
 
 //! Standard Exonum CLI command used to perform different maintenance actions.
 
-use exonum::merkledb::{Database, RocksDB};
+use exonum::merkledb::{migration::rollback_migration, Database, RocksDB};
 use exonum::runtime::remove_local_migration_result;
 use exonum_node::helpers::clear_consensus_messages_cache;
 use failure::Error;
@@ -80,8 +80,8 @@ impl Action {
             db_path,
             &node_config.private_config.database,
         )?);
-        let fork = db.fork();
-
+        let mut fork = db.fork();
+        rollback_migration(&mut fork, service_name);
         remove_local_migration_result(&fork, service_name);
         db.merge_sync(fork.into_patch())?;
 

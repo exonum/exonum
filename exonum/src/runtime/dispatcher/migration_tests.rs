@@ -1031,7 +1031,8 @@ fn test_migration_restart() {
     assert_eq!(res.0.unwrap_err(), "This migration is unsuccessful!");
 
     // Remove local migration result.
-    let fork = db.fork();
+    let mut fork = db.fork();
+    rollback_migration(&mut fork, service_name);
     remove_local_migration_result(&fork, service_name);
     db.merge_sync(fork.into_patch())
         .expect("Failed to merge patch after local migration result remove");
