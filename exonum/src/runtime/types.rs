@@ -735,10 +735,26 @@ pub struct InstanceState {
     pub data_version: Option<Version>,
 
     /// Service instance activity status.
+    ///
+    /// Status can be `None` only during the block execution if instance was created,
+    /// but activation routine for it is not yet completed, and this value can occur no more
+    /// than once in a service lifetime.
+    ///
+    /// If this field is set to `None`, the pending_status must have value
+    /// `Some(InstanceStatus::Active)`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub status: Option<InstanceStatus>,
 
-    /// Pending status of instance if the value is not `None`.
+    /// Pending status of the instance.
+    ///
+    /// Pending state can be not `None` if core is in process of changing service status,
+    /// e.g. service initialization, resuming or migration. If this field was set to value
+    /// other than `None`, it always will be reset to `None` in the next block.
+    ///
+    /// The purpose of this field is to keep information about further service status during the
+    /// block execution because the service status can be changed only after that block is
+    /// committed. This approach is needed because there is no guarantee that the executed
+    /// block will be committed.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
 
