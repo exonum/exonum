@@ -65,7 +65,7 @@ pub fn byzantine_quorum(total: usize) -> usize {
 ///
 /// It can be used with `ProtobufConvert` derive macro, e.g.:
 ///
-/// ```no_run
+/// ```ignore
 /// #[derive(Debug, ProtobufConvert)]
 /// #[protobuf_convert(source = "path::to::ProtoStructure")]
 /// struct Structure {
@@ -100,7 +100,7 @@ pub mod pb_optional_hash {
 ///
 /// It can be used with `ProtobufConvert` derive macro, e.g.:
 ///
-/// ```no_run
+/// ```ignore
 /// #[derive(Debug, ProtobufConvert)]
 /// #[protobuf_convert(source = "path::to::ProtoStructure")]
 /// struct Structure {
