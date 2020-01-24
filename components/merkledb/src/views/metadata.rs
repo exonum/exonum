@@ -164,7 +164,7 @@ impl Default for IndexType {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V = Vec<u8>> {
     // A globally unique numeric index identifier. MerkleDB assigns a unique numeric ID for each
-    // fully-qualified index name.
+    // fully-qualified index name. Valid identifiers are non-zero.
     //
     // MerkleDB never re-uses the identifiers.
     identifier: u64,
