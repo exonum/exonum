@@ -166,4 +166,4 @@ def find_service_status(available_service, service_name):
     for service in available_service["services"]:
         if service["spec"]["name"] == service_name:
             return service["status"]["type"]
-    return "Service status has not been found"
+    raise RuntimeError

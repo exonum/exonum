@@ -237,7 +237,6 @@ class RegularDeployTest(unittest.TestCase):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
             available_services = client.public_api.available_services().json()
-            # crypto instance always first element in array
             service_status = find_service_status(available_services, "crypto")
             self.assertEqual(service_status, "stopped")
             with ExonumCryptoAdvancedClient(client) as crypto_client:
@@ -271,7 +270,6 @@ class RegularDeployTest(unittest.TestCase):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
             available_services = client.public_api.available_services().json()
-            # crypto instance always first element in array
             service_status = find_service_status(available_services, "crypto")
             self.assertEqual(service_status, "active")
             with ExonumCryptoAdvancedClient(client) as crypto_client:
