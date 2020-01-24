@@ -62,6 +62,17 @@ pub fn byzantine_quorum(total: usize) -> usize {
 }
 
 /// Module for serializing `Option<Hash>` to Protobuf.
+///
+/// It can be used with `ProtobufConvert` derive macro, e.g.:
+///
+/// ```no_run
+/// #[derive(Debug, ProtobufConvert)]
+/// #[protobuf_convert(source = "path::to::ProtoStructure")]
+/// struct Structure {
+///     #[protobuf_convert(with = "exonum::helpers::pb_optional_hash")]
+///     pub maybe_hash: Option<Hash>,
+/// }
+/// ```
 pub mod pb_optional_hash {
     use exonum_crypto::{proto::types::Hash as PbHash, Hash};
     use exonum_proto::ProtobufConvert;
@@ -86,10 +97,22 @@ pub mod pb_optional_hash {
 }
 
 /// Module for serializing `semver::Version` to Protobuf.
+///
+/// It can be used with `ProtobufConvert` derive macro, e.g.:
+///
+/// ```no_run
+/// #[derive(Debug, ProtobufConvert)]
+/// #[protobuf_convert(source = "path::to::ProtoStructure")]
+/// struct Structure {
+///     #[protobuf_convert(with = "exonum::helpers::pb_version")]
+///     pub some_version: Version,
+/// }
+/// ```
 pub mod pb_version {
     use semver::Version;
 
     /// Deserializes `semver::Version` from string.
+    #[allow(clippy::needless_pass_by_value)] // False positive, we need a `String` type here.
     pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
         pb.parse().map_err(From::from)
     }

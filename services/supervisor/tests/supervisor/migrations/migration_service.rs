@@ -23,7 +23,10 @@
 // cspell:ignore Trillian, Vogon
 
 use exonum::{
-    crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
+    merkledb::{
+        access::{Access, FromAccess},
+        ProofEntry,
+    },
     runtime::{
         migrations::{
             InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
@@ -35,256 +38,72 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory};
-// use rand::{seq::SliceRandom, thread_rng, Rng};
 
-use std::borrow::Cow;
-
-#[derive(Debug, Clone)]
-pub struct TestUser {
-    full_name: Cow<'static, str>,
-    first_name: Cow<'static, str>,
-    last_name: Cow<'static, str>,
-    balance: u64,
+#[derive(Debug, FromAccess)]
+pub struct Schema<T: Access> {
+    pub entry: ProofEntry<T::Base, u8>,
 }
 
-const USERS: &[TestUser] = &[
-    TestUser {
-        full_name: Cow::Borrowed("Deep Thought"),
-        first_name: Cow::Borrowed("Deep"),
-        last_name: Cow::Borrowed("Thought"),
-        balance: 42,
-    },
-    TestUser {
-        full_name: Cow::Borrowed("Arthur Dent"),
-        first_name: Cow::Borrowed("Arthur"),
-        last_name: Cow::Borrowed("Dent"),
-        balance: 7,
-    },
-    TestUser {
-        full_name: Cow::Borrowed("Trillian"),
-        first_name: Cow::Borrowed("Trillian"),
-        last_name: Cow::Borrowed(""),
-        balance: 90,
-    },
-    TestUser {
-        full_name: Cow::Borrowed("Marvin \"The Paranoid\" Android"),
-        first_name: Cow::Borrowed("Marvin \"The Paranoid\""),
-        last_name: Cow::Borrowed("Android"),
-        balance: 0,
-    },
-];
-
-impl TestUser {
-    fn keypair(&self) -> (PublicKey, SecretKey) {
-        let seed = hash(self.full_name.as_bytes());
-        let seed = Seed::from_slice(&seed[..]).unwrap();
-        gen_keypair_from_seed(&seed)
+impl<T: Access> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
     }
 }
 
 /// Initial service schema.
 pub(super) mod v01 {
-    use exonum::{
-        crypto::PublicKey,
-        merkledb::{
-            access::{Access, FromAccess, Prefixed},
-            MapIndex, Snapshot,
-        },
-    };
-    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use serde_derive::{Deserialize, Serialize};
+    use super::Schema;
+    use exonum::merkledb::{access::Prefixed, Snapshot};
 
-    #[derive(Debug, Serialize, Deserialize)]
-    #[derive(BinaryValue, ObjectHash)]
-    #[binary_value(codec = "bincode")]
-    pub struct Wallet {
-        pub username: String,
-        pub balance: u64,
-    }
-
-    #[derive(Debug, FromAccess)]
-    pub struct Schema<T: Access> {
-        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
-    }
-
-    impl<T: Access> Schema<T> {
-        pub fn new(access: T) -> Self {
-            Self::from_root(access).unwrap()
-        }
-    }
+    pub(crate) const ENTRY_VALUE: u8 = 1;
 
     pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
-        let users = super::USERS;
-
         let schema = Schema::new(snapshot.clone());
-        for user in users {
-            let (key, _) = user.keypair();
-            let wallet = schema
-                .wallets
-                .get(&key)
-                .expect("V01: User wallet not found");
-            assert_eq!(wallet.username, user.full_name.to_string());
-            assert_eq!(wallet.balance, user.balance);
-        }
+        assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
 }
 
 pub(super) mod v02 {
-    use exonum::crypto::PublicKey;
-    use exonum::merkledb::{
-        access::{Access, FromAccess, Prefixed},
-        ProofEntry, ProofMapIndex, Snapshot,
-    };
-    use exonum_derive::FromAccess;
+    use exonum::merkledb::{access::Prefixed, Snapshot};
 
-    use super::v01::Wallet;
+    use super::Schema;
 
-    #[derive(Debug, FromAccess)]
-    pub struct Schema<T: Access> {
-        pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
-        pub total_balance: ProofEntry<T::Base, u64>,
-    }
-
-    impl<T: Access> Schema<T> {
-        pub fn new(access: T) -> Self {
-            Self::from_root(access).unwrap()
-        }
-    }
+    pub(crate) const ENTRY_VALUE: u8 = 2;
 
     pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
-        let users = super::USERS;
-        let schema = Schema::new(snapshot);
-        for user in users {
-            let (key, _) = user.keypair();
-            let wallet = schema
-                .wallets
-                .get(&key)
-                .expect("V02: User wallet not found");
-            assert_eq!(wallet.balance, user.balance);
-            assert_eq!(wallet.username, user.full_name);
-        }
-        assert_eq!(schema.wallets.iter().count(), users.len());
-
-        let total_balance = schema.total_balance.get().unwrap();
-        assert_eq!(
-            total_balance,
-            users.iter().map(|user| user.balance).sum::<u64>()
-        );
+        let schema = Schema::new(snapshot.clone());
+        assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
 }
 
 pub(super) mod v05 {
-    use exonum::crypto::PublicKey;
-    use exonum::merkledb::{
-        access::{Access, AccessExt, FromAccess, Prefixed},
-        ProofEntry, ProofMapIndex, Snapshot,
-    };
-    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use serde_derive::{Deserialize, Serialize};
+    use exonum::merkledb::{access::Prefixed, Snapshot};
 
-    #[derive(Debug, Serialize, Deserialize)]
-    #[derive(BinaryValue, ObjectHash)]
-    #[binary_value(codec = "bincode")]
-    pub struct Wallet {
-        pub first_name: String,
-        pub last_name: String,
-        pub balance: u64,
-    }
+    use super::Schema;
 
-    #[derive(Debug, Serialize, Deserialize)]
-    #[derive(BinaryValue, ObjectHash)]
-    #[binary_value(codec = "bincode")]
-    pub struct Summary {
-        pub ticker: String,
-        pub total_balance: u64,
-    }
-
-    #[derive(Debug, FromAccess)]
-    pub struct Schema<T: Access> {
-        pub wallets: ProofMapIndex<T::Base, PublicKey, Wallet>,
-        pub summary: ProofEntry<T::Base, Summary>,
-    }
-
-    impl<T: Access> Schema<T> {
-        pub fn new(access: T) -> Self {
-            Self::from_root(access).unwrap()
-        }
-    }
+    pub(crate) const ENTRY_VALUE: u8 = 5;
 
     pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
-        let users = super::USERS;
-
         let schema = Schema::new(snapshot.clone());
-        for user in users {
-            let (key, _) = user.keypair();
-            let wallet = schema
-                .wallets
-                .get(&key)
-                .expect("V05: User wallet not found");
-            assert_eq!(wallet.balance, user.balance);
-            assert_eq!(wallet.first_name, user.first_name);
-            assert_eq!(wallet.last_name, user.last_name);
-        }
-        assert_eq!(schema.wallets.iter().count(), users.len());
-
-        let summary = schema.summary.get().unwrap();
-        assert_eq!(summary.ticker, super::SERVICE_NAME);
-        assert_eq!(
-            summary.total_balance,
-            users.iter().map(|user| user.balance).sum::<u64>()
-        );
-
-        // Check that the outdated index has been deleted.
-        assert_eq!(snapshot.index_type("total_balance"), None);
+        assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
 }
 
-/// First migration script. Merkelizes the wallets table and records the total number of tokens.
-fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    let old_schema = v01::Schema::new(ctx.helper.old_data());
-    let mut new_schema = v02::Schema::new(ctx.helper.new_data());
-
-    let mut total_balance = 0;
-    for (key, wallet) in &old_schema.wallets {
-        total_balance += wallet.balance;
-        new_schema.wallets.put(&key, wallet);
-    }
-    new_schema.total_balance.set(total_balance);
+fn migrate_to_02(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    let mut new_schema = Schema::new(ctx.helper.new_data());
+    new_schema.entry.set(v02::ENTRY_VALUE);
     Ok(())
 }
 
-/// Second migration script. Transforms the wallet type and reorganizes the service summary.
-fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    let old_schema = v02::Schema::new(ctx.helper.old_data());
-    let mut new_schema = v05::Schema::new(ctx.helper.new_data());
-
-    let total_balance = old_schema.total_balance.get().unwrap_or(0);
-    new_schema.summary.set(v05::Summary {
-        ticker: ctx.instance_spec.name.clone(),
-        total_balance,
-    });
-    ctx.helper.new_data().create_tombstone("total_balance");
-
-    for (key, wallet) in &old_schema.wallets {
-        let name_parts: Vec<_> = wallet.username.rsplitn(2, ' ').collect();
-        let (first_name, last_name) = match &name_parts[..] {
-            [first_name] => (*first_name, ""),
-            [last_name, first_name] => (*first_name, *last_name),
-            _ => unreachable!(),
-        };
-        let new_wallet = v05::Wallet {
-            first_name: first_name.to_owned(),
-            last_name: last_name.to_owned(),
-            balance: wallet.balance,
-        };
-        new_schema.wallets.put(&key, new_wallet);
-    }
+fn migrate_to_05(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+    let mut new_schema = Schema::new(ctx.helper.new_data());
+    new_schema.entry.set(v05::ENTRY_VALUE);
     Ok(())
 }
 
 /// Third migration script. Always fails.
 fn failing_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError> {
-    Err(MigrationError::Custom("This migration always fails".into()))
+    Err(MigrationError::new("This migration always fails"))
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -298,16 +117,9 @@ impl Service for MigrationService {
         _params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // At the init step fill the schema with some data.
-        let mut schema = v01::Schema::new(context.service_data());
+        let mut schema = Schema::new(context.service_data());
 
-        for user in USERS {
-            let (key, _) = user.keypair();
-            let wallet = v01::Wallet {
-                username: user.full_name.to_string(),
-                balance: user.balance,
-            };
-            schema.wallets.put(&key, wallet);
-        }
+        schema.entry.set(v01::ENTRY_VALUE);
 
         Ok(())
     }
@@ -354,7 +166,7 @@ impl MigrateData for MigrationServiceV02 {
         start_version: &Version,
     ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
-            .add_script(Version::new(0, 2, 0), merkelize_wallets)
+            .add_script(Version::new(0, 2, 0), migrate_to_02)
             .select(start_version)
     }
 }
@@ -374,8 +186,8 @@ impl MigrateData for MigrationServiceV05 {
         start_version: &Version,
     ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
-            .add_script(Version::new(0, 2, 0), merkelize_wallets)
-            .add_script(Version::new(0, 5, 0), transform_wallet_type)
+            .add_script(Version::new(0, 2, 0), migrate_to_02)
+            .add_script(Version::new(0, 5, 0), migrate_to_05)
             .select(start_version)
     }
 }
@@ -386,8 +198,8 @@ impl MigrateData for MigrationServiceV05_1 {
         start_version: &Version,
     ) -> Result<Vec<MigrationScript>, InitMigrationError> {
         LinearMigrations::new(self.artifact_id().version)
-            .add_script(Version::new(0, 2, 0), merkelize_wallets)
-            .add_script(Version::new(0, 5, 0), transform_wallet_type)
+            .add_script(Version::new(0, 2, 0), migrate_to_02)
+            .add_script(Version::new(0, 5, 0), migrate_to_05)
             .select(start_version)
     }
 }
