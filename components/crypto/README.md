@@ -12,10 +12,10 @@ Capabilities of `exonum-crypto` include:
 - Generating key pairs for work with digital signatures;
 - Creating and verifying of digital signatures.
 
-The main backend for `exonum-crypto` is `sodiumoxide`, and used algorithms are:
+The main backend for `exonum-crypto` is `sodiumoxide`, and the used algorithms are:
 
-- `SHA256` for hashing.
-- `Ed25519` for digital signatures.
+- SHA-256 for hashing.
+- Ed25519 for digital signatures.
 
 Consult [the crate docs](https://docs.rs/exonum-crypto) for more details.
 

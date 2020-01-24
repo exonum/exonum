@@ -16,7 +16,7 @@ validation of Protobuf data.
 
 Most of the time you do not have to implement this trait because most
 of the use cases are covered by `#[derive(ProtobufConvert)]`
-from `exonum_derive` crate.
+from the `exonum-derive` crate.
 
 A typical example of such mapping with validation is manual implementation
 of this trait for `exonum_crypto::Hash`. `exonum_crypto::Hash` is a fixed

@@ -6,7 +6,6 @@
 
 `exonum-api` crate provides an extensible interface for building backend-agnostic
 HTTP APIs.
-
 Within Exonum, this crate is used by [Rust services][rust-runtime] and in
 plugins for the Exonum node.
 
