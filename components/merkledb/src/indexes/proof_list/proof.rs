@@ -15,7 +15,7 @@
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 use exonum_crypto::Hash;
-use exonum_proto::failure::{self, Fail};
+use failure::{self, Fail};
 use serde_derive::*;
 
 use std::cmp::Ordering;
