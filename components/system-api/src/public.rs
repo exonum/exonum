@@ -90,7 +90,8 @@
 //!
 //! Returns an user agent of the node.
 //!
-//! User agent includes Exonum, Rust compiler and OS version, separated by slashes.
+//! User agent includes versions of Exonum and the Rust compiler and the OS info,
+//! all separated by slashes.
 //!
 //! ```
 //! use exonum_system_api::SystemApiPlugin;

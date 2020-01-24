@@ -130,9 +130,9 @@
 //! Returns `true` if consensus is enabled on the node, and `false` otherwise.
 //!
 //! Note the difference between `consensus_enabled` and
-//! [public `healthcheck` endpoint](public/index.html#node-health-info):
+//! [public `healthcheck` endpoint](../public/index.html#node-health-info):
 //!
-//! This endpoint only reports the setting value (should node participate in consensus
+//! This endpoint only reports the setting value (should the node participate in consensus
 //! or not), while `healthcheck` provides information about consensus status (since even
 //! with consensus setting turned on, node may not participate in consensus due to lack of
 //! peers).
