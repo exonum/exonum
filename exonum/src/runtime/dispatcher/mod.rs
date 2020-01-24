@@ -329,7 +329,8 @@ impl Dispatcher {
             InstanceDescriptor::new(spec.id, &name),
         )
         .initiate_adding_service(spec, constructor);
-        if should_rollback {
+
+        if should_rollback && res.is_ok() {
             res = Err(CoreError::IncorrectCall.into());
         }
 
@@ -583,7 +584,7 @@ impl Dispatcher {
                 };
 
                 let mut res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
-                if should_rollback {
+                if should_rollback && res.is_ok() {
                     res = Err(CoreError::IncorrectCall.into());
                 }
 
