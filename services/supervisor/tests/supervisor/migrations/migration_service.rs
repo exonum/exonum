@@ -113,8 +113,7 @@ pub(super) mod v01 {
         }
     }
 
-    #[allow(clippy::borrowed_box)] // We can't just convert `&Box<dyn Snapshot>` to `&dyn Snapshot`.
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &Box<dyn Snapshot>>) {
+    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
         let users = super::USERS;
 
         let schema = Schema::new(snapshot.clone());
@@ -152,8 +151,7 @@ pub(super) mod v02 {
         }
     }
 
-    #[allow(clippy::borrowed_box)] // We can't just convert `&Box<dyn Snapshot>` to `&dyn Snapshot`.
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &Box<dyn Snapshot>>) {
+    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
         let users = super::USERS;
         let schema = Schema::new(snapshot);
         for user in users {
@@ -213,8 +211,7 @@ pub(super) mod v05 {
         }
     }
 
-    #[allow(clippy::borrowed_box)] // We can't just convert `&Box<dyn Snapshot>` to `&dyn Snapshot`.
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &Box<dyn Snapshot>>) {
+    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
         let users = super::USERS;
 
         let schema = Schema::new(snapshot.clone());

@@ -292,7 +292,7 @@ fn migration() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v02::verify_schema(prefixed);
 }
@@ -329,7 +329,7 @@ fn migration_two_scripts_sequential() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v02::verify_schema(prefixed);
 
@@ -357,7 +357,7 @@ fn migration_two_scripts_sequential() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v05::verify_schema(prefixed);
 }
@@ -460,7 +460,7 @@ fn complex_migration() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v02::verify_schema(prefixed);
 
@@ -489,7 +489,7 @@ fn complex_migration() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v05::verify_schema(prefixed);
 }
@@ -593,7 +593,7 @@ fn migration_consensus() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v02::verify_schema(prefixed);
 }
@@ -657,7 +657,7 @@ fn migration_no_consensus() {
 
     // After that check that schema did not change.
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v01::verify_schema(prefixed);
 }
@@ -743,7 +743,7 @@ fn migration_hash_divergence() {
 
     // After that check that schema did not change.
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v01::verify_schema(prefixed);
 }
@@ -814,7 +814,7 @@ fn mixed_migration() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v02::verify_schema(prefixed);
 
@@ -843,7 +843,7 @@ fn mixed_migration() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v05::verify_schema(prefixed);
 
@@ -872,7 +872,7 @@ fn mixed_migration() {
     );
 
     let snapshot = testkit.snapshot();
-    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     // Data should not change.
     migration_service::v05::verify_schema(prefixed);
