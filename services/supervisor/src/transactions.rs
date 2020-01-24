@@ -52,7 +52,8 @@ pub trait SupervisorInterface<Ctx> {
     /// Confirms that the artifact deployment was completed by the validator.
     ///
     /// The artifact is registered in the dispatcher once all validators send successful confirmation.
-    /// This transaction is sent automatically by the node when the local deployment process completes.
+    /// This transaction is sent automatically by a validator node when the local deployment process
+    /// completes.
     #[interface_method(id = 1)]
     fn report_deploy_result(&self, context: Ctx, artifact: DeployResult) -> Self::Output;
 
@@ -91,7 +92,8 @@ pub trait SupervisorInterface<Ctx> {
     /// Confirms that migration was completed by the validator.
     ///
     /// The migration is applied in the core once all validators send successful confirmation.
-    /// This transaction is sent automatically by the node when the local migration process completes.
+    /// This transaction is sent automatically by a validator node when the local migration process
+    /// completes.
     #[interface_method(id = 5)]
     fn report_migration_result(&self, context: Ctx, result: MigrationResult) -> Self::Output;
 }
@@ -484,7 +486,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 request.service
             );
             // Store initial state of the request.
-            let state =
+            let mut state =
                 MigrationState::new(AsyncEventState::Pending, instance.data_version().clone());
             schema.migration_states.put(&request, state.clone());
             // Store the migration as pending. It will be removed in `before_transactions` hook
@@ -510,7 +512,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             // Migration started. Check if migration is fast-forward.
             let instance = get_instance_by_name(&context, request.service.as_ref())
                 .expect("BUG: Instance disappeared");
-            if state.version != *instance.data_version() {
+            if request.new_artifact.version == *instance.data_version() {
                 // Migration is fast-forward, complete it immediately.
                 // No agreement needed, since nodes which will behave differently will obtain
                 // different blockchain state hash and will be excluded from consensus.
@@ -519,10 +521,6 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 let mut schema = SchemaImpl::new(context.service_data());
 
                 // Update the state of a migration.
-                let mut state = schema
-                    .migration_states
-                    .get(&request)
-                    .expect("BUG: Migration succeed, but does not have a stored state");
                 state.update(AsyncEventState::Succeed, instance.data_version().clone());
                 schema.migration_states.put(&request, state);
 
@@ -541,30 +539,19 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         // Verifies that transaction author is validator.
         let author = get_validator(&context)?;
 
-        result
-            .request
-            .new_artifact
-            .validate()
-            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
-
         let core_schema = context.data().for_core();
         let current_height = core_schema.height();
 
         let schema = SchemaImpl::new(context.service_data());
 
         // Verify that this migration is registered.
-        schema
+        let state = schema
             .migration_states
             .get(&result.request)
             .ok_or(MigrationError::MigrationRequestNotRegistered)?;
 
         // Check if migration already failed.
-        if schema
-            .migration_states
-            .get(&result.request)
-            .map(|state| state.is_failed())
-            .unwrap_or_default()
-        {
+        if state.is_failed() {
             // This migration is already resulted in failure, no further
             // processing needed.
             return Ok(());
@@ -577,7 +564,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
         drop(schema);
 
-        match result.result.0 {
+        match result.status.0 {
             Ok(hash) => self.confirm_migration(context, result.request, hash, author)?,
             Err(error) => {
                 // Since the migration process error is represented as a string rather than
@@ -684,7 +671,7 @@ impl Supervisor {
 
         if schema
             .deploy_confirmations
-            .all_validators_confirmed(&deploy_request, validator_keys)
+            .intersect_with_validators(&deploy_request, validator_keys)
         {
             log::trace!(
                 "Registering deployed artifact in dispatcher {:?}",
@@ -741,15 +728,12 @@ impl Supervisor {
 
         let mut schema = SchemaImpl::new(context.service_data());
 
-        let mut state = schema
-            .migration_states
-            .get(&request)
-            .expect("BUG: Attempt to confirm a migration which does not have a stored state");
+        let mut state = schema.migration_state_unchecked(&request);
 
         // Verify that state hash does match expected one.
         if let Err(error) = state.add_state_hash(state_hash) {
             // Hashes do not match, rollback the migration.
-            drop(schema); // Required for the context reborrow.
+            drop(schema); // Required for the context reborrow in `fail_migration`.
             let initiate_rollback = true;
             return self.fail_migration(context, request, error, initiate_rollback);
         }
@@ -769,7 +753,7 @@ impl Supervisor {
 
         if schema
             .migration_confirmations
-            .all_validators_confirmed(&request, validator_keys)
+            .intersect_with_validators(&request, validator_keys)
         {
             log::trace!(
                 "Confirming commit of migration request {:?}. Result state hash: {:?}",
@@ -823,10 +807,7 @@ impl Supervisor {
         let mut schema = SchemaImpl::new(context.service_data());
 
         // Mark deploy as failed.
-        let mut state = schema
-            .migration_states
-            .get(&request)
-            .expect("BUG: Attempt to rollback a migration which does not have a stored state");
+        let mut state = schema.migration_state_unchecked(&request);
 
         state.fail(AsyncEventState::Failed { height, error });
         schema.migration_states.put(&request, state);

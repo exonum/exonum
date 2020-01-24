@@ -129,36 +129,6 @@ impl From<MigrationRequest> for MigrationInfoQuery {
     }
 }
 
-/// Response with execution status for a certain asynchronous request.
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct ProcessStateResponse {
-    /// Process execution state. Can be `None` if there is no corresponding request.
-    pub state: Option<AsyncEventState>,
-}
-
-impl ProcessStateResponse {
-    /// Creates a new `ProcessStateResponse` object.
-    pub fn new(state: Option<AsyncEventState>) -> Self {
-        Self { state }
-    }
-}
-
-/// Response with execution status for a migration request.
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
-pub struct MigrationStateResponse {
-    /// Migration state. Can be `None` if there is no corresponding request.
-    pub state: Option<MigrationState>,
-}
-
-impl MigrationStateResponse {
-    /// Creates a new `MigrationStateResponse` object.
-    pub fn new(state: Option<MigrationState>) -> Self {
-        Self { state }
-    }
-}
-
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
     /// Error type for the current API implementation.
@@ -187,13 +157,10 @@ pub trait PrivateApi {
     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
 
     /// Returns the state of deployment for the given deploy request.
-    fn deploy_status(&self, request: DeployInfoQuery) -> Result<ProcessStateResponse, Self::Error>;
+    fn deploy_status(&self, request: DeployInfoQuery) -> Result<AsyncEventState, Self::Error>;
 
     /// Returns the state of migration for the given migration request.
-    fn migration_status(
-        &self,
-        request: MigrationInfoQuery,
-    ) -> Result<MigrationStateResponse, Self::Error>;
+    fn migration_status(&self, request: MigrationInfoQuery) -> Result<MigrationState, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -255,23 +222,24 @@ impl PrivateApi for ApiImpl<'_> {
         Ok(config)
     }
 
-    fn deploy_status(&self, query: DeployInfoQuery) -> Result<ProcessStateResponse, Self::Error> {
+    fn deploy_status(&self, query: DeployInfoQuery) -> Result<AsyncEventState, Self::Error> {
         let request = DeployRequest::try_from(query)?;
         let schema = SchemaImpl::new(self.0.service_data());
-        let status = schema.deploy_states.get(&request);
+        let status = schema.deploy_states.get(&request).ok_or_else(|| {
+            Self::Error::not_found().title("No corresponding deploy request found")
+        })?;
 
-        Ok(ProcessStateResponse::new(status))
+        Ok(status)
     }
 
-    fn migration_status(
-        &self,
-        query: MigrationInfoQuery,
-    ) -> Result<MigrationStateResponse, Self::Error> {
+    fn migration_status(&self, query: MigrationInfoQuery) -> Result<MigrationState, Self::Error> {
         let request = MigrationRequest::try_from(query)?;
         let schema = SchemaImpl::new(self.0.service_data());
-        let status = schema.migration_states.get(&request);
+        let status = schema.migration_states.get(&request).ok_or_else(|| {
+            api::Error::not_found().title("No corresponding migration request found")
+        })?;
 
-        Ok(MigrationStateResponse::new(status))
+        Ok(status)
     }
 }
 

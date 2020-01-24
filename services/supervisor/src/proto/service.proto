@@ -121,7 +121,7 @@ enum SupervisorMode {
 
 // Request for the service data migration.
 message MigrationRequest {
-  // NNew artifact identifier.
+  // New artifact identifier.
   exonum.runtime.ArtifactId new_artifact = 1;
   // Name of service for a migration.
   string service = 2;
@@ -130,12 +130,12 @@ message MigrationRequest {
 }
 
 // Confirmation that migration has ended for a validator.
-// Result can be either successful or unsuccessful.
+// Status can be either successful or unsuccessful.
 message MigrationResult {
   // Corresponding request.
   MigrationRequest request = 1;
-  // Result of migration.
-  exonum.runtime.MigrationStatus result = 2;
+  // Status of migration.
+  exonum.runtime.MigrationStatus status = 2;
 }
 
 // Supervisor service configuration (not to be confused with `ConfigPropose`,

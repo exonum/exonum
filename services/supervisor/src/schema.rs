@@ -64,7 +64,7 @@ pub struct SchemaImpl<T: Access> {
     pub migration_confirmations: MultisigIndex<T, MigrationRequest>,
     /// Migrations that are not yet completed.
     pub pending_migrations: ValueSetIndex<T::Base, MigrationRequest>,
-    /// Migrations that completed but not merged yet.
+    /// Migrations that completed but not flushed yet.
     pub migrations_to_flush: ValueSetIndex<T::Base, MigrationRequest>,
 }
 
@@ -97,6 +97,14 @@ impl<T: Access> SchemaImpl<T> {
             .configuration
             .get()
             .expect("Supervisor entity was not configured; unable to load configuration")
+    }
+
+    /// Obtains the migration state, panicking if there is no state for provided
+    /// request.
+    pub fn migration_state_unchecked(&self, request: &MigrationRequest) -> MigrationState {
+        self.migration_states
+            .get(request)
+            .expect("BUG: Migration succeed, but does not have a stored state")
     }
 }
 

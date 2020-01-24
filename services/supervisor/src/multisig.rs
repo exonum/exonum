@@ -90,7 +90,6 @@ where
     /// are not validators anymore won't be taken into account.
     fn intersect(&mut self, id: &V, validator_keys: BTreeSet<PublicKey>) {
         let mut confirmations = self.index.get(id).unwrap_or_default();
-        let validator_keys: BTreeSet<PublicKey> = validator_keys.into_iter().collect();
 
         confirmations.0 = confirmations
             .0
@@ -101,11 +100,14 @@ where
         self.index.put(id, confirmations);
     }
 
-    /// Checks whether all validators agreed on provided item.
+    /// Calculates the intersection of current confirmations and actual list of
+    /// validators.
+    ///
+    /// Returns `true` if all validators confirmed the item, and `false` otherwise.
     ///
     /// This method updates the list of confirmation, leaving confirmations only from
     /// the actual validators.
-    pub fn all_validators_confirmed(
+    pub fn intersect_with_validators(
         &mut self,
         id: &V,
         validator_keys: impl IntoIterator<Item = PublicKey>,

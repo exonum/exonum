@@ -56,3 +56,27 @@ pub trait ValidateInput: Sized {
 pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
 }
+
+/// Module for serializing `Option<Hash>` to protobuf.
+pub mod pb_optional_hash {
+    use exonum_crypto::{proto::types::Hash as PbHash, Hash};
+    use exonum_proto::ProtobufConvert;
+
+    /// Deserializes `Option<Hash>` from Protobuf.
+    pub fn from_pb(pb: PbHash) -> Result<Option<Hash>, failure::Error> {
+        if pb.get_data().is_empty() {
+            Ok(None)
+        } else {
+            Hash::from_pb(pb).map(Some)
+        }
+    }
+
+    /// Serializes `Option<Hash>` to Protobuf.
+    pub fn to_pb(value: &Option<Hash>) -> PbHash {
+        if let Some(hash) = value {
+            hash.to_pb()
+        } else {
+            PbHash::new()
+        }
+    }
+}

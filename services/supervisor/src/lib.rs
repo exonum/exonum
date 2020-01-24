@@ -77,8 +77,7 @@
 //!
 //! ## Migration Workflow
 //!
-//! Migration starts in the next block relative to the actual block at the moment of receiving a
-//! request, and performed asynchronously.
+//! Migration starts after the block with the request is committed, and performed asynchronously.
 //!
 //! After the local migration completion, validator nodes report the result of migration, which can
 //! be either successful or unsuccessful.
@@ -129,7 +128,7 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, MigrationInfoQuery, MigrationStateResponse, ProcessStateResponse},
+    api::{DeployInfoQuery, MigrationInfoQuery},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
     errors::{ArtifactError, CommonError, ConfigurationError, MigrationError, ServiceError},
     event_state::AsyncEventState,
@@ -533,13 +532,20 @@ impl Supervisor {
         &self,
         context: &mut ExecutionContext<'_>,
     ) -> Result<(), ExecutionError> {
-        let schema = SchemaImpl::new(context.service_data());
+        let mut schema = SchemaImpl::new(context.service_data());
 
         // Collect pending migration requests which are successfully completed.
-        let finished_migrations = schema.migrations_to_flush.iter().collect::<Vec<_>>();
+        let finished_migrations = schema
+            .migrations_to_flush
+            .iter()
+            .map(|(_, request)| request)
+            .collect::<Vec<_>>();
+
+        // Clear the index, since we will flush all the migrations now.
+        schema.migrations_to_flush.clear();
 
         drop(schema);
-        for (_, request) in finished_migrations {
+        for request in finished_migrations {
             // Flush the migration.
             // This has to be done before the state update, so core will update the data version
             // for instance.
@@ -551,17 +557,11 @@ impl Supervisor {
             let mut schema = SchemaImpl::new(context.service_data());
 
             // Update the state of a migration.
-            let mut state = schema
-                .migration_states
-                .get(&request)
-                .expect("BUG: Migration succeed, but does not have a stored state");
+            let mut state = schema.migration_state_unchecked(&request);
             let instance = transactions::get_instance_by_name(&context, request.service.as_ref())
                 .expect("BUG: Migration succeed, but there is no such instance in core");
             state.update(AsyncEventState::Succeed, instance.data_version().clone());
             schema.migration_states.put(&request, state);
-
-            // Remove the migration from the list of not flushed.
-            schema.migrations_to_flush.remove(&request);
         }
 
         Ok(())
@@ -591,11 +591,8 @@ impl Supervisor {
             let mut schema = SchemaImpl::new(context.service_data());
             schema.pending_migrations.remove(&request);
 
-            let mut state = schema
-                .migration_states
-                .get(&request)
-                .expect("BUG: State for pending migration request is not stored");
-            if state.state.is_pending() {
+            let mut state = schema.migration_state_unchecked(&request);
+            if state.is_pending() {
                 // If state is marked as pending, change it to failed as well.
                 state.fail(AsyncEventState::Timeout);
                 schema.migration_states.put(&request, state);
@@ -623,10 +620,7 @@ impl Supervisor {
                 .pending_migrations
                 .iter()
                 .filter_map(|(_, request)| {
-                    let state = schema
-                        .migration_states
-                        .get(&request)
-                        .expect("BUG: State for pending migration request is not stored");
+                    let state = schema.migration_state_unchecked(&request);
 
                     let confirmed_by_us = schema
                         .migration_confirmations
@@ -639,7 +633,7 @@ impl Supervisor {
                     // Thus if request is `pending` and there is no out signature in
                     // `migration_confirmations` index, it means than we did not send the
                     // result report, and should do it once core will provide this result.
-                    if state.state.is_pending() && !confirmed_by_us {
+                    if state.is_pending() && !confirmed_by_us {
                         Some(request)
                     } else {
                         None
@@ -656,10 +650,10 @@ impl Supervisor {
 
             let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
 
-            if let Some(result) = local_migration_result {
+            if let Some(status) = local_migration_result {
                 // We've got a result, broadcast it if our node is a validator.
                 if let Some(tx_sender) = tx_sender {
-                    let confirmation = MigrationResult { request, result };
+                    let confirmation = MigrationResult { request, status };
 
                     if let Err(e) = tx_sender.report_migration_result((), confirmation) {
                         log::error!("Cannot send `MigrationResult`: {}", e);

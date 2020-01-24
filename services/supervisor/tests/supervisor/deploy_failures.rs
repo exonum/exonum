@@ -31,8 +31,7 @@ use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    AsyncEventState, DeployInfoQuery, DeployRequest, DeployResult, ProcessStateResponse,
-    Supervisor, SupervisorInterface,
+    AsyncEventState, DeployInfoQuery, DeployRequest, DeployResult, Supervisor, SupervisorInterface,
 };
 
 use self::failing_runtime::{FailingRuntime, FailingRuntimeError};
@@ -245,7 +244,7 @@ fn send_deploy_request(api: &TestKitApi, request: &DeployRequest) -> Hash {
 }
 
 /// Gets a deploy status for a certain request.
-fn get_deploy_status(api: &TestKitApi, request: &DeployRequest) -> ProcessStateResponse {
+fn get_deploy_status(api: &TestKitApi, request: &DeployRequest) -> AsyncEventState {
     let query = DeployInfoQuery::from(request.clone());
     api.private(ApiKind::Service("supervisor"))
         .query(&query)
@@ -313,8 +312,7 @@ fn deploy_success() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy.
@@ -326,8 +324,7 @@ fn deploy_success() {
 
     // Check that status is `Succeed`.
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Succeed);
 }
 
@@ -349,8 +346,7 @@ fn deploy_failure_because_not_confirmed() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Do NOT confirm a deploy.
@@ -358,8 +354,7 @@ fn deploy_failure_because_not_confirmed() {
 
     // Check that status is `Failed` at the deadline height.
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Timeout);
 }
 
@@ -381,8 +376,7 @@ fn deploy_failure_because_cannot_deploy() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
@@ -396,8 +390,7 @@ fn deploy_failure_because_cannot_deploy() {
     // the deployment is scheduled itself for the next block, but is performed in
     // `after_commit`, thus height is 2.
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, fail_state(Height(2)));
 }
 
@@ -427,8 +420,7 @@ fn deploy_failure_check_no_extra_actions() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
@@ -442,8 +434,7 @@ fn deploy_failure_check_no_extra_actions() {
     assert_eq!(block.transactions.len(), 1);
 
     // Check that deployment is already marked as failed.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, fail_state(Height(2)));
 
     // Ensure that there are no more transactions until the deadline height.
@@ -458,8 +449,7 @@ fn deploy_failure_check_no_extra_actions() {
     // Check the deployment status again (after the deadline),
     // it should not change.
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, fail_state(Height(2)));
 }
 
@@ -480,8 +470,7 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
@@ -495,12 +484,11 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     // Check that status is `Failed` on the same height when failure report
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request);
     let fail_state = AsyncEventState::Failed {
         height: Height(1),
         error,
     };
-    let state = response.state.expect("There should be a state for request");
     assert_deploy_state(state, fail_state);
 }
 
@@ -527,8 +515,7 @@ fn deploy_successfully_after_failure() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
@@ -542,12 +529,11 @@ fn deploy_successfully_after_failure() {
     // Check that status is `Failed` on the same height when failure report
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request);
     let fail_state = AsyncEventState::Failed {
         height: Height(1),
         error,
     };
-    let state = response.state.expect("There should be a state for request");
     assert_deploy_state(state, fail_state);
 
     // 2. Update the deadline height and perform the same routine as in `deploy_success`:
@@ -571,8 +557,7 @@ fn deploy_successfully_after_failure() {
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy.
@@ -584,12 +569,11 @@ fn deploy_successfully_after_failure() {
 
     // Check that status is `Succeed`.
     let api = testkit.api();
-    let response = get_deploy_status(&api, &deploy_request);
-    let state = response.state.expect("There should be a state for request");
+    let state = get_deploy_status(&api, &deploy_request);
     assert_deploy_state(state, AsyncEventState::Succeed);
 }
 
-/// Checks that `deploy-status` returns `NotRequested` for unknown requests.
+/// Checks that `deploy-status` returns `NotFound` for unknown requests.
 #[test]
 fn not_requested_deploy_status() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
@@ -601,9 +585,12 @@ fn not_requested_deploy_status() {
         deadline_height: DEPLOY_HEIGHT,
     };
 
-    let response = get_deploy_status(&api, &deploy_request);
-    assert!(
-        response.state.is_none(),
-        "There should be no state for unknown request"
-    );
+    let query = DeployInfoQuery::from(deploy_request);
+    let error = api
+        .private(ApiKind::Service("supervisor"))
+        .query(&query)
+        .get::<AsyncEventState>("deploy-status")
+        .expect_err("Call for `deploy-status` API endpoint succeed, but was expected to fail");
+
+    assert_eq!(u16::from(error.http_code), 404);
 }

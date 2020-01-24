@@ -17,8 +17,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::access::Prefixed,
     runtime::{
-        migrations::MigrationStatus, CoreError, ErrorMatch, ExecutionError, InstanceId, Version,
-        SUPERVISOR_INSTANCE_ID,
+        migrations::MigrationStatus, versioning::Version, CoreError, ErrorMatch, ExecutionError,
+        InstanceId, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
@@ -26,7 +26,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
     AsyncEventState, ConfigPropose, MigrationError, MigrationInfoQuery, MigrationRequest,
-    MigrationResult, MigrationStateResponse, SchemaImpl, Supervisor, SupervisorInterface,
+    MigrationResult, MigrationState, SchemaImpl, Supervisor, SupervisorInterface,
 };
 
 use std::{thread, time::Duration};
@@ -117,7 +117,7 @@ fn request_migration(api: &TestKitApi, request: MigrationRequest) -> Hash {
 }
 
 /// Obtains a migration state through API.
-fn migration_state(api: &TestKitApi, request: MigrationRequest) -> MigrationStateResponse {
+fn migration_state(api: &TestKitApi, request: MigrationRequest) -> MigrationState {
     let query: MigrationInfoQuery = request.into();
     api.private(ApiKind::Service("supervisor"))
         .query(&query)
@@ -142,13 +142,10 @@ fn obtain_expected_hash(testkit: &mut TestKit, request: &MigrationRequest) -> Ha
         let snapshot = testkit.snapshot();
         let prefixed = Prefixed::new(Supervisor::NAME, &snapshot);
         let schema = SchemaImpl::new(prefixed);
-        let state = schema
-            .migration_states
-            .get(request)
-            .expect("Migration state is not stored");
+        let state = schema.migration_state_unchecked(&request);
 
         assert!(
-            state.state.is_pending(),
+            state.is_pending(),
             "State changed from pending while awaiting for expected hash: {:?}",
             state
         );
@@ -177,11 +174,9 @@ fn wait_for_migration_success(
     while testkit.height() <= deadline_height.next() {
         testkit.create_block();
         let api = testkit.api();
-        let migration_state = migration_state(&api, request.clone())
-            .state
-            .expect("State for requested migration is not stored");
+        let migration_state = migration_state(&api, request.clone());
 
-        match migration_state.state {
+        match migration_state.inner {
             AsyncEventState::Pending => {
                 // Not ready yet.
             }
@@ -211,11 +206,9 @@ fn wait_for_migration_fail(
     while testkit.height() <= deadline_height.next() {
         testkit.create_block();
         let api = testkit.api();
-        let migration_state = migration_state(&api, request.clone())
-            .state
-            .expect("State for requested migration is not stored");
+        let migration_state = migration_state(&api, request.clone());
 
-        match migration_state.state {
+        match migration_state.inner {
             AsyncEventState::Pending => {
                 // Not ready yet.
             }
@@ -240,11 +233,9 @@ fn wait_for_migration_timeout(
     while testkit.height() <= deadline_height.next() {
         testkit.create_block();
         let api = testkit.api();
-        let migration_state = migration_state(&api, request.clone())
-            .state
-            .expect("State for requested migration is not stored");
+        let migration_state = migration_state(&api, request.clone());
 
-        match migration_state.state {
+        match migration_state.inner {
             AsyncEventState::Pending => {
                 // Not ready yet.
             }
@@ -575,7 +566,7 @@ fn migration_consensus() {
     let migration_status = MigrationStatus(Ok(expected_hash));
     let migration_result = MigrationResult {
         request: request.clone(),
-        result: migration_status,
+        status: migration_status,
     };
 
     // Build confirmation transactions
@@ -588,10 +579,8 @@ fn migration_consensus() {
 
     // Check that before obtaining confirmations, migration state is pending.
     let api = testkit.api();
-    let migration_state = migration_state(&api, request.clone())
-        .state
-        .expect("State for requested migration is not stored");
-    assert!(migration_state.state.is_pending());
+    let migration_state = migration_state(&api, request.clone());
+    assert!(migration_state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
@@ -645,7 +634,7 @@ fn migration_no_consensus() {
     let migration_status = MigrationStatus(Ok(expected_hash));
     let migration_result = MigrationResult {
         request: request.clone(),
-        result: migration_status,
+        status: migration_status,
     };
 
     // Build confirmation transactions for every validator except one.
@@ -658,10 +647,8 @@ fn migration_no_consensus() {
 
     // Check that before obtaining confirmations, migration state is pending.
     let api = testkit.api();
-    let migration_state = migration_state(&api, request.clone())
-        .state
-        .expect("State for requested migration is not stored");
-    assert!(migration_state.state.is_pending());
+    let migration_state = migration_state(&api, request.clone());
+    assert!(migration_state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
@@ -711,7 +698,7 @@ fn migration_hash_divergence() {
     let migration_status = MigrationStatus(Ok(expected_hash));
     let migration_result = MigrationResult {
         request: request.clone(),
-        result: migration_status,
+        status: migration_status,
     };
 
     // Build confirmation transactions for every validator except one.
@@ -726,7 +713,7 @@ fn migration_hash_divergence() {
     let wrong_status = MigrationStatus(Ok(Hash::zero()));
     let wrong_result = MigrationResult {
         request: request.clone(),
-        result: wrong_status,
+        status: wrong_status,
     };
 
     let wrong_confirmation = {
@@ -741,10 +728,8 @@ fn migration_hash_divergence() {
 
     // Check that before obtaining confirmations, migration state is pending.
     let api = testkit.api();
-    let migration_state = migration_state(&api, request.clone())
-        .state
-        .expect("State for requested migration is not stored");
-    assert!(migration_state.state.is_pending());
+    let migration_state = migration_state(&api, request.clone());
+    assert!(migration_state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 

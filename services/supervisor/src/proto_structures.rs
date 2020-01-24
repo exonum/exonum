@@ -264,7 +264,7 @@ pub struct MigrationResult {
     /// Corresponding request.
     pub request: MigrationRequest,
     /// Result of migration.
-    pub result: MigrationStatus,
+    pub status: MigrationStatus,
 }
 
 /// Pending config change proposal entry

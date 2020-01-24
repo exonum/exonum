@@ -14,7 +14,7 @@
 
 use exonum::{
     crypto::Hash,
-    runtime::{ExecutionError, Version},
+    runtime::{versioning::Version, ExecutionError},
 };
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -29,7 +29,8 @@ use super::{proto, AsyncEventState, MigrationError};
 #[protobuf_convert(source = "proto::MigrationState")]
 pub struct MigrationState {
     /// Migration process state.
-    pub state: AsyncEventState,
+    #[serde(rename = "state")]
+    pub inner: AsyncEventState,
 
     /// Current artifact data version.
     #[protobuf_convert(with = "pb_version")]
@@ -39,16 +40,16 @@ pub struct MigrationState {
     /// For a good scenario, all the hashes should be equal between each other.
     /// For the bad scenario, at least one node obtains the different hash and that's enough
     /// to consider migration failed.
-    #[protobuf_convert(with = "pb_expected_state_hash")]
+    #[protobuf_convert(with = "exonum::helpers::pb_optional_hash")]
     #[serde(skip)]
     pub(crate) expected_state_hash: Option<Hash>,
 }
 
 impl MigrationState {
     /// Creates a new `MigrationState` object.
-    pub fn new(state: AsyncEventState, version: Version) -> Self {
+    pub fn new(inner: AsyncEventState, version: Version) -> Self {
         Self {
-            state,
+            inner,
             version,
             expected_state_hash: None,
         }
@@ -75,12 +76,17 @@ impl MigrationState {
 
     /// Checks whether migration is failed.
     pub fn is_failed(&self) -> bool {
-        self.state.is_failed()
+        self.inner.is_failed()
+    }
+
+    /// Checks whether migration is pending.
+    pub fn is_pending(&self) -> bool {
+        self.inner.is_pending()
     }
 
     /// Updates migration state to the new state and artifact.
     pub fn update(&mut self, new_state: AsyncEventState, version: Version) {
-        self.state = new_state;
+        self.inner = new_state;
         self.version = version;
     }
 
@@ -88,38 +94,13 @@ impl MigrationState {
     pub fn fail(&mut self, new_state: AsyncEventState) {
         debug_assert!(new_state.is_failed());
 
-        self.state = new_state;
+        self.inner = new_state;
     }
 
     /// Returns the expected state hash.
     #[doc(hidden)] // Public for tests.
     pub fn expected_state_hash(&self) -> &Option<Hash> {
         &self.expected_state_hash
-    }
-}
-
-mod pb_expected_state_hash {
-    use super::*;
-    use exonum::crypto::proto as crypto_proto;
-
-    pub fn from_pb(pb: crypto_proto::Hash) -> Result<Option<Hash>, failure::Error> {
-        let hash = Hash::from_pb(pb)?;
-
-        let result = if hash != Hash::zero() {
-            Some(hash)
-        } else {
-            None
-        };
-
-        Ok(result)
-    }
-
-    pub fn to_pb(value: &Option<Hash>) -> crypto_proto::Hash {
-        if let Some(value) = value {
-            Hash::to_pb(value)
-        } else {
-            Hash::to_pb(&Hash::zero())
-        }
     }
 }
 

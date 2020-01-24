@@ -184,14 +184,12 @@ pub use self::{
 #[doc(hidden)]
 pub use error::execution_error::ExecutionErrorSerde;
 
-// Re-export for dependent crates, so they won't have to add `semver` as a dependency.
-pub use semver::Version;
-
 pub mod migrations;
 pub mod versioning;
 
 use exonum_merkledb::Snapshot;
 use futures::Future;
+use semver::Version;
 
 use std::fmt;
 

@@ -515,7 +515,7 @@ pub struct InstanceMigration {
     /// Consensus-wide outcome of the migration, in the form of the aggregation hash
     /// of the migrated data. The lack of value signifies that the network has not yet reached
     /// consensus about the migration outcome.
-    #[protobuf_convert(with = "self::pb_optional_hash")]
+    #[protobuf_convert(with = "crate::helpers::pb_optional_hash")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
 
@@ -547,27 +547,6 @@ impl InstanceMigration {
     /// among all nodes in the blockchain network.
     pub fn is_completed(&self) -> bool {
         self.completed_hash.is_some()
-    }
-}
-
-mod pb_optional_hash {
-    use super::*;
-    use exonum_crypto::proto::types::Hash as PbHash;
-
-    pub fn from_pb(pb: PbHash) -> Result<Option<Hash>, failure::Error> {
-        if pb.get_data().is_empty() {
-            Ok(None)
-        } else {
-            Hash::from_pb(pb).map(Some)
-        }
-    }
-
-    pub fn to_pb(value: &Option<Hash>) -> PbHash {
-        if let Some(hash) = value {
-            hash.to_pb()
-        } else {
-            PbHash::new()
-        }
     }
 }
 
