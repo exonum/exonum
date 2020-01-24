@@ -90,6 +90,8 @@
 //!
 //! Returns an user agent of the node.
 //!
+//! User agent includes Exonum, Rust compiler and OS version, separated by slashes.
+//!
 //! ```
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
@@ -100,6 +102,12 @@
 //!     .create();
 //! let api = testkit.api();
 //! let user_agent: String = api.public(ApiKind::System).get("v1/user_agent")?;
+//!
+//! let components: Vec<_> = user_agent.split('/').collect();
+//! assert_eq!(components.len(), 3);
+//! let exonum_version = components[0];
+//! let rust_version = components[1];
+//! let os_version = components[2];
 //! # Ok(())
 //! # }
 //! ```
@@ -115,7 +123,7 @@
 //!
 //! Returns information about services available in the network.
 //!
-//! [`DispatcherInfo`]: struct.StatsInfo.html
+//! [`DispatcherInfo`]: struct.DispatcherInfo.html
 //!
 //! ```
 //! use exonum_system_api::{public::DispatcherInfo, SystemApiPlugin};
