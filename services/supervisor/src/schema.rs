@@ -64,6 +64,8 @@ pub struct SchemaImpl<T: Access> {
     pub migration_confirmations: MultisigIndex<T, MigrationRequest>,
     /// Migrations that are not yet completed.
     pub pending_migrations: ValueSetIndex<T::Base, MigrationRequest>,
+    /// Migrations that completed but not merged yet.
+    pub migrations_to_flush: ValueSetIndex<T::Base, MigrationRequest>,
 }
 
 /// Public part of the supervisor service.

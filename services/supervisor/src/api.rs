@@ -24,7 +24,7 @@ use std::convert::TryFrom;
 
 use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, AsyncEventState, ConfigProposalWithHash,
-    ConfigPropose, ConfigVote, DeployRequest, MigrationRequest, SupervisorConfig,
+    ConfigPropose, ConfigVote, DeployRequest, MigrationRequest, MigrationState, SupervisorConfig,
 };
 
 /// Query for retrieving information about deploy state.
@@ -144,6 +144,21 @@ impl ProcessStateResponse {
     }
 }
 
+/// Response with execution status for a migration request.
+#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct MigrationStateResponse {
+    /// Migration state. Can be `None` if there is no corresponding request.
+    pub state: Option<MigrationState>,
+}
+
+impl MigrationStateResponse {
+    /// Creates a new `MigrationStateResponse` object.
+    pub fn new(state: Option<MigrationState>) -> Self {
+        Self { state }
+    }
+}
+
 /// Private API specification of the supervisor service.
 pub trait PrivateApi {
     /// Error type for the current API implementation.
@@ -178,7 +193,7 @@ pub trait PrivateApi {
     fn migration_status(
         &self,
         request: MigrationInfoQuery,
-    ) -> Result<ProcessStateResponse, Self::Error>;
+    ) -> Result<MigrationStateResponse, Self::Error>;
 }
 
 pub trait PublicApi {
@@ -251,15 +266,12 @@ impl PrivateApi for ApiImpl<'_> {
     fn migration_status(
         &self,
         query: MigrationInfoQuery,
-    ) -> Result<ProcessStateResponse, Self::Error> {
+    ) -> Result<MigrationStateResponse, Self::Error> {
         let request = MigrationRequest::try_from(query)?;
         let schema = SchemaImpl::new(self.0.service_data());
-        let status = schema
-            .migration_states
-            .get(&request)
-            .map(|state| state.inner);
+        let status = schema.migration_states.get(&request);
 
-        Ok(ProcessStateResponse::new(status))
+        Ok(MigrationStateResponse::new(status))
     }
 }
 

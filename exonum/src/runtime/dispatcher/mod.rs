@@ -415,35 +415,6 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Checks whether migration can be performed and will require the execution of exactly one
-    /// migration script.
-    ///
-    /// This method is required for supervisor, since it's unable yet to perform migrations which
-    /// contain more than one script automatically.
-    pub(crate) fn exactly_one_migration_script(
-        &self,
-        fork: &Fork,
-        new_artifact: &ArtifactId,
-        service_name: &str,
-    ) -> Result<bool, ExecutionError> {
-        let schema = Schema::new(fork);
-        let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
-
-        let runtime = self
-            .runtime_by_id(new_artifact.runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
-
-        let result = runtime
-            .migrate(&new_artifact, instance_state.data_version())
-            .map(|maybe_script| {
-                maybe_script.map_or(false, |script| {
-                    new_artifact.version == *script.end_version()
-                })
-            })?;
-
-        Ok(result)
-    }
-
     /// Initiates migration rollback. The rollback will actually be performed once
     /// the block corresponding to `fork` is committed.
     pub(crate) fn rollback_migration(

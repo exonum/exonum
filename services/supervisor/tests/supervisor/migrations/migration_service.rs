@@ -319,11 +319,26 @@ pub struct MigrationServiceV02;
 
 impl Service for MigrationServiceV02 {}
 
+/// Service with a fast-forward migration (0.1.0 -> 0.1.1).
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.1.1")]
+pub struct MigrationServiceV01_1;
+
+impl Service for MigrationServiceV01_1 {}
+
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.5.0")]
 pub struct MigrationServiceV05;
 
 impl Service for MigrationServiceV05 {}
+
+/// Service with mixed migrations (data migrations 0.1.0 -> 0.2.0, 0.2.0 -> 0.5.0, and
+/// fast-forward migration 0.5.0 -> 0.5.1)
+#[derive(Debug, ServiceFactory, ServiceDispatcher)]
+#[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.5.1")]
+pub struct MigrationServiceV05_1;
+
+impl Service for MigrationServiceV05_1 {}
 
 pub const SERVICE_ID: InstanceId = 512;
 pub const SERVICE_NAME: &str = "migration-service";
@@ -344,7 +359,28 @@ impl MigrateData for MigrationServiceV02 {
     }
 }
 
+impl MigrateData for MigrationServiceV01_1 {
+    fn migration_scripts(
+        &self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        LinearMigrations::new(self.artifact_id().version).select(start_version)
+    }
+}
+
 impl MigrateData for MigrationServiceV05 {
+    fn migration_scripts(
+        &self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        LinearMigrations::new(self.artifact_id().version)
+            .add_script(Version::new(0, 2, 0), merkelize_wallets)
+            .add_script(Version::new(0, 5, 0), transform_wallet_type)
+            .select(start_version)
+    }
+}
+
+impl MigrateData for MigrationServiceV05_1 {
     fn migration_scripts(
         &self,
         start_version: &Version,

@@ -12,35 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::Hash, runtime::ExecutionError};
+use exonum::{
+    crypto::Hash,
+    runtime::{ExecutionError, Version},
+};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
+use serde_derive::{Deserialize, Serialize};
 
 use super::{proto, AsyncEventState, MigrationError};
 
-#[doc(hidden)]
+/// State of a migration.
 #[derive(Debug, Clone)]
 #[derive(ProtobufConvert, BinaryValue)]
+#[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::MigrationState")]
 pub struct MigrationState {
     /// Migration process state.
-    pub inner: AsyncEventState,
+    pub state: AsyncEventState,
+
+    /// Current artifact data version.
+    #[protobuf_convert(with = "pb_version")]
+    pub version: Version,
+
     /// Expected state hash. Equals to the first obtained local migration state hash.
     /// For a good scenario, all the hashes should be equal between each other.
     /// For the bad scenario, at least one node obtains the different hash and that's enough
     /// to consider migration failed.
     #[protobuf_convert(with = "pb_expected_state_hash")]
-    pub expected_state_hash: Option<Hash>,
+    #[serde(skip)]
+    pub(crate) expected_state_hash: Option<Hash>,
 }
 
 impl MigrationState {
-    pub fn new(inner: AsyncEventState) -> Self {
+    /// Creates a new `MigrationState` object.
+    pub fn new(state: AsyncEventState, version: Version) -> Self {
         Self {
-            inner,
+            state,
+            version,
             expected_state_hash: None,
         }
     }
 
+    /// Adds a new state hash to the migration state.
+    /// If this is a first hash, the `expected_hash` value will be initialized.
+    /// Otherwise, provided hash will be compared to `expected_hash`.
     pub fn add_state_hash(&mut self, state_hash: Hash) -> Result<(), ExecutionError> {
         if let Some(expected_hash) = self.expected_state_hash {
             // We already have an expected hash, so we compare a new one against it.
@@ -57,12 +73,28 @@ impl MigrationState {
         Ok(())
     }
 
+    /// Checks whether migration is failed.
     pub fn is_failed(&self) -> bool {
-        self.inner.is_failed()
+        self.state.is_failed()
     }
 
-    pub fn update(&mut self, new_state: AsyncEventState) {
-        self.inner = new_state;
+    /// Updates migration state to the new state and artifact.
+    pub fn update(&mut self, new_state: AsyncEventState, version: Version) {
+        self.state = new_state;
+        self.version = version;
+    }
+
+    /// Marks migration as failed.
+    pub fn fail(&mut self, new_state: AsyncEventState) {
+        debug_assert!(new_state.is_failed());
+
+        self.state = new_state;
+    }
+
+    /// Returns the expected state hash.
+    #[doc(hidden)] // Public for tests.
+    pub fn expected_state_hash(&self) -> &Option<Hash> {
+        &self.expected_state_hash
     }
 }
 
@@ -88,5 +120,17 @@ mod pb_expected_state_hash {
         } else {
             Hash::to_pb(&Hash::zero())
         }
+    }
+}
+
+mod pb_version {
+    use super::*;
+
+    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
+        pb.parse().map_err(From::from)
+    }
+
+    pub fn to_pb(value: &Version) -> String {
+        value.to_string()
     }
 }

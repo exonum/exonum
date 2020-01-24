@@ -220,6 +220,22 @@ fn get_instance(
         .map_err(From::from)
 }
 
+/// Returns the information about a service instance by its name.
+pub(crate) fn get_instance_by_name(
+    context: &ExecutionContext<'_>,
+    service: &str,
+) -> Result<InstanceState, ExecutionError> {
+    context
+        .data()
+        .for_dispatcher()
+        .get_instance(service)
+        .ok_or_else(|| {
+            ConfigurationError::MalformedConfigPropose
+                .with_description("Instance with the specified ID is absent.")
+        })
+        .map_err(From::from)
+}
+
 impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
     type Output = Result<(), ExecutionError>;
 
@@ -440,10 +456,15 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         // Verify that transaction author is validator.
         let author = get_validator(&context)?;
 
+        // Verify that artifact can be parsed.
+        // Check that we can migrate to the provided artifact will be performed by core.
         request
             .new_artifact
             .validate()
             .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
+
+        // Check that target instance exists.
+        let instance = get_instance_by_name(&context, request.service.as_ref())?;
 
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
@@ -463,8 +484,9 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 request.service
             );
             // Store initial state of the request.
-            let state = MigrationState::new(AsyncEventState::Pending);
-            schema.migration_states.put(&request, state);
+            let state =
+                MigrationState::new(AsyncEventState::Pending, instance.data_version().clone());
+            schema.migration_states.put(&request, state.clone());
             // Store the migration as pending. It will be removed in `before_transactions` hook
             // once the migration will be completed (either successfully or unsuccessfully).
             schema.pending_migrations.insert(request.clone());
@@ -476,18 +498,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             drop(schema);
             let supervisor_extensions = context.supervisor_extensions();
             let result = supervisor_extensions
-                .exactly_one_migration_script(&request.new_artifact, request.service.as_ref())
-                .and_then(|simple_migration| {
-                    // Currently supervisor supports only migrations with one script.
-                    if simple_migration {
-                        supervisor_extensions.initiate_migration(
-                            request.new_artifact.clone(),
-                            request.service.as_ref(),
-                        )
-                    } else {
-                        Err(MigrationError::ComplexMigration.into())
-                    }
-                });
+                .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
 
             // Check whether migration started successfully.
             if let Err(error) = result {
@@ -496,7 +507,28 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 return self.fail_migration(context, request, error, initiate_rollback);
             }
 
-            // Migration started, no more actions needed.
+            // Migration started. Check if migration is fast-forward.
+            let instance = get_instance_by_name(&context, request.service.as_ref())
+                .expect("BUG: Instance disappeared");
+            if state.version != *instance.data_version() {
+                // Migration is fast-forward, complete it immediately.
+                // No agreement needed, since nodes which will behave differently will obtain
+                // different blockchain state hash and will be excluded from consensus.
+                log::trace!("Applied fast-forward migration with request {:?}", request);
+
+                let mut schema = SchemaImpl::new(context.service_data());
+
+                // Update the state of a migration.
+                let mut state = schema
+                    .migration_states
+                    .get(&request)
+                    .expect("BUG: Migration succeed, but does not have a stored state");
+                state.update(AsyncEventState::Succeed, instance.data_version().clone());
+                schema.migration_states.put(&request, state);
+
+                // Remove the migration from the list of pending.
+                schema.pending_migrations.remove(&request);
+            }
         }
         Ok(())
     }
@@ -745,11 +777,12 @@ impl Supervisor {
                 state_hash
             );
 
-            // Mark migration as succeed.
-            // Migration will be flushed and removed from pending in `before_transactions`
+            // Schedule migration for a flush.
+            // Migration will be flushed and marked as succeed in `before_transactions`
             // hook of the next block.
-            state.update(AsyncEventState::Succeed);
             schema.migration_states.put(&request, state);
+            schema.pending_migrations.remove(&request);
+            schema.migrations_to_flush.insert(request.clone());
 
             drop(schema);
 
@@ -795,7 +828,7 @@ impl Supervisor {
             .get(&request)
             .expect("BUG: Attempt to rollback a migration which does not have a stored state");
 
-        state.update(AsyncEventState::Failed { height, error });
+        state.fail(AsyncEventState::Failed { height, error });
         schema.migration_states.put(&request, state);
 
         // Migration is not pending anymore, remove it.

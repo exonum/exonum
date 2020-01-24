@@ -395,21 +395,6 @@ impl<'a> SupervisorExtensions<'a> {
             .initiate_migration(self.0.fork, new_artifact, old_service)
     }
 
-    /// Checks whether migration can be performed and will require the execution of exactly one
-    /// migration script.
-    ///
-    /// This method is required for supervisor, since it's unable yet to perform migrations which
-    /// contain more than one script automatically.
-    pub fn exactly_one_migration_script(
-        &self,
-        new_artifact: &ArtifactId,
-        old_service: &str,
-    ) -> Result<bool, ExecutionError> {
-        self.0
-            .dispatcher
-            .exactly_one_migration_script(self.0.fork, new_artifact, old_service)
-    }
-
     /// Rolls back previously initiated migration.
     pub fn rollback_migration(&self, service_name: &str) -> Result<(), ExecutionError> {
         Dispatcher::rollback_migration(self.0.fork, service_name)

@@ -63,19 +63,19 @@
 //! to migrate, end artifact version to achieve after migration, and deadline height until which
 //! migration should be completed.
 //!
-//! The following pre-requirements should be satisfied in order to start a migration:
+//! ### Requirements
+//!
+//! The following requirements should be satisfied in order to start a migration:
 //!
 //! - Target service instance should exist and be stopped.
 //! - End artifact for a migration should be a superior version of the artifact of target instance.
 //! - New (end) version of artifact should be deployed.
 //! - Service should have all the migration scripts required to migrate to the end artifact version.
-//! - Migration contains only one migration script. It means that if you need to migrate service from
-//!   version 0.1 to version 0.3, and this will include execution of two migration scripts (0.1 -> 0.2
-//!   and 0.2 -> 0.3), you should request two separate migrations, an attempt to directly migrate from
-//!   version 0.1 to 0.3 will fail.
 //!
 //! Violation of any of requirements listed above will result in a request failure without
 //! actual start of migration.
+//!
+//! ## Migration Workflow
 //!
 //! Migration starts in the next block relative to the actual block at the moment of receiving a
 //! request, and performed asynchronously.
@@ -94,6 +94,27 @@
 //! It will require a different deadline height though, since `MigrationRequest` objects are considered
 //! unique and supervisor won't attempt to perform the same `MigrationRequest` again.
 //!
+//! ### Complex Migrations
+//!
+//! If migration contains more than one migration script (e.g. if you need to migrate service from
+//! version 0.1 to version 0.3, and this will include execution of two migration scripts: 0.1 -> 0.2
+//! and 0.2 -> 0.3), supervisor will perform one migration script at the time.
+//!
+//! After the first migration request to version 0.3, migration will be performed for version 0.2,
+//! and you need to create the same migration request again (with different deadline height though).
+//!
+//! After the second migration request, the version will be updated to 0.3.
+//!
+//! To put it simply, you may need to perform the same migration request several times until every
+//! step of migration is completed.
+//!
+//! ### Incomplete Migrations
+//!
+//! Migrations require only the current and the last version of artifact to be deployed. If you will
+//! decide to stop migration until reaching the last version (e.g. you requested migration to version
+//! 0.3, but decided to go with version 0.2), you will have to deploy a corresponding artifact after
+//! you migrate to version 0.2, before you'll be able to start your service.
+//!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 //! [`DeployRequest`]: struct.DeployRequest.html
@@ -108,10 +129,11 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, MigrationInfoQuery, ProcessStateResponse},
+    api::{DeployInfoQuery, MigrationInfoQuery, MigrationStateResponse, ProcessStateResponse},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
     errors::{ArtifactError, CommonError, ConfigurationError, MigrationError, ServiceError},
     event_state::AsyncEventState,
+    migration_state::MigrationState,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
         DeployResult, MigrationRequest, MigrationResult, ResumeService, ServiceConfig,
@@ -514,35 +536,32 @@ impl Supervisor {
         let schema = SchemaImpl::new(context.service_data());
 
         // Collect pending migration requests which are successfully completed.
-        let finished_migrations = schema
-            .pending_migrations
-            .iter()
-            .filter_map(|(_, request)| {
-                let state = schema
-                    .migration_states
-                    .get(&request)
-                    .expect("BUG: State for pending migration request is not stored");
-
-                if state.inner.is_succeed() {
-                    Some(request)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let finished_migrations = schema.migrations_to_flush.iter().collect::<Vec<_>>();
 
         drop(schema);
-        for request in finished_migrations {
-            // Remove the migration from the list of pending.
-            let mut schema = SchemaImpl::new(context.service_data());
-            schema.pending_migrations.remove(&request);
-
+        for (_, request) in finished_migrations {
             // Flush the migration.
-            drop(schema);
+            // This has to be done before the state update, so core will update the data version
+            // for instance.
             context
                 .supervisor_extensions()
                 .flush_migration(request.service.as_ref())?;
             log::trace!("Flushed and finished migration with request {:?}", request);
+
+            let mut schema = SchemaImpl::new(context.service_data());
+
+            // Update the state of a migration.
+            let mut state = schema
+                .migration_states
+                .get(&request)
+                .expect("BUG: Migration succeed, but does not have a stored state");
+            let instance = transactions::get_instance_by_name(&context, request.service.as_ref())
+                .expect("BUG: Migration succeed, but there is no such instance in core");
+            state.update(AsyncEventState::Succeed, instance.data_version().clone());
+            schema.migration_states.put(&request, state);
+
+            // Remove the migration from the list of not flushed.
+            schema.migrations_to_flush.remove(&request);
         }
 
         Ok(())
@@ -576,9 +595,9 @@ impl Supervisor {
                 .migration_states
                 .get(&request)
                 .expect("BUG: State for pending migration request is not stored");
-            if state.inner.is_pending() {
+            if state.state.is_pending() {
                 // If state is marked as pending, change it to failed as well.
-                state.update(AsyncEventState::Timeout);
+                state.fail(AsyncEventState::Timeout);
                 schema.migration_states.put(&request, state);
 
                 // Then, rollback the migration.
@@ -620,7 +639,7 @@ impl Supervisor {
                     // Thus if request is `pending` and there is no out signature in
                     // `migration_confirmations` index, it means than we did not send the
                     // result report, and should do it once core will provide this result.
-                    if state.inner.is_pending() && !confirmed_by_us {
+                    if state.state.is_pending() && !confirmed_by_us {
                         Some(request)
                     } else {
                         None

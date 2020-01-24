@@ -17,7 +17,7 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::access::Prefixed,
     runtime::{
-        migrations::MigrationStatus, CoreError, ErrorMatch, ExecutionError, InstanceId,
+        migrations::MigrationStatus, CoreError, ErrorMatch, ExecutionError, InstanceId, Version,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -26,7 +26,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
     AsyncEventState, ConfigPropose, MigrationError, MigrationInfoQuery, MigrationRequest,
-    MigrationResult, ProcessStateResponse, SchemaImpl, Supervisor, SupervisorInterface,
+    MigrationResult, MigrationStateResponse, SchemaImpl, Supervisor, SupervisorInterface,
 };
 
 use std::{thread, time::Duration};
@@ -34,7 +34,8 @@ use std::{thread, time::Duration};
 use crate::service_lifecycle::execute_transaction;
 
 use migration_service::{
-    FailingMigrationServiceV07, MigrationService, MigrationServiceV02, MigrationServiceV05,
+    FailingMigrationServiceV07, MigrationService, MigrationServiceV01_1, MigrationServiceV02,
+    MigrationServiceV05, MigrationServiceV05_1,
 };
 
 mod migration_service;
@@ -55,6 +56,11 @@ fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
     // Add MigrationService with running instance.
     let builder = builder.with_default_rust_service(MigrationService);
 
+    // Add migrating artifact for version 0.1.1.
+    let builder = builder
+        .with_migrating_rust_service(MigrationServiceV01_1)
+        .with_artifact(MigrationServiceV01_1.artifact_id());
+
     // Add migrating artifact for version 0.2.
     let builder = builder
         .with_migrating_rust_service(MigrationServiceV02)
@@ -64,6 +70,11 @@ fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
     let builder = builder
         .with_migrating_rust_service(MigrationServiceV05)
         .with_artifact(MigrationServiceV05.artifact_id());
+
+    // Add artifact for version 0.5.1.
+    let builder = builder
+        .with_migrating_rust_service(MigrationServiceV05_1)
+        .with_artifact(MigrationServiceV05_1.artifact_id());
 
     builder.create()
 }
@@ -106,7 +117,7 @@ fn request_migration(api: &TestKitApi, request: MigrationRequest) -> Hash {
 }
 
 /// Obtains a migration state through API.
-fn migration_state(api: &TestKitApi, request: MigrationRequest) -> ProcessStateResponse {
+fn migration_state(api: &TestKitApi, request: MigrationRequest) -> MigrationStateResponse {
     let query: MigrationInfoQuery = request.into();
     api.private(ApiKind::Service("supervisor"))
         .query(&query)
@@ -137,15 +148,15 @@ fn obtain_expected_hash(testkit: &mut TestKit, request: &MigrationRequest) -> Ha
             .expect("Migration state is not stored");
 
         assert!(
-            state.inner.is_pending(),
+            state.state.is_pending(),
             "State changed from pending while awaiting for expected hash: {:?}",
             state
         );
 
-        let expected_hash = state.expected_state_hash;
+        let expected_hash = state.expected_state_hash();
 
         if let Some(expected_hash) = expected_hash {
-            return expected_hash;
+            return *expected_hash;
         } else {
             // Migration is executed in the separate thread, so sleep a bit.
             thread::sleep(Duration::from_millis(50));
@@ -160,6 +171,7 @@ fn wait_for_migration_success(
     testkit: &mut TestKit,
     deadline_height: Height,
     request: MigrationRequest,
+    version: Version,
 ) {
     let mut success = false;
     while testkit.height() <= deadline_height.next() {
@@ -169,12 +181,13 @@ fn wait_for_migration_success(
             .state
             .expect("State for requested migration is not stored");
 
-        match migration_state {
+        match migration_state.state {
             AsyncEventState::Pending => {
                 // Not ready yet.
             }
             AsyncEventState::Succeed => {
                 // Migration completed.
+                assert_eq!(migration_state.version, version);
                 success = true;
                 break;
             }
@@ -202,7 +215,7 @@ fn wait_for_migration_fail(
             .state
             .expect("State for requested migration is not stored");
 
-        match migration_state {
+        match migration_state.state {
             AsyncEventState::Pending => {
                 // Not ready yet.
             }
@@ -231,7 +244,7 @@ fn wait_for_migration_timeout(
             .state
             .expect("State for requested migration is not stored");
 
-        match migration_state {
+        match migration_state.state {
             AsyncEventState::Pending => {
                 // Not ready yet.
             }
@@ -280,7 +293,12 @@ fn migration() {
         .status()
         .expect("Transaction should be executed successfully");
 
-    wait_for_migration_success(&mut testkit, deadline_height, request);
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 2, 0),
+    );
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
@@ -312,7 +330,12 @@ fn migration_two_scripts_sequential() {
         .status()
         .expect("Transaction should be executed successfully");
 
-    wait_for_migration_success(&mut testkit, deadline_height, request);
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 2, 0),
+    );
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
@@ -335,7 +358,12 @@ fn migration_two_scripts_sequential() {
         .status()
         .expect("Transaction should be executed successfully");
 
-    wait_for_migration_success(&mut testkit, deadline_height, request);
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 5, 0),
+    );
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
@@ -406,16 +434,17 @@ fn migration_fail() {
     );
 }
 
-/// This test checks that attempt to request a complex migration (which will require
-/// multiple migration scripts to be executed) results in a migration failure.
+/// This test checks that migration that contains two migration scripts completes
+/// successfully in two steps.
 #[test]
-fn complex_migration_fails() {
+fn complex_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
     // Stop service instance before running the migration.
     stop_service(&mut testkit, MigrationService::INSTANCE_ID);
 
-    // Request migration.
+    // Request migration to 0.5.
+    // This migration will require two migration requests.
     let deadline_height = DEADLINE_HEIGHT;
     let request = MigrationRequest {
         new_artifact: MigrationServiceV05.artifact_id(),
@@ -427,18 +456,51 @@ fn complex_migration_fails() {
     let tx_hash = request_migration(&api, request.clone());
     let block = testkit.create_block();
 
-    // Despite the fact that migration should fail, the transaction with request
-    // should be executed successfully.
     block[tx_hash]
         .status()
         .expect("Transaction should be executed successfully");
 
-    let error = wait_for_migration_fail(&mut testkit, deadline_height, request);
-
-    assert_eq!(
-        error,
-        ErrorMatch::from_fail(&MigrationError::ComplexMigration).with_any_description()
+    // After the first migration step, version should be "0.2".
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 2, 0),
     );
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+
+    migration_service::v02::verify_schema(prefixed);
+
+    // Request the same migration.
+    let deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
+    let request = MigrationRequest {
+        new_artifact: MigrationServiceV05.artifact_id(),
+        service: MigrationService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    // Now we finally should have version "0.5".
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 5, 0),
+    );
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+
+    migration_service::v05::verify_schema(prefixed);
 }
 
 /// This test checks that attempt to request a migration for service that doesn't support
@@ -529,12 +591,17 @@ fn migration_consensus() {
     let migration_state = migration_state(&api, request.clone())
         .state
         .expect("State for requested migration is not stored");
-    assert!(migration_state.is_pending());
+    assert!(migration_state.state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
     // Now wait for migration success.
-    wait_for_migration_success(&mut testkit, deadline_height, request);
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 2, 0),
+    );
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
@@ -594,7 +661,7 @@ fn migration_no_consensus() {
     let migration_state = migration_state(&api, request.clone())
         .state
         .expect("State for requested migration is not stored");
-    assert!(migration_state.is_pending());
+    assert!(migration_state.state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
@@ -677,7 +744,7 @@ fn migration_hash_divergence() {
     let migration_state = migration_state(&api, request.clone())
         .state
         .expect("State for requested migration is not stored");
-    assert!(migration_state.is_pending());
+    assert!(migration_state.state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
@@ -694,4 +761,134 @@ fn migration_hash_divergence() {
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
 
     migration_service::v01::verify_schema(prefixed);
+}
+
+/// Test for a fast-forward migration (0.1.0 - 0.1.1)
+#[test]
+fn fast_forward_migration() {
+    let mut testkit = testkit_with_supervisor_and_service(1);
+
+    // Stop service instance before running the migration.
+    stop_service(&mut testkit, MigrationService::INSTANCE_ID);
+
+    // Request migration.
+    let deadline_height = DEADLINE_HEIGHT;
+    let request = MigrationRequest {
+        new_artifact: MigrationServiceV01_1.artifact_id(),
+        service: MigrationService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 1, 1),
+    );
+}
+
+/// This test checks mixed migration scenario: two data migrations and one fast-forward.
+#[test]
+fn mixed_migration() {
+    let mut testkit = testkit_with_supervisor_and_service(1);
+
+    // Stop service instance before running the migration.
+    stop_service(&mut testkit, MigrationService::INSTANCE_ID);
+
+    // Request migration to 0.5.1.
+    // This migration will require three migration requests.
+    let deadline_height = DEADLINE_HEIGHT;
+    let request = MigrationRequest {
+        new_artifact: MigrationServiceV05_1.artifact_id(),
+        service: MigrationService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    // After the first migration step, version should be "0.2".
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 2, 0),
+    );
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+
+    migration_service::v02::verify_schema(prefixed);
+
+    // Request the same migration.
+    let deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
+    let request = MigrationRequest {
+        new_artifact: MigrationServiceV05_1.artifact_id(),
+        service: MigrationService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    // Now we should have version "0.5".
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 5, 0),
+    );
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+
+    migration_service::v05::verify_schema(prefixed);
+
+    // Request the same migration for the third time.
+    let deadline_height = Height(DEADLINE_HEIGHT.0 * 3);
+    let request = MigrationRequest {
+        new_artifact: MigrationServiceV05_1.artifact_id(),
+        service: MigrationService::INSTANCE_NAME.into(),
+        deadline_height,
+    };
+
+    let api = testkit.api();
+    let tx_hash = request_migration(&api, request.clone());
+    let block = testkit.create_block();
+
+    block[tx_hash]
+        .status()
+        .expect("Transaction should be executed successfully");
+
+    // Now we finally should have version "0.5.1".
+    wait_for_migration_success(
+        &mut testkit,
+        deadline_height,
+        request,
+        Version::new(0, 5, 1),
+    );
+
+    let snapshot = testkit.snapshot();
+    let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, &snapshot);
+
+    // Data should not change.
+    migration_service::v05::verify_schema(prefixed);
 }
