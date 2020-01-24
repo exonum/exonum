@@ -31,6 +31,8 @@ const ACCESS_ERROR_STR: &str = "An attempt to access blockchain data after execu
 ///
 /// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
 /// or the service constructor invocation.
+///
+/// Errors that occur after making nested calls must bubble up to the upper level.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
