@@ -76,6 +76,13 @@
 //! returns to the [`Stopped`] status. The local migration result is ignored; if the migration
 //! script has not completed locally, it is aborted.
 //!
+//! Note that commitment and flushing are separate operations and need to be performed in
+//! different blocks. When a migration is flushed, the migrated data needs to have a definite
+//! state, which is ensured by an earlier commitment acting as a [Great Filter]. The requirement
+//! for different blocks is more nuanced and is related to implementation details of the database
+//! backend. Namely, the flushing operation needs to be performed on a fork which contains the final
+//! migration state; not doing this may break hash aggregation.
+//!
 //! Deciding when it is appropriate to commit or roll back a migration is the responsibility
 //! of the supervisor service. For example, it may commit the migration once all validators have
 //! submitted identical migration results, and roll back a migration if at least one validator
@@ -90,6 +97,7 @@
 //! [`local_migration_result()`]: ../struct.DispatcherSchema.html#method.local_migration_result
 //! [artifact commitment]: ../index.html#artifact-lifecycle
 //! [`Stopped`]: ../enum.InstanceStatus.html#variant.Stopped
+//! [Great Filter]: https://en.wikipedia.org/wiki/Great_Filter
 
 pub use super::types::{InstanceMigration, MigrationStatus};
 
