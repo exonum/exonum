@@ -49,7 +49,7 @@ pub struct ExecutionContext<'a> {
     /// Depth of the call stack.
     call_stack_depth: u64,
     /// Flag indicates that there was an error occurred during the child call.
-    has_child_call_error: bool,
+    has_child_call_error: &'a mut bool,
 }
 
 impl<'a> ExecutionContext<'a> {
@@ -59,6 +59,7 @@ impl<'a> ExecutionContext<'a> {
     pub(crate) fn for_transaction(
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
+        has_child_call_error: &'a mut bool,
         instance: InstanceDescriptor<'a>,
         author: PublicKey,
         transaction_hash: Hash,
@@ -66,6 +67,7 @@ impl<'a> ExecutionContext<'a> {
         Self::new(
             dispatcher,
             fork,
+            has_child_call_error,
             instance,
             Caller::Transaction { author },
             Some(transaction_hash),
@@ -75,14 +77,23 @@ impl<'a> ExecutionContext<'a> {
     pub(crate) fn for_block_call(
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
+        has_child_call_error: &'a mut bool,
         instance: InstanceDescriptor<'a>,
     ) -> Self {
-        Self::new(dispatcher, fork, instance, Caller::Blockchain, None)
+        Self::new(
+            dispatcher,
+            fork,
+            has_child_call_error,
+            instance,
+            Caller::Blockchain,
+            None,
+        )
     }
 
     fn new(
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
+        has_child_call_error: &'a mut bool,
         instance: InstanceDescriptor<'a>,
         caller: Caller,
         transaction_hash: Option<Hash>,
@@ -95,7 +106,7 @@ impl<'a> ExecutionContext<'a> {
             transaction_hash,
             interface_name: "",
             call_stack_depth: 0,
-            has_child_call_error: false,
+            has_child_call_error,
         }
     }
 
@@ -107,7 +118,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Provides access to blockchain data.
     pub fn data(&self) -> BlockchainData<'a, &Fork> {
-        if self.has_child_call_error {
+        if *self.has_child_call_error {
             panic!(ACCESS_ERROR_STR);
         }
 
@@ -181,6 +192,7 @@ impl<'a> ExecutionContext<'a> {
         runtime
             .initiate_adding_service(context, &spec.artifact, constructor.into_bytes())
             .map_err(|mut err| {
+                self.should_rollback();
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite::new(spec.id, CallType::Constructor));
                 err
@@ -194,7 +206,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Re-borrows an execution context with the given instance descriptor.
     fn reborrow<'s>(&'s mut self, instance: InstanceDescriptor<'s>) -> ExecutionContext<'s> {
-        if self.has_child_call_error {
+        if *self.has_child_call_error {
             panic!(ACCESS_ERROR_STR);
         }
 
@@ -206,7 +218,7 @@ impl<'a> ExecutionContext<'a> {
             interface_name: self.interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
-            has_child_call_error: false,
+            has_child_call_error: self.has_child_call_error,
         }
     }
 
@@ -224,7 +236,7 @@ impl<'a> ExecutionContext<'a> {
         instance: InstanceDescriptor<'s>,
         fallthrough_auth: bool,
     ) -> ExecutionContext<'s> {
-        if self.has_child_call_error {
+        if *self.has_child_call_error {
             panic!(ACCESS_ERROR_STR);
         }
 
@@ -244,8 +256,13 @@ impl<'a> ExecutionContext<'a> {
             fork: &mut *self.fork,
             interface_name,
             call_stack_depth: self.call_stack_depth + 1,
-            has_child_call_error: false,
+            has_child_call_error: self.has_child_call_error,
         }
+    }
+
+    /// Sets the flag that the fork should rollback after this execution.
+    pub(crate) fn should_rollback(&mut self) {
+        *self.has_child_call_error = true;
     }
 }
 
@@ -279,44 +296,37 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
         arguments: &[u8],
         fallthrough_auth: bool,
     ) -> Result<(), ExecutionError> {
-        // Move logic to closure to catch execution errors in uniform way.
-        let child_call = || {
-            if self.call_stack_depth + 1 >= Self::MAX_CALL_STACK_DEPTH {
-                let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
-                return Err(err);
-            }
+        if self.call_stack_depth + 1 >= Self::MAX_CALL_STACK_DEPTH {
+            let err = CoreError::stack_overflow(Self::MAX_CALL_STACK_DEPTH);
+            return Err(err);
+        }
 
-            let descriptor = self
-                .dispatcher
-                .get_service(called_instance)
-                .ok_or(CoreError::IncorrectInstanceId)?;
+        let descriptor = self
+            .dispatcher
+            .get_service(called_instance)
+            .ok_or(CoreError::IncorrectInstanceId)?;
 
-            let (runtime_id, runtime) = self
-                .dispatcher
-                .runtime_for_service(descriptor.id)
-                .ok_or(CoreError::IncorrectRuntime)?;
+        let (runtime_id, runtime) = self
+            .dispatcher
+            .runtime_for_service(descriptor.id)
+            .ok_or(CoreError::IncorrectRuntime)?;
 
-            let context = self.child_context(interface_name, descriptor, fallthrough_auth);
-            runtime
-                .execute(context, method_id, arguments)
-                .map_err(|mut err| {
-                    err.set_runtime_id(runtime_id).set_call_site(|| {
-                        CallSite::new(
-                            descriptor.id,
-                            CallType::Method {
-                                interface: interface_name.to_owned(),
-                                id: method_id,
-                            },
-                        )
-                    });
-                    err
-                })
-        };
-        // Set has_child_call_error if an execution error occurs.
-        child_call().map_err(|e| {
-            self.has_child_call_error = true;
-            e
-        })
+        let context = self.child_context(interface_name, descriptor, fallthrough_auth);
+        runtime
+            .execute(context, method_id, arguments)
+            .map_err(|mut err| {
+                self.should_rollback();
+                err.set_runtime_id(runtime_id).set_call_site(|| {
+                    CallSite::new(
+                        descriptor.id,
+                        CallType::Method {
+                            interface: interface_name.to_owned(),
+                            id: method_id,
+                        },
+                    )
+                });
+                err
+            })
     }
 }
 
@@ -399,8 +409,9 @@ impl<'a> SupervisorExtensions<'a> {
                 params.into_bytes(),
             )
             .map_err(|mut err| {
+                self.0.should_rollback();
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite::new(instance_id, CallType::Constructor));
+                    .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
                 err
             })?;
 

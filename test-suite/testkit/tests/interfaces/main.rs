@@ -16,7 +16,9 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     crypto,
     messages::{AnyTx, Verified},
-    runtime::{CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError},
+    runtime::{
+        CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, SnapshotExt,
+    },
 };
 use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{TestKit, TestKitBuilder};
@@ -25,10 +27,10 @@ use pretty_assertions::assert_eq;
 use crate::{
     error::Error,
     interface::IssueReceiverMut,
+    schema::{Wallet, WalletSchema},
     services::{
-        AnyCall, AnyCallService, CallAny, CustomCallInterface,
-        CustomCallServiceFactory, DepositInterface, DepositService, Issue, TxIssue,
-        WalletInterface, WalletService,
+        AnyCall, AnyCallService, CallAny, CustomCallInterface, CustomCallServiceFactory,
+        DepositInterface, DepositService, Issue, TxIssue, WalletInterface, WalletService,
     },
 };
 
@@ -394,7 +396,7 @@ fn test_any_call_panic_recursion_limit() {
     );
 }
 
-fn execute_custom_call<F>(f: F) -> Result<(), ExecutionError>
+fn execute_custom_call<F>(f: F) -> (TestKit, Result<(), ExecutionError>)
 where
     F: Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Clone + Send + 'static,
 {
@@ -417,15 +419,16 @@ where
         .create();
 
     let keypair = crypto::gen_keypair();
-    execute_transaction(
+    let res = execute_transaction(
         &mut testkit,
         keypair.custom_call(CustomCallServiceFactory::INSTANCE_ID, vec![]),
-    )
+    );
+    (testkit, res)
 }
 
-fn assert_access_blockchain_data(err: ExecutionError) {
+fn assert_access_blockchain_data(res: Result<(), ExecutionError>) {
     assert_eq!(
-        err,
+        res.unwrap_err(),
         ErrorMatch::any_unexpected().with_description_containing(
             "An attempt to access blockchain data after execution error"
         )
@@ -438,13 +441,22 @@ fn custom_call_ok() {
         context.service_data();
         Ok(())
     })
+    .1
     .unwrap();
 }
 
 #[test]
-fn custom_call_err_interface_call() {
-    let err = execute_custom_call(|mut context| {
+fn custom_call_err_interface_call_access_panic() {
+    let (testkit, res) = execute_custom_call(|mut context| {
         let to = context.caller().author().unwrap();
+        // Write data to blockchain.
+        WalletSchema::new(context.service_data()).wallets.put(
+            &to,
+            Wallet {
+                name: "Magic".to_string(),
+                balance: 102,
+            },
+        );
         // Ignore child call error.
         let err = context
             .issue(WalletService::ID, Issue { to, amount: 0 })
@@ -453,16 +465,63 @@ fn custom_call_err_interface_call() {
         // Try to access service data.
         context.service_data();
         Ok(())
-    })
-    .unwrap_err();
+    });
 
-    assert_access_blockchain_data(err);
+    assert_access_blockchain_data(res);
+    // Verify that the changes made by `execute_custom_call` have been reverted.
+    let snapshot = testkit.snapshot();
+    let schema = WalletSchema::new(
+        snapshot
+            .for_service(CustomCallServiceFactory::INSTANCE_NAME)
+            .unwrap(),
+    );
+    assert_eq!(schema.wallets.values().collect::<Vec<_>>(), vec![]);
+}
+
+#[test]
+fn custom_call_err_interface_call_always_revert() {
+    let (testkit, res) = execute_custom_call(|mut context| {
+        let to = context.caller().author().unwrap();
+        // Write data to blockchain.
+        WalletSchema::new(context.service_data()).wallets.put(
+            &to,
+            Wallet {
+                name: "Magic".to_string(),
+                balance: 102,
+            },
+        );
+        // Ignore child call error.
+        let err = context
+            .issue(WalletService::ID, Issue { to, amount: 0 })
+            .unwrap_err();
+        assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
+        Ok(())
+    });
+
+    let err = res.unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectCall));
+    // Verify that the changes made by `execute_custom_call` have been reverted.
+    let snapshot = testkit.snapshot();
+    let schema = WalletSchema::new(
+        snapshot
+            .for_service(CustomCallServiceFactory::INSTANCE_NAME)
+            .unwrap(),
+    );
+    assert_eq!(schema.wallets.values().collect::<Vec<_>>(), vec![]);
 }
 
 #[test]
 fn custom_call_err_incorrect_instance_id() {
-    let err = execute_custom_call(|mut context| {
+    let (testkit, res) = execute_custom_call(|mut context| {
         let to = context.caller().author().unwrap();
+        // Write data to blockchain.
+        WalletSchema::new(context.service_data()).wallets.put(
+            &to,
+            Wallet {
+                name: "Magic".to_string(),
+                balance: 102,
+            },
+        );
         // Ignore child call error.
         let err = context
             .issue(WalletService::ID + 1, Issue { to, amount: 0 })
@@ -471,8 +530,21 @@ fn custom_call_err_incorrect_instance_id() {
         // Try to access blockchain data.
         context.data();
         Ok(())
-    })
-    .unwrap_err();
+    });
 
-    assert_access_blockchain_data(err);
+    res.expect("Blockchain data must be accessible");
+    // Verify that the changes made by `execute_custom_call` have been written.
+    let snapshot = testkit.snapshot();
+    let schema = WalletSchema::new(
+        snapshot
+            .for_service(CustomCallServiceFactory::INSTANCE_NAME)
+            .unwrap(),
+    );
+    assert_eq!(
+        schema.wallets.values().collect::<Vec<_>>(),
+        vec![Wallet {
+            name: "Magic".to_string(),
+            balance: 102,
+        }]
+    );
 }

@@ -229,8 +229,7 @@ pub trait CustomCallInterface<Ctx> {
     fn custom_call(&self, context: Ctx, arg: Vec<u8>) -> Self::Output;
 }
 
-type CustomCall =
-    Box<dyn Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Send + 'static>;
+type CustomCall = Box<dyn Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Send + 'static>;
 
 #[derive(ServiceFactory)]
 #[service_factory(
