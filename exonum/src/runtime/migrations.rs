@@ -83,7 +83,7 @@
 //!
 //! Note that commitment and flushing are separate operations and must be performed in
 //! different blocks. When a migration is flushed, the migrated data needs to have a definite
-//! state, which is ensured by an earlier commitment acting as a [Great Filter]. The requirement
+//! state, which is ensured by an earlier commitment acting as a filter. The requirement
 //! for different blocks is more nuanced and is related to implementation details of the database
 //! backend. Namely, the flushing operation needs to be performed on a fork which contains the final
 //! migration state; not doing this may break state aggregation.
@@ -103,7 +103,6 @@
 //! [`local_migration_result()`]: ../struct.DispatcherSchema.html#method.local_migration_result
 //! [artifact commitment]: ../index.html#artifact-lifecycle
 //! [`Stopped`]: ../enum.InstanceStatus.html#variant.Stopped
-//! [Great Filter]: https://en.wikipedia.org/wiki/Great_Filter
 
 pub use super::types::{InstanceMigration, MigrationStatus};
 
