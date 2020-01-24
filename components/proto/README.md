@@ -43,13 +43,10 @@ Sample Protobuf roundtrip:
 use exonum_proto::ProtobufConvert;
 use bit_vec::BitVec;
 
-fn main() {
-    let bit_vector = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
-
-    let bit_vector_pb = bit_vector.to_pb();
-    let deserialized_bit_vector: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
-    assert_eq!(bit_vector, deserialized_bit_vector);
-}
+let bit_vector = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
+let bit_vector_pb = bit_vector.to_pb();
+let deserialized_bit_vector: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
+assert_eq!(bit_vector, deserialized_bit_vector);
 ```
 
 ## Usage
