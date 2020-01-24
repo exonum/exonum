@@ -102,7 +102,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Provides access to blockchain data.
     pub fn data(&self) -> BlockchainData<&Fork> {
-        BlockchainData::new(self.fork, self.instance.clone())
+        BlockchainData::new(self.fork, &self.instance.name)
     }
 
     /// Provides access to the data of the executing service.

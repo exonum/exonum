@@ -62,7 +62,7 @@ impl<'a> ServiceApiState<'a> {
 
     /// Returns readonly access to blockchain data.
     pub fn data(&'a self) -> BlockchainData<&dyn Snapshot> {
-        BlockchainData::new(&self.snapshot, self.instance())
+        BlockchainData::new(&self.snapshot, &self.instance().name)
     }
 
     /// Returns readonly access to the data of the executing service.

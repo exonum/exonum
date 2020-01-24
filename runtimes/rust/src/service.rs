@@ -217,7 +217,7 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns blockchain data for the snapshot associated with this context.
     pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
-        BlockchainData::new(self.snapshot, self.broadcaster.instance())
+        BlockchainData::new(self.snapshot, &self.broadcaster.instance().name)
     }
 
     /// Returns snapshot of the data for the executing service.

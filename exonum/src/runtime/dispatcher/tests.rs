@@ -940,7 +940,7 @@ fn stopped_service_workflow() {
     let dummy_descriptor = InstanceDescriptor::new(2, "dummy");
 
     // Check that service schema is still reachable.
-    BlockchainData::new(&fork, dummy_descriptor.clone())
+    BlockchainData::new(&fork, &dummy_descriptor.name)
         .for_service(instance_name)
         .expect("Schema should be reachable");
 
@@ -957,7 +957,7 @@ fn stopped_service_workflow() {
 
     // Check that service schema is now unreachable.
     assert!(
-        BlockchainData::new(&fork, dummy_descriptor.clone())
+        BlockchainData::new(&fork, &dummy_descriptor.name)
             .for_service(instance_name)
             .is_none(),
         "Schema should be unreachable for stopped service"
@@ -998,7 +998,7 @@ fn stopped_service_workflow() {
 
     // Check that service schema is now unreachable.
     assert!(
-        BlockchainData::new(&fork, dummy_descriptor)
+        BlockchainData::new(&fork, &dummy_descriptor.name)
             .for_service(instance_name)
             .is_none(),
         "Service was stopped before restart, schema should be unreachable"

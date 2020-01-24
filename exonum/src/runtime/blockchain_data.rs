@@ -19,7 +19,7 @@ use exonum_merkledb::{
 
 use super::{
     versioning::{ArtifactReqError, RequireArtifact},
-    DispatcherSchema, InstanceDescriptor, InstanceQuery, InstanceSpec, InstanceStatus,
+    DispatcherSchema, InstanceQuery, InstanceSpec, InstanceStatus,
 };
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
@@ -27,16 +27,16 @@ use crate::blockchain::{IndexProof, Schema as CoreSchema};
 #[derive(Debug, Clone)]
 pub struct BlockchainData<T> {
     access: T,
-    service_instance: InstanceDescriptor,
+    instance_name: String,
 }
 
 impl<T: RawAccess + AsReadonly> BlockchainData<T> {
     /// Creates structured access to blockchain data based on the unstructured access
     /// (e.g., a `Snapshot` or a `Fork`) and the descriptor of the executing service.
-    pub fn new(access: T, service_instance: InstanceDescriptor) -> Self {
+    pub fn new(access: T, instance_name: impl Into<String>) -> Self {
         Self {
             access,
-            service_instance,
+            instance_name: instance_name.into(),
         }
     }
 
@@ -103,7 +103,7 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
     /// Unlike other data, this one may be writeable provided that this `BlockchainData`
     /// wraps a `Fork`.
     pub fn for_executing_service(&self) -> Prefixed<T> {
-        Prefixed::new(&self.service_instance.name, self.access.clone())
+        Prefixed::new(&self.instance_name, self.access.clone())
     }
 }
 
@@ -119,7 +119,7 @@ impl BlockchainData<&dyn Snapshot> {
     /// returned value may unexpectedly lead to a panic unless the index is initialized early
     /// (e.g., during service initialization).
     pub fn proof_for_service_index(&self, index_name: &str) -> Option<IndexProof> {
-        let full_index_name = [&self.service_instance.name, ".", index_name].concat();
+        let full_index_name = [&self.instance_name, ".", index_name].concat();
         self.access.proof_for_index(&full_index_name)
     }
 }
