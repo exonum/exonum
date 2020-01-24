@@ -277,7 +277,7 @@ pub trait ExecutionContextUnstable {
     ///
     /// See explanation about [`fallthrough_auth`](struct.ExecutionContext.html#child_context).
     ///
-    /// # Safety
+    /// # Return value
     ///
     /// If this method returns an error, the error should bubble up to the top level.
     /// In this case do not access the blockchain data through this context methods, this will
