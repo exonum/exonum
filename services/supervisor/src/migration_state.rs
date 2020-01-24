@@ -33,7 +33,7 @@ pub struct MigrationState {
     pub inner: AsyncEventState,
 
     /// Current artifact data version.
-    #[protobuf_convert(with = "pb_version")]
+    #[protobuf_convert(with = "exonum::helpers::pb_version")]
     pub version: Version,
 
     /// Expected state hash. Equals to the first obtained local migration state hash.
@@ -101,17 +101,5 @@ impl MigrationState {
     #[doc(hidden)] // Public for tests.
     pub fn expected_state_hash(&self) -> &Option<Hash> {
         &self.expected_state_hash
-    }
-}
-
-mod pb_version {
-    use super::*;
-
-    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
-        pb.parse().map_err(From::from)
-    }
-
-    pub fn to_pb(value: &Version) -> String {
-        value.to_string()
     }
 }

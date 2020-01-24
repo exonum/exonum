@@ -185,25 +185,13 @@ pub struct ArtifactId {
     /// Artifact name.
     pub name: String,
     /// Semantic version of the artifact.
-    #[protobuf_convert(with = "self::pb_version")]
+    #[protobuf_convert(with = "crate::helpers::pb_version")]
     pub version: Version,
 
     /// No-op field for forward compatibility.
     #[protobuf_convert(skip)]
     #[serde(default, skip)]
     non_exhaustive: (),
-}
-
-mod pb_version {
-    use super::*;
-
-    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
-        pb.parse().map_err(From::from)
-    }
-
-    pub fn to_pb(value: &Version) -> String {
-        value.to_string()
-    }
 }
 
 impl ArtifactId {
@@ -509,7 +497,7 @@ pub struct InstanceMigration {
     /// Version of the instance data after the migration is completed.
     /// Note that it does not necessarily match the version of `target`,
     /// but should be not greater.
-    #[protobuf_convert(with = "self::pb_version")]
+    #[protobuf_convert(with = "crate::helpers::pb_version")]
     pub end_version: Version,
 
     /// Consensus-wide outcome of the migration, in the form of the aggregation hash

@@ -57,7 +57,7 @@ pub fn byzantine_quorum(total: usize) -> usize {
     total * 2 / 3 + 1
 }
 
-/// Module for serializing `Option<Hash>` to protobuf.
+/// Module for serializing `Option<Hash>` to Protobuf.
 pub mod pb_optional_hash {
     use exonum_crypto::{proto::types::Hash as PbHash, Hash};
     use exonum_proto::ProtobufConvert;
@@ -78,5 +78,20 @@ pub mod pb_optional_hash {
         } else {
             PbHash::new()
         }
+    }
+}
+
+/// Module for serializing `semver::Version` to Protobuf.
+pub mod pb_version {
+    use semver::Version;
+
+    /// Deserializes `semver::Version` from string.
+    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
+        pb.parse().map_err(From::from)
+    }
+
+    /// Serializes `semver::Version` to string.
+    pub fn to_pb(value: &Version) -> String {
+        value.to_string()
     }
 }
