@@ -86,7 +86,7 @@
 //! state, which is ensured by an earlier commitment acting as a [Great Filter]. The requirement
 //! for different blocks is more nuanced and is related to implementation details of the database
 //! backend. Namely, the flushing operation needs to be performed on a fork which contains the final
-//! migration state; not doing this may break hash aggregation.
+//! migration state; not doing this may break state aggregation.
 //!
 //! Deciding when it is appropriate to commit or roll back a migration is the responsibility
 //! of the supervisor service. For example, it may commit the migration once all validators have
