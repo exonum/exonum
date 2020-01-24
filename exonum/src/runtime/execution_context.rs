@@ -52,7 +52,7 @@ pub struct ExecutionContext<'a> {
     dispatcher: &'a Dispatcher,
     /// Depth of the call stack.
     call_stack_depth: u64,
-    /// Flag indicates that there was an error occurred during the child call.
+    /// Flag indicating an error occurred during the child call.
     has_child_call_error: &'a mut bool,
 }
 
