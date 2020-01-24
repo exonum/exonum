@@ -16,7 +16,7 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{contains_transaction, ConsensusConfig, ProposerId, ValidatorKeys},
+    blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
@@ -161,7 +161,7 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Option<Patch>,
     txs: Vec<Hash>,
-    proposer_id: ProposerId,
+    proposer_id: ValidatorId,
 }
 
 /// Incomplete block.
@@ -363,7 +363,7 @@ impl BlockState {
     }
 
     /// Returns id of the validator that proposed the block.
-    pub fn proposer_id(&self) -> ProposerId {
+    pub fn proposer_id(&self) -> ValidatorId {
         self.proposer_id
     }
 }
@@ -1023,7 +1023,7 @@ impl State {
         block_hash: Hash,
         patch: Patch,
         txs: Vec<Hash>,
-        proposer_id: ProposerId,
+        proposer_id: ValidatorId,
     ) -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,

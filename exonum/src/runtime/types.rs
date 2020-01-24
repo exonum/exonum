@@ -47,14 +47,14 @@ pub type InstanceId = u32;
 /// Identifier of the method in the service interface required for the call.
 pub type MethodId = u32;
 
-/// Information for calling the service method.
+/// Information sufficient to route a transaction to a service.
 #[derive(Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "schema::runtime::CallInfo")]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
-    /// corresponding runtime to execute a transaction.
+    /// runtime to execute a transaction.
     pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
@@ -66,7 +66,7 @@ pub struct CallInfo {
 }
 
 impl CallInfo {
-    /// Create an ordinary `CallInfo` instance.
+    /// Creates a `CallInfo` instance.
     pub fn new(instance_id: u32, method_id: u32) -> Self {
         Self {
             instance_id,
@@ -76,7 +76,7 @@ impl CallInfo {
     }
 }
 
-/// Transaction with the information required for the call.
+/// Transaction with the information required to dispatch it to a service.
 ///
 /// # Examples
 ///
@@ -143,11 +143,11 @@ impl AnyTx {
     }
 }
 
-/// The artifact identifier is required by the runtime to construct service instances.
+/// The artifact identifier is required to construct service instances.
 /// In other words, an artifact identifier is similar to a class name, and a specific service
 /// instance is similar to a class instance.
 ///
-/// In string representation the artifact identifier is written as follows:
+/// An artifact ID has the following string representation:
 ///
 /// ```text
 /// {runtime_id}:{artifact_name}:{version}
@@ -194,6 +194,7 @@ pub struct ArtifactId {
     non_exhaustive: (),
 }
 
+    #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
 impl ArtifactId {
     /// Creates a new artifact identifier from the given runtime id and name
     /// or returns error if the resulting artifact id is not correct.
@@ -209,10 +210,12 @@ impl ArtifactId {
 
     /// Creates a new artifact identifier from prepared parts without any checks.
     ///
+    /// Use this method only if you don't need an artifact verification (e.g. in tests).
+    ///
+    /// # Stability
+    ///
     /// Since the internal structure of `ArtifactId` can change, this method is considered
     /// unstable and can break in the future.
-    ///
-    /// Use this method only if you don't need an artifact verification (e.g. in tests).
     pub fn from_raw_parts(runtime_id: u32, name: String, version: Version) -> Self {
         Self {
             runtime_id,
@@ -227,7 +230,7 @@ impl ArtifactId {
         self.name == other.name && self.version > other.version
     }
 
-    /// Converts into `InstanceInitParams` with given id, name and empty constructor.
+    /// Converts into `InstanceInitParams` with the given IDs and an empty constructor.
     pub fn into_default_instance(
         self,
         id: InstanceId,
@@ -294,7 +297,7 @@ impl FromStr for ArtifactId {
     }
 }
 
-/// Exhaustive artifact specification.
+/// Exhaustive artifact specification. This information is enough to deploy an artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -651,7 +654,7 @@ impl ProtobufConvert for InstanceStatus {
     }
 }
 
-/// Current state of artifact in dispatcher.
+/// Current state of an artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -669,8 +672,8 @@ pub struct ArtifactState {
 }
 
 impl ArtifactState {
-    /// Create a new artifact state with the given specification and status.
-    pub fn new(deploy_spec: Vec<u8>, status: ArtifactStatus) -> Self {
+    /// Creates an artifact state with the given specification and status.
+    pub(super) fn new(deploy_spec: Vec<u8>, status: ArtifactStatus) -> Self {
         Self {
             deploy_spec,
             status,
@@ -699,10 +702,26 @@ pub struct InstanceState {
     pub data_version: Option<Version>,
 
     /// Service instance activity status.
+    ///
+    /// Status can be `None` only during the block execution if instance was created,
+    /// but activation routine for it is not yet completed, and this value can occur no more
+    /// than once in a service lifetime.
+    ///
+    /// If this field is set to `None`, the pending_status must have value
+    /// `Some(InstanceStatus::Active)`.
     #[protobuf_convert(with = "InstanceStatus")]
     pub status: Option<InstanceStatus>,
 
-    /// Pending status of instance if the value is not `None`.
+    /// Pending status of the instance.
+    ///
+    /// Pending state can be not `None` if core is in process of changing service status,
+    /// e.g. service initialization, resuming or migration. If this field was set to value
+    /// other than `None`, it always will be reset to `None` in the next block.
+    ///
+    /// The purpose of this field is to keep information about further service status during the
+    /// block execution because the service status can be changed only after that block is
+    /// committed. This approach is needed because there is no guarantee that the executed
+    /// block will be committed.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
 
@@ -715,6 +734,7 @@ pub struct InstanceState {
 mod pb_optional_version {
     use super::*;
 
+    #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
     pub fn from_pb(pb: String) -> Result<Option<Version>, failure::Error> {
         if pb.is_empty() {
             Ok(None)

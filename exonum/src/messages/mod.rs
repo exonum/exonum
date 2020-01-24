@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Handling messages received from P2P node network.
+//! Tools for messages authenticated with the Ed25519 public-key crypto system.
+//! These messages are used by the P2P networking and for transaction authentication by external
+//! clients.
 //!
 //! Every message passes through three phases:
 //!
-//!   - `Vec<u8>`: raw bytes as received from the network
-//!   - `SignedMessage`: integrity and signature of the message has been verified
-//!   - `impl IntoMessage`:  the message has been completely parsed and has correct structure
+//! 1. `Vec<u8>`: raw bytes as received from the network
+//! 2. `SignedMessage`: integrity and the signature of the message has been verified
+//! 3. `impl IntoMessage`:  the message has been completely parsed
 //!
 //! Graphical representation of the message processing flow:
 //!
@@ -34,7 +36,7 @@
 //!
 //! # Examples
 //!
-//! The procedure of creating a new signed message is as follows.
+//! A new signed message can be created as follows.
 //!
 //! ```
 //! # use chrono::Utc;
@@ -45,7 +47,7 @@
 //! # };
 //! # fn send<T>(_: T) {}
 //! let keypair = crypto::gen_keypair();
-//! // For example, get some `Status` message.
+//! // For example, let's create a `Precommit` message.
 //! let payload = Precommit::new(
 //!     ValidatorId(0),
 //!     Height(15),
@@ -62,7 +64,7 @@
 //! send(raw_signed_message);
 //! ```
 //!
-//! The procedure of verification of a signed message is as follows:
+//! A signed message can be verified as follows:
 //!
 //! ```
 //! # use assert_matches::assert_matches;
@@ -107,7 +109,7 @@ mod signed;
 mod types;
 
 /// Lower bound on the size of the correct `SignedMessage`.
-/// This is the size of message fields + protobuf overhead.
+/// This is the size of message fields + Protobuf overhead.
 #[doc(hidden)]
 pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 8;
 

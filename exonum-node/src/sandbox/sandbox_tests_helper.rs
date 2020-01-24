@@ -105,7 +105,7 @@ impl<'a> BlockBuilder<'a> {
             .unwrap_or_else(|| self.sandbox.current_leader());
 
         let mut additional_headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
-        additional_headers.insert::<ProposerId>(proposer_id.into());
+        additional_headers.insert::<ProposerId>(proposer_id);
 
         Block {
             height: self.height.unwrap_or_else(|| self.sandbox.current_height()),

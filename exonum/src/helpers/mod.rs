@@ -32,7 +32,11 @@ use log::SetLoggerError;
 mod types;
 mod user_agent;
 
-/// Performs the logger initialization.
+/// Initializes the logger.
+///
+/// See [`env_logger`] crate for details how to configure the logger output.
+///
+/// [`env_logger`]: https://docs.rs/env_logger/
 pub fn init_logger() -> Result<(), SetLoggerError> {
     Builder::from_default_env()
         .default_format_timestamp_nanos(true)

@@ -300,6 +300,9 @@ pub trait MigrateData {
 
 /// Errors that can occur when initiating a data migration. This error indicates that the migration
 /// cannot be started.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
 pub enum InitMigrationError {
     /// The start version is too far in the past.
@@ -331,6 +334,10 @@ pub enum InitMigrationError {
     /// Data migrations are not supported by the artifact.
     #[fail(display = "Data migrations are not supported by the artifact")]
     NotSupported,
+
+    #[doc(hidden)]
+    #[fail(display = "")] // Never actually generated.
+    __NonExhaustive,
 }
 
 impl From<InitMigrationError> for ExecutionError {

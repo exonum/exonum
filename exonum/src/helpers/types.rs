@@ -14,19 +14,18 @@
 
 //! Common widely used type definitions.
 
-use exonum_merkledb::{
-    impl_binary_key_for_binary_value, impl_object_hash_for_binary_value, BinaryValue, ObjectHash,
-};
+use exonum_derive::ObjectHash;
+use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{borrow::Cow, fmt, num::ParseIntError, str::FromStr};
 
-use crate::crypto::Hash;
+use std::{borrow::Cow, fmt, num::ParseIntError, str::FromStr};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
 
-/// Blockchain height (number of blocks).
+/// Blockchain height, that is, the number of committed blocks in it.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(ObjectHash)]
 pub struct Height(pub u64);
 
 impl Height {
@@ -127,11 +126,50 @@ impl BinaryValue for Height {
 }
 
 impl_binary_key_for_binary_value! { Height }
-impl_object_hash_for_binary_value! { Height }
+
+impl fmt::Display for Height {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Height> for u64 {
+    fn from(val: Height) -> Self {
+        val.0
+    }
+}
+
+// Serialization/deserialization is implemented manually because TOML round-trip for the tuple
+// structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
+impl Serialize for Height {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Height {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Height(u64::deserialize(deserializer)?))
+    }
+}
+
+impl FromStr for Height {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, ParseIntError> {
+        u64::from_str(s).map(Height)
+    }
+}
 
 /// Consensus round index.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ObjectHash)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -246,11 +284,8 @@ impl Round {
     /// assert_eq!(Some(Round(1)), iter.next());
     /// assert_eq!(None, iter.next());
     /// ```
-    pub fn iter_to(self, to: Self) -> RoundRangeIter {
-        RoundRangeIter {
-            next: self,
-            last: to,
-        }
+    pub fn iter_to(self, to: Self) -> impl Iterator<Item = Self> {
+        (self.0..to.0).map(Round)
     }
 }
 
@@ -265,7 +300,23 @@ impl BinaryValue for Round {
     }
 }
 
-impl_object_hash_for_binary_value! { Round }
+impl fmt::Display for Round {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Round> for u32 {
+    fn from(val: Round) -> Self {
+        val.0
+    }
+}
+
+impl From<Round> for u64 {
+    fn from(val: Round) -> Self {
+        u64::from(val.0)
+    }
+}
 
 /// Validators identifier.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -288,33 +339,13 @@ impl ValidatorId {
     }
 }
 
-impl fmt::Display for Height {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+impl BinaryValue for ValidatorId {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes()
     }
-}
 
-impl From<Height> for u64 {
-    fn from(val: Height) -> Self {
-        val.0
-    }
-}
-
-impl fmt::Display for Round {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<Round> for u32 {
-    fn from(val: Round) -> Self {
-        val.0
-    }
-}
-
-impl From<Round> for u64 {
-    fn from(val: Round) -> Self {
-        u64::from(val.0)
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        u16::from_bytes(bytes).map(ValidatorId)
     }
 }
 
@@ -333,55 +364,5 @@ impl From<ValidatorId> for u16 {
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
         val.0 as usize
-    }
-}
-
-// Serialization/deserialization is implemented manually because TOML round-trip for the tuple
-// structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
-impl Serialize for Height {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Height {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(Height(u64::deserialize(deserializer)?))
-    }
-}
-
-impl FromStr for Height {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, ParseIntError> {
-        u64::from_str(s).map(Height)
-    }
-}
-
-/// Iterator over rounds range.
-#[derive(Debug)]
-pub struct RoundRangeIter {
-    next: Round,
-    last: Round,
-}
-
-// TODO: Add (or replace by) `Step` implementation. (ECR-165)
-impl Iterator for RoundRangeIter {
-    type Item = Round;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.next < self.last {
-            let res = Some(self.next);
-            self.next.increment();
-            res
-        } else {
-            None
-        }
     }
 }

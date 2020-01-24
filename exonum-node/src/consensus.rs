@@ -15,7 +15,7 @@
 use exonum::{
     blockchain::{contains_transaction, Blockchain, BlockchainMut, ProposerId, Schema},
     crypto::{Hash, PublicKey},
-    helpers::{Height, Round},
+    helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, Fork, ObjectHash, Patch},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
 };
@@ -1013,7 +1013,7 @@ impl NodeHandler {
     /// Creates block with given transaction and returns its hash and corresponding changes.
     fn create_block(
         &mut self,
-        proposer_id: ProposerId,
+        proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
@@ -1041,17 +1041,13 @@ impl NodeHandler {
             .into_payload();
 
         let (block_hash, patch) = self.create_block(
-            propose.validator.into(),
+            propose.validator,
             propose.height,
             propose.transactions.as_slice(),
         );
         // Save patch
-        self.state.add_block(
-            block_hash,
-            patch,
-            propose.transactions,
-            propose.validator.into(),
-        );
+        self.state
+            .add_block(block_hash, patch, propose.transactions, propose.validator);
         self.state
             .propose_mut(propose_hash)
             .unwrap()

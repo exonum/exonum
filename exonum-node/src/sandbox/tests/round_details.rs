@@ -1461,7 +1461,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let mut first_block = sandbox.create_block(&[tx.clone()]);
-    first_block.add_header::<ProposerId>(ValidatorId(0).into());
+    first_block.add_header::<ProposerId>(ValidatorId(0));
 
     // this propose will be used during second commit
     let height_one_propose = ProposeBuilder::new(&sandbox)

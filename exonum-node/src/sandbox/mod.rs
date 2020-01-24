@@ -706,7 +706,7 @@ impl Sandbox {
         blockchain.merge(fork.into_patch()).unwrap();
 
         let (_, patch) =
-            blockchain.create_patch(ValidatorId(0).into(), height, &hashes, &mut BTreeMap::new());
+            blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
