@@ -31,6 +31,8 @@ const ACCESS_ERROR_STR: &str = "An attempt to access blockchain data after execu
 ///
 /// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
 /// or the service constructor invocation.
+/// 
+/// # Safety
 ///
 /// Errors that occur after making nested calls must bubble up to the upper level.
 #[derive(Debug)]
@@ -275,10 +277,11 @@ pub trait ExecutionContextUnstable {
     ///
     /// See explanation about [`fallthrough_auth`](struct.ExecutionContext.html#child_context).
     ///
-    /// # Panics
+    /// # Safety
     ///
-    /// If this method returns an error, do not access the blockchain data through this context
-    /// methods, this will lead to panic.
+    /// If this method returns an error, the error should bubble up to the top level.
+    /// In this case do not access the blockchain data through this context methods, this will
+    /// lead to panic.
     fn make_child_call<'q>(
         &mut self,
         called_instance: impl Into<InstanceQuery<'q>>,
