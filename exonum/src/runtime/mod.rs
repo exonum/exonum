@@ -428,7 +428,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// previously stopped and has the proper artifact version and name.
     ///
     /// This method has the same workflow as [`initiate_adding_service`] method.
-    /// The main difference is that `initialize_adding_service` should call the service
+    /// The main difference is that `initiate_adding_service` should call the service
     /// `initialize` method and `initiate_resuming_service` should call the service `resume` method.
     ///
     /// [`initiate_adding_service`]: #tymethod.initiate_adding_service
