@@ -14,6 +14,11 @@
 
 //! Data migration tools.
 //!
+//! # Stability
+//!
+//! Since migrations are tightly related to unstable [`Runtime`] trait, the entirety of this
+//! module is considered unstable.
+//!
 //! # Migrations Overview
 //!
 //! The goal of a data migration is to prepare data of an Exonum service for use with an updated
@@ -88,6 +93,7 @@
 //! submitted identical migration results, and roll back a migration if at least one validator
 //! has reported an error during migration or there is divergence among reported migration results.
 //!
+//! [`Runtime`]: ../trait.Runtime.html
 //! [dispatcher]: ../index.html
 //! [supervisor service]: ../index.html#supervisor-service
 //! [`MigrationScript`]: struct.MigrationScript.html
