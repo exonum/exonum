@@ -88,16 +88,19 @@ where
     /// This method is intended to be called before comparing the amount of
     /// confirmations and amount of validators, so confirmations of nodes which
     /// are not validators anymore won't be taken into account.
-    fn intersect(&mut self, id: &V, validator_keys: BTreeSet<PublicKey>) {
+    ///
+    /// Returns the amount of confirmations in the updated set.
+    fn intersect(&mut self, id: &V, validator_keys: &BTreeSet<PublicKey>) -> usize {
         let mut confirmations = self.index.get(id).unwrap_or_default();
-
         confirmations.0 = confirmations
             .0
-            .intersection(&validator_keys)
-            .cloned()
+            .intersection(validator_keys)
+            .copied()
             .collect();
-
+        let confirmations_amount = confirmations.0.len();
         self.index.put(id, confirmations);
+
+        confirmations_amount
     }
 
     /// Calculates the intersection of current confirmations and actual list of
@@ -114,10 +117,7 @@ where
     ) -> bool {
         let validator_keys: BTreeSet<PublicKey> = validator_keys.into_iter().collect();
         let validators_amount = validator_keys.len();
-
-        self.intersect(id, validator_keys);
-
-        self.confirmations(id) == validators_amount
+        self.intersect(id, &validator_keys) == validators_amount
     }
 }
 

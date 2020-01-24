@@ -56,5 +56,5 @@ message AsyncEventState {
 message MigrationState {
     AsyncEventState inner = 1;
     string version = 2;
-    exonum.crypto.Hash expected_state_hash = 3;
+    exonum.crypto.Hash reference_state_hash = 3;
 }

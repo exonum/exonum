@@ -725,9 +725,7 @@ impl Supervisor {
         author: PublicKey,
     ) -> Result<(), ExecutionError> {
         let core_schema = context.data().for_core();
-
         let mut schema = SchemaImpl::new(context.service_data());
-
         let mut state = schema.migration_state_unchecked(&request);
 
         // Verify that state hash does match expected one.

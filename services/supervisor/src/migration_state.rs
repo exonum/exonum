@@ -36,13 +36,13 @@ pub struct MigrationState {
     #[protobuf_convert(with = "exonum::helpers::pb_version")]
     pub version: Version,
 
-    /// Expected state hash. Equals to the first obtained local migration state hash.
+    /// Reference state hash. Equals to the first obtained local migration state hash.
     /// For a good scenario, all the hashes should be equal between each other.
     /// For the bad scenario, at least one node obtains the different hash and that's enough
     /// to consider migration failed.
     #[protobuf_convert(with = "exonum::helpers::pb_optional_hash")]
     #[serde(skip)]
-    pub(crate) expected_state_hash: Option<Hash>,
+    pub(crate) reference_state_hash: Option<Hash>,
 }
 
 impl MigrationState {
@@ -51,7 +51,7 @@ impl MigrationState {
         Self {
             inner,
             version,
-            expected_state_hash: None,
+            reference_state_hash: None,
         }
     }
 
@@ -59,9 +59,9 @@ impl MigrationState {
     /// If this is a first hash, the `expected_hash` value will be initialized.
     /// Otherwise, provided hash will be compared to `expected_hash`.
     pub fn add_state_hash(&mut self, state_hash: Hash) -> Result<(), ExecutionError> {
-        if let Some(expected_hash) = self.expected_state_hash {
+        if let Some(reference_state_hash) = self.reference_state_hash {
             // We already have an expected hash, so we compare a new one against it.
-            if expected_hash == state_hash {
+            if reference_state_hash == state_hash {
                 // Hashes match, that's OK.
             } else {
                 // Hashes do not match, report an error.
@@ -69,7 +69,7 @@ impl MigrationState {
             }
         } else {
             // No state hash yet, initialize it with the provided value.
-            self.expected_state_hash = Some(state_hash);
+            self.reference_state_hash = Some(state_hash);
         }
         Ok(())
     }
@@ -97,9 +97,9 @@ impl MigrationState {
         self.inner = new_state;
     }
 
-    /// Returns the expected state hash.
+    /// Returns the reference state hash.
     #[doc(hidden)] // Public for tests.
-    pub fn expected_state_hash(&self) -> &Option<Hash> {
-        &self.expected_state_hash
+    pub fn reference_state_hash(&self) -> &Option<Hash> {
+        &self.reference_state_hash
     }
 }

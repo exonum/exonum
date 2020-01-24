@@ -51,39 +51,39 @@ impl<T: Access> Schema<T> {
 }
 
 /// Initial service schema.
-pub(super) mod v01 {
+pub mod v01 {
     use super::Schema;
     use exonum::merkledb::{access::Prefixed, Snapshot};
 
-    pub(crate) const ENTRY_VALUE: u8 = 1;
+    pub(super) const ENTRY_VALUE: u8 = 1;
 
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
+    pub fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
         let schema = Schema::new(snapshot.clone());
         assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
 }
 
-pub(super) mod v02 {
+pub mod v02 {
     use exonum::merkledb::{access::Prefixed, Snapshot};
 
     use super::Schema;
 
-    pub(crate) const ENTRY_VALUE: u8 = 2;
+    pub(super) const ENTRY_VALUE: u8 = 2;
 
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
+    pub fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
         let schema = Schema::new(snapshot.clone());
         assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
 }
 
-pub(super) mod v05 {
+pub mod v05 {
     use exonum::merkledb::{access::Prefixed, Snapshot};
 
     use super::Schema;
 
-    pub(crate) const ENTRY_VALUE: u8 = 5;
+    pub(super) const ENTRY_VALUE: u8 = 5;
 
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
+    pub fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
         let schema = Schema::new(snapshot.clone());
         assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }

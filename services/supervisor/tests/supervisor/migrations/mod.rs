@@ -44,7 +44,7 @@ mod migration_service;
 ///
 /// One instance (with lowest version, "0.1.0") is started by default.
 fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
-    // Initialize builder;
+    // Initialize builder.
     let builder = TestKitBuilder::validator().with_validators(validator_count);
 
     // Add supervisor.
@@ -137,7 +137,7 @@ fn stop_service(testkit: &mut TestKit, id: InstanceId) {
     .expect("Stop service transaction should be processed");
 }
 
-fn obtain_expected_hash(testkit: &mut TestKit, request: &MigrationRequest) -> Hash {
+fn obtain_reference_hash(testkit: &mut TestKit, request: &MigrationRequest) -> Hash {
     for _ in 0..5 {
         let snapshot = testkit.snapshot();
         let prefixed = Prefixed::new(Supervisor::NAME, &snapshot);
@@ -150,10 +150,10 @@ fn obtain_expected_hash(testkit: &mut TestKit, request: &MigrationRequest) -> Ha
             state
         );
 
-        let expected_hash = state.expected_state_hash();
+        let reference_hash = state.reference_state_hash();
 
-        if let Some(expected_hash) = expected_hash {
-            return *expected_hash;
+        if let Some(reference_hash) = reference_hash {
+            return *reference_hash;
         } else {
             // Migration is executed in the separate thread, so sleep a bit.
             thread::sleep(Duration::from_millis(50));
@@ -510,9 +510,9 @@ fn migration_consensus() {
     send_migration_request(&mut testkit, request.clone());
 
     // Obtain the expected migration hash and send confirmations from other nodes.
-    let expected_hash = obtain_expected_hash(&mut testkit, &request);
+    let reference_hash = obtain_reference_hash(&mut testkit, &request);
 
-    let migration_status = MigrationStatus(Ok(expected_hash));
+    let migration_status = MigrationStatus(Ok(reference_hash));
     let migration_result = MigrationResult {
         request: request.clone(),
         status: migration_status,
@@ -572,9 +572,9 @@ fn migration_no_consensus() {
     send_migration_request(&mut testkit, request.clone());
 
     // Obtain the expected migration hash and send confirmations from other nodes.
-    let expected_hash = obtain_expected_hash(&mut testkit, &request);
+    let reference_hash = obtain_reference_hash(&mut testkit, &request);
 
-    let migration_status = MigrationStatus(Ok(expected_hash));
+    let migration_status = MigrationStatus(Ok(reference_hash));
     let migration_result = MigrationResult {
         request: request.clone(),
         status: migration_status,
@@ -630,9 +630,9 @@ fn migration_hash_divergence() {
     send_migration_request(&mut testkit, request.clone());
 
     // Obtain the expected migration hash and send confirmations from other nodes.
-    let expected_hash = obtain_expected_hash(&mut testkit, &request);
+    let reference_hash = obtain_reference_hash(&mut testkit, &request);
 
-    let migration_status = MigrationStatus(Ok(expected_hash));
+    let migration_status = MigrationStatus(Ok(reference_hash));
     let migration_result = MigrationResult {
         request: request.clone(),
         status: migration_status,
