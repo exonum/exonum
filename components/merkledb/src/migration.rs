@@ -485,7 +485,7 @@ impl MigrationHelper {
     }
 
     /// Returns readonly access to the old version of migrated data.
-    pub fn old_data(&self) -> Prefixed<'_, ReadonlyFork<'_>> {
+    pub fn old_data(&self) -> Prefixed<ReadonlyFork<'_>> {
         Prefixed::new(&self.namespace, self.fork_ref().readonly())
     }
 

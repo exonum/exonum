@@ -76,7 +76,7 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     pub fn for_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'static, T::Readonly>> {
+    ) -> Option<Prefixed<T::Readonly>> {
         mount_point_for_service(self.access.as_readonly(), id).map(|(access, _)| access)
     }
 
@@ -93,7 +93,7 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// [`ArtifactReqError`]: versioning/enum.ArtifactReqError.html
     pub fn service_schema<'q, S, I>(&self, service_id: I) -> Result<S, ArtifactReqError>
     where
-        S: RequireArtifact + FromAccess<Prefixed<'static, T::Readonly>>,
+        S: RequireArtifact + FromAccess<Prefixed<T::Readonly>>,
         I: Into<InstanceQuery<'q>>,
     {
         schema_for_service(self.access.as_readonly(), service_id)
@@ -102,7 +102,7 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// Returns a mount point for the data of the executing service instance.
     /// Unlike other data, this one may be writeable provided that this `BlockchainData`
     /// wraps a `Fork`.
-    pub fn for_executing_service(&self) -> Prefixed<'a, T> {
+    pub fn for_executing_service(&self) -> Prefixed<T> {
         Prefixed::new(self.service_instance.name, self.access.clone())
     }
 }
@@ -127,7 +127,7 @@ impl BlockchainData<'_, &dyn Snapshot> {
 fn mount_point_for_service<'q, T: RawAccess>(
     access: T,
     id: impl Into<InstanceQuery<'q>>,
-) -> Option<(Prefixed<'static, T>, InstanceSpec)> {
+) -> Option<(Prefixed<T>, InstanceSpec)> {
     let state = DispatcherSchema::new(access.clone())
         .get_instance(id)
         .filter(|state| match (&state.status, &state.pending_status) {
@@ -143,7 +143,7 @@ fn schema_for_service<'q, T, S>(
 ) -> Result<S, ArtifactReqError>
 where
     T: RawAccess,
-    S: RequireArtifact + FromAccess<Prefixed<'static, T>>,
+    S: RequireArtifact + FromAccess<Prefixed<T>>,
 {
     let (access, spec) =
         mount_point_for_service(access, service_id).ok_or(ArtifactReqError::NoService)?;
@@ -170,10 +170,7 @@ pub trait SnapshotExt {
     /// as a safer alternative, which performs all necessary checks.
     ///
     /// [`service_schema`]: #tymethod.service_schema
-    fn for_service<'q>(
-        &self,
-        id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'static, &dyn Snapshot>>;
+    fn for_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<Prefixed<&dyn Snapshot>>;
 
     /// Returns a proof for a Merkelized index with the specified name.
     ///
@@ -200,7 +197,7 @@ pub trait SnapshotExt {
     /// [`ArtifactReqError`]: versioning/enum.ArtifactReqError.html
     fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>
     where
-        S: RequireArtifact + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
+        S: RequireArtifact + FromAccess<Prefixed<&'s dyn Snapshot>>,
         I: Into<InstanceQuery<'q>>;
 }
 
@@ -213,10 +210,7 @@ impl SnapshotExt for dyn Snapshot {
         DispatcherSchema::new(self)
     }
 
-    fn for_service<'q>(
-        &self,
-        id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<Prefixed<'static, &dyn Snapshot>> {
+    fn for_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<Prefixed<&dyn Snapshot>> {
         mount_point_for_service(self, id).map(|(access, _)| access)
     }
 
@@ -233,7 +227,7 @@ impl SnapshotExt for dyn Snapshot {
 
     fn service_schema<'s, 'q, S, I>(&'s self, service_id: I) -> Result<S, ArtifactReqError>
     where
-        S: RequireArtifact + FromAccess<Prefixed<'static, &'s dyn Snapshot>>,
+        S: RequireArtifact + FromAccess<Prefixed<&'s dyn Snapshot>>,
         I: Into<InstanceQuery<'q>>,
     {
         schema_for_service(self, service_id)

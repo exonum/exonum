@@ -106,7 +106,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Provides access to the data of the executing service.
-    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
+    pub fn service_data(&self) -> Prefixed<&Fork> {
         self.data().for_executing_service()
     }
 

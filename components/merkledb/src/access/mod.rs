@@ -57,7 +57,7 @@
 
 use failure::{Error, Fail};
 
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 pub use self::extensions::AccessExt;
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
@@ -172,12 +172,12 @@ impl<T: RawAccess> Access for T {
 /// assert_eq!(same_list.len(), 3);
 /// ```
 #[derive(Debug, Clone)]
-pub struct Prefixed<'a, T> {
+pub struct Prefixed<T> {
     access: T,
-    prefix: Cow<'a, str>,
+    prefix: String,
 }
 
-impl<'a, T: RawAccess> Prefixed<'a, T> {
+impl<T: RawAccess> Prefixed<T> {
     /// Creates a new prefixed access.
     ///
     /// # Panics
@@ -185,14 +185,14 @@ impl<'a, T: RawAccess> Prefixed<'a, T> {
     /// - Will panic if the prefix is not a [valid prefix name].
     ///
     /// [valid prefix name]: ../validation/fn.is_valid_index_name_component.html
-    pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
+    pub fn new(prefix: impl Into<String>, access: T) -> Self {
         let prefix = prefix.into();
         assert_valid_name_component(prefix.as_ref());
         Self { access, prefix }
     }
 }
 
-impl<T: RawAccess> Access for Prefixed<'_, T> {
+impl<T: RawAccess> Access for Prefixed<T> {
     type Base = T;
 
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
