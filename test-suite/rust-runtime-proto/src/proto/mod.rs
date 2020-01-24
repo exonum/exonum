@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_build::ProtobufGenerator;
+//! Module of the rust-protobuf generated files.
 
-fn main() {
-    ProtobufGenerator::with_mod_name("test_runtime_api_protobuf_mod.rs")
-        .with_input_dir("src/proto")
-        .with_includes(&["src/proto".into()])
-        .generate();
-}
+// For protobuf generated files.
+#![allow(bare_trait_objects)]
+#![allow(renamed_and_removed_lints)]
+
+#[cfg(test)]
+use exonum_crypto::proto::*;
+#[cfg(test)]
+use exonum_proto::proto::*;
+
+include!(concat!(
+    env!("OUT_DIR"),
+    "/test_runtime_api_protobuf_mod.rs"
+));

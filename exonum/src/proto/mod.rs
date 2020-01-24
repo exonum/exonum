@@ -32,9 +32,6 @@ use crate::helpers::{Height, Round, ValidatorId};
 
 pub mod schema;
 
-#[cfg(test)]
-mod tests;
-
 impl ProtobufConvert for Height {
     type ProtoStruct = u64;
 

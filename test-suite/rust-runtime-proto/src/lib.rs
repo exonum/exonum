@@ -22,6 +22,9 @@ use crate::service::TestRuntimeApiService;
 mod proto;
 mod service;
 
+#[cfg(test)]
+mod tests;
+
 /// Creates the TestKit and TestKitApi instances.
 pub fn testkit_with_rust_service() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
@@ -48,7 +51,6 @@ pub fn assert_exonum_core_protos(api: &TestKitApi) {
         "blockchain.proto",
         "messages.proto",
         "runtime.proto",
-        "tests.proto",
         "common.proto",
         "types.proto",
         "proofs.proto",
@@ -89,11 +91,14 @@ fn service_protos_with_service() {
         .get("proto-sources")
         .expect("Rust runtime Api unexpectedly failed");
 
-    const EXPECTED_CONTENT: &str = include_str!("proto/test_service.proto");
+    const TEST_SERVICE_CONTENT: &str = include_str!("proto/test_service.proto");
+    const TESTS_CONTENT: &str = include_str!("proto/tests.proto");
 
-    assert_eq!(proto_files.len(), 1);
+    assert_eq!(proto_files.len(), 2);
     assert_eq!(proto_files[0].name, "test_service.proto".to_string());
-    assert_eq!(proto_files[0].content, EXPECTED_CONTENT.to_string());
+    assert_eq!(proto_files[1].name, "tests.proto".to_string());
+    assert_eq!(proto_files[0].content, TEST_SERVICE_CONTENT.to_string());
+    assert_eq!(proto_files[1].content, TESTS_CONTENT.to_string());
 }
 
 /// Rust-runtime API should return error in case of an incorrect artifact.
