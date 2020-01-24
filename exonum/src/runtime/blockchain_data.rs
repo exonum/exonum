@@ -24,16 +24,16 @@ use super::{
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
 /// Provides access to blockchain data for the executing service.
-#[derive(Debug, Clone, Copy)]
-pub struct BlockchainData<'a, T> {
+#[derive(Debug, Clone)]
+pub struct BlockchainData<T> {
     access: T,
-    service_instance: InstanceDescriptor<'a>,
+    service_instance: InstanceDescriptor,
 }
 
-impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
+impl<T: RawAccess + AsReadonly> BlockchainData<T> {
     /// Creates structured access to blockchain data based on the unstructured access
     /// (e.g., a `Snapshot` or a `Fork`) and the descriptor of the executing service.
-    pub fn new(access: T, service_instance: InstanceDescriptor<'a>) -> Self {
+    pub fn new(access: T, service_instance: InstanceDescriptor) -> Self {
         Self {
             access,
             service_instance,
@@ -103,11 +103,11 @@ impl<'a, T: RawAccess + AsReadonly> BlockchainData<'a, T> {
     /// Unlike other data, this one may be writeable provided that this `BlockchainData`
     /// wraps a `Fork`.
     pub fn for_executing_service(&self) -> Prefixed<T> {
-        Prefixed::new(self.service_instance.name, self.access.clone())
+        Prefixed::new(&self.service_instance.name, self.access.clone())
     }
 }
 
-impl BlockchainData<'_, &dyn Snapshot> {
+impl BlockchainData<&dyn Snapshot> {
     /// Returns a proof for a Merkelized index with the specified name
     /// in the currently executing service.
     ///
@@ -119,7 +119,7 @@ impl BlockchainData<'_, &dyn Snapshot> {
     /// returned value may unexpectedly lead to a panic unless the index is initialized early
     /// (e.g., during service initialization).
     pub fn proof_for_service_index(&self, index_name: &str) -> Option<IndexProof> {
-        let full_index_name = [self.service_instance.name, ".", index_name].concat();
+        let full_index_name = [&self.service_instance.name, ".", index_name].concat();
         self.access.proof_for_index(&full_index_name)
     }
 }

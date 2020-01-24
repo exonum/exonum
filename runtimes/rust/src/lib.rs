@@ -172,7 +172,7 @@
 //! #[exonum_interface(removed_method_ids(0, 2))]
 //! pub trait Transactions<Ctx> {
 //!     type Output;
-//!     
+//!
 //!     // Method with ID 0 is removed because it was buggy.
 //!
 //!     #[interface_method(id = 1)]
@@ -413,7 +413,7 @@ impl Instance {
         Self { id, name, service }
     }
 
-    fn descriptor(&self) -> InstanceDescriptor<'_> {
+    fn descriptor(&self) -> InstanceDescriptor {
         InstanceDescriptor::new(self.id, &self.name)
     }
 }
@@ -539,7 +539,7 @@ impl RustRuntime {
     fn new_service(
         &self,
         artifact: &ArtifactId,
-        instance: InstanceDescriptor<'_>,
+        instance: &InstanceDescriptor,
     ) -> Result<Instance, ExecutionError> {
         if !self.deployed_artifacts.contains(artifact) {
             panic!(
@@ -553,7 +553,7 @@ impl RustRuntime {
                 instance
             );
         }
-        if self.started_services_by_name.contains_key(instance.name) {
+        if self.started_services_by_name.contains_key(&instance.name) {
             panic!(
                 "BUG: Core requested service service instance start ({}) with already taken name",
                 instance
@@ -574,7 +574,7 @@ impl RustRuntime {
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
                     self.blockchain().clone(),
-                    InstanceDescriptor::new(instance.id, instance.name.as_ref()),
+                    InstanceDescriptor::new(instance.id, &instance.name),
                 );
                 instance.as_ref().wire_api(&mut builder);
                 let root_path = builder
@@ -678,7 +678,7 @@ impl Runtime for RustRuntime {
         match status {
             InstanceStatus::Active => {
                 let instance = self
-                    .new_service(&spec.artifact, spec.as_descriptor())
+                    .new_service(&spec.artifact, &spec.as_descriptor())
                     .expect(
                     "BUG: Attempt to create a new service instance failed; \
                      within `instantiate_adding_service` we were able to create a new instance, \

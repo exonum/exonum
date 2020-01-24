@@ -46,7 +46,7 @@ impl<'a> ServiceApiState<'a> {
     /// Create service API state snapshot from the given blockchain and instance descriptor.
     pub fn from_api_context<S: Into<String>>(
         blockchain: &'a Blockchain,
-        instance: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor,
         endpoint: S,
     ) -> Self {
         Self {
@@ -82,7 +82,7 @@ impl<'a> ServiceApiState<'a> {
     }
 
     /// Returns information about the executing service.
-    pub fn instance(&self) -> InstanceDescriptor<'_> {
+    pub fn instance(&self) -> InstanceDescriptor {
         self.broadcaster.instance()
     }
 
@@ -133,11 +133,11 @@ pub struct ServiceApiScope {
 
 impl ServiceApiScope {
     /// Creates a new service API scope for the specified service instance.
-    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
+    pub fn new(blockchain: Blockchain, instance: &InstanceDescriptor) -> Self {
         Self {
             inner: ApiScope::new(),
             blockchain,
-            descriptor: (instance.id, instance.name.to_owned()),
+            descriptor: (instance.id, instance.name.clone()),
         }
     }
 
@@ -368,11 +368,11 @@ pub struct ServiceApiBuilder {
 impl ServiceApiBuilder {
     /// Create a new service API builder for the specified service instance.
     #[doc(hidden)]
-    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor<'_>) -> Self {
+    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor) -> Self {
         Self {
             blockchain: blockchain.clone(),
-            public_scope: ServiceApiScope::new(blockchain.clone(), instance),
-            private_scope: ServiceApiScope::new(blockchain, instance),
+            public_scope: ServiceApiScope::new(blockchain.clone(), &instance),
+            private_scope: ServiceApiScope::new(blockchain, &instance),
             root_path: None,
         }
     }

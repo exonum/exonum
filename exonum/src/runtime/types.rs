@@ -403,9 +403,9 @@ impl InstanceSpec {
         Ok(())
     }
 
-    /// Return the corresponding descriptor of this instance specification.
-    pub fn as_descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor::new(self.id, self.name.as_ref())
+    /// Returns the corresponding descriptor of this instance specification.
+    pub fn as_descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor::new(self.id, &self.name)
     }
 }
 
