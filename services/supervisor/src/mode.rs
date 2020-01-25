@@ -29,7 +29,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::str::FromStr;
 
-use super::{multisig::MultisigIndex, proto, DeployRequest};
+use super::{multisig::MultisigIndex, proto, DeployRequest, MigrationRequest};
 
 /// Supervisor operating mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,7 +78,7 @@ impl Mode {
                 deploy_requests.confirmations(deploy) >= 1
             }
             Mode::Decentralized => {
-                // Approve deploy in case 2/3+1 validators confirmed it.
+                // Approve deploy if 2/3+1 validators confirmed it.
                 let confirmations = deploy_requests.confirmations(&deploy);
                 confirmations >= byzantine_quorum(validators)
             }
@@ -98,8 +98,28 @@ impl Mode {
                 config_confirms.confirmations(&config_hash) >= 1
             }
             Mode::Decentralized => {
-                // Apply pending config in case 2/3+1 validators voted for it.
+                // Apply pending config if 2/3+1 validators voted for it.
                 let confirmations = config_confirms.confirmations(&config_hash);
+                confirmations >= byzantine_quorum(validators)
+            }
+        }
+    }
+
+    /// Checks whether migration should be performed within the network.
+    pub fn migration_approved<T: Access>(
+        self,
+        request: &MigrationRequest,
+        migration_requests: &MultisigIndex<T, MigrationRequest>,
+        validators: usize,
+    ) -> bool {
+        match self {
+            Mode::Simple => {
+                // For simple supervisor request from 1 validator is enough.
+                migration_requests.confirmations(request) >= 1
+            }
+            Mode::Decentralized => {
+                // Approve migration if 2/3+1 validators confirmed it.
+                let confirmations = migration_requests.confirmations(&request);
                 confirmations >= byzantine_quorum(validators)
             }
         }

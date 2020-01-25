@@ -29,10 +29,17 @@ class ExonumNetwork:
     def __enter__(self) -> "ExonumNetwork":
         return self
 
-    def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object]) -> None:
+    def __exit__(
+        self,
+        exc_type: Optional[type],
+        exc_value: Optional[Any],
+        exc_traceback: Optional[object],
+    ) -> None:
         self.deinitialize()
 
-    def generate_template(self, validators_count: int, supervisor_mode: str = "simple") -> None:
+    def generate_template(
+        self, validators_count: int, supervisor_mode: str = "simple"
+    ) -> None:
         """Runs `generate-template` command."""
         common_config = self._common_config()
 
@@ -59,7 +66,9 @@ class ExonumNetwork:
 
         self._run_command("generate-config", args)
 
-    def finalize(self, validator_id: int, public_api_address: str, private_api_address: str) -> None:
+    def finalize(
+        self, validator_id: int, public_api_address: str, private_api_address: str
+    ) -> None:
         """Runs `finalize` command."""
 
         sec_config = self._validator_config(validator_id, "sec")
@@ -151,7 +160,9 @@ class ExonumNetwork:
 
             return host, int(public_port), int(private_port)
 
-        raise RuntimeError(f"Incorrect node ID, expected >= 0 and < {self._validators_count}, got {validator_id}")
+        raise RuntimeError(
+            f"Incorrect node ID, expected >= 0 and < {self._validators_count}, got {validator_id}"
+        )
 
     def deinitialize(self) -> None:
         # Cleanup after use.

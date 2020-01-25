@@ -188,7 +188,10 @@
 pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{Action as DispatcherAction, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{
+        remove_local_migration_result, Action as DispatcherAction, Mailbox,
+        Schema as DispatcherSchema,
+    },
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
         ExecutionError, ExecutionFail, ExecutionStatus,
@@ -197,7 +200,7 @@ pub use self::{
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, Caller,
         CallerAddress, InstanceId, InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
-        MethodId,
+        MethodId, MigrationStatus,
     },
 };
 

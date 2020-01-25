@@ -12,6 +12,7 @@ from suite import (
     run_4_nodes,
     wait_network_to_start,
     ExonumCryptoAdvancedClient,
+    generate_config,
 )
 
 
@@ -22,18 +23,11 @@ class CryptoAdvancedTest(unittest.TestCase):
         try:
             self.network = run_4_nodes("exonum-cryptocurrency-advanced")
             wait_network_to_start(self.network)
-            cryptocurrency_advanced_config_dict = {
-                "networks": launcher_networks(self.network),
-                "deadline_height": 10000,
-                "artifacts": {
-                    "cryptocurrency": {
-                        "runtime": "rust",
-                        "name": "exonum-cryptocurrency-advanced",
-                        "version": "0.13.0-rc.2",
-                    }
-                },
-                "instances": {"crypto": {"artifact": "cryptocurrency", "action": "start"}},
-            }
+
+            instances = {"crypto": {"artifact": "cryptocurrency"}}
+            cryptocurrency_advanced_config_dict = generate_config(
+                self.network, instances=instances
+            )
 
             cryptocurrency_advanced_config = Configuration(
                 cryptocurrency_advanced_config_dict
@@ -160,7 +154,9 @@ class CryptoAdvancedTest(unittest.TestCase):
                 )
                 with client.create_subscriber("transactions") as subscriber:
                     subscriber.wait_for_new_event()
-                tx_status = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()["status"]["type"]
+                tx_status = client.public_api.get_tx_info(
+                    tx_response.json()["tx_hash"]
+                ).json()["status"]["type"]
                 self.assertEqual(tx_status, "success")
                 # create the wallet with the same keys again
                 tx_same_keys = crypto_client.create_wallet(
@@ -168,7 +164,9 @@ class CryptoAdvancedTest(unittest.TestCase):
                 )
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
-                tx_status = client.public_api.get_tx_info(tx_same_keys.json()["tx_hash"]).json()["status"]["type"]
+                tx_status = client.public_api.get_tx_info(
+                    tx_same_keys.json()["tx_hash"]
+                ).json()["status"]["type"]
                 self.assertEqual(tx_status, "service_error")
 
     def test_transfer_funds_insufficient(self):
@@ -188,7 +186,9 @@ class CryptoAdvancedTest(unittest.TestCase):
                         110, alice_keys, bob_keys.public_key
                     )
                     subscriber.wait_for_new_event()
-                    tx_info = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()
+                    tx_info = client.public_api.get_tx_info(
+                        tx_response.json()["tx_hash"]
+                    ).json()
                     tx_status = tx_info["status"]["type"]
                     self.assertEqual(tx_status, "service_error")
                     alice_balance = crypto_client.get_balance(alice_keys)
@@ -204,7 +204,9 @@ class CryptoAdvancedTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             with ExonumCryptoAdvancedClient(client) as crypto_client:
                 alice_keys = KeyPair.generate()
-                wallet_history = crypto_client.get_wallet_info(alice_keys).json()["wallet_history"]
+                wallet_history = crypto_client.get_wallet_info(alice_keys).json()[
+                    "wallet_history"
+                ]
                 self.assertIsNone(wallet_history)
 
     def test_add_funds_to_nonexistent_wallet(self):
@@ -218,7 +220,9 @@ class CryptoAdvancedTest(unittest.TestCase):
                 tx_response = crypto_client.issue(alice_keys, 100)
                 with client.create_subscriber("transactions") as subscriber:
                     subscriber.wait_for_new_event()
-                    tx_info = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()
+                    tx_info = client.public_api.get_tx_info(
+                        tx_response.json()["tx_hash"]
+                    ).json()
                     tx_status = tx_info["status"]["type"]
                     self.assertEqual(tx_status, "service_error")
 

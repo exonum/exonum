@@ -47,8 +47,8 @@
 //!
 //! * `run-dev` command automatically generates network configuration with a single node and runs
 //! it. This command can be useful for fast testing of the services during development process.
-//! * `maintenance` command contains only `clear-cache` functionality at the moment. It allows to
-//! clear node's consensus messages cache to fix rare node out-of-sync issues.
+//! * `maintenance` command allows to clear node's consensus messages with `clear-cache`, and
+//! restart node's service migration script with `restart-migration`.
 //!
 //! ## How to Extend Parameters
 //!

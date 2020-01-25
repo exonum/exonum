@@ -627,6 +627,22 @@ impl AbortHandle {
 /// - Migrated indexes will be aggregated in the default namespace
 /// - Indexes marked with tombstones will be removed
 /// - Scratchpad associated with the migration will be cleared
+///
+/// # Safety
+///
+/// Flushing a migration must be performed on a `fork` which contains the final migration
+/// changes. Not doing so **may break the state aggregation in the database.** A scenario when
+/// this requirement would be violated is as follows:
+///
+/// 1. Start a database migration in a separate thread, constructing a `MigrationHelper` around
+///   `Arc<dyn Database>`.
+/// 2. Create a fork.
+/// 3. Ensure that the migration is complete via some synchronization primitive.
+/// 4. Call `flush_migration` on the fork from step 2.
+///
+/// In this scenario, a fork may not have the latest migration data because it was created before
+/// the migration is complete. The correct workflow would be to swap steps 2 and 3, i.e.,
+/// first ensure that the migration is complete and *then* create a fork in which it will be flushed.
 pub fn flush_migration(fork: &mut Fork, namespace: &str) {
     fork.flush_migration(namespace);
     Scratchpad::new(namespace, &*fork).clear();

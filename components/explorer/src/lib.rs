@@ -372,6 +372,11 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// | `location` | [`TxLocation`] | Location of the transaction in the block |
 /// | `location_proof` | [`ListProof`]`<`[`Hash`]`>` | Proof of transaction inclusion into a block |
 /// | `status` | (custom; see below) | Execution status |
+/// | `time` | [`DateTime`]`<`[`Utc`]`>` | Commitment time* |
+///
+/// \* By commitment time we mean an approximate commitment time of the block
+/// which includes the transaction. This time is a median time of the precommit local times
+/// of each validator.
 ///
 /// ## `status` field
 ///
@@ -437,6 +442,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`CoreError`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CoreError.html
 /// [`CommonError`]: https://docs.rs/exonum/latest/exonum/runtime/enum.CommonError.html
 /// [TypeScript]: https://www.typescriptlang.org/
+/// [`DateTime`]: https://docs.rs/chrono/0.4.10/chrono/struct.DateTime.html
+/// [`Utc`]: https://docs.rs/chrono/0.4.10/chrono/offset/struct.Utc.html
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommittedTransaction {
     message: Verified<AnyTx>,

@@ -12,6 +12,7 @@ from suite import (
     wait_for_block,
 )
 
+
 class ApiTest(unittest.TestCase):
     """Tests for Exonum API."""
 
@@ -28,8 +29,11 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             health_info_response = client.public_api.health_info()
             self.assertEqual(health_info_response.status_code, 200)
-            self.assertEqual(health_info_response.json()['connected_peers'], self.network.validators_count()-1)
-            self.assertEqual(health_info_response.json()['consensus_status'], 'Active')
+            self.assertEqual(
+                health_info_response.json()["connected_peers"],
+                self.network.validators_count() - 1,
+            )
+            self.assertEqual(health_info_response.json()["consensus_status"], "Active")
 
     def test_block_response(self):
         """Tests the `block` endpoint. Check response for block"""
@@ -39,9 +43,9 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             block_response = client.public_api.get_block(1)
             self.assertEqual(block_response.status_code, 200)
-            self.assertEqual(block_response.json()['height'], 1)
-            self.assertEqual(block_response.json()['tx_count'], 0)
-            self.assertIsNotNone(block_response.json()['time'])
+            self.assertEqual(block_response.json()["height"], 1)
+            self.assertEqual(block_response.json()["tx_count"], 0)
+            self.assertIsNotNone(block_response.json()["time"])
 
     def test_zero_block(self):
         """Tests the `block` endpoint. Check response for 0 block"""
@@ -51,7 +55,7 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             block_response = client.public_api.get_block(0)
             self.assertEqual(block_response.status_code, 200)
-            self.assertEqual(block_response.json()['height'], 0)
+            self.assertEqual(block_response.json()["height"], 0)
 
     def test_nonexistent_block(self):
         """Tests the `block` endpoint. Check response for nonexistent block"""
@@ -69,9 +73,11 @@ class ApiTest(unittest.TestCase):
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            blocks_response = client.public_api.get_blocks(count=5, skip_empty_blocks=True)
+            blocks_response = client.public_api.get_blocks(
+                count=5, skip_empty_blocks=True
+            )
             self.assertEqual(blocks_response.status_code, 200)
-            self.assertEqual(len(blocks_response.json()['blocks']), 0)
+            self.assertEqual(len(blocks_response.json()["blocks"]), 0)
 
     def test_get_last_n_blocks(self):
         """Tests the `blocks` endpoint. Check response for last N blocks"""
@@ -83,7 +89,7 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             blocks_response = client.public_api.get_blocks(count=number_of_blocks)
             self.assertEqual(blocks_response.status_code, 200)
-            self.assertEqual(len(blocks_response.json()['blocks']), number_of_blocks)
+            self.assertEqual(len(blocks_response.json()["blocks"]), number_of_blocks)
 
     def test_get_blocks_with_time(self):
         """Tests the `blocks` endpoint. Check response for blocks with time"""
@@ -91,9 +97,11 @@ class ApiTest(unittest.TestCase):
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            blocks_response = client.public_api.get_blocks(count=1, add_blocks_time=True)
+            blocks_response = client.public_api.get_blocks(
+                count=1, add_blocks_time=True
+            )
             self.assertEqual(blocks_response.status_code, 200)
-            self.assertIsNotNone(blocks_response.json()['blocks'][0]['time'])
+            self.assertIsNotNone(blocks_response.json()["blocks"][0]["time"])
 
     def test_get_blocks_with_precommits(self):
         """Tests the `blocks` endpoint. Check response for blocks with precommits"""
@@ -103,7 +111,7 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             blocks_response = client.public_api.get_blocks(count=1, add_precommits=True)
             self.assertEqual(blocks_response.status_code, 200)
-            self.assertEqual(len(blocks_response.json()['blocks'][0]['precommits']), 3)
+            self.assertEqual(len(blocks_response.json()["blocks"][0]["precommits"]), 3)
 
     def test_get_n_latest_blocks(self):
         """Tests the `blocks` endpoint. Check response for N latest blocks"""
@@ -115,10 +123,12 @@ class ApiTest(unittest.TestCase):
             height_counter = latest
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            blocks_response = client.public_api.get_blocks(count=number_of_blocks, latest=latest)
-            self.assertEqual(len(blocks_response.json()['blocks']), latest+1)
-            for block in blocks_response.json()['blocks']:
-                self.assertEqual(int(block['height']), height_counter)
+            blocks_response = client.public_api.get_blocks(
+                count=number_of_blocks, latest=latest
+            )
+            self.assertEqual(len(blocks_response.json()["blocks"]), latest + 1)
+            for block in blocks_response.json()["blocks"]:
+                self.assertEqual(int(block["height"]), height_counter)
                 height_counter -= 1
 
     def test_get_n_latest_blocks_negative(self):
@@ -129,7 +139,9 @@ class ApiTest(unittest.TestCase):
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            blocks_response = client.public_api.get_blocks(count=number_of_blocks, latest=latest)
+            blocks_response = client.public_api.get_blocks(
+                count=number_of_blocks, latest=latest
+            )
             self.assertEqual(blocks_response.status_code, 404)
 
     def test_get_n_earliest_blocks(self):
@@ -142,12 +154,16 @@ class ApiTest(unittest.TestCase):
             height_counter = earliest
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            blocks_response = client.public_api.get_blocks(count=number_of_blocks, earliest=earliest)
-            latest_height = int(blocks_response.json()['blocks'][0]['height'])
-            self.assertEqual(len(blocks_response.json()['blocks']), latest_height - earliest + 1)
+            blocks_response = client.public_api.get_blocks(
+                count=number_of_blocks, earliest=earliest
+            )
+            latest_height = int(blocks_response.json()["blocks"][0]["height"])
+            self.assertEqual(
+                len(blocks_response.json()["blocks"]), latest_height - earliest + 1
+            )
             # blocks must be started from 'earliest' height
-            for block in reversed(blocks_response.json()['blocks']):
-                self.assertEqual(int(block['height']), height_counter)
+            for block in reversed(blocks_response.json()["blocks"]):
+                self.assertEqual(int(block["height"]), height_counter)
                 height_counter += 1
 
     def test_get_mix_latest_earliest_blocks(self):
@@ -161,10 +177,14 @@ class ApiTest(unittest.TestCase):
             height_counter = latest
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            blocks_response = client.public_api.get_blocks(count=number_of_blocks, latest=latest, earliest=earliest)
-            self.assertEqual(len(blocks_response.json()['blocks']), latest - earliest + 1)
-            for block in blocks_response.json()['blocks']:
-                self.assertEqual(int(block['height']), height_counter)
+            blocks_response = client.public_api.get_blocks(
+                count=number_of_blocks, latest=latest, earliest=earliest
+            )
+            self.assertEqual(
+                len(blocks_response.json()["blocks"]), latest - earliest + 1
+            )
+            for block in blocks_response.json()["blocks"]:
+                self.assertEqual(int(block["height"]), height_counter)
                 height_counter -= 1
 
     def test_get_unknown_transaction(self):
@@ -174,7 +194,7 @@ class ApiTest(unittest.TestCase):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
             tx_response = client.public_api.get_tx_info(
-              "b2d09e1bddca851bee8faf8ffdcfc18cb87fbde167a29bd049fa2eee4a82c1ca"
+                "b2d09e1bddca851bee8faf8ffdcfc18cb87fbde167a29bd049fa2eee4a82c1ca"
             )
             self.assertEqual(tx_response.status_code, 404)
             response_info = tx_response.json()
@@ -189,9 +209,9 @@ class ApiTest(unittest.TestCase):
             client = ExonumClient(host, public_port, private_port)
             stats = client.public_api.stats()
             self.assertEqual(stats.status_code, 200)
-            self.assertEqual(stats.json()['tx_count'], 0)
-            self.assertEqual(stats.json()['tx_pool_size'], 0)
-            self.assertEqual(stats.json()['tx_cache_size'], 0)
+            self.assertEqual(stats.json()["tx_count"], 0)
+            self.assertEqual(stats.json()["tx_pool_size"], 0)
+            self.assertEqual(stats.json()["tx_cache_size"], 0)
 
     def test_user_agent(self):
         """Tests the `user_agent` endpoint."""

@@ -14,6 +14,11 @@
 
 //! Data migration tools.
 //!
+//! # Stability
+//!
+//! Since migrations are tightly related to unstable [`Runtime`] trait, the entirety of this
+//! module is considered unstable.
+//!
 //! # Migrations Overview
 //!
 //! The goal of a data migration is to prepare data of an Exonum service for use with an updated
@@ -76,11 +81,19 @@
 //! returns to the [`Stopped`] status. The local migration result is ignored; if the migration
 //! script has not completed locally, it is aborted.
 //!
+//! Note that commitment and flushing are separate operations and must be performed in
+//! different blocks. When a migration is flushed, the migrated data needs to have a definite
+//! state, which is ensured by an earlier commitment acting as a filter. The requirement
+//! for different blocks is more nuanced and is related to implementation details of the database
+//! backend. Namely, the flushing operation needs to be performed on a fork which contains the final
+//! migration state; not doing this may break state aggregation.
+//!
 //! Deciding when it is appropriate to commit or roll back a migration is the responsibility
 //! of the supervisor service. For example, it may commit the migration once all validators have
 //! submitted identical migration results, and roll back a migration if at least one validator
 //! has reported an error during migration or there is divergence among reported migration results.
 //!
+//! [`Runtime`]: ../trait.Runtime.html
 //! [dispatcher]: ../index.html
 //! [supervisor service]: ../index.html#supervisor-service
 //! [`MigrationScript`]: struct.MigrationScript.html
