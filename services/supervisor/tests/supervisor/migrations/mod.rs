@@ -203,9 +203,6 @@ fn wait_for_migration_success(
     } else {
         panic!("Migration failed: {:?}", state);
     }
-
-    // Migration is flushed at the next block after its success.
-    testkit.create_block();
 }
 
 /// Waits for the migration associated with provides request will result
@@ -217,7 +214,7 @@ fn wait_for_migration_fail(
 ) -> ExecutionError {
     let state = wait_while_pending(testkit, deadline_height, request);
     if let AsyncEventState::Failed { error, .. } = state.inner {
-        return error;
+        error
     } else {
         panic!("Migration not failed, but was expected to: {:?}", state);
     }

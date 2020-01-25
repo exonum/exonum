@@ -194,7 +194,7 @@ pub struct ArtifactId {
     non_exhaustive: (),
 }
 
-    #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
+#[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
 impl ArtifactId {
     /// Creates a new artifact identifier from the given runtime id and name
     /// or returns error if the resulting artifact id is not correct.
