@@ -19,7 +19,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_merkledb::access::AccessExt;
+use exonum_merkledb::access::AccessRefExt;
 use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{TestKit, TestKitBuilder};
 

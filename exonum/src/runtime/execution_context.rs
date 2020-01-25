@@ -372,7 +372,7 @@ impl<'a> SupervisorExtensions<'a> {
             })?;
 
         DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact.clone())
+            .initiate_resuming_service(instance_id, spec.artifact)
             .map_err(From::from)
     }
 

@@ -414,7 +414,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, Fork, TemporaryDB};
+    use crate::{
+        access::{AccessExt, AccessRefExt},
+        Database, Fork, TemporaryDB,
+    };
 
     fn list_index_methods(list_index: &mut ListIndex<&Fork, i32>) {
         assert!(list_index.is_empty());

@@ -190,7 +190,7 @@ mod timestamping {
 mod cryptocurrency {
     use exonum::{
         crypto::PublicKey,
-        merkledb::access::AccessExt,
+        merkledb::access::AccessRefExt,
         messages::Verified,
         runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
     };

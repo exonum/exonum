@@ -164,7 +164,7 @@ mod v02 {
 mod v05 {
     use exonum::crypto::PublicKey;
     use exonum::merkledb::{
-        access::{Access, AccessExt, FromAccess, Prefixed},
+        access::{Access, AccessRefExt, FromAccess, Prefixed},
         ProofEntry, ProofMapIndex, Snapshot,
     };
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};

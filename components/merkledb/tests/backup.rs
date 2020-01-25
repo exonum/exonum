@@ -24,7 +24,7 @@ use proptest::{
 use std::collections::{HashMap, HashSet};
 
 use exonum_merkledb::{
-    access::{Access, AccessExt},
+    access::{Access, AccessRefExt},
     Database, DatabaseExt, IndexAddress, IndexType, SystemSchema, TemporaryDB,
 };
 

@@ -19,7 +19,7 @@
 use exonum::{
     crypto::Hash,
     helpers::{Height, ValidatorId},
-    merkledb::access::AccessExt,
+    merkledb::access::AccessRefExt,
     messages::{AnyTx, Verified},
     runtime::{
         CommonError, ErrorMatch, ExecutionContext, ExecutionError, InstanceId, SnapshotExt,

@@ -27,7 +27,7 @@ use proptest::{
 use std::rc::Rc;
 
 use exonum_merkledb::{
-    access::AccessExt, BinaryValue, Fork, HashTag, ListIndex, ObjectHash, ProofListIndex,
+    access::AccessRefExt, BinaryValue, Fork, HashTag, ListIndex, ObjectHash, ProofListIndex,
     TemporaryDB,
 };
 

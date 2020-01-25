@@ -296,7 +296,7 @@ impl FromStr for ArtifactId {
             [runtime_id, name, version] => {
                 let artifact = Self::new(
                     u32::from_str(runtime_id)?,
-                    name.to_string(),
+                    (*name).to_string(),
                     version.parse()?,
                 )?;
                 artifact.validate()?;

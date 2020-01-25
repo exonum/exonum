@@ -71,7 +71,7 @@ pub enum ScriptStatus {
 /// # use exonum::runtime::{
 /// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
 /// # };
-/// use exonum::merkledb::access::AccessExt;
+/// use exonum::merkledb::access::AccessRefExt;
 /// # use exonum_rust_runtime::Service;
 /// use exonum_testkit::migrations::{MigrationTest, ScriptExt};
 ///
@@ -111,7 +111,7 @@ pub enum ScriptStatus {
 /// # use exonum::runtime::{
 /// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
 /// # };
-/// use exonum::merkledb::access::AccessExt;
+/// use exonum::merkledb::access::AccessRefExt;
 /// # use exonum_rust_runtime::Service;
 /// use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
 ///
@@ -149,7 +149,7 @@ pub enum ScriptStatus {
 /// # use exonum::runtime::{
 /// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
 /// # };
-/// # use exonum::merkledb::access::AccessExt;
+/// # use exonum::merkledb::access::AccessRefExt;
 /// # use exonum_rust_runtime::Service;
 /// # use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
 /// fn infinite_script(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
@@ -223,7 +223,7 @@ where
 
     /// Gets the migrated data. This method is useful to inspect migration state after
     /// script abortion. Once the migration is flushed, the migrated data is erased.
-    pub fn migration_data(&self) -> Migration<'static, &dyn Snapshot> {
+    pub fn migration_data(&self) -> Migration<&dyn Snapshot> {
         let snapshot = self
             .end_snapshot
             .as_ref()
@@ -509,7 +509,7 @@ mod tests {
     use super::*;
 
     use exonum::{
-        merkledb::access::AccessExt,
+        merkledb::access::AccessRefExt,
         runtime::{migrations::InitMigrationError, ArtifactId},
     };
     use exonum_rust_runtime::{ArtifactProtobufSpec, Service};

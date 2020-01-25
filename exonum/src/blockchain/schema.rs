@@ -14,7 +14,7 @@
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
-    access::{Access, AccessExt, RawAccessMut},
+    access::{Access, AccessRefExt, RawAccessMut},
     impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofEntry, ProofListIndex, ProofMapIndex,
 };
@@ -113,7 +113,7 @@ impl<T: Access> Schema<T> {
     /// Returns a table that represents a map with a key-value pair of a
     /// transaction hash and raw transaction message.
     pub fn transactions(&self) -> MapIndex<T::Base, Hash, Verified<AnyTx>> {
-        self.access.clone().get_map(TRANSACTIONS)
+        self.access.get_map(TRANSACTIONS)
     }
 
     /// Returns a record of errors that occurred during execution of a particular block.
@@ -140,9 +140,7 @@ impl<T: Access> Schema<T> {
         &self,
         block_height: Height,
     ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
-        self.access
-            .clone()
-            .get_proof_map((CALL_ERRORS, &block_height.0))
+        self.access.get_proof_map((CALL_ERRORS, &block_height.0))
     }
 
     /// Returns the result of the execution for a transaction with the specified location.
@@ -164,7 +162,7 @@ impl<T: Access> Schema<T> {
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
     fn transactions_len_index(&self) -> Entry<T::Base, u64> {
-        self.access.clone().get_entry(TRANSACTIONS_LEN)
+        self.access.get_entry(TRANSACTIONS_LEN)
     }
 
     /// Returns the number of committed transactions in the blockchain.
@@ -176,13 +174,13 @@ impl<T: Access> Schema<T> {
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
     pub fn transactions_pool(&self) -> KeySetIndex<T::Base, Hash> {
-        self.access.clone().get_key_set(TRANSACTIONS_POOL)
+        self.access.get_key_set(TRANSACTIONS_POOL)
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
     #[doc(hidden)]
     pub fn transactions_pool_len_index(&self) -> Entry<T::Base, u64> {
-        self.access.clone().get_entry(TRANSACTIONS_POOL_LEN)
+        self.access.get_entry(TRANSACTIONS_POOL_LEN)
     }
 
     /// Returns the number of transactions in the pool.
@@ -194,36 +192,34 @@ impl<T: Access> Schema<T> {
     /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
     pub fn transactions_locations(&self) -> MapIndex<T::Base, Hash, TxLocation> {
-        self.access.clone().get_map(TRANSACTIONS_LOCATIONS)
+        self.access.get_map(TRANSACTIONS_LOCATIONS)
     }
 
     /// Returns a table that stores a block object for every block height.
     pub fn blocks(&self) -> MapIndex<T::Base, Hash, Block> {
-        self.access.clone().get_map(BLOCKS)
+        self.access.get_map(BLOCKS)
     }
 
     /// Returns a table that keeps block hashes for corresponding block heights.
     pub fn block_hashes_by_height(&self) -> ListIndex<T::Base, Hash> {
-        self.access.clone().get_list(BLOCK_HASHES_BY_HEIGHT)
+        self.access.get_list(BLOCK_HASHES_BY_HEIGHT)
     }
 
     /// Returns a table that keeps a list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<T::Base, Hash> {
         let height: u64 = height.into();
-        self.access
-            .clone()
-            .get_proof_list((BLOCK_TRANSACTIONS, &height))
+        self.access.get_proof_list((BLOCK_TRANSACTIONS, &height))
     }
 
     /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<T::Base, Verified<Precommit>> {
-        self.access.clone().get_list((PRECOMMITS, hash))
+        self.access.get_list((PRECOMMITS, hash))
     }
 
     /// Returns an actual consensus configuration entry.
     #[doc(hidden)]
     pub fn consensus_config_entry(&self) -> ProofEntry<T::Base, ConsensusConfig> {
-        self.access.clone().get_proof_entry(CONSENSUS_CONFIG)
+        self.access.get_proof_entry(CONSENSUS_CONFIG)
     }
 
     /// Returns the block hash for the given height.

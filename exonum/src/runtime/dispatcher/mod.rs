@@ -326,7 +326,7 @@ impl Dispatcher {
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
     pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
         // Mark services as active.
-        self.activate_pending(&fork);
+        Self::activate_pending(&fork);
         // Start pending services.
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
@@ -600,7 +600,7 @@ impl Dispatcher {
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, &CallType::AfterTransactions);
-        self.activate_pending(fork);
+        Self::activate_pending(fork);
         errors
     }
 
@@ -770,7 +770,7 @@ impl Dispatcher {
     }
 
     /// Make pending artifacts and instances active.
-    pub(crate) fn activate_pending(&self, fork: &Fork) {
+    pub(crate) fn activate_pending(fork: &Fork) {
         Schema::new(fork).activate_pending()
     }
 

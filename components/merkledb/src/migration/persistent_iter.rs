@@ -26,7 +26,7 @@ use std::{
 };
 
 use crate::{
-    access::{Access, AccessExt, RawAccess, RawAccessMut},
+    access::{Access, AccessRefExt, RawAccess, RawAccessMut},
     indexes::{self, proof_map::ToProofPath},
     BinaryKey, BinaryValue, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
     ProofMapIndex, SparseListIndex, ValueSetIndex,
@@ -269,7 +269,7 @@ where
 /// independently:
 ///
 /// ```
-/// # use exonum_merkledb::{access::AccessExt, Database, TemporaryDB};
+/// # use exonum_merkledb::{access::{AccessExt, AccessRefExt}, Database, TemporaryDB};
 /// # use exonum_merkledb::migration::{MigrationHelper, PersistentIter};
 /// let db = TemporaryDB::new();
 /// // Create data for migration.
@@ -282,7 +282,7 @@ where
 /// let list = helper.old_data().get_proof_list::<_, String>("list");
 /// // In the context of migration, persistent iterators should use
 /// // the scratchpad data access.
-/// let iter = PersistentIter::new(helper.scratchpad(), "list_iter", &list);
+/// let iter = PersistentIter::new(&helper.scratchpad(), "list_iter", &list);
 /// // Now, we can use `iter` as any other iterator. Persistence is most useful
 /// // together with the `take` adapter; it allows to break migrated data
 /// // into manageable chunks.
@@ -293,7 +293,7 @@ where
 ///
 /// // If we recreate the iterator, it will resume iteration from the last
 /// // known position (the element with 0-based index 100, in our case).
-/// let mut iter = PersistentIter::new(helper.scratchpad(), "list_iter", &list);
+/// let mut iter = PersistentIter::new(&helper.scratchpad(), "list_iter", &list);
 /// let (i, item) = iter.next().unwrap();
 /// assert_eq!(i, 100);
 /// assert_eq!(item, "100");
@@ -355,7 +355,7 @@ where
     I: ContinueIterator,
 {
     /// Creates a new persistent iterator.
-    pub fn new<A>(access: A, name: &str, index: I) -> Self
+    pub fn new<A>(access: &A, name: &str, index: I) -> Self
     where
         A: Access<Base = T>,
     {
@@ -442,7 +442,7 @@ where
         index: I,
     ) -> PersistentIter<T::Base, I> {
         self.names.insert(name.to_owned());
-        PersistentIter::new(self.access.clone(), name, index)
+        PersistentIter::new(&self.access, name, index)
     }
 
     /// Checks if all iterators instantiated via this instance have ended.
@@ -467,7 +467,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{migration::Scratchpad, Database, TemporaryDB};
+    use crate::{access::AccessExt, migration::Scratchpad, Database, TemporaryDB};
 
     use std::{collections::HashSet, iter::FromIterator};
 
@@ -481,7 +481,7 @@ mod tests {
         }
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "map", &map);
+        let iter = PersistentIter::new(&scratchpad, "map", &map);
         let mut count = 0;
         for (i, (key, value)) in iter.take(5).enumerate() {
             assert_eq!(key, i as u32);
@@ -495,7 +495,7 @@ mod tests {
         }
 
         // Resume the iterator.
-        let iter = PersistentIter::new(scratchpad, "map", &map);
+        let iter = PersistentIter::new(&scratchpad, "map", &map);
         count = 0;
         for (i, (key, value)) in (5..).zip(iter) {
             assert_eq!(key, i as u32);
@@ -509,7 +509,7 @@ mod tests {
         }
 
         // The iterator is ended now.
-        let iter = PersistentIter::new(scratchpad, "map", &map);
+        let iter = PersistentIter::new(&scratchpad, "map", &map);
         assert_eq!(iter.count(), 0);
     }
 
@@ -524,7 +524,7 @@ mod tests {
         }
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "map", &map);
+        let iter = PersistentIter::new(&scratchpad, "map", &map);
         for (word, size) in iter.take_while(|(word, _)| word.as_str() < "many") {
             assert!(words.contains(&word.as_str()));
             assert_eq!(word.len() as u64, size);
@@ -538,7 +538,7 @@ mod tests {
             assert_eq!(position_entry.get(), Some(expected_pos));
         }
 
-        let iter = PersistentIter::new(scratchpad, "map", &map);
+        let iter = PersistentIter::new(&scratchpad, "map", &map);
         assert_eq!(
             iter.collect::<Vec<_>>(),
             vec![("this".to_owned(), 4), ("word".to_owned(), 4)]
@@ -553,7 +553,7 @@ mod tests {
         list.extend((0_u32..10).map(|i| i.to_string()));
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "list", &list);
+        let iter = PersistentIter::new(&scratchpad, "list", &list);
         // Test that iterators work with adapters as expected.
         let items: Vec<_> = iter.take(5).filter(|(i, _)| i % 2 == 1).collect();
         assert_eq!(items, vec![(1, "1".to_owned()), (3, "3".to_owned())]);
@@ -563,7 +563,7 @@ mod tests {
             assert_eq!(position_entry.get(), Some(IteratorPosition::NextKey(5)));
         }
 
-        let iter = PersistentIter::new(scratchpad, "list", &list);
+        let iter = PersistentIter::new(&scratchpad, "list", &list);
         for (i, value) in iter.take(3) {
             assert_eq!(i.to_string(), value);
         }
@@ -573,7 +573,7 @@ mod tests {
             assert_eq!(position_entry.get(), Some(IteratorPosition::NextKey(8)));
         }
 
-        let iter = PersistentIter::new(scratchpad, "list", &list);
+        let iter = PersistentIter::new(&scratchpad, "list", &list);
         assert_eq!(iter.count(), 2);
     }
 
@@ -584,7 +584,7 @@ mod tests {
         let list = fork.get_list::<_, String>("list");
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "list", &list);
+        let iter = PersistentIter::new(&scratchpad, "list", &list);
         assert_eq!(iter.count(), 0);
         let position_entry = scratchpad.get_entry::<_, IteratorPosition<u64>>("list");
         assert_eq!(position_entry.get(), Some(IteratorPosition::Ended));
@@ -600,7 +600,7 @@ mod tests {
         }
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "list", &list);
+        let iter = PersistentIter::new(&scratchpad, "list", &list);
         let mut count = 0;
         for (i, value) in iter.take(5) {
             assert_eq!(value, i.to_string());
@@ -612,7 +612,7 @@ mod tests {
             assert_eq!(position_entry.get(), Some(IteratorPosition::NextKey(8)));
         }
 
-        let iter = PersistentIter::new(scratchpad, "list", &list);
+        let iter = PersistentIter::new(&scratchpad, "list", &list);
         let indexes: Vec<_> = iter.map(|(i, _)| i).collect();
         assert_eq!(indexes, vec![8, 13, 21]);
     }
@@ -627,12 +627,12 @@ mod tests {
         }
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "set", &set);
+        let iter = PersistentIter::new(&scratchpad, "set", &set);
         let head: Vec<_> = iter.take(3).collect();
         assert_eq!(head, vec![0, 1, 2]);
 
         {
-            let mut iter = PersistentIter::new(scratchpad, "set", &set);
+            let mut iter = PersistentIter::new(&scratchpad, "set", &set);
             assert_eq!(iter.nth(2), Some(8));
         }
         {
@@ -640,7 +640,7 @@ mod tests {
             assert_eq!(position_entry.get(), Some(IteratorPosition::NextKey(13)));
         }
 
-        let iter = PersistentIter::new(scratchpad, "set", &set);
+        let iter = PersistentIter::new(&scratchpad, "set", &set);
         let tail: Vec<_> = iter.collect();
         assert_eq!(tail, vec![13, 21]);
     }
@@ -656,11 +656,11 @@ mod tests {
         }
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(scratchpad, "set", &set);
+        let iter = PersistentIter::new(&scratchpad, "set", &set);
         let head: Vec<_> = iter.take(3).map(|(_, val)| val).collect();
-        let iter = PersistentIter::new(scratchpad, "set", &set);
+        let iter = PersistentIter::new(&scratchpad, "set", &set);
         let middle: Vec<_> = iter.take(2).map(|(_, val)| val).collect();
-        let iter = PersistentIter::new(scratchpad, "set", &set);
+        let iter = PersistentIter::new(&scratchpad, "set", &set);
         let tail: Vec<_> = iter.map(|(_, val)| val).collect();
 
         let actual_set: HashSet<_> = HashSet::from_iter(head.into_iter().chain(middle).chain(tail));

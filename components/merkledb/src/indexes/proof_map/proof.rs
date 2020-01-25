@@ -244,7 +244,6 @@ impl<K, V> OptionalEntry<K, V> {
 /// #    proof_map::{Hashed, ToProofPath},
 /// # };
 /// # use exonum_crypto::hash;
-/// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = fork.get_proof_map("index");
 /// let (h1, h2) = (HashTag::hash_leaf(&[1]), HashTag::hash_leaf(&[2]));
@@ -262,7 +261,6 @@ impl<K, V> OptionalEntry<K, V> {
 ///         "entries": [{ "key": h2, "value": 200 }],
 ///     })
 /// );
-/// # }
 /// ```
 ///
 /// ## Note on external implementations

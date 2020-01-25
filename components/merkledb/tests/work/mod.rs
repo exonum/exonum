@@ -8,7 +8,7 @@ use proptest::{
 use std::{collections::BTreeMap, iter::FromIterator};
 
 use exonum_merkledb::{
-    access::{Access, AccessExt, RawAccessMut},
+    access::{Access, AccessRefExt, RawAccessMut},
     IndexAddress, IndexType,
 };
 
@@ -27,7 +27,7 @@ pub fn work_on_index<T>(
     value: Option<Vec<u8>>,
 ) -> IndexType
 where
-    T: Access + Copy,
+    T: Access,
     T::Base: RawAccessMut,
 {
     if let Some(real_type) = fork.index_type(addr.clone()) {

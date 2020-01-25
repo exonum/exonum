@@ -57,7 +57,6 @@ use exonum_crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SI
 ///         Key { a, b }
 ///     }
 /// }
-/// # fn main() {
 /// # // Check the natural ordering of keys
 /// # let (mut x, mut y) = (vec![0_u8; 6], vec![0_u8; 6]);
 /// # Key { a: -1, b: 2 }.write(&mut x);
@@ -67,7 +66,6 @@ use exonum_crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SI
 /// # let key = Key::read(&x);
 /// # assert_eq!(key.a, -1);
 /// # assert_eq!(key.b, 2);
-/// # }
 /// ```
 pub trait BinaryKey: ToOwned {
     /// Returns the size of the serialized key in bytes.

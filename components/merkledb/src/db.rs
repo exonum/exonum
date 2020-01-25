@@ -531,7 +531,7 @@ pub trait DatabaseExt: Database {
     /// and then applying backups in the reverse order:
     ///
     /// ```
-    /// # use exonum_merkledb::{access::{Access, AccessExt}, Database, DatabaseExt, TemporaryDB};
+    /// # use exonum_merkledb::{access::{Access, AccessExt, AccessRefExt}, Database, DatabaseExt, TemporaryDB};
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
     /// fork.get_list("list").push(1_u32);

@@ -582,7 +582,9 @@ mod tests {
     use assert_matches::assert_matches;
     use exonum_crypto::Hash;
     use exonum_merkledb::{
-        access::AccessExt, migration::flush_migration, Database, Snapshot, TemporaryDB,
+        access::{AccessExt, AccessRefExt},
+        migration::flush_migration,
+        Database, Snapshot, TemporaryDB,
     };
 
     use std::{collections::HashSet, sync::Arc};

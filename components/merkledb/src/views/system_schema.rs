@@ -140,7 +140,11 @@ impl SystemSchema<&Fork> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, migration::Migration, Database, HashTag, TemporaryDB};
+    use crate::{
+        access::{AccessExt, AccessRefExt},
+        migration::Migration,
+        Database, HashTag, TemporaryDB,
+    };
 
     fn initial_changes(fork: &Fork) {
         fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);

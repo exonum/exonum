@@ -156,7 +156,7 @@ where
 mod tests {
     use super::*;
     use crate::{
-        access::{AccessExt, Prefixed, RawAccessMut},
+        access::{AccessExt, AccessRefExt, Prefixed, RawAccessMut},
         migration::{Migration, Scratchpad},
         Database, ProofListIndex, TemporaryDB,
     };
@@ -198,7 +198,7 @@ mod tests {
         A: Access,
         A::Base: RawAccessMut,
     {
-        let group: Group<_, str, ProofListIndex<_, String>> = fork.clone().get_group("group");
+        let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group("group");
         group.get("foo").push("foo".to_owned());
         group.get("bar").push("bar".to_owned());
         group.get("baz").push("baz".to_owned());

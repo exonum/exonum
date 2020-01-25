@@ -262,7 +262,7 @@ where
         }
     }
 
-    /// Returns an iterator over the indexes of the 'SparseListIndex'.
+    /// Returns an iterator over the indexes of the `SparseListIndex`.
     ///
     /// # Examples
     ///
@@ -285,7 +285,7 @@ where
         }
     }
 
-    /// Returns an iterator over the values of the 'SparseListIndex'. The iterator element type is
+    /// Returns an iterator over the values of the `SparseListIndex`. The iterator element type is
     /// V.
     ///
     /// # Examples
@@ -340,7 +340,7 @@ where
     T: RawAccessMut,
     V: BinaryValue,
 {
-    /// Appends an element to the back of the 'SparseListIndex'.
+    /// Appends an element to the back of the `SparseListIndex`.
     ///
     /// # Examples
     ///
@@ -493,7 +493,7 @@ where
         self.state.unset();
     }
 
-    /// Removes the first element from the 'SparseListIndex' and returns it, or
+    /// Removes the first element from the `SparseListIndex` and returns it, or
     /// returns `None` if it is empty.
     ///
     /// # Examples

@@ -93,7 +93,7 @@ fn create_initial_data() -> TemporaryDB {
             let mut bytes = [0_u8; PUBLIC_KEY_LENGTH];
             rng.fill(&mut bytes[..]);
             let public_key = PublicKey::new(bytes);
-            let username = NAMES.choose(&mut rng).unwrap().to_string();
+            let username = (*NAMES.choose(&mut rng).unwrap()).to_string();
             let wallet = v1::Wallet {
                 public_key,
                 username,

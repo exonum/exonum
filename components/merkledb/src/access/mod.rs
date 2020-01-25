@@ -59,7 +59,7 @@ use failure::{Error, Fail};
 
 use std::fmt;
 
-pub use self::extensions::AccessExt;
+pub use self::extensions::{AccessExt, AccessRefExt};
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
 use crate::{
@@ -162,7 +162,7 @@ impl<T: RawAccess> Access for T {
 /// # Examples
 ///
 /// ```
-/// use exonum_merkledb::{access::{AccessExt, Prefixed}, Database, TemporaryDB};
+/// use exonum_merkledb::{access::{AccessExt, AccessRefExt, Prefixed}, Database, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();

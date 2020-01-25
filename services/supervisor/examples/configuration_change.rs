@@ -18,7 +18,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess},
+    access::{Access, AccessRefExt, FromAccess},
     Entry, ObjectHash,
 };
 use exonum_rust_runtime::{Service, ServiceFactory};

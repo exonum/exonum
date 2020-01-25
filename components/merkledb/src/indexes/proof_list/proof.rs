@@ -96,7 +96,6 @@ impl HashedEntry {
 /// # use exonum_merkledb::{
 /// #     access::AccessExt, Database, TemporaryDB, BinaryValue, HashTag, ListProof,
 /// # };
-/// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut list = fork.get_proof_list("index");
 /// list.extend(vec![1_u32, 2, 3]);
@@ -116,7 +115,6 @@ impl HashedEntry {
 ///         "length": 3,
 ///     })
 /// );
-/// # }
 /// ```
 ///
 /// ## Note on external implementations
