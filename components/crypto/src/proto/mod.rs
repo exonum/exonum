@@ -12,19 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Re-export raw Protobuf types so other modules can re-use it for custom serialization.
 pub use crate::proto::schema::*;
 
 use exonum_proto::ProtobufConvert;
 use failure::{ensure, format_err, Error};
 
-use crate::{Hash, PublicKey, Signature};
 use crate::{HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 mod schema;
 #[cfg(test)]
 mod tests;
 
-impl ProtobufConvert for Hash {
+// Here and below fully qualified types are required to not override re-exports
+// from `crate::proto::schema`.
+impl ProtobufConvert for crate::Hash {
     type ProtoStruct = schema::Hash;
 
     fn to_pb(&self) -> schema::Hash {
@@ -40,7 +42,7 @@ impl ProtobufConvert for Hash {
     }
 }
 
-impl ProtobufConvert for PublicKey {
+impl ProtobufConvert for crate::PublicKey {
     type ProtoStruct = schema::PublicKey;
 
     fn to_pb(&self) -> schema::PublicKey {
@@ -57,7 +59,7 @@ impl ProtobufConvert for PublicKey {
     }
 }
 
-impl ProtobufConvert for Signature {
+impl ProtobufConvert for crate::Signature {
     type ProtoStruct = schema::Signature;
 
     fn to_pb(&self) -> schema::Signature {

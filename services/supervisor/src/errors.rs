@@ -54,7 +54,7 @@ pub enum ServiceError {
 }
 
 /// Configuration-related errors group.
-/// Error codes 48-64.
+/// Error codes 48-63.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 pub enum ConfigurationError {
@@ -70,4 +70,17 @@ pub enum ConfigurationError {
     IncorrectConfigurationNumber = 52,
     /// Invalid configuration for supervisor.
     InvalidConfig = 53,
+}
+
+/// Configuration-related errors group.
+/// Error codes 64-79.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(ExecutionFail)]
+pub enum MigrationError {
+    /// Migration request has not been registered or accepted.
+    MigrationRequestNotRegistered = 64,
+    /// Migration was started but failed during the execution.
+    MigrationFailed = 65,
+    /// Several nodes reported different state hashes.
+    StateHashDivergence = 66,
 }

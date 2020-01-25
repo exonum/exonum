@@ -200,7 +200,7 @@ pub use self::{
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, Caller,
         CallerAddress, InstanceId, InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
-        MethodId,
+        MethodId, MigrationStatus,
     },
 };
 

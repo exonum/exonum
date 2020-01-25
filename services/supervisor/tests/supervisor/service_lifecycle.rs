@@ -25,7 +25,10 @@ use crate::inc::IncService;
 use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor};
 
 /// Creates block with the specified transaction and returns its execution result.
-fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(), ExecutionError> {
+pub fn execute_transaction(
+    testkit: &mut TestKit,
+    tx: Verified<AnyTx>,
+) -> Result<(), ExecutionError> {
     testkit.create_block_with_transaction(tx).transactions[0]
         .status()
         .map_err(Clone::clone)

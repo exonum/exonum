@@ -81,6 +81,44 @@ where
         self.index.put(id, confirmations);
         len
     }
+
+    /// Updates the stored confirmations to be an intersection of the set
+    /// with current confirmations, and set of the actual validator keys.
+    ///
+    /// This method is intended to be called before comparing the amount of
+    /// confirmations and amount of validators, so confirmations of nodes which
+    /// are not validators anymore won't be taken into account.
+    ///
+    /// Returns the amount of confirmations in the updated set.
+    fn intersect(&mut self, id: &V, validator_keys: &BTreeSet<PublicKey>) -> usize {
+        let mut confirmations = self.index.get(id).unwrap_or_default();
+        confirmations.0 = confirmations
+            .0
+            .intersection(validator_keys)
+            .copied()
+            .collect();
+        let confirmations_amount = confirmations.0.len();
+        self.index.put(id, confirmations);
+
+        confirmations_amount
+    }
+
+    /// Calculates the intersection of current confirmations and actual list of
+    /// validators.
+    ///
+    /// Returns `true` if all validators confirmed the item, and `false` otherwise.
+    ///
+    /// This method updates the list of confirmation, leaving confirmations only from
+    /// the actual validators.
+    pub fn intersect_with_validators(
+        &mut self,
+        id: &V,
+        validator_keys: impl IntoIterator<Item = PublicKey>,
+    ) -> bool {
+        let validator_keys: BTreeSet<PublicKey> = validator_keys.into_iter().collect();
+        let validators_amount = validator_keys.len();
+        self.intersect(id, &validator_keys) == validators_amount
+    }
 }
 
 impl<T, V> ObjectHash for MultisigIndex<T, V>

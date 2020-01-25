@@ -263,6 +263,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   - Added `resume_service` method to the `ConfigPropose`.
   - Added `ResumeService` variant to the `ConfigChange` enumeration.
 
+- Supervisor now supports migrations. (#1727)
+
 #### exonum-middleware-service
 
 - Added *middleware* service that can batch transactions and perform checked calls
