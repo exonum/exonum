@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{hash, Hash, HashStream};
 use failure::Fail;
@@ -94,7 +95,7 @@ impl HashTag {
     /// the hash of the root node of the Merkle tree corresponding to the list.
     ///
     /// ```text
-    /// h = sha-256( HashTag::ListNode || len as u64 || merkle_root )
+    /// h = sha256( HashTag::ListNode || len as u64 || merkle_root )
     /// ```
     pub fn hash_list_node(len: u64, root: Hash) -> Hash {
         let mut len_bytes = [0; 8];
@@ -107,10 +108,10 @@ impl HashTag {
             .hash()
     }
 
-    /// Hash of an empty Merkelized list.
+    /// Obtains hash of an empty Merkelized list.
     ///
     /// ```text
-    /// h = sha-256( HashTag::ListNode || 0 || Hash::zero() )
+    /// h = sha256( HashTag::ListNode || 0 || Hash::zero() )
     /// ```
     pub fn empty_list_hash() -> Hash {
         Hash::from_hex(EMPTY_LIST_HASH).unwrap()
@@ -121,11 +122,11 @@ impl HashTag {
         Self::hash_list_node(values.len() as u64, root_hash(values))
     }
 
-    /// Hash of a Merkelized map with at least 2 entries. `root` is the recursively defined
+    /// Obtains hash of a Merkelized map. `root` is the recursively defined
     /// hash of the root node of the binary Patricia Merkle tree corresponding to the map.
     ///
     /// ```text
-    /// h = sha-256( HashTag::MapNode || merkle_root )
+    /// h = sha256( HashTag::MapNode || merkle_root )
     /// ```
     pub fn hash_map_node(root: Hash) -> Hash {
         HashStream::new()
@@ -138,7 +139,7 @@ impl HashTag {
     /// of the node.
     ///
     /// ```text
-    /// h = sha-256(HashTag::MapBranchNode || <branch_node>)
+    /// h = sha256( HashTag::MapBranchNode || branch_node )
     /// ```
     ///
     /// See [`ProofMapIndex`] for details how branch nodes are serialized.
@@ -154,7 +155,7 @@ impl HashTag {
     /// Hash of a Merkelized map with a single entry.
     ///
     /// ``` text
-    /// h = sha-256( HashTag::MapBranchNode || <path> || <child_hash> )
+    /// h = sha256( HashTag::MapBranchNode || path || child_hash )
     /// ```
     pub fn hash_single_entry_map(path: &ProofPath, child_hash: &Hash) -> Hash {
         HashStream::new()
@@ -168,7 +169,7 @@ impl HashTag {
     ///
     /// Empty map hash:
     /// ```text
-    /// sha-256( HashTag::MapNode || Hash::default() )
+    /// sha256( HashTag::MapNode || Hash::default() )
     /// ```
     pub fn empty_map_hash() -> Hash {
         Hash::from_hex(EMPTY_MAP_HASH).unwrap()
