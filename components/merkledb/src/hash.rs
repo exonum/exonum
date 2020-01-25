@@ -13,14 +13,21 @@
 // limitations under the License.
 
 use byteorder::{ByteOrder, LittleEndian};
-use exonum_crypto::{hash, Hash, HashStream};
+use exonum_crypto::{hash, Hash, HashStream, HASH_SIZE};
 use failure::Fail;
-use hex::FromHex;
 
 use crate::{proof_map::ProofPath, BinaryValue};
 
-const EMPTY_LIST_HASH: &str = "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9";
-const EMPTY_MAP_HASH: &str = "7324b5c72b51bb5d4c180f1109cfd347b60473882145841c39f3e584576296f9";
+// "c6c0aa07f27493d2f2e5cff56c890a353a20086d6c25ec825128e12ae752b2d9" in hex.
+const EMPTY_LIST_HASH: [u8; HASH_SIZE] = [
+    198, 192, 170, 7, 242, 116, 147, 210, 242, 229, 207, 245, 108, 137, 10, 53, 58, 32, 8, 109,
+    108, 37, 236, 130, 81, 40, 225, 42, 231, 82, 178, 217,
+];
+// "7324b5c72b51bb5d4c180f1109cfd347b60473882145841c39f3e584576296f9" in hex.
+const EMPTY_MAP_HASH: [u8; HASH_SIZE] = [
+    115, 36, 181, 199, 43, 81, 187, 93, 76, 24, 15, 17, 9, 207, 211, 71, 182, 4, 115, 136, 33, 69,
+    132, 28, 57, 243, 229, 132, 87, 98, 150, 249,
+];
 
 /// Prefixes for different types of objects stored in the database. These prefixes are necessary
 /// to provide domain separation among hashed objects of different types.
@@ -114,7 +121,7 @@ impl HashTag {
     /// h = sha256( HashTag::ListNode || 0 || Hash::zero() )
     /// ```
     pub fn empty_list_hash() -> Hash {
-        Hash::from_hex(EMPTY_LIST_HASH).unwrap()
+        Hash::new(EMPTY_LIST_HASH)
     }
 
     /// Computes the hash for a Merkelized list containing the given values.
@@ -172,7 +179,7 @@ impl HashTag {
     /// sha256( HashTag::MapNode || Hash::default() )
     /// ```
     pub fn empty_map_hash() -> Hash {
-        Hash::from_hex(EMPTY_MAP_HASH).unwrap()
+        Hash::new(EMPTY_MAP_HASH)
     }
 }
 
@@ -270,7 +277,7 @@ pub enum ValidationError<E: Fail> {
 mod tests {
     use exonum_crypto::{Hash, HashStream};
 
-    use super::HashTag;
+    use super::*;
 
     #[test]
     fn empty_list_hash() {
