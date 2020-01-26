@@ -56,14 +56,21 @@ harness = false
 
 [features]
 default = ["rocksdb_snappy", "with-protobuf"]
-long_benchmarks = []
 with-protobuf = ["with-serde", "protobuf", "exonum-proto"]
 with-serde = []
+
+# Compression options passed to RocksDB backend.
 rocksdb_snappy = ["rocksdb/snappy"]
 rocksdb_lz4 = ["rocksdb/lz4"]
 rocksdb_zlib = ["rocksdb/zlib"]
 rocksdb_zstd = ["rocksdb/zstd"]
 rocksdb_bzip2 = ["rocksdb/bzip2"]
+
+# Enables long benchmarks; does not influence main crate code.
+long_benchmarks = []
+# Enables `unsafe` optimizations / experimental features.
+# Strongly discouraged for use in production.
+yolo = []
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../build" }
