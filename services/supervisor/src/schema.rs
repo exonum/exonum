@@ -19,19 +19,24 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::{
     access::{Access, FromAccess, Prefixed},
-    Entry, Fork, ProofEntry, ProofMapIndex,
+    Entry, Fork, ProofEntry, ProofMapIndex, ValueSetIndex,
 };
 
 use super::{
-    multisig::MultisigIndex, ConfigProposalWithHash, DeployRequest, DeployState, SupervisorConfig,
+    migration_state::MigrationState, multisig::MultisigIndex, AsyncEventState,
+    ConfigProposalWithHash, DeployRequest, MigrationRequest, SupervisorConfig,
 };
 
 /// Service information schema.
+#[doc(hidden)] // Public for tests, logically not public.
 #[derive(Debug, FromAccess)]
-pub(crate) struct SchemaImpl<T: Access> {
+pub struct SchemaImpl<T: Access> {
     /// Public part of the schema.
     #[from_access(flatten)]
     pub public: Schema<T>,
+
+    /// The following free instance ID for assignment.
+    pub vacant_instance_id: Entry<T::Base, InstanceId>,
 
     /// Stored deploy requests with the confirmations from the validators.
     pub deploy_requests: MultisigIndex<T, DeployRequest>,
@@ -40,15 +45,27 @@ pub(crate) struct SchemaImpl<T: Access> {
     /// distinguish several attempts of the same artifact deployment.
     pub deploy_confirmations: MultisigIndex<T, DeployRequest>,
     /// Deployment failures.
-    pub deploy_states: ProofMapIndex<T::Base, DeployRequest, DeployState>,
+    pub deploy_states: ProofMapIndex<T::Base, DeployRequest, AsyncEventState>,
     /// Artifacts to be deployed.
     pub pending_deployments: ProofMapIndex<T::Base, ArtifactId, DeployRequest>,
+
     /// Votes for a configuration change.
     pub config_confirms: MultisigIndex<T, Hash>,
     /// Number of the processed configurations. Used to avoid conflicting configuration proposals.
     pub configuration_number: Entry<T::Base, u64>,
-    /// The following free instance ID for assignment.
-    pub vacant_instance_id: Entry<T::Base, InstanceId>,
+
+    /// Stored migration requests with the confirmations from the validators.
+    pub migration_requests: MultisigIndex<T, MigrationRequest>,
+    /// States of all the migration requests.
+    pub migration_states: ProofMapIndex<T::Base, MigrationRequest, MigrationState>,
+    /// Validator confirmations on successful local migrations.
+    /// Note that `MigrationRequest`s are stored instead of `ArtifactId` to
+    /// distinguish several attempts of the same migration.
+    pub migration_confirmations: MultisigIndex<T, MigrationRequest>,
+    /// Migrations that are not yet completed.
+    pub pending_migrations: ValueSetIndex<T::Base, MigrationRequest>,
+    /// Migrations that completed but not flushed yet.
+    pub migrations_to_flush: ValueSetIndex<T::Base, MigrationRequest>,
 }
 
 /// Public part of the supervisor service.
@@ -61,6 +78,7 @@ pub struct Schema<T: Access> {
 }
 
 impl<T: Access> SchemaImpl<T> {
+    /// Creates a new `SchemaImpl` object.
     pub fn new(access: T) -> Self {
         Self::from_root(access).unwrap()
     }
@@ -79,6 +97,14 @@ impl<T: Access> SchemaImpl<T> {
             .configuration
             .get()
             .expect("Supervisor entity was not configured; unable to load configuration")
+    }
+
+    /// Obtains the migration state, panicking if there is no state for provided
+    /// request.
+    pub fn migration_state_unchecked(&self, request: &MigrationRequest) -> MigrationState {
+        self.migration_states
+            .get(request)
+            .expect("BUG: Migration succeed, but does not have a stored state")
     }
 }
 
