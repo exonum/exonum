@@ -100,10 +100,9 @@
 #![deny(unsafe_code, bare_trait_objects)]
 
 pub use crate::{
-    api::{ApiKind, TestKitApi},
+    api::{ApiKind, RequestBuilder, TestKitApi},
     builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
-    server::TestKitStatus,
 };
 pub use exonum_explorer as explorer;
 
@@ -149,7 +148,7 @@ mod checkpoint_db;
 pub mod migrations;
 mod network;
 mod poll_events;
-mod server;
+pub mod server;
 
 type ApiNotifierChannel = (
     mpsc::Sender<UpdateEndpoints>,
@@ -287,7 +286,8 @@ impl TestKit {
 
     /// Returns control messages received by the testkit since the last call to this method.
     ///
-    /// This method is only available if the crate is compiled with the `exonum-node` feature.
+    /// This method is only available if the crate is compiled with the `exonum-node` feature,
+    /// which is off by default.
     #[cfg(feature = "exonum-node")]
     pub fn poll_control_messages(&mut self) -> Vec<ExternalMessage> {
         use crate::poll_events::poll_all;
@@ -624,12 +624,12 @@ impl TestKit {
         byzantine_quorum(self.network().validators().len())
     }
 
-    /// Returns the leader on the current height. At the moment first validator.
+    /// Returns the leader on the current height. At the moment, this is always the first validator.
     pub fn leader(&self) -> TestNode {
         self.network().validators()[0].clone()
     }
 
-    /// Returns the reference to test network.
+    /// Returns the reference to the test network.
     pub fn network(&self) -> &TestNetwork {
         &self.network
     }

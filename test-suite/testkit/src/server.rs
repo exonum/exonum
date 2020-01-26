@@ -12,6 +12,75 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Types used by the testkit server.
+//!
+//! The server may be created via [`serve`] method in `TestKitBuilder`. Testkit-specific
+//! server endpoints are documented below. Other endpoints exposed by the server are the same
+//! as for an Exonum node or [`TestKitApi`]; that is, the server exposes HTTP API of Exonum
+//! services and node plugins.
+//!
+//! # HTTP endpoints
+//!
+//! All endpoints are served on the private HTTP server, which listens on the second
+//! address passed to `TestKitBuilder::serve()`.
+//!
+//! ## Testkit status
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/testkit/v1/status` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`TestKitStatus`] |
+//!
+//! Outputs the status of the testkit, which includes:
+//!
+//! - Current blockchain height
+//! - Current test network configuration
+//!
+//! [`TestKitStatus`]: struct.TestKitStatus.html
+//!
+//! ## Create block
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/testkit/v1/blocks/create` |
+//! | Method      | POST  |
+//! | Body type   | [`CreateBlock`] |
+//! | Return type | `BlockWithTransactions` |
+//!
+//! Creates a new block in the testkit blockchain. If the
+//! JSON body of the request is an empty object, the call is functionally equivalent
+//! to [`create_block`]. Otherwise, if the body has the `tx_hashes` field specifying an array
+//! of transaction hashes, the call is equivalent to [`create_block_with_tx_hashes`] supplied
+//! with these hashes.
+//!
+//! Returns the latest block from the blockchain on success.
+//!
+//! [`CreateBlock`]: struct.CreateBlock.html
+//!
+//! ## Roll back
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/testkit/v1/blocks/rollback` |
+//! | Method      | POST  |
+//! | Body type   | `Height` |
+//! | Return type | `BlockWithTransactions` |
+//!
+//! Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
+//! at the specified in JSON body `height` value (a positive integer), so that after the request
+//! the blockchain height is equal to `height - 1`. If the specified height is greater than the
+//! blockchain height, the request performs no action.
+//!
+//! Returns the latest block from the blockchain on success.
+//!
+//! [`serve`]: ../struct.TestKitBuilder.html#method.serve
+//! [`TestKitApi`]: ../struct.TestKitApi.html
+//! [`create_block`]: ../struct.TestKit.html#method.create_block
+//! [`create_block_with_tx_hashes`]: ../struct.TestKit.html#method.create_block_with_tx_hashes
+//! [`rollback`]: ../struct.TestKit.html#method.rollback
+
 use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
 use exonum_api::{self as api, ApiAggregator, ApiBuilder};
@@ -24,7 +93,7 @@ use std::thread::{self, JoinHandle};
 use super::TestKit;
 
 #[derive(Debug)]
-pub struct TestKitActor(TestKit);
+pub(crate) struct TestKitActor(TestKit);
 
 impl TestKitActor {
     pub(crate) fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
@@ -103,10 +172,16 @@ impl Handler<GetStatus> for TestKitActor {
     }
 }
 
+/// Block creation parameters for the testkit server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CreateBlock {
+pub struct CreateBlock {
+    /// List of transaction hashes to include in the block. Transactions should be
+    /// present in the memory pool of the testkit.
+    ///
+    /// If the field is set to `None` (e.g., omitted in a `POST` request to the server),
+    /// the server will create a block with all transactions from the memory pool.
     #[serde(default)]
-    tx_hashes: Option<Vec<Hash>>,
+    pub tx_hashes: Option<Vec<Hash>>,
 }
 
 impl Message for CreateBlock {
