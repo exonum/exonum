@@ -59,7 +59,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
 ///     .with_rust_service(service)
 ///     .with_validators(4)
-///     .create();
+///     .build();
 /// testkit.create_block();
 /// // Other test code
 /// # }
@@ -223,7 +223,7 @@ impl TestKitBuilder {
     }
 
     /// Creates the testkit.
-    pub fn create(mut self) -> TestKit {
+    pub fn build(mut self) -> TestKit {
         if self.logger {
             exonum::helpers::init_logger().ok();
         }
@@ -287,7 +287,7 @@ impl TestKitBuilder {
     ///
     /// See [`server` module](server/index.html) for the description of testkit server API.
     pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let testkit = self.create();
+        let testkit = self.build();
         testkit.run(public_api_address, private_api_address);
     }
 

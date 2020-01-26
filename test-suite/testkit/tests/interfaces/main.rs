@@ -39,7 +39,7 @@ fn testkit_with_interfaces() -> TestKit {
         .with_default_rust_service(WalletService)
         .with_default_rust_service(DepositService)
         .with_default_rust_service(AnyCallService)
-        .create()
+        .build()
 }
 
 fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(), ExecutionError> {

@@ -54,7 +54,7 @@ fn main() {
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(instance_id, "timestamping"))
         .with_rust_service(service)
-        .create();
+        .build();
     // Create few transactions.
     let keypair = gen_keypair();
     let tx1 = keypair.timestamp(instance_id, "Down To Earth".to_owned());

@@ -34,7 +34,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(CounterService)
         .with_default_rust_service(ExplorerFactory)
-        .create();
+        .build();
     let api = testkit.api();
     (testkit, api)
 }

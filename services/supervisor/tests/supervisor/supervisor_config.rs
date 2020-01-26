@@ -46,7 +46,7 @@ fn initial_configuration() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
     assert_supervisor_config(&testkit, Supervisor::simple_config());
 
     // Check for decentralized mode.
@@ -54,7 +54,7 @@ fn initial_configuration() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
-        .create();
+        .build();
     assert_supervisor_config(&testkit, Supervisor::decentralized_config());
 }
 
@@ -72,7 +72,7 @@ fn incorrect_configuration() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(incorrect_instance)
-        .create();
+        .build();
 
     // By this moment, genesis block should be created and node is expected to panic.
 }
@@ -84,7 +84,7 @@ fn configure_call() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     // Change config to decentralized.
     let configuration_change = ServiceConfig {
@@ -114,7 +114,7 @@ fn supervisor_config_api() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
     assert_eq!(
         testkit
             .api()
@@ -129,7 +129,7 @@ fn supervisor_config_api() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
-        .create();
+        .build();
     assert_eq!(
         testkit
             .api()

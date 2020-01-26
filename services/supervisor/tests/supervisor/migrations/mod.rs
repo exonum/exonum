@@ -76,7 +76,7 @@ fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
         .with_migrating_rust_service(MigrationServiceV05_1)
         .with_artifact(MigrationServiceV05_1.artifact_id());
 
-    builder.create()
+    builder.build()
 }
 
 /// Same as `testkit_with_supervisor_and_service`, but services do not support migrations.
@@ -103,7 +103,7 @@ fn testkit_with_supervisor_and_service_no_migrations(validator_count: u16) -> Te
         .with_rust_service(MigrationServiceV05)
         .with_artifact(MigrationServiceV05.artifact_id());
 
-    builder.create()
+    builder.build()
 }
 
 /// Sends a `MigrationRequest` to supervisor through API.
@@ -371,7 +371,7 @@ fn migration_fail() {
             .with_migrating_rust_service(FailingMigrationServiceV07)
             .with_artifact(FailingMigrationServiceV07.artifact_id());
 
-        builder.create()
+        builder.build()
     };
 
     // Stop service instance before running the migration.

@@ -300,7 +300,7 @@ mod tests {
                 artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
             )
             .with_rust_service(service)
-            .create();
+            .build();
         testkit.create_blocks_until(height);
         // Process incoming events in background.
         let events = testkit.remove_events_stream();

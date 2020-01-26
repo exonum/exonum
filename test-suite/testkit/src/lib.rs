@@ -69,7 +69,7 @@
 //!     .with_artifact(artifact.clone())
 //!     .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
 //!     .with_rust_service(service)
-//!     .create();
+//!     .build();
 //!
 //! // Create a few transactions.
 //! let keys = gen_keypair();
@@ -201,7 +201,7 @@ impl TestKit {
                     .with_constructor(constructor),
             )
             .with_rust_service(service_factory)
-            .create()
+            .build()
     }
 
     fn assemble(
@@ -383,7 +383,7 @@ impl TestKit {
     ///     .with_artifact(artifact.clone())
     ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
     ///     .with_rust_service(ExampleService)
-    ///     .create();
+    ///     .build();
     /// expensive_setup(&mut testkit);
     /// let keys = exonum::crypto::gen_keypair();
     /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
@@ -585,7 +585,7 @@ impl TestKit {
     /// # use exonum::helpers::Height;
     /// # use exonum_testkit::TestKitBuilder;
     /// # fn main() {
-    /// let mut testkit = TestKitBuilder::validator().create();
+    /// let mut testkit = TestKitBuilder::validator().build();
     /// testkit.create_blocks_until(Height(5));
     /// assert_eq!(Height(5), testkit.height());
     /// # }
@@ -859,7 +859,7 @@ impl StoppedTestKit {
 
 #[test]
 fn test_create_block_heights() {
-    let mut testkit = TestKitBuilder::validator().create();
+    let mut testkit = TestKitBuilder::validator().build();
     assert_eq!(Height(0), testkit.height());
     testkit.create_block();
     assert_eq!(Height(1), testkit.height());
@@ -869,20 +869,20 @@ fn test_create_block_heights() {
 
 #[test]
 fn test_number_of_validators_in_builder() {
-    let testkit = TestKitBuilder::auditor().create();
+    let testkit = TestKitBuilder::auditor().build();
     assert_eq!(testkit.network().validators().len(), 1);
     assert_ne!(testkit.validator(ValidatorId(0)), testkit.us());
 
-    let testkit = TestKitBuilder::validator().create();
+    let testkit = TestKitBuilder::validator().build();
     assert_eq!(testkit.network().validators().len(), 1);
     assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
 
-    let testkit = TestKitBuilder::auditor().with_validators(3).create();
+    let testkit = TestKitBuilder::auditor().with_validators(3).build();
     assert_eq!(testkit.network().validators().len(), 3);
     let us = testkit.us();
     assert!(!testkit.network().validators().into_iter().any(|v| v == us));
 
-    let testkit = TestKitBuilder::validator().with_validators(5).create();
+    let testkit = TestKitBuilder::validator().with_validators(5).build();
     assert_eq!(testkit.network().validators().len(), 5);
     assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
 }
@@ -890,7 +890,7 @@ fn test_number_of_validators_in_builder() {
 #[test]
 #[should_panic(expected = "validator should be present")]
 fn test_zero_validators_in_builder() {
-    TestKitBuilder::auditor().with_validators(0).create();
+    TestKitBuilder::auditor().with_validators(0).build();
 }
 
 #[test]
@@ -899,12 +899,12 @@ fn test_multiple_spec_of_validators_in_builder() {
     let testkit = TestKitBuilder::auditor()
         .with_validators(5)
         .with_validators(2)
-        .create();
+        .build();
     drop(testkit);
 }
 
 #[test]
 fn test_stop() {
-    let testkit = TestKitBuilder::validator().with_logger().create();
+    let testkit = TestKitBuilder::validator().with_logger().build();
     let _testkit_stopped = testkit.stop();
 }

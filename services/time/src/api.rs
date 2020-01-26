@@ -48,7 +48,7 @@
 //!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
 //!     )
 //!     .with_rust_service(time_service_factory)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //!
 //! // Make request to the `current_time` endpoint.
@@ -103,7 +103,7 @@
 //!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
 //!     )
 //!     .with_rust_service(time_service_factory)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! testkit.create_blocks_until(Height(5));
 //!

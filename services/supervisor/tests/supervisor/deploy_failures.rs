@@ -201,7 +201,7 @@ fn testkit_with_failing_runtime(validator_count: u16) -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .with_additional_runtime(FailingRuntime::default())
-        .create()
+        .build()
 }
 
 /// Creates a `DeployResult` transaction for `ValidatorId(1)`.

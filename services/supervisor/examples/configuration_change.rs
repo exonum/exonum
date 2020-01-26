@@ -89,7 +89,7 @@ fn main() {
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
         .with_rust_service(service)
-        .create();
+        .build();
 
     // Firstly, lets change consensus configuration and increase `min_propose_timeout`.
     let cfg_change_height = Height(5);
