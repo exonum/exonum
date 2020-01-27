@@ -60,7 +60,7 @@
 //!     .with_rust_service(Supervisor)
 //!     .with_artifact(Supervisor.artifact_id())
 //!     .with_instance(Supervisor::simple())
-//!     .create();
+//!     .build();
 //!
 //! let consensus_config: ConsensusConfig = testkit
 //!     .api()
@@ -96,7 +96,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
@@ -162,7 +162,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! // In this example, we will try to deploy `SomeService` artifact.
 //! let deploy_request = DeployRequest {
@@ -226,7 +226,7 @@
 //!     .with_artifact(Supervisor.artifact_id())
 //!     .with_instance(Supervisor::simple())
 //!     // Add some service that supports migrations...
-//!     .create();
+//!     .build();
 //!
 //! // Migration request creation skipped...
 //! let migration_request = // Migration of some service.
@@ -299,7 +299,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(0));
@@ -363,7 +363,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(10));
@@ -428,7 +428,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let configuration_number: u64 = testkit
 //!     .api()
@@ -465,7 +465,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let config: SupervisorConfig = testkit
 //!     .api()
@@ -513,7 +513,7 @@
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
 //! #         .with_rust_service(SomeService)
-//! #         .create();
+//! #         .build();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.
 //! #     DeployRequest {
@@ -566,7 +566,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
 //! #     MigrationRequest {
