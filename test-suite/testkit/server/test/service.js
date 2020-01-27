@@ -17,80 +17,56 @@
 
 // Cryptocurrency service stub.
 
-const proto = require('./stubs.js')
-const $protobuf = require('protobufjs/light')
-const Root = $protobuf.Root
-const Type = $protobuf.Type
-const Field = $protobuf.Field
-
-let root = new Root()
-
+const { expect } = require('chai')
 const exonum = require('exonum-client')
 const fetch = require('node-fetch')
-const expect = require('chai').expect
+const proto = require('./stubs.js')
 
-const SERVICE_ID = 1
-const TX_CREATE_WALLET_ID = 0
-const TX_TRANSFER_ID = 1
-const SERVICE_URL = 'http://127.0.0.1:8000/api/explorer'
-const EXPLORER_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
+const SERVICE_ID = 101
+const EXPLORER_URL = 'http://127.0.0.1:8000/api/explorer/v1/transactions'
+const SERVICE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
 
-function haveTxBody (type, data, secretKey) {
-  // Clone type.
-  const typeCopy = exonum.newTransaction(type)
-  // Sign transaction.
-  typeCopy.signature = typeCopy.sign(secretKey, data)
-  // Serialize transaction header and body.
-  const buffer = typeCopy.serialize(data)
-  // Convert buffer into hexadecimal string.
-  const txBody = exonum.uint8ArrayToHexadecimal(new Uint8Array(buffer))
-  // Get transaction hash.
-  const txHash = exonum.hash(buffer)
-
-  return {
-    tx_body: txBody,
-    tx_hash: txHash
-  }
-}
+const CreateWallet = new exonum.Transaction({
+  schema: proto.exonum.examples.cryptocurrency.TxCreateWallet,
+  serviceId: SERVICE_ID,
+  methodId: 0
+})
+const Transfer = new exonum.Transaction({
+  schema: proto.exonum.examples.cryptocurrency.TxTransfer,
+  serviceId: SERVICE_ID,
+  methodId: 1
+})
 
 exports.service = {
-  createWalletTransaction (author) {
-    const tx = exonum.newTransaction({
-      service_id: SERVICE_ID,
-      message_id: TX_CREATE_WALLET_ID,
-      author,
-      schema: proto.exonum.examples.cryptocurrency.TxCreateWallet
-    })
-
-    return tx
+  createWallet (keyPair, name) {
+    return CreateWallet.create({ name }, keyPair)
   },
 
-  createTransferTransaction (author) {
-    const tx = exonum.newTransaction({
-      service_id: SERVICE_ID,
-      message_id: TX_TRANSFER_ID,
-      author,
-      schema: proto.exonum.examples.cryptocurrency.TxTransfer
-    })
-
-    return tx
+  createTransfer (keyPair, to, amount) {
+    const payload = {
+      to: { data: exonum.hexadecimalToUint8Array(to) },
+      amount,
+      seed: exonum.randomUint64()
+    }
+    return Transfer.create(payload, keyPair)
   },
 
-  async transactionSend (sk, tx, body) {
-    const { tx_body, tx_hash } = haveTxBody(tx, body, sk)
-
-    let response = await fetch(`${SERVICE_URL}/v1/transactions`, {
+  async sendTransaction (transaction) {
+    // It is impossible to use `exonum.send` here because it waits until transaction is committed,
+    // which does not happen automatically in the testkit.
+    const bytes = exonum.uint8ArrayToHexadecimal(transaction.serialize())
+    const response = await fetch(EXPLORER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_body })
+      body: JSON.stringify({ tx_body: bytes })
     })
-    response = await response.json()
-    expect(response.tx_hash).to.equal(tx_hash)
-    tx.hash = response.tx_hash;
+    const { tx_hash: hash } = await response.json()
+    expect(hash).to.equal(transaction.hash())
+    return hash
   },
 
   async getWallet (pubkey) {
-    const response = await fetch(`${EXPLORER_URL}/v1/wallet?pub_key=${pubkey}`)
+    const response = await fetch(`${SERVICE_URL}/v1/wallet?pub_key=${pubkey}`)
     return response.json()
   }
 }

@@ -226,6 +226,6 @@ whitelisted
 writeln
 xorshift
 xsalsa
-xsalsa
+yolo
 zeroize
 zstd

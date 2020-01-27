@@ -15,6 +15,9 @@ Testkit for Exonum blockchain framework, allowing to test service APIs
 synchronously.
 """
 
+[package.metadata.docs.rs]
+all-features = true # document `exonum-node`-specific APIs
+
 [badges]
 travis-ci = { repository = "exonum/exonum" }
 

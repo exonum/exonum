@@ -315,12 +315,12 @@ fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     for item in &data {
         table.push(item.clone());
     }
-    let table_root_hash = table.object_hash();
+    let table_hash = table.object_hash();
     let proofs: Vec<_> = (0..len).map(|i| table.get_proof(i as u64)).collect();
 
     b.iter(|| {
         for proof in &proofs {
-            let items = proof.check_against_hash(table_root_hash).unwrap();
+            let items = proof.check_against_hash(table_hash).unwrap();
             assert_eq!(items.entries().len(), 1);
         }
     });

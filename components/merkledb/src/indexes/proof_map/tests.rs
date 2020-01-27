@@ -317,13 +317,13 @@ where
 
         let mut index = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
         index.put(&[1; 32], 1);
-        let root_hash = index.merkle_root();
+        let merkle_root = index.merkle_root();
 
         index.clear();
         assert_eq!(index.merkle_root(), Hash::zero());
 
         index.put(&[1; 32], 1);
-        assert_eq!(index.merkle_root(), root_hash);
+        assert_eq!(index.merkle_root(), merkle_root);
     }
 
     fn test_fuzz_insert() {

@@ -77,7 +77,7 @@
 //!     )
 //!     .with_rust_service(time_service_factory)
 //!     // Add other services here
-//!     .create();
+//!     .build();
 //!
 //! // Set time in `MockTimeProvider`.
 //! time_provider.set_time(Utc.timestamp(10, 0));

@@ -62,7 +62,7 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
                     time_service_name: TIME_SERVICE_NAME.to_owned(),
                 }),
         )
-        .create();
+        .build();
     testkit.create_blocks_until(Height(2)); // Ensure that time is set
     (testkit, mock_provider)
 }

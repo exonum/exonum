@@ -69,6 +69,7 @@ use exonum_cryptocurrency_advanced as cryptocurrency;
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
+        .with_service(cryptocurrency::CryptocurrencyService)
         .run()
 }
 ```

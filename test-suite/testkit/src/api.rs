@@ -52,9 +52,10 @@ use crate::TestKit;
 #[derive(Debug, Clone, Copy)]
 pub enum ApiKind {
     /// `api/system` endpoints of the system API node plugin. To access endpoints, the plugin
-    /// should be attached to the testkit.
+    /// must be attached to the testkit.
     System,
-    /// Endpoints of the REST API of the explorer service.
+    /// Endpoints of the REST API of the explorer service. The service must be included
+    /// to the testkit in order for endpoints to work.
     Explorer,
     /// `api/runtimes/rust` endpoints corresponding to Rust runtime of the Exonum REST API.
     RustRuntime,
@@ -75,6 +76,11 @@ impl fmt::Display for ApiKind {
 
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
+///
+/// Note that `TestKitApi` instantiation spawns a new HTTP server. Hence, it is advised to reuse
+/// existing instances unless it is impossible. The latter may be the case if changes
+/// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
+/// instantiated.
 pub struct TestKitApi {
     test_server: TestServer,
     test_client: Client,
@@ -112,7 +118,7 @@ impl TestKitApi {
         self.test_server.url(&format!("public/{}", url))
     }
 
-    /// Sends a transaction to the node via `ApiSender`.
+    /// Sends a transaction to the node.
     pub fn send<T>(&self, transaction: T)
     where
         T: Into<Verified<AnyTx>>,
@@ -192,7 +198,10 @@ where
         }
     }
 
-    /// Sets a query data of the current request.
+    /// Sets a request data of the current request.
+    ///
+    /// For `GET` requests, it will be serialized as a query string parameters,
+    /// and for `POST` requests, it will be serialized as a JSON in the request body.
     pub fn query<T>(self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
         RequestBuilder {
             test_server_url: self.test_server_url,
@@ -228,6 +237,8 @@ where
 
     /// Sends a get request to the testing API endpoint and decodes response as
     /// the corresponding type.
+    ///
+    /// If query was specified, it is serialized as a query string parameters.
     pub fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
@@ -264,6 +275,8 @@ where
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
+    ///
+    /// If query was specified, it is serialized as a JSON in the request body.
     pub fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
