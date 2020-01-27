@@ -1,30 +1,30 @@
-# exonum-testkit
+# Testing Framework for Exonum Services
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![Docs.rs](https://docs.rs/exonum-testkit/badge.svg)](https://docs.rs/exonum-testkit)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
-Testkit for Exonum blockchain is a framework that allows to test operation
-of the whole service. Specifically, it allows to test transaction execution
+Testkit for Exonum blockchain allows to test service operation.
+Specifically, it allows to test transaction execution
 and APIs in the synchronous environment (without consensus algorithm)
-and in the same system process.
+and in the same process as the test code.
 
 ## Usage
 
-Just add the following line to the `Cargo.toml`:
+Add the following lines to the `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
 exonum-testkit = "0.13.0-rc.2"
 ```
 
-[For more details, see Exonum documentation][documentation]
+For more details, see [Exonum documentation][documentation].
 
 ## Examples
 
 See the [**tests**](tests) and [**examples**](examples) folders for examples
-of building a service and then testing it with the testkit.
+of testing Exonum services with the testkit.
 
 ## License
 

@@ -14,9 +14,9 @@ There are several predefined sets of protobuf sources available for use.
 Currently presented sets:
 
 - Crypto sources: all the necessary crypto types used in services
-  and system proto-files. These types are Hash, PublicKey and Signature.
+  and system proto-files. These types are `Hash`, `PublicKey` and `Signature`.
 - Exonum sources: types used in core and in system services such
-  as `Supervisor`.
+  as the supervisor.
 - Common sources: types that can be used by various parts of Exonum.
 - MerkleDB sources: types representing proofs of existence of element
   in database.
@@ -29,12 +29,8 @@ Sample `build.rs` using `exonum-build`:
 
 ```rust
 use exonum_build::ProtobufGenerator;
-use std::env;
 
 fn main() {
-    let current_dir = env::current_dir().expect("Failed to get current dir.");
-    let protos = current_dir.join("src/proto");
-
     ProtobufGenerator::with_mod_name("protobuf_mod.rs")
         .with_input_dir("src/proto")
         .with_crypto()

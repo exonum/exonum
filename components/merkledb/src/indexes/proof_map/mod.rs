@@ -792,49 +792,57 @@ where
 /// The `object_hash` is defined as
 ///
 /// ```text
-/// h = sha-256( HashTag::MapNode || merkle_root )
+/// h = sha256( HashTag::MapNode || root_hash )
 /// ```
 ///
-/// where `merkle_root` is computed according to one of the three cases as follows.
+/// where `root_hash` is computed according to one of the three cases as follows.
 ///
 /// ## Empty map
 ///
 /// ```text
-/// merkle_root = Hash::zero().
+/// root_hash = Hash::zero().
 /// ```
 ///
 /// ## Map with a single entry
 ///
 /// ```text
-/// merkle_root = sha-256( HashTag::MapBranchNode || <path> || <child_hash> ).
+/// root_hash = sha256( HashTag::MapBranchNode || 0x01 || path || 0x00 || child_hash ).
 /// ```
 ///
-/// Here, the map contains a single `path` (see `ProofPath`), and `child_hash` is the hash
-/// of the object under this key. `path` is always serialized as 32 bytes.
+/// Here, the map contains a single `path`, and `child_hash` is the hash
+/// of the object under this key. `path` is always serialized as 32 bytes. `0x01` and `0x00`
+/// are single bytes present for historic reasons.
 ///
 /// ## Map with multiple entries
 ///
 /// ```text
-/// merkle_root = sha-256(
+/// root_hash = sha256(
 ///     HashTag::MapBranchNode
-///     || <left_path> || <right_path>
-///     || <left_hash> || <right_hash>
+///     || left_path || right_path
+///     || left_hash || right_hash
 /// ).
 /// ```
 ///
 /// Here, the root node in the Merkle Patricia tree corresponding to the map has `left_path` /
-/// `right_path` as child `ProofPath`s, and `left_hash` / `right_hash` are hashes of child nodes.
-/// These hashes are defined according to the same formula for branch nodes, and per
-/// `object_hash` implementation if a node is a leaf.
+/// `right_path` as child paths, and `left_hash` / `right_hash` are hashes of child nodes.
+/// These hashes are defined according to the same formula for branch nodes, and for leaves as
+///
+/// ```text
+/// leaf_hash = sha256( HashTag::Blob || serialized_value ).
+/// ```
 ///
 /// `ProofPath`s are serialized in this case as
 ///
 /// ```text
-/// LEB128(<bit_length>) || <bytes>,
+/// LEB128(bit_length) || bytes.
 /// ```
 ///
-/// where `bytes` contains the minimum necessary number of bytes to accommodate `bit_length` bits,
-/// and is zero-padded if necessary.
+/// - [LEB128] is a compact serialization format for unsigned integers
+/// - `bit_length` is the number of bits in the path
+/// - `bytes` is the path serialized as the minimum necessary number of bytes,
+///   with zero padding at the end if necessary.
+///
+/// [LEB128]: https://en.wikipedia.org/wiki/LEB128
 ///
 /// # Examples
 ///

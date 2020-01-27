@@ -372,7 +372,7 @@ fn create_testkit() -> (TestKit, CryptocurrencyApi) {
         .with_rust_service(CryptocurrencyService)
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
-        .create();
+        .build();
     let api = CryptocurrencyApi {
         inner: testkit.api(),
     };

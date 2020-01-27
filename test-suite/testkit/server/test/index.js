@@ -16,6 +16,8 @@
  */
 /* eslint-env node,mocha */
 
+require('regenerator-runtime/runtime')
+
 const exonum = require('exonum-client')
 const expect = require('chai').expect
 const testkit = require('./testkit')
@@ -29,107 +31,73 @@ describe('CurrencyService', function () {
   })
 
   it('should create wallet', async () => {
-    const {
-      publicKey,
-      secretKey
-    } = exonum.keyPair()
-    const tx = service.createWalletTransaction(publicKey)
-    await service.transactionSend(secretKey, tx, {
-      name: 'Kate'
-    })
+    const alice = exonum.keyPair()
+    const tx = service.createWallet(alice, 'Alice')
+    await service.sendTransaction(tx)
 
     await testkit.createBlock()
     expect(await testkit.getBlockchainHeight()).to.equal(1)
 
-    const wallet = await service.getWallet(publicKey)
+    const wallet = await service.getWallet(alice.publicKey)
     expect('' + wallet.balance).to.equal('100')
-    expect(wallet.name).to.equal('Kate')
+    expect(wallet.name).to.equal('Alice')
   })
 
-
   it('should perform transfer between wallets', async () => {
-    const {
-      publicKey: alicePK,
-      secretKey: aliceKey
-    } = exonum.keyPair()
-    const txAlice = service.createWalletTransaction(alicePK)
+    const alice = exonum.keyPair()
+    const txAlice = service.createWallet(alice, 'Alice')
 
-    const {
-      publicKey: bobPK,
-      secretKey: bobKey
-    } = exonum.keyPair()
-    const txBob = service.createWalletTransaction(bobPK)
+    const bob = exonum.keyPair()
+    const txBob = service.createWallet(bob, 'Bob')
 
-    const transferTx = service.createTransferTransaction(alicePK)
+    const transferTx = service.createTransfer(alice, bob.publicKey, 15)
 
     await Promise.all([
-      service.transactionSend(aliceKey, txAlice, {
-        name: 'Alice'
-      }),
-      service.transactionSend(bobKey, txBob, {
-        name: 'Bob'
-      }),
-      service.transactionSend(aliceKey, transferTx, {
-        to: {
-          data: Uint8Array.from(exonum.hexadecimalToUint8Array(bobPK))
-        },
-        amount: '15',
-        seed: '0'
-      })
+      service.sendTransaction(txAlice),
+      service.sendTransaction(txBob),
+      service.sendTransaction(transferTx)
     ])
     await testkit.createBlock([
-      txAlice.hash,
-      txBob.hash,
-      transferTx.hash
+      txAlice.hash(),
+      txBob.hash(),
+      transferTx.hash()
     ])
     expect(await testkit.getBlockchainHeight()).to.equal(1)
     const [aliceWallet, bobWallet] = await Promise.all([
-      service.getWallet(alicePK),
-      service.getWallet(bobPK)
+      service.getWallet(alice.publicKey),
+      service.getWallet(bob.publicKey)
     ])
     expect('' + aliceWallet.balance).to.equal('85')
     expect('' + bobWallet.balance).to.equal('115')
   })
 
   it('should not perform transfer between wallets if the receiver is unknown', async () => {
-    const {
-      publicKey: alicePK,
-      secretKey: aliceKey
-    } = exonum.keyPair()
-    const txAlice = service.createWalletTransaction(alicePK)
+    const alice = exonum.keyPair()
+    const txAlice = service.createWallet(alice, 'Alice')
+    const bob = exonum.keyPair()
+    const txBob = service.createWallet(bob, 'Bob')
 
-    const {
-      publicKey: bobPK,
-      secretKey: bobKey
-    } = exonum.keyPair()
-    const txBob = service.createWalletTransaction(bobPK)
-
-    const transferTx = service.createTransferTransaction(alicePK)
+    const transferTx = service.createTransfer(alice, bob.publicKey, 15)
 
     await Promise.all([
-      service.transactionSend(aliceKey, txAlice, {
-        name: 'Alice'
-      }),
-      service.transactionSend(bobKey, txBob, {
-        name: 'Bob'
-      }),
-      service.transactionSend(aliceKey, transferTx, {
-        to: {
-          data: Uint8Array.from(exonum.hexadecimalToUint8Array(bobPK))
-        },
-        amount: '15',
-        seed: '0'
-      })
+      service.sendTransaction(txAlice),
+      service.sendTransaction(txBob),
+      service.sendTransaction(transferTx)
     ])
+
+    // Note that the Bob's wallet creation transaction is missing
     await testkit.createBlock([
-      txAlice.hash,
-      transferTx.hash
+      txAlice.hash(),
+      transferTx.hash()
     ])
-    const [aliceWallet, bobWallet] = await Promise.all([
-      service.getWallet(alicePK),
-      service.getWallet(bobPK)
+    const [aliceWallet, bobError] = await Promise.all([
+      service.getWallet(alice.publicKey),
+      service.getWallet(bob.publicKey)
     ])
     expect('' + aliceWallet.balance).to.equal('100')
-    expect(bobWallet).to.equal('Wallet not found')
+    expect(bobError).to.deep.equal({
+      title: 'Wallet not found',
+      source: '101:cryptocurrency'
+    })
   })
 })

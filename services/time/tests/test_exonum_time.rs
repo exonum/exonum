@@ -263,7 +263,7 @@ fn test_mock_provider() {
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
-        .create();
+        .build();
 
     let validators = testkit.network().validators().to_vec();
     let assert_storage_times = |snapshot: Box<dyn Snapshot>| {
@@ -313,7 +313,7 @@ fn test_selected_time_less_than_time_in_storage() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let validators = testkit.network().validators().to_vec();
 
@@ -420,7 +420,7 @@ fn create_testkit_with_validators(validators_count: u16) -> TestKit {
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
         .with_rust_service(time_service)
-        .create()
+        .build()
 }
 
 fn get_current_time(api: &mut TestKitApi) -> Option<DateTime<Utc>> {
@@ -484,7 +484,7 @@ fn test_endpoint_api() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let mut api = testkit.api();
     let validators = testkit.network().validators().to_vec();

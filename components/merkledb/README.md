@@ -56,7 +56,6 @@ let list: ProofListIndex<_, u8> = ProofListIndex::new(list_name, &snapshot);
 // Mutable list
 let fork = db.fork();
 let mut list: ProofListIndex<_, u8> = ProofListIndex::new(list_name, &fork);
-
 ```
 
 After adding elements to the object you can obtain cryptographic proofs for their
@@ -70,13 +69,12 @@ assert_eq!(ListProof::Leaf(1), list.get_proof(0));
 if let ListProof::Absent(_proof) = list.get_proof(1) {
     println!("Element with index 1 is absent")
 }
-
 ```
 
 ## Further Reading
 
 - [Blockchain example](examples/blockchain.rs)
-- [MerkleDB description in Exonum docs](https://exonum.com/doc/version/latest/architecture/storage/)
+- [MerkleDB description in Exonum docs](https://exonum.com/doc/version/latest/architecture/merkledb/)
 
 ## License
 

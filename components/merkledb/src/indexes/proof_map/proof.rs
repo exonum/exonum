@@ -578,9 +578,9 @@ where
             }
         }
 
-        collect(&proof).map(|root_hash| CheckedMapProof {
+        collect(&proof).map(|merkle_root| CheckedMapProof {
             entries: &self.entries,
-            hash: HashTag::hash_map_node(root_hash),
+            hash: HashTag::hash_map_node(merkle_root),
         })
     }
 

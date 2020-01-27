@@ -44,7 +44,7 @@
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
 //!     // Add other services here
-//!     .create();
+//!     .build();
 //! // The explorer endpoints can be accessed via `api()`:
 //! let api = testkit.api();
 //! let BlocksRange { blocks, range } = api
