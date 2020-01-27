@@ -284,7 +284,7 @@ impl FromStr for ArtifactId {
             [runtime_id, name, version] => {
                 let artifact = Self::new(
                     u32::from_str(runtime_id)?,
-                    name.to_string(),
+                    (*name).to_string(),
                     version.parse()?,
                 )?;
                 artifact.validate()?;
@@ -391,9 +391,9 @@ impl InstanceSpec {
         Ok(())
     }
 
-    /// Return the corresponding descriptor of this instance specification.
-    pub fn as_descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor::new(self.id, self.name.as_ref())
+    /// Returns the corresponding descriptor of this instance specification.
+    pub fn as_descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor::new(self.id, &self.name)
     }
 }
 

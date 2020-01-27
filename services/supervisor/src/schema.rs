@@ -108,7 +108,7 @@ impl<T: Access> SchemaImpl<T> {
     }
 }
 
-impl SchemaImpl<Prefixed<'_, &Fork>> {
+impl SchemaImpl<Prefixed<&Fork>> {
     /// Increases the stored configuration number.
     pub fn increase_configuration_number(&mut self) {
         let new_configuration_number = self.get_configuration_number() + 1;

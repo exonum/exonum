@@ -81,7 +81,7 @@ fn migration_with_helper(db: Arc<dyn Database>) {
         let old_data = helper.old_data();
 
         let old_schema = v1::Schema::new(old_data);
-        let mut new_schema = v2::Schema::new(new_data);
+        let mut new_schema = v2::Schema::new(new_data.clone());
 
         // Move `ticker` and `divisibility` to `config`.
         let config = v2::Config {
