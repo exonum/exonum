@@ -192,7 +192,10 @@ where
         }
     }
 
-    /// Sets a query data of the current request.
+    /// Sets a request data of the current request.
+    ///
+    /// For `GET` requests, it will be serialized as a query string parameters,
+    /// and for `POST` requests, it will be serialized as a JSON in the request body.
     pub fn query<T>(self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
         RequestBuilder {
             test_server_url: self.test_server_url,
@@ -228,6 +231,8 @@ where
 
     /// Sends a get request to the testing API endpoint and decodes response as
     /// the corresponding type.
+    ///
+    /// If query was specified, it is serialized as a query string parameters.
     pub fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
@@ -264,6 +269,8 @@ where
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
+    ///
+    /// If query was specified, it is serialized as a JSON in the request body.
     pub fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,

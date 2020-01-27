@@ -31,7 +31,8 @@ use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    AsyncEventState, DeployInfoQuery, DeployRequest, DeployResult, Supervisor, SupervisorInterface,
+    api::DeployInfoQuery, AsyncEventState, DeployRequest, DeployResult, Supervisor,
+    SupervisorInterface,
 };
 
 use self::failing_runtime::{FailingRuntime, FailingRuntimeError};

@@ -25,7 +25,7 @@ use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    AsyncEventState, ConfigPropose, MigrationError, MigrationInfoQuery, MigrationRequest,
+    api::MigrationInfoQuery, AsyncEventState, ConfigPropose, MigrationError, MigrationRequest,
     MigrationResult, MigrationState, SchemaImpl, Supervisor, SupervisorInterface,
 };
 
