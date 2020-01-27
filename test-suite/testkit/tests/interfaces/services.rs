@@ -229,46 +229,41 @@ pub trait CustomCallInterface<Ctx> {
     fn custom_call(&self, context: Ctx, arg: Vec<u8>) -> Self::Output;
 }
 
-type CustomCall = Box<dyn Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Send + 'static>;
+pub type CustomCall = fn(ExecutionContext<'_>) -> Result<(), ExecutionError>;
 
-#[derive(ServiceFactory)]
+#[derive(ServiceFactory, ServiceDispatcher, Clone, Copy)]
 #[service_factory(
     artifact_name = "custom-call",
     service_constructor = "Self::new_instance"
 )]
-pub struct CustomCallServiceFactory {
-    factory: Box<dyn Fn() -> CustomCall + Send + 'static>,
+#[service_dispatcher(implements("CustomCallInterface"))]
+pub struct CustomCallService {
+    handler: CustomCall,
 }
 
-impl CustomCallServiceFactory {
-    pub fn new<F>(f: F) -> Self
-    where
-        F: Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Clone + Send + 'static,
+impl CustomCallService {
+    pub fn new(handler: CustomCall) -> Self
     {
         Self {
-            factory: Box::new(move || Box::new(f.clone())),
+            handler,
         }
     }
 
     pub fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(CustomCallService((self.factory)()))
+        Box::new(*self)
     }
 }
 
-impl DefaultInstance for CustomCallServiceFactory {
+impl DefaultInstance for CustomCallService {
     const INSTANCE_ID: u32 = 112;
     const INSTANCE_NAME: &'static str = "custom-call";
 }
-
-#[derive(ServiceDispatcher)]
-#[service_dispatcher(implements("CustomCallInterface"))]
-struct CustomCallService(CustomCall);
 
 impl CustomCallInterface<ExecutionContext<'_>> for CustomCallService {
     type Output = Result<(), ExecutionError>;
 
     fn custom_call(&self, context: ExecutionContext<'_>, _arg: Vec<u8>) -> Self::Output {
-        (self.0)(context)
+        (self.handler)(context)
     }
 }
 
@@ -277,11 +272,5 @@ impl Service for CustomCallService {}
 impl std::fmt::Debug for CustomCallService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CustomCallService").finish()
-    }
-}
-
-impl std::fmt::Debug for CustomCallServiceFactory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CustomCallServiceFactory").finish()
     }
 }

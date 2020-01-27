@@ -28,7 +28,7 @@ use crate::{
     interface::IssueReceiverMut,
     schema::{Wallet, WalletSchema},
     services::{
-        AnyCall, AnyCallService, CallAny, CustomCallInterface, CustomCallServiceFactory,
+        AnyCall, AnyCallService, CallAny, CustomCallInterface, CustomCallService, CustomCall,
         DepositInterface, DepositService, Issue, TxIssue, WalletInterface, WalletService,
     },
 };
@@ -395,20 +395,18 @@ fn test_any_call_panic_recursion_limit() {
     );
 }
 
-fn execute_custom_call<F>(f: F) -> (TestKit, Result<(), ExecutionError>)
-where
-    F: Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Clone + Send + 'static,
+fn execute_custom_call(f: CustomCall) -> (TestKit, Result<(), ExecutionError>)
 {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_default_rust_service(WalletService)
-        .with_default_rust_service(CustomCallServiceFactory::new(f))
+        .with_default_rust_service(CustomCallService::new(f))
         .create();
 
     let keypair = crypto::gen_keypair();
     let res = execute_transaction(
         &mut testkit,
-        keypair.custom_call(CustomCallServiceFactory::INSTANCE_ID, vec![]),
+        keypair.custom_call(CustomCallService::INSTANCE_ID, vec![]),
     );
     (testkit, res)
 }
@@ -458,7 +456,7 @@ fn child_call_error_propagated() {
     let snapshot = testkit.snapshot();
     let schema = WalletSchema::new(
         snapshot
-            .for_service(CustomCallServiceFactory::INSTANCE_NAME)
+            .for_service(CustomCallService::INSTANCE_NAME)
             .unwrap(),
     );
     assert_eq!(schema.wallets.values().count(), 0);
@@ -490,7 +488,7 @@ fn data_inaccessible_on_child_call_error() {
     let snapshot = testkit.snapshot();
     let schema = WalletSchema::new(
         snapshot
-            .for_service(CustomCallServiceFactory::INSTANCE_NAME)
+            .for_service(CustomCallService::INSTANCE_NAME)
             .unwrap(),
     );
     assert_eq!(schema.wallets.values().count(), 0);
@@ -523,7 +521,7 @@ fn custom_call_err_incorrect_instance_id() {
     let snapshot = testkit.snapshot();
     let schema = WalletSchema::new(
         snapshot
-            .for_service(CustomCallServiceFactory::INSTANCE_NAME)
+            .for_service(CustomCallService::INSTANCE_NAME)
             .unwrap(),
     );
     assert_eq!(
