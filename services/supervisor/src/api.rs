@@ -78,12 +78,12 @@
 //! | Path        | `/api/supervisor/v1/config-proposal` |
 //! | Method      | GET   |
 //! | Query type  | - |
-//! | Return type | Option<[`ConfigProposalWithHash`]> |
+//! | Return type | `Option<[ConfigProposalWithHash]>` |
 //!
 //! Returns the configuration proposal which is currently pending. Returns `None` if there is no
 //! pending configuration at the moment.
 //!
-//! [`ConfigProposalWithHash`]: ../struct.ConfigProposalWithHash.html
+//! [ConfigProposalWithHash]: ../struct.ConfigProposalWithHash.html
 //!
 //! ```
 //! # use exonum_rust_runtime::ServiceFactory;
