@@ -73,6 +73,10 @@ configuration change and follows the same rules.
 Consult [the crate docs](https://docs.rs/exonum-supervisor) for more details
 about the service API.
 
+## HTTP API
+
+REST API of the service is documented in the crate docs.
+
 ## Usage
 
 Include `exonum-supervisor` as a dependency in your `Cargo.toml`:
