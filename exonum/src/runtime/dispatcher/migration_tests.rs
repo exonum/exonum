@@ -14,7 +14,7 @@
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
-    access::{AccessExt, AccessRefExt},
+    access::{AccessExt, CopyAccessExt},
     migration::Migration,
     HashTag, ObjectHash, SystemSchema, TemporaryDB,
 };

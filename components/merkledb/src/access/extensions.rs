@@ -29,14 +29,17 @@ use crate::{
 ///
 /// This trait is essentially a thin wrapper around [`FromAccess`]. Where `FromAccess` returns
 /// an access error, the methods of this trait will `unwrap()` the error and panic.
-///
+/// This trait is helpful for references implementing Access, such as `&Fork` or `&dyn Snapshot`
+/// because Rust method resolution does not apply `AccessExt` to variables of corresponding types.
+/// For example, if fork has type Fork, then `fork.get_list("foo")` is not resolved
+/// as `AccessExt::get_list(..)`, only `(&fork).get_list("foo")` is.
 /// [`Access`]: trait.Access.html
 /// [`FromAccess`]: trait.FromAccess.html
 ///
 /// # Examples
 ///
 /// ```
-/// use exonum_merkledb::{access::AccessExt, Database, ListIndex, TemporaryDB};
+/// use exonum_merkledb::{access::CopyAccessExt, Database, ListIndex, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
@@ -64,7 +67,7 @@ use crate::{
 /// let list = patch.get_list::<_, String>("list");
 /// assert_eq!(list.len(), 1);
 /// ```
-pub trait AccessExt: Access + Copy {
+pub trait CopyAccessExt: Access + Copy {
     /// Returns a group of indexes. All indexes in the group have the same type.
     /// Indexes are initialized lazily; i.e., no initialization is performed when the group
     /// is created.
@@ -185,7 +188,7 @@ pub trait AccessExt: Access + Copy {
     ///
     /// ```
     /// # use exonum_merkledb::{
-    /// #     access::AccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
+    /// #     access::CopyAccessExt, Fork, Database, ListIndex, TemporaryDB, ProofMapIndex,
     /// #     RawProofMapIndex,
     /// # };
     /// # use exonum_crypto::PublicKey;
@@ -267,7 +270,7 @@ pub trait AccessExt: Access + Copy {
     }
 }
 
-impl<T: Access + Copy> AccessExt for T {}
+impl<T: Access + Copy> CopyAccessExt for T {}
 
 /// Extension trait allowing for easy access to indexes from any type implementing
 /// [`Access`].
@@ -276,11 +279,13 @@ impl<T: Access + Copy> AccessExt for T {}
 ///
 /// This trait is essentially a thin wrapper around [`FromAccess`]. Where `FromAccess` returns
 /// an access error, the methods of this trait will `unwrap()` the error and panic.
+/// For a version on `AccessExt` traits designed for `Copy` types (e.g. `&Fork` and
+/// `&dyn Snapshot`) see [`CopyAccessExt`] trait.
 ///
 /// [`Access`]: trait.Access.html
 /// [`FromAccess`]: trait.FromAccess.html
-///
-pub trait AccessRefExt: Access {
+/// [`CopyAccessExt`]: trait.CopyAccessExt.html
+pub trait AccessExt: Access {
     /// Returns a group of indexes. All indexes in the group have the same type.
     /// Indexes are initialized lazily; i.e., no initialization is performed when the group
     /// is created.
@@ -403,7 +408,7 @@ pub trait AccessRefExt: Access {
     ///
     /// ```
     /// # use exonum_merkledb::{
-    /// #     access::{AccessRefExt, Prefixed}, Fork, Database, ListIndex, TemporaryDB,
+    /// #     access::{AccessExt, Prefixed}, Fork, Database, ListIndex, TemporaryDB,
     /// #     ProofMapIndex, RawProofMapIndex,
     /// # };
     /// # use exonum_crypto::PublicKey;
@@ -487,7 +492,7 @@ pub trait AccessRefExt: Access {
     }
 }
 
-impl<T: Access> AccessRefExt for T {}
+impl<T: Access> AccessExt for T {}
 
 #[cfg(test)]
 mod tests {

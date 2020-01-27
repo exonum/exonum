@@ -26,7 +26,7 @@ use std::{
 };
 
 use crate::{
-    access::{Access, AccessRefExt, RawAccess, RawAccessMut},
+    access::{Access, AccessExt, RawAccess, RawAccessMut},
     indexes::{self, proof_map::ToProofPath},
     BinaryKey, BinaryValue, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
     ProofMapIndex, SparseListIndex, ValueSetIndex,
@@ -269,7 +269,7 @@ where
 /// independently:
 ///
 /// ```
-/// # use exonum_merkledb::{access::{AccessExt, AccessRefExt}, Database, TemporaryDB};
+/// # use exonum_merkledb::{access::{CopyAccessExt, AccessExt}, Database, TemporaryDB};
 /// # use exonum_merkledb::migration::{MigrationHelper, PersistentIter};
 /// let db = TemporaryDB::new();
 /// // Create data for migration.
@@ -467,7 +467,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, migration::Scratchpad, Database, TemporaryDB};
+    use crate::{access::CopyAccessExt, migration::Scratchpad, Database, TemporaryDB};
 
     use std::{collections::HashSet, iter::FromIterator};
 

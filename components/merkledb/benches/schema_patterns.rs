@@ -19,7 +19,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{
-    access::{Access, AccessRefExt, FromAccess, Prefixed, RawAccessMut},
+    access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
     Database, Group, KeySetIndex, Lazy, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
     TemporaryDB,
 };

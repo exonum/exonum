@@ -14,7 +14,7 @@
 
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
-    access::{Access, AccessRefExt, RawAccessMut},
+    access::{Access, AccessExt, RawAccessMut},
     impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
     ProofEntry, ProofListIndex, ProofMapIndex,
 };

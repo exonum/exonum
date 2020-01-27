@@ -595,7 +595,7 @@ mod tests {
     use assert_matches::assert_matches;
     use exonum_crypto::Hash;
     use exonum_merkledb::{
-        access::{AccessExt, AccessRefExt},
+        access::{AccessExt, CopyAccessExt},
         migration::flush_migration,
         Database, Snapshot, TemporaryDB,
     };

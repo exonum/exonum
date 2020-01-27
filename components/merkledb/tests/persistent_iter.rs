@@ -24,7 +24,7 @@ use rand_xorshift::XorShiftRng;
 
 use exonum_merkledb::migration::{rollback_migration, Scratchpad};
 use exonum_merkledb::{
-    access::AccessExt, migration::PersistentIter, Database, Fork, IndexAddress, IndexType,
+    access::CopyAccessExt, migration::PersistentIter, Database, Fork, IndexAddress, IndexType,
     TemporaryDB,
 };
 

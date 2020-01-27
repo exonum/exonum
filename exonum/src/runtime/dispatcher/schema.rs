@@ -17,7 +17,7 @@
 use exonum_crypto::Hash;
 use exonum_derive::*;
 use exonum_merkledb::{
-    access::{Access, AccessRefExt, AsReadonly},
+    access::{Access, AccessExt, AsReadonly},
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;

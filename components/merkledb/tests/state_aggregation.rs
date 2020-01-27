@@ -22,7 +22,7 @@ use proptest::{
 use std::{collections::HashSet, iter::FromIterator};
 
 use exonum_merkledb::{
-    access::AccessExt, Database, IndexAddress, ObjectHash, Patch, SystemSchema, TemporaryDB,
+    access::CopyAccessExt, Database, IndexAddress, ObjectHash, Patch, SystemSchema, TemporaryDB,
 };
 
 const ACTIONS_MAX_LEN: usize = 50;
@@ -110,11 +110,11 @@ fn check_patch(patch: &Patch) -> TestCaseResult {
     prop_assert_eq!(state_hash, aggregator.object_hash());
 
     let mut absent_lists: HashSet<_> =
-        HashSet::from_iter(LIST_NAMES.iter().map(|s| (*s).to_string()));
+        HashSet::from_iter(LIST_NAMES.iter().map(|&s| s.to_string()));
     let mut absent_maps: HashSet<_> =
-        HashSet::from_iter(MAP_NAMES.iter().map(|s| (*s).to_string()));
+        HashSet::from_iter(MAP_NAMES.iter().map(|&s| s.to_string()));
     let mut absent_entries: HashSet<_> =
-        HashSet::from_iter(ENTRY_NAMES.iter().map(|s| (*s).to_string()));
+        HashSet::from_iter(ENTRY_NAMES.iter().map(|&s| (s.to_string()));
 
     for (index_name, index_hash) in aggregator.iter() {
         let is_list = LIST_NAMES.contains(&index_name.as_str());

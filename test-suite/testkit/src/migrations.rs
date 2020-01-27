@@ -71,7 +71,7 @@ pub enum ScriptStatus {
 /// # use exonum::runtime::{
 /// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
 /// # };
-/// use exonum::merkledb::access::AccessRefExt;
+/// use exonum::merkledb::access::AccessExt;
 /// # use exonum_rust_runtime::Service;
 /// use exonum_testkit::migrations::{MigrationTest, ScriptExt};
 ///
@@ -111,7 +111,7 @@ pub enum ScriptStatus {
 /// # use exonum::runtime::{
 /// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
 /// # };
-/// use exonum::merkledb::access::AccessRefExt;
+/// use exonum::merkledb::access::AccessExt;
 /// # use exonum_rust_runtime::Service;
 /// use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
 ///
@@ -149,7 +149,7 @@ pub enum ScriptStatus {
 /// # use exonum::runtime::{
 /// #     migrations::{MigrationContext, MigrationError}, versioning::Version,
 /// # };
-/// # use exonum::merkledb::access::AccessRefExt;
+/// # use exonum::merkledb::access::AccessExt;
 /// # use exonum_rust_runtime::Service;
 /// # use exonum_testkit::migrations::{AbortPolicy, MigrationTest, ScriptExt};
 /// fn infinite_script(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
@@ -509,7 +509,7 @@ mod tests {
     use super::*;
 
     use exonum::{
-        merkledb::access::AccessRefExt,
+        merkledb::access::AccessExt,
         runtime::{migrations::InitMigrationError, ArtifactId},
     };
     use exonum_rust_runtime::{ArtifactProtobufSpec, Service};

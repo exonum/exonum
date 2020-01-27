@@ -56,7 +56,7 @@
 //! # Examples
 //!
 //! ```
-//! # use exonum_merkledb::{access::{AccessExt, AccessRefExt}, Database, SystemSchema, TemporaryDB};
+//! # use exonum_merkledb::{access::{CopyAccessExt, AccessExt}, Database, SystemSchema, TemporaryDB};
 //! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
 //! # fn main() -> Result<(), failure::Error> {
@@ -192,7 +192,7 @@ impl<T: RawAccess + AsReadonly> Migration<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_merkledb::{access::AccessRefExt, migration::Migration, Database, TemporaryDB};
+    /// # use exonum_merkledb::{access::AccessExt, migration::Migration, Database, TemporaryDB};
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
     /// {
@@ -354,7 +354,7 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 ///
 /// ```
 /// # use assert_matches::assert_matches;
-/// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
+/// # use exonum_merkledb::{access::CopyAccessExt, TemporaryDB};
 /// # use exonum_merkledb::migration::{MigrationHelper, MigrationError};
 /// # use std::{sync::mpsc, thread, time::Duration};
 /// let db = TemporaryDB::new();
@@ -386,7 +386,7 @@ impl<T: RawAccess> Access for Scratchpad<T> {
 /// from time to time. To do this, we use the following script:
 ///
 /// ```
-/// # use exonum_merkledb::{access::AccessRefExt, TemporaryDB};
+/// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
 /// # use exonum_merkledb::migration::{MigrationHelper, MigrationError};
 /// # fn main() -> Result<(), MigrationError> {
 /// /// Number of accounts processed per DB merge.
@@ -663,7 +663,7 @@ pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
 mod tests {
     use super::*;
     use crate::{
-        access::{AccessExt, AccessRefExt, RawAccess},
+        access::{AccessExt, CopyAccessExt, RawAccess},
         HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
 

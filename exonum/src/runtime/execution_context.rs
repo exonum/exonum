@@ -184,7 +184,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Re-borrows an execution context with the given instance descriptor.
-    fn reborrow(&mut self, instance: InstanceDescriptor) -> ExecutionContext {
+    fn reborrow(&mut self, instance: InstanceDescriptor) -> ExecutionContext<'_> {
         ExecutionContext {
             fork: &mut *self.fork,
             caller: self.caller.clone(),

@@ -32,7 +32,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use exonum_merkledb::{
-    access::{Access, AccessExt, AsReadonly, FromAccess, Prefixed, RawAccess},
+    access::{Access, AsReadonly, CopyAccessExt, FromAccess, Prefixed, RawAccess},
     migration::{flush_migration, Migration},
     Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex,
     ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,

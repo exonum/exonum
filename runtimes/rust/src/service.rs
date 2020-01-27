@@ -267,34 +267,6 @@ impl<'a> AfterCommitContext<'a> {
     }
 }
 
-// It is impossible to use `Cow` with `InstanceDescriptor` since it has a lifetime of its own.
-#[derive(Debug, Clone)]
-enum CowInstanceDescriptor {
-    Borrowed(InstanceDescriptor),
-    Owned { id: InstanceId, name: String },
-}
-
-impl CowInstanceDescriptor {
-    fn as_ref(&self) -> InstanceDescriptor {
-        match self {
-            CowInstanceDescriptor::Borrowed(descriptor) => descriptor.clone(),
-            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor::new(*id, name),
-        }
-    }
-
-    fn into_owned(self) -> CowInstanceDescriptor {
-        match self {
-            CowInstanceDescriptor::Borrowed(InstanceDescriptor { id, name, .. }) => {
-                CowInstanceDescriptor::Owned {
-                    id,
-                    name: name.to_owned(),
-                }
-            }
-            CowInstanceDescriptor::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
-        }
-    }
-}
-
 /// Transaction broadcaster.
 ///
 /// Transaction broadcast allows a service to create transactions in the `after_commit`
@@ -308,7 +280,7 @@ impl CowInstanceDescriptor {
 /// by processing corresponding transactions.
 #[derive(Debug, Clone)]
 pub struct Broadcaster<'a> {
-    instance: CowInstanceDescriptor,
+    instance: InstanceDescriptor,
     service_keypair: Cow<'a, (PublicKey, SecretKey)>,
     tx_sender: Cow<'a, ApiSender>,
 }
@@ -321,7 +293,7 @@ impl<'a> Broadcaster<'a> {
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            instance: CowInstanceDescriptor::Borrowed(instance),
+            instance,
             service_keypair: Cow::Borrowed(service_keypair),
             tx_sender: Cow::Borrowed(tx_sender),
         }
@@ -331,15 +303,15 @@ impl<'a> Broadcaster<'a> {
         self.service_keypair.as_ref()
     }
 
-    pub(super) fn instance(&self) -> InstanceDescriptor {
-        self.instance.as_ref()
+    pub(super) fn instance(&self) -> &InstanceDescriptor {
+        &self.instance
     }
 
     /// Converts the broadcaster into the owned representation, which can be used to broadcast
     /// transactions asynchronously.
     pub fn into_owned(self) -> Broadcaster<'static> {
         Broadcaster {
-            instance: self.instance.into_owned(),
+            instance: self.instance.clone(),
             service_keypair: Cow::Owned(self.service_keypair.into_owned()),
             tx_sender: Cow::Owned(self.tx_sender.into_owned()),
         }

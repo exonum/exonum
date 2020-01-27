@@ -18,7 +18,7 @@ use exonum::{
         Blockchain, BlockchainBuilder, BlockchainMut,
     },
     helpers::Height,
-    merkledb::{access::AccessRefExt, BinaryValue, SystemSchema},
+    merkledb::{access::AccessExt, BinaryValue, SystemSchema},
     runtime::{
         Caller, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError,
         InstanceStatus, SnapshotExt,

@@ -16,7 +16,7 @@ use exonum::{
     crypto::PublicKey,
     helpers::Round,
     merkledb::{
-        access::{Access, AccessRefExt, RawAccessMut},
+        access::{Access, AccessExt, RawAccessMut},
         ListIndex, MapIndex,
     },
     messages::Verified,

@@ -38,7 +38,7 @@ pub fn get_state_aggregator<T: RawAccess>(
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::AccessExt, Database, ObjectHash, TemporaryDB, SystemSchema};
+/// # use exonum_merkledb::{access::CopyAccessExt, Database, ObjectHash, TemporaryDB, SystemSchema};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
@@ -141,7 +141,7 @@ impl SystemSchema<&Fork> {
 mod tests {
     use super::*;
     use crate::{
-        access::{AccessExt, AccessRefExt},
+        access::{AccessExt, CopyAccessExt},
         migration::Migration,
         Database, HashTag, TemporaryDB,
     };

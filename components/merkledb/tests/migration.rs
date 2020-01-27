@@ -20,7 +20,7 @@ use proptest::{
 use std::collections::{HashMap, HashSet};
 
 use exonum_merkledb::{
-    access::{Access, AccessRefExt},
+    access::{Access, AccessExt},
     migration::{flush_migration, rollback_migration, Migration},
     Database, HashTag, IndexAddress, IndexType, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
 };
@@ -130,7 +130,7 @@ fn generate_action_with_rollbacks(namespaces: Strings) -> impl Strategy<Value = 
     ]
 }
 
-fn get_object_hash<S>(snapshot: S, name: &str, index_type: IndexType) -> Hash
+fn get_object_hash<S>(snapshot: &S, name: &str, index_type: IndexType) -> Hash
 where
     S: Access,
 {
@@ -157,7 +157,7 @@ fn check_namespace_aggregator<'a>(
         let aggregated_name = format!("{}.{}", namespace, name);
         let maybe_hash = if index_type.is_merkelized() {
             expected_names.insert(aggregated_name.clone());
-            Some(get_object_hash(migration.clone(), name, index_type))
+            Some(get_object_hash(&migration, name, index_type))
         } else {
             None
         };
@@ -177,7 +177,7 @@ fn check_default_aggregator<'a>(
     for (name, index_type) in single_indexes {
         let maybe_hash = if index_type.is_merkelized() {
             expected_names.insert(name.to_owned());
-            Some(get_object_hash(snapshot, name, index_type))
+            Some(get_object_hash(&snapshot, name, index_type))
         } else {
             None
         };
@@ -250,7 +250,7 @@ fn check_final_consistency(
             // The index should be fully removed; thus, creating a `ProofMapIndex` on its place
             // should succeed and it should have a default `object_hash`.
             prop_assert_eq!(
-                get_object_hash(snapshot, name, IndexType::ProofMap),
+                get_object_hash(&snapshot, name, IndexType::ProofMap),
                 HashTag::empty_map_hash()
             );
         }

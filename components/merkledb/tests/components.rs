@@ -17,7 +17,7 @@
 use exonum_derive::FromAccess;
 
 use exonum_merkledb::{
-    access::{Access, AccessExt, FromAccess, RawAccessMut},
+    access::{Access, CopyAccessExt, FromAccess, RawAccessMut},
     BinaryKey, Database, Entry, Group, Lazy, ListIndex, ObjectHash, ProofEntry, ProofMapIndex,
     TemporaryDB,
 };

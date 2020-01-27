@@ -23,7 +23,7 @@ use serde_json::{self, json};
 use std::cmp;
 
 use super::{key::ProofListKey, tree_height_by_length, ListProof, ListProofError, ProofListIndex};
-use crate::{access::AccessExt, BinaryValue, Database, HashTag, ObjectHash, TemporaryDB};
+use crate::{access::CopyAccessExt, BinaryValue, Database, HashTag, ObjectHash, TemporaryDB};
 
 const IDX_NAME: &str = "idx_name";
 
@@ -993,7 +993,9 @@ fn invalid_proofs_with_no_values() {
 }
 
 mod root_hash {
-    use crate::{access::AccessExt, hash::HashTag, BinaryValue, Database, ObjectHash, TemporaryDB};
+    use crate::{
+        access::CopyAccessExt, hash::HashTag, BinaryValue, Database, ObjectHash, TemporaryDB,
+    };
     use exonum_crypto::{self, Hash};
 
     /// Cross-verify `object_hash()` with `ProofListIndex` against expected root hash value.

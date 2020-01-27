@@ -32,7 +32,7 @@ use super::{
     MapProof, MapProofError, ProofPath,
 };
 use crate::{
-    access::AccessExt,
+    access::CopyAccessExt,
     proof_map::{Hashed, ProofMapIndex, Raw, ToProofPath},
     BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };

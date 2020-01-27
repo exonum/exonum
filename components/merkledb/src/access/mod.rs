@@ -26,7 +26,7 @@
 //!   are separated by namespaces.
 //! - [`Scratchpad`]s can be used for temporary data. They are distinguished by namespaces as well.
 //!
-//! [`AccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
+//! [`CopyAccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
 //! is useful in quick-and-dirty testing. For more complex applications, consider deriving
 //! data schema via [`FromAccess`].
 //!
@@ -52,14 +52,14 @@
 //! [`Migration`]: ../migration/struct.Migration.html
 //! [migrations]: ../migration/index.html
 //! [`Scratchpad`]: ../migration/struct.Scratchpad.html
-//! [`AccessExt`]: trait.AccessExt.html
+//! [`CopyAccessExt`]: trait.CopyAccessExt.html
 //! [`FromAccess`]: trait.FromAccess.html
 
 use failure::{Error, Fail};
 
 use std::fmt;
 
-pub use self::extensions::{AccessExt, AccessRefExt};
+pub use self::extensions::{AccessExt, CopyAccessExt};
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
 use crate::{
@@ -74,9 +74,9 @@ mod extensions;
 ///
 /// This trait is not intended to be implemented by the types outside the crate; indeed,
 /// it instantiates several crate-private types. Correspondingly, `Access` methods
-/// rarely need to be used directly; use [its extension trait][`AccessExt`] instead.
+/// rarely need to be used directly; use [its extension trait][`CopyAccessExt`] instead.
 ///
-/// [`AccessExt`]: trait.AccessExt.html
+/// [`CopyAccessExt`]: trait.CopyAccessExt.html
 ///
 /// # Examples
 ///
@@ -162,7 +162,7 @@ impl<T: RawAccess> Access for T {
 /// # Examples
 ///
 /// ```
-/// use exonum_merkledb::{access::{AccessExt, AccessRefExt, Prefixed}, Database, TemporaryDB};
+/// use exonum_merkledb::{access::{CopyAccessExt, AccessExt, Prefixed}, Database, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
@@ -309,7 +309,7 @@ pub enum AccessErrorKind {
 /// ```
 /// use exonum_derive::FromAccess;
 /// # use exonum_merkledb::{
-/// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
+/// #     access::{Access, CopyAccessExt, AccessError, FromAccess, RawAccessMut},
 /// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
 /// # };
 ///

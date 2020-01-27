@@ -82,8 +82,8 @@ impl<'a> ServiceApiState<'a> {
     }
 
     /// Returns information about the executing service.
-    pub fn instance(&self) -> InstanceDescriptor {
-        self.broadcaster.instance()
+    pub fn instance(&self) -> &InstanceDescriptor {
+        &self.broadcaster.instance()
     }
 
     /// Returns a transaction broadcaster if the current node is a validator. If the node

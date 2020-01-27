@@ -21,7 +21,7 @@ use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidatorId},
     merkledb::{
-        access::{Access, AccessExt, FromAccess, Prefixed},
+        access::{Access, CopyAccessExt, FromAccess, Prefixed},
         Entry, HashTag, ProofMapIndex, Snapshot,
     },
     runtime::{

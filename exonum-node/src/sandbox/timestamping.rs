@@ -14,7 +14,7 @@
 
 use exonum::{
     crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
-    merkledb::access::AccessRefExt,
+    merkledb::access::AccessExt,
     messages::Verified,
     runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
 };

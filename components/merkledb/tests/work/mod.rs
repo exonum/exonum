@@ -8,7 +8,7 @@ use proptest::{
 use std::{collections::BTreeMap, iter::FromIterator};
 
 use exonum_merkledb::{
-    access::{Access, AccessRefExt, RawAccessMut},
+    access::{Access, AccessExt, RawAccessMut},
     IndexAddress, IndexType,
 };
 
