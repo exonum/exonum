@@ -426,7 +426,7 @@ where
     (testkit, res)
 }
 
-fn assert_access_blockchain_data(res: Result<(), ExecutionError>) {
+fn assert_access_error(res: Result<(), ExecutionError>) {
     assert_eq!(
         res.unwrap_err(),
         ErrorMatch::any_unexpected().with_description_containing(
@@ -436,17 +436,16 @@ fn assert_access_blockchain_data(res: Result<(), ExecutionError>) {
 }
 
 #[test]
-fn custom_call_ok() {
-    execute_custom_call(|context| {
+fn execute_custom_call_ok() {
+    let (_, res) = execute_custom_call(|context| {
         context.service_data();
         Ok(())
-    })
-    .1
-    .unwrap();
+    });
+    res.unwrap();
 }
 
 #[test]
-fn custom_call_err_interface_call_access_panic() {
+fn child_call_error_propagated() {
     let (testkit, res) = execute_custom_call(|mut context| {
         let to = context.caller().author().unwrap();
         // Write data to blockchain.
@@ -467,7 +466,7 @@ fn custom_call_err_interface_call_access_panic() {
         Ok(())
     });
 
-    assert_access_blockchain_data(res);
+    assert_access_error(res);
     // Verify that the changes made by `execute_custom_call` have been reverted.
     let snapshot = testkit.snapshot();
     let schema = WalletSchema::new(
@@ -475,11 +474,11 @@ fn custom_call_err_interface_call_access_panic() {
             .for_service(CustomCallServiceFactory::INSTANCE_NAME)
             .unwrap(),
     );
-    assert_eq!(schema.wallets.values().collect::<Vec<_>>(), vec![]);
+    assert_eq!(schema.wallets.values().count(), 0);
 }
 
 #[test]
-fn custom_call_err_interface_call_always_revert() {
+fn data_inaccessible_on_child_call_error() {
     let (testkit, res) = execute_custom_call(|mut context| {
         let to = context.caller().author().unwrap();
         // Write data to blockchain.
@@ -507,7 +506,7 @@ fn custom_call_err_interface_call_always_revert() {
             .for_service(CustomCallServiceFactory::INSTANCE_NAME)
             .unwrap(),
     );
-    assert_eq!(schema.wallets.values().collect::<Vec<_>>(), vec![]);
+    assert_eq!(schema.wallets.values().count(), 0);
 }
 
 #[test]

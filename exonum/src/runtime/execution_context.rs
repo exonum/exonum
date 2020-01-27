@@ -32,9 +32,6 @@ const ACCESS_ERROR_STR: &str = "An attempt to access blockchain data after execu
 /// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
 /// or the service constructor invocation.
 ///
-/// # Safety
-///
-/// Errors that occur after making nested calls must bubble up to the upper level.
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
@@ -271,6 +268,18 @@ impl<'a> ExecutionContext<'a> {
 }
 
 /// Collection of unstable execution context features.
+///
+/// # Safety
+///
+/// Errors that occur after making nested calls should be bubbled up to the upper level.
+///
+/// If an error has occurred in a nested call, but the returned result of the topmost
+/// call is `Ok(())`, the latter will be coerced to an error `(CoreError::InvalidCall)`
+/// and recorded as such in the blockchain. Accessing storage after an error in a
+/// nested call will result in a panic.
+///
+/// Nested calls is a part of an unfinished "interfaces" feature. It is exempt
+/// from semantic versioning and will be replaced in the future releases.
 #[doc(hidden)]
 pub trait ExecutionContextUnstable {
     /// Invokes the interface method of the instance with the specified ID.
