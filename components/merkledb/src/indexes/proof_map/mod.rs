@@ -806,12 +806,22 @@ where
 /// ## Map with a single entry
 ///
 /// ```text
-/// root_hash = sha256( HashTag::MapBranchNode || 0x01 || path || 0x00 || child_hash ).
+/// root_hash = sha256( HashTag::MapBranchNode || path || child_hash ).
 /// ```
 ///
 /// Here, the map contains a single `path`, and `child_hash` is the hash
-/// of the object under this key. `path` is always serialized as 32 bytes. `0x01` and `0x00`
-/// are single bytes present for historic reasons.
+/// of the object under this key. `path` is serialized as
+///
+/// ```text
+/// LEB128(bit_length) || bytes,
+/// ```
+///
+/// where
+///
+/// - [LEB128] is a compact serialization format for unsigned integers
+/// - `bit_length` is the number of bits in the path
+/// - `bytes` is the path serialized as the minimum necessary number of bytes,
+///   with zero padding at the end if necessary.
 ///
 /// ## Map with multiple entries
 ///
@@ -831,16 +841,7 @@ where
 /// leaf_hash = sha256( HashTag::Blob || serialized_value ).
 /// ```
 ///
-/// `ProofPath`s are serialized in this case as
-///
-/// ```text
-/// LEB128(bit_length) || bytes.
-/// ```
-///
-/// - [LEB128] is a compact serialization format for unsigned integers
-/// - `bit_length` is the number of bits in the path
-/// - `bytes` is the path serialized as the minimum necessary number of bytes,
-///   with zero padding at the end if necessary.
+/// `ProofPath`s are serialized in the same way as in the previous case.
 ///
 /// [LEB128]: https://en.wikipedia.org/wiki/LEB128
 ///
