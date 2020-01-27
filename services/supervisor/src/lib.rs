@@ -56,7 +56,6 @@
 //! The operation of starting or resuming a service is treated similarly to a configuration change
 //! and follows the same rules.
 //!
-//!
 //! ## Migrations Management
 //!
 //! Supervisor service provides a functionality to perform data migrations for services.
