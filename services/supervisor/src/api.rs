@@ -34,7 +34,6 @@
 //!     - [Check the deployment status](#check-deployment-status)
 //!     - [Check the migration status](#check-migration-status)
 //!
-//!
 //! # Public API
 //!
 //! ## Obtaining Consensus Configuration
@@ -44,7 +43,7 @@
 //! | Path        | `/api/supervisor/v1/consensus-config` |
 //! | Method      | GET   |
 //! | Query type  | - |
-//! | Return type | [`BlockInfo`] |
+//! | Return type | [`ConsensusConfig`] |
 //!
 //! Returns the current consensus configuration.
 //!
@@ -79,24 +78,25 @@
 //! | Path        | `/api/supervisor/v1/config-proposal` |
 //! | Method      | GET   |
 //! | Query type  | - |
-//! | Return type | `Option<[ConfigProposalWithHash]>` |
+//! | Return type | Option<[`ConfigProposalWithHash`]> |
 //!
 //! Returns the configuration proposal which is currently pending. Returns `None` if there is no
 //! pending configuration at the moment.
 //!
-//! [ConfigProposalWithHash]: ../struct.ConfigProposalWithHash.html
+//! [`ConfigProposalWithHash`]: ../struct.ConfigProposalWithHash.html
 //!
 //! ```
-//! use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
@@ -117,7 +117,7 @@
 //! |-------------|-------|
 //! | Path        | `/api/supervisor/v1/deploy-artifact` |
 //! | Method      | POST   |
-//! | Query type  | [`DeployRequest`] |
+//! | Body type   | [`DeployRequest`] |
 //! | Return type | [`Hash`] |
 //!
 //! Requests the deployment of a certain artifact.
@@ -139,9 +139,9 @@
 //!
 //! ```
 //! use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! use exonum_rust_runtime::ServiceFactory;
 //! use exonum_supervisor::{DeployRequest, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum_rust_runtime::ServiceFactory;
 //!
 //! # use exonum_derive::*;
 //! # use exonum_rust_runtime::Service;
@@ -157,20 +157,21 @@
 //! # }
 //! #
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .with_rust_service(SomeService)
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
-//! // In this example, we will try to deploy supervisor service.
+//! // In this example, we will try to deploy `SomeService` artifact.
 //! let deploy_request = DeployRequest {
 //!     artifact: SomeService.artifact_id(),
 //!     spec: config_for_service(),
 //!     deadline_height: Height(10),
 //! };
 //!
+//! // `deploy_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
@@ -192,7 +193,7 @@
 //! |-------------|-------|
 //! | Path        | `/api/supervisor/v1/migrate` |
 //! | Method      | POST   |
-//! | Query type  | [`MigrationRequest`] |
+//! | Body type   | [`MigrationRequest`] |
 //! | Return type | [`Hash`] |
 //!
 //! Requests the migration of certain service to a newer artifact version.
@@ -213,10 +214,11 @@
 //! [`Hash`]: https://docs.rs/exonum-crypto/latest/exonum_crypto/struct.Hash.html
 //!
 //! ```
-//! use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! use exonum_rust_runtime::ServiceFactory;
+//! use exonum::crypto::Hash;
 //! use exonum_supervisor::{MigrationRequest, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum::helpers::Height;
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
@@ -235,6 +237,7 @@
 //! #         deadline_height: Height(10),
 //! #     };
 //!
+//! // `migration_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
@@ -254,7 +257,7 @@
 //! |-------------|-------|
 //! | Path        | `/api/supervisor/v1/propose-config` |
 //! | Method      | POST   |
-//! | Query type  | [`ConfigPropose`] |
+//! | Body type   | [`ConfigPropose`] |
 //! | Return type | [`Hash`] |
 //!
 //! Proposes the new configuration for the Exonum blockchain.
@@ -285,22 +288,23 @@
 //!
 //! ```
 //! use exonum::crypto::Hash;
-//! # use exonum::helpers::Height;
-//! use exonum_rust_runtime::ServiceFactory;
 //! use exonum_supervisor::{ConfigPropose, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum::helpers::Height;
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(0));
 //!
-//! // In this example, query is serialized to hexadecimal string automatically.
+//! // `proposal` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
@@ -330,7 +334,7 @@
 //! Depending on the supervisor operating mode, it may be required to vote by majority of
 //! nodes (in "decentralized" mode), or one vote will be enough (in "simple" mode).
 //!
-//! The first vote is sent automatically by the node which broadcast the proposal, there is
+//! The node that broadcast the proposal is considered to have voted for it, there is
 //! no need to send vote request for this node manually.
 //!
 //! After receiving a vote, supervisor creates a corresponding transaction, signs it
@@ -347,18 +351,19 @@
 //!
 //! ```
 //! use exonum::crypto::Hash;
-//! # use exonum::helpers::{Height, ValidatorId};
-//! use exonum_rust_runtime::ServiceFactory;
 //! use exonum_supervisor::{ConfigPropose, ConfigVote, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum::helpers::{Height, ValidatorId};
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_validators(2)
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .create();
+//! let mut testkit = // Same as in previous example (but with several validators)...
+//! #     TestKitBuilder::validator()
+//! #         .with_validators(2) // 2 validators to create a config to vote for.
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(10));
@@ -415,14 +420,15 @@
 //! ```
 //! use exonum_rust_runtime::ServiceFactory;
 //! use exonum_supervisor::Supervisor;
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
 //! let configuration_number: u64 = testkit
 //!     .api()
@@ -454,11 +460,12 @@
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
 //! let config: SupervisorConfig = testkit
 //!     .api()
@@ -486,9 +493,9 @@
 //!
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! use exonum_rust_runtime::ServiceFactory;
-//! use exonum_supervisor::{DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum_rust_runtime::ServiceFactory;
+//! use exonum_supervisor::{api::DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor};
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # use exonum_derive::*;
 //! # use exonum_rust_runtime::Service;
@@ -500,12 +507,13 @@
 //! # impl Service for SomeService {}
 //! #
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//! #    .with_rust_service(SomeService)
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .with_rust_service(SomeService)
+//! #         .create();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.
 //! #     DeployRequest {
@@ -548,16 +556,17 @@
 //!
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! use exonum_rust_runtime::ServiceFactory;
-//! use exonum_supervisor::{MigrationInfoQuery, MigrationRequest, MigrationState, Supervisor};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! # use exonum_rust_runtime::ServiceFactory;
+//! use exonum_supervisor::{api::MigrationInfoQuery, MigrationRequest, MigrationState, Supervisor};
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
-//!     .create();
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .create();
 //!
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
 //! #     MigrationRequest {
@@ -831,7 +840,7 @@ impl PublicApi for ApiImpl<'_> {
 }
 
 /// Wires Supervisor API endpoints.
-pub fn wire(builder: &mut ServiceApiBuilder) {
+pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
         .endpoint_mut("deploy-artifact", |state, query| {

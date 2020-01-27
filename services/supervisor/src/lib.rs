@@ -132,7 +132,6 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, MigrationInfoQuery},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
     errors::{ArtifactError, CommonError, ConfigurationError, MigrationError, ServiceError},
     event_state::AsyncEventState,
