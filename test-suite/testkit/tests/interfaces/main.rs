@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::config::InstanceInitParams,
     crypto,
     messages::{AnyTx, Verified},
     runtime::{
         CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, SnapshotExt,
     },
 };
-use exonum_rust_runtime::ServiceFactory;
+use exonum_rust_runtime::DefaultInstance;
 use exonum_testkit::{TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
@@ -400,22 +399,10 @@ fn execute_custom_call<F>(f: F) -> (TestKit, Result<(), ExecutionError>)
 where
     F: Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Clone + Send + 'static,
 {
-    let custom_call_factory = CustomCallServiceFactory::new(f);
-    let custom_call_artifact = custom_call_factory.artifact_id();
-
-    let custom_call_instance = InstanceInitParams::new(
-        CustomCallServiceFactory::INSTANCE_ID,
-        CustomCallServiceFactory::INSTANCE_NAME,
-        custom_call_artifact.clone(),
-        vec![],
-    );
-
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_default_rust_service(WalletService)
-        .with_artifact(custom_call_artifact)
-        .with_rust_service(custom_call_factory)
-        .with_instance(custom_call_instance)
+        .with_default_rust_service(CustomCallServiceFactory::new(f))
         .create();
 
     let keypair = crypto::gen_keypair();

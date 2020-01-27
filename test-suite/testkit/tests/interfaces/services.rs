@@ -241,9 +241,6 @@ pub struct CustomCallServiceFactory {
 }
 
 impl CustomCallServiceFactory {
-    pub const INSTANCE_ID: u32 = 112;
-    pub const INSTANCE_NAME: &'static str = "custom-call";
-
     pub fn new<F>(f: F) -> Self
     where
         F: Fn(ExecutionContext<'_>) -> Result<(), ExecutionError> + Clone + Send + 'static,
@@ -256,6 +253,11 @@ impl CustomCallServiceFactory {
     pub fn new_instance(&self) -> Box<dyn Service> {
         Box::new(CustomCallService((self.factory)()))
     }
+}
+
+impl DefaultInstance for CustomCallServiceFactory {
+    const INSTANCE_ID: u32 = 112;
+    const INSTANCE_NAME: &'static str = "custom-call";
 }
 
 #[derive(ServiceDispatcher)]
