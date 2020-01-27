@@ -153,7 +153,7 @@
 //! # impl Service for SomeService {}
 //! #
 //! # fn config_for_service() -> Vec<u8> {
-//! #     Vec::new()   
+//! #     Vec::new()
 //! # }
 //! #
 //! # fn main() -> Result<(), failure::Error> {
@@ -446,7 +446,7 @@
 //!
 //! Returns the current supervisor configuration, which includes the supervisor operating mode.
 //!
-//! [`SupervisorConfig`]: ../SupervisorConfig.html
+//! [`SupervisorConfig`]: ../struct.SupervisorConfig.html
 //!
 //! ```
 //! use exonum_rust_runtime::ServiceFactory;
@@ -482,7 +482,7 @@
 //! Returns the state of the deployment for a certain `ArtifactId`.
 //!
 //! [`DeployInfoQuery`]: struct.DeployInfoQuery.html
-//! [`AsyncEventState`]: ../struct.AsyncEventState.html
+//! [`AsyncEventState`]: ../enum.AsyncEventState.html
 //!
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
