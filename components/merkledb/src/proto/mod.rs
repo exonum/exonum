@@ -28,7 +28,7 @@ use std::borrow::Cow;
 
 use crate::{
     proof_map::{BitsRange, ProofPath},
-    BinaryKey, BinaryValue,
+    BinaryValue,
 };
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
@@ -56,7 +56,7 @@ fn parse_map_proof_entry(
 
 impl<K, V, S> ProtobufConvert for crate::MapProof<K, V, S>
 where
-    K: BinaryKey + ToOwned<Owned = K>,
+    K: BinaryValue,
     V: BinaryValue,
 {
     type ProtoStruct = MapProof;
@@ -86,9 +86,7 @@ where
             .all_entries_unchecked()
             .map(|(key, value)| {
                 let mut entry = OptionalEntry::new();
-                let mut buf = vec![0_u8; key.size()];
-                key.write(&mut buf);
-                entry.set_key(buf.to_vec());
+                entry.set_key(key.to_bytes());
 
                 match value {
                     Some(value) => entry.set_value(value.to_bytes()),
@@ -113,13 +111,13 @@ where
             .collect::<Result<Vec<_>, Error>>()?;
 
         let entries = pb
-            .get_entries()
-            .iter()
-            .map(|entry| {
-                let key = K::read(entry.get_key());
+            .take_entries()
+            .into_iter()
+            .map(|mut entry| {
+                let key = K::from_bytes(Cow::Owned(entry.take_key()))?;
 
                 let value = if entry.has_value() {
-                    Some(V::from_bytes(Cow::Borrowed(entry.get_value()))?)
+                    Some(V::from_bytes(Cow::Owned(entry.take_value()))?)
                 } else {
                     ensure!(
                         entry.has_no_value(),
@@ -250,7 +248,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn map_proof_malformed_key_deserialize() {
         let mut proof = proto::MapProof::new();
         let mut entry = proto::OptionalEntry::new();
@@ -258,8 +255,8 @@ mod tests {
         entry.set_value(vec![2]);
         proof.set_entries(RepeatedField::from_vec(vec![entry]));
 
-        // TODO: will panic at runtime, should change BinaryKey::read signature (ECR-174)
-        let _res = MapProof::<u16, u8>::from_pb(proof);
+        let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
+        assert!(err.to_string().contains("failed to fill whole buffer"));
     }
 
     #[test]

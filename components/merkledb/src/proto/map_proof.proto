@@ -34,7 +34,7 @@ message MapProof {
 // Key with corresponding value or an empty value if the key is missing
 // from the underlying map.
 message OptionalEntry {
-  // Key serialized as per `BinaryKey` implementation (usually as
+  // Key serialized as per `BinaryValue` implementation (usually as
   // a Protobuf message, except for primitive types).
   bytes key = 1;
   oneof maybe_value {
