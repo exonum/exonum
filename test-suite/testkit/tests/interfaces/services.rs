@@ -242,11 +242,8 @@ pub struct CustomCallService {
 }
 
 impl CustomCallService {
-    pub fn new(handler: CustomCall) -> Self
-    {
-        Self {
-            handler,
-        }
+    pub fn new(handler: CustomCall) -> Self {
+        Self { handler }
     }
 
     pub fn new_instance(&self) -> Box<dyn Service> {

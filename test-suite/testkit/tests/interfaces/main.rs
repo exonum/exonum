@@ -28,7 +28,7 @@ use crate::{
     interface::IssueReceiverMut,
     schema::{Wallet, WalletSchema},
     services::{
-        AnyCall, AnyCallService, CallAny, CustomCallInterface, CustomCallService, CustomCall,
+        AnyCall, AnyCallService, CallAny, CustomCall, CustomCallInterface, CustomCallService,
         DepositInterface, DepositService, Issue, TxIssue, WalletInterface, WalletService,
     },
 };
@@ -395,8 +395,7 @@ fn test_any_call_panic_recursion_limit() {
     );
 }
 
-fn execute_custom_call(f: CustomCall) -> (TestKit, Result<(), ExecutionError>)
-{
+fn execute_custom_call(f: CustomCall) -> (TestKit, Result<(), ExecutionError>) {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_default_rust_service(WalletService)
