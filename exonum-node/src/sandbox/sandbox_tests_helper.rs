@@ -19,7 +19,7 @@ use exonum::{
     blockchain::{AdditionalHeaders, Block, ProposerId},
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
-    merkledb::{access::AccessExt, Database, HashTag, ObjectHash, TemporaryDB},
+    merkledb::{access::CopyAccessExt, Database, HashTag, ObjectHash, TemporaryDB},
     messages::{AnyTx, Precommit, Verified},
 };
 use log::trace;

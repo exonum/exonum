@@ -82,7 +82,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -105,7 +105,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -127,7 +127,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -154,7 +154,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -173,7 +173,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -203,7 +203,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, KeySetIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, KeySetIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -247,7 +247,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, TemporaryDB};
+    use crate::{access::CopyAccessExt, Database, TemporaryDB};
 
     const INDEX_NAME: &str = "test_index_name";
 

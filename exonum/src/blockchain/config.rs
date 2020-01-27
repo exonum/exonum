@@ -139,9 +139,9 @@ impl Default for ConsensusConfig {
 }
 
 impl ConsensusConfig {
-    /// Default value for max_message_len.
+    /// Default value for `max_message_len`.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
-    /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
+    /// Time that will be added to round timeout for each next round in terms of percent of `first_round_timeout`.
     pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
 
     /// Generates a consensus configuration for testing and returns it together with the keys
@@ -609,11 +609,10 @@ mod tests {
             .with_instance(artifact1.clone().into_default_instance(1, "art1_inst1"))
             .with_instance(
                 artifact1
-                    .clone()
                     .into_default_instance(2, "art1_inst2")
                     .with_constructor(vec![4_u8, 5, 6]),
             )
-            .with_instance(artifact2.clone().into_default_instance(1, "art2_inst1"))
+            .with_instance(artifact2.into_default_instance(1, "art2_inst1"))
             .build();
 
         assert_eq!(genesis_config.consensus_config, consensus);

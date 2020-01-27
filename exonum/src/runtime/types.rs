@@ -254,11 +254,11 @@ impl FromStr for ArtifactId {
         let split = s.splitn(3, ':').collect::<Vec<_>>();
         match &split[..] {
             [runtime_id, name, version] => {
-                let artifact = Self {
-                    runtime_id: runtime_id.parse()?,
-                    name: name.to_string(),
-                    version: version.parse()?,
-                };
+                let artifact = Self::new(
+                    u32::from_str(runtime_id)?,
+                    (*name).to_string(),
+                    version.parse()?,
+                )?;
                 artifact.validate()?;
                 Ok(artifact)
             }
@@ -346,12 +346,9 @@ impl InstanceSpec {
         Ok(())
     }
 
-    /// Return the corresponding descriptor of this instance specification.
-    pub fn as_descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor {
-            id: self.id,
-            name: self.name.as_ref(),
-        }
+    /// Returns the corresponding descriptor of this instance specification.
+    pub fn as_descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor::new(self.id, &self.name)
     }
 }
 

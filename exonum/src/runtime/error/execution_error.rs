@@ -60,7 +60,7 @@ impl ExecutionError {
         let any = any.as_ref();
 
         if let Some(s) = any.downcast_ref::<&str>() {
-            s.to_string()
+            (*s).to_string()
         } else if let Some(s) = any.downcast_ref::<String>() {
             s.clone()
         } else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {

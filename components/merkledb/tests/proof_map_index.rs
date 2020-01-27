@@ -23,7 +23,7 @@
 // cspell:ignore proptest
 
 use exonum_merkledb::{
-    access::{AccessExt, RawAccess},
+    access::{CopyAccessExt, RawAccess},
     proof_map::{Hashed, ToProofPath},
     BinaryKey, BinaryValue, Database, MapProof, ObjectHash, ProofMapIndex, TemporaryDB,
 };

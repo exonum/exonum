@@ -200,7 +200,7 @@ impl<'a> AfterCommitContext<'a> {
     /// Creates a new `AfterCommit` context.
     pub(crate) fn new(
         mailbox: &'a mut Mailbox,
-        instance: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor,
         snapshot: &'a dyn Snapshot,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
@@ -216,7 +216,7 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns blockchain data for the snapshot associated with this context.
     pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
-        BlockchainData::new(self.snapshot, self.broadcaster.instance())
+        BlockchainData::new(self.snapshot, &self.broadcaster.instance().name)
     }
 
     /// Returns snapshot of the data for the executing service.
@@ -266,34 +266,6 @@ impl<'a> AfterCommitContext<'a> {
     }
 }
 
-// It is impossible to use `Cow` with `InstanceDescriptor` since it has a lifetime of its own.
-#[derive(Debug, Clone)]
-enum CowInstanceDescriptor<'a> {
-    Borrowed(InstanceDescriptor<'a>),
-    Owned { id: InstanceId, name: String },
-}
-
-impl CowInstanceDescriptor<'_> {
-    fn as_ref(&self) -> InstanceDescriptor<'_> {
-        match self {
-            CowInstanceDescriptor::Borrowed(descriptor) => *descriptor,
-            CowInstanceDescriptor::Owned { id, ref name } => InstanceDescriptor { id: *id, name },
-        }
-    }
-
-    fn into_owned(self) -> CowInstanceDescriptor<'static> {
-        match self {
-            CowInstanceDescriptor::Borrowed(InstanceDescriptor { id, name }) => {
-                CowInstanceDescriptor::Owned {
-                    id,
-                    name: name.to_owned(),
-                }
-            }
-            CowInstanceDescriptor::Owned { id, name } => CowInstanceDescriptor::Owned { id, name },
-        }
-    }
-}
-
 /// Transaction broadcaster.
 ///
 /// Transaction broadcast allows a service to create transactions in the `after_commit`
@@ -307,7 +279,7 @@ impl CowInstanceDescriptor<'_> {
 /// by processing corresponding transactions.
 #[derive(Debug, Clone)]
 pub struct Broadcaster<'a> {
-    instance: CowInstanceDescriptor<'a>,
+    instance: InstanceDescriptor,
     service_keypair: Cow<'a, (PublicKey, SecretKey)>,
     tx_sender: Cow<'a, ApiSender>,
 }
@@ -315,12 +287,12 @@ pub struct Broadcaster<'a> {
 impl<'a> Broadcaster<'a> {
     /// Creates a new broadcaster.
     pub(super) fn new(
-        instance: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor,
         service_keypair: &'a (PublicKey, SecretKey),
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
-            instance: CowInstanceDescriptor::Borrowed(instance),
+            instance,
             service_keypair: Cow::Borrowed(service_keypair),
             tx_sender: Cow::Borrowed(tx_sender),
         }
@@ -330,15 +302,15 @@ impl<'a> Broadcaster<'a> {
         self.service_keypair.as_ref()
     }
 
-    pub(super) fn instance(&self) -> InstanceDescriptor<'_> {
-        self.instance.as_ref()
+    pub(super) fn instance(&self) -> &InstanceDescriptor {
+        &self.instance
     }
 
     /// Converts the broadcaster into the owned representation, which can be used to broadcast
     /// transactions asynchronously.
     pub fn into_owned(self) -> Broadcaster<'static> {
         Broadcaster {
-            instance: self.instance.into_owned(),
+            instance: self.instance,
             service_keypair: Cow::Owned(self.service_keypair.into_owned()),
             tx_sender: Cow::Owned(self.tx_sender.into_owned()),
         }

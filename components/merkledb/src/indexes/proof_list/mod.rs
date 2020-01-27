@@ -148,7 +148,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -167,7 +167,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -189,7 +189,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -208,7 +208,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -230,7 +230,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -252,7 +252,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -278,7 +278,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -303,7 +303,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -325,7 +325,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -472,7 +472,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -490,7 +490,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -532,7 +532,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -568,7 +568,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -606,7 +606,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -636,7 +636,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -700,7 +700,7 @@ where
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     access::AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash,
+/// #     access::CopyAccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash,
 /// # };
 /// # use exonum_crypto::Hash;
 /// let db = TemporaryDB::new();

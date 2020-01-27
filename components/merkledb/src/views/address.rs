@@ -44,7 +44,7 @@ const MIGRATION_CHAR: u8 = b'^';
 /// be converted into an address.
 ///
 /// ```
-/// use exonum_merkledb::{access::AccessExt, IndexAddress, TemporaryDB, Database};
+/// use exonum_merkledb::{access::CopyAccessExt, IndexAddress, TemporaryDB, Database};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();

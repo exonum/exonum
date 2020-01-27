@@ -810,31 +810,40 @@ impl<'a> ExecutionContext<'a> {
 }
 
 /// Instance descriptor contains information to access the running service instance.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct InstanceDescriptor<'a> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceDescriptor {
     /// A unique numeric ID of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.id)
     pub id: InstanceId,
     /// A unique name of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.name)
-    pub name: &'a str,
+    pub name: String,
 }
 
-impl fmt::Display for InstanceDescriptor<'_> {
+impl InstanceDescriptor {
+    pub fn new<S: Into<String>>(id: InstanceId, name: S) -> Self {
+        Self {
+            id,
+            name: name.into(),
+        }
+    }
+}
+
+impl fmt::Display for InstanceDescriptor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.id, self.name)
     }
 }
 
-impl From<InstanceDescriptor<'_>> for (InstanceId, String) {
-    fn from(descriptor: InstanceDescriptor<'_>) -> Self {
+impl From<InstanceDescriptor> for (InstanceId, String) {
+    fn from(descriptor: InstanceDescriptor) -> Self {
         (descriptor.id, descriptor.name.to_owned())
     }
 }
 
-impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor<'a> {
+impl<'a> From<(InstanceId, &'a str)> for InstanceDescriptor {
     fn from((id, name): (InstanceId, &'a str)) -> Self {
-        InstanceDescriptor { id, name }
+        InstanceDescriptor { id, name: name.to_owned() }
     }
 }
 
@@ -970,7 +979,7 @@ pub trait ExecutionContextUnstable {
     /// Re-borrows an execution context with the specified interface name.
     fn reborrow_with_interface<'s>(&'s mut self, interface_name: &'s str) -> ExecutionContext<'s>;
     /// Returns the service matching the specified query.
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>>;
+    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor>;
     /// Invokes the interface method of the instance with the specified ID.
     /// You may override the instance ID of the one who calls this method by the given one.
     fn make_child_call(
@@ -997,7 +1006,7 @@ impl<'a> ExecutionContextUnstable for ExecutionContext<'a> {
         self.reborrow_with_interface(self.interface_name)
     }
 
-    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor<'_>> {
+    fn get_service<'q>(&self, id: impl Into<InstanceQuery<'q>>) -> Option<InstanceDescriptor> {
         self.dispatcher.get_service(id)
     }
 

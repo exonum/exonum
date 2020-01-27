@@ -58,7 +58,7 @@ impl HashedEntry {
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, ListProof, ObjectHash,
+/// #     access::CopyAccessExt, Database, TemporaryDB, BinaryValue, ListProof, ObjectHash,
 /// # };
 /// # use failure::Error;
 /// # fn main() -> Result<(), Error> {
@@ -94,9 +94,8 @@ impl HashedEntry {
 /// ```
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
-/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, HashTag, ListProof,
+/// #     access::CopyAccessExt, Database, TemporaryDB, BinaryValue, HashTag, ListProof,
 /// # };
-/// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut list = fork.get_proof_list("index");
 /// list.extend(vec![1_u32, 2, 3]);
@@ -116,7 +115,6 @@ impl HashedEntry {
 ///         "length": 3,
 ///     })
 /// );
-/// # }
 /// ```
 ///
 /// ## Note on external implementations
@@ -624,7 +622,7 @@ pub enum ListProofError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, TemporaryDB};
+    use crate::{access::CopyAccessExt, Database, TemporaryDB};
 
     fn entry(height: u8, index: u64) -> HashedEntry {
         HashedEntry::new(

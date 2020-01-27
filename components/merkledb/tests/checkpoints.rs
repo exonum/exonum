@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{access::AccessExt, Database, DbOptions, RocksDB};
+use exonum_merkledb::{access::CopyAccessExt, Database, DbOptions, RocksDB};
 use tempfile::TempDir;
 
 #[test]

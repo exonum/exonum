@@ -363,10 +363,10 @@ impl Instance {
         Self { id, name, service }
     }
 
-    fn descriptor(&self) -> InstanceDescriptor<'_> {
+    fn descriptor(&self) -> InstanceDescriptor {
         InstanceDescriptor {
             id: self.id,
-            name: &self.name,
+            name: self.name.clone(),
         }
     }
 }
@@ -521,7 +521,7 @@ impl RustRuntime {
                     self.blockchain().clone(),
                     InstanceDescriptor {
                         id: instance.id,
-                        name: instance.name.as_ref(),
+                        name: instance.name.clone(),
                     },
                 );
                 instance.as_ref().wire_api(&mut builder);

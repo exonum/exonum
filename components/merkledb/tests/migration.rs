@@ -130,9 +130,9 @@ fn generate_action_with_rollbacks(namespaces: Strings) -> impl Strategy<Value = 
     ]
 }
 
-fn get_object_hash<S>(snapshot: S, name: &str, index_type: IndexType) -> Hash
+fn get_object_hash<S>(snapshot: &S, name: &str, index_type: IndexType) -> Hash
 where
-    S: Access + Copy,
+    S: Access,
 {
     match index_type {
         IndexType::ProofEntry => snapshot.get_proof_entry::<_, ()>(name).object_hash(),
@@ -157,7 +157,7 @@ fn check_namespace_aggregator<'a>(
         let aggregated_name = format!("{}.{}", namespace, name);
         let maybe_hash = if index_type.is_merkelized() {
             expected_names.insert(aggregated_name.clone());
-            Some(get_object_hash(migration, name, index_type))
+            Some(get_object_hash(&migration, name, index_type))
         } else {
             None
         };
@@ -177,7 +177,7 @@ fn check_default_aggregator<'a>(
     for (name, index_type) in single_indexes {
         let maybe_hash = if index_type.is_merkelized() {
             expected_names.insert(name.to_owned());
-            Some(get_object_hash(snapshot, name, index_type))
+            Some(get_object_hash(&snapshot, name, index_type))
         } else {
             None
         };
@@ -218,7 +218,7 @@ fn check_intermediate_consistency(
         check_namespace_aggregator(snapshot, namespace, indexes)?;
     }
     for ((ns, addr), data) in new_indexes {
-        let migration = Migration::new(ns, snapshot);
+        let migration = Migration::new(*ns, snapshot);
         data.check(migration, addr.to_owned())?;
     }
     Ok(())
@@ -250,7 +250,7 @@ fn check_final_consistency(
             // The index should be fully removed; thus, creating a `ProofMapIndex` on its place
             // should succeed and it should have a default `object_hash`.
             prop_assert_eq!(
-                get_object_hash(snapshot, name, IndexType::ProofMap),
+                get_object_hash(&snapshot, name, IndexType::ProofMap),
                 HashTag::empty_map_hash()
             );
         }
@@ -283,7 +283,7 @@ fn apply_actions(
                     work_on_index(&fork, addr.clone(), index_type, value.clone())
                 } else {
                     let migration = Migration::new(namespace, &fork);
-                    work_on_index(migration, addr.clone(), index_type, value.clone())
+                    work_on_index(migration.clone(), addr.clone(), index_type, value.clone())
                 };
 
                 if !namespace.is_empty() {

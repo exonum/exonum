@@ -141,7 +141,7 @@ impl From<TemporaryDB> for Arc<dyn Database> {
 
 #[test]
 fn clearing_database() {
-    use crate::access::AccessExt;
+    use crate::access::CopyAccessExt;
 
     let db = TemporaryDB::new();
 
@@ -167,7 +167,7 @@ fn clearing_database() {
 
 #[test]
 fn check_if_snapshot_is_still_valid() {
-    use crate::access::AccessExt;
+    use crate::access::CopyAccessExt;
 
     let (snapshot, db_path) = {
         let db = TemporaryDB::new();

@@ -164,6 +164,15 @@ pub struct CallSite {
     pub call_type: CallType,
 }
 
+impl CallSite {
+    pub fn new(instance_id: InstanceId, call_type: CallType) -> Self {
+        Self {
+            instance_id,
+            call_type,
+        }
+    }
+}
+
 impl fmt::Display for CallSite {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

@@ -14,7 +14,9 @@
 
 use exonum_crypto::gen_keypair;
 use exonum_merkledb::{
-    access::AccessExt, migration::Migration, HashTag, ObjectHash, SystemSchema, TemporaryDB,
+    access::{AccessExt, CopyAccessExt},
+    migration::Migration,
+    HashTag, ObjectHash, SystemSchema, TemporaryDB,
 };
 use futures::IntoFuture;
 
@@ -319,7 +321,7 @@ fn migration_workflow() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
 
     // Since service is not stopped, the migration should fail.
     let fork = rig.blockchain.fork();
@@ -396,7 +398,7 @@ fn fast_forward_migration() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("none", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("none", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "service");
+    let service = rig.initialize_service(old_artifact, "service");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
@@ -431,7 +433,7 @@ fn migration_immediate_errors() {
     // Attempt to upgrade service to an unrelated artifact.
     let err = rig
         .dispatcher()
-        .initiate_migration(&fork, unrelated_artifact.clone(), &old_service.name)
+        .initiate_migration(&fork, unrelated_artifact, &old_service.name)
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
 
@@ -483,7 +485,7 @@ fn migration_is_resumed_after_node_restart() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     // Start migration.
@@ -513,7 +515,7 @@ fn migration_threads_are_timely_aborted() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
@@ -552,7 +554,7 @@ fn completed_migration_is_not_resumed_after_node_restart() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     // Start migration.
@@ -581,7 +583,7 @@ fn test_erroneous_migration(artifact_name: &str) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact(artifact_name, "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact(artifact_name, "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "service");
+    let service = rig.initialize_service(old_artifact, "service");
     rig.stop_service(&service);
 
     // Start migration.
@@ -628,7 +630,7 @@ fn concurrent_migrations_to_same_artifact() {
     rig.stop_service(&service);
     let other_service = rig.initialize_service(old_artifact.clone(), "other-service");
     rig.stop_service(&other_service);
-    let another_service = rig.initialize_service(old_artifact.clone(), "another-service");
+    let another_service = rig.initialize_service(old_artifact, "another-service");
     rig.stop_service(&another_service);
 
     // Place two migration starts in the same block.
@@ -650,7 +652,7 @@ fn concurrent_migrations_to_same_artifact() {
     thread::sleep(DELAY * 2 / 3);
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &another_service.name)
+        .initiate_migration(&fork, new_artifact, &another_service.name)
         .unwrap();
     rig.create_block(fork);
 
@@ -685,12 +687,12 @@ fn migration_influencing_state_hash() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "service");
+    let service = rig.initialize_service(old_artifact, "service");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     let state_hash = rig.create_block(fork).state_hash;
 
@@ -725,12 +727,12 @@ fn migration_rollback_workflow() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     rig.create_block(fork);
 
@@ -763,7 +765,7 @@ fn migration_rollback_invariants() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
 
     // Non-existing service.
     let fork = rig.blockchain.fork();
@@ -806,12 +808,12 @@ fn migration_rollback_aborts_migration_script() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     rig.create_block(fork);
 
@@ -840,12 +842,12 @@ fn migration_rollback_erases_migration_data() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     rig.create_block(fork);
 
@@ -872,7 +874,7 @@ fn migration_commit_workflow() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
@@ -909,7 +911,7 @@ fn migration_commit_invariants() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "good");
+    let service = rig.initialize_service(old_artifact, "good");
 
     // Non-existing service.
     let fork = rig.blockchain.fork();
@@ -999,7 +1001,7 @@ fn test_migration_commit_with_differing_hash(local_result: LocalResult) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "service");
+    let service = rig.initialize_service(old_artifact, "service");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
@@ -1046,7 +1048,7 @@ fn migration_commit_without_completing_script_locally() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("with-state", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("with-state", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact.clone(), "test");
+    let service = rig.initialize_service(old_artifact, "test");
     rig.stop_service(&service);
 
     let fork = rig.blockchain.fork();
@@ -1134,7 +1136,7 @@ fn two_part_migration() {
     // Second part of migration.
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     rig.create_block(fork);
 

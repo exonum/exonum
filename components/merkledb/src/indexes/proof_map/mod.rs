@@ -253,7 +253,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -275,7 +275,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -297,7 +297,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -315,7 +315,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -336,7 +336,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -360,7 +360,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -384,7 +384,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -407,7 +407,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -434,7 +434,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -461,7 +461,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -626,7 +626,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -699,7 +699,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -764,7 +764,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofMapIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex};
     /// use exonum_crypto::Hash;
     ///
     /// let db = TemporaryDB::new();
@@ -840,7 +840,7 @@ where
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     access::AccessExt, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash,
+/// #     access::CopyAccessExt, TemporaryDB, Database, ProofMapIndex, HashTag, ObjectHash,
 /// # };
 /// # use exonum_crypto::Hash;
 /// let db = TemporaryDB::new();

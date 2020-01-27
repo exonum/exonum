@@ -27,7 +27,7 @@ pub fn work_on_index<T>(
     value: Option<Vec<u8>>,
 ) -> IndexType
 where
-    T: Access + Copy,
+    T: Access,
     T::Base: RawAccessMut,
 {
     if let Some(real_type) = fork.index_type(addr.clone()) {

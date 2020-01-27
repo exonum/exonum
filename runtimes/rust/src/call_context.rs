@@ -33,13 +33,13 @@ pub struct CallContext<'a> {
     /// Underlying execution context.
     inner: ExecutionContext<'a>,
     /// ID of the executing service.
-    instance: InstanceDescriptor<'a>,
+    instance: InstanceDescriptor,
 }
 
 impl<'a> CallContext<'a> {
     /// Creates a new transaction context for the specified execution context and the instance
     /// descriptor.
-    pub(crate) fn new(context: ExecutionContext<'a>, instance: InstanceDescriptor<'a>) -> Self {
+    pub(crate) fn new(context: ExecutionContext<'a>, instance: InstanceDescriptor) -> Self {
         Self {
             inner: context,
             instance,
@@ -47,12 +47,12 @@ impl<'a> CallContext<'a> {
     }
 
     /// Provides access to blockchain data.
-    pub fn data(&self) -> BlockchainData<'a, &Fork> {
-        BlockchainData::new(self.inner.fork, self.instance)
+    pub fn data(&self) -> BlockchainData<&Fork> {
+        BlockchainData::new(self.inner.fork, &self.instance.name)
     }
 
     /// Provides access to the data of the executing service.
-    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
+    pub fn service_data(&self) -> Prefixed<&Fork> {
         self.data().for_executing_service()
     }
 
@@ -62,8 +62,8 @@ impl<'a> CallContext<'a> {
     }
 
     /// Returns a descriptor of the executing service instance.
-    pub fn instance(&self) -> InstanceDescriptor<'_> {
-        self.instance
+    pub fn instance(&self) -> InstanceDescriptor {
+        self.instance.clone()
     }
 
     /// Returns `true` if currently processed block is a genesis block.
@@ -77,7 +77,7 @@ impl<'a> CallContext<'a> {
     pub fn with_fallthrough_auth(&mut self) -> FallthroughAuth<'_> {
         FallthroughAuth(CallContext {
             inner: self.inner.reborrow(),
-            instance: self.instance,
+            instance: self.instance.clone(),
         })
     }
 

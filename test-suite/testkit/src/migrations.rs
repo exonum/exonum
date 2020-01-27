@@ -62,7 +62,7 @@ where
     /// Sets up initial data.
     pub fn setup<F>(&mut self, setup: F) -> &mut Self
     where
-        F: FnOnce(Prefixed<'static, &Fork>),
+        F: FnOnce(Prefixed<&Fork>),
     {
         let fork = self.db.fork();
         let access = Prefixed::new(Self::SERVICE_NAME, &fork);
@@ -72,7 +72,7 @@ where
     }
 
     /// Gets the snapshot before the migration scripts are run.
-    pub fn start_snapshot(&self) -> Prefixed<'static, &dyn Snapshot> {
+    pub fn start_snapshot(&self) -> Prefixed<&dyn Snapshot> {
         let snapshot = self
             .start_snapshot
             .as_ref()
@@ -80,8 +80,10 @@ where
         Prefixed::new(Self::SERVICE_NAME, snapshot)
     }
 
-    /// Gets the snapshot at the end of the migration.
-    pub fn end_snapshot(&self) -> Prefixed<'static, &dyn Snapshot> {
+    /// Gets the snapshot at the end of the migration. If the latest migration script execution
+    /// was aborted, this method will provide access to old data since the migration is not
+    /// flushed in this case.
+    pub fn end_snapshot(&self) -> Prefixed<&dyn Snapshot> {
         let snapshot = self
             .end_snapshot
             .as_ref()

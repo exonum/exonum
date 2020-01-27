@@ -92,7 +92,7 @@ impl CommittedServices {
     fn get_instance<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceDescriptor<'_>, &InstanceStatus)> {
+    ) -> Option<(InstanceDescriptor, &InstanceStatus)> {
         let (id, info) = match id.into() {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
@@ -101,8 +101,7 @@ impl CommittedServices {
                 (id, self.instances.get(&id)?)
             }
         };
-        let name = info.name.as_str();
-        Some((InstanceDescriptor { id, name }, &info.status))
+        Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
 
     fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceId, u32)> + 'a {
@@ -327,7 +326,7 @@ impl Dispatcher {
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
     pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
         // Mark services as active.
-        self.activate_pending(&fork);
+        Self::activate_pending(&fork);
         // Start pending services.
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
@@ -563,10 +562,8 @@ impl Dispatcher {
                 let res = call_fn(self.runtimes[&runtime_id].as_ref(), context, instance_id);
                 if let Err(mut err) = res {
                     fork.rollback();
-                    err.set_runtime_id(runtime_id).set_call_site(|| CallSite {
-                        instance_id,
-                        call_type: call_type.clone(),
-                    });
+                    err.set_runtime_id(runtime_id)
+                        .set_call_site(|| CallSite::new(instance_id, call_type.clone()));
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
@@ -600,7 +597,7 @@ impl Dispatcher {
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, CallType::AfterTransactions);
-        self.activate_pending(fork);
+        Self::activate_pending(fork);
         errors
     }
 
@@ -770,7 +767,7 @@ impl Dispatcher {
     }
 
     /// Make pending artifacts and instances active.
-    pub(crate) fn activate_pending(&self, fork: &Fork) {
+    pub(crate) fn activate_pending(fork: &Fork) {
         Schema::new(fork).activate_pending()
     }
 
@@ -828,7 +825,7 @@ impl Dispatcher {
     pub(crate) fn get_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<InstanceDescriptor<'_>> {
+    ) -> Option<InstanceDescriptor> {
         let (descriptor, status) = self.service_infos.get_instance(id)?;
         if status.is_active() {
             Some(descriptor)

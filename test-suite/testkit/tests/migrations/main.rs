@@ -108,7 +108,7 @@ mod v01 {
         }
     }
 
-    pub(crate) fn generate_test_data(access: Prefixed<'_, &Fork>, users: &[TestUser]) {
+    pub(crate) fn generate_test_data(access: Prefixed<&Fork>, users: &[TestUser]) {
         let mut schema = Schema::new(access);
         for user in users {
             let (key, _) = user.keypair();
@@ -143,7 +143,7 @@ mod v02 {
         }
     }
 
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>, users: &[TestUser]) {
+    pub(crate) fn verify_schema(snapshot: Prefixed<&dyn Snapshot>, users: &[TestUser]) {
         let schema = Schema::new(snapshot);
         for user in users {
             let (key, _) = user.keypair();
@@ -201,7 +201,7 @@ mod v05 {
         }
     }
 
-    pub(crate) fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>, users: &[TestUser]) {
+    pub(crate) fn verify_schema(snapshot: Prefixed<&dyn Snapshot>, users: &[TestUser]) {
         let schema = Schema::new(snapshot.clone());
         for user in users {
             let (key, _) = user.keypair();

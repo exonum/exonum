@@ -110,33 +110,33 @@ impl<T: Access> Schema<T> {
 
     /// Returns an artifacts registry indexed by the artifact name.
     pub(crate) fn artifacts(&self) -> ProofMapIndex<T::Base, ArtifactId, ArtifactState> {
-        self.access.clone().get_proof_map(ARTIFACTS)
+        self.access.get_proof_map(ARTIFACTS)
     }
 
     /// Returns a service instances registry indexed by the instance name.
     pub(crate) fn instances(&self) -> ProofMapIndex<T::Base, str, InstanceState> {
-        self.access.clone().get_proof_map(INSTANCES)
+        self.access.get_proof_map(INSTANCES)
     }
 
     /// Returns a lookup table to map instance ID with the instance name.
     fn instance_ids(&self) -> MapIndex<T::Base, InstanceId, String> {
-        self.access.clone().get_map(INSTANCE_IDS)
+        self.access.get_map(INSTANCE_IDS)
     }
 
     /// Returns a pending artifacts queue used to notify the runtime about artifacts
     /// to be deployed.
     fn pending_artifacts(&self) -> KeySetIndex<T::Base, ArtifactId> {
-        self.access.clone().get_key_set(PENDING_ARTIFACTS)
+        self.access.get_key_set(PENDING_ARTIFACTS)
     }
 
     /// Returns a pending instances queue used to notify the runtime about service instances
     /// to be updated.
     fn modified_instances(&self) -> MapIndex<T::Base, str, ModifiedInstanceInfo> {
-        self.access.clone().get_map(PENDING_INSTANCES)
+        self.access.get_map(PENDING_INSTANCES)
     }
 
-    fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
-        self.access.clone().get_map(LOCAL_MIGRATION_RESULTS)
+    pub(crate) fn local_migration_results(&self) -> MapIndex<T::Base, str, MigrationStatus> {
+        self.access.get_map(LOCAL_MIGRATION_RESULTS)
     }
 
     /// Returns the information about a service instance by its identifier.
