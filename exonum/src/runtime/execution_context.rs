@@ -273,7 +273,7 @@ impl<'a> ExecutionContext<'a> {
 /// Errors that occur after making nested calls should be bubbled up to the upper level.
 ///
 /// If an error has occurred in a nested call, but the returned result of the topmost
-/// call is `Ok(())`, the latter will be coerced to an error `(CoreError::InvalidCall)`
+/// call is `Ok(())`, the latter will be coerced to an error `CoreError::InvalidCall`
 /// and recorded as such in the blockchain. Accessing storage after an error in a
 /// nested call will result in a panic.
 ///
