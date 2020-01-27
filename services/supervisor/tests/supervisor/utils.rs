@@ -153,7 +153,7 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
-        .create()
+        .build()
 }
 
 pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
@@ -163,7 +163,7 @@ pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
         .with_default_rust_service(ConfigChangeService)
-        .create()
+        .build()
 }
 
 pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
@@ -182,7 +182,7 @@ pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
         )
         .with_instance(artifact.into_default_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME))
         .with_rust_service(service)
-        .create()
+        .build()
 }
 
 pub fn check_service_actual_param(testkit: &TestKit, param: Option<String>) {

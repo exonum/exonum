@@ -1,4 +1,4 @@
-# exonum-time
+# Exonum Time Oracle
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![Docs.rs](https://docs.rs/exonum-time/badge.svg)](https://docs.rs/exonum-time)

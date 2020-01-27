@@ -50,7 +50,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
-//!     .create();
+//!     .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
@@ -89,7 +89,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with_default_rust_service(ExplorerFactory)
-//! #    .create();
+//! #    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
@@ -154,7 +154,7 @@
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
-//!    .create();
+//!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
 //! testkit.create_block_with_transaction(tx.clone());
 //!
@@ -221,7 +221,7 @@
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
 //!    .with_default_rust_service(ExplorerFactory)
-//!    .create();
+//!    .build();
 //! let tx = gen_keypair().cause_error(MyService::INSTANCE_ID, 0);
 //! testkit.create_block_with_transaction(tx.clone());
 //!
@@ -280,7 +280,7 @@
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
 //!    .with_default_rust_service(ExplorerFactory)
-//!    .create();
+//!    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
@@ -361,7 +361,7 @@
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
-//!    .create();
+//!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
 //! let tx_body = hex::encode(tx.to_bytes());
 //!

@@ -307,7 +307,7 @@ where
                 }
                 proof
             }
-            Some((root_path, Node::Leaf(root_hash))) => {
+            Some((root_path, Node::Leaf(merkle_root))) => {
                 let mut proof = MapProof::new();
                 // (One of) keys corresponding to the existing table entry.
                 let mut found_key: Option<K::Owned> = None;
@@ -325,7 +325,7 @@ where
                     let value = self.value(key.borrow());
                     proof.add_entry(key, value)
                 } else {
-                    proof.add_proof_entry(root_path, root_hash)
+                    proof.add_proof_entry(root_path, merkle_root)
                 }
             }
 

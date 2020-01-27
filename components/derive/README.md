@@ -9,8 +9,8 @@ This crate provides several procedural macros for Exonum core and Exonum service
 Overview of presented macros:
 
 - `BinaryValue`: derive macro for `BinaryValue` trait of MerkleDB.
-  Depending on codec, implementation may use `ProtobufConvert` (default)
-  trait as base, or `serde` traits using `bincode`.
+  Depending on codec, the implementation may use `ProtobufConvert`
+  trait as base (default), or `serde` traits using `bincode`.
 - `ObjectHash`: derive macro for `ObjectHash` trait of MerkleDB.
   It can be used for any type that implements `BinaryValue` trait.
 - `FromAccess`: derive macro for `FromAccess` trait for schemas of

@@ -219,7 +219,7 @@ fn testkit_with_inc_service() -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
-        .create()
+        .build()
 }
 
 fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
@@ -230,7 +230,7 @@ fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
         .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
         .with_validators(n)
-        .create()
+        .build()
 }
 
 fn testkit_with_inc_service_and_two_validators() -> TestKit {
@@ -245,7 +245,7 @@ fn testkit_with_inc_service_auditor_validator() -> TestKit {
         .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
         .with_validators(1)
-        .create()
+        .build()
 }
 
 fn testkit_with_inc_service_and_static_instance() -> TestKit {
@@ -255,7 +255,7 @@ fn testkit_with_inc_service_and_static_instance() -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
         .with_default_rust_service(IncService)
-        .create()
+        .build()
 }
 
 fn available_services() -> RustRuntimeBuilder {
@@ -525,7 +525,7 @@ fn test_restart_node_and_start_service_instance() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
         .with_rust_service(IncService)
-        .create();
+        .build();
     deploy_default(&mut testkit);
 
     // Stop the node.
@@ -955,7 +955,7 @@ fn test_id_assignment_sparse() {
         .with_artifact(inc_service_artifact.clone())
         .with_instance(inc_service_artifact.into_default_instance(max_builtin_id, "inc"))
         .with_rust_service(inc_service)
-        .create();
+        .build();
 
     let artifact = default_artifact();
     let deadline = testkit.height().next();

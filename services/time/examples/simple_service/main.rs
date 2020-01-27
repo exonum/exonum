@@ -136,7 +136,7 @@ fn main() {
         .with_artifact(marker_service_artifact.clone())
         .with_instance(marker_service_artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
         .with_rust_service(marker_service)
-        .create();
+        .build();
 
     mock_provider.set_time(Utc.timestamp(10, 0));
     testkit.create_blocks_until(Height(2));
