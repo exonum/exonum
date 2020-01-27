@@ -31,7 +31,8 @@ use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    AsyncEventState, DeployInfoQuery, DeployRequest, DeployResult, Supervisor, SupervisorInterface,
+    api::DeployInfoQuery, AsyncEventState, DeployRequest, DeployResult, Supervisor,
+    SupervisorInterface,
 };
 
 use self::failing_runtime::{FailingRuntime, FailingRuntimeError};
@@ -201,7 +202,7 @@ fn testkit_with_failing_runtime(validator_count: u16) -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .with_additional_runtime(FailingRuntime::default())
-        .create()
+        .build()
 }
 
 /// Creates a `DeployResult` transaction for `ValidatorId(1)`.

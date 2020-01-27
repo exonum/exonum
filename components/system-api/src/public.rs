@@ -44,7 +44,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let stats: StatsInfo = api.public(ApiKind::System).get("v1/stats")?;
 //! # Ok(())
@@ -72,7 +72,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck")?;
 //! # Ok(())
@@ -100,7 +100,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let user_agent: String = api.public(ApiKind::System).get("v1/user_agent")?;
 //!
@@ -133,7 +133,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let user_agent: DispatcherInfo = api.public(ApiKind::System).get("v1/services")?;
 //! # Ok(())

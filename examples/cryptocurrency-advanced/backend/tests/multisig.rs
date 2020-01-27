@@ -196,7 +196,7 @@ fn create_testkit_with_multisig(keys: Vec<PublicKey>, threshold: usize) -> TestK
         .with_instance(artifact.into_default_instance(SERVICE_ID, "token"))
         .with_artifact(ms_artifact)
         .with_instance(ms_instance)
-        .create()
+        .build()
 }
 
 #[test]

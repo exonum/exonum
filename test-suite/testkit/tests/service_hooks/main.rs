@@ -29,7 +29,7 @@ fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(service.clone())
-        .create();
+        .build();
 
     // Check that `after_commit` invoked on the correct height.
     for i in 1..5 {
@@ -62,7 +62,7 @@ fn test_after_commit_with_auditor() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
         .with_default_rust_service(service.clone())
-        .create();
+        .build();
 
     for i in 1..5 {
         let block = testkit.create_block();
@@ -88,7 +88,7 @@ fn restart_testkit() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_default_rust_service(AfterCommitService::new())
-        .create();
+        .build();
     testkit.create_blocks_until(Height(5));
 
     let stopped = testkit.stop();
@@ -129,7 +129,7 @@ fn restart_testkit() {
 fn tx_pool_is_retained_on_restart() {
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(AfterCommitService::new())
-        .create();
+        .build();
 
     let tx_hashes: Vec<_> = (100..105)
         .map(|i| {

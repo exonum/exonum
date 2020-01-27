@@ -130,7 +130,7 @@ fn change_consensus_config_with_one_confirmation() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let cfg_change_height = Height(5);
     let new_consensus_config = {
@@ -180,7 +180,7 @@ fn service_config_change() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .with_default_rust_service(ConfigChangeService)
-        .create();
+        .build();
 
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
@@ -213,7 +213,7 @@ fn incorrect_actual_from_field() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .with_default_rust_service(ConfigChangeService)
-        .create();
+        .build();
 
     let cfg_change_height = Height(5);
     let params = "I am a new parameter".to_owned();
@@ -241,7 +241,7 @@ fn discard_config_propose_from_auditor() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let cfg_change_height = Height(5);
     let old_consensus_config = testkit.consensus_config();
@@ -283,7 +283,7 @@ fn test_send_proposal_with_api() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let old_validators = testkit.network().validators();
 
@@ -333,7 +333,7 @@ fn deploy_service() {
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .with_rust_service(DeployableService)
-        .create();
+        .build();
 
     let deadline_height = Height(5);
 
@@ -376,7 +376,7 @@ fn actual_from_is_zero() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     // Change height set to 0
     let cfg_change_height = Height(0);

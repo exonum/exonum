@@ -114,6 +114,10 @@
 //! 0.3, but decided to go with version 0.2), you will have to deploy a corresponding artifact after
 //! you migrate to version 0.2, before you'll be able to start your service.
 //!
+//! # HTTP API
+//!
+//! REST API of the service is documented in the [`api` module](api/index.html).
+//!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 //! [`DeployRequest`]: struct.DeployRequest.html
@@ -128,7 +132,6 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, MigrationInfoQuery},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
     errors::{ArtifactError, CommonError, ConfigurationError, MigrationError, ServiceError},
     event_state::AsyncEventState,
@@ -157,9 +160,9 @@ use exonum_rust_runtime::{
 
 use crate::{configure::ConfigureMut, mode::Mode};
 
+pub mod api;
 pub mod mode;
 
-mod api;
 mod configure;
 mod errors;
 mod event_state;

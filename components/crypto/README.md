@@ -12,10 +12,10 @@ Capabilities of `exonum-crypto` include:
 - Generating key pairs for work with digital signatures;
 - Creating and verifying of digital signatures.
 
-The main backend for `exonum-crypto` is `sodiumoxide`, and used algorithms are:
+The main backend for `exonum-crypto` is `sodiumoxide`, and the used algorithms are:
 
-- `SHA256` for hashing.
-- `Ed25519` for digital signatures.
+- SHA-256 for hashing.
+- Ed25519 for digital signatures.
 
 Consult [the crate docs](https://docs.rs/exonum-crypto) for more details.
 
@@ -24,23 +24,19 @@ Consult [the crate docs](https://docs.rs/exonum-crypto) for more details.
 Signing data and verifying the signature:
 
 ```rust
-fn main() {
-    exonum_crypto::init();
-    let (public_key, secret_key) = exonum_crypto::gen_keypair();
-    let data = [1, 2, 3];
-    let signature = exonum_crypto::sign(&data, &secret_key);
-    assert!(exonum_crypto::verify(&signature, &data, &public_key));
-}
+exonum_crypto::init();
+let (public_key, secret_key) = exonum_crypto::gen_keypair();
+let data = [1, 2, 3];
+let signature = exonum_crypto::sign(&data, &secret_key);
+assert!(exonum_crypto::verify(&signature, &data, &public_key));
 ```
 
 Hashing fixed amount of data:
 
 ```rust
-fn main() {
-    exonum_crypto::init();
-    let data = [1, 2, 3];
-    let hash = exonum_crypto::hash(&data);
-}
+exonum_crypto::init();
+let data = [1, 2, 3];
+let hash = exonum_crypto::hash(&data);
 ```
 
 Hashing data by chunks:
@@ -48,16 +44,13 @@ Hashing data by chunks:
 ```rust
 use exonum_crypto::HashStream;
 
-fn main() {
-    exonum_crypto::init();
-
-    let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
-    let mut hash_stream = HashStream::new();
-    for chunk in data {
-        hash_stream = hash_stream.update(&chunk);
-    }
-    let _ = hash_stream.hash();
+exonum_crypto::init();
+let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
+let mut hash_stream = HashStream::new();
+for chunk in data {
+    hash_stream = hash_stream.update(&chunk);
 }
+let _ = hash_stream.hash();
 ```
 
 ## Usage

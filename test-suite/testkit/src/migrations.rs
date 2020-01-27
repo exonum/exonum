@@ -19,6 +19,11 @@
 //!
 //! The core type in this module is [`MigrationTest`]; see its docs for examples of usage.
 //!
+//! # Stability
+//!
+//! Since the corresponding functionality in the core is unstable, the entirety of this module
+//! is considered unstable as well.
+//!
 //! [`MigrationTest`]: struct.MigrationTest.html
 
 use exonum::{

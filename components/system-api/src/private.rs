@@ -46,7 +46,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let info: PeersInfo = api.private(ApiKind::System).get("v1/peers")?;
 //! # Ok(())
@@ -82,7 +82,7 @@
 //!
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! api.private(ApiKind::System)
 //!     .query(&connect_info)
@@ -111,7 +111,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let info: NodeInfo = api.private(ApiKind::System).get("v1/network")?;
 //! # Ok(())
@@ -144,7 +144,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let consensus_enabled: bool = api.private(ApiKind::System).get("v1/consensus_enabled")?;
 //! # Ok(())
@@ -171,7 +171,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let enabled = true;
 //! let query = ConsensusEnabledQuery { enabled };
@@ -200,7 +200,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! api.private(ApiKind::System).post::<()>("v1/shutdown")?;
 //! # Ok(())
