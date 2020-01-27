@@ -163,10 +163,6 @@ impl Default for IndexType {
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V = Vec<u8>> {
-    // A globally unique numeric index identifier. MerkleDB assigns a unique numeric ID for each
-    // fully-qualified index name. Valid identifiers are non-zero.
-    //
-    // MerkleDB never re-uses the identifiers.
     identifier: u64,
     index_type: IndexType,
     // `state` may be empty for any possible type. `None` option usually represents
@@ -240,6 +236,16 @@ impl<V> IndexMetadata<V> {
     /// Returns the index type.
     pub fn index_type(&self) -> IndexType {
         self.index_type
+    }
+
+    /// Returns a globally unique numeric index identifier.
+    /// MerkleDB assigns a unique numeric ID for each fully-qualified index name.
+    ///
+    /// Valid identifiers are non-zero.
+    ///
+    /// MerkleDB never re-uses the identifiers.
+    pub fn identifier(&self) -> u64 {
+        self.identifier
     }
 }
 
