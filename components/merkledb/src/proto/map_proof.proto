@@ -23,25 +23,40 @@ option java_package = "com.exonum.core.messages";
 // Subset of map elements coupled with a proof. MapProof can assert existence/absence of certain keys
 // from the underlying map.
 message MapProof {
-    // Array with 2 kinds of objects: `{ key, no_value }` for keys missing from
-    // the underlying index, and `{ key, value }` for key-value pairs, existence of
-    // which is asserted by the proof.
-    repeated OptionalEntry entries = 1;
-    // Array of { path: ProofPath, hash: Hash } objects.
-    repeated MapProofEntry proof = 2;
+  // Array with 2 kinds of objects: `{ key, no_value }` for keys missing from
+  // the underlying index, and `{ key, value }` for key-value pairs, existence of
+  // which is asserted by the proof.
+  repeated OptionalEntry entries = 1;
+  // Array of { path: ProofPath, hash: Hash } objects.
+  repeated MapProofEntry proof = 2;
 }
 
-// Key with corresponding value and empty value if key is missing.
+// Key with corresponding value or an empty value if the key is missing
+// from the underlying map.
 message OptionalEntry {
-    bytes key = 1;
-    oneof maybe_value {
-        bytes value = 2;
-        google.protobuf.Empty no_value = 3;
-    }
+  // Key serialized as per `BinaryKey` implementation (usually as
+  // a Protobuf message, except for primitive types).
+  bytes key = 1;
+  oneof maybe_value {
+    // Value serialized per `BinaryValue` implementation (usually as
+    // a Protobuf message, except for primitive types).
+    bytes value = 2;
+    // Indicator that `key` is missing from the underlying map.
+    google.protobuf.Empty no_value = 3;
+  }
 }
 
-// Proof path and corresponding hash value.
+// Path to an intermediate Merkle Patricia tree node and a corresponding
+// hash value.
 message MapProofEntry {
-    bytes proof_path = 1;
-    exonum.crypto.Hash hash = 2;
+  // Path to the node, expressed with the minimum necessary number of bytes.
+  // Bits within each byte are indexed from the least significant to
+  // the most significant.
+  // The last byte may be padded with zeros if necessary.
+  bytes path = 1;
+  // Hash associated with the node.
+  exonum.crypto.Hash hash = 2;
+  // Number of zero bit padding at the end of the path. Must be in the `0..8`
+  // interval.
+  uint32 path_padding = 3;
 }

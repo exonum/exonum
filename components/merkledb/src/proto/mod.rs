@@ -19,16 +19,40 @@
 
 pub use self::{list_proof::*, map_proof::*};
 
-use exonum_crypto::proto::*;
+use exonum_crypto::{proto::*, HASH_SIZE};
 use exonum_proto::ProtobufConvert;
 use failure::{ensure, Error};
 use protobuf::{well_known_types::Empty, RepeatedField};
 
 use std::borrow::Cow;
 
-use crate::{proof_map::ProofPath, BinaryKey, BinaryValue};
+use crate::{
+    proof_map::{BitsRange, ProofPath},
+    BinaryKey, BinaryValue,
+};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
+
+fn parse_map_proof_entry(
+    mut entry: MapProofEntry,
+) -> Result<(ProofPath, exonum_crypto::Hash), Error> {
+    let padding = entry.get_path_padding();
+    ensure!(padding < 8, "`padding` is not in 0..8 interval");
+    let mut path_buffer = entry.take_path();
+    ensure!(!path_buffer.is_empty(), "Empty `path`");
+    ensure!(path_buffer.len() <= HASH_SIZE, "`path` is too long");
+
+    // Since we've checked both `path_buffer.len()` and `padding` sanity, the coercions
+    // and the subtraction below will not lead to unexpected results.
+    let path_bit_length = path_buffer.len() as u16 * 8 - padding as u16;
+    path_buffer.resize(HASH_SIZE, 0);
+    let mut path = ProofPath::from_bytes(path_buffer);
+    if path_bit_length < HASH_SIZE as u16 * 8 {
+        path = path.prefix(path_bit_length);
+    }
+    let hash = exonum_crypto::Hash::from_pb(entry.take_hash())?;
+    Ok((path, hash))
+}
 
 impl<K, V, S> ProtobufConvert for crate::MapProof<K, V, S>
 where
@@ -43,10 +67,17 @@ where
         let proof: Vec<MapProofEntry> = self
             .proof_unchecked()
             .iter()
-            .map(|(p, h)| {
+            .map(|(path, hash)| {
                 let mut entry = MapProofEntry::new();
-                entry.set_hash(h.to_pb());
-                entry.set_proof_path(p.as_bytes().to_vec());
+                let padding = match u32::from(path.len()) % 8 {
+                    0 => 0,
+                    value => 8 - value,
+                };
+                debug_assert!(padding < 8);
+
+                entry.set_hash(hash.to_pb());
+                entry.set_path_padding(padding);
+                entry.set_path(path.path_bits());
                 entry
             })
             .collect();
@@ -74,16 +105,11 @@ where
         map_proof
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
         let proof = pb
-            .get_proof()
-            .iter()
-            .map(|entry| {
-                Ok((
-                    ProofPath::read(entry.get_proof_path()),
-                    exonum_crypto::Hash::from_pb(entry.get_hash().clone())?,
-                ))
-            })
+            .take_proof()
+            .into_iter()
+            .map(parse_map_proof_entry)
             .collect::<Result<Vec<_>, Error>>()?;
 
         let entries = pb
@@ -121,7 +147,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use exonum_crypto::{proto::types, PublicKey};
+    use exonum_crypto::{hash, proto::types, PublicKey};
     use exonum_proto::ProtobufConvert;
     use protobuf::RepeatedField;
 
@@ -179,7 +205,7 @@ mod tests {
 
         hash.set_data(vec![0_u8; 31]);
         proof_entry.set_hash(hash);
-        proof_entry.set_proof_path(vec![0_u8; 34]);
+        proof_entry.set_path(vec![0_u8; 32]);
         proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
 
         let res = MapProof::<u8, u8>::from_pb(proof.clone());
@@ -195,15 +221,45 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn map_proof_malformed_key_serialize() {
+    fn map_proof_malformed_proof_entry() {
         let mut proof = proto::MapProof::new();
         let mut proof_entry = proto::MapProofEntry::new();
-        proof_entry.set_proof_path(vec![0_u8; 33]);
+        proof_entry.set_hash(hash(b"foo").to_pb());
         proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
+        assert!(err.to_string().contains("Empty `path`"));
+
+        let mut proof = proto::MapProof::new();
+        let mut proof_entry = proto::MapProofEntry::new();
+        proof_entry.set_hash(hash(b"foo").to_pb());
+        proof_entry.set_path(vec![1; 33]);
+        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
+        assert!(err.to_string().contains("`path` is too long"));
+
+        let mut proof = proto::MapProof::new();
+        let mut proof_entry = proto::MapProofEntry::new();
+        proof_entry.set_hash(hash(b"foo").to_pb());
+        proof_entry.set_path(vec![11; 32]);
+        proof_entry.set_path_padding(8);
+        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("`padding` is not in 0..8 interval"));
+    }
+
+    #[test]
+    #[should_panic]
+    fn map_proof_malformed_key_deserialize() {
+        let mut proof = proto::MapProof::new();
+        let mut entry = proto::OptionalEntry::new();
+        entry.set_key(vec![1]); // invalid `u16` serialization.
+        entry.set_value(vec![2]);
+        proof.set_entries(RepeatedField::from_vec(vec![entry]));
 
         // TODO: will panic at runtime, should change BinaryKey::read signature (ECR-174)
-        let _res = MapProof::<u8, u8>::from_pb(proof);
+        let _res = MapProof::<u16, u8>::from_pb(proof);
     }
 
     #[test]

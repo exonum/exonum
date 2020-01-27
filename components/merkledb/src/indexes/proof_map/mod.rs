@@ -14,7 +14,7 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
-pub(crate) use self::key::ProofPath;
+pub(crate) use self::key::{BitsRange, ProofPath};
 pub use self::{
     key::{Hashed, Raw, RawKey, ToProofPath, KEY_SIZE as PROOF_MAP_KEY_SIZE, PROOF_PATH_SIZE},
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
@@ -25,7 +25,7 @@ use std::{fmt, io, marker::PhantomData};
 use exonum_crypto::Hash;
 
 use self::{
-    key::{BitsRange, ChildKind, VALUE_KEY_PREFIX},
+    key::{ChildKind, VALUE_KEY_PREFIX},
     node::{BranchNode, Node},
     proof_builder::{BuildProof, MerklePatriciaTree},
 };
