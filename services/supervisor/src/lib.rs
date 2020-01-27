@@ -56,6 +56,7 @@
 //! The operation of starting or resuming a service is treated similarly to a configuration change
 //! and follows the same rules.
 //!
+//!
 //! ## Migrations Management
 //!
 //! Supervisor service provides a functionality to perform data migrations for services.
@@ -114,6 +115,10 @@
 //! 0.3, but decided to go with version 0.2), you will have to deploy a corresponding artifact after
 //! you migrate to version 0.2, before you'll be able to start your service.
 //!
+//! # HTTP API
+//!
+//! REST API of the service is documented in the [`api` module](api/index.html).
+//!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 //! [`DeployRequest`]: struct.DeployRequest.html
@@ -157,9 +162,9 @@ use exonum_rust_runtime::{
 
 use crate::{configure::ConfigureMut, mode::Mode};
 
+pub mod api;
 pub mod mode;
 
-mod api;
 mod configure;
 mod errors;
 mod event_state;
