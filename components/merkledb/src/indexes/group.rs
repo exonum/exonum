@@ -193,8 +193,7 @@ mod tests {
         // group.get(&3).push("quux".to_owned());
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn prepare_key_iter<A>(fork: A)
+    fn prepare_key_iter<A>(fork: &A)
     where
         A: Access,
         A::Base: RawAccessMut,
@@ -244,7 +243,7 @@ mod tests {
     fn iterating_over_keys() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(&fork);
+        prepare_key_iter(&&fork);
         test_key_iter(fork.readonly());
         let patch = fork.into_patch();
         test_key_iter(&patch);
@@ -254,7 +253,7 @@ mod tests {
     fn iterating_over_keys_in_prefixed_access() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(Prefixed::new("namespace", &fork));
+        prepare_key_iter(&Prefixed::new("namespace", &fork));
         test_key_iter(Prefixed::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
         test_key_iter(Prefixed::new("namespace", &patch));
@@ -266,7 +265,7 @@ mod tests {
     fn iterating_over_keys_in_migration() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(Migration::new("namespace", &fork));
+        prepare_key_iter(&Migration::new("namespace", &fork));
         test_key_iter(Migration::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
         test_key_iter(Migration::new("namespace", &patch));
@@ -278,7 +277,7 @@ mod tests {
     fn iterating_over_keys_in_scratchpad() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(Scratchpad::new("namespace", &fork));
+        prepare_key_iter(&Scratchpad::new("namespace", &fork));
         test_key_iter(Scratchpad::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
         test_key_iter(Scratchpad::new("namespace", &patch));

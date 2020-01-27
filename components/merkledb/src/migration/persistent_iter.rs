@@ -269,7 +269,7 @@ where
 /// independently:
 ///
 /// ```
-/// # use exonum_merkledb::{access::{CopyAccessExt, AccessExt}, Database, TemporaryDB};
+/// # use exonum_merkledb::{access::{AccessExt, CopyAccessExt}, Database, TemporaryDB};
 /// # use exonum_merkledb::migration::{MigrationHelper, PersistentIter};
 /// let db = TemporaryDB::new();
 /// // Create data for migration.

@@ -29,11 +29,12 @@ use crate::{
 ///
 /// This trait is essentially a thin wrapper around [`FromAccess`]. Where `FromAccess` returns
 /// an access error, the methods of this trait will `unwrap()` the error and panic.
-/// This trait is helpful for references implementing Access, such as `&Fork` or `&dyn Snapshot`
-/// because Rust method resolution does not apply `AccessExt` to variables of corresponding types.
+/// This trait is helpful for references implementing [`Access`], such as `&Fork` or `&dyn Snapshot`
+/// because Rust method resolution does not apply [`AccessExt`] to variables of corresponding types.
 /// For example, if fork has type Fork, then `fork.get_list("foo")` is not resolved
 /// as `AccessExt::get_list(..)`, only `(&fork).get_list("foo")` is.
 /// [`Access`]: trait.Access.html
+/// [`AccessExt`]: trait.AccessExt.html
 /// [`FromAccess`]: trait.FromAccess.html
 ///
 /// # Examples
@@ -277,13 +278,14 @@ impl<T: Access + Copy> CopyAccessExt for T {}
 ///
 /// # Implementation details
 ///
-/// This trait is essentially a thin wrapper around [`FromAccess`]. Where `FromAccess` returns
+/// This trait is essentially a thin wrapper around [`FromAccess`]. Where [`FromAccess`] returns
 /// an access error, the methods of this trait will `unwrap()` the error and panic.
-/// For a version on `AccessExt` traits designed for `Copy` types (e.g. `&Fork` and
+/// For a version on [`AccessExt`] traits designed for `Copy` types (e.g. `&Fork` and
 /// `&dyn Snapshot`) see [`CopyAccessExt`] trait.
 ///
 /// [`Access`]: trait.Access.html
 /// [`FromAccess`]: trait.FromAccess.html
+/// [`AccessExt`]: trait.AccessExt.html
 /// [`CopyAccessExt`]: trait.CopyAccessExt.html
 pub trait AccessExt: Access {
     /// Returns a group of indexes. All indexes in the group have the same type.

@@ -56,7 +56,7 @@
 //! # Examples
 //!
 //! ```
-//! # use exonum_merkledb::{access::{CopyAccessExt, AccessExt}, Database, SystemSchema, TemporaryDB};
+//! # use exonum_merkledb::{access::{AccessExt, CopyAccessExt}, Database, SystemSchema, TemporaryDB};
 //! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
 //! # fn main() -> Result<(), failure::Error> {

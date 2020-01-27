@@ -162,7 +162,7 @@ impl<T: RawAccess> Access for T {
 /// # Examples
 ///
 /// ```
-/// use exonum_merkledb::{access::{CopyAccessExt, AccessExt, Prefixed}, Database, TemporaryDB};
+/// use exonum_merkledb::{access::{AccessExt, CopyAccessExt, Prefixed}, Database, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();

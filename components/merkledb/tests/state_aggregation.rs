@@ -111,10 +111,9 @@ fn check_patch(patch: &Patch) -> TestCaseResult {
 
     let mut absent_lists: HashSet<_> =
         HashSet::from_iter(LIST_NAMES.iter().map(|&s| s.to_string()));
-    let mut absent_maps: HashSet<_> =
-        HashSet::from_iter(MAP_NAMES.iter().map(|&s| s.to_string()));
+    let mut absent_maps: HashSet<_> = HashSet::from_iter(MAP_NAMES.iter().map(|&s| s.to_string()));
     let mut absent_entries: HashSet<_> =
-        HashSet::from_iter(ENTRY_NAMES.iter().map(|&s| (s.to_string()));
+        HashSet::from_iter(ENTRY_NAMES.iter().map(|&s| s.to_string()));
 
     for (index_name, index_hash) in aggregator.iter() {
         let is_list = LIST_NAMES.contains(&index_name.as_str());

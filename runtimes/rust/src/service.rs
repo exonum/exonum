@@ -311,7 +311,7 @@ impl<'a> Broadcaster<'a> {
     /// transactions asynchronously.
     pub fn into_owned(self) -> Broadcaster<'static> {
         Broadcaster {
-            instance: self.instance.clone(),
+            instance: self.instance,
             service_keypair: Cow::Owned(self.service_keypair.into_owned()),
             tx_sender: Cow::Owned(self.tx_sender.into_owned()),
         }
