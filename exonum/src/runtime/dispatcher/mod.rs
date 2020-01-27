@@ -92,7 +92,7 @@ impl CommittedServices {
     fn get_instance<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceDescriptor<'_>, &InstanceStatus)> {
+    ) -> Option<(InstanceDescriptor, &InstanceStatus)> {
         let (id, info) = match id.into() {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
@@ -103,11 +103,10 @@ impl CommittedServices {
 
             InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
-        let name = info.name.as_str();
-        Some((InstanceDescriptor::new(id, name), &info.status))
+        Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
 
-    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceDescriptor<'a>, u32)> + 'a {
+    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceDescriptor, u32)> + 'a {
         self.instances.iter().filter_map(|(&id, info)| {
             if info.status.is_active() {
                 let descriptor = InstanceDescriptor::new(id, &info.name);
@@ -327,7 +326,7 @@ impl Dispatcher {
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
     pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
         // Mark services as active.
-        self.activate_pending(&fork);
+        Self::activate_pending(&fork);
         // Start pending services.
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
@@ -555,7 +554,7 @@ impl Dispatcher {
         self.service_infos
             .active_instances()
             .filter_map(|(instance, runtime_id)| {
-                let context = ExecutionContext::for_block_call(self, fork, instance);
+                let context = ExecutionContext::for_block_call(self, fork, instance.clone());
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
                     CallType::AfterTransactions => Runtime::after_transactions,
@@ -565,14 +564,15 @@ impl Dispatcher {
                 let res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
                 if let Err(mut err) = res {
                     fork.rollback();
+                    let instance_id = instance.id;
                     err.set_runtime_id(runtime_id)
-                        .set_call_site(|| CallSite::new(instance.id, call_type.clone()));
+                        .set_call_site(|| CallSite::new(instance_id, call_type.clone()));
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
-                            CallInBlock::before_transactions(instance.id)
+                            CallInBlock::before_transactions(instance_id)
                         }
-                        CallType::AfterTransactions => CallInBlock::after_transactions(instance.id),
+                        CallType::AfterTransactions => CallInBlock::after_transactions(instance_id),
                         _ => unreachable!(),
                     };
                     Self::report_error(&err, fork, call);
@@ -600,7 +600,7 @@ impl Dispatcher {
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, &CallType::AfterTransactions);
-        self.activate_pending(fork);
+        Self::activate_pending(fork);
         errors
     }
 
@@ -771,7 +771,7 @@ impl Dispatcher {
     }
 
     /// Make pending artifacts and instances active.
-    pub(crate) fn activate_pending(&self, fork: &Fork) {
+    pub(crate) fn activate_pending(fork: &Fork) {
         Schema::new(fork).activate_pending()
     }
 
@@ -829,7 +829,7 @@ impl Dispatcher {
     pub(crate) fn get_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<InstanceDescriptor<'_>> {
+    ) -> Option<InstanceDescriptor> {
         let (descriptor, status) = self.service_infos.get_instance(id)?;
         if status.is_active() {
             Some(descriptor)

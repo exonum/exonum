@@ -19,7 +19,7 @@ use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
-use exonum_merkledb::{access::AccessExt, Database, MapIndex, ObjectHash, TemporaryDB};
+use exonum_merkledb::{access::CopyAccessExt, Database, MapIndex, ObjectHash, TemporaryDB};
 
 const NAME: &str = "name";
 const FAMILY: &str = "index_family";
@@ -315,12 +315,12 @@ fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     for item in &data {
         table.push(item.clone());
     }
-    let table_root_hash = table.object_hash();
+    let table_hash = table.object_hash();
     let proofs: Vec<_> = (0..len).map(|i| table.get_proof(i as u64)).collect();
 
     b.iter(|| {
         for proof in &proofs {
-            let items = proof.check_against_hash(table_root_hash).unwrap();
+            let items = proof.check_against_hash(table_hash).unwrap();
             assert_eq!(items.entries().len(), 1);
         }
     });

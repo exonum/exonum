@@ -50,7 +50,7 @@ fn create_testkit() -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_artifact(IncService.artifact_id())
         .with_instance(Supervisor::simple())
-        .create()
+        .build()
 }
 
 /// Starts service instance and gets its ID

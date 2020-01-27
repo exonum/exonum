@@ -42,7 +42,7 @@ use crate::migration::{perform_migration, v1, v2};
 /// Wallets and history from username Eve will be removed.
 fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     let old_schema = v1::Schema::new(old_data);
-    let mut new_schema = v2::Schema::new(new_data);
+    let mut new_schema = v2::Schema::new(new_data.clone());
 
     // Migrate wallets.
     for (i, (public_key, wallet)) in old_schema.wallets.iter().enumerate() {
@@ -78,7 +78,7 @@ fn manual_migration(db: Arc<dyn Database>) {
         let old_data = Prefixed::new("test", fork.readonly());
 
         let old_schema = v1::Schema::new(old_data);
-        let mut new_schema = v2::Schema::new(new_data);
+        let mut new_schema = v2::Schema::new(new_data.clone());
 
         // Move `ticker` and `divisibility` to `config`.
         let config = v2::Config {

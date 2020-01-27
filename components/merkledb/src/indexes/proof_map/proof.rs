@@ -201,7 +201,7 @@ impl<K, V> OptionalEntry<K, V> {
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, ObjectHash,
+/// #     access::CopyAccessExt, Database, TemporaryDB, BinaryValue, MapProof, ObjectHash,
 /// # };
 /// # use exonum_crypto::hash;
 /// # use failure::Error;
@@ -240,11 +240,10 @@ impl<K, V> OptionalEntry<K, V> {
 /// ```
 /// # use serde_json::{self, json};
 /// # use exonum_merkledb::{
-/// #    access::AccessExt, Database, TemporaryDB, BinaryValue, MapProof, HashTag,
+/// #    access::CopyAccessExt, Database, TemporaryDB, BinaryValue, MapProof, HashTag,
 /// #    proof_map::{Hashed, ToProofPath},
 /// # };
 /// # use exonum_crypto::hash;
-/// # fn main() {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = fork.get_proof_map("index");
 /// let (h1, h2) = (HashTag::hash_leaf(&[1]), HashTag::hash_leaf(&[2]));
@@ -262,7 +261,6 @@ impl<K, V> OptionalEntry<K, V> {
 ///         "entries": [{ "key": h2, "value": 200 }],
 ///     })
 /// );
-/// # }
 /// ```
 ///
 /// ## Note on external implementations
@@ -533,7 +531,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use exonum_merkledb::{access::AccessExt, Database, TemporaryDB, ProofMapIndex, ObjectHash};
+    /// # use exonum_merkledb::{access::CopyAccessExt, Database, TemporaryDB, ProofMapIndex, ObjectHash};
     /// # use exonum_crypto::hash;
     /// let fork = { let db = TemporaryDB::new(); db.fork() };
     /// let mut map = fork.get_proof_map("index");
@@ -580,9 +578,9 @@ where
             }
         }
 
-        collect(&proof).map(|root_hash| CheckedMapProof {
+        collect(&proof).map(|merkle_root| CheckedMapProof {
             entries: &self.entries,
-            hash: HashTag::hash_map_node(root_hash),
+            hash: HashTag::hash_map_node(merkle_root),
         })
     }
 

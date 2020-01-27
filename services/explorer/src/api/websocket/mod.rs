@@ -75,7 +75,7 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let url = api.public_url("api/explorer/v1/ws");
 //! let mut client = websocket::ClientBuilder::new(&url)?.connect_insecure()?;
@@ -152,7 +152,7 @@
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
-//!    .create();
+//!    .build();
 //! let api = testkit.api();
 //!
 //! // Signal that we want to receive notifications about `MyService` transactions.

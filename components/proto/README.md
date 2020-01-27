@@ -16,7 +16,7 @@ validation of Protobuf data.
 
 Most of the time you do not have to implement this trait because most
 of the use cases are covered by `#[derive(ProtobufConvert)]`
-from `exonum_derive` crate.
+from the `exonum-derive` crate.
 
 A typical example of such mapping with validation is manual implementation
 of this trait for `exonum_crypto::Hash`. `exonum_crypto::Hash` is a fixed
@@ -43,13 +43,10 @@ Sample Protobuf roundtrip:
 use exonum_proto::ProtobufConvert;
 use bit_vec::BitVec;
 
-fn main() {
-    let bit_vector = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
-
-    let bit_vector_pb = bit_vector.to_pb();
-    let deserialized_bit_vector: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
-    assert_eq!(bit_vector, deserialized_bit_vector);
-}
+let bit_vector = BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]);
+let bit_vector_pb = bit_vector.to_pb();
+let deserialized_bit_vector: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
+assert_eq!(bit_vector, deserialized_bit_vector);
 ```
 
 ## Usage

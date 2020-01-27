@@ -57,7 +57,6 @@ use exonum_crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SI
 ///         Key { a, b }
 ///     }
 /// }
-/// # fn main() {
 /// # // Check the natural ordering of keys
 /// # let (mut x, mut y) = (vec![0_u8; 6], vec![0_u8; 6]);
 /// # Key { a: -1, b: 2 }.write(&mut x);
@@ -67,7 +66,6 @@ use exonum_crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SI
 /// # let key = Key::read(&x);
 /// # assert_eq!(key.a, -1);
 /// # assert_eq!(key.b, 2);
-/// # }
 /// ```
 pub trait BinaryKey: ToOwned {
     /// Returns the size of the serialized key in bytes.
@@ -257,12 +255,22 @@ impl BinaryKey for String {
         self.size()
     }
 
+    #[cfg(feature = "yolo")]
     #[allow(unsafe_code)]
     fn read(buffer: &[u8]) -> Self::Owned {
         // SAFETY:
         // As with other `BinaryKey` implementations, we assume that data read by the key
         // is trusted, i.e., was created by a previous call to `write()`.
         unsafe { std::str::from_utf8_unchecked(buffer).to_string() }
+    }
+
+    #[cfg(not(feature = "yolo"))]
+    fn read(buffer: &[u8]) -> Self::Owned {
+        const ERROR_MSG: &str =
+            "Error reading UTF-8 string from the database. \
+             Probable reason is data schema mismatch; for example, data was written to \
+             `MapIndex<u64, _>` and is read as `MapIndex<str, _>`";
+        std::str::from_utf8(buffer).expect(ERROR_MSG).to_string()
     }
 }
 
@@ -340,7 +348,7 @@ impl BinaryKey for Decimal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::access::AccessExt;
+    use crate::access::CopyAccessExt;
 
     use std::{fmt::Debug, str::FromStr};
 
@@ -602,6 +610,14 @@ mod tests {
             let new_val = str::read(&buffer);
             assert_eq!(new_val, *val);
         }
+    }
+
+    #[test]
+    #[cfg(not(feature = "yolo"))]
+    #[should_panic(expected = "Error reading UTF-8 string")]
+    fn test_str_key_error() {
+        let buffer = &[0xfe_u8, 0xfd];
+        str::read(buffer);
     }
 
     #[test]

@@ -35,7 +35,7 @@ use crate::{
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     access::{Access, AccessExt, FromAccess},
+/// #     access::{Access, CopyAccessExt, FromAccess},
 /// #     Database, Group, ListIndex, TemporaryDB,
 /// # };
 /// type StrGroup<T> = Group<T, str, ListIndex<<T as Access>::Base, u64>>;
@@ -56,7 +56,7 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::{AccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
+/// # use exonum_merkledb::{access::{CopyAccessExt, FromAccess}, Database, Group, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// let group: Group<_, u64, ListIndex<_, u64>> = fork.get_group("group");
@@ -74,7 +74,7 @@ use crate::{
 /// Group keys can be unsized:
 ///
 /// ```
-/// # use exonum_merkledb::{access::AccessExt, Database, Group, ListIndex, TemporaryDB};
+/// # use exonum_merkledb::{access::CopyAccessExt, Database, Group, ListIndex, TemporaryDB};
 /// # let db = TemporaryDB::new();
 /// # let fork = db.fork();
 /// let group: Group<_, str, ListIndex<_, u64>> = fork.get_group("unsized_group");
@@ -156,7 +156,7 @@ where
 mod tests {
     use super::*;
     use crate::{
-        access::{AccessExt, Prefixed, RawAccessMut},
+        access::{AccessExt, CopyAccessExt, Prefixed, RawAccessMut},
         migration::{Migration, Scratchpad},
         Database, ProofListIndex, TemporaryDB,
     };
@@ -193,12 +193,12 @@ mod tests {
         // group.get(&3).push("quux".to_owned());
     }
 
-    fn prepare_key_iter<A>(fork: A)
+    fn prepare_key_iter<A>(fork: &A)
     where
         A: Access,
         A::Base: RawAccessMut,
     {
-        let group: Group<_, str, ProofListIndex<_, String>> = fork.clone().get_group("group");
+        let group: Group<_, str, ProofListIndex<_, String>> = fork.get_group("group");
         group.get("foo").push("foo".to_owned());
         group.get("bar").push("bar".to_owned());
         group.get("baz").push("baz".to_owned());
@@ -211,18 +211,15 @@ mod tests {
         group.get(&100_000).push("?".to_owned());
 
         // Add some unrelated stuff to the DB.
-        fork.clone().get_entry("gr").set(42);
-        fork.clone().get_entry("group_").set("!".to_owned());
-        fork.clone()
-            .get_list(("group_", &1_u8))
-            .extend(vec![1, 2, 3]);
-        fork.clone().get_entry("prefix").set(".".to_owned());
-        fork.clone().get_entry("prefixed").set("??".to_owned());
-        fork.clone().get_list(("prefixed", &1_u8)).push(42);
-        fork.clone()
-            .get_entry(("prefixed", &concat_keys!(&1_u8, &42_u32)))
+        fork.get_entry("gr").set(42);
+        fork.get_entry("group_").set("!".to_owned());
+        fork.get_list(("group_", &1_u8)).extend(vec![1, 2, 3]);
+        fork.get_entry("prefix").set(".".to_owned());
+        fork.get_entry("prefixed").set("??".to_owned());
+        fork.get_list(("prefixed", &1_u8)).push(42);
+        fork.get_entry(("prefixed", &concat_keys!(&1_u8, &42_u32)))
             .set(42);
-        fork.clone().get_entry("t").set(21);
+        fork.get_entry("t").set(21);
         fork.get_entry("unrelated").set(23);
     }
 
@@ -231,7 +228,7 @@ mod tests {
         A: Access,
         A::Base: AsReadonly<Readonly = A::Base>,
     {
-        let group: Group<_, str, ProofListIndex<_, String>> = snapshot.clone().get_group("group");
+        let group: Group<_, str, ProofListIndex<_, String>> = snapshot.get_group("group");
         assert_eq!(
             group.keys().collect::<Vec<_>>(),
             vec!["bar".to_owned(), "baz".to_owned(), "foo".to_owned()]
@@ -246,7 +243,7 @@ mod tests {
     fn iterating_over_keys() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(&fork);
+        prepare_key_iter(&&fork);
         test_key_iter(fork.readonly());
         let patch = fork.into_patch();
         test_key_iter(&patch);
@@ -256,7 +253,7 @@ mod tests {
     fn iterating_over_keys_in_prefixed_access() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(Prefixed::new("namespace", &fork));
+        prepare_key_iter(&Prefixed::new("namespace", &fork));
         test_key_iter(Prefixed::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
         test_key_iter(Prefixed::new("namespace", &patch));
@@ -268,7 +265,7 @@ mod tests {
     fn iterating_over_keys_in_migration() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(Migration::new("namespace", &fork));
+        prepare_key_iter(&Migration::new("namespace", &fork));
         test_key_iter(Migration::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
         test_key_iter(Migration::new("namespace", &patch));
@@ -280,7 +277,7 @@ mod tests {
     fn iterating_over_keys_in_scratchpad() {
         let db = TemporaryDB::new();
         let fork = db.fork();
-        prepare_key_iter(Scratchpad::new("namespace", &fork));
+        prepare_key_iter(&Scratchpad::new("namespace", &fork));
         test_key_iter(Scratchpad::new("namespace", fork.readonly()));
         let patch = fork.into_patch();
         test_key_iter(Scratchpad::new("namespace", &patch));

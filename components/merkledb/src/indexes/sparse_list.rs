@@ -152,7 +152,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -175,7 +175,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -195,7 +195,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -220,7 +220,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -244,7 +244,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -262,12 +262,12 @@ where
         }
     }
 
-    /// Returns an iterator over the indexes of the 'SparseListIndex'.
+    /// Returns an iterator over the indexes of the `SparseListIndex`.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -285,13 +285,13 @@ where
         }
     }
 
-    /// Returns an iterator over the values of the 'SparseListIndex'. The iterator element type is
+    /// Returns an iterator over the values of the `SparseListIndex`. The iterator element type is
     /// V.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -315,7 +315,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -340,12 +340,12 @@ where
     T: RawAccessMut,
     V: BinaryValue,
 {
-    /// Appends an element to the back of the 'SparseListIndex'.
+    /// Appends an element to the back of the `SparseListIndex`.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -368,7 +368,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -404,7 +404,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -437,7 +437,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -476,7 +476,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -493,13 +493,13 @@ where
         self.state.unset();
     }
 
-    /// Removes the first element from the 'SparseListIndex' and returns it, or
+    /// Removes the first element from the `SparseListIndex` and returns it, or
     /// returns `None` if it is empty.
     ///
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, SparseListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, SparseListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let mut fork = db.fork();
@@ -572,7 +572,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{access::AccessExt, db::Database, TemporaryDB};
+    use crate::{access::CopyAccessExt, db::Database, TemporaryDB};
 
     const IDX_NAME: &str = "idx_name";
 

@@ -32,7 +32,7 @@ fn cannot_initialize_blockchain_with_2_explorers() {
     TestKitBuilder::validator()
         .with_default_rust_service(ExplorerFactory)
         .with_instance(other_explorer)
-        .create();
+        .build();
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn cannot_add_another_explorer() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let deadline = Height(5);
     let config = ConfigPropose::new(0, deadline).start_service(

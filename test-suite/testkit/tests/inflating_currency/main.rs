@@ -34,7 +34,7 @@ fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
         .with_default_rust_service(CurrencyService)
-        .create()
+        .build()
 }
 
 fn create_wallet(testkit: &mut TestKit, name: &str) -> (PublicKey, SecretKey) {

@@ -46,7 +46,7 @@ fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
             )
             .with_rust_service(service_factory);
     }
-    builder.create()
+    builder.build()
 }
 
 fn inc_schema<'a>(

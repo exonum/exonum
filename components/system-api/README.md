@@ -6,6 +6,19 @@
 
 Plugin extending HTTP API of the node to return information about node state.
 
+## Description
+
+The system API plugin provides information about the node state using REST interface.
+The following info can be retrieved:
+
+- Information about the current set of artifacts and services
+- Network connectivity stats
+- Version of Exonum / Rust that the node was compiled with
+
+## HTTP API
+
+REST API of the service is documented in the crate docs.
+
 ## Usage
 
 Include `exonum-system-api` as a dependency in your `Cargo.toml`:
@@ -21,5 +34,5 @@ Consult [the crate docs](https://docs.rs/exonum-system-api) for more details.
 
 ## License
 
-`exonum-api` is licensed under the Apache License (Version 2.0).
+`exonum-system-api` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.

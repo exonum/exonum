@@ -28,7 +28,7 @@ fn test_add_nodes_to_validators() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::decentralized())
-        .create();
+        .build();
 
     let new_node_keys = testkit.network_mut().add_node().public_keys();
     let new_consensus_config = {
