@@ -57,7 +57,7 @@ pub mod v01 {
 
     pub(super) const ENTRY_VALUE: u8 = 1;
 
-    pub fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
+    pub fn verify_schema(snapshot: Prefixed<&dyn Snapshot>) {
         let schema = Schema::new(snapshot.clone());
         assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
@@ -70,7 +70,7 @@ pub mod v02 {
 
     pub(super) const ENTRY_VALUE: u8 = 2;
 
-    pub fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
+    pub fn verify_schema(snapshot: Prefixed<&dyn Snapshot>) {
         let schema = Schema::new(snapshot.clone());
         assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }
@@ -83,7 +83,7 @@ pub mod v05 {
 
     pub(super) const ENTRY_VALUE: u8 = 5;
 
-    pub fn verify_schema(snapshot: Prefixed<'_, &dyn Snapshot>) {
+    pub fn verify_schema(snapshot: Prefixed<&dyn Snapshot>) {
         let schema = Schema::new(snapshot.clone());
         assert_eq!(schema.entry.get().expect("No value for entry"), ENTRY_VALUE);
     }

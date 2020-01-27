@@ -32,7 +32,7 @@ use super::{
     MapProof, MapProofError, ProofPath,
 };
 use crate::{
-    access::AccessExt,
+    access::CopyAccessExt,
     proof_map::{Hashed, ProofMapIndex, Raw, ToProofPath},
     BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };
@@ -702,7 +702,7 @@ where
         check_map_multiproof(&proof, keys, &table);
 
         let keys = vec![[64; 32], [64; 32]];
-        let proof = table.get_multiproof(keys.clone());
+        let proof = table.get_multiproof(keys);
         assert_eq!(
             proof.proof_unchecked(),
             vec![
@@ -713,7 +713,7 @@ where
         check_map_multiproof(&proof, vec![[64; 32]], &table);
 
         let keys = vec![[128; 32], [64; 32], [128; 32]];
-        let proof = table.get_multiproof(keys.clone());
+        let proof = table.get_multiproof(keys);
         assert_eq!(
             proof.proof_unchecked(),
             vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]

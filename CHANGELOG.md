@@ -145,6 +145,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Public structures and enums were made non-exhaustive. (#1710)
 
+- `CopyAccessExt` trait has been introduced. This trait is helpful for references
+  implementing `Access`, such as `&Fork` or `&dyn Snapshot`. Methods from `AccessExt`
+  trait accept `self` by reference now. (#1739)
+
 - `ProofPath` serialization during map hash computations was unified.
   It now uses `LEB128(bit_length) || bytes` format, which was previously used
   for branches, but not for a single-entry maps. (#1743)

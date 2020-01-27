@@ -21,7 +21,7 @@ use exonum::{
     crypto::PublicKey,
     helpers::{Height, ValidatorId},
     merkledb::{
-        access::{Access, AccessExt, FromAccess, Prefixed},
+        access::{Access, CopyAccessExt, FromAccess, Prefixed},
         Entry, HashTag, ProofMapIndex, Snapshot,
     },
     runtime::{
@@ -155,7 +155,7 @@ fn proof_for_index_in_snapshot() {
 fn proof_for_service_index() {
     let snapshot = setup_blockchain_for_index_proofs();
     let instance = InstanceDescriptor::new(100, "test");
-    let data = BlockchainData::new(snapshot.as_ref(), instance);
+    let data = BlockchainData::new(snapshot.as_ref(), &instance.name);
     let proof = data.proof_for_service_index("list").unwrap();
     check_list_proof(&proof);
     assert!(data.proof_for_service_index("entry").is_none());
@@ -174,7 +174,7 @@ fn access_to_service_schema() {
     }
 
     let instance = InstanceDescriptor::new(0, "who");
-    let data = BlockchainData::new(&fork, instance);
+    let data = BlockchainData::new(&fork, &instance.name);
     {
         let schema: Schema<_> = data.service_schema("token").unwrap();
         assert_eq!(schema.wallets.values().sum::<u64>(), 300);

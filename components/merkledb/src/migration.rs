@@ -56,7 +56,7 @@
 //! # Examples
 //!
 //! ```
-//! # use exonum_merkledb::{access::AccessExt, Database, SystemSchema, TemporaryDB};
+//! # use exonum_merkledb::{access::{AccessExt, CopyAccessExt}, Database, SystemSchema, TemporaryDB};
 //! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
 //! # fn main() -> Result<(), failure::Error> {
@@ -158,26 +158,29 @@ const SCRATCHPAD_NAME: &str = "__scratchpad__";
 /// an index in a migration without constructing a `Migration` object first.
 ///
 /// [`Prefixed`]: ../access/struct.Prefixed.html
-#[derive(Debug, Clone, Copy)]
-pub struct Migration<'a, T> {
+#[derive(Debug, Clone)]
+pub struct Migration<T> {
     access: T,
-    namespace: &'a str,
+    namespace: String,
 }
 
-impl<'a, T: RawAccess> Migration<'a, T> {
+impl<'a, T: RawAccess> Migration<T> {
     /// Creates a migration in the specified namespace.
-    pub fn new(namespace: &'a str, access: T) -> Self {
-        Self { namespace, access }
+    pub fn new(namespace: impl Into<String>, access: T) -> Self {
+        Self {
+            namespace: namespace.into(),
+            access,
+        }
     }
 
     /// Returns the state hash of indexes within the migration. The state hash is up to date
     /// for `Snapshot`s (including `Patch`es), but is generally stale for `Fork`s.
     pub fn state_hash(&self) -> Hash {
-        get_state_aggregator(self.access.clone(), self.namespace).object_hash()
+        get_state_aggregator(self.access.clone(), &self.namespace).object_hash()
     }
 }
 
-impl<T: RawAccess + AsReadonly> Migration<'_, T> {
+impl<T: RawAccess + AsReadonly> Migration<T> {
     /// Returns the state aggregator for the indexes within the migration. The aggregator
     /// is up to date for `Snapshot`s (including `Patch`es), but is generally stale for `Fork`s.
     ///
@@ -203,30 +206,31 @@ impl<T: RawAccess + AsReadonly> Migration<'_, T> {
     ///                                                  // full index names as keys.
     /// ```
     pub fn state_aggregator(&self) -> ProofMapIndex<T::Readonly, str, Hash> {
-        get_state_aggregator(self.access.as_readonly(), self.namespace)
+        get_state_aggregator(self.access.as_readonly(), &self.namespace)
     }
 }
 
-impl<T: RawAccessMut> Migration<'_, T> {
+impl<T: RawAccessMut> Migration<T> {
     /// Marks an index with the specified address as removed during migration.
     ///
     /// # Panics
     ///
     /// Panics if an index already exists at the specified address.
-    pub fn create_tombstone<I>(self, addr: I)
+    pub fn create_tombstone<I>(&self, addr: I)
     where
         I: Into<IndexAddress>,
     {
-        self.get_or_create_view(addr.into(), IndexType::Tombstone)
+        self.clone()
+            .get_or_create_view(addr.into(), IndexType::Tombstone)
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e));
     }
 }
 
-impl<T: RawAccess> Access for Migration<'_, T> {
+impl<T: RawAccess> Access for Migration<T> {
     type Base = T;
 
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
-        let mut prefixed_addr = addr.prepend_name(self.namespace);
+        let mut prefixed_addr = addr.prepend_name(&self.namespace);
         prefixed_addr.set_in_migration();
         self.access.get_index_metadata(prefixed_addr)
     }
@@ -236,7 +240,7 @@ impl<T: RawAccess> Access for Migration<'_, T> {
         addr: IndexAddress,
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
-        let mut prefixed_addr = addr.prepend_name(self.namespace);
+        let mut prefixed_addr = addr.prepend_name(&self.namespace);
         prefixed_addr.set_in_migration();
         self.access.get_or_create_view(prefixed_addr, index_type)
     }
@@ -246,7 +250,7 @@ impl<T: RawAccess> Access for Migration<'_, T> {
         K: BinaryKey + ?Sized,
         Self::Base: AsReadonly<Readonly = Self::Base>,
     {
-        let mut prefixed_addr = base_addr.prepend_name(self.namespace.as_ref());
+        let mut prefixed_addr = base_addr.prepend_name(&self.namespace);
         prefixed_addr.set_in_migration();
         self.access.group_keys(prefixed_addr)
     }
@@ -258,30 +262,33 @@ impl<T: RawAccess> Access for Migration<'_, T> {
 /// Like `Migration`s, `Scratchpad`s are separated via namespaces. Scratchpads are optimized
 /// for small amounts of data per index. Indexes in a `Scratchpad` are not aggregated into
 /// the overall database state or the migration state.
-#[derive(Debug, Clone, Copy)]
-pub struct Scratchpad<'a, T> {
+#[derive(Debug, Clone)]
+pub struct Scratchpad<T> {
     access: T,
-    namespace: &'a str,
+    namespace: String,
 }
 
-impl<'a, T: RawAccess> Scratchpad<'a, T> {
+impl<T: RawAccess> Scratchpad<T> {
     /// Creates a scratchpad in the specified namespace.
-    pub fn new(namespace: &'a str, access: T) -> Self {
-        Self { namespace, access }
+    pub fn new(namespace: impl Into<String>, access: T) -> Self {
+        Self {
+            namespace: namespace.into(),
+            access,
+        }
     }
 
     fn get_scratchpad_addr(&self, addr: IndexAddress) -> IndexAddress {
-        let prefixed_addr = addr.prepend_name(self.namespace);
+        let prefixed_addr = addr.prepend_name(&self.namespace);
         IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.fully_qualified_name())
     }
 
     fn get_scratchpad_prefix(&self, addr: IndexAddress) -> IndexAddress {
-        let prefixed_addr = addr.prepend_name(self.namespace);
+        let prefixed_addr = addr.prepend_name(&self.namespace);
         IndexAddress::from_root(SCRATCHPAD_NAME).append_key(&prefixed_addr.qualified_prefix())
     }
 }
 
-impl<T: RawAccessMut> Scratchpad<'_, T> {
+impl<T: RawAccessMut> Scratchpad<T> {
     /// Removes all indexes and their data from the scratchpad.
     ///
     /// # Panics
@@ -297,7 +304,7 @@ impl<T: RawAccessMut> Scratchpad<'_, T> {
     }
 }
 
-impl<T: RawAccess> Access for Scratchpad<'_, T> {
+impl<T: RawAccess> Access for Scratchpad<T> {
     type Base = T;
 
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
@@ -347,7 +354,7 @@ impl<T: RawAccess> Access for Scratchpad<'_, T> {
 ///
 /// ```
 /// # use assert_matches::assert_matches;
-/// # use exonum_merkledb::{access::AccessExt, TemporaryDB};
+/// # use exonum_merkledb::{access::CopyAccessExt, TemporaryDB};
 /// # use exonum_merkledb::migration::{MigrationHelper, MigrationError};
 /// # use std::{sync::mpsc, thread, time::Duration};
 /// let db = TemporaryDB::new();
@@ -475,17 +482,17 @@ impl MigrationHelper {
     }
 
     /// Returns full access to the new version of migrated data.
-    pub fn new_data(&self) -> Migration<'_, &Fork> {
+    pub fn new_data(&self) -> Migration<&Fork> {
         Migration::new(&self.namespace, self.fork_ref())
     }
 
     /// Returns the scratchpad for temporary data to use during migration.
-    pub fn scratchpad(&self) -> Scratchpad<'_, &Fork> {
+    pub fn scratchpad(&self) -> Scratchpad<&Fork> {
         Scratchpad::new(&self.namespace, self.fork_ref())
     }
 
     /// Returns readonly access to the old version of migrated data.
-    pub fn old_data(&self) -> Prefixed<'_, ReadonlyFork<'_>> {
+    pub fn old_data(&self) -> Prefixed<ReadonlyFork<'_>> {
         Prefixed::new(&self.namespace, self.fork_ref().readonly())
     }
 
@@ -515,7 +522,7 @@ impl MigrationHelper {
     /// If no iterators are instantiated within the closure, a single iteration will be performed.
     pub fn iter_loop(
         &mut self,
-        mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<'_, &Fork>>),
+        mut step: impl FnMut(&Self, &mut PersistentIters<Scratchpad<&Fork>>),
     ) -> Result<(), MigrationError> {
         let mut should_break = false;
         while !should_break {
@@ -656,7 +663,7 @@ pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
 mod tests {
     use super::*;
     use crate::{
-        access::{AccessExt, RawAccess},
+        access::{AccessExt, CopyAccessExt, RawAccess},
         HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
 

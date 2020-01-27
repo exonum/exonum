@@ -261,12 +261,12 @@ pub(crate) trait BitsRange {
     fn start_from(&self, pos: u16) -> Self;
 
     /// Returns a copy of this bit range shortened to the specified length.
-    /// This action changes the ProofPath's type to a branch as well.
+    /// This action changes the `ProofPath`'s type to a branch as well.
     /// TODO Clarify documentation. [ECR-2820]
     fn prefix(&self, len: u16) -> Self;
 
     /// Returns a copy of this bit range where the start is shifted by the `len`
-    /// bits to the right. This action doesn't affect a type of ProofPath.
+    /// bits to the right. This action doesn't affect a type of `ProofPath`.
     /// TODO Clarify documentation. [ECR-2820]
     fn suffix(&self, len: u16) -> Self;
 
@@ -464,7 +464,7 @@ impl ProofPath {
     ///
     /// # Binary format
     ///
-    /// - **bits_len** - total length of the given `ProofPath` in bits compressed
+    /// - **`bits_len`** - total length of the given `ProofPath` in bits compressed
     ///   by the `leb128` algorithm
     /// - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
     ///   `(bits_len + 7) / 8` bytes.

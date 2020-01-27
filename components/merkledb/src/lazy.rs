@@ -32,7 +32,7 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::{AccessExt, FromAccess}, Database, Lazy, ListIndex, TemporaryDB};
+/// # use exonum_merkledb::{access::{CopyAccessExt, FromAccess}, Database, Lazy, ListIndex, TemporaryDB};
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
 /// {

@@ -44,20 +44,19 @@ impl<T: Access> NodeSchema<T> {
     /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
     pub fn peers_cache(&self) -> MapIndex<T::Base, PublicKey, Verified<Connect>> {
-        self.access.clone().get_map(PEERS_CACHE)
+        self.access.get_map(PEERS_CACHE)
     }
 
     /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
     pub fn consensus_messages_cache(&self) -> ListIndex<T::Base, Message> {
-        self.access.clone().get_list(CONSENSUS_MESSAGES_CACHE)
+        self.access.get_list(CONSENSUS_MESSAGES_CACHE)
     }
 
     /// Returns the saved value of the consensus round. Returns the first round
     /// if it has not been saved.
     pub fn consensus_round(&self) -> Round {
         self.access
-            .clone()
             .get_entry(CONSENSUS_ROUND)
             .get()
             .unwrap_or_else(Round::first)
@@ -70,7 +69,7 @@ where
 {
     /// Saves the given consensus round value into the storage.
     pub fn set_consensus_round(&mut self, round: Round) {
-        self.access.clone().get_entry(CONSENSUS_ROUND).set(round);
+        self.access.get_entry(CONSENSUS_ROUND).set(round);
     }
 
     /// Saves a collection of SignedMessage to the consensus messages cache with single access to the

@@ -660,32 +660,32 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
 }
 
 /// Instance descriptor contains information to access the running service instance.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct InstanceDescriptor<'a> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceDescriptor {
     /// A unique numeric ID of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.id)
     pub id: InstanceId,
     /// A unique name of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.name)
-    pub name: &'a str,
+    pub name: String,
 
     /// No-op field for forward compatibility.
     non_exhaustive: (),
 }
 
-impl<'a> InstanceDescriptor<'a> {
+impl InstanceDescriptor {
     /// Creates a new `InstanceDescriptor` object.
-    pub fn new(id: InstanceId, name: &'a str) -> Self {
+    pub fn new(id: InstanceId, name: impl Into<String>) -> Self {
         Self {
             id,
-            name,
+            name: name.into(),
             non_exhaustive: (),
         }
     }
 }
 
-impl fmt::Display for InstanceDescriptor<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for InstanceDescriptor {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}:{}", self.id, self.name)
     }
 }
