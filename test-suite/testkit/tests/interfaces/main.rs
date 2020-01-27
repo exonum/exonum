@@ -44,7 +44,7 @@ fn testkit_with_interfaces() -> TestKit {
         .with_default_rust_service(WalletService)
         .with_default_rust_service(DepositService)
         .with_default_rust_service(AnyCallService)
-        .create()
+        .build()
 }
 
 fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(), ExecutionError> {
@@ -400,7 +400,7 @@ fn execute_custom_call(f: CustomCall) -> (TestKit, Result<(), ExecutionError>) {
         .with_logger()
         .with_default_rust_service(WalletService)
         .with_default_rust_service(CustomCallService::new(f))
-        .create();
+        .build();
 
     let keypair = crypto::gen_keypair();
     let res = execute_transaction(
