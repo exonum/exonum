@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use byteorder::{ByteOrder, LittleEndian};
-use exonum_crypto::{hash, Hash, HashStream};
+use exonum_crypto::{hash, Hash, HashStream, HASH_SIZE};
 use failure::Fail;
 use hex::FromHex;
 
@@ -157,9 +157,14 @@ impl HashTag {
     /// h = sha-256( HashTag::MapBranchNode || <path> || <child_hash> )
     /// ```
     pub fn hash_single_entry_map(path: &ProofPath, child_hash: &Hash) -> Hash {
+        // `HASH_SIZE` bytes are necessary for `path` bytes, and 2 additional bytes
+        // for the `LEB128` encoding of bit length (`HASH_SIZE * 8`).
+        let mut path_buffer = [0; HASH_SIZE + 2];
+        path.write_compressed(&mut path_buffer);
+
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
-            .update(path.as_bytes())
+            .update(&path_buffer[..])
             .update(child_hash.as_ref())
             .hash()
     }
@@ -269,7 +274,7 @@ pub enum ValidationError<E: Fail> {
 mod tests {
     use exonum_crypto::{Hash, HashStream};
 
-    use super::HashTag;
+    use super::*;
 
     #[test]
     fn empty_list_hash() {
@@ -295,5 +300,22 @@ mod tests {
             .hash();
 
         assert_eq!(empty_map_hash, HashTag::empty_map_hash());
+    }
+
+    #[test]
+    fn single_entry_map_hash() {
+        let path = ProofPath::from_bytes([0; HASH_SIZE]);
+        let value_hash = hash(b"foo");
+        let expected_hash = HashStream::new()
+            .update(&[HashTag::MapBranchNode as u8])
+            .update(&[128, 2]) // LEB128(256)
+            .update(&[0; HASH_SIZE])
+            .update(value_hash.as_ref())
+            .hash();
+
+        assert_eq!(
+            expected_hash,
+            HashTag::hash_single_entry_map(&path, &value_hash)
+        );
     }
 }
