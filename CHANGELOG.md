@@ -148,6 +148,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Public structures and enums were made non-exhaustive. (#1710)
 
+- `CopyAccessExt` trait has been introduced. This trait is helpful for references
+  implementing `Access`, such as `&Fork` or `&dyn Snapshot`. Methods from `AccessExt`
+  trait accept `self` by reference now. (#1739)
+
 #### exonum-rust-runtime
 
 - Service interfaces now have to specify method IDs with either `interface_method`
@@ -214,6 +218,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Slash (`/`) is now allowed to be a part of artifact/instance name. (#1681)
 
+#### exonum-cli
+
+- Added maintenance command `restart-migration` to restart migration script. (#1728)
+
 #### exonum-merkledb
 
 - MerkleDB now performs automated state aggregation allowing to construct proofs
@@ -261,6 +269,8 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - Added support for resuming previously stopped services. (#1706)
   - Added `resume_service` method to the `ConfigPropose`.
   - Added `ResumeService` variant to the `ConfigChange` enumeration.
+
+- Supervisor now supports migrations. (#1727)
 
 #### exonum-middleware-service
 

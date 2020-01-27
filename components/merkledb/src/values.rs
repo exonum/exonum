@@ -62,7 +62,6 @@ use super::ObjectHash;
 ///         Ok(Self { a, b })
 ///     }
 /// }
-/// # fn main() {}
 /// ```
 pub trait BinaryValue: Sized {
     /// Serializes the given value to the vector of bytes.

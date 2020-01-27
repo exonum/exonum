@@ -475,6 +475,19 @@ fn test_clear_cache() {
 }
 
 #[test]
+fn test_restart_migration() {
+    let env = ConfigSpec::new_without_pass();
+    let db_path = env.output_dir().join("db0");
+
+    env.command("maintenance")
+        .with_named_arg("--node-config", &env.expected_node_config_file(0))
+        .with_named_arg("--db-path", &db_path)
+        .with_named_arg("restart-migration", "service")
+        .run()
+        .unwrap();
+}
+
+#[test]
 fn run_node_with_simple_supervisor() {
     run_node_with_supervisor(&SupervisorMode::Simple).unwrap();
 }

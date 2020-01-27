@@ -66,7 +66,7 @@ impl SampleRuntime {
     fn start_service(
         &self,
         artifact: &ArtifactId,
-        instance: InstanceDescriptor<'_>,
+        instance: &InstanceDescriptor,
     ) -> Result<SampleService, ExecutionError> {
         // Invariants guaranteed by the core.
         assert!(self.deployed_artifacts.contains_key(artifact));
@@ -148,7 +148,7 @@ impl Runtime for SampleRuntime {
                 // `exonum` guarantees that `initiate_adding_service` was invoked
                 // before and it returned `Ok(..)`.
                 let instance = self
-                    .start_service(&spec.artifact, spec.as_descriptor())
+                    .start_service(&spec.artifact, &spec.as_descriptor())
                     .unwrap();
                 println!("Starting service {}: {:?}", spec, instance);
                 self.started_services.insert(spec.id, instance);

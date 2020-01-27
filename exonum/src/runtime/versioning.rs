@@ -250,7 +250,7 @@ impl FromStr for ArtifactReq {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.splitn(2, '@').collect();
         match &parts[..] {
-            [name, version] => Ok(Self::new(name.to_string(), version.parse()?)),
+            [name, version] => Ok(Self::new((*name).to_string(), version.parse()?)),
             _ => Err(format_err!(
                 "Invalid artifact requirement. Use `name@version` format, \
                  e.g., `exonum.Token@^1.3.0`"

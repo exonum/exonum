@@ -188,7 +188,10 @@
 pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
-    dispatcher::{Action as DispatcherAction, Mailbox, Schema as DispatcherSchema},
+    dispatcher::{
+        remove_local_migration_result, Action as DispatcherAction, Mailbox,
+        Schema as DispatcherSchema,
+    },
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
         ExecutionError, ExecutionFail, ExecutionStatus,
@@ -197,7 +200,7 @@ pub use self::{
     types::{
         AnyTx, ArtifactId, ArtifactSpec, ArtifactState, ArtifactStatus, CallInfo, Caller,
         CallerAddress, InstanceId, InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
-        MethodId,
+        MethodId, MigrationStatus,
     },
 };
 
@@ -657,32 +660,32 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
 }
 
 /// Instance descriptor contains information to access the running service instance.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct InstanceDescriptor<'a> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceDescriptor {
     /// A unique numeric ID of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.id)
     pub id: InstanceId,
     /// A unique name of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.name)
-    pub name: &'a str,
+    pub name: String,
 
     /// No-op field for forward compatibility.
     non_exhaustive: (),
 }
 
-impl<'a> InstanceDescriptor<'a> {
+impl InstanceDescriptor {
     /// Creates a new `InstanceDescriptor` object.
-    pub fn new(id: InstanceId, name: &'a str) -> Self {
+    pub fn new(id: InstanceId, name: impl Into<String>) -> Self {
         Self {
             id,
-            name,
+            name: name.into(),
             non_exhaustive: (),
         }
     }
 }
 
-impl fmt::Display for InstanceDescriptor<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for InstanceDescriptor {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}:{}", self.id, self.name)
     }
 }

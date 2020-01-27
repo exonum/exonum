@@ -18,7 +18,7 @@ use url::form_urlencoded::byte_serialize;
 use std::{num::NonZeroU64, panic, rc::Rc};
 
 use crate::{
-    access::AccessExt,
+    access::CopyAccessExt,
     db,
     validation::is_valid_identifier,
     views::{IndexAddress, IndexType, RawAccess, View, ViewWithMetadata},

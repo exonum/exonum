@@ -185,7 +185,7 @@ pub struct ArtifactId {
     /// Artifact name.
     pub name: String,
     /// Semantic version of the artifact.
-    #[protobuf_convert(with = "self::pb_version")]
+    #[protobuf_convert(with = "crate::helpers::pb_version")]
     pub version: Version,
 
     /// No-op field for forward compatibility.
@@ -194,19 +194,7 @@ pub struct ArtifactId {
     non_exhaustive: (),
 }
 
-mod pb_version {
-    use super::*;
-
-    #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
-    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
-        pb.parse().map_err(From::from)
-    }
-
-    pub fn to_pb(value: &Version) -> String {
-        value.to_string()
-    }
-}
-
+#[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
 impl ArtifactId {
     /// Creates a new artifact identifier from the given runtime id and name
     /// or returns error if the resulting artifact id is not correct.
@@ -296,7 +284,7 @@ impl FromStr for ArtifactId {
             [runtime_id, name, version] => {
                 let artifact = Self::new(
                     u32::from_str(runtime_id)?,
-                    name.to_string(),
+                    (*name).to_string(),
                     version.parse()?,
                 )?;
                 artifact.validate()?;
@@ -403,9 +391,9 @@ impl InstanceSpec {
         Ok(())
     }
 
-    /// Return the corresponding descriptor of this instance specification.
-    pub fn as_descriptor(&self) -> InstanceDescriptor<'_> {
-        InstanceDescriptor::new(self.id, self.name.as_ref())
+    /// Returns the corresponding descriptor of this instance specification.
+    pub fn as_descriptor(&self) -> InstanceDescriptor {
+        InstanceDescriptor::new(self.id, &self.name)
     }
 }
 
@@ -512,13 +500,13 @@ pub struct InstanceMigration {
     /// Version of the instance data after the migration is completed.
     /// Note that it does not necessarily match the version of `target`,
     /// but should be not greater.
-    #[protobuf_convert(with = "self::pb_version")]
+    #[protobuf_convert(with = "crate::helpers::pb_version")]
     pub end_version: Version,
 
     /// Consensus-wide outcome of the migration, in the form of the aggregation hash
     /// of the migrated data. The lack of value signifies that the network has not yet reached
     /// consensus about the migration outcome.
-    #[protobuf_convert(with = "self::pb_optional_hash")]
+    #[protobuf_convert(with = "crate::helpers::pb_optional_hash")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
 
@@ -550,27 +538,6 @@ impl InstanceMigration {
     /// among all nodes in the blockchain network.
     pub fn is_completed(&self) -> bool {
         self.completed_hash.is_some()
-    }
-}
-
-mod pb_optional_hash {
-    use super::*;
-    use exonum_crypto::proto::types::Hash as PbHash;
-
-    pub fn from_pb(pb: PbHash) -> Result<Option<Hash>, failure::Error> {
-        if pb.get_data().is_empty() {
-            Ok(None)
-        } else {
-            Hash::from_pb(pb).map(Some)
-        }
-    }
-
-    pub fn to_pb(value: &Option<Hash>) -> PbHash {
-        if let Some(hash) = value {
-            hash.to_pb()
-        } else {
-            PbHash::new()
-        }
     }
 }
 

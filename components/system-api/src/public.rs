@@ -16,6 +16,129 @@
 //!
 //! Public API includes universally available endpoints, e.g., allowing to view
 //! the list of services on the current node.
+//!
+//! # Table of Contents
+//!
+//! - [Network statistics](#network-statistics)
+//! - [Node health info](#node-health-info)
+//! - [User agent](#user-agent)
+//! - [Available services](#available-services)
+//!
+//! # Network Statistics
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/stats` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`StatsInfo`] |
+//!
+//! Returns information about the current state of the node memory pool.
+//!
+//! [`StatsInfo`]: struct.StatsInfo.html
+//!
+//! ```
+//! use exonum_system_api::{public::StatsInfo, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let stats: StatsInfo = api.public(ApiKind::System).get("v1/stats")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Node Health Info
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/healthcheck` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`HealthCheckInfo`] |
+//!
+//! Returns information about whether the node is connected to other peers and
+//! its consensus status.
+//!
+//! [`HealthCheckInfo`]: struct.HealthCheckInfo.html
+//!
+//! ```
+//! use exonum_system_api::{public::HealthCheckInfo, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # User Agent
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/user_agent` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | `String` |
+//!
+//! Returns an user agent of the node.
+//!
+//! User agent includes versions of Exonum and the Rust compiler and the OS info,
+//! all separated by slashes.
+//!
+//! ```
+//! use exonum_system_api::SystemApiPlugin;
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let user_agent: String = api.public(ApiKind::System).get("v1/user_agent")?;
+//!
+//! let components: Vec<_> = user_agent.split('/').collect();
+//! assert_eq!(components.len(), 3);
+//! let exonum_version = components[0];
+//! let rust_version = components[1];
+//! let os_version = components[2];
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Available Services
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/services` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`DispatcherInfo`] |
+//!
+//! Returns information about services available in the network.
+//!
+//! [`DispatcherInfo`]: struct.DispatcherInfo.html
+//!
+//! ```
+//! use exonum_system_api::{public::DispatcherInfo, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let user_agent: DispatcherInfo = api.public(ApiKind::System).get("v1/services")?;
+//! # Ok(())
+//! # }
+//! ```
 
 use exonum::{
     blockchain::{Blockchain, Schema},

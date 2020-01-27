@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use self::schema::Schema;
+pub use self::schema::{remove_local_migration_result, Schema};
 
 use exonum_merkledb::{
     migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
@@ -92,7 +92,7 @@ impl CommittedServices {
     fn get_instance<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<(InstanceDescriptor<'_>, &InstanceStatus)> {
+    ) -> Option<(InstanceDescriptor, &InstanceStatus)> {
         let (id, info) = match id.into() {
             InstanceQuery::Id(id) => (id, self.instances.get(&id)?),
 
@@ -103,11 +103,10 @@ impl CommittedServices {
 
             InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
-        let name = info.name.as_str();
-        Some((InstanceDescriptor::new(id, name), &info.status))
+        Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
 
-    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceDescriptor<'a>, u32)> + 'a {
+    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceDescriptor, u32)> + 'a {
         self.instances.iter().filter_map(|(&id, info)| {
             if info.status.is_active() {
                 let descriptor = InstanceDescriptor::new(id, &info.name);
@@ -340,7 +339,7 @@ impl Dispatcher {
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
     pub(crate) fn start_builtin_instances(&mut self, fork: Fork) -> Patch {
         // Mark services as active.
-        self.activate_pending(&fork);
+        Self::activate_pending(&fork);
         // Start pending services.
         let mut schema = Schema::new(&fork);
         let pending_instances = schema.take_modified_instances();
@@ -575,8 +574,12 @@ impl Dispatcher {
             .active_instances()
             .filter_map(|(instance, runtime_id)| {
                 let mut should_rollback = false;
-                let context =
-                    ExecutionContext::for_block_call(self, fork, &mut should_rollback, instance);
+                let context = ExecutionContext::for_block_call(
+                    self,
+                    fork,
+                    &mut should_rollback,
+                    instance.clone(),
+                );
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
                     CallType::AfterTransactions => Runtime::after_transactions,
@@ -625,7 +628,7 @@ impl Dispatcher {
     /// calculated for precommit and actually committed block.
     pub(crate) fn after_transactions(&self, fork: &mut Fork) -> Vec<(CallInBlock, ExecutionError)> {
         let errors = self.call_service_hooks(fork, &CallType::AfterTransactions);
-        self.activate_pending(fork);
+        Self::activate_pending(fork);
         errors
     }
 
@@ -758,17 +761,18 @@ impl Dispatcher {
         // a consensus failure.
         let res = local_result.0.as_ref();
         let local_hash = *res.unwrap_or_else(|err| {
-            // FIXME: Add a maintenance command for removing local migration result (ECR-4095).
             panic!(
                 "Migration for service `{}` is committed with migration hash {:?}, \
-                 but locally it has finished with an error: {}",
+                 but locally it has finished with an error: {}. You can remove local \
+                 migration result with CLI maintenance command `restart-migration`.",
                 namespace, global_hash, err
             );
         });
         assert!(
             local_hash == global_hash,
             "Migration for service `{}` is committed with migration hash {:?}, \
-             but locally it has finished with another hash {:?}",
+             but locally it has finished with another hash {:?}. You can remove local \
+             migration result with CLI maintenance command `restart-migration`.",
             namespace,
             global_hash,
             local_hash
@@ -795,7 +799,7 @@ impl Dispatcher {
     }
 
     /// Make pending artifacts and instances active.
-    pub(crate) fn activate_pending(&self, fork: &Fork) {
+    pub(crate) fn activate_pending(fork: &Fork) {
         Schema::new(fork).activate_pending()
     }
 
@@ -853,7 +857,7 @@ impl Dispatcher {
     pub(crate) fn get_service<'q>(
         &self,
         id: impl Into<InstanceQuery<'q>>,
-    ) -> Option<InstanceDescriptor<'_>> {
+    ) -> Option<InstanceDescriptor> {
         let (descriptor, status) = self.service_infos.get_instance(id)?;
         if status.is_active() {
             Some(descriptor)

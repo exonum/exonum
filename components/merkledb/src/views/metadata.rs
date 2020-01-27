@@ -164,7 +164,7 @@ impl Default for IndexType {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V = Vec<u8>> {
     // A globally unique numeric index identifier. MerkleDB assigns a unique numeric ID for each
-    // fully-qualified index name.
+    // fully-qualified index name. Valid identifiers are non-zero.
     //
     // MerkleDB never re-uses the identifiers.
     identifier: u64,
@@ -713,7 +713,7 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::AccessExt, Database, Fork, TemporaryDB};
+    use crate::{access::CopyAccessExt, Database, Fork, TemporaryDB};
 
     use std::collections::{BTreeSet, HashMap};
 
@@ -895,7 +895,7 @@ mod tests {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
-    use crate::{access::AccessExt, Database, TemporaryDB};
+    use crate::{access::CopyAccessExt, Database, TemporaryDB};
 
     use proptest::{
         collection::vec,

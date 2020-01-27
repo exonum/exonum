@@ -128,7 +128,7 @@ mod tests {
     use std::fmt;
 
     use crate::{
-        access::AccessExt, indexes::proof_map::ToProofPath, proto, BinaryKey, BinaryValue,
+        access::CopyAccessExt, indexes::proof_map::ToProofPath, proto, BinaryKey, BinaryValue,
         Database, ListProof, MapProof, ObjectHash, TemporaryDB,
     };
 

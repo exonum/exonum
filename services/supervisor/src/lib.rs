@@ -18,6 +18,7 @@
 //! - Service instances creation;
 //! - Changing consensus configuration;
 //! - Changing service instances configuration.
+//! - Migrating service data.
 //!
 //! More information on the artifact/service lifecycle can be found in the documentation for
 //! the Exonum [runtime module][runtime-docs].
@@ -55,6 +56,64 @@
 //! The operation of starting or resuming a service is treated similarly to a configuration change
 //! and follows the same rules.
 //!
+//! ## Migrations Management
+//!
+//! Supervisor service provides a functionality to perform data migrations for services.
+//! Request for migration is sent through private REST API and contains the name of instance
+//! to migrate, end artifact version to achieve after migration, and deadline height until which
+//! migration should be completed.
+//!
+//! ### Requirements
+//!
+//! The following requirements should be satisfied in order to start a migration:
+//!
+//! - Target service instance should exist and be stopped.
+//! - End artifact for a migration should be a superior version of the artifact of target instance.
+//! - New (end) version of artifact should be deployed.
+//! - Service should have all the migration scripts required to migrate to the end artifact version.
+//!
+//! Violation of any of requirements listed above will result in a request failure without
+//! actual start of migration.
+//!
+//! ## Migration Workflow
+//!
+//! Migration starts after the block with the request is committed, and performed asynchronously.
+//!
+//! After the local migration completion, validator nodes report the result of migration, which can
+//! be either successful or unsuccessful.
+//!
+//! If all validators report the successful local migration result, and the resulting state hashes
+//! match, migration is committed and flushed in the block, next to block with the last required
+//! migration confirmation.
+//!
+//! In any other case (e.g. migration failure for at least one node, resulting state hash divergence,
+//! lack of report at the deadline height), migration is considered failed and rolled back.
+//!
+//! After fixing the reason for migration failure, the migration attempt can be performed once again.
+//! It will require a different deadline height though, since `MigrationRequest` objects are considered
+//! unique and supervisor won't attempt to perform the same `MigrationRequest` again.
+//!
+//! ### Complex Migrations
+//!
+//! If migration contains more than one migration script (e.g. if you need to migrate service from
+//! version 0.1 to version 0.3, and this will include execution of two migration scripts: 0.1 -> 0.2
+//! and 0.2 -> 0.3), supervisor will perform one migration script at the time.
+//!
+//! After the first migration request to version 0.3, migration will be performed for version 0.2,
+//! and you need to create the same migration request again (with different deadline height though).
+//!
+//! After the second migration request, the version will be updated to 0.3.
+//!
+//! To put it simply, you may need to perform the same migration request several times until every
+//! step of migration is completed.
+//!
+//! ### Incomplete Migrations
+//!
+//! Migrations require only the current and the last version of artifact to be deployed. If you will
+//! decide to stop migration until reaching the last version (e.g. you requested migration to version
+//! 0.3, but decided to go with version 0.2), you will have to deploy a corresponding artifact after
+//! you migrate to version 0.2, before you'll be able to start your service.
+//!
 //! [exonum]: https://github.com/exonum/exonum
 //! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 //! [`DeployRequest`]: struct.DeployRequest.html
@@ -69,17 +128,22 @@
 )]
 
 pub use self::{
-    api::{DeployInfoQuery, DeployResponse},
+    api::{DeployInfoQuery, MigrationInfoQuery},
     configure::{Configure, CONFIGURE_INTERFACE_NAME},
-    deploy_state::DeployState,
-    errors::{ArtifactError, CommonError, ConfigurationError, ServiceError},
+    errors::{ArtifactError, CommonError, ConfigurationError, MigrationError, ServiceError},
+    event_state::AsyncEventState,
+    migration_state::MigrationState,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
-        DeployResult, ResumeService, ServiceConfig, StartService, StopService, SupervisorConfig,
+        DeployResult, MigrationRequest, MigrationResult, ResumeService, ServiceConfig,
+        StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
 };
+
+#[doc(hidden)] // Public for migration tests.
+pub use self::schema::SchemaImpl;
 
 use exonum::{
     blockchain::config::InstanceInitParams,
@@ -91,14 +155,15 @@ use exonum_rust_runtime::{
     api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
 };
 
-use crate::{configure::ConfigureMut, mode::Mode, schema::SchemaImpl};
+use crate::{configure::ConfigureMut, mode::Mode};
 
 pub mod mode;
 
 mod api;
 mod configure;
-mod deploy_state;
 mod errors;
+mod event_state;
+mod migration_state;
 mod multisig;
 mod proto;
 mod proto_structures;
@@ -318,36 +383,11 @@ impl Service for Supervisor {
         Ok(())
     }
 
-    fn before_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        // Perform a cleanup for outdated requests.
-        let mut schema = SchemaImpl::new(context.service_data());
-        let core_schema = context.data().for_core();
-        let height = core_schema.height();
-
-        // Remove pending deploy requests for which deadline was exceeded.
-        let requests_to_remove = schema
-            .pending_deployments
-            .values()
-            .filter(|request| request.deadline_height <= height)
-            .collect::<Vec<_>>();
-
-        for request in requests_to_remove {
-            schema.pending_deployments.remove(&request.artifact);
-            if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
-                // If state is marked as pending, change it to failed as well.
-                schema.deploy_states.put(&request, DeployState::Timeout);
-            }
-            log::trace!("Removed outdated deployment request {:?}", request);
-        }
-
-        let entry = schema.public.pending_proposal.get();
-        if let Some(entry) = entry {
-            if entry.config_propose.actual_from <= height {
-                // Remove pending config proposal for which deadline was exceeded.
-                log::trace!("Removed outdated config proposal");
-                schema.public.pending_proposal.remove();
-            }
-        }
+    fn before_transactions(&self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        self.remove_outdated_deployments(&context);
+        self.remove_outdated_config_proposal(&context);
+        self.flush_completed_migrations(&mut context)?;
+        self.remove_outdated_migrations(&mut context)?;
         Ok(())
     }
 
@@ -390,6 +430,58 @@ impl Service for Supervisor {
 
     /// Sends confirmation transaction for unconfirmed deployment requests.
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
+        self.process_unconfirmed_deployments(&mut context);
+        self.process_incomplete_migrations(&mut context);
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::wire(builder)
+    }
+}
+
+impl Supervisor {
+    /// Removes deployments for which deadline height is already exceeded.
+    fn remove_outdated_deployments(&self, context: &ExecutionContext<'_>) {
+        let mut schema = SchemaImpl::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let height = core_schema.height();
+
+        // Collect pending deploy requests for which deadline was exceeded.
+        let requests_to_remove = schema
+            .pending_deployments
+            .values()
+            .filter(|request| request.deadline_height <= height)
+            .collect::<Vec<_>>();
+
+        for request in requests_to_remove {
+            schema.pending_deployments.remove(&request.artifact);
+            if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
+                // If state is marked as pending, change it to failed as well.
+                schema.deploy_states.put(&request, AsyncEventState::Timeout);
+            }
+            log::trace!("Removed outdated deployment request {:?}", request);
+        }
+    }
+
+    /// Removes pending config proposal if it's outdated.
+    fn remove_outdated_config_proposal(&self, context: &ExecutionContext<'_>) {
+        let mut schema = SchemaImpl::new(context.service_data());
+        let core_schema = context.data().for_core();
+        let height = core_schema.height();
+
+        let entry = schema.public.pending_proposal.get();
+        if let Some(entry) = entry {
+            if entry.config_propose.actual_from <= height {
+                // Remove pending config proposal for which deadline was exceeded.
+                log::trace!("Removed outdated config proposal");
+                schema.public.pending_proposal.remove();
+            }
+        }
+    }
+
+    /// Goes through pending deployments, chooses ones that we're not confirmed by our node
+    /// and starts the local deployment routine for them.
+    fn process_unconfirmed_deployments(&self, context: &mut AfterCommitContext<'_>) {
         let service_key = context.service_key();
 
         let deployments: Vec<_> = {
@@ -398,7 +490,7 @@ impl Service for Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    if let Some(DeployState::Pending) = schema.deploy_states.get(&request) {
+                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
                         // From all pending requests we are interested only in ones not
                         // confirmed by us.
                         !schema
@@ -423,7 +515,7 @@ impl Service for Supervisor {
                 if let Some(tx_sender) = tx_sender {
                     log::trace!("Sending deployment result report {:?}", unconfirmed_request);
                     let confirmation = DeployResult::new(unconfirmed_request, result);
-                    if let Err(e) = tx_sender.confirm_artifact_deploy((), confirmation) {
+                    if let Err(e) = tx_sender.report_deploy_result((), confirmation) {
                         log::error!("Cannot send `DeployResult`: {}", e);
                     }
                 }
@@ -432,8 +524,143 @@ impl Service for Supervisor {
         }
     }
 
-    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::wire(builder)
+    /// Flushes completed migrations and removes them from the list of pending.
+    ///
+    /// This has to be done in the block other than one in which migration was committed,
+    /// so this method is invoked in `before_transactions` of the next block.
+    fn flush_completed_migrations(
+        &self,
+        context: &mut ExecutionContext<'_>,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        // Collect pending migration requests which are successfully completed.
+        let finished_migrations = schema
+            .migrations_to_flush
+            .iter()
+            .map(|(_, request)| request)
+            .collect::<Vec<_>>();
+
+        // Clear the index, since we will flush all the migrations now.
+        schema.migrations_to_flush.clear();
+
+        drop(schema);
+        for request in finished_migrations {
+            // Flush the migration.
+            // This has to be done before the state update, so core will update the data version
+            // for instance.
+            context
+                .supervisor_extensions()
+                .flush_migration(request.service.as_ref())?;
+            log::trace!("Flushed and finished migration with request {:?}", request);
+
+            let mut schema = SchemaImpl::new(context.service_data());
+
+            // Update the state of a migration.
+            let mut state = schema.migration_state_unchecked(&request);
+            let instance = transactions::get_instance_by_name(&context, request.service.as_ref())
+                .expect("BUG: Migration succeed, but there is no such instance in core");
+            state.update(AsyncEventState::Succeed, instance.data_version().clone());
+            schema.migration_states.put(&request, state);
+        }
+
+        Ok(())
+    }
+
+    /// Rollbacks and removes migrations for which deadline height is already exceeded.
+    fn remove_outdated_migrations(
+        &self,
+        context: &mut ExecutionContext<'_>,
+    ) -> Result<(), ExecutionError> {
+        let height = context.data().for_core().height();
+
+        // Collect pending migration requests for which deadline was exceeded.
+        let requests_to_remove = SchemaImpl::new(context.service_data())
+            .pending_migrations
+            .iter()
+            .filter_map(|(_, request)| {
+                if request.deadline_height <= height {
+                    Some(request)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        for request in requests_to_remove {
+            let mut schema = SchemaImpl::new(context.service_data());
+            schema.pending_migrations.remove(&request);
+
+            let mut state = schema.migration_state_unchecked(&request);
+            if state.is_pending() {
+                // If state is marked as pending, change it to failed as well.
+                state.fail(AsyncEventState::Timeout);
+                schema.migration_states.put(&request, state);
+
+                // Then, rollback the migration.
+                drop(schema);
+                context
+                    .supervisor_extensions()
+                    .rollback_migration(request.service.as_ref())?;
+            }
+            log::trace!("Removed outdated migration request {:?}", request);
+        }
+
+        Ok(())
+    }
+
+    /// Goes through incomplete migrations, checking their statuses.
+    fn process_incomplete_migrations(&self, context: &mut AfterCommitContext<'_>) {
+        let service_key = context.service_key();
+
+        // First of all, check all the new migrations and request core to start them.
+        let pending_migrations: Vec<_> = {
+            let schema = SchemaImpl::new(context.service_data());
+            schema
+                .pending_migrations
+                .iter()
+                .filter_map(|(_, request)| {
+                    let state = schema.migration_state_unchecked(&request);
+
+                    let confirmed_by_us = schema
+                        .migration_confirmations
+                        .confirmed_by(&request, &service_key);
+
+                    // We are interested in requests that are both pending and not yet confirmed.
+                    // Despite the fact that `migration_confirmations` stores only successful
+                    // outcomes, receiving any failure report will immediately change the state
+                    // to `Failed`.
+                    // Thus if request is `pending` and there is no out signature in
+                    // `migration_confirmations` index, it means than we did not send the
+                    // result report, and should do it once core will provide this result.
+                    if state.is_pending() && !confirmed_by_us {
+                        Some(request)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
+
+        for request in pending_migrations {
+            let local_migration_result = context
+                .data()
+                .for_dispatcher()
+                .local_migration_result(request.service.as_ref());
+
+            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
+
+            if let Some(status) = local_migration_result {
+                // We've got a result, broadcast it if our node is a validator.
+                if let Some(tx_sender) = tx_sender {
+                    let confirmation = MigrationResult { request, status };
+
+                    if let Err(e) = tx_sender.report_migration_result((), confirmation) {
+                        log::error!("Cannot send `MigrationResult`: {}", e);
+                    }
+                }
+            }
+        }
     }
 }
 

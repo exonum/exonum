@@ -20,7 +20,10 @@ use exonum::{
         impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue, ObjectHash,
     },
     messages::{AnyTx, Verified},
-    runtime::{ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, MigrationStatus,
+        SUPERVISOR_INSTANCE_ID,
+    },
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -52,11 +55,12 @@ pub struct DeployRequest {
     pub deadline_height: Height,
 }
 
-/// Request for the artifact deployment.
+/// Confirmation that artifact deployment has ended for a validator.
+/// Result can be either successful or unsuccessful.
 #[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "proto::DeployResult")]
 pub struct DeployResult {
-    /// Artifact identifier.
+    /// Corresponding request.
     pub request: DeployRequest,
     /// Result of deployment.
     pub result: ExecutionStatus,
@@ -240,6 +244,29 @@ pub struct ConfigVote {
     pub propose_hash: Hash,
 }
 
+/// Request for the service data migration.
+#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::MigrationRequest")]
+pub struct MigrationRequest {
+    /// New artifact identifier.
+    pub new_artifact: ArtifactId,
+    /// Name of service for a migration.
+    pub service: String,
+    /// The height until which the migration procedure should be completed.
+    pub deadline_height: Height,
+}
+
+/// Confirmation that migration has ended for a validator.
+/// Result can be either successful or unsuccessful.
+#[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
+#[protobuf_convert(source = "proto::MigrationResult")]
+pub struct MigrationResult {
+    /// Corresponding request.
+    pub request: MigrationRequest,
+    /// Result of migration.
+    pub status: MigrationStatus,
+}
+
 /// Pending config change proposal entry
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Serialize, Deserialize)]
@@ -259,6 +286,7 @@ impl_binary_key_for_binary_value! { StopService }
 impl_binary_key_for_binary_value! { ResumeService }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
+impl_binary_key_for_binary_value! { MigrationRequest }
 
 impl_serde_hex_for_binary_value! { DeployRequest }
 impl_serde_hex_for_binary_value! { DeployResult }
@@ -267,6 +295,7 @@ impl_serde_hex_for_binary_value! { StopService }
 impl_serde_hex_for_binary_value! { ResumeService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
+impl_serde_hex_for_binary_value! { MigrationRequest }
 
 impl DeployResult {
     /// Creates a new `DeployRequest` object with a positive result.

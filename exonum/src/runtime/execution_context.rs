@@ -31,7 +31,6 @@ const ACCESS_ERROR_STR: &str = "An attempt to access blockchain data after execu
 ///
 /// The call can mean a transaction call, `before_transactions` / `after_transactions` hook,
 /// or the service constructor invocation.
-///
 #[derive(Debug)]
 pub struct ExecutionContext<'a> {
     /// The current state of the blockchain. It includes the new, not-yet-committed, changes to
@@ -42,7 +41,7 @@ pub struct ExecutionContext<'a> {
     /// Identifier of the service interface required for the call.
     interface_name: &'a str,
     /// ID of the executing service.
-    instance: InstanceDescriptor<'a>,
+    instance: InstanceDescriptor,
     /// Hash of the currently executing transaction, or `None` for non-transaction calls.
     transaction_hash: Option<Hash>,
     /// Reference to the dispatcher.
@@ -61,7 +60,7 @@ impl<'a> ExecutionContext<'a> {
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
         has_child_call_error: &'a mut bool,
-        instance: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor,
         author: PublicKey,
         transaction_hash: Hash,
     ) -> Self {
@@ -79,7 +78,7 @@ impl<'a> ExecutionContext<'a> {
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
         has_child_call_error: &'a mut bool,
-        instance: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor,
     ) -> Self {
         Self::new(
             dispatcher,
@@ -95,7 +94,7 @@ impl<'a> ExecutionContext<'a> {
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
         has_child_call_error: &'a mut bool,
-        instance: InstanceDescriptor<'a>,
+        instance: InstanceDescriptor,
         caller: Caller,
         transaction_hash: Option<Hash>,
     ) -> Self {
@@ -118,16 +117,16 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Provides access to blockchain data.
-    pub fn data(&self) -> BlockchainData<'a, &Fork> {
+    pub fn data(&self) -> BlockchainData<&Fork> {
         if *self.has_child_call_error {
             panic!(ACCESS_ERROR_STR);
         }
 
-        BlockchainData::new(self.fork, self.instance)
+        BlockchainData::new(self.fork, &self.instance.name)
     }
 
     /// Provides access to the data of the executing service.
-    pub fn service_data(&self) -> Prefixed<'a, &Fork> {
+    pub fn service_data(&self) -> Prefixed<&Fork> {
         self.data().for_executing_service()
     }
 
@@ -137,8 +136,8 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Returns a descriptor of the executing service instance.
-    pub fn instance(&self) -> InstanceDescriptor<'_> {
-        self.instance
+    pub fn instance(&self) -> &InstanceDescriptor {
+        &self.instance
     }
 
     /// Returns `true` if currently processed block is a genesis block.
@@ -169,7 +168,7 @@ impl<'a> ExecutionContext<'a> {
         if self.instance.id != SUPERVISOR_INSTANCE_ID {
             panic!("`supervisor_extensions` called within a non-supervisor service");
         }
-        SupervisorExtensions(self.reborrow(self.instance))
+        SupervisorExtensions(self.reborrow(self.instance.clone()))
     }
 
     /// Initiates adding a new service instance to the blockchain. The created service is not active
@@ -206,7 +205,7 @@ impl<'a> ExecutionContext<'a> {
     }
 
     /// Re-borrows an execution context with the given instance descriptor.
-    fn reborrow<'s>(&'s mut self, instance: InstanceDescriptor<'s>) -> ExecutionContext<'s> {
+    fn reborrow(&mut self, instance: InstanceDescriptor) -> ExecutionContext<'_> {
         if *self.has_child_call_error {
             panic!(ACCESS_ERROR_STR);
         }
@@ -234,7 +233,7 @@ impl<'a> ExecutionContext<'a> {
     fn child_context<'s>(
         &'s mut self,
         interface_name: &'s str,
-        instance: InstanceDescriptor<'s>,
+        instance: InstanceDescriptor,
         fallthrough_auth: bool,
     ) -> ExecutionContext<'s> {
         if *self.has_child_call_error {
@@ -319,10 +318,10 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
             .dispatcher
             .get_service(called_instance)
             .ok_or(CoreError::IncorrectInstanceId)?;
-
+        let instance_id = descriptor.id;
         let (runtime_id, runtime) = self
             .dispatcher
-            .runtime_for_service(descriptor.id)
+            .runtime_for_service(instance_id)
             .ok_or(CoreError::IncorrectRuntime)?;
 
         let context = self.child_context(interface_name, descriptor, fallthrough_auth);
@@ -332,7 +331,7 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
                 self.should_rollback();
                 err.set_runtime_id(runtime_id).set_call_site(|| {
                     CallSite::new(
-                        descriptor.id,
+                        instance_id,
                         CallType::Method {
                             interface: interface_name.to_owned(),
                             id: method_id,
@@ -370,7 +369,7 @@ impl<'a> SupervisorExtensions<'a> {
         constructor: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         self.0
-            .child_context("", self.0.instance, false)
+            .child_context("", self.0.instance.clone(), false)
             .initiate_adding_service(instance_spec, constructor)
     }
 
@@ -430,7 +429,7 @@ impl<'a> SupervisorExtensions<'a> {
             })?;
 
         DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact.clone())
+            .initiate_resuming_service(instance_id, spec.artifact)
             .map_err(From::from)
     }
 

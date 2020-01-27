@@ -16,6 +16,196 @@
 //!
 //! Private API includes requests that are available only to the blockchain
 //! administrators, e.g. shutting down the node.
+//!
+//! # Table of Contents
+//!
+//! - [List peers](#list-peers)
+//! - [Add peer](#add-peer)
+//! - [Get node info](#get-node-info)
+//! - [Check if consensus is enabled](#check-if-consensus-is-enabled)
+//! - [Change consensus status](#change-consensus-status)
+//! - [Node shutdown](#node-shutdown)
+//!
+//! # List Peers
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/peers` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`PeersInfo`] |
+//!
+//! Returns the list of incoming and outgoing connections for current node.
+//!
+//! [`PeersInfo`]: struct.PeersInfo.html
+//!
+//! ```
+//! use exonum_system_api::{private::PeersInfo, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let info: PeersInfo = api.private(ApiKind::System).get("v1/peers")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Add Peer
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/peers` |
+//! | Method      | POST   |
+//! | Query type  | [`ConnectInfo`] |
+//! | Return type | - |
+//!
+//! Adds a peer to the Exonum node. Node will attempt to connect to this peer.
+//!
+//! [`ConnectInfo`]: https://docs.rs/exonum-node/latest/exonum_node/struct.ConnectInfo.html
+//!
+//! ```
+//! use exonum_node::ConnectInfo;
+//! use exonum_system_api::SystemApiPlugin;
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! # let address = "127.0.0.1:8080".to_owned();
+//! # let public_key = Default::default();
+//! // Obtaining address and public key of target node skipped...
+//! let connect_info = ConnectInfo {
+//!     address,
+//!     public_key,
+//! };
+//!
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! api.private(ApiKind::System)
+//!     .query(&connect_info)
+//!     .post("v1/peers")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Get Node Info
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/network` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`NodeInfo`] |
+//!
+//! Obtains information about node.
+//!
+//! [`NodeInfo`]: struct.NodeInfo.html
+//!
+//! ```
+//! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let info: NodeInfo = api.private(ApiKind::System).get("v1/network")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Check if Consensus is Enabled
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/consensus_enabled` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | `bool` |
+//!
+//! Returns `true` if consensus is enabled on the node, and `false` otherwise.
+//!
+//! Note the difference between `consensus_enabled` and
+//! [public `healthcheck` endpoint](../public/index.html#node-health-info):
+//!
+//! This endpoint only reports the setting value (should the node participate in consensus
+//! or not), while `healthcheck` provides information about consensus status (since even
+//! with consensus setting turned on, node may not participate in consensus due to lack of
+//! peers).
+//!
+//! ```
+//! use exonum_system_api::SystemApiPlugin;
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let consensus_enabled: bool = api.private(ApiKind::System).get("v1/consensus_enabled")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Change Consensus Status
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/consensus_enabled` |
+//! | Method      | POST   |
+//! | Query type  | [`ConsensusEnabledQuery`] |
+//! | Return type | - |
+//!
+//! Enables or disables consensus on the node.
+//!
+//! [`ConsensusEnabledQuery`]: struct.ConsensusEnabledQuery.html
+//!
+//! ```
+//! use exonum_system_api::{private::ConsensusEnabledQuery, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! let enabled = true;
+//! let query = ConsensusEnabledQuery { enabled };
+//! api.private(ApiKind::System)
+//!     .query(&query)
+//!     .post("v1/consensus_enabled")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Node Shutdown
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/shutdown` |
+//! | Method      | POST   |
+//! | Query type  | - |
+//! | Return type | - |
+//!
+//! Shuts down the node.
+//!
+//! ```
+//! use exonum_system_api::SystemApiPlugin;
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .create();
+//! let api = testkit.api();
+//! api.private(ApiKind::System).post::<()>("v1/shutdown")?;
+//! # Ok(())
+//! # }
+//! ```
 
 use exonum::{blockchain::ApiSender, crypto::PublicKey, runtime::InstanceId};
 use exonum_api::{self as api, ApiBackend, ApiScope};
@@ -55,20 +245,27 @@ impl Default for NodeInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
-struct OutgoingConnection {
-    public_key: Option<PublicKey>,
+/// Information about the outgoing connection.
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct OutgoingConnection {
+    /// Public key of target node, if any.
+    pub public_key: Option<PublicKey>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct PeersInfo {
-    incoming_connections: Vec<ConnectInfo>,
-    outgoing_connections: HashMap<SocketAddr, OutgoingConnection>,
+/// Information about connections of the node.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PeersInfo {
+    /// Incoming connections.
+    pub incoming_connections: Vec<ConnectInfo>,
+    /// Outgoing connections.
+    pub outgoing_connections: HashMap<SocketAddr, OutgoingConnection>,
 }
 
+/// Query for setting consensus enabled or disabled.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-struct ConsensusEnabledQuery {
-    enabled: bool,
+pub struct ConsensusEnabledQuery {
+    /// Denotes if consensus should be enabled or disabled.
+    pub enabled: bool,
 }
 
 /// Private system API.

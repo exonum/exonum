@@ -48,7 +48,7 @@ use crate::{
 pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
     let is_genesis_block = CoreSchema::new(&fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
 
     let block = Block {
         height: Height(0),
@@ -365,7 +365,7 @@ fn test_dispatcher_simple() {
         rust_service.as_descriptor(),
     );
     context
-        .initiate_adding_service(rust_service.clone(), vec![])
+        .initiate_adding_service(rust_service, vec![])
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service =
@@ -398,7 +398,7 @@ fn test_dispatcher_simple() {
         conflicting_rust_service.as_descriptor(),
     );
     let err = context
-        .initiate_adding_service(conflicting_rust_service.clone(), vec![])
+        .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
@@ -621,7 +621,7 @@ impl DeploymentRuntime {
             });
 
         let fork = db.fork();
-        dispatcher.activate_pending(&fork);
+        Dispatcher::activate_pending(&fork);
         let patch = dispatcher.commit_block_and_notify_runtimes(fork);
         db.merge_sync(patch).unwrap();
         (artifact, Self::SPEC.to_vec())
@@ -842,7 +842,7 @@ fn failed_deployment_with_node_restart() {
 
     let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     assert!(dispatcher.is_artifact_deployed(&artifact));
@@ -935,7 +935,7 @@ fn stopped_service_workflow() {
         .expect("`initiate_adding_service` failed");
 
     // Activate artifact and service.
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     let mut fork = db.fork();
@@ -959,12 +959,12 @@ fn stopped_service_workflow() {
     let dummy_descriptor = InstanceDescriptor::new(2, "dummy");
 
     // Check that service schema is still reachable.
-    BlockchainData::new(&fork, dummy_descriptor)
+    BlockchainData::new(&fork, &dummy_descriptor.name)
         .for_service(instance_name)
         .expect("Schema should be reachable");
 
     // Commit service status
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     let mut fork = db.fork();
@@ -976,7 +976,7 @@ fn stopped_service_workflow() {
 
     // Check that service schema is now unreachable.
     assert!(
-        BlockchainData::new(&fork, dummy_descriptor)
+        BlockchainData::new(&fork, &dummy_descriptor.name)
             .for_service(instance_name)
             .is_none(),
         "Schema should be unreachable for stopped service"
@@ -1017,7 +1017,7 @@ fn stopped_service_workflow() {
 
     // Check that service schema is now unreachable.
     assert!(
-        BlockchainData::new(&fork, dummy_descriptor)
+        BlockchainData::new(&fork, &dummy_descriptor.name)
             .for_service(instance_name)
             .is_none(),
         "Service was stopped before restart, schema should be unreachable"
@@ -1031,7 +1031,7 @@ fn stopped_service_workflow() {
         service.as_descriptor(),
     );
     context
-        .initiate_adding_service(service.clone(), vec![])
+        .initiate_adding_service(service, vec![])
         .expect_err("`initiate_adding_service` should failed");
 
     // Check that it is impossible to stop service twice.
