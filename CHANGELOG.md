@@ -155,9 +155,12 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 ### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)
+
   - `compare` module;
   - `txvec` macro;
   - `TestKit::probe_all` and `TestKit::probe` methods.
+
+- `TestKitBuilder::create` method was renamed to `build`. (#1740)
 
 ### exonum-time
 
@@ -236,6 +239,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
 - It is now possible to iterate over keys of the indexes within a group. (#1662)
+
+- Unsafe optimizations / experimental features are now behind a `yolo` feature,
+  which is off by default. (#1740)
 
 #### exonum-node
 
