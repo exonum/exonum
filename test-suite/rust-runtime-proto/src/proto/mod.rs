@@ -18,7 +18,12 @@
 #![allow(bare_trait_objects)]
 #![allow(renamed_and_removed_lints)]
 
+#[cfg(test)]
+use exonum_crypto::proto::*;
+#[cfg(test)]
+use exonum_proto::proto::*;
+
 include!(concat!(
     env!("OUT_DIR"),
-    "/test_runtime_api_protobuf_mod.rs"
+    "/test_runtime_proto_protobuf_mod.rs"
 ));
