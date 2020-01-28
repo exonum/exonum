@@ -5,7 +5,7 @@
   "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "proto": "pbjs --keep-case -t static-module ../../../exonum/src/proto/schema/exonum/protocol.proto ../backend/src/proto/cryptocurrency.proto -o ./proto/stubs.js",
+    "proto": "pbjs --keep-case -t static-module proto/**/*.proto ../backend/src/proto/service.proto -o ./proto/stubs.js",
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
@@ -23,7 +23,7 @@
     "axios": "^0.19.0",
     "big-integer": "^1.6.44",
     "bootstrap": "^4.3.1",
-    "exonum-client": "^0.17.1",
+    "exonum-client": "^0.18.1",
     "express": "^4.17.1",
     "http-proxy-middleware": "^0.19.1",
     "jquery": "^3.4.1",
