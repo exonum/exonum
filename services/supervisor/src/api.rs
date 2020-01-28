@@ -40,7 +40,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/consensus-config` |
+//! | Path        | `/api/services/supervisor/consensus-config` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | [`ConsensusConfig`] |
@@ -60,7 +60,7 @@
 //!     .with_rust_service(Supervisor)
 //!     .with_artifact(Supervisor.artifact_id())
 //!     .with_instance(Supervisor::simple())
-//!     .create();
+//!     .build();
 //!
 //! let consensus_config: ConsensusConfig = testkit
 //!     .api()
@@ -75,7 +75,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/config-proposal` |
+//! | Path        | `/api/services/supervisor/config-proposal` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | `Option<[ConfigProposalWithHash]>` |
@@ -96,7 +96,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
@@ -115,7 +115,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/deploy-artifact` |
+//! | Path        | `/api/services/supervisor/deploy-artifact` |
 //! | Method      | POST   |
 //! | Body type   | [`DeployRequest`] |
 //! | Return type | [`Hash`] |
@@ -162,7 +162,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! // In this example, we will try to deploy `SomeService` artifact.
 //! let deploy_request = DeployRequest {
@@ -191,7 +191,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/migrate` |
+//! | Path        | `/api/services/supervisor/migrate` |
 //! | Method      | POST   |
 //! | Body type   | [`MigrationRequest`] |
 //! | Return type | [`Hash`] |
@@ -226,7 +226,7 @@
 //!     .with_artifact(Supervisor.artifact_id())
 //!     .with_instance(Supervisor::simple())
 //!     // Add some service that supports migrations...
-//!     .create();
+//!     .build();
 //!
 //! // Migration request creation skipped...
 //! let migration_request = // Migration of some service.
@@ -255,7 +255,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/propose-config` |
+//! | Path        | `/api/services/supervisor/propose-config` |
 //! | Method      | POST   |
 //! | Body type   | [`ConfigPropose`] |
 //! | Return type | [`Hash`] |
@@ -299,7 +299,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(0));
@@ -324,7 +324,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/confirm-config` |
+//! | Path        | `/api/services/supervisor/confirm-config` |
 //! | Method      | POST   |
 //! | Query type  | [`DeployRequest`] |
 //! | Return type | [`Hash`] |
@@ -363,7 +363,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(10));
@@ -399,7 +399,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/configuration-number` |
+//! | Path        | `/api/services/supervisor/configuration-number` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | `u64` |
@@ -428,7 +428,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let configuration_number: u64 = testkit
 //!     .api()
@@ -445,7 +445,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/supervisor-config` |
+//! | Path        | `/api/services/supervisor/supervisor-config` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | [`SupervisorConfig`] |
@@ -465,7 +465,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let config: SupervisorConfig = testkit
 //!     .api()
@@ -481,7 +481,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/deploy-status` |
+//! | Path        | `/api/services/supervisor/deploy-status` |
 //! | Method      | GET   |
 //! | Query type  | [`DeployInfoQuery`] |
 //! | Return type | [`AsyncEventState`] |
@@ -513,7 +513,7 @@
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
 //! #         .with_rust_service(SomeService)
-//! #         .create();
+//! #         .build();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.
 //! #     DeployRequest {
@@ -544,7 +544,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/migration-status` |
+//! | Path        | `/api/services/supervisor/migration-status` |
 //! | Method      | GET   |
 //! | Query type  | [`MigrationInfoQuery`] |
 //! | Return type | [`MigrationState`] |
@@ -566,7 +566,7 @@
 //! #         .with_rust_service(Supervisor)
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
-//! #         .create();
+//! #         .build();
 //!
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
 //! #     MigrationRequest {

@@ -149,6 +149,16 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
   implementing `Access`, such as `&Fork` or `&dyn Snapshot`. Methods from `AccessExt`
   trait accept `self` by reference now. (#1739)
 
+- `ProofPath` serialization during map hash computations was unified.
+  It now uses `LEB128(bit_length) || bytes` format, which was previously used
+  for branches, but not for a single-entry maps. (#1743)
+
+- Serialization of `ProofPath`s within `MapProof` Protobuf messages
+  was changed to a more compact and implementation-independent format. (#1743)
+
+- `MapProof` Protobuf messages now serialize keys according to their
+  `BinaryValue` implementation, rather than `BinaryKey`. (#1743)
+
 #### exonum-rust-runtime
 
 - Service interfaces now have to specify method IDs with either `interface_method`
