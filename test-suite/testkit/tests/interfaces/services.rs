@@ -231,7 +231,7 @@ pub trait CustomCallInterface<Ctx> {
 
 pub type CustomCall = fn(ExecutionContext<'_>) -> Result<(), ExecutionError>;
 
-#[derive(ServiceFactory, ServiceDispatcher, Clone, Copy)]
+#[derive(ServiceFactory, ServiceDispatcher, Clone)]
 #[service_factory(
     artifact_name = "custom-call",
     service_constructor = "Self::new_instance"
@@ -247,7 +247,7 @@ impl CustomCallService {
     }
 
     pub fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(*self)
+        Box::new(self.clone())
     }
 }
 
