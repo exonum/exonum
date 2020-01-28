@@ -40,7 +40,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/consensus-config` |
+//! | Path        | `/api/services/supervisor/consensus-config` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | [`ConsensusConfig`] |
@@ -75,7 +75,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/config-proposal` |
+//! | Path        | `/api/services/supervisor/config-proposal` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | `Option<[ConfigProposalWithHash]>` |
@@ -115,7 +115,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/deploy-artifact` |
+//! | Path        | `/api/services/supervisor/deploy-artifact` |
 //! | Method      | POST   |
 //! | Body type   | [`DeployRequest`] |
 //! | Return type | [`Hash`] |
@@ -191,7 +191,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/migrate` |
+//! | Path        | `/api/services/supervisor/migrate` |
 //! | Method      | POST   |
 //! | Body type   | [`MigrationRequest`] |
 //! | Return type | [`Hash`] |
@@ -255,7 +255,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/propose-config` |
+//! | Path        | `/api/services/supervisor/propose-config` |
 //! | Method      | POST   |
 //! | Body type   | [`ConfigPropose`] |
 //! | Return type | [`Hash`] |
@@ -324,7 +324,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/confirm-config` |
+//! | Path        | `/api/services/supervisor/confirm-config` |
 //! | Method      | POST   |
 //! | Query type  | [`DeployRequest`] |
 //! | Return type | [`Hash`] |
@@ -399,7 +399,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/configuration-number` |
+//! | Path        | `/api/services/supervisor/configuration-number` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | `u64` |
@@ -445,7 +445,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/supervisor-config` |
+//! | Path        | `/api/services/supervisor/supervisor-config` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | [`SupervisorConfig`] |
@@ -481,7 +481,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/deploy-status` |
+//! | Path        | `/api/services/supervisor/deploy-status` |
 //! | Method      | GET   |
 //! | Query type  | [`DeployInfoQuery`] |
 //! | Return type | [`AsyncEventState`] |
@@ -544,7 +544,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/supervisor/v1/migration-status` |
+//! | Path        | `/api/services/supervisor/migration-status` |
 //! | Method      | GET   |
 //! | Query type  | [`MigrationInfoQuery`] |
 //! | Return type | [`MigrationState`] |
