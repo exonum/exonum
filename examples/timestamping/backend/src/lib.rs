@@ -49,7 +49,7 @@ use exonum_supervisor::Configure;
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("TimestampingInterface"))]
+#[service_dispatcher(implements("TimestampingInterface", raw = "Configure<Params = Config>"))]
 #[service_factory(proto_sources = "proto")]
 pub struct TimestampingService;
 
