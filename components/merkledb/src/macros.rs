@@ -160,3 +160,47 @@ macro_rules! impl_serde_hex_for_binary_value {
         }
     };
 }
+
+/// Implements `BinaryValue` traint for tuples cross single member generic tuple struct.
+/// If expression begins with for keyword it creates implementation for existend structure
+/// supposing it meets requirements, mentioned above. Otherwise it creates new structure
+/// according to supplied meta attributes, visibility, name and type constraint for generic type.
+/// Target tuple types must be listed in curly braces.
+#[macro_export]
+macro_rules! binary_value_tuple_impls {
+    () => ();
+    ($(#[$attr:meta])* $vis:vis $name:ident $(where $whc:ty)? {$(($t1:ty$(,$( $t2:ty$(,$( $t3:ty$(,$( $t4:ty$(, $($t5:ty$(, $($t6:ty$(, $($t7:ty$(,$( $t8:ty$(,$( $t9:ty$(,$( $t10:ty$(,$( $t11:ty$(,$( $t12:ty)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)),+$(,)?} $($rest:tt)*) => {
+        $(#[$attr])*
+        $vis struct $name<T$(: $whc)?>(pub T);
+        $crate::binary_value_tuple_impls!(for $name {$(($t1$(, $t2$(, $t3$(, $t4$(, $t5$(, $t6$(, $t7$(, $t8$(, $t9$(, $t10$(, $t11$(, $t12)?)?)?)?)?)?)?)?)?)?)?)),+} $($rest)*);
+    };
+    (for $name:ident {$(($t1:ty$(,$( $t2:ty$(,$( $t3:ty$(,$( $t4:ty$(, $($t5:ty$(, $($t6:ty$(, $($t7:ty$(,$( $t8:ty$(,$( $t9:ty$(,$( $t10:ty$(,$( $t11:ty$(,$( $t12:ty)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)),+$(,)?} $($rest:tt)*) => {
+        $($crate::binary_value_tuple_impls!($name ($t1, 0)$(, ($t2, 1)$(, ($t3, 2)$(, ($t4, 3)$(, ($t5, 4)$(, ($t6, 5)$(, ($t7, 6)$(, ($t8, 7)$(, ($t9, 8)$(, ($t10, 9)$(, ($t11, 10)$(, ($t12, 11))?)?)?)?)?)?)?)?)?)?)?);)+
+        $crate::binary_value_tuple_impls!($($rest)*);
+    };
+    ($name:ident $(($t:ty, $idx:tt)),+) => {
+        impl $crate::BinaryValue for $name<($($t,)+)> {
+            fn to_bytes(&self) -> Vec<u8> {
+                let inner = &self.0;
+                $crate::concat_buffers(&mut [$(inner.$idx.to_bytes()),+])
+            }
+
+            fn from_bytes(bytes: ::std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+                use ::std::borrow::Cow;
+                let parts = $crate::split_buffer_into_sized_parts(&bytes, $crate::binary_value_tuple_impls!(@COUNT $($t)+))?;
+
+                Ok($name((
+                    $(<$t as $crate::BinaryValue>::from_bytes(Cow::Borrowed(&parts[$idx]))?),+)
+                ))
+            }
+        }
+
+        impl From<($($t,)+)> for $name<($($t,)+)> {
+            fn from(t: ($($t,)+)) -> Self {
+                Self(t)
+            }
+        }
+    };
+    (@COUNT $head:tt $($tail:tt)*) => (1_usize + $crate::binary_value_tuple_impls!(@COUNT $($tail)*));
+    (@COUNT) => (0_usize);
+}
