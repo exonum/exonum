@@ -199,7 +199,7 @@ fn test_runtime_factory() {
         .with_additional_runtime(TestRuntime::with_runtime_tester(tester.clone()))
         .with_parametric_artifact(artifact.clone(), deploy_args.clone())
         .with_instance(inst_cfg)
-        .create();
+        .build();
 
     tester.assert_artifact_deployed(artifact, deploy_args);
     tester.assert_constructor_params_passed(constructor);

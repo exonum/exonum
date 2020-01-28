@@ -36,8 +36,7 @@ query the blockchain info.
 
 ## HTTP API
 
-REST API of the service is documented in the [`api` module](api-module), and its
-WebSocket API in the [`api::websocket` module](websocket-module).
+REST and WebSocket APIs of the service is documented in the crate docs.
 
 ## Usage
 

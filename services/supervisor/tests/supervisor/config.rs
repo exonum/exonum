@@ -507,7 +507,7 @@ fn test_service_config_discard_fake_supervisor() {
         .with_artifact(fake_supervisor_artifact)
         .with_instance(fake_supervisor_instance)
         .with_default_rust_service(ConfigChangeService)
-        .create();
+        .build();
 
     let params = "I am a new parameter".to_owned();
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)

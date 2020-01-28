@@ -48,7 +48,7 @@ use crate::{
 pub fn create_genesis_block(dispatcher: &mut Dispatcher, fork: Fork) -> Patch {
     let is_genesis_block = CoreSchema::new(&fork).block_hashes_by_height().is_empty();
     assert!(is_genesis_block);
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
 
     let block = Block {
         height: Height(0),
@@ -84,8 +84,13 @@ impl Dispatcher {
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::for_block_call(self, fork, instance);
-        runtime.execute(context, call_info.method_id, arguments)
+
+        let mut should_rollback = false;
+        let context = ExecutionContext::for_block_call(self, fork, &mut should_rollback, instance);
+        let res = runtime.execute(context, call_info.method_id, arguments);
+
+        assert!(!should_rollback);
+        res
     }
 
     /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
@@ -351,10 +356,16 @@ fn test_dispatcher_simple() {
         RUST_SERVICE_NAME.into(),
         rust_artifact.clone(),
     );
-    let mut context =
-        ExecutionContext::for_block_call(&dispatcher, &mut fork, rust_service.as_descriptor());
+
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        rust_service.as_descriptor(),
+    );
     context
-        .initiate_adding_service(rust_service.clone(), vec![])
+        .initiate_adding_service(rust_service, vec![])
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service =
@@ -383,10 +394,11 @@ fn test_dispatcher_simple() {
     let mut context = ExecutionContext::for_block_call(
         &dispatcher,
         &mut fork,
+        &mut should_rollback,
         conflicting_rust_service.as_descriptor(),
     );
     let err = context
-        .initiate_adding_service(conflicting_rust_service.clone(), vec![])
+        .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
 
@@ -460,6 +472,8 @@ fn test_dispatcher_simple() {
         expected_new_services,
         changes_rx.iter().take(2).collect::<Vec<_>>()
     );
+
+    assert!(!should_rollback);
 }
 
 #[derive(Debug, Clone)]
@@ -607,7 +621,7 @@ impl DeploymentRuntime {
             });
 
         let fork = db.fork();
-        dispatcher.activate_pending(&fork);
+        Dispatcher::activate_pending(&fork);
         let patch = dispatcher.commit_block_and_notify_runtimes(fork);
         db.merge_sync(patch).unwrap();
         (artifact, Self::SPEC.to_vec())
@@ -828,7 +842,7 @@ fn failed_deployment_with_node_restart() {
 
     let fork = db.fork();
     Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     assert!(dispatcher.is_artifact_deployed(&artifact));
@@ -909,14 +923,19 @@ fn stopped_service_workflow() {
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec::from_raw_parts(instance_id, instance_name.into(), artifact);
-    let mut context =
-        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
     context
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
 
     // Activate artifact and service.
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     let mut fork = db.fork();
@@ -940,12 +959,12 @@ fn stopped_service_workflow() {
     let dummy_descriptor = InstanceDescriptor::new(2, "dummy");
 
     // Check that service schema is still reachable.
-    BlockchainData::new(&fork, dummy_descriptor)
+    BlockchainData::new(&fork, &dummy_descriptor.name)
         .for_service(instance_name)
         .expect("Schema should be reachable");
 
     // Commit service status
-    dispatcher.activate_pending(&fork);
+    Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     let mut fork = db.fork();
@@ -957,7 +976,7 @@ fn stopped_service_workflow() {
 
     // Check that service schema is now unreachable.
     assert!(
-        BlockchainData::new(&fork, dummy_descriptor)
+        BlockchainData::new(&fork, &dummy_descriptor.name)
             .for_service(instance_name)
             .is_none(),
         "Schema should be unreachable for stopped service"
@@ -998,17 +1017,21 @@ fn stopped_service_workflow() {
 
     // Check that service schema is now unreachable.
     assert!(
-        BlockchainData::new(&fork, dummy_descriptor)
+        BlockchainData::new(&fork, &dummy_descriptor.name)
             .for_service(instance_name)
             .is_none(),
         "Service was stopped before restart, schema should be unreachable"
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context =
-        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
     context
-        .initiate_adding_service(service.clone(), vec![])
+        .initiate_adding_service(service, vec![])
         .expect_err("`initiate_adding_service` should failed");
 
     // Check that it is impossible to stop service twice.
@@ -1018,4 +1041,5 @@ fn stopped_service_workflow() {
         actual_err,
         ErrorMatch::from_fail(&CoreError::ServiceNotActive)
     );
+    assert!(!should_rollback);
 }

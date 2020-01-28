@@ -27,7 +27,7 @@ fn create_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(2)
         .with_plugin(SystemApiPlugin)
-        .create()
+        .build()
 }
 
 #[test]

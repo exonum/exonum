@@ -20,6 +20,11 @@ import "google/protobuf/timestamp.proto";
 
 package exonum.tests;
 
+message Transfer {
+  string message = 1;
+  fixed64 seed = 2;
+}
+
 message Point {
   uint32 x = 1;
   uint32 y = 2;

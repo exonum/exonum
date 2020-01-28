@@ -195,7 +195,7 @@ impl<T: Database> CheckpointDbInner<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use exonum_merkledb::{access::AccessExt, TemporaryDB};
+    use exonum_merkledb::{access::CopyAccessExt, TemporaryDB};
 
     fn stack_len<T>(db: &CheckpointDb<T>) -> usize {
         let inner = db.inner.read().unwrap();

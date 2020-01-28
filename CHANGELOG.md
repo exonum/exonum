@@ -119,6 +119,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Public structures and enums were made non-exhaustive. (#1710)
 
+- Blockchain data access from the `ExecutionContext` after an error in a nested
+  call is prohibited. (#1733)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
@@ -145,6 +148,20 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Public structures and enums were made non-exhaustive. (#1710)
 
+- `CopyAccessExt` trait has been introduced. This trait is helpful for references
+  implementing `Access`, such as `&Fork` or `&dyn Snapshot`. Methods from `AccessExt`
+  trait accept `self` by reference now. (#1739)
+
+- `ProofPath` serialization during map hash computations was unified.
+  It now uses `LEB128(bit_length) || bytes` format, which was previously used
+  for branches, but not for a single-entry maps. (#1743)
+
+- Serialization of `ProofPath`s within `MapProof` Protobuf messages
+  was changed to a more compact and implementation-independent format. (#1743)
+
+- `MapProof` Protobuf messages now serialize keys according to their
+  `BinaryValue` implementation, rather than `BinaryKey`. (#1743)
+
 #### exonum-rust-runtime
 
 - Service interfaces now have to specify method IDs with either `interface_method`
@@ -155,9 +172,12 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 ### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)
+
   - `compare` module;
   - `txvec` macro;
   - `TestKit::probe_all` and `TestKit::probe` methods.
+
+- `TestKitBuilder::create` method was renamed to `build`. (#1740)
 
 ### exonum-time
 
@@ -236,6 +256,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
 
 - It is now possible to iterate over keys of the indexes within a group. (#1662)
+
+- Unsafe optimizations / experimental features are now behind a `yolo` feature,
+  which is off by default. (#1740)
 
 #### exonum-node
 

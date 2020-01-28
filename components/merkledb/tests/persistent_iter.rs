@@ -24,7 +24,7 @@ use rand_xorshift::XorShiftRng;
 
 use exonum_merkledb::migration::{rollback_migration, Scratchpad};
 use exonum_merkledb::{
-    access::AccessExt, migration::PersistentIter, Database, Fork, IndexAddress, IndexType,
+    access::CopyAccessExt, migration::PersistentIter, Database, Fork, IndexAddress, IndexType,
     TemporaryDB,
 };
 
@@ -182,39 +182,39 @@ impl IterState {
         match self.collection.ty {
             IndexType::List => {
                 let list = fork.get_list::<_, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &list);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &list);
                 self.items.extend(iter.map(|(_, value)| value).take(amount));
             }
             IndexType::ProofList => {
                 let list = fork.get_proof_list::<_, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &list);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &list);
                 self.items.extend(iter.map(|(_, value)| value).take(amount));
             }
             IndexType::SparseList => {
                 let list = fork.get_sparse_list::<_, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &list);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &list);
                 self.items.extend(iter.map(|(_, value)| value).take(amount));
             }
 
             IndexType::Map => {
                 let map = fork.get_map::<_, u64, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &map);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &map);
                 self.items.extend(iter.map(|(_, value)| value).take(amount));
             }
             IndexType::ProofMap => {
                 let map = fork.get_proof_map::<_, u64, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &map);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &map);
                 self.items.extend(iter.map(|(_, value)| value).take(amount));
             }
 
             IndexType::KeySet => {
                 let set = fork.get_key_set::<_, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &set);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &set);
                 self.items.extend(iter.take(amount));
             }
             IndexType::ValueSet => {
                 let set = fork.get_value_set::<_, u64>(addr);
-                let iter = PersistentIter::new(scratchpad, &self.name, &set);
+                let iter = PersistentIter::new(&scratchpad, &self.name, &set);
                 self.items.extend(iter.map(|(_, value)| value).take(amount));
             }
 

@@ -148,7 +148,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -167,7 +167,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -189,7 +189,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -208,7 +208,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -230,7 +230,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -252,7 +252,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -278,7 +278,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -303,7 +303,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -325,7 +325,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -472,7 +472,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -490,7 +490,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -532,7 +532,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -568,7 +568,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -606,7 +606,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -636,7 +636,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum_merkledb::{access::AccessExt, TemporaryDB, Database, ProofListIndex};
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ProofListIndex};
     ///
     /// let db = TemporaryDB::new();
     /// let fork = db.fork();
@@ -661,16 +661,17 @@ where
 /// The `object_hash` is calculated as follows:
 ///
 /// ```text
-/// h = sha-256( HashTag::ListNode || len as u64 || merkle_root )
+/// h = sha256( HashTag::ListNode || u64_LE(len) || root_hash )
 /// ```
 ///
-/// In particular, for an empty list
+/// Here, `u64_LE` is the 8-byte little-endian serialization of an integer. In particular,
+/// for an empty list
 ///
 /// ```text
-/// h = sha-256( HashTag::ListNode || 0 || Hash::zero() )
+/// h = sha256( HashTag::ListNode || 0 || Hash::zero() )
 /// ```
 ///
-/// Here, `merkle_root` is defined recursively based on the binary Merkle tree corresponding
+/// `root_hash` is defined recursively based on the binary Merkle tree corresponding
 /// to the list. The tree is built so that left children at each level are filled up first,
 /// and the depth of each leaf node is the same. For example, here's the structure of a tree
 /// with 6 leaves:
@@ -688,19 +689,23 @@ where
 /// For branch nodes of the tree,
 ///
 /// ```text
-/// node_hash = sha-256( HashTag::ListBranchNode || left_hash || right_hash? )
+/// node_hash = sha256( HashTag::ListBranchNode || left_hash || right_hash? )
 /// ```
 ///
 /// where `left_hash` is the hash of the left child and `right_hash` is the optional hash
 /// of the right child, which may be absent if the tree is not balanced.
 ///
-/// For leaves, the hash is `object_hash` of the corresponding object.
+/// For leaves, the hash is
+///
+/// ```text
+/// leaf_hash = sha256( HashTag::Blob || serialized_value ).
+/// ```
 ///
 /// # Examples
 ///
 /// ```
 /// # use exonum_merkledb::{
-/// #     access::AccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash,
+/// #     access::CopyAccessExt, TemporaryDB, Database, ProofListIndex, HashTag, ObjectHash,
 /// # };
 /// # use exonum_crypto::Hash;
 /// let db = TemporaryDB::new();

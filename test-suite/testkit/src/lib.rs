@@ -69,7 +69,7 @@
 //!     .with_artifact(artifact.clone())
 //!     .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
 //!     .with_rust_service(service)
-//!     .create();
+//!     .build();
 //!
 //! // Create a few transactions.
 //! let keys = gen_keypair();
@@ -100,10 +100,9 @@
 #![deny(unsafe_code, bare_trait_objects)]
 
 pub use crate::{
-    api::{ApiKind, TestKitApi},
+    api::{ApiKind, RequestBuilder, TestKitApi},
     builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
-    server::TestKitStatus,
 };
 pub use exonum_explorer as explorer;
 
@@ -149,7 +148,7 @@ mod checkpoint_db;
 pub mod migrations;
 mod network;
 mod poll_events;
-mod server;
+pub mod server;
 
 type ApiNotifierChannel = (
     mpsc::Sender<UpdateEndpoints>,
@@ -202,7 +201,7 @@ impl TestKit {
                     .with_constructor(constructor),
             )
             .with_rust_service(service_factory)
-            .create()
+            .build()
     }
 
     fn assemble(
@@ -287,7 +286,8 @@ impl TestKit {
 
     /// Returns control messages received by the testkit since the last call to this method.
     ///
-    /// This method is only available if the crate is compiled with the `exonum-node` feature.
+    /// This method is only available if the crate is compiled with the `exonum-node` feature,
+    /// which is off by default.
     #[cfg(feature = "exonum-node")]
     pub fn poll_control_messages(&mut self) -> Vec<ExternalMessage> {
         use crate::poll_events::poll_all;
@@ -383,7 +383,7 @@ impl TestKit {
     ///     .with_artifact(artifact.clone())
     ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
     ///     .with_rust_service(ExampleService)
-    ///     .create();
+    ///     .build();
     /// expensive_setup(&mut testkit);
     /// let keys = exonum::crypto::gen_keypair();
     /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
@@ -585,7 +585,7 @@ impl TestKit {
     /// # use exonum::helpers::Height;
     /// # use exonum_testkit::TestKitBuilder;
     /// # fn main() {
-    /// let mut testkit = TestKitBuilder::validator().create();
+    /// let mut testkit = TestKitBuilder::validator().build();
     /// testkit.create_blocks_until(Height(5));
     /// assert_eq!(Height(5), testkit.height());
     /// # }
@@ -624,12 +624,12 @@ impl TestKit {
         byzantine_quorum(self.network().validators().len())
     }
 
-    /// Returns the leader on the current height. At the moment first validator.
+    /// Returns the leader on the current height. At the moment, this is always the first validator.
     pub fn leader(&self) -> TestNode {
         self.network().validators()[0].clone()
     }
 
-    /// Returns the reference to test network.
+    /// Returns the reference to the test network.
     pub fn network(&self) -> &TestNetwork {
         &self.network
     }
@@ -859,7 +859,7 @@ impl StoppedTestKit {
 
 #[test]
 fn test_create_block_heights() {
-    let mut testkit = TestKitBuilder::validator().create();
+    let mut testkit = TestKitBuilder::validator().build();
     assert_eq!(Height(0), testkit.height());
     testkit.create_block();
     assert_eq!(Height(1), testkit.height());
@@ -869,20 +869,20 @@ fn test_create_block_heights() {
 
 #[test]
 fn test_number_of_validators_in_builder() {
-    let testkit = TestKitBuilder::auditor().create();
+    let testkit = TestKitBuilder::auditor().build();
     assert_eq!(testkit.network().validators().len(), 1);
     assert_ne!(testkit.validator(ValidatorId(0)), testkit.us());
 
-    let testkit = TestKitBuilder::validator().create();
+    let testkit = TestKitBuilder::validator().build();
     assert_eq!(testkit.network().validators().len(), 1);
     assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
 
-    let testkit = TestKitBuilder::auditor().with_validators(3).create();
+    let testkit = TestKitBuilder::auditor().with_validators(3).build();
     assert_eq!(testkit.network().validators().len(), 3);
     let us = testkit.us();
     assert!(!testkit.network().validators().into_iter().any(|v| v == us));
 
-    let testkit = TestKitBuilder::validator().with_validators(5).create();
+    let testkit = TestKitBuilder::validator().with_validators(5).build();
     assert_eq!(testkit.network().validators().len(), 5);
     assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
 }
@@ -890,7 +890,7 @@ fn test_number_of_validators_in_builder() {
 #[test]
 #[should_panic(expected = "validator should be present")]
 fn test_zero_validators_in_builder() {
-    TestKitBuilder::auditor().with_validators(0).create();
+    TestKitBuilder::auditor().with_validators(0).build();
 }
 
 #[test]
@@ -899,12 +899,12 @@ fn test_multiple_spec_of_validators_in_builder() {
     let testkit = TestKitBuilder::auditor()
         .with_validators(5)
         .with_validators(2)
-        .create();
+        .build();
     drop(testkit);
 }
 
 #[test]
 fn test_stop() {
-    let testkit = TestKitBuilder::validator().with_logger().create();
+    let testkit = TestKitBuilder::validator().with_logger().build();
     let _testkit_stopped = testkit.stop();
 }

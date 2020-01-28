@@ -52,7 +52,7 @@
 //!
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
-//!     .create();
+//!     .build();
 //! let api = testkit.api();
 //! let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
 //! assert!(info.core_version.is_some());

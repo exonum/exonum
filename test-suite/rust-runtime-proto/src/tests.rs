@@ -14,14 +14,13 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
+use exonum::crypto::{self, Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
+use exonum_proto::ProtobufConvert;
 use pretty_assertions::assert_eq;
 
 use std::{borrow::Cow, collections::HashMap};
-
-use super::{schema, ProtobufConvert};
-use crate::crypto::{self, Hash, PublicKey};
 
 #[test]
 fn test_date_time_pb_convert() {
@@ -33,7 +32,7 @@ fn test_date_time_pb_convert() {
 
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::tests::Point")]
+#[protobuf_convert(source = "crate::proto::tests::Point")]
 struct Point {
     x: u32,
     y: u32,
@@ -54,7 +53,7 @@ fn test_simple_struct_round_trip() {
 
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::tests::TestProtobufConvert")]
+#[protobuf_convert(source = "crate::proto::tests::TestProtobufConvert")]
 struct StructWithScalarTypes {
     key: PublicKey,
     hash: Hash,
@@ -112,7 +111,7 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[protobuf_convert(source = "schema::tests::TestProtobufConvertRepeated")]
+#[protobuf_convert(source = "crate::proto::tests::TestProtobufConvertRepeated")]
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 struct StructWithRepeatedTypes {
@@ -145,7 +144,7 @@ fn test_repeated_struct_round_trip() {
 
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::tests::TestProtobufConvertMap")]
+#[protobuf_convert(source = "crate::proto::tests::TestProtobufConvertMap")]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
     string_map: HashMap<u32, String>,
@@ -185,7 +184,7 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[protobuf_convert(source = "schema::tests::TestFixedArrays")]
+#[protobuf_convert(source = "crate::proto::tests::TestFixedArrays")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 struct StructWithFixedArrays {

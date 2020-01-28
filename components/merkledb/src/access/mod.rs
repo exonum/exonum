@@ -26,7 +26,7 @@
 //!   are separated by namespaces.
 //! - [`Scratchpad`]s can be used for temporary data. They are distinguished by namespaces as well.
 //!
-//! [`AccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
+//! [`CopyAccessExt`] extends [`Access`] and provides helper methods to instantiate indexes. This
 //! is useful in quick-and-dirty testing. For more complex applications, consider deriving
 //! data schema via [`FromAccess`].
 //!
@@ -52,14 +52,14 @@
 //! [`Migration`]: ../migration/struct.Migration.html
 //! [migrations]: ../migration/index.html
 //! [`Scratchpad`]: ../migration/struct.Scratchpad.html
-//! [`AccessExt`]: trait.AccessExt.html
+//! [`CopyAccessExt`]: trait.CopyAccessExt.html
 //! [`FromAccess`]: trait.FromAccess.html
 
 use failure::{Error, Fail};
 
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
-pub use self::extensions::AccessExt;
+pub use self::extensions::{AccessExt, CopyAccessExt};
 pub use crate::views::{AsReadonly, RawAccess, RawAccessMut};
 
 use crate::{
@@ -74,9 +74,9 @@ mod extensions;
 ///
 /// This trait is not intended to be implemented by the types outside the crate; indeed,
 /// it instantiates several crate-private types. Correspondingly, `Access` methods
-/// rarely need to be used directly; use [its extension trait][`AccessExt`] instead.
+/// rarely need to be used directly; use [its extension trait][`CopyAccessExt`] instead.
 ///
-/// [`AccessExt`]: trait.AccessExt.html
+/// [`CopyAccessExt`]: trait.CopyAccessExt.html
 ///
 /// # Examples
 ///
@@ -162,7 +162,7 @@ impl<T: RawAccess> Access for T {
 /// # Examples
 ///
 /// ```
-/// use exonum_merkledb::{access::{AccessExt, Prefixed}, Database, TemporaryDB};
+/// use exonum_merkledb::{access::{AccessExt, CopyAccessExt, Prefixed}, Database, TemporaryDB};
 ///
 /// let db = TemporaryDB::new();
 /// let fork = db.fork();
@@ -172,12 +172,12 @@ impl<T: RawAccess> Access for T {
 /// assert_eq!(same_list.len(), 3);
 /// ```
 #[derive(Debug, Clone)]
-pub struct Prefixed<'a, T> {
+pub struct Prefixed<T> {
     access: T,
-    prefix: Cow<'a, str>,
+    prefix: String,
 }
 
-impl<'a, T: RawAccess> Prefixed<'a, T> {
+impl<T: RawAccess> Prefixed<T> {
     /// Creates a new prefixed access.
     ///
     /// # Panics
@@ -185,14 +185,14 @@ impl<'a, T: RawAccess> Prefixed<'a, T> {
     /// - Will panic if the prefix is not a [valid prefix name].
     ///
     /// [valid prefix name]: ../validation/fn.is_valid_index_name_component.html
-    pub fn new(prefix: impl Into<Cow<'a, str>>, access: T) -> Self {
+    pub fn new(prefix: impl Into<String>, access: T) -> Self {
         let prefix = prefix.into();
         assert_valid_name_component(prefix.as_ref());
         Self { access, prefix }
     }
 }
 
-impl<T: RawAccess> Access for Prefixed<'_, T> {
+impl<T: RawAccess> Access for Prefixed<T> {
     type Base = T;
 
     fn get_index_metadata(self, addr: IndexAddress) -> Result<Option<IndexMetadata>, AccessError> {
@@ -309,7 +309,7 @@ pub enum AccessErrorKind {
 /// ```
 /// use exonum_derive::FromAccess;
 /// # use exonum_merkledb::{
-/// #     access::{Access, AccessExt, AccessError, FromAccess, RawAccessMut},
+/// #     access::{Access, CopyAccessExt, AccessError, FromAccess, RawAccessMut},
 /// #     Database, Entry, Group, Lazy, MapIndex, IndexAddress, TemporaryDB,
 /// # };
 ///

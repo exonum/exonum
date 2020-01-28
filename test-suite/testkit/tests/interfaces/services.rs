@@ -222,3 +222,52 @@ impl DefaultInstance for AnyCallService {
     const INSTANCE_ID: u32 = Self::ID;
     const INSTANCE_NAME: &'static str = "any-call";
 }
+
+#[exonum_interface(auto_ids)]
+pub trait CustomCallInterface<Ctx> {
+    type Output;
+    fn custom_call(&self, context: Ctx, arg: Vec<u8>) -> Self::Output;
+}
+
+pub type CustomCall = fn(ExecutionContext<'_>) -> Result<(), ExecutionError>;
+
+#[derive(ServiceFactory, ServiceDispatcher, Clone)]
+#[service_factory(
+    artifact_name = "custom-call",
+    service_constructor = "Self::new_instance"
+)]
+#[service_dispatcher(implements("CustomCallInterface"))]
+pub struct CustomCallService {
+    handler: CustomCall,
+}
+
+impl CustomCallService {
+    pub fn new(handler: CustomCall) -> Self {
+        Self { handler }
+    }
+
+    pub fn new_instance(&self) -> Box<dyn Service> {
+        Box::new(self.clone())
+    }
+}
+
+impl DefaultInstance for CustomCallService {
+    const INSTANCE_ID: u32 = 112;
+    const INSTANCE_NAME: &'static str = "custom-call";
+}
+
+impl CustomCallInterface<ExecutionContext<'_>> for CustomCallService {
+    type Output = Result<(), ExecutionError>;
+
+    fn custom_call(&self, context: ExecutionContext<'_>, _arg: Vec<u8>) -> Self::Output {
+        (self.handler)(context)
+    }
+}
+
+impl Service for CustomCallService {}
+
+impl std::fmt::Debug for CustomCallService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CustomCallService").finish()
+    }
+}

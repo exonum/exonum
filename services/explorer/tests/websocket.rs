@@ -89,7 +89,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(CounterService)
         .with_default_rust_service(ExplorerFactory)
-        .create();
+        .build();
     let api = testkit.api();
     (testkit, api)
 }
@@ -361,7 +361,7 @@ fn connections_shut_down_on_service_stop() {
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
-        .create();
+        .build();
 
     let api = testkit.api();
     let url = api.public_url("api/explorer/v1/blocks/subscribe");

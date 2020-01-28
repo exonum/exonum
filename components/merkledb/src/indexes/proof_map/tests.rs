@@ -27,12 +27,12 @@ use serde_json::{self, json};
 use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash, marker::PhantomData};
 
 use super::{
-    key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
+    key::{BitsRange, ChildKind, KEY_SIZE},
     node::BranchNode,
     MapProof, MapProofError, ProofPath,
 };
 use crate::{
-    access::AccessExt,
+    access::CopyAccessExt,
     proof_map::{Hashed, ProofMapIndex, Raw, ToProofPath},
     BinaryKey, BinaryValue, Database, Fork, HashTag, ObjectHash, TemporaryDB,
 };
@@ -161,10 +161,11 @@ where
         let fork = db.fork();
         let mut table = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
         assert_eq!(table.object_hash(), HashTag::empty_map_hash());
-        let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
+
         let hash = HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
-            .update(root_prefix)
+            .update(&[128, 2])
+            .update(&[255; HASH_SIZE])
             .update(HashTag::hash_leaf(&[2]).as_ref())
             .hash();
 
@@ -316,13 +317,13 @@ where
 
         let mut index = fork.get_generic_proof_map::<_, _, _, S>(IDX_NAME);
         index.put(&[1; 32], 1);
-        let root_hash = index.merkle_root();
+        let merkle_root = index.merkle_root();
 
         index.clear();
         assert_eq!(index.merkle_root(), Hash::zero());
 
         index.put(&[1; 32], 1);
-        assert_eq!(index.merkle_root(), root_hash);
+        assert_eq!(index.merkle_root(), merkle_root);
     }
 
     fn test_fuzz_insert() {
@@ -701,7 +702,7 @@ where
         check_map_multiproof(&proof, keys, &table);
 
         let keys = vec![[64; 32], [64; 32]];
-        let proof = table.get_multiproof(keys.clone());
+        let proof = table.get_multiproof(keys);
         assert_eq!(
             proof.proof_unchecked(),
             vec![
@@ -712,7 +713,7 @@ where
         check_map_multiproof(&proof, vec![[64; 32]], &table);
 
         let keys = vec![[128; 32], [64; 32], [128; 32]];
-        let proof = table.get_multiproof(keys.clone());
+        let proof = table.get_multiproof(keys);
         assert_eq!(
             proof.proof_unchecked(),
             vec![(S::transform_key(&[32; 32]), HashTag::hash_leaf(&[2]))]
@@ -1222,25 +1223,6 @@ fn test_build_proof_in_single_node_tree_hashed() {
 }
 
 #[test]
-fn test_insert_same_key() {
-    let db = TemporaryDB::default();
-    let fork = db.fork();
-    let mut table = fork.get_raw_proof_map(IDX_NAME);
-    assert_eq!(table.object_hash(), HashTag::empty_map_hash());
-    let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0_u8]].concat();
-    let hash = HashStream::new()
-        .update(&[HashTag::MapBranchNode as u8])
-        .update(root_prefix)
-        .update(HashTag::hash_leaf(&[2]).as_ref())
-        .hash();
-
-    table.put(&[255; 32], vec![1]);
-    table.put(&[255; 32], vec![2]);
-    assert_eq!(table.get(&[255; 32]), Some(vec![2]));
-    assert_eq!(table.object_hash(), HashTag::hash_map_node(hash));
-}
-
-#[test]
 fn test_merkle_root_leaf() {
     let db = TemporaryDB::default();
     let fork = db.fork();
@@ -1250,9 +1232,13 @@ fn test_merkle_root_leaf() {
     let value = vec![4, 5, 6];
     index.put(&key, value.clone());
 
+    let path = Hashed::transform_key(&key);
+    let mut path_buffer = [0; HASH_SIZE + 2];
+    path.write_compressed(&mut path_buffer);
+
     let merkle_root = HashStream::new()
         .update(&[HashTag::MapBranchNode as u8])
-        .update(Hashed::transform_key(&key).as_bytes())
+        .update(&path_buffer[..])
         .update(HashTag::hash_leaf(&value).as_ref())
         .hash();
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());

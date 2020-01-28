@@ -19,6 +19,11 @@
 //!
 //! The core type in this module is [`MigrationTest`]; see its docs for examples of usage.
 //!
+//! # Stability
+//!
+//! Since the corresponding functionality in the core is unstable, the entirety of this module
+//! is considered unstable as well.
+//!
 //! [`MigrationTest`]: struct.MigrationTest.html
 
 use exonum::{
@@ -203,7 +208,7 @@ where
     /// Sets up initial data for the service before the migration.
     pub fn setup<F>(&mut self, setup: F) -> &mut Self
     where
-        F: FnOnce(Prefixed<'static, &Fork>),
+        F: FnOnce(Prefixed<&Fork>),
     {
         let fork = self.db.fork();
         let access = Prefixed::new(Self::SERVICE_NAME, &fork);
@@ -213,7 +218,7 @@ where
     }
 
     /// Gets the snapshot before the migration scripts are run.
-    pub fn start_snapshot(&self) -> Prefixed<'static, &dyn Snapshot> {
+    pub fn start_snapshot(&self) -> Prefixed<&dyn Snapshot> {
         let snapshot = self
             .start_snapshot
             .as_ref()
@@ -223,7 +228,7 @@ where
 
     /// Gets the migrated data. This method is useful to inspect migration state after
     /// script abortion. Once the migration is flushed, the migrated data is erased.
-    pub fn migration_data(&self) -> Migration<'static, &dyn Snapshot> {
+    pub fn migration_data(&self) -> Migration<&dyn Snapshot> {
         let snapshot = self
             .end_snapshot
             .as_ref()
@@ -234,7 +239,7 @@ where
     /// Gets the snapshot at the end of the migration. If the latest migration script execution
     /// was aborted, this method will provide access to old data since the migration is not
     /// flushed in this case.
-    pub fn end_snapshot(&self) -> Prefixed<'static, &dyn Snapshot> {
+    pub fn end_snapshot(&self) -> Prefixed<&dyn Snapshot> {
         let snapshot = self
             .end_snapshot
             .as_ref()
