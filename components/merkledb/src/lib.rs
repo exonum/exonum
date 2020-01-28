@@ -180,7 +180,7 @@ pub use self::{
     keys::BinaryKey,
     lazy::Lazy,
     options::DbOptions,
-    values::BinaryValue,
+    values::{concat_buffers, split_buffer_into_sized_parts, BinaryValue},
     views::{AsReadonly, IndexAddress, IndexType, ResolvedAddress, SystemSchema},
 };
 // Workaround for 'Linked file at path {exonum_merkledb_path}/struct.ProofMapIndex.html
