@@ -116,6 +116,7 @@ use crate::{
 ///
 /// [`RawAccess`]: ../access/trait.RawAccess.html
 /// [`RawAccessMut`]: ../access/trait.RawAccessMut.html
+/// [`is_mutable()`]: #method.is_mutable
 #[derive(Debug, Clone)]
 pub enum GenericRawAccess<'a> {
     /// Borrowed snapshot.
