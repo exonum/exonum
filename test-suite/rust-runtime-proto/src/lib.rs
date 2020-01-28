@@ -22,6 +22,9 @@ use crate::service::TestRuntimeApiService;
 mod proto;
 mod service;
 
+#[cfg(test)]
+mod tests;
+
 /// Creates the TestKit and TestKitApi instances.
 pub fn testkit_with_rust_service() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
@@ -48,7 +51,6 @@ pub fn assert_exonum_core_protos(api: &TestKitApi) {
         "blockchain.proto",
         "messages.proto",
         "runtime.proto",
-        "tests.proto",
         "common.proto",
         "types.proto",
         "proofs.proto",
@@ -89,10 +91,10 @@ fn service_protos_with_service() {
         .get("proto-sources")
         .expect("Rust runtime Api unexpectedly failed");
 
-    const EXPECTED_CONTENT: &str = include_str!("proto/test_service.proto");
+    const EXPECTED_CONTENT: &str = include_str!("proto/tests.proto");
 
     assert_eq!(proto_files.len(), 1);
-    assert_eq!(proto_files[0].name, "test_service.proto".to_string());
+    assert_eq!(proto_files[0].name, "tests.proto".to_string());
     assert_eq!(proto_files[0].content, EXPECTED_CONTENT.to_string());
 }
 
