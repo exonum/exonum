@@ -48,18 +48,18 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
     /// can lead to a panic because of borrowing checks performed by the database.
     /// Check that your wrapper prevent such attempts to access.
     #[doc(hidden)]
-    pub fn unstructured_assess(&self) -> T::Readonly {
+    pub fn unstructured_access(&self) -> T::Readonly {
         self.access.as_readonly()
     }
 
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::new(self.unstructured_assess())
+        CoreSchema::new(self.unstructured_access())
     }
 
     /// Returns dispatcher schema.
     pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
-        DispatcherSchema::new(self.unstructured_assess())
+        DispatcherSchema::new(self.unstructured_access())
     }
 
     /// Returns a mount point for another service. If the service with `id` does not exist,
