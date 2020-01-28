@@ -163,11 +163,7 @@ impl Default for IndexType {
 /// See also `BinaryAttribute`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IndexMetadata<V = Vec<u8>> {
-    // A globally unique numeric index identifier. MerkleDB assigns a unique numeric ID for each
-    // fully-qualified index name. Valid identifiers are non-zero.
-    //
-    // MerkleDB never re-uses the identifiers.
-    identifier: u64,
+    identifier: NonZeroU64,
     index_type: IndexType,
     // `state` may be empty for any possible type. `None` option usually represents
     // a "default" value; it is used on index initialization, or after the index
@@ -187,7 +183,8 @@ where
         }
         let mut buf = Vec::with_capacity(capacity);
 
-        buf.write_u64::<LittleEndian>(self.identifier).unwrap();
+        buf.write_u64::<LittleEndian>(self.identifier.get())
+            .unwrap();
         buf.write_u32::<LittleEndian>(self.index_type as u32)
             .unwrap();
         if let Some(ref state) = self.state {
@@ -202,7 +199,8 @@ where
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut bytes = bytes.as_ref();
 
-        let identifier = bytes.read_u64::<LittleEndian>()?;
+        let identifier = NonZeroU64::new(bytes.read_u64::<LittleEndian>()?)
+            .ok_or_else(|| format_err!("IndexMetadata identifier is 0"))?;
         let index_type = bytes.read_u32::<LittleEndian>()?;
         let index_type = IndexType::from_u32(index_type)
             .ok_or_else(|| format_err!("Unknown index type: {}", index_type))?;
@@ -240,6 +238,14 @@ impl<V> IndexMetadata<V> {
     /// Returns the index type.
     pub fn index_type(&self) -> IndexType {
         self.index_type
+    }
+
+    /// Returns a globally unique numeric index identifier.
+    /// MerkleDB assigns a unique numeric ID for each fully-qualified index name.
+    ///
+    /// MerkleDB never re-uses the identifiers.
+    pub fn identifier(&self) -> NonZeroU64 {
+        self.identifier
     }
 }
 
@@ -340,8 +346,7 @@ impl<T: RawAccess> IndexesPool<T> {
     {
         let len = self.len();
         let metadata = IndexMetadata {
-            identifier: len + 1,
-            // ^-- Identifier should be non-zero to translate to a correct id in `ResolvedAddress`
+            identifier: NonZeroU64::new(len + 1).unwrap(),
             index_type,
             state: None,
         };
@@ -381,7 +386,7 @@ impl<T: RawAccessMut> IndexesPool<T> {
             if let Some(old_metadata) = self.0.get::<_, IndexMetadata>(migrated_key) {
                 let (name, is_in_group) =
                     IndexAddress::parse_fully_qualified_name(migrated_key, min_name_len);
-                let resolved = ResolvedAddress::new(name, NonZeroU64::new(old_metadata.identifier));
+                let resolved = ResolvedAddress::new(name, Some(old_metadata.identifier));
                 let is_removed_from_aggregation = !is_in_group
                     && old_metadata.index_type.is_merkelized()
                     && !metadata.index_type.is_merkelized();
@@ -430,8 +435,7 @@ impl<T: RawAccessMut> IndexesPool<T> {
             .0
             .iter::<_, Vec<u8>, IndexMetadata>(prefix)
             .map(|(key, metadata)| {
-                let resolved =
-                    ResolvedAddress::new(extract_name(&key), NonZeroU64::new(metadata.identifier));
+                let resolved = ResolvedAddress::new(extract_name(&key), Some(metadata.identifier));
                 (key, resolved)
             })
             .unzip();
@@ -647,7 +651,7 @@ where
         );
 
         let real_index_type = metadata.index_type;
-        let addr = ResolvedAddress::new(index_name, NonZeroU64::new(metadata.identifier));
+        let addr = ResolvedAddress::new(index_name, Some(metadata.identifier));
 
         let is_aggregated =
             !is_phantom && real_index_type.is_merkelized() && index_address.id_in_group.is_none();
@@ -722,7 +726,7 @@ mod tests {
     #[test]
     fn test_index_metadata_binary_value() {
         let metadata = IndexMetadata {
-            identifier: 12,
+            identifier: NonZeroU64::new(12).unwrap(),
             index_type: IndexType::ProofList,
             state: Some(16_u64),
         };
@@ -731,7 +735,7 @@ mod tests {
         assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
 
         let metadata = IndexMetadata {
-            identifier: 12,
+            identifier: NonZeroU64::new(12).unwrap(),
             index_type: IndexType::ProofList,
             state: None::<u64>,
         };
@@ -744,7 +748,7 @@ mod tests {
     #[should_panic(expected = "Attribute with unknown tag")]
     fn test_index_metadata_unknown_tag() {
         let metadata = IndexMetadata {
-            identifier: 12,
+            identifier: NonZeroU64::new(12).unwrap(),
             index_type: IndexType::ProofList,
             state: Some(16_u64),
         };
