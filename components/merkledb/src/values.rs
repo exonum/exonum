@@ -262,6 +262,42 @@ impl BinaryValue for [u8; HASH_SIZE] {
     }
 }
 
+/// Concatenates slice of byte buffers prepending size of buffer before each one
+pub fn concat_buffers(buffers: &mut [Vec<u8>]) -> Vec<u8> {
+    use std::convert::TryFrom;
+
+    let mut res_buf = Vec::new();
+    for mut buf in buffers {
+        let size = u32::try_from(buf.len()).unwrap_or_else(|_| panic!("Too large buffer"));
+        res_buf.append(&mut size.to_bytes());
+        res_buf.append(&mut buf);
+    }
+    res_buf
+}
+
+/// Splits single byte buffer into vector of separate buffers according to its size
+pub fn split_buffer_into_sized_parts<'a>(
+    bytes: &'a Cow<[u8]>,
+    qty: usize,
+) -> Result<Vec<Cow<'a, [u8]>>, failure::Error> {
+    use std::mem::size_of;
+
+    let mut pos = 0;
+    let mut result = Vec::with_capacity(qty);
+    for _ in 0..qty {
+        ensure!(
+            bytes.len() >= pos + size_of::<u32>(),
+            "Unexpected end of buffer"
+        );
+        let len = u32::from_bytes(bytes[pos..pos + size_of::<u32>()].into())? as usize;
+        pos += size_of::<u32>();
+        ensure!(bytes.len() >= pos + len, "Unexpected end of buffer");
+        result.push(bytes[pos..pos + len].into());
+        pos += len;
+    }
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Debug;
