@@ -84,8 +84,13 @@ impl Dispatcher {
         let (_, runtime) = self
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::for_block_call(self, fork, instance);
-        runtime.execute(context, call_info.method_id, arguments)
+
+        let mut should_rollback = false;
+        let context = ExecutionContext::for_block_call(self, fork, &mut should_rollback, instance);
+        let res = runtime.execute(context, call_info.method_id, arguments);
+
+        assert!(!should_rollback);
+        res
     }
 
     /// Deploys and commits an artifact synchronously, i.e., blocking until the artifact is
@@ -351,8 +356,14 @@ fn test_dispatcher_simple() {
         RUST_SERVICE_NAME.into(),
         rust_artifact.clone(),
     );
-    let mut context =
-        ExecutionContext::for_block_call(&dispatcher, &mut fork, rust_service.as_descriptor());
+
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        rust_service.as_descriptor(),
+    );
     context
         .initiate_adding_service(rust_service, vec![])
         .expect("`initiate_adding_service` failed for rust");
@@ -383,6 +394,7 @@ fn test_dispatcher_simple() {
     let mut context = ExecutionContext::for_block_call(
         &dispatcher,
         &mut fork,
+        &mut should_rollback,
         conflicting_rust_service.as_descriptor(),
     );
     let err = context
@@ -460,6 +472,8 @@ fn test_dispatcher_simple() {
         expected_new_services,
         changes_rx.iter().take(2).collect::<Vec<_>>()
     );
+
+    assert!(!should_rollback);
 }
 
 #[derive(Debug, Clone)]
@@ -909,8 +923,13 @@ fn stopped_service_workflow() {
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec::from_raw_parts(instance_id, instance_name.into(), artifact);
-    let mut context =
-        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
     context
         .initiate_adding_service(service.clone(), vec![])
         .expect("`initiate_adding_service` failed");
@@ -1005,8 +1024,12 @@ fn stopped_service_workflow() {
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context =
-        ExecutionContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
     context
         .initiate_adding_service(service, vec![])
         .expect_err("`initiate_adding_service` should failed");
@@ -1018,4 +1041,5 @@ fn stopped_service_workflow() {
         actual_err,
         ErrorMatch::from_fail(&CoreError::ServiceNotActive)
     );
+    assert!(!should_rollback);
 }

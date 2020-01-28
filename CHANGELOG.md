@@ -119,6 +119,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Public structures and enums were made non-exhaustive. (#1710)
 
+- Blockchain data access from the `ExecutionContext` after an error in a nested
+  call is prohibited. (#1733)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
