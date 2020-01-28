@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    helpers::Height,
-    runtime::{InstanceId, SnapshotExt},
-};
+use exonum::runtime::{InstanceId, SnapshotExt};
 
 use exonum_merkledb::access::AccessExt;
 use exonum_rust_runtime::ServiceFactory;
@@ -39,7 +36,7 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
     let timestamping = TimestampingService;
     let timestamping_artifact = timestamping.artifact_id();
 
-    let mut testkit = TestKitBuilder::validator()
+    let testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
@@ -58,7 +55,6 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
                 }),
         )
         .build();
-    testkit.create_blocks_until(Height(2)); // Ensure that time is set
     (testkit, mock_provider)
 }
 
