@@ -177,6 +177,12 @@ pub struct Prefixed<T> {
     prefix: String,
 }
 
+impl<T> Prefixed<T> {
+    pub(crate) fn into_parts(self) -> (String, T) {
+        (self.prefix, self.access)
+    }
+}
+
 impl<T: RawAccess> Prefixed<T> {
     /// Creates a new prefixed access.
     ///
