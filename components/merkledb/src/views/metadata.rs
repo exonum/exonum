@@ -726,7 +726,7 @@ mod tests {
     #[test]
     fn test_index_metadata_binary_value() {
         let metadata = IndexMetadata {
-            identifier: 12,
+            identifier: NonZeroU64::new(12).unwrap(),
             index_type: IndexType::ProofList,
             state: Some(16_u64),
         };
@@ -735,7 +735,7 @@ mod tests {
         assert_eq!(IndexMetadata::from_bytes(bytes.into()).unwrap(), metadata);
 
         let metadata = IndexMetadata {
-            identifier: 12,
+            identifier: NonZeroU64::new(12).unwrap(),
             index_type: IndexType::ProofList,
             state: None::<u64>,
         };
@@ -748,7 +748,7 @@ mod tests {
     #[should_panic(expected = "Attribute with unknown tag")]
     fn test_index_metadata_unknown_tag() {
         let metadata = IndexMetadata {
-            identifier: 12,
+            identifier: NonZeroU64::new(12).unwrap(),
             index_type: IndexType::ProofList,
             state: Some(16_u64),
         };
