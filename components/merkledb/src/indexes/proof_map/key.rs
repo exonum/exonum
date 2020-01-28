@@ -487,6 +487,22 @@ impl ProofPath {
         }
         bytes_written
     }
+
+    /// Returns bits in the path expressed as the minimum necessary number of bytes
+    /// and zero-padded if necessary.
+    pub(crate) fn path_bits(&self) -> Vec<u8> {
+        let bits_len = self.end() as usize;
+        let whole_bytes_len = div_ceil!(bits_len, 8);
+        let mut key = self.raw_key()[0..whole_bytes_len].to_vec();
+
+        // Trims insignificant bits in the last byte.
+        let bits_in_last_byte = bits_len % 8;
+        if whole_bytes_len > 0 && bits_in_last_byte != 0 {
+            let tail = self.end() % 8;
+            reset_bits(&mut key[whole_bytes_len - 1], tail);
+        }
+        key
+    }
 }
 
 #[cfg(test)]
@@ -915,30 +931,42 @@ mod tests {
     #[test]
     fn test_proof_path_debug_leaf() {
         use std::fmt::Write;
+
         let b = ProofPath::from_inner(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
         let mut buf = String::new();
         write!(&mut buf, "{:?}", b).unwrap();
         assert_eq!(
-        buf,
-        "ProofPath { start: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|0111\
-         1001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110\
-         1000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110\
-         1101|00110001|00110010|00110011|00110100|00110101|00110110|\" }"
-    );
+            buf,
+            "ProofPath { start: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|0111\
+             1001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110\
+             1000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110\
+             1101|00110001|00110010|00110011|00110100|00110101|00110110|\" }"
+        );
     }
 
     #[test]
     fn test_proof_path_debug_branch() {
         use std::fmt::Write;
+
         let b = ProofPath::from_inner(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xF0").suffix(12);
         let mut buf = String::new();
         write!(&mut buf, "{:?}", b).unwrap();
         assert_eq!(
-        buf,
-        "ProofPath { start: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|011\
-         11001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|011\
-         01000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|011\
-         01101|00110001|00110010|00110011|00110100|________|________|\" }"
-    );
+            buf,
+            "ProofPath { start: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|011\
+             11001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|011\
+             01000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|011\
+             01101|00110001|00110010|00110011|00110100|________|________|\" }"
+        );
+    }
+
+    #[test]
+    fn test_path_bits() {
+        let path = ProofPath::from_bytes([127; HASH_SIZE]);
+        assert_eq!(path.path_bits(), vec![127; HASH_SIZE]);
+        let prefix = path.prefix(5);
+        assert_eq!(prefix.path_bits(), vec![0b_0001_1111]);
+        let prefix = path.prefix(8);
+        assert_eq!(prefix.path_bits(), vec![127]);
     }
 }

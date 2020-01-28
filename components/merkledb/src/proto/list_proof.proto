@@ -42,7 +42,7 @@ message ListProofEntry {
     bytes value = 2;
 }
 
-// Represents list node position in the merkle tree.
+// Represents list node position in the Merkle tree.
 message ProofListKey {
     uint64 index = 1;
     uint32 height = 2;

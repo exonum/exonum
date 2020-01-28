@@ -39,7 +39,7 @@ const EMPTY_MAP_HASH: [u8; HASH_SIZE] = [
 /// collection contents. This hash can then be used that a collection contains (or does not contain)
 /// certain elements.
 ///
-/// Different hashes for leaf and branch nodes of the list are used to secure merkle tree
+/// Different hashes for leaf and branch nodes of the list are used to secure Merkle tree
 /// from the pre-image attack. See more information [here][rfc6962].
 ///
 /// This type is not intended to be exhaustively matched. It can be extended in the future
@@ -142,8 +142,8 @@ impl HashTag {
             .hash()
     }
 
-    /// Hash of a branch node in a Merkle Patricia tree. `branch_node` is the binary serialization
-    /// of the node.
+    /// Obtains hash of a branch node in a Merkle Patricia tree.
+    /// `branch_node` is the binary serialization of the node.
     ///
     /// ```text
     /// h = sha256( HashTag::MapBranchNode || branch_node )
@@ -159,24 +159,34 @@ impl HashTag {
             .hash()
     }
 
-    /// Hash of a Merkelized map with a single entry.
+    /// Obtains hash of a Merkelized map with a single entry.
     ///
     /// ``` text
     /// h = sha256( HashTag::MapBranchNode || path || child_hash )
     /// ```
+    ///
+    /// See [`ProofMapIndex`] for details how `path` is serialized.
+    ///
+    /// [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html#impl-ObjectHash
     pub fn hash_single_entry_map(path: &ProofPath, child_hash: &Hash) -> Hash {
+        // `HASH_SIZE` bytes are necessary for `path` bytes, and 2 additional bytes
+        // for the `LEB128` encoding of bit length (`HASH_SIZE * 8`).
+        let mut path_buffer = [0; HASH_SIZE + 2];
+        path.write_compressed(&mut path_buffer);
+
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
-            .update(path.as_bytes())
+            .update(&path_buffer[..])
             .update(child_hash.as_ref())
             .hash()
     }
 
-    /// Hash of an empty Merkelized map.
+    /// Obtains hash of an empty Merkelized map.
     ///
-    /// Empty map hash:
+    /// The hash is computed as
+    ///
     /// ```text
-    /// sha256( HashTag::MapNode || Hash::default() )
+    /// sha256( HashTag::MapNode || Hash::zero() )
     /// ```
     pub fn empty_map_hash() -> Hash {
         Hash::new(EMPTY_MAP_HASH)
@@ -303,5 +313,22 @@ mod tests {
             .hash();
 
         assert_eq!(empty_map_hash, HashTag::empty_map_hash());
+    }
+
+    #[test]
+    fn single_entry_map_hash() {
+        let path = ProofPath::from_bytes([0; HASH_SIZE]);
+        let value_hash = hash(b"foo");
+        let expected_hash = HashStream::new()
+            .update(&[HashTag::MapBranchNode as u8])
+            .update(&[128, 2]) // LEB128(256)
+            .update(&[0; HASH_SIZE])
+            .update(value_hash.as_ref())
+            .hash();
+
+        assert_eq!(
+            expected_hash,
+            HashTag::hash_single_entry_map(&path, &value_hash)
+        );
     }
 }
