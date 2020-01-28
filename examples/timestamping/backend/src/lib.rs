@@ -44,6 +44,7 @@ use exonum::{
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
+use exonum_supervisor::Configure;
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
@@ -75,5 +76,31 @@ impl Service for TimestampingService {
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         TimestampingApi.wire(builder);
+    }
+}
+
+impl Configure for TimestampingService {
+    type Params = Config;
+
+    fn verify_config(
+        &self,
+        _context: ExecutionContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        if params.time_service_name.is_empty() {
+            Err(Error::InvalidConfig.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn apply_config(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.service_data());
+        schema.config.set(params);
+        Ok(())
     }
 }
