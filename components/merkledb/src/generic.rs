@@ -13,6 +13,90 @@
 // limitations under the License.
 
 //! Access generalizations, mainly useful for bindings.
+//!
+//! This module provides:
+//!
+//! - [`GenericRawAccess`], an enumeration of all available types of raw accesses (e.g., `Snapshot`
+//!   or `Fork`)
+//! - [`GenericAccess`], an enumeration of all high-level access types (e.g., `Prefixed`
+//!   or `Migration`)
+//! - [`ErasedAccess`], which combines the previous two types and thus is the most abstract kind
+//!   of access to the database.
+//!
+//! [`GenericRawAccess`]: enum.GenericRawAccess.html
+//! [`GenericAccess`]: enum.GenericAccess.html
+//! [`ErasedAccess`]: type.ErasedAccess.html
+//!
+//! # Examples
+//!
+//! Basic usage of `ErasedAccess`:
+//!
+//! ```
+//! use exonum_merkledb::{
+//!     access::{AccessExt, Prefixed}, migration::Migration, Database, TemporaryDB,
+//! };
+//! use exonum_merkledb::generic::{ErasedAccess, IntoErased};
+//!
+//! fn manipulate_db(access: &ErasedAccess<'_>) {
+//!     assert!(access.is_mutable());
+//!     let mut list = access.get_list::<_, u32>("list");
+//!     list.extend(vec![1, 2, 3]);
+//!     access.get_proof_entry("entry").set("!".to_owned());
+//! }
+//!
+//! fn check_db(access: &ErasedAccess<'_>) {
+//!     assert!(!access.is_mutable());
+//!     let list = access.get_list::<_, u32>("list");
+//!     assert_eq!(list.len(), 3);
+//!     assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
+//!     let entry = access.get_proof_entry::<_, String>("entry");
+//!     assert_eq!(entry.get().unwrap(), "!");
+//! }
+//!
+//! let db = TemporaryDB::new();
+//! let fork = db.fork();
+//! // Create a `Prefixed` access and use `IntoErased` trait to convert it
+//! // to the most generic access.
+//! {
+//!     let erased = Prefixed::new("ns", &fork).into_erased();
+//!     manipulate_db(&erased);
+//! }
+//! // The same method may be applied to other access kinds, e.g., `Migration`s.
+//! {
+//!     let erased = Migration::new("other-ns", &fork).into_erased();
+//!     manipulate_db(&erased);
+//! }
+//! db.merge(fork.into_patch()).unwrap();
+//!
+//! let snapshot = db.snapshot();
+//! let erased = Prefixed::new("ns", snapshot.as_ref()).into_erased();
+//! check_db(&erased);
+//! let erased = Migration::new("other-ns", snapshot.as_ref()).into_erased();
+//! check_db(&erased);
+//! ```
+//!
+//! Use of `GenericRawAccess` with owned accesses:
+//!
+//! ```
+//! use exonum_merkledb::{access::AccessExt, Database, TemporaryDB};
+//! use exonum_merkledb::generic::GenericRawAccess;
+//! use std::rc::Rc;
+//!
+//! let db = TemporaryDB::new();
+//! let fork = db.fork();
+//! let access = GenericRawAccess::from(fork); // Consumes `fork`!
+//! access.get_proof_map("list").put("foo", "bar".to_owned());
+//! // Get `Fork` back from the access. The caller should ensure
+//! // that `access` is not used elsewhere at this point, e.g.,
+//! // by instantiated indexes.
+//! let fork = match access {
+//!     GenericRawAccess::OwnedFork(fork) => Rc::try_unwrap(fork).unwrap(),
+//!     _ => unreachable!(),
+//! };
+//! db.merge(fork.into_patch()).unwrap();
+//! ```
+
+use std::rc::Rc;
 
 use crate::{
     access::{Access, AccessError, AsReadonly, Prefixed},
@@ -22,17 +106,35 @@ use crate::{
     BinaryKey, Fork, IndexAddress, IndexType, ReadonlyFork, ResolvedAddress, Snapshot,
 };
 
-#[derive(Debug, Clone, Copy)]
+/// Container for an arbitrary raw access. For `Fork`s and `Snapshot`s, this type provides
+/// both owned and borrowed variants.
+///
+/// `GenericRawAccess` implements [`RawAccess`] and [`RawAccessMut`] traits. The latter
+/// means that the mutable methods on indexes will panic in the run time if an immutable access
+/// (such as a `Snapshot`) is used as the base. The caller is advised to check
+/// mutability in advance with the help of [`is_mutable()`] first.
+///
+/// [`RawAccess`]: ../access/trait.RawAccess.html
+/// [`RawAccessMut`]: ../access/trait.RawAccessMut.html
+#[derive(Debug, Clone)]
 pub enum GenericRawAccess<'a> {
+    /// Borrowed snapshot.
     Snapshot(&'a dyn Snapshot),
+    /// Owned snapshot.
+    OwnedSnapshot(Rc<dyn Snapshot>),
+    /// Borrowed fork.
     Fork(&'a Fork),
+    /// Owned fork.
+    OwnedFork(Rc<Fork>),
+    /// Readonly fork.
     ReadonlyFork(ReadonlyFork<'a>),
 }
 
 impl GenericRawAccess<'_> {
-    pub fn is_mutable(self) -> bool {
+    /// Checks if the underlying access is mutable.
+    pub fn is_mutable(&self) -> bool {
         match self {
-            GenericRawAccess::Fork(_) => true,
+            GenericRawAccess::Fork(_) | GenericRawAccess::OwnedFork(_) => true,
             _ => false,
         }
     }
@@ -44,9 +146,21 @@ impl<'a> From<&'a dyn Snapshot> for GenericRawAccess<'a> {
     }
 }
 
+impl From<Box<dyn Snapshot>> for GenericRawAccess<'_> {
+    fn from(snapshot: Box<dyn Snapshot>) -> Self {
+        GenericRawAccess::OwnedSnapshot(Rc::from(snapshot))
+    }
+}
+
 impl<'a> From<&'a Fork> for GenericRawAccess<'a> {
     fn from(fork: &'a Fork) -> Self {
         GenericRawAccess::Fork(fork)
+    }
+}
+
+impl From<Fork> for GenericRawAccess<'_> {
+    fn from(fork: Fork) -> Self {
+        GenericRawAccess::OwnedFork(Rc::new(fork))
     }
 }
 
@@ -56,10 +170,14 @@ impl<'a> From<ReadonlyFork<'a>> for GenericRawAccess<'a> {
     }
 }
 
+/// Generic changes supported the database backend.
 #[derive(Debug)]
 pub enum GenericChanges<'a> {
+    /// No changes.
     None,
+    /// Immutable changes.
     Ref(ChangesRef<'a>),
+    /// Mutable changes.
     Mut(ChangesMut<'a>),
 }
 
@@ -86,15 +204,20 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
     fn snapshot(&self) -> &dyn Snapshot {
         match self {
             GenericRawAccess::Snapshot(snapshot) => *snapshot,
+            GenericRawAccess::OwnedSnapshot(snapshot) => snapshot.as_ref(),
             GenericRawAccess::Fork(fork) => fork.snapshot(),
+            GenericRawAccess::OwnedFork(fork) => fork.snapshot(),
             GenericRawAccess::ReadonlyFork(ro_fork) => ro_fork.snapshot(),
         }
     }
 
     fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
         match self {
-            GenericRawAccess::Snapshot(_) => GenericChanges::None,
+            GenericRawAccess::Snapshot(_) | GenericRawAccess::OwnedSnapshot(_) => {
+                GenericChanges::None
+            }
             GenericRawAccess::Fork(fork) => GenericChanges::Mut(fork.changes(address)),
+            GenericRawAccess::OwnedFork(fork) => GenericChanges::Mut(fork.changes(address)),
             GenericRawAccess::ReadonlyFork(ro_fork) => {
                 GenericChanges::Ref(ro_fork.changes(address))
             }
@@ -105,11 +228,16 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
 /// Will panic in runtime if mutable methods are called on an inappropriate underlying access.
 impl RawAccessMut for GenericRawAccess<'_> {}
 
+/// Generic access containing any kind of accesses supported by the database.
 #[derive(Debug, Clone)]
 pub enum GenericAccess<T> {
+    /// Access to the entire database.
     Raw(T),
+    /// Prefixed access to the database.
     Prefixed(Prefixed<T>),
+    /// Migration within a certain namespace.
     Migration(Migration<T>),
+    /// Scratchpad for a migration.
     Scratchpad(Scratchpad<T>),
 }
 
@@ -179,55 +307,73 @@ impl<T: RawAccess> Access for GenericAccess<T> {
     }
 }
 
-pub trait IntoGeneric<'a> {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>>;
+/// Most generic access to the database, encapsulating any of base accesses and any of
+/// possible access restrictions.
+pub type ErasedAccess<'a> = GenericAccess<GenericRawAccess<'a>>;
+
+impl ErasedAccess<'_> {
+    /// Checks if the underlying access is mutable.
+    pub fn is_mutable(&self) -> bool {
+        match self {
+            GenericAccess::Raw(access) => access.is_mutable(),
+            GenericAccess::Prefixed(prefixed) => prefixed.access().is_mutable(),
+            GenericAccess::Migration(migration) => migration.access().is_mutable(),
+            GenericAccess::Scratchpad(scratchpad) => scratchpad.access().is_mutable(),
+        }
+    }
 }
 
-impl<'a> IntoGeneric<'a> for &'a dyn Snapshot {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>> {
+/// Conversion to a most generic access to the database.
+pub trait IntoErased<'a> {
+    /// Performs the conversion.
+    fn into_erased(self) -> ErasedAccess<'a>;
+}
+
+impl<'a> IntoErased<'a> for &'a dyn Snapshot {
+    fn into_erased(self) -> ErasedAccess<'a> {
         GenericAccess::Raw(GenericRawAccess::from(self))
     }
 }
 
-impl<'a> IntoGeneric<'a> for &'a Fork {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>> {
+impl<'a> IntoErased<'a> for &'a Fork {
+    fn into_erased(self) -> ErasedAccess<'a> {
         GenericAccess::Raw(GenericRawAccess::from(self))
     }
 }
 
-impl<'a> IntoGeneric<'a> for ReadonlyFork<'a> {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>> {
+impl<'a> IntoErased<'a> for ReadonlyFork<'a> {
+    fn into_erased(self) -> ErasedAccess<'a> {
         GenericAccess::Raw(GenericRawAccess::from(self))
     }
 }
 
-impl<'a, T> IntoGeneric<'a> for Prefixed<T>
+impl<'a, T> IntoErased<'a> for Prefixed<T>
 where
     T: Into<GenericRawAccess<'a>>,
 {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>> {
+    fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
         let access: GenericRawAccess = access.into();
         GenericAccess::Prefixed(Prefixed::new(prefix, access))
     }
 }
 
-impl<'a, T> IntoGeneric<'a> for Migration<T>
+impl<'a, T> IntoErased<'a> for Migration<T>
 where
     T: Into<GenericRawAccess<'a>>,
 {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>> {
+    fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
         let access: GenericRawAccess = access.into();
         GenericAccess::Migration(Migration::new(prefix, access))
     }
 }
 
-impl<'a, T> IntoGeneric<'a> for Scratchpad<T>
+impl<'a, T> IntoErased<'a> for Scratchpad<T>
 where
     T: Into<GenericRawAccess<'a>>,
 {
-    fn into_generic(self) -> GenericAccess<GenericRawAccess<'a>> {
+    fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
         let access: GenericRawAccess = access.into();
         GenericAccess::Scratchpad(Scratchpad::new(prefix, access))
@@ -287,6 +433,37 @@ mod tests {
     }
 
     #[test]
+    fn generic_raw_owned_access() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+
+        let access = GenericRawAccess::from(fork);
+        assert!(access.is_mutable());
+        {
+            let mut list = access.get_proof_list("list");
+            list.extend(vec![1_u32, 2, 3]);
+            access.get_entry("entry").set("!".to_owned());
+        }
+        let fork = match access {
+            GenericRawAccess::OwnedFork(fork) => Rc::try_unwrap(fork).unwrap(),
+            _ => unreachable!(),
+        };
+
+        db.merge(fork.into_patch()).unwrap();
+        let access = GenericRawAccess::from(db.snapshot());
+        assert!(!access.is_mutable());
+        let list = access.get_proof_list::<_, u32>("list");
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(access.get_entry::<_, String>("entry").get().unwrap(), "!");
+
+        let non_existent_map = access.get_map::<_, u32, u32>("map");
+        assert_eq!(non_existent_map.get(&1), None);
+        let non_existent_list = access.get_list::<_, u32>("other_list");
+        assert_eq!(non_existent_list.len(), 0);
+    }
+
+    #[test]
     #[should_panic(expected = "Attempt to modify a readonly view of the database")]
     fn generic_raw_access_panic_on_non_existing_index() {
         let db = TemporaryDB::new();
@@ -311,13 +488,15 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let access = Prefixed::new("foo", &fork).into_generic();
+        let access = Prefixed::new("foo", &fork).into_erased();
+        assert!(access.is_mutable());
         access.get_list("list").extend(vec![2_u32, 3, 4]);
         access.get_proof_map("map").put("foo", 42_u64);
         access.get_value_set("set").insert(100_u8);
 
         // Check that elements are available from the underlying fork.
-        let access = (&fork).into_generic();
+        let access = (&fork).into_erased();
+        assert!(access.is_mutable());
         assert_eq!(access.get_list::<_, u32>("foo.list").len(), 3);
         assert_eq!(
             access.get_proof_map::<_, str, u64>("foo.map").get("foo"),
@@ -326,7 +505,8 @@ mod tests {
         assert!(access.get_value_set::<_, u8>("foo.set").contains(&100));
 
         // ...or from `Prefixed<ReadonlyFork>`.
-        let access = Prefixed::new("foo", fork.readonly()).into_generic();
+        let access = Prefixed::new("foo", fork.readonly()).into_erased();
+        assert!(!access.is_mutable());
         assert_eq!(access.get_list::<_, u32>("list").len(), 3);
         assert_eq!(
             access.get_proof_map::<_, str, u64>("map").get("foo"),
@@ -335,23 +515,26 @@ mod tests {
         assert!(access.get_value_set::<_, u8>("set").contains(&100));
 
         // Erased access can also be used to modify data.
-        let access = Migration::new("foo", &fork).into_generic();
+        let access = Migration::new("foo", &fork).into_erased();
+        assert!(access.is_mutable());
         access.get_proof_list("list").extend(vec![4_i32, 5, 6, 7]);
         access.get_key_set("set").insert(99_u8);
-        let access = Scratchpad::new("foo", &fork).into_generic();
+        let access = Scratchpad::new("foo", &fork).into_erased();
         access.get_entry("iter_position").set(123_u32);
         drop(access);
 
         let patch = fork.into_patch();
         let patch_ref = &patch as &dyn Snapshot;
-        let access = Migration::new("foo", patch_ref).into_generic();
+        let access = Migration::new("foo", patch_ref).into_erased();
+        assert!(!access.is_mutable());
         let list = access.get_proof_list::<_, i32>("list");
         assert_eq!(list.len(), 4);
         assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5, 6, 7]);
         let set = access.get_key_set::<_, u8>("set");
         assert_eq!(set.iter().collect::<Vec<_>>(), vec![99]);
 
-        let erased = Scratchpad::new("foo", patch_ref).into_generic();
+        let erased = Scratchpad::new("foo", patch_ref).into_erased();
+        assert!(!access.is_mutable());
         assert_eq!(erased.get_entry::<_, u32>("iter_position").get(), Some(123));
     }
 }

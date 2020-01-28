@@ -164,7 +164,13 @@ pub struct Migration<T> {
     namespace: String,
 }
 
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Migration`.
 impl<T> Migration<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
     pub(crate) fn into_parts(self) -> (String, T) {
         (self.namespace, self.access)
     }
@@ -274,7 +280,13 @@ pub struct Scratchpad<T> {
     namespace: String,
 }
 
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Scratchpad`.
 impl<T> Scratchpad<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
     pub(crate) fn into_parts(self) -> (String, T) {
         (self.namespace, self.access)
     }
