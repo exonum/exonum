@@ -177,6 +177,18 @@ pub struct Prefixed<T> {
     prefix: String,
 }
 
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Prefixed`.
+impl<T> Prefixed<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
+    pub(crate) fn into_parts(self) -> (String, T) {
+        (self.prefix, self.access)
+    }
+}
+
 impl<T: RawAccess> Prefixed<T> {
     /// Creates a new prefixed access.
     ///
