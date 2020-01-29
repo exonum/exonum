@@ -104,31 +104,17 @@ fn test_propose_configuration() {
 
 #[test]
 fn test_propose_invalid_configuration() {
-    // Empty service name.
     let (mut testkit, _) = init_testkit(false);
-    let config = Config {
-        time_service_name: "".to_string(),
-    };
-    // Propose configuration with invalid time service name.
-    let new_config = propose_configuration(&mut testkit, config);
-    // Check that configuration has not changed.
-    assert_eq!(new_config.time_service_name, TIME_SERVICE_NAME);
+    let incorrect_names = vec!["", " ", "illegal.illegal", "not_service", SERVICE_NAME];
 
-    // Service name with illegal character.
-    let config = Config {
-        time_service_name: "illegal.illegal".to_string(),
-    };
-    // Propose configuration with not existing service name.
-    let new_config = propose_configuration(&mut testkit, config.clone());
-    // Check that configuration has not changed.
-    assert_eq!(new_config.time_service_name, TIME_SERVICE_NAME);
+    for name in incorrect_names {
+        let config = Config {
+            time_service_name: name.to_string(),
+        };
 
-    // Name of not existing service.
-    let config = Config {
-        time_service_name: "not_service".to_string(),
-    };
-    // Propose configuration with not existing service name.
-    let new_config = propose_configuration(&mut testkit, config.clone());
-    // Check that configuration has not changed.
-    assert_eq!(new_config.time_service_name, TIME_SERVICE_NAME);
+        // Propose configuration with invalid time service name.
+        let new_config = propose_configuration(&mut testkit, config);
+        // Check that configuration has not changed.
+        assert_eq!(new_config.time_service_name, TIME_SERVICE_NAME);
+    }
 }
