@@ -22,7 +22,6 @@ Example of basic test that uses `suite`:
 
 ```python
 import unittest
-import time
 
 from exonum_client import ExonumClient
 
