@@ -366,11 +366,13 @@ impl<T: RawAccess> View<T> {
 
 impl<T: RawAccessMut> View<T> {
     fn changes_mut(&mut self) -> &mut ViewChanges {
+        const ACCESS_ERROR: &str =
+            "Attempt to modify a readonly view of the database using a generic access. \
+             The caller should check the access type before calling any mutable methods";
+
         match self {
-            View::Real(ViewInner { changes, .. }) => changes.as_mut().unwrap(),
-            View::Phantom => unreachable!(
-                "Mutable accesses should create views on demand rather than return phantom views"
-            ),
+            View::Real(ViewInner { changes, .. }) => changes.as_mut().expect(ACCESS_ERROR),
+            View::Phantom => panic!(ACCESS_ERROR),
         }
     }
 

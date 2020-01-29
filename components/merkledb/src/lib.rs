@@ -203,6 +203,7 @@ pub mod access;
 mod backends;
 mod db;
 mod error;
+pub mod generic;
 mod hash;
 pub mod indexes;
 mod keys;

@@ -164,7 +164,19 @@ pub struct Migration<T> {
     namespace: String,
 }
 
-impl<'a, T: RawAccess> Migration<T> {
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Migration`.
+impl<T> Migration<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
+    pub(crate) fn into_parts(self) -> (String, T) {
+        (self.namespace, self.access)
+    }
+}
+
+impl<T: RawAccess> Migration<T> {
     /// Creates a migration in the specified namespace.
     pub fn new(namespace: impl Into<String>, access: T) -> Self {
         Self {
@@ -266,6 +278,18 @@ impl<T: RawAccess> Access for Migration<T> {
 pub struct Scratchpad<T> {
     access: T,
     namespace: String,
+}
+
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Scratchpad`.
+impl<T> Scratchpad<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
+    pub(crate) fn into_parts(self) -> (String, T) {
+        (self.namespace, self.access)
+    }
 }
 
 impl<T: RawAccess> Scratchpad<T> {
