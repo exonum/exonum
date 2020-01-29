@@ -61,8 +61,6 @@ fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
         let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
         let time_service_artifact = time_service.artifact_id();
         testkit
-            .with_rust_service(time_service)
-            .with_artifact(time_service_artifact.clone())
             .with_instance(
                 time_service_artifact
                     .into_default_instance(SECOND_TIME_SERVICE_ID, SECOND_TIME_SERVICE_NAME),
@@ -79,9 +77,8 @@ fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
 fn propose_configuration(testkit: &mut TestKit, config: Config) -> Config {
     let tx = ConfigPropose::immediate(0).service_config(SERVICE_ID, config);
 
-    let initiator_id = testkit.network().us().validator_id().unwrap();
-    let (pub_key, sec_key) = &testkit.validator(initiator_id).service_keypair();
-    testkit.create_block_with_transaction(tx.sign_for_supervisor(*pub_key, sec_key));
+    let (pub_key, sec_key) = testkit.network().us().service_keypair();
+    testkit.create_block_with_transaction(tx.sign_for_supervisor(pub_key, &sec_key));
 
     testkit
         .snapshot()
