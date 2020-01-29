@@ -21,7 +21,10 @@ use exonum::{
 use exonum_merkledb::{proof_map::Raw, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
-use crate::schema::{Schema, TimestampEntry};
+use crate::{
+    schema::{Schema, TimestampEntry},
+    transactions::Config,
+};
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -84,6 +87,18 @@ impl PublicApi {
         })
     }
 
+    /// Endpoint for getting service configuration.
+    pub fn get_service_configuration(self, state: &ServiceApiState<'_>) -> api::Result<Config> {
+        let schema = Schema::new(state.service_data());
+        let config_entry = schema.config.get();
+
+        if let Some(config) = config_entry {
+            Ok(config)
+        } else {
+            Err(api::Error::not_found().title("Configuration not found"))
+        }
+    }
+
     /// Wires the above endpoints to public API scope of the given `ServiceApiBuilder`.
     pub fn wire(self, builder: &mut ServiceApiBuilder) {
         builder
@@ -97,6 +112,9 @@ impl PublicApi {
                 move |state: &ServiceApiState<'_>, query: TimestampQuery| {
                     self.handle_timestamp_proof(state, query.hash)
                 }
+            })
+            .endpoint("v1/timestamps/config", {
+                move |state: &ServiceApiState<'_>, _query: ()| self.get_service_configuration(state)
             });
     }
 }
