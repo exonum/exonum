@@ -39,12 +39,13 @@ pub use crate::{
 };
 
 use exonum::{
-    merkledb::{validation::is_valid_index_name_component, BinaryValue},
+    merkledb::BinaryValue,
     runtime::{CommonError, ExecutionContext, ExecutionError},
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
 use exonum_supervisor::Configure;
+use exonum_time::TimeSchema;
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
@@ -54,18 +55,9 @@ use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 pub struct TimestampingService;
 
 fn verify_config(context: &ExecutionContext<'_>, config: &Config) -> Result<(), ExecutionError> {
-    if !is_valid_index_name_component(&config.time_service_name) {
-        return Err(Error::InvalidConfig.into());
-    }
-
-    if context
+    let _time_schema: TimeSchema<_> = context
         .data()
-        .for_dispatcher()
-        .get_instance(&*config.time_service_name)
-        .is_none()
-    {
-        return Err(Error::TimeServiceNotFound.into());
-    }
+        .service_schema(config.time_service_name.as_str())?;
 
     Ok(())
 }
