@@ -89,14 +89,10 @@ impl PublicApi {
 
     /// Endpoint for getting service configuration.
     pub fn get_service_configuration(self, state: &ServiceApiState<'_>) -> api::Result<Config> {
-        let schema = Schema::new(state.service_data());
-        let config_entry = schema.config.get();
-
-        if let Some(config) = config_entry {
-            Ok(config)
-        } else {
-            Err(api::Error::not_found().title("Configuration not found"))
-        }
+        Schema::new(state.service_data())
+            .config
+            .get()
+            .ok_or_else(|| api::Error::not_found().title("Configuration not found"))
     }
 
     /// Wires the above endpoints to public API scope of the given `ServiceApiBuilder`.
