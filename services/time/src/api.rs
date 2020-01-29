@@ -21,7 +21,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/{INSTANCE_NAME}/v1/current_time` |
+//! | Path        | `/api/services/{INSTANCE_NAME}/v1/current_time` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | `Option<DateTime<Utc>>` |
@@ -75,7 +75,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/{INSTANCE_NAME}/v1/validators_times` |
+//! | Path        | `/api/services/{INSTANCE_NAME}/v1/validators_times` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | Vec<[`ValidatorTime`]> |
@@ -122,7 +122,7 @@
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/{INSTANCE_NAME}/v1/validators_times/all` |
+//! | Path        | `/api/services/{INSTANCE_NAME}/v1/validators_times/all` |
 //! | Method      | GET   |
 //! | Query type  | - |
 //! | Return type | Vec<[`ValidatorTime`]> |
