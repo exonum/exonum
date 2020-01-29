@@ -28,8 +28,10 @@ const TIME_SERVICE_ID: InstanceId = 102;
 const TIME_SERVICE_NAME: &str = "time";
 const SERVICE_ID: InstanceId = 103;
 const SERVICE_NAME: &str = "timestamping";
+const SECOND_TIME_SERVICE_ID: InstanceId = 104;
+const SECOND_TIME_SERVICE_NAME: &str = "time2";
 
-fn init_testkit() -> (TestKit, MockTimeProvider) {
+fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
     let time_service_artifact = time_service.artifact_id();
@@ -53,8 +55,23 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
                 .with_constructor(Config {
                     time_service_name: TIME_SERVICE_NAME.to_owned(),
                 }),
-        )
-        .build();
+        );
+
+    let testkit = if second_time_service {
+        let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
+        let time_service_artifact = time_service.artifact_id();
+        testkit
+            .with_rust_service(time_service)
+            .with_artifact(time_service_artifact.clone())
+            .with_instance(
+                time_service_artifact
+                    .into_default_instance(SECOND_TIME_SERVICE_ID, SECOND_TIME_SERVICE_NAME),
+            )
+            .build()
+    } else {
+        testkit.build()
+    };
+
     (testkit, mock_provider)
 }
 
@@ -77,9 +94,9 @@ fn propose_configuration(testkit: &mut TestKit, config: Config) -> Config {
 
 #[test]
 fn test_propose_configuration() {
-    let (mut testkit, _) = init_testkit();
+    let (mut testkit, _) = init_testkit(true);
     let config = Config {
-        time_service_name: "time2".to_string(),
+        time_service_name: SECOND_TIME_SERVICE_NAME.to_string(),
     };
 
     // Propose valid configuration.
@@ -90,15 +107,24 @@ fn test_propose_configuration() {
 
 #[test]
 fn test_propose_invalid_configuration() {
-    let (mut testkit, _) = init_testkit();
-    let orig_time_service_name = "time";
+    let (mut testkit, _) = init_testkit(false);
     let config = Config {
         time_service_name: "".to_string(),
     };
 
-    // Propose invalid configuration.
+    // Propose configuration with invalid time service name.
     let new_config = propose_configuration(&mut testkit, config);
 
     // Check that configuration has not changed.
-    assert_eq!(new_config.time_service_name, orig_time_service_name);
+    assert_eq!(new_config.time_service_name, TIME_SERVICE_NAME);
+
+    let config = Config {
+        time_service_name: "not_service".to_string(),
+    };
+
+    // Propose configuration with not existing service name.
+    let new_config = propose_configuration(&mut testkit, config.clone());
+
+    // Check that configuration has not changed.
+    assert_eq!(new_config.time_service_name, TIME_SERVICE_NAME);
 }
