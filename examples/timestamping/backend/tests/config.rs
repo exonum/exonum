@@ -81,9 +81,8 @@ fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<Config
     let tx = tx.sign_for_supervisor(pub_key, &sec_key);
     let block = testkit.create_block_with_transaction(tx.clone());
 
-    let tx_status = block.index(tx.object_hash()).status();
-    if tx_status.is_err() {
-        return Err((*tx_status.unwrap_err()).clone());
+    if let Err(e) = block.index(tx.object_hash()).status() {
+        return Err(e.clone());
     }
 
     let new_config = testkit
