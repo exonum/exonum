@@ -53,6 +53,23 @@ use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 #[service_factory(proto_sources = "proto")]
 pub struct TimestampingService;
 
+fn verify_config(context: &ExecutionContext<'_>, config: &Config) -> Result<(), ExecutionError> {
+    if config.time_service_name.is_empty() {
+        return Err(Error::InvalidConfig.into());
+    }
+
+    if context
+        .data()
+        .for_dispatcher()
+        .get_instance(&*config.time_service_name)
+        .is_none()
+    {
+        return Err(Error::TimeServiceNotFound.into());
+    }
+
+    Ok(())
+}
+
 impl Service for TimestampingService {
     fn initialize(
         &self,
@@ -60,15 +77,7 @@ impl Service for TimestampingService {
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let config = Config::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
-
-        if context
-            .data()
-            .for_dispatcher()
-            .get_instance(&*config.time_service_name)
-            .is_none()
-        {
-            return Err(Error::TimeServiceNotFound.into());
-        }
+        verify_config(&context, &config)?;
 
         Schema::new(context.service_data()).config.set(config);
         Ok(())
@@ -84,14 +93,10 @@ impl Configure for TimestampingService {
 
     fn verify_config(
         &self,
-        _context: ExecutionContext<'_>,
+        context: ExecutionContext<'_>,
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
-        if params.time_service_name.is_empty() {
-            Err(Error::InvalidConfig.into())
-        } else {
-            Ok(())
-        }
+        verify_config(&context, &params)
     }
 
     fn apply_config(
