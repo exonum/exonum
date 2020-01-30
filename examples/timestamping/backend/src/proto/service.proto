@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.examples.timestamping;
 
-import "types.proto";
+import "exonum/crypto/types.proto";
 import "google/protobuf/timestamp.proto";
 
 // Stores content's hash and some metadata about it.
