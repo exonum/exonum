@@ -20,7 +20,7 @@ use exonum_time::{MockTimeProvider, TimeServiceFactory};
 
 use std::time::SystemTime;
 
-use exonum_timestamping::{Config, Error, TimestampingService};
+use exonum_timestamping::{Config, TimestampingService};
 
 const TIME_SERVICE_ID: InstanceId = 102;
 const TIME_SERVICE_NAME: &str = "time";
@@ -89,11 +89,9 @@ fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), Ex
         .public(ApiKind::Service(SERVICE_NAME))
         .get("v1/timestamps/config")
         .expect("Failed to get service configuration");
-    if config.time_service_name == new_config.time_service_name {
-        Ok(())
-    } else {
-        Err(Error::InvalidConfig.into())
-    }
+
+    assert_eq!(config.time_service_name, new_config.time_service_name);
+    Ok(())
 }
 
 #[test]
@@ -104,11 +102,7 @@ fn test_propose_configuration() {
     };
 
     // Propose valid configuration.
-    let res = propose_configuration(&mut testkit, config);
-    assert!(
-        res.is_ok(),
-        format!("Configuration proposal failed: {:?}", res)
-    );
+    propose_configuration(&mut testkit, config).expect("Configuration proposal failed.");
 }
 
 #[test]
