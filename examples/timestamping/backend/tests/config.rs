@@ -13,16 +13,14 @@
 // limitations under the License.
 
 use exonum::runtime::{CoreError, ErrorMatch, ExecutionError, InstanceId};
-
-use exonum_merkledb::ObjectHash;
 use exonum_rust_runtime::ServiceFactory;
 use exonum_supervisor::{ConfigPropose, Supervisor};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use exonum_time::{MockTimeProvider, TimeServiceFactory};
 
-use std::{ops::Index, time::SystemTime};
+use std::time::SystemTime;
 
-use exonum_timestamping::{Config, TimestampingService};
+use exonum_timestamping::{Config, Error, TimestampingService};
 
 const TIME_SERVICE_ID: InstanceId = 102;
 const TIME_SERVICE_NAME: &str = "time";
@@ -73,24 +71,29 @@ fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
     (testkit, mock_provider)
 }
 
-/// Creates block with `ConfigPropose` tx and returns `Result` with new configuration or corresponding `ExecutionError`.
-fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<Config, ExecutionError> {
-    let tx = ConfigPropose::immediate(0).service_config(SERVICE_ID, config);
+/// Creates block with `ConfigPropose` tx and returns `Result` with new
+/// configuration or corresponding `ExecutionError`.
+fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), ExecutionError> {
+    let tx = ConfigPropose::immediate(0).service_config(SERVICE_ID, config.clone());
 
     let (pub_key, sec_key) = testkit.network().us().service_keypair();
     let tx = tx.sign_for_supervisor(pub_key, &sec_key);
-    let block = testkit.create_block_with_transaction(tx.clone());
+    let block = testkit.create_block_with_transaction(tx);
 
-    if let Err(e) = block.index(tx.object_hash()).status() {
+    if let Err(e) = block[0].status() {
         return Err(e.clone());
     }
 
-    let new_config = testkit
+    let new_config: Config = testkit
         .api()
         .public(ApiKind::Service(SERVICE_NAME))
-        .get::<Config>("v1/timestamps/config")
+        .get("v1/timestamps/config")
         .expect("Failed to get service configuration");
-    Ok(new_config)
+    if config.time_service_name == new_config.time_service_name {
+        Ok(())
+    } else {
+        Err(Error::InvalidConfig.into())
+    }
 }
 
 #[test]
@@ -101,10 +104,11 @@ fn test_propose_configuration() {
     };
 
     // Propose valid configuration.
-    let new_config = propose_configuration(&mut testkit, config.clone())
-        .expect("Configuration proposal failed.");
-
-    assert_eq!(new_config.time_service_name, config.time_service_name);
+    let res = propose_configuration(&mut testkit, config);
+    assert!(
+        res.is_ok(),
+        format!("Configuration proposal failed: {:?}", res)
+    );
 }
 
 #[test]
