@@ -112,9 +112,9 @@ Run nodes:
 
 ```sh
 exonum-cryptocurrency-advanced run \
-  --node-config example/1/node.toml
-  --db-path example/1/db
-  --public-api-address 0.0.0.0:8200
+  --node-config example/1/node.toml \
+  --db-path example/1/db \
+  --public-api-address 0.0.0.0:8200 \
   --master-key-pass pass
 
 # Similar commands for other 3 nodes, with adjusted paths and socket addresses
