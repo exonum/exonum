@@ -43,11 +43,21 @@ fn main() {
 Include `exonum-build` as a dependency in your `Cargo.toml`:
 
 ```toml
-[dependencies]
+[build-dependencies]
 exonum-build = "0.13.0-rc.2"
 ```
+
+## Known Issues
+
+The [code generator][`rust-protobuf`] used by the crate does not
+support hierarchies, instead using a flat structure for the generated Rust modules.
+This means that compile errors can occur
+if the generator input (accounting for includes!) contains several Protobuf files
+with the same base name (e.g., `foo/bar.proto` and `other/bar.proto`).
 
 ## License
 
 `exonum-build` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
+
+[`rust-protobuf`]: https://github.com/stepancheg/rust-protobuf/
