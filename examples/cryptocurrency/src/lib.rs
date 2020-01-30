@@ -299,11 +299,11 @@ pub mod api {
 
     impl CryptocurrencyApi {
         /// Endpoint for getting a single wallet.
-        pub fn get_wallet(state: &ServiceApiState<'_>, pub_key: PublicKey) -> api::Result<Wallet> {
+        pub fn get_wallet(state: &ServiceApiState<'_>, query: WalletQuery) -> api::Result<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
             schema
                 .wallets
-                .get(&pub_key)
+                .get(&query.pub_key)
                 .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
         }
 
