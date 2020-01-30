@@ -47,6 +47,10 @@ impl<T: Access> SchemaImpl<T> {
     pub fn new(access: T) -> Self {
         Self::from_root(access).unwrap()
     }
+
+    pub fn wallet(&self, address: Address) -> Option<Wallet> {
+        self.public.wallets.get(&address)
+    }
 }
 
 impl<T> SchemaImpl<T>
