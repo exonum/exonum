@@ -63,7 +63,7 @@ Generate blockchain configuration:
 ```sh
 mkdir example
 
-exonum-timestamping generate-template example/common.toml --validators-count 4
+exonum-timestamping generate-template example/common.toml --validators-count 4 --supervisor-mode simple
 ```
 
 Generate templates of nodes configurations:

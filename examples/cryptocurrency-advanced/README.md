@@ -71,7 +71,7 @@ Generate template:
 ```sh
 mkdir example
 
-exonum-cryptocurrency-advanced generate-template example/common.toml --validators-count 4
+exonum-cryptocurrency-advanced generate-template example/common.toml --validators-count 4 --supervisor-mode simple
 ```
 
 Generate public and secrets keys for each node:

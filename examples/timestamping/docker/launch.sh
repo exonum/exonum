@@ -4,9 +4,10 @@ node_count=4
 start_peer_port=6331
 start_public_port=8000
 path_to_app=/root/.cargo/bin/exonum-timestamping
+supervisor_mode=simple
 
 cd backend && mkdir example && cd example
-$path_to_app generate-template common.toml --validators-count $node_count
+${path_to_app} generate-template common.toml --validators-count $node_count --supervisor-mode ${supervisor_mode}
 
 for i in $(seq 0 $((node_count - 1)))
 do
