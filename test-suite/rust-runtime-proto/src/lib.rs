@@ -51,7 +51,6 @@ pub fn assert_exonum_core_protos(api: &TestKitApi) {
         "exonum/blockchain.proto",
         "exonum/messages.proto",
         "exonum/proofs.proto",
-        "exonum/_impl/details.proto",
         "exonum/runtime/auth.proto",
         "exonum/runtime/base.proto",
         "exonum/runtime/errors.proto",

@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package exonum.runtime;
+package exonum.runtime._details;
 
 // Information about a modified service instance. This type is considered
 // an implementation detail of the core.

@@ -14,7 +14,7 @@
 
 // spell-checker:ignore rustc
 
-use exonum_build::ProtobufGenerator;
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
@@ -56,7 +56,6 @@ fn write_user_agent_file() {
 
 fn main() {
     write_user_agent_file();
-
     create_path_to_protobuf_schema_env();
 
     ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
@@ -65,11 +64,17 @@ fn main() {
         .with_common()
         .with_merkledb()
         .generate();
+
+    ProtobufGenerator::with_mod_name("exonum_details_mod.rs")
+        .with_input_dir("src/proto/details")
+        .with_crypto()
+        .with_includes(&[ProtoSources::Path("src/proto/schema")])
+        .without_sources()
+        .generate();
 }
 
 fn rust_version() -> Option<String> {
     let rustc = option_env!("RUSTC").unwrap_or("rustc");
-
     let output = Command::new(rustc).arg("-V").output().ok()?.stdout;
     String::from_utf8(output).ok()
 }
