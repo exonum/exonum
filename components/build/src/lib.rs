@@ -88,14 +88,30 @@ impl<'a> From<&'a str> for ProtoSources<'a> {
     }
 }
 
-/// Finds all .proto files in `path` and subfolders and returns a vector of their paths.
-fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct ProtobufFile {
+    full_path: PathBuf,
+    relative_path: String,
+}
+
+/// Finds all .proto files in `path` and sub-directories and returns a vector
+/// with metadata on found files.
+fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<ProtobufFile> {
     WalkDir::new(path)
         .into_iter()
         .filter_map(|e| {
-            let e = e.ok()?;
-            if e.path().extension()?.to_str() == Some("proto") {
-                Some(e.path().into())
+            let entry = e.ok()?;
+            if entry.file_type().is_file() && entry.path().extension()?.to_str() == Some("proto") {
+                let full_path = entry.path().to_owned();
+                let relative_path = full_path.strip_prefix(path).unwrap().to_owned();
+                let relative_path = relative_path
+                    .to_str()
+                    .expect("Cannot convert relative path to string");
+
+                Some(ProtobufFile {
+                    full_path,
+                    relative_path: canonicalize_protobuf_path(&relative_path),
+                })
             } else {
                 None
             }
@@ -103,20 +119,26 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
         .collect()
 }
 
+#[cfg(windows)]
+fn canonicalize_protobuf_path(path_str: &str) -> String {
+    path_str.replace('\\', "/")
+}
+
+#[cfg(not(windows))]
+fn canonicalize_protobuf_path(path_str: &str) -> String {
+    path_str.to_owned()
+}
+
 /// Includes all .proto files with their names into generated file as array of tuples,
 /// where tuple content is (file_name, file_content).
-fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTokens {
+fn include_proto_files(proto_files: HashSet<&ProtobufFile>, name: &str) -> impl ToTokens {
     let proto_files_len = proto_files.len();
     // TODO Think about syn crate and token streams instead of dirty strings.
-    let proto_files = proto_files.iter().map(|path| {
-        let name = path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .expect(".proto file name is not convertible to &str");
+    let proto_files = proto_files.iter().map(|file| {
+        let name = &file.relative_path;
 
         let mut content = String::new();
-        File::open(path)
+        File::open(&file.full_path)
             .expect("Unable to open .proto file")
             .read_to_string(&mut content)
             .expect("Unable to read .proto file");
@@ -145,13 +167,14 @@ fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTok
 /// - Also this method includes source files as `PROTO_SOURCES` constant.
 fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
     out_dir: P,
-    proto_files: &[PathBuf],
-    includes: &[PathBuf],
+    proto_files: &[ProtobufFile],
+    includes: &[ProtobufFile],
     mod_file: Q,
 ) {
     let mod_files = {
-        proto_files.iter().map(|f| {
-            let mod_name = f
+        proto_files.iter().map(|file| {
+            let mod_name = file
+                .full_path
                 .file_stem()
                 .unwrap()
                 .to_str()
@@ -354,7 +377,11 @@ where
             .expect("Out dir name is not convertible to &str"),
         input: &proto_files
             .iter()
-            .map(|s| s.to_str().expect("File name is not convertible to &str"))
+            .map(|s| {
+                s.full_path
+                    .to_str()
+                    .expect("File name is not convertible to &str")
+            })
             .collect::<Vec<_>>(),
         includes: &includes,
         customize: Customize {
@@ -365,7 +392,7 @@ where
     .expect("protoc");
 }
 
-fn get_included_files(includes: &[&str]) -> Vec<PathBuf> {
+fn get_included_files(includes: &[&str]) -> Vec<ProtobufFile> {
     includes
         .iter()
         .flat_map(|path| get_proto_files(path))

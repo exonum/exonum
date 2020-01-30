@@ -47,15 +47,19 @@ pub fn assert_exonum_core_protos(api: &TestKitApi) {
         .collect();
 
     let expected_files: HashSet<String> = vec![
-        "key_value_sequence.proto",
-        "blockchain.proto",
-        "messages.proto",
-        "runtime.proto",
-        "common.proto",
-        "types.proto",
-        "proofs.proto",
-        "list_proof.proto",
-        "map_proof.proto",
+        "exonum/key_value_sequence.proto",
+        "exonum/blockchain.proto",
+        "exonum/messages.proto",
+        "exonum/proofs.proto",
+        "exonum/_impl/details.proto",
+        "exonum/runtime/auth.proto",
+        "exonum/runtime/base.proto",
+        "exonum/runtime/errors.proto",
+        "exonum/runtime/lifecycle.proto",
+        "exonum/common/bit_vec.proto",
+        "exonum/crypto/types.proto",
+        "exonum/proof/list_proof.proto",
+        "exonum/proof/map_proof.proto",
     ]
     .into_iter()
     .map(str::to_owned)
