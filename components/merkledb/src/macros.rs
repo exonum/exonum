@@ -161,12 +161,12 @@ macro_rules! impl_serde_hex_for_binary_value {
 #[macro_export]
 macro_rules! binary_value_tuple_impls {
     () => ();
-    ($(#[$attr:meta])* $vis:vis $name:ident $(where $whc:ty)? {$(($t1:ty$(,$( $t2:ty$(,$( $t3:ty$(,$( $t4:ty$(, $($t5:ty$(, $($t6:ty$(, $($t7:ty$(,$( $t8:ty$(,$( $t9:ty$(,$( $t10:ty$(,$( $t11:ty$(,$( $t12:ty)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)),+$(,)?} $($rest:tt)*) => {
+    ($(#[$attr:meta])* $vis:vis $name:ident {$(($t1:ty$(, $t2:ty$(, $t3:ty$(, $t4:ty$(, $t5:ty$(, $t6:ty$(, $t7:ty$(, $t8:ty$(, $t9:ty$(, $t10:ty$(, $t11:ty$(, $t12:ty)?)?)?)?)?)?)?)?)?)?)?$(,)?)),+$(,)?} $($rest:tt)*) => {
         $(#[$attr])*
-        $vis struct $name<T$(: $whc)?>(pub T);
+        $vis struct $name<T>(pub T);
         $crate::binary_value_tuple_impls!(for $name {$(($t1$(, $t2$(, $t3$(, $t4$(, $t5$(, $t6$(, $t7$(, $t8$(, $t9$(, $t10$(, $t11$(, $t12)?)?)?)?)?)?)?)?)?)?)?)),+} $($rest)*);
     };
-    (for $name:ident {$(($t1:ty$(,$( $t2:ty$(,$( $t3:ty$(,$( $t4:ty$(, $($t5:ty$(, $($t6:ty$(, $($t7:ty$(,$( $t8:ty$(,$( $t9:ty$(,$( $t10:ty$(,$( $t11:ty$(,$( $t12:ty)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)?)),+$(,)?} $($rest:tt)*) => {
+    (for $name:ident {$(($t1:ty$(, $t2:ty$(, $t3:ty$(, $t4:ty$(, $t5:ty$(, $t6:ty$(, $t7:ty$(, $t8:ty$(, $t9:ty$(, $t10:ty$(, $t11:ty$(, $t12:ty)?)?)?)?)?)?)?)?)?)?)?$(,)?)),+$(,)?} $($rest:tt)*) => {
         $($crate::binary_value_tuple_impls!($name ($t1, 0)$(, ($t2, 1)$(, ($t3, 2)$(, ($t4, 3)$(, ($t5, 4)$(, ($t6, 5)$(, ($t7, 6)$(, ($t8, 7)$(, ($t9, 8)$(, ($t10, 9)$(, ($t11, 10)$(, ($t12, 11))?)?)?)?)?)?)?)?)?)?)?);)+
         $crate::binary_value_tuple_impls!($($rest)*);
     };

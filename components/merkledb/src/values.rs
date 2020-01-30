@@ -431,7 +431,7 @@ mod tests {
         }
 
         #[derive(Debug, PartialEq)]
-        AnotherContainer where Debug + Copy + Clone {
+        AnotherContainer {
             (i64, i32),
         }
     }
@@ -441,25 +441,25 @@ mod tests {
             (PublicKey, [u8; HASH_SIZE])
         }
     }
-    
+
     #[test]
     fn test_binary_from_tuple_container() {
         use chrono::TimeZone;
-    
+
         let values_1: [TupleContainer<(i128, Uuid, Vec<u8>)>; 3] = [
-           (12345, Uuid::nil(), vec![0, 1, 2, 3, 4, 5]).into(),
-           (
-               67890,
-               Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
-               vec![6, 7, 8, 9, 10, 11],
-           )
-               .into(),
-           (
-               111_222_333,
-               Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
-               vec![u8::max_value(); u8::max_value() as usize],
-           )
-               .into(),
+            (12345, Uuid::nil(), vec![0, 1, 2, 3, 4, 5]).into(),
+            (
+                67890,
+                Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+                vec![6, 7, 8, 9, 10, 11],
+            )
+                .into(),
+            (
+                111_222_333,
+                Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
+                vec![u8::max_value(); u8::max_value() as usize],
+            )
+                .into(),
         ];
         assert_round_trip_eq(&values_1);
 
