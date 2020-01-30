@@ -12,28 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate simplifies writing `build.rs` for Exonum and Exonum services.
+//! This crate simplifies writing build scripts (`build.rs`) for Exonum and Exonum services.
 //!
 //! Since Protobuf is the Exonum default serialization format, `build.rs` is mostly used
 //! to compile Protobuf files and generate a corresponding code. This code is used later by
 //! the Exonum core and services.
 //!
-//! All you need to do is to call `ProtobufGenerator` with required params, for an example see
-//! [`ProtobufGenerator`] docs.
+//! In order to use the crate, call `ProtobufGenerator` with the required params.
+//! See [`ProtobufGenerator`] docs for an example.
 //!
-//! There are several predefined sets of protobuf sources available for use.
-//! See [`ProtoSources`].
+//! # File Sets
 //!
-//! Currently presented sets:
+//! There are several predefined sets of Protobuf sources available for use, split according
+//! to the crate the sources are defined in. These sets are described by [`ProtoSources`]:
 //!
-//! - Crypto sources: all the necessary crypto types used in services and system proto-files.
-//! These types are `Hash`, `PublicKey` and `Signature`.
+//! - **Crypto sources:** cryptographic types used in services and the code.
+//! - **Common sources:** types that can be used by various parts of Exonum.
+//! - **MerkleDB sources:** types representing proofs of existence of element in database.
+//! - **Core sources:** types used in core and in system services such as supervisor.
 //!
-//! - Exonum sources: types used in core and in system services such as supervisor.
+//! | File path | Set | Description |
+//! |-----------|-----|-------------|
+//! | `exonum/crypto/types.proto` | Crypto | Basic types: `Hash`, `PublicKey` and `Signature` |
+//! | `exonum/common/bit_vec.proto` | Common | Protobuf mapping for `BitVec` |
+//! | `exonum/proof/list_proof.proto` | MerkleDB | `ListProof` and related helpers |
+//! | `exonum/proof/map_proof.proto` | MerkleDB | `MapProof` and related helpers |
+//! | `exonum/blockchain.proto` | Core | Basic core types (e.g., `Block`) |
+//! | `exonum/key_value_sequence.proto` | Core | Key-value sequence used to store additional headers in `Block` |
+//! | `exonum/messages.proto` | Core | Base types for Ed25519-authenticated messages |
+//! | `exonum/proofs.proto` | Core | Block and index proofs |
+//! | `exonum/runtime/auth.proto` | Core | Authorization-related types |
+//! | `exonum/runtime/base.proto` | Core | Basic runtime types (e.g., artifact ID) |
+//! | `exonum/runtime/errors.proto` | Core | Execution errors |
+//! | `exonum/runtime/lifecycle.proto` | Core | Advanced types used in service lifecycle |
 //!
-//! - Common sources: types that can be used by various parts of Exonum.
-//!
-//! - MerkleDB sources: types representing proofs of existence of element in database.
+//! Each file is placed in the Protobuf package matching its path, similar to well-known Protobuf
+//! types. For example, `exonum/runtime/auth.proto` types are in the `exonum.runtime` package.
 //!
 //! [`ProtobufGenerator`]: struct.ProtobufGenerator.html
 //! [`ProtoSources`]: enum.ProtoSources.html
@@ -54,18 +68,18 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Enum represents various sources of protobuf files.
+/// Enum representing various sources of Protobuf files.
 #[derive(Debug, Copy, Clone)]
 pub enum ProtoSources<'a> {
-    /// Path to exonum core protobuf files.
+    /// Path to core Protobuf files.
     Exonum,
-    /// Path to exonum crypto protobuf files.
+    /// Path to crypto Protobuf files.
     Crypto,
-    /// Path to common protobuf files.
+    /// Path to common Protobuf files.
     Common,
-    /// Path to merkledb protobuf files.
+    /// Path to database-related Protobuf files.
     Merkledb,
-    /// Path to manually specified protobuf sources.
+    /// Manually specified path.
     Path(&'a str),
 }
 
