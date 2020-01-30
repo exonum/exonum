@@ -78,10 +78,10 @@ pub struct Issue {
 }
 
 /// Create wallet with the given `name`.
-#[protobuf_convert(source = "proto::CreateWallet")]
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::CreateWallet")]
 pub struct CreateWallet {
     /// Name of the new wallet.
     pub name: String,

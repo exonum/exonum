@@ -38,7 +38,7 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    /// Create new Wallet.
+    /// Creates a new wallet.
     pub fn new(
         owner: Address,
         name: &str,
@@ -54,6 +54,7 @@ impl Wallet {
             history_hash,
         }
     }
+
     /// Returns a copy of this wallet with updated balance.
     pub fn set_balance(self, balance: u64, history_hash: &Hash) -> Self {
         Self::new(

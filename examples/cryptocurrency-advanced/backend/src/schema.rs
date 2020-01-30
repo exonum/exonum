@@ -54,13 +54,8 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
-    /// Increase balance of the wallet and append new record to its history.
-    pub(crate) fn increase_wallet_balance(
-        &mut self,
-        wallet: Wallet,
-        amount: u64,
-        transaction: Hash,
-    ) {
+    /// Increases balance of the wallet and append new record to its history.
+    pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
         let mut history = self.wallet_history.get(&wallet.owner);
         history.push(transaction);
         let history_hash = history.object_hash();
@@ -70,13 +65,8 @@ where
         self.public.wallets.put(&wallet_key, wallet);
     }
 
-    /// Decrease balance of the wallet and append new record to its history.
-    pub(crate) fn decrease_wallet_balance(
-        &mut self,
-        wallet: Wallet,
-        amount: u64,
-        transaction: Hash,
-    ) {
+    /// Decreases balance of the wallet and append new record to its history.
+    pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
         let mut history = self.wallet_history.get(&wallet.owner);
         history.push(transaction);
         let history_hash = history.object_hash();
@@ -86,8 +76,8 @@ where
         self.public.wallets.put(&wallet_key, wallet);
     }
 
-    /// Create new wallet and append first record to its history.
-    pub(crate) fn create_wallet(&mut self, key: Address, name: &str, transaction: Hash) {
+    /// Creates a new wallet and append first record to its history.
+    pub fn create_wallet(&mut self, key: Address, name: &str, transaction: Hash) {
         let mut history = self.wallet_history.get(&key);
         history.push(transaction);
         let history_hash = history.object_hash();
