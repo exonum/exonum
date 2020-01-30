@@ -34,7 +34,6 @@
 extern crate serde_derive; // Required for Protobuf.
 
 pub mod proto;
-
 #[cfg(test)]
 mod tx_tests;
 
@@ -144,10 +143,10 @@ pub mod transactions {
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
-    #[protobuf_convert(source = "proto::TxTransfer")]
     #[derive(Clone, Debug)]
     #[derive(Serialize, Deserialize)]
     #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+    #[protobuf_convert(source = "proto::TxTransfer")]
     pub struct TxTransfer {
         /// Public key of the receiver.
         pub to: PublicKey,
@@ -233,12 +232,12 @@ pub mod contracts {
             let author = context
                 .caller()
                 .author()
-                .expect("Wrong 'TxCreateWallet' initiator");
+                .expect("Wrong `TxCreateWallet` initiator");
 
             let mut schema = CurrencySchema::new(context.service_data());
             if schema.wallets.get(&author).is_none() {
                 let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
-                println!("Create the wallet: {:?}", wallet);
+                println!("Created wallet: {:?}", wallet);
                 schema.wallets.put(&author, wallet);
                 Ok(())
             } else {
@@ -275,7 +274,7 @@ pub mod contracts {
 
     impl Service for CryptocurrencyService {
         fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-            CryptocurrencyApi.wire(builder);
+            CryptocurrencyApi::wire(builder);
         }
     }
 }
@@ -300,11 +299,7 @@ pub mod api {
 
     impl CryptocurrencyApi {
         /// Endpoint for getting a single wallet.
-        pub fn get_wallet(
-            self,
-            state: &ServiceApiState<'_>,
-            pub_key: PublicKey,
-        ) -> api::Result<Wallet> {
+        pub fn get_wallet(state: &ServiceApiState<'_>, pub_key: PublicKey) -> api::Result<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
             schema
                 .wallets
@@ -313,25 +308,19 @@ pub mod api {
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(self, state: &ServiceApiState<'_>) -> api::Result<Vec<Wallet>> {
+        pub fn get_wallets(state: &ServiceApiState<'_>, _query: ()) -> api::Result<Vec<Wallet>> {
             let schema = CurrencySchema::new(state.service_data());
             Ok(schema.wallets.values().collect())
         }
 
-        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
+        /// `ServiceApiBuilder` facilitates conversion between read requests and REST
         /// endpoints.
-        pub fn wire(self, builder: &mut ServiceApiBuilder) {
+        pub fn wire(builder: &mut ServiceApiBuilder) {
             // Binds handlers to specific routes.
             builder
                 .public_scope()
-                .endpoint("v1/wallet", {
-                    move |state: &ServiceApiState<'_>, query: WalletQuery| {
-                        self.get_wallet(state, query.pub_key)
-                    }
-                })
-                .endpoint("v1/wallets", {
-                    move |state: &ServiceApiState<'_>, _query: ()| self.get_wallets(state)
-                });
+                .endpoint("v1/wallet", Self::get_wallet)
+                .endpoint("v1/wallets", Self::get_wallets);
         }
     }
 }
