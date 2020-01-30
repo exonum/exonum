@@ -21,7 +21,7 @@ package exonum.consensus;
 option java_package = "com.exonum.core.messages";
 
 import "exonum/crypto/types.proto";
-import "exonum/common/common.proto";
+import "exonum/common/bit_vec.proto";
 import "exonum/blockchain.proto";
 import "exonum/messages.proto";
 import "exonum/runtime/runtime.proto";

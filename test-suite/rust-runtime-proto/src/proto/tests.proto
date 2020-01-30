@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 import "exonum/crypto/types.proto";
-import "exonum/common/common.proto";
+import "exonum/common/bit_vec.proto";
 import "google/protobuf/timestamp.proto";
 
 package exonum.tests;
