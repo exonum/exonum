@@ -26,7 +26,7 @@ fn create_path_to_protobuf_schema_env() {
     // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
 
     let current_dir = env::current_dir().expect("Failed to get current dir.");
-    let protos = current_dir.join("src/proto/schema/exonum");
+    let protos = current_dir.join("src/proto/schema");
     println!("cargo:protos={}", protos.to_str().unwrap());
 
     // Reexport common, MerkleDB and crypto protobuf files.
@@ -60,7 +60,7 @@ fn main() {
     create_path_to_protobuf_schema_env();
 
     ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
-        .with_input_dir("src/proto/schema/exonum")
+        .with_input_dir("src/proto/schema")
         .with_crypto()
         .with_common()
         .with_merkledb()

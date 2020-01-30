@@ -18,7 +18,7 @@ package exonum.runtime;
 
 option java_package = "com.exonum.core.messages";
 
-import "blockchain.proto";
+import "exonum/blockchain.proto";
 import "exonum/crypto/types.proto";
 import "google/protobuf/empty.proto";
 
@@ -214,7 +214,7 @@ message InstanceMigration {
 // Current state of service instance in dispatcher.
 message InstanceState {
   // Service instance specification.
-  exonum.runtime.InstanceSpec spec = 1;
+  InstanceSpec spec = 1;
   // Service instance activity status.
   //
   // Status can be `NONE` only during the block execution if instance was created,

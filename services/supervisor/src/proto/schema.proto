@@ -17,8 +17,8 @@ syntax = "proto3";
 package exonum.supervisor;
 
 import "exonum/crypto/types.proto";
+import "exonum/runtime/runtime.proto";
 import "service.proto";
-import "runtime.proto";
 
 message ConfigProposalWithHash {
     exonum.crypto.Hash propose_hash = 1;

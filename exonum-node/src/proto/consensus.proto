@@ -21,10 +21,10 @@ package exonum.consensus;
 option java_package = "com.exonum.core.messages";
 
 import "exonum/crypto/types.proto";
-import "common.proto";
-import "blockchain.proto";
-import "messages.proto";
-import "runtime.proto";
+import "exonum/common/common.proto";
+import "exonum/blockchain.proto";
+import "exonum/messages.proto";
+import "exonum/runtime/runtime.proto";
 import "google/protobuf/timestamp.proto";
 
 message Connect {
@@ -103,7 +103,7 @@ message PoolTransactionsRequest {
 message ExonumMessage {
   oneof kind {
     exonum.runtime.AnyTx any_tx = 1;
-    exonum.messages.Precommit precommit = 2;
+    exonum.Precommit precommit = 2;
 
     Status status = 3;
     Connect connect = 4;

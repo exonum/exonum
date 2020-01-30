@@ -19,7 +19,7 @@ package exonum;
 option java_package = "com.exonum.core.messages";
 
 import "exonum/crypto/types.proto";
-import "key_value_sequence.proto";
+import "exonum/key_value_sequence.proto";
 
 // Extensible set of additional headers, represented
 // as a sequence of key-value pairs.

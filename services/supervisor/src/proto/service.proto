@@ -17,8 +17,8 @@ syntax = "proto3";
 package exonum.supervisor;
 
 import "exonum/crypto/types.proto";
-import "runtime.proto";
-import "blockchain.proto";
+import "exonum/blockchain.proto";
+import "exonum/runtime/runtime.proto";
 import "google/protobuf/empty.proto";
 
 // Transactions
