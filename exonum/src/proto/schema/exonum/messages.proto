@@ -21,7 +21,7 @@ package exonum;
 option java_package = "com.exonum.core.messages";
 
 import "exonum/crypto/types.proto";
-import "exonum/runtime/runtime.proto";
+import "exonum/runtime/base.proto";
 import "google/protobuf/timestamp.proto";
 
 // Container for the signed messages.

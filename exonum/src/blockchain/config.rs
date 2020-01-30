@@ -31,7 +31,7 @@ use crate::{
     keys::Keys,
     merkledb::BinaryValue,
     messages::SIGNED_MESSAGE_MIN_SIZE,
-    proto::schema::{blockchain, runtime},
+    proto::schema,
     runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
 };
 
@@ -41,7 +41,7 @@ use crate::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
-#[protobuf_convert(source = "blockchain::ValidatorKeys")]
+#[protobuf_convert(source = "schema::blockchain::ValidatorKeys")]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
@@ -94,7 +94,7 @@ impl ValidateInput for ValidatorKeys {
 ///
 /// For additional information on the Exonum consensus algorithm, refer to
 /// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
-#[protobuf_convert(source = "blockchain::Config")]
+#[protobuf_convert(source = "schema::blockchain::Config")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -486,15 +486,16 @@ impl ValidateInput for ConsensusConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "runtime::GenesisConfig")]
+#[protobuf_convert(source = "schema::lifecycle::GenesisConfig")]
 pub struct GenesisConfig {
     /// Blockchain configuration used to create the genesis block.
     pub consensus_config: ConsensusConfig,
 
-    /// Artifacts specification of builtin services.
+    /// Artifacts specification of the built-in services.
     pub artifacts: Vec<ArtifactSpec>,
 
-    /// List of services with its configuration parameters that are created directly in the genesis block.
+    /// List of services with their configuration parameters that are created directly
+    /// in the genesis block.
     pub builtin_instances: Vec<InstanceInitParams>,
 
     /// No-op field for forward compatibility.
@@ -503,15 +504,15 @@ pub struct GenesisConfig {
     non_exhaustive: (),
 }
 
-/// Represents data that is required for initialization of service instance.
+/// Data that is required for initialization of a service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "runtime::InstanceInitParams")]
+#[protobuf_convert(source = "schema::lifecycle::InstanceInitParams")]
 pub struct InstanceInitParams {
-    /// Wrapped `InstanceSpec`.
+    /// Instance specification.
     pub instance_spec: InstanceSpec,
-    /// Constructor argument for specific `InstanceSpec`.
+    /// Constructor argument for the instance.
     pub constructor: Vec<u8>,
 
     /// No-op field for forward compatibility.

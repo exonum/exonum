@@ -24,7 +24,7 @@ import "exonum/crypto/types.proto";
 import "exonum/common/bit_vec.proto";
 import "exonum/blockchain.proto";
 import "exonum/messages.proto";
-import "exonum/runtime/runtime.proto";
+import "exonum/runtime/base.proto";
 import "google/protobuf/timestamp.proto";
 
 message Connect {

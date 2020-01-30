@@ -17,7 +17,7 @@ syntax = "proto3";
 package exonum.supervisor;
 
 import "exonum/crypto/types.proto";
-import "exonum/runtime/runtime.proto";
+import "exonum/runtime/errors.proto";
 import "service.proto";
 
 message ConfigProposalWithHash {

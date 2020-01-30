@@ -29,7 +29,7 @@ use std::{
 use super::{execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError};
 use crate::{
     crypto::{self, Hash},
-    proto::schema::runtime as runtime_proto,
+    proto::schema,
     runtime::{CallSite, RuntimeIdentifier},
 };
 
@@ -157,7 +157,7 @@ impl Display for ExecutionError {
 }
 
 impl ProtobufConvert for ExecutionError {
-    type ProtoStruct = runtime_proto::ExecutionError;
+    type ProtoStruct = schema::errors::ExecutionError;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();

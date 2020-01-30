@@ -25,7 +25,7 @@ use semver::Version;
 
 use crate::{
     proto::schema::{
-        self, runtime::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
+        self, details::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
     },
     runtime::{
         migrations::{InstanceMigration, MigrationStatus},
@@ -43,7 +43,7 @@ const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
 /// Information about a modified service instance.
 #[derive(Debug, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "schema::runtime::ModifiedInstanceInfo")]
+#[protobuf_convert(source = "schema::details::ModifiedInstanceInfo")]
 pub(super) struct ModifiedInstanceInfo {
     #[protobuf_convert(with = "MigrationTransition")]
     pub migration_transition: Option<MigrationTransition>,

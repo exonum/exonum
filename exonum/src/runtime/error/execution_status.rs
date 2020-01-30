@@ -17,7 +17,7 @@ use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
 use failure::ensure;
 
-use crate::{crypto::Hash, proto::schema::runtime as runtime_proto};
+use crate::{crypto::Hash, proto::schema::errors as errors_proto};
 
 use super::ExecutionError;
 
@@ -47,7 +47,7 @@ impl From<Result<(), ExecutionError>> for ExecutionStatus {
 }
 
 impl ProtobufConvert for ExecutionStatus {
-    type ProtoStruct = runtime_proto::ExecutionStatus;
+    type ProtoStruct = errors_proto::ExecutionStatus;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();

@@ -14,16 +14,22 @@
 
 syntax = "proto3";
 
-package exonum.service.middleware;
+package exonum.runtime;
 
-import "exonum/runtime/base.proto";
+option java_package = "com.exonum.core.messages";
 
-message CheckedCall {
-  string artifact_name = 1;
-  string artifact_version = 2;
-  exonum.runtime.AnyTx inner = 3;
-}
+import "exonum/crypto/types.proto";
+import "google/protobuf/empty.proto";
 
-message Batch {
-  repeated exonum.runtime.AnyTx inner = 1;
+// The authorization information for a call to the service.
+message Caller {
+  oneof caller {
+    // The caller is identified by the specified Ed25519 public key.
+    exonum.crypto.PublicKey transaction_author = 1;
+    // The call is invoked with the authority of a blockchain service
+    // with the specified identifier.
+    uint32 instance_id = 2;
+    // The call is invoked by one of the blockchain lifecycle events.
+    google.protobuf.Empty blockchain = 3;
+  }
 }
