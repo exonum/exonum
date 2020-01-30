@@ -93,7 +93,8 @@ pub trait CopyAccessExt: Access + Copy {
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
     {
-        ProofEntry::from_access(self, addr.into()).unwrap()
+        ProofEntry::from_access(self, addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a list index with the specified address.
@@ -313,7 +314,8 @@ pub trait AccessExt: Access {
         I: Into<IndexAddress>,
         V: BinaryValue + ObjectHash,
     {
-        ProofEntry::from_access(self.clone(), addr.into()).unwrap()
+        ProofEntry::from_access(self.clone(), addr.into())
+            .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
     }
 
     /// Gets a list index with the specified address.
