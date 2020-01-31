@@ -33,6 +33,8 @@ pub enum Error {
     HashAlreadyExists = 0,
     /// Time service with the specified name doesn't exist.
     TimeServiceNotFound = 1,
+    /// Timestamping configuration is invalid.
+    InvalidConfig = 2,
 }
 
 /// Timestamping configuration parameters.

@@ -44,13 +44,23 @@ use exonum::{
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
+use exonum_supervisor::Configure;
+use exonum_time::TimeSchema;
 
 use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("TimestampingInterface"))]
+#[service_dispatcher(implements("TimestampingInterface", raw = "Configure<Params = Config>"))]
 #[service_factory(proto_sources = "proto")]
 pub struct TimestampingService;
+
+fn verify_config(context: &ExecutionContext<'_>, config: &Config) -> Result<(), ExecutionError> {
+    let _time_schema: TimeSchema<_> = context
+        .data()
+        .service_schema(config.time_service_name.as_str())?;
+
+    Ok(())
+}
 
 impl Service for TimestampingService {
     fn initialize(
@@ -59,15 +69,7 @@ impl Service for TimestampingService {
         params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         let config = Config::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
-
-        if context
-            .data()
-            .for_dispatcher()
-            .get_instance(&*config.time_service_name)
-            .is_none()
-        {
-            return Err(Error::TimeServiceNotFound.into());
-        }
+        verify_config(&context, &config)?;
 
         Schema::new(context.service_data()).config.set(config);
         Ok(())
@@ -75,5 +77,27 @@ impl Service for TimestampingService {
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         TimestampingApi.wire(builder);
+    }
+}
+
+impl Configure for TimestampingService {
+    type Params = Config;
+
+    fn verify_config(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        verify_config(&context, &params)
+    }
+
+    fn apply_config(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.service_data());
+        schema.config.set(params);
+        Ok(())
     }
 }
