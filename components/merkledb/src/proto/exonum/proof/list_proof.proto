@@ -23,28 +23,37 @@ option java_package = "com.exonum.core.messages";
 // Subset of ProofList elements coupled with a proof. ListProof` can assert existence of
 // certain elements and that the list is shorter than the requested range of indexes.
 message ListProof {
-    // Array of { ProofListKey, Hash } objects.
-    repeated HashedEntry proof = 1;
-    // Array with list elements and their indexes.
-    repeated ListProofEntry entries = 2;
-    // Length of the underlying `ProofListIndex`.
-    uint64 length = 3;
+  // Array of { ProofListKey, Hash } objects.
+  repeated HashedEntry proof = 1;
+  // Array with list elements and their indexes.
+  repeated ListProofEntry entries = 2;
+  // Length of the underlying `ProofListIndex`.
+  uint64 length = 3;
 }
 
 // Represents list key and corresponding hash value.
 message HashedEntry {
-    ProofListKey key = 1;
-    exonum.crypto.Hash hash = 2;
+  // Location of the node within the Merkle tree.
+  ProofListKey key = 1;
+  // Hash associated with the node.
+  exonum.crypto.Hash hash = 2;
 }
 
 // Index of the list element and its value.
 message ListProofEntry {
-    uint64 index = 1;
-    bytes value = 2;
+  // Zero-based index of the element.
+  uint64 index = 1;
+  // Value serialized per `BinaryValue` implementation (usually as
+  // a Protobuf message, except for primitive types).
+  bytes value = 2;
 }
 
-// Represents list node position in the Merkle tree.
+// Node position in the Merkle tree.
 message ProofListKey {
-    uint64 index = 1;
-    uint32 height = 2;
+  // Zero-based index of the node on the level.
+  uint64 index = 1;
+  // Height of the element. Should always be greater than 0.
+  // 1 corresponds to the hashes of single elements, 2 to hashes
+  // obtained by hashing together pairs of hashes at height 1, etc.
+  uint32 height = 2;
 }
