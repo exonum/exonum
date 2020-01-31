@@ -517,11 +517,13 @@ pub struct InstanceMigration {
 }
 
 impl InstanceMigration {
-    pub(super) fn new(target: ArtifactId, end_version: Version) -> Self {
+    /// Creates new instance of `InstanceMigration`.
+    pub fn new(target: ArtifactId, end_version: Version) -> Self {
         Self::from_raw_parts(target, end_version, None)
     }
 
-    pub(super) fn from_raw_parts(
+    /// Creates new instance of `InstanceMigration` from prepared parts.
+    pub fn from_raw_parts(
         target: ArtifactId,
         end_version: Version,
         completed_hash: Option<Hash>,
