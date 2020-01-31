@@ -186,3 +186,16 @@ fn test_api_cannot_add_same_content_hash() {
         }),
     );
 }
+
+#[test]
+fn test_api_get_configuration() {
+    let (mut testkit, _) = init_testkit();
+    let api = testkit.api();
+
+    let config: Config = api
+        .public(ApiKind::Service(SERVICE_NAME))
+        .get("v1/timestamps/config")
+        .expect("Failed to get service configuration.");
+
+    assert_eq!(config.time_service_name, "time");
+}

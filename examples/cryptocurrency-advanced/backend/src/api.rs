@@ -18,7 +18,7 @@ use exonum::{
     blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
     messages::{AnyTx, Verified},
-    runtime::{Caller, CallerAddress as Address},
+    runtime::CallerAddress as Address,
 };
 use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
@@ -67,11 +67,7 @@ pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting a single wallet.
-    pub fn wallet_info(
-        self,
-        state: &ServiceApiState<'_>,
-        pub_key: PublicKey,
-    ) -> api::Result<WalletInfo> {
+    pub fn wallet_info(state: &ServiceApiState<'_>, query: WalletQuery) -> api::Result<WalletInfo> {
         let IndexProof {
             block_proof,
             index_proof,
@@ -79,7 +75,7 @@ impl PublicApi {
         } = state.data().proof_for_service_index("wallets").unwrap();
 
         let currency_schema = SchemaImpl::new(state.service_data());
-        let address = Caller::Transaction { author: pub_key }.address();
+        let address = Address::from_key(query.pub_key);
         let to_wallet = currency_schema.public.wallets.get_proof(address);
         let wallet_proof = WalletProof {
             to_table: index_proof,
@@ -112,12 +108,9 @@ impl PublicApi {
     }
 
     /// Wires the above endpoint to public scope of the given `ServiceApiBuilder`.
-    pub fn wire(self, builder: &mut ServiceApiBuilder) {
-        builder.public_scope().endpoint(
-            "v1/wallets/info",
-            move |state: &ServiceApiState<'_>, query: WalletQuery| {
-                self.wallet_info(state, query.pub_key)
-            },
-        );
+    pub fn wire(builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("v1/wallets/info", Self::wallet_info);
     }
 }
