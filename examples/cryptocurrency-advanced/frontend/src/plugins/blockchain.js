@@ -10,42 +10,37 @@ const TX_ISSUE_ID = 1
 const TX_WALLET_ID = 2
 const Wallet = Exonum.newType(proto.exonum.examples.cryptocurrency_advanced.Wallet)
 
-function TransferTransaction () {
-  return new Exonum.Transaction({
-    serviceId: SERVICE_ID,
-    methodId: TX_TRANSFER_ID,
-    schema: proto.exonum.examples.cryptocurrency_advanced.Transfer
-  })
-}
+const transferTransaction = new Exonum.Transaction({
+  serviceId: SERVICE_ID,
+  methodId: TX_TRANSFER_ID,
+  schema: proto.exonum.examples.cryptocurrency_advanced.Transfer
+})
 
-function IssueTransaction () {
-  return new Exonum.Transaction({
-    schema: proto.exonum.examples.cryptocurrency_advanced.Issue,
-    serviceId: SERVICE_ID,
-    methodId: TX_ISSUE_ID
-  })
-}
+const issueTransaction = new Exonum.Transaction({
+  schema: proto.exonum.examples.cryptocurrency_advanced.Issue,
+  serviceId: SERVICE_ID,
+  methodId: TX_ISSUE_ID
+})
 
-function WalletTx () {
-  return new Exonum.Transaction({
-    schema: proto.exonum.examples.cryptocurrency_advanced.CreateWallet,
-    serviceId: SERVICE_ID,
-    methodId: TX_WALLET_ID
-  })
-}
+const walletTx = new Exonum.Transaction({
+  schema: proto.exonum.examples.cryptocurrency_advanced.CreateWallet,
+  serviceId: SERVICE_ID,
+  methodId: TX_WALLET_ID
+})
 
 function deserializeWalletTx (transaction) {
-  const txTypes = [TransferTransaction(), IssueTransaction()]
+  const txTypes = [transferTransaction, issueTransaction]
   for (const tx of txTypes) {
     const txData = tx.deserialize(Exonum.hexadecimalToUint8Array(transaction))
-    if (txData) return Object.assign({}, txData.payload, {
-      hash: txData.hash(),
-      to: txData.payload.to ? Exonum.uint8ArrayToHexadecimal(txData.payload.to.data) : undefined
-    })
+    if (txData) {
+      return Object.assign({}, txData.payload, {
+        hash: txData.hash(),
+        to: txData.payload.to ? Exonum.uint8ArrayToHexadecimal(txData.payload.to.data) : undefined
+      })
+    }
   }
   return { name: 'initialTx' }
 }
-
 
 module.exports = {
   install (Vue) {
@@ -59,39 +54,31 @@ module.exports = {
       },
 
       createWallet (keyPair, name) {
-        const walletTx = WalletTx()
         const transaction = walletTx.create({ name }, keyPair).serialize()
         // Send transaction into blockchain
         return Exonum.send(TRANSACTION_URL, transaction)
       },
 
       addFunds (keyPair, amountToAdd, seed) {
-        // Describe transaction
-        const issueTx = IssueTransaction()
-
         // Transaction data
         const data = {
           amount: amountToAdd.toString(),
           seed: seed
         }
-        const transaction = issueTx.create(data, keyPair).serialize()
+        const transaction = issueTransaction.create(data, keyPair).serialize()
 
         // Send transaction into blockchain
         return Exonum.send(TRANSACTION_URL, transaction)
       },
 
       transfer (keyPair, receiver, amountToTransfer, seed) {
-        // Describe transaction
-        const transferTx = TransferTransaction()
-
         // Transaction data
         const data = {
           to: { data: Exonum.hexadecimalToUint8Array(Exonum.publicKeyToAddress(receiver)) },
           amount: amountToTransfer,
           seed: seed
         }
-        console.log(data)
-        const transaction = transferTx.create(data, keyPair).serialize()
+        const transaction = transferTransaction.create(data, keyPair).serialize()
 
         // Send transaction into blockchain
         return Exonum.send(TRANSACTION_URL, transaction)
@@ -112,6 +99,15 @@ module.exports = {
 
               const wallet = walletProof.entries.get(Exonum.publicKeyToAddress(publicKey))
               if (typeof wallet === undefined) throw new Error('Wallet not found')
+
+              const verifiedTransactions = new Exonum.ListProof(wallet_history.proof, Exonum.Hash)
+              const hexHistoryHash = Exonum.uint8ArrayToHexadecimal(new Uint8Array(wallet.history_hash.data))
+              if (verifiedTransactions.merkleRoot !== hexHistoryHash) throw new Error('Transactions proof is corrupted')
+
+              const validIndexes = verifiedTransactions
+                .entries
+                .every(({ index }, i) => i === index)
+              if (!validIndexes) throw new Error('Invalid transaction indexes in the proof')
 
               const transactions = wallet_history.transactions.map(deserializeWalletTx)
 
@@ -144,3 +140,4 @@ module.exports = {
     }
   }
 }
+
