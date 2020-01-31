@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.runtime;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.core.runtime";
 
 import "google/protobuf/empty.proto";
 

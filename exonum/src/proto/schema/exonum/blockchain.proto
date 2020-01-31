@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.core";
 
 import "exonum/crypto/types.proto";
 import "exonum/key_value_sequence.proto";

@@ -18,7 +18,7 @@ import "google/protobuf/empty.proto";
 
 package exonum.proof;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.proof";
 
 // Subset of map elements coupled with a proof. MapProof can assert existence/absence of certain keys
 // from the underlying map.

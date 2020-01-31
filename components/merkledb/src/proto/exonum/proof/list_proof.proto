@@ -18,7 +18,7 @@ import "exonum/crypto/types.proto";
 
 package exonum.proof;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.proof";
 
 // Subset of ProofList elements coupled with a proof. ListProof` can assert existence of
 // certain elements and that the list is shorter than the requested range of indexes.

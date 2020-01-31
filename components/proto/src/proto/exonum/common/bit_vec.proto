@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.common;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.common";
 
 // Vector of bits.
 message BitVec {

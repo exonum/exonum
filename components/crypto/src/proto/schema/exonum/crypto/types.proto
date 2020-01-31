@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.crypto;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.crypto";
 
 message Hash { bytes data = 1; }
 
