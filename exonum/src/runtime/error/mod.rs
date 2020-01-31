@@ -55,7 +55,7 @@ use std::{
     panic,
 };
 
-use super::{InstanceId, MethodId};
+use super::{CallInfo, InstanceId, MethodId};
 use crate::proto::schema::runtime as runtime_proto;
 
 /// Trait representing an error type defined in the service or runtime code.
@@ -171,6 +171,17 @@ impl CallSite {
         Self {
             instance_id,
             call_type,
+            non_exhaustive: (),
+        }
+    }
+
+    pub(crate) fn from_call_info(call_info: &CallInfo, interface: impl Into<String>) -> Self {
+        Self {
+            instance_id: call_info.instance_id,
+            call_type: CallType::Method {
+                interface: interface.into(),
+                id: call_info.method_id,
+            },
             non_exhaustive: (),
         }
     }

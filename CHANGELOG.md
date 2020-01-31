@@ -114,10 +114,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     Public fields in `ExecutionData` has been replaced by the corresponding
     getters.
   - Direct `fork` access in `ExecutionContext` has been replaced by the
-    `BlockchainData::unstructured_assess` which returns readonly access to
+    `BlockchainData::unstructured_access` which returns readonly access to
     whole blockchain data.
 
 - Public structures and enums were made non-exhaustive. (#1710)
+
+- Blockchain data access from the `ExecutionContext` after an error in a nested
+  call is prohibited. (#1733)
 
 #### exonum-cli
 

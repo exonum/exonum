@@ -319,8 +319,21 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         // Start the built-in service instance.
         let name = spec.name.clone();
-        ExecutionContext::for_block_call(self, fork, InstanceDescriptor::new(spec.id, &name))
-            .initiate_adding_service(spec, constructor)
+
+        let mut should_rollback = false;
+        let mut res = ExecutionContext::for_block_call(
+            self,
+            fork,
+            &mut should_rollback,
+            InstanceDescriptor::new(spec.id, &name),
+        )
+        .initiate_adding_service(spec, constructor);
+
+        if should_rollback && res.is_ok() {
+            res = Err(CoreError::IncorrectCall.into());
+        }
+
+        res
     }
 
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
@@ -523,21 +536,27 @@ impl Dispatcher {
         let instance = self
             .get_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
-        let context = ExecutionContext::for_transaction(self, fork, instance, tx.author(), tx_id);
+
+        let mut should_rollback = false;
+        let context = ExecutionContext::for_transaction(
+            self,
+            fork,
+            &mut should_rollback,
+            instance,
+            tx.author(),
+            tx_id,
+        );
 
         let mut res = runtime.execute(context, call_info.method_id, &tx.as_ref().arguments);
+        if should_rollback && res.is_ok() {
+            res = Err(CoreError::IncorrectCall.into());
+        }
+
         if let Err(ref mut err) = res {
             fork.rollback();
 
-            err.set_runtime_id(runtime_id).set_call_site(|| {
-                CallSite::new(
-                    call_info.instance_id,
-                    CallType::Method {
-                        interface: String::new(),
-                        id: call_info.method_id,
-                    },
-                )
-            });
+            err.set_runtime_id(runtime_id)
+                .set_call_site(|| CallSite::from_call_info(call_info, ""));
             Self::report_error(err, fork, CallInBlock::transaction(tx_index));
         } else {
             fork.flush();
@@ -554,25 +573,34 @@ impl Dispatcher {
         self.service_infos
             .active_instances()
             .filter_map(|(instance, runtime_id)| {
-                let context = ExecutionContext::for_block_call(self, fork, instance.clone());
+                let mut should_rollback = false;
+                let context = ExecutionContext::for_block_call(
+                    self,
+                    fork,
+                    &mut should_rollback,
+                    instance.clone(),
+                );
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
                     CallType::AfterTransactions => Runtime::after_transactions,
                     _ => unreachable!(),
                 };
 
-                let res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
+                let mut res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
+                if should_rollback && res.is_ok() {
+                    res = Err(CoreError::IncorrectCall.into());
+                }
+
                 if let Err(mut err) = res {
                     fork.rollback();
-                    let instance_id = instance.id;
                     err.set_runtime_id(runtime_id)
-                        .set_call_site(|| CallSite::new(instance_id, call_type.clone()));
+                        .set_call_site(|| CallSite::new(instance.id, call_type.clone()));
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
-                            CallInBlock::before_transactions(instance_id)
+                            CallInBlock::before_transactions(instance.id)
                         }
-                        CallType::AfterTransactions => CallInBlock::after_transactions(instance_id),
+                        CallType::AfterTransactions => CallInBlock::after_transactions(instance.id),
                         _ => unreachable!(),
                     };
                     Self::report_error(&err, fork, call);

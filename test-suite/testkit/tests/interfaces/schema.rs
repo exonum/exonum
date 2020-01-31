@@ -22,7 +22,7 @@ use exonum::{
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash)]
 #[binary_value(codec = "bincode")]
