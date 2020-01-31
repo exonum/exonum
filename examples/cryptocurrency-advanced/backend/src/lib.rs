@@ -56,6 +56,6 @@ impl Service for CryptocurrencyService {
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        CryptocurrencyApi.wire(builder);
+        CryptocurrencyApi::wire(builder);
     }
 }

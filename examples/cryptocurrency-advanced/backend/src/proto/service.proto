@@ -18,7 +18,7 @@ package exonum.examples.cryptocurrency_advanced;
 
 import "types.proto";
 
-/// Transfer `amount` of the currency from one wallet to another.
+// Transfer `amount` of the currency from one wallet to another.
 message Transfer {
   // Address of receiver's wallet.
   exonum.crypto.Hash to = 1;
