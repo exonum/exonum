@@ -4,10 +4,11 @@ import * as proto from '../../proto/stubs.js'
 
 const TRANSACTION_URL = '/api/explorer/v1/transactions'
 const PER_PAGE = 10
-const SERVICE_ID = 1
+const SERVICE_ID = 3
 const TX_TRANSFER_ID = 0
 const TX_ISSUE_ID = 1
 const TX_WALLET_ID = 2
+const Wallet = Exonum.newType(proto.exonum.examples.cryptocurrency_advanced.Wallet)
 
 function TransferTransaction () {
   return new Exonum.Transaction({
@@ -44,6 +45,7 @@ function deserializeWalletTx (transaction) {
   }
   return { name: 'initialTx' }
 }
+
 
 module.exports = {
   install (Vue) {
@@ -84,10 +86,11 @@ module.exports = {
 
         // Transaction data
         const data = {
-          to: { data: Exonum.hexadecimalToUint8Array(receiver) },
+          to: { data: Exonum.hexadecimalToUint8Array(Exonum.publicKeyToAddress(receiver)) },
           amount: amountToTransfer,
           seed: seed
         }
+        console.log(data)
         const transaction = transferTx.create(data, keyPair).serialize()
 
         // Send transaction into blockchain
@@ -97,18 +100,24 @@ module.exports = {
       getWallet (publicKey) {
         return axios.get('/api/services/supervisor/consensus-config').then(response => {
           // actual list of public keys of validators
-          const validators = response.data.validator_keys.map(validator => {
-            return validator.consensus_key
-          })
+          const validators = response.data.validator_keys.map(validator => validator.consensus_key)
 
           return axios.get(`/api/services/crypto/v1/wallets/info?pub_key=${publicKey}`)
             .then(response => response.data)
-            .then(data => {
-              const transactions = data.wallet_history.transactions.map(deserializeWalletTx)
+            .then(({ block_proof, wallet_proof, wallet_history }) => {
+              if (Exonum.verifyBlock(block_proof, validators) !== undefined) throw new Error('Block is invalid')
+              const tableRootHash = Exonum.verifyTable(wallet_proof.to_table, block_proof.block.state_hash, 'crypto.wallets')
+              const walletProof = new Exonum.MapProof(wallet_proof.to_wallet, Exonum.MapProof.rawKey(Exonum.PublicKey), Wallet)
+              if (walletProof.merkleRoot !== tableRootHash) throw new Error('Wallet proof is corrupted')
+
+              const wallet = walletProof.entries.get(Exonum.publicKeyToAddress(publicKey))
+              if (typeof wallet === undefined) throw new Error('Wallet not found')
+
+              const transactions = wallet_history.transactions.map(deserializeWalletTx)
 
               return {
-                block: data.block_proof.block,
-                wallet: {},
+                block: block_proof.block,
+                wallet: wallet,
                 transactions: transactions
               }
             })
@@ -125,7 +134,12 @@ module.exports = {
       },
 
       getTransaction (hash) {
-        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/transactions?hash=${hash}`)
+          .then(response => response.data)
+          .then(data => {
+            data.content = deserializeWalletTx(data.message)
+            return data
+          })
       }
     }
   }
