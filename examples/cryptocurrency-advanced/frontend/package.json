@@ -5,7 +5,7 @@
   "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "proto": "pbjs --keep-case -t static-module node_modules/exonum-client/proto/**/*.proto ../backend/src/proto/service.proto -o ./proto/stubs.js",
+    "proto": "pbjs --keep-case -t static-module --root cryptocurrency --path node_modules/exonum-client/proto ../backend/src/proto/service.proto -o ./proto/stubs.js",
     "lint": "eslint --ext .js,.vue src test",
     "compile": "webpack",
     "test": "jest",
