@@ -809,3 +809,113 @@ fn migration_downgrade() {
     .expect_err("Downgrade should fail.");
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
 }
+
+#[test]
+fn migration_data() {
+    let (mut blockchain, events_handle) = create_runtime();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+
+    // Stop running service instance.
+    execute_transaction(
+        &mut blockchain,
+        keypair.stop_service(
+            ToySupervisorService::INSTANCE_ID,
+            StopService {
+                instance_id: v01::MigrationService::INSTANCE_ID,
+            },
+        ),
+    )
+    .unwrap();
+    // We not interested in events in this case.
+    drop(events_handle.take());
+
+    // Try to execute migration with script.
+    execute_transaction(
+        &mut blockchain,
+        keypair.migrate_service(
+            ToySupervisorService::INSTANCE_ID,
+            MigrateService {
+                instance_name: v01::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: v04::MigrationService.artifact_id(),
+            },
+        ),
+    )
+    .unwrap();
+
+    let migration_service = v04::MigrationService.default_instance().instance_spec;
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::MigrateService(
+                migration_service.artifact.clone(),
+                v01::MigrationService.artifact_id().version
+            ),
+            RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::CommitService(
+                Height(3),
+                v01::MigrationService.default_instance().instance_spec,
+                InstanceStatus::Migrating(Box::new(InstanceMigration::from_raw_parts(
+                    v04::MigrationService.artifact_id(),
+                    v04::MigrationService.artifact_id().version,
+                    None,
+                )))
+            ),
+            RuntimeEvent::MigrateService(
+                migration_service.artifact.clone(),
+                v01::MigrationService.artifact_id().version
+            ),
+            RuntimeEvent::AfterCommit(Height(3)),
+        ]
+    );
+
+    // Resume stopped service instance.
+    execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: v04::MigrationService::INSTANCE_ID,
+                artifact: v04::MigrationService.artifact_id(),
+                params: vec![],
+            },
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::StartResumingService(migration_service.clone(), vec![]),
+            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::CommitService(
+                Height(4),
+                v04::MigrationService.default_instance().instance_spec,
+                InstanceStatus::Active,
+            ),
+            RuntimeEvent::AfterCommit(Height(4)),
+        ]
+    );
+
+    // Check instance state after migration and resume.
+    let instance_state = blockchain
+        .snapshot()
+        .for_dispatcher()
+        .get_instance(v04::MigrationService::INSTANCE_ID)
+        .unwrap();
+
+    assert_eq!(instance_state.spec, migration_service);
+    assert_eq!(instance_state.status, Some(InstanceStatus::Active));
+    assert_eq!(
+        instance_state.data_version(),
+        &migration_service.artifact.version
+    );
+
+    v04::verify_schema(
+        blockchain
+            .snapshot()
+            .for_service(v04::MigrationService::INSTANCE_ID)
+            .unwrap(),
+        USERS,
+    );
+}
