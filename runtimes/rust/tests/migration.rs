@@ -14,160 +14,475 @@
 
 use exonum::{
     blockchain::{config::InstanceInitParams, Blockchain, BlockchainBuilder, BlockchainMut},
+    crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
     helpers::Height,
-    merkledb::{
-        access::{Access, FromAccess},
-        BinaryValue, ProofEntry, ProofListIndex,
-    },
     runtime::{
-        migrations::{InitMigrationError, MigrateData, MigrationScript},
+        migrations::{InitMigrationError, InstanceMigration, MigrateData, MigrationScript},
         versioning::Version,
-        CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceStatus, SnapshotExt,
+        ArtifactId, CoreError, ErrorMatch, ExecutionError, InstanceStatus, SnapshotExt,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
+use exonum_supervisor::Supervisor;
 use pretty_assertions::assert_eq;
 
+use std::borrow::Cow;
+
 use self::inspected::{
-    create_genesis_config_builder, execute_transaction, EventsHandle, Inspected, MigrateService,
-    ResumeService, RuntimeEvent, StopService, ToySupervisor, ToySupervisorService,
+    create_block_with_transactions, create_genesis_config_builder, execute_transaction,
+    EventsHandle, Inspected, MigrateService, ResumeService, RuntimeEvent, StopService,
+    ToySupervisor, ToySupervisorService,
 };
 
 mod inspected;
 
-const INITIAL_BALANCE: u64 = 100_000;
-
-#[derive(Debug, FromAccess, RequireArtifact)]
-struct Schema<T: Access> {
-    balance: ProofEntry<T::Base, u64>,
-    withdrawals: ProofListIndex<T::Base, u64>,
+#[derive(Debug, Clone)]
+struct TestUser {
+    full_name: Cow<'static, str>,
+    first_name: Cow<'static, str>,
+    last_name: Cow<'static, str>,
+    balance: u64,
 }
 
-impl<T: Access> Schema<T> {
-    pub fn new(access: T) -> Self {
-        Self::from_root(access).unwrap()
+const USERS: &[TestUser] = &[
+    TestUser {
+        full_name: Cow::Borrowed("Deep Thought"),
+        first_name: Cow::Borrowed("Deep"),
+        last_name: Cow::Borrowed("Thought"),
+        balance: 42,
+    },
+    TestUser {
+        full_name: Cow::Borrowed("Arthur Dent"),
+        first_name: Cow::Borrowed("Arthur"),
+        last_name: Cow::Borrowed("Dent"),
+        balance: 7,
+    },
+    TestUser {
+        full_name: Cow::Borrowed("Trillian"),
+        first_name: Cow::Borrowed("Trillian"),
+        last_name: Cow::Borrowed(""),
+        balance: 90,
+    },
+    TestUser {
+        full_name: Cow::Borrowed("Marvin \"The Paranoid\" Android"),
+        first_name: Cow::Borrowed("Marvin \"The Paranoid\""),
+        last_name: Cow::Borrowed("Android"),
+        balance: 0,
+    },
+];
+
+impl TestUser {
+    fn keypair(&self) -> (PublicKey, SecretKey) {
+        let seed = hash(self.full_name.as_bytes());
+        let seed = Seed::from_slice(&seed[..]).unwrap();
+        gen_keypair_from_seed(&seed)
     }
 }
 
 #[exonum_interface(auto_ids)]
-trait Withdrawal<Ctx> {
+trait Migration<Ctx> {
     type Output;
 
-    fn withdraw(&self, context: Ctx, arg: u64) -> Self::Output;
+    fn op(&self, context: Ctx, arg: ()) -> Self::Output;
 }
 
-/// This implementation is incorrect and instead of decrementing the balance of the wallet
-/// after withdraw, it increases it.
-#[derive(Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(implements("Withdrawal"))]
-#[service_factory(artifact_name = "withdrawal", artifact_version = "0.1.0")]
-struct WithdrawalServiceV1;
+mod v01 {
+    use exonum::{
+        crypto::PublicKey,
+        merkledb::{
+            access::{Access, FromAccess, Prefixed},
+            Fork, MapIndex,
+        },
+        runtime::{ExecutionContext, ExecutionError},
+    };
+    use exonum_derive::*;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory};
+    use serde_derive::{Deserialize, Serialize};
 
-impl Withdrawal<ExecutionContext<'_>> for WithdrawalServiceV1 {
-    type Output = Result<(), ExecutionError>;
+    use super::*;
 
-    fn withdraw(&self, context: ExecutionContext<'_>, arg: u64) -> Self::Output {
-        let mut schema = Schema::new(context.service_data());
-        schema.balance.set(schema.balance.get().unwrap() + arg);
-        schema.withdrawals.push(arg);
-        Ok(())
-    }
-}
-
-impl Service for WithdrawalServiceV1 {
-    fn initialize(
-        &self,
-        context: ExecutionContext<'_>,
-        params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_data());
-        schema.balance.set(u64::from_bytes(params.into()).unwrap());
-        Ok(())
-    }
-}
-
-impl DefaultInstance for WithdrawalServiceV1 {
-    const INSTANCE_ID: u32 = 2;
-    const INSTANCE_NAME: &'static str = "withdrawal";
-
-    fn default_instance(&self) -> InstanceInitParams {
-        self.artifact_id()
-            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
-            .with_constructor(INITIAL_BALANCE)
-    }
-}
-
-/// This implementation fixes the incorrect behavior of the previous one. After the migration
-/// procedure, during the resuming this implementation also recalculates the resulting balance.
-#[derive(Debug, ServiceFactory, ServiceDispatcher)]
-#[service_dispatcher(implements("Withdrawal"))]
-#[service_factory(artifact_name = "withdrawal", artifact_version = "0.2.0")]
-struct WithdrawalServiceV2;
-
-impl Withdrawal<ExecutionContext<'_>> for WithdrawalServiceV2 {
-    type Output = Result<(), ExecutionError>;
-
-    fn withdraw(&self, context: ExecutionContext<'_>, arg: u64) -> Self::Output {
-        let mut schema = Schema::new(context.service_data());
-        schema.balance.set(schema.balance.get().unwrap() - arg);
-        schema.withdrawals.push(arg);
-        Ok(())
-    }
-}
-
-impl Service for WithdrawalServiceV2 {
-    fn initialize(
-        &self,
-        context: ExecutionContext<'_>,
-        params: Vec<u8>,
-    ) -> Result<(), ExecutionError> {
-        let mut schema = Schema::new(context.service_data());
-        schema.balance.set(u64::from_bytes(params.into()).unwrap());
-        Ok(())
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
+    pub struct Wallet {
+        pub username: String,
+        pub balance: u64,
     }
 
-    fn resume(&self, context: ExecutionContext<'_>, params: Vec<u8>) -> Result<(), ExecutionError> {
-        if !params.is_empty() {
-            return Err(CommonError::MalformedArguments
-                .with_description("Resuming parameters should be empty."));
+    #[derive(Debug, FromAccess, RequireArtifact)]
+    pub struct Schema<T: Access> {
+        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+    }
+
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
         }
+    }
 
-        // Recalculate the balance taking into account the error of the previous implementation.
-        // Despite the simplicity this approach is very fragile and can lead to errors during
-        // subsequent migrations.
-        // Therefore, this approach should be used only in test environment.
-        let mut schema = Schema::new(context.service_data());
-        let correct_balance = schema
-            .withdrawals
-            .iter()
-            .fold(schema.balance.get().unwrap(), |balance, value| {
-                balance - 2 * value
-            });
-        schema.balance.set(correct_balance);
+    pub(crate) fn generate_test_data(access: Prefixed<&Fork>, users: &[TestUser]) {
+        let mut schema = Schema::new(access);
+
+        for user in users {
+            let (key, _) = user.keypair();
+            let wallet = Wallet {
+                username: user.full_name.to_string(),
+                balance: user.balance,
+            };
+            schema.wallets.put(&key, wallet);
+        }
+    }
+
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("Migration"))]
+    #[service_factory(artifact_name = "migration", artifact_version = "0.1.0")]
+    pub struct MigrationService;
+
+    impl Migration<ExecutionContext<'_>> for MigrationService {
+        type Output = Result<(), ExecutionError>;
+
+        fn op(&self, _context: ExecutionContext<'_>, _arg: ()) -> Self::Output {
+            Ok(())
+        }
+    }
+
+    impl Service for MigrationService {
+        fn initialize(
+            &self,
+            context: ExecutionContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            let data = context.service_data();
+            generate_test_data(data, USERS);
+            Ok(())
+        }
+    }
+
+    impl DefaultInstance for MigrationService {
+        const INSTANCE_ID: u32 = 2;
+        const INSTANCE_NAME: &'static str = "migration";
+
+        fn default_instance(&self) -> InstanceInitParams {
+            self.artifact_id()
+                .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+            // .with_constructor(INITIAL_BALANCE)
+        }
+    }
+
+    impl MigrateData for MigrationService {
+        fn migration_scripts(
+            &self,
+            _start_version: &Version,
+        ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+            Ok(Vec::new())
+        }
+    }
+}
+
+mod v02 {
+    use exonum::{
+        crypto::PublicKey,
+        merkledb::{
+            access::{Access, FromAccess, Prefixed},
+            Fork, MapIndex,
+        },
+        runtime::{
+            migrations::{InitMigrationError, MigrateData, MigrationScript},
+            versioning::Version,
+            ExecutionContext, ExecutionError,
+        },
+    };
+    use exonum_derive::*;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory};
+    use serde_derive::{Deserialize, Serialize};
+
+    use super::*;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
+    pub struct Wallet {
+        pub username: String,
+        pub balance: u64,
+    }
+
+    #[derive(Debug, FromAccess, RequireArtifact)]
+    pub struct Schema<T: Access> {
+        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+    }
+
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+    }
+
+    pub(crate) fn generate_test_data(access: Prefixed<&Fork>, users: &[TestUser]) {
+        let mut schema = Schema::new(access);
+
+        for user in users {
+            let (key, _) = user.keypair();
+            let wallet = Wallet {
+                username: user.full_name.to_string(),
+                balance: user.balance,
+            };
+            schema.wallets.put(&key, wallet);
+        }
+    }
+
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("Migration"))]
+    #[service_factory(artifact_name = "migration", artifact_version = "0.2.0")]
+    pub struct MigrationService;
+
+    impl Migration<ExecutionContext<'_>> for MigrationService {
+        type Output = Result<(), ExecutionError>;
+
+        fn op(&self, _context: ExecutionContext<'_>, _arg: ()) -> Self::Output {
+            Ok(())
+        }
+    }
+
+    impl Service for MigrationService {
+        fn initialize(
+            &self,
+            context: ExecutionContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            let data = context.service_data();
+            generate_test_data(data, USERS);
+            Ok(())
+        }
+    }
+
+    impl DefaultInstance for MigrationService {
+        const INSTANCE_ID: u32 = 2;
+        const INSTANCE_NAME: &'static str = "migration";
+
+        fn default_instance(&self) -> InstanceInitParams {
+            self.artifact_id()
+                .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+            // .with_constructor(INITIAL_BALANCE)
+        }
+    }
+
+    impl MigrateData for MigrationService {
+        fn migration_scripts(
+            &self,
+            _start_version: &Version,
+        ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+            Ok(Vec::new())
+        }
+    }
+}
+
+mod v03 {
+    use exonum::{
+        crypto::PublicKey,
+        merkledb::{
+            access::{Access, FromAccess, Prefixed},
+            Fork, MapIndex,
+        },
+        runtime::{ExecutionContext, ExecutionError},
+    };
+    use exonum_derive::*;
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory};
+    use serde_derive::{Deserialize, Serialize};
+
+    use super::*;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(BinaryValue, ObjectHash)]
+    #[binary_value(codec = "bincode")]
+    pub struct Wallet {
+        pub username: String,
+        pub balance: u64,
+    }
+
+    #[derive(Debug, FromAccess, RequireArtifact)]
+    pub struct Schema<T: Access> {
+        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
+    }
+
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+    }
+
+    pub(crate) fn generate_test_data(access: Prefixed<&Fork>, users: &[TestUser]) {
+        let mut schema = Schema::new(access);
+
+        for user in users {
+            let (key, _) = user.keypair();
+            let wallet = Wallet {
+                username: user.full_name.to_string(),
+                balance: user.balance,
+            };
+            schema.wallets.put(&key, wallet);
+        }
+    }
+
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("Migration"))]
+    #[service_factory(artifact_name = "migration", artifact_version = "0.3.0")]
+    pub struct MigrationService;
+
+    impl Migration<ExecutionContext<'_>> for MigrationService {
+        type Output = Result<(), ExecutionError>;
+
+        fn op(&self, _context: ExecutionContext<'_>, _arg: ()) -> Self::Output {
+            Ok(())
+        }
+    }
+
+    impl Service for MigrationService {
+        fn initialize(
+            &self,
+            context: ExecutionContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            let data = context.service_data();
+            generate_test_data(data, USERS);
+            Ok(())
+        }
+    }
+
+    impl DefaultInstance for MigrationService {
+        const INSTANCE_ID: u32 = 2;
+        const INSTANCE_NAME: &'static str = "migration";
+
+        fn default_instance(&self) -> InstanceInitParams {
+            self.artifact_id()
+                .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+        }
+    }
+}
+
+mod v04 {
+    use exonum::{
+        crypto::PublicKey,
+        merkledb::{
+            access::{Access, FromAccess, Prefixed},
+            ProofEntry, ProofMapIndex, Snapshot,
+        },
+        runtime::{
+            migrations::{MigrateData, MigrationContext, MigrationError, MigrationScript},
+            versioning::Version,
+            ExecutionContext, ExecutionError,
+        },
+    };
+    use exonum_derive::FromAccess;
+    use exonum_derive::*;
+    use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory};
+
+    use super::{
+        v01, InitMigrationError, InstanceInitParams, Migration, ServiceDispatcher, TestUser,
+    };
+    // use super::*;
+
+    // #[derive(Debug, Serialize, Deserialize)]
+    // #[derive(BinaryValue, ObjectHash)]
+    // #[binary_value(codec = "bincode")]
+    // pub struct Wallet {
+    //     pub username: String,
+    //     pub balance: u64,
+    // }
+
+    #[derive(Debug, FromAccess, RequireArtifact)]
+    pub struct Schema<T: Access> {
+        pub wallets: ProofMapIndex<T::Base, PublicKey, v01::Wallet>,
+        pub total_balance: ProofEntry<T::Base, u64>,
+    }
+
+    impl<T: Access> Schema<T> {
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
+        }
+    }
+
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("Migration"))]
+    #[service_factory(artifact_name = "migration", artifact_version = "0.4.0")]
+    pub struct MigrationService;
+
+    impl Migration<ExecutionContext<'_>> for MigrationService {
+        type Output = Result<(), ExecutionError>;
+
+        fn op(&self, _context: ExecutionContext<'_>, _arg: ()) -> Self::Output {
+            Ok(())
+        }
+    }
+
+    impl Service for MigrationService {
+        fn initialize(
+            &self,
+            _context: ExecutionContext<'_>,
+            _params: Vec<u8>,
+        ) -> Result<(), ExecutionError> {
+            Ok(())
+        }
+    }
+
+    impl DefaultInstance for MigrationService {
+        const INSTANCE_ID: u32 = 2;
+        const INSTANCE_NAME: &'static str = "migration";
+
+        fn default_instance(&self) -> InstanceInitParams {
+            self.artifact_id()
+                .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
+        }
+    }
+
+    impl MigrateData for MigrationService {
+        fn migration_scripts(
+            &self,
+            _start_version: &Version,
+        ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+            println!("v04::MigrationService::migration_scripts.");
+
+            Ok(vec![MigrationScript::new(
+                migrate_wallets,
+                "0.4.0".parse().unwrap(),
+            )])
+        }
+    }
+
+    fn migrate_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
+        println!("Started wallet migration.");
+        let old_schema = v01::Schema::new(ctx.helper.old_data());
+        let mut new_schema = self::Schema::new(ctx.helper.new_data());
+
+        let mut total_balance = 0;
+        for (key, wallet) in &old_schema.wallets {
+            total_balance += wallet.balance;
+            new_schema.wallets.put(&key, wallet);
+        }
+        new_schema.total_balance.set(total_balance);
+        println!("Finished wallet migration.");
         Ok(())
     }
-}
 
-impl DefaultInstance for WithdrawalServiceV2 {
-    const INSTANCE_ID: u32 = 2;
-    const INSTANCE_NAME: &'static str = "withdrawal";
+    pub(crate) fn verify_schema(snapshot: Prefixed<&dyn Snapshot>, users: &[TestUser]) {
+        let schema = Schema::new(snapshot);
+        for user in users {
+            let (key, _) = user.keypair();
+            let wallet = schema.wallets.get(&key).unwrap();
+            assert_eq!(wallet.balance, user.balance);
+            assert_eq!(wallet.username, user.full_name);
+        }
+        assert_eq!(schema.wallets.iter().count(), users.len());
 
-    fn default_instance(&self) -> InstanceInitParams {
-        self.artifact_id()
-            .into_default_instance(Self::INSTANCE_ID, Self::INSTANCE_NAME)
-            .with_constructor(INITIAL_BALANCE)
-    }
-}
-
-impl MigrateData for WithdrawalServiceV2 {
-    fn migration_scripts(
-        &self,
-        start_version: &Version,
-    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
-        assert_eq!(start_version, &WithdrawalServiceV1.artifact_id().version);
-        Ok(Vec::new())
+        let total_balance = schema.total_balance.get().unwrap();
+        assert_eq!(
+            total_balance,
+            users.iter().map(|user| user.balance).sum::<u64>()
+        );
     }
 }
 
@@ -176,16 +491,20 @@ fn create_runtime() -> (BlockchainMut, EventsHandle) {
     let genesis_config = create_genesis_config_builder()
         .with_artifact(ToySupervisorService.artifact_id())
         .with_instance(ToySupervisorService.default_instance())
-        .with_artifact(WithdrawalServiceV1.artifact_id())
-        .with_artifact(WithdrawalServiceV2.artifact_id())
-        .with_instance(WithdrawalServiceV1.default_instance())
+        .with_artifact(v01::MigrationService.artifact_id())
+        .with_instance(v01::MigrationService.default_instance())
+        .with_artifact(v02::MigrationService.artifact_id())
+        .with_artifact(v03::MigrationService.artifact_id())
+        .with_artifact(v04::MigrationService.artifact_id())
         .build();
 
     let inspected = Inspected::new(
         RustRuntimeBuilder::new()
-            .with_factory(WithdrawalServiceV1)
-            .with_migrating_factory(WithdrawalServiceV2)
             .with_factory(ToySupervisorService)
+            .with_factory(v01::MigrationService)
+            .with_migrating_factory(v02::MigrationService)
+            .with_factory(v03::MigrationService)
+            .with_migrating_factory(v04::MigrationService)
             .build_for_tests(),
     );
     let events_handle = inspected.events.clone();
@@ -196,110 +515,49 @@ fn create_runtime() -> (BlockchainMut, EventsHandle) {
     (blockchain, events_handle)
 }
 
-#[test]
-fn resume_without_migration() {
-    let (mut blockchain, events_handle) = create_runtime();
-    let keypair = blockchain.as_ref().service_keypair().clone();
-    // We are not interested in blockchain initialization events.
-    drop(events_handle.take());
+fn create_runtime_custom(
+    initial: impl ServiceFactory + DefaultInstance,
+    migrating: Vec<impl ServiceFactory + MigrateData>,
+    not_migrating: Vec<impl ServiceFactory>,
+) -> (BlockchainMut, EventsHandle) {
+    let blockchain = Blockchain::build_for_tests();
+    let mut genesis_config = create_genesis_config_builder()
+        .with_artifact(ToySupervisorService.artifact_id())
+        .with_instance(ToySupervisorService.default_instance())
+        .with_artifact(initial.artifact_id())
+        .with_instance(initial.default_instance());
+    for it in &migrating {
+        genesis_config = genesis_config.with_artifact(it.artifact_id());
+    }
+    for it in &not_migrating {
+        genesis_config = genesis_config.with_artifact(it.artifact_id());
+    }
+    let genesis_config = genesis_config.build();
 
-    // Make withdrawal.
-    let amount = 10_000;
-    execute_transaction(
-        &mut blockchain,
-        keypair.withdraw(WithdrawalServiceV1::INSTANCE_ID, amount),
-    )
-    .unwrap();
-    // We not interested in events in this case.
-    drop(events_handle.take());
+    let mut runtime = RustRuntimeBuilder::new()
+        .with_factory(ToySupervisorService)
+        .with_factory(initial);
+    for it in migrating {
+        runtime = runtime.with_migrating_factory(it);
+    }
+    for it in not_migrating {
+        runtime = runtime.with_factory(it);
+    }
+    let runtime = runtime.build_for_tests();
 
-    // Stop running service instance.
-    execute_transaction(
-        &mut blockchain,
-        keypair.stop_service(
-            ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
-        ),
-    )
-    .unwrap();
-    // We not interested in events in this case.
-    drop(events_handle.take());
+    let inspected = Inspected::new(runtime);
+    let events_handle = inspected.events.clone();
 
-    // Resume stopped service instance.
-    execute_transaction(
-        &mut blockchain,
-        keypair.resume_service(
-            ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact: WithdrawalServiceV1.artifact_id(),
-                params: vec![],
-            },
-        ),
-    )
-    .unwrap();
-
-    let withdrawal_service = WithdrawalServiceV1.default_instance().instance_spec;
-    assert_eq!(
-        events_handle.take(),
-        vec![
-            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartResumingService(withdrawal_service.clone(), vec![]),
-            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::CommitService(
-                Height(4),
-                WithdrawalServiceV1.default_instance().instance_spec,
-                InstanceStatus::Active,
-            ),
-            RuntimeEvent::AfterCommit(Height(4)),
-        ]
-    );
-
-    // Make another withdrawal.
-    let amount_2 = 20_000;
-    execute_transaction(
-        &mut blockchain,
-        keypair.withdraw(WithdrawalServiceV1::INSTANCE_ID, amount_2),
-    )
-    .unwrap();
-    drop(events_handle.take());
-
-    // Check balance and history.
-    let snapshot = blockchain.snapshot();
-    let schema = Schema::new(
-        snapshot
-            .for_service(WithdrawalServiceV1::INSTANCE_NAME)
-            .unwrap(),
-    );
-
-    assert_eq!(
-        schema.balance.get(),
-        Some(INITIAL_BALANCE + amount + amount_2)
-    );
-    assert_eq!(
-        schema.withdrawals.iter().collect::<Vec<_>>(),
-        vec![amount, amount_2]
-    );
+    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
+        .with_runtime(inspected)
+        .build();
+    (blockchain, events_handle)
 }
 
 #[test]
-fn resume_with_fast_forward_migration() {
+fn fast_forward_migration() {
     let (mut blockchain, events_handle) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
-    // We are not interested in blockchain initialization events.
-    drop(events_handle.take());
-
-    // Make withdrawal.
-    let amount = 10_000;
-    execute_transaction(
-        &mut blockchain,
-        keypair.withdraw(WithdrawalServiceV1::INSTANCE_ID, amount),
-    )
-    .unwrap();
-    // We not interested in events in this case.
-    drop(events_handle.take());
 
     // Stop running service instance.
     execute_transaction(
@@ -307,7 +565,7 @@ fn resume_with_fast_forward_migration() {
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
             StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
+                instance_id: v01::MigrationService::INSTANCE_ID,
             },
         ),
     )
@@ -315,30 +573,30 @@ fn resume_with_fast_forward_migration() {
     // We not interested in events in this case.
     drop(events_handle.take());
 
-    // Make fast-forward migration to the WithdrawalServiceV2.
+    // Make fast-forward migration to the v02::MigrationService.
     execute_transaction(
         &mut blockchain,
         keypair.migrate_service(
             ToySupervisorService::INSTANCE_ID,
             MigrateService {
-                instance_name: WithdrawalServiceV1::INSTANCE_NAME.to_owned(),
-                artifact: WithdrawalServiceV2.artifact_id(),
+                instance_name: v01::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: v02::MigrationService.artifact_id(),
             },
         ),
     )
     .unwrap();
 
-    let withdrawal_service = WithdrawalServiceV2.default_instance().instance_spec;
+    let migration_service = v02::MigrationService.default_instance().instance_spec;
     assert_eq!(
         events_handle.take(),
         vec![
-            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::MigrateService(
-                withdrawal_service.artifact.clone(),
-                WithdrawalServiceV1.artifact_id().version
+                migration_service.artifact.clone(),
+                v01::MigrationService.artifact_id().version
             ),
-            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(4)),
+            RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(3)),
         ]
     );
 
@@ -348,8 +606,8 @@ fn resume_with_fast_forward_migration() {
         keypair.resume_service(
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
-                instance_id: WithdrawalServiceV2::INSTANCE_ID,
-                artifact: WithdrawalServiceV2.artifact_id(),
+                instance_id: v02::MigrationService::INSTANCE_ID,
+                artifact: v02::MigrationService.artifact_id(),
                 params: vec![],
             },
         ),
@@ -358,15 +616,15 @@ fn resume_with_fast_forward_migration() {
     assert_eq!(
         events_handle.take(),
         vec![
-            RuntimeEvent::BeforeTransactions(Height(4), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartResumingService(withdrawal_service.clone(), vec![]),
-            RuntimeEvent::AfterTransactions(Height(4), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::StartResumingService(migration_service.clone(), vec![]),
+            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::CommitService(
-                Height(5),
-                WithdrawalServiceV2.default_instance().instance_spec,
+                Height(4),
+                v02::MigrationService.default_instance().instance_spec,
                 InstanceStatus::Active,
             ),
-            RuntimeEvent::AfterCommit(Height(5)),
+            RuntimeEvent::AfterCommit(Height(4)),
         ]
     );
 
@@ -374,131 +632,21 @@ fn resume_with_fast_forward_migration() {
     let instance_state = blockchain
         .snapshot()
         .for_dispatcher()
-        .get_instance(WithdrawalServiceV2::INSTANCE_ID)
+        .get_instance(v02::MigrationService::INSTANCE_ID)
         .unwrap();
 
-    assert_eq!(instance_state.spec, withdrawal_service);
+    assert_eq!(instance_state.spec, migration_service);
     assert_eq!(instance_state.status, Some(InstanceStatus::Active));
     assert_eq!(
         instance_state.data_version(),
-        &withdrawal_service.artifact.version
-    );
-
-    // Make another withdrawal.
-    let amount_2 = 20_000;
-    execute_transaction(
-        &mut blockchain,
-        keypair.withdraw(WithdrawalServiceV2::INSTANCE_ID, amount_2),
-    )
-    .unwrap();
-    assert_eq!(
-        events_handle.take(),
-        vec![
-            RuntimeEvent::BeforeTransactions(Height(5), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::BeforeTransactions(Height(5), WithdrawalServiceV2::INSTANCE_ID),
-            RuntimeEvent::AfterTransactions(Height(5), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::AfterTransactions(Height(5), WithdrawalServiceV2::INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(6)),
-        ]
-    );
-
-    // Check balance and history.
-    let snapshot = blockchain.snapshot();
-    let schema = Schema::new(
-        snapshot
-            .for_service(WithdrawalServiceV2::INSTANCE_NAME)
-            .unwrap(),
-    );
-
-    assert_eq!(
-        schema.balance.get(),
-        Some(INITIAL_BALANCE - amount - amount_2)
+        &migration_service.artifact.version
     );
 }
 
 #[test]
-fn test_resume_incorrect_artifact_version() {
-    let (mut blockchain, _) = create_runtime();
+fn migration_errors() {
+    let (mut blockchain, events_handle) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
-
-    execute_transaction(
-        &mut blockchain,
-        keypair.stop_service(
-            ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
-        ),
-    )
-    .unwrap();
-
-    let actual_err = execute_transaction(
-        &mut blockchain,
-        keypair.resume_service(
-            ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact: WithdrawalServiceV2.artifact_id(),
-                params: vec![],
-            },
-        ),
-    )
-    .unwrap_err();
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CoreError::CannotResumeService)
-    );
-}
-
-#[test]
-fn test_resume_incorrect_artifact_name() {
-    let (mut blockchain, _) = create_runtime();
-    let keypair = blockchain.as_ref().service_keypair().clone();
-
-    execute_transaction(
-        &mut blockchain,
-        keypair.stop_service(
-            ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
-        ),
-    )
-    .unwrap();
-
-    let mut artifact = WithdrawalServiceV1.artifact_id();
-    artifact.name = "toy_supervisor".to_owned();
-
-    let actual_err = execute_transaction(
-        &mut blockchain,
-        keypair.resume_service(
-            ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact,
-                params: vec![],
-            },
-        ),
-    )
-    .unwrap_err();
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CoreError::CannotResumeService)
-    );
-}
-
-#[test]
-fn test_resume_service_error() {
-    let (mut blockchain, _) = create_runtime();
-    let keypair = blockchain.as_ref().service_keypair().clone();
-
-    // Make withdrawal.
-    let amount = 10_000;
-    execute_transaction(
-        &mut blockchain,
-        keypair.withdraw(WithdrawalServiceV1::INSTANCE_ID, amount),
-    )
-    .unwrap();
 
     // Stop running service instance.
     execute_transaction(
@@ -506,104 +654,158 @@ fn test_resume_service_error() {
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
             StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
+                instance_id: v01::MigrationService::INSTANCE_ID,
             },
         ),
     )
     .unwrap();
+    // We not interested in events in this case.
+    drop(events_handle.take());
 
-    // Make fast-forward migration to the WithdrawalServiceV2.
-    execute_transaction(
+    // Attempt to upgrade service to an unrelated artifact.
+    let err = execute_transaction(
         &mut blockchain,
         keypair.migrate_service(
             ToySupervisorService::INSTANCE_ID,
             MigrateService {
-                instance_name: WithdrawalServiceV1::INSTANCE_NAME.to_owned(),
-                artifact: WithdrawalServiceV2.artifact_id(),
+                instance_name: v01::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: ToySupervisorService.artifact_id(),
+            },
+        ),
+    )
+    .expect_err("Upgrade to an unrelated artifact should fail.");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
+    drop(events_handle.take());
+
+    // Attempt to migrate to the same version.
+    let err = execute_transaction(
+        &mut blockchain,
+        keypair.migrate_service(
+            ToySupervisorService::INSTANCE_ID,
+            MigrateService {
+                instance_name: v01::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: v01::MigrationService.artifact_id(),
+            },
+        ),
+    )
+    .expect_err("Upgrade to the same version should fail.");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
+    drop(events_handle.take());
+
+    // Attempt to migrate unknown service.
+    let err = execute_transaction(
+        &mut blockchain,
+        keypair.migrate_service(
+            ToySupervisorService::INSTANCE_ID,
+            MigrateService {
+                instance_name: "unknown".to_string(),
+                artifact: v02::MigrationService.artifact_id(),
+            },
+        ),
+    )
+    .expect_err("Upgrade of unknown service should fail.");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    drop(events_handle.take());
+
+    // Attempt to migrate to unknown artifact.
+    let err = execute_transaction(
+        &mut blockchain,
+        keypair.migrate_service(
+            ToySupervisorService::INSTANCE_ID,
+            MigrateService {
+                instance_name: v01::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: ArtifactId::from_raw_parts(
+                    0,
+                    "unknown".to_string(),
+                    "0.2.0".parse().unwrap(),
+                ),
+            },
+        ),
+    )
+    .expect_err("Upgrade to unknown artifact should fail.");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::UnknownArtifactId));
+    drop(events_handle.take());
+
+    // Attempt to upgrade to service without migration support.
+    let err = execute_transaction(
+        &mut blockchain,
+        keypair.migrate_service(
+            ToySupervisorService::INSTANCE_ID,
+            MigrateService {
+                instance_name: v01::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: v03::MigrationService.artifact_id(),
+            },
+        ),
+    )
+    .expect_err("Upgrade to service without migration support should fail.");
+    let expected_err = ExecutionError::from(InitMigrationError::NotSupported).to_match();
+    assert_eq!(err, expected_err);
+    drop(events_handle.take());
+
+    // Resume stopped service instance.
+    execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: v01::MigrationService::INSTANCE_ID,
+                artifact: v01::MigrationService.artifact_id(),
+                params: vec![],
             },
         ),
     )
     .unwrap();
-
-    // Resume stopped service instance.
-    let actual_err = execute_transaction(
-        &mut blockchain,
-        keypair.resume_service(
-            ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV2::INSTANCE_ID,
-                artifact: WithdrawalServiceV2.artifact_id(),
-                params: vec![1, 2, 3, 4],
-            },
-        ),
-    )
-    .unwrap_err();
+    let migration_service = v01::MigrationService.default_instance().instance_spec;
     assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CommonError::MalformedArguments)
-            .with_description_containing("Resuming parameters should be empty")
-    );
-
-    // Verify the service instance after migration and unsuccessful resume.
-    let instance_state = blockchain
-        .snapshot()
-        .for_dispatcher()
-        .get_instance(WithdrawalServiceV1::INSTANCE_ID)
-        .unwrap();
-
-    assert_eq!(
-        instance_state.spec,
-        WithdrawalServiceV1.default_instance().instance_spec
-    );
-    assert_eq!(instance_state.status, Some(InstanceStatus::Stopped));
-    assert_eq!(
-        instance_state.data_version(),
-        &WithdrawalServiceV2.artifact_id().version
+        events_handle.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(7), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::StartResumingService(migration_service.clone(), vec![]),
+            RuntimeEvent::AfterTransactions(Height(7), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::CommitService(
+                Height(8),
+                v01::MigrationService.default_instance().instance_spec,
+                InstanceStatus::Active,
+            ),
+            RuntimeEvent::AfterCommit(Height(8)),
+        ]
     );
 }
 
 #[test]
-fn resume_non_existent_service_error() {
-    let (mut blockchain, _) = create_runtime();
+fn migration_downgrade() {
+    let (mut blockchain, events_handle) = create_runtime_custom(
+        v03::MigrationService,
+        vec![v02::MigrationService],
+        vec![v01::MigrationService],
+    );
     let keypair = blockchain.as_ref().service_keypair().clone();
 
-    let actual_err = execute_transaction(
+    // Stop running service instance.
+    execute_transaction(
         &mut blockchain,
-        keypair.resume_service(
+        keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV2::INSTANCE_ID + 1,
-                artifact: WithdrawalServiceV2.artifact_id(),
-                params: vec![],
+            StopService {
+                instance_id: v03::MigrationService::INSTANCE_ID,
             },
         ),
     )
-    .unwrap_err();
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
-    );
-}
+    .unwrap();
+    // We not interested in events in this case.
+    drop(events_handle.take());
 
-#[test]
-fn resume_active_service_error() {
-    let (mut blockchain, _) = create_runtime();
-    let keypair = blockchain.as_ref().service_keypair().clone();
-
-    let actual_err = execute_transaction(
+    // Attempt to downgrade service.
+    let err = execute_transaction(
         &mut blockchain,
-        keypair.resume_service(
+        keypair.migrate_service(
             ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact: WithdrawalServiceV1.artifact_id(),
-                params: vec![],
+            MigrateService {
+                instance_name: v03::MigrationService::INSTANCE_NAME.to_owned(),
+                artifact: v02::MigrationService.artifact_id(),
             },
         ),
     )
-    .unwrap_err();
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CoreError::ServiceNotStopped)
-    );
+    .expect_err("Downgrade should fail.");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
 }

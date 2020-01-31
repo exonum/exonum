@@ -37,6 +37,7 @@ pretty_assertions = "0.6.1"
 rand = "0.7"
 serde_json = "1.0.44"
 tempfile = "3"
+exonum-supervisor = { version = "0.13.0-rc.2", path = "../../services/supervisor" }
 
 [build-dependencies]
 exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
