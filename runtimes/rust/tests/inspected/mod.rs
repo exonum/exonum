@@ -257,7 +257,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
             height,
             context.instance().id,
         ));
-        self.runtime.after_transactions(context)
+        self.runtime.before_transactions(context)
     }
 
     fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
