@@ -35,6 +35,28 @@
 //! # }
 //! ```
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // `filter(..).map(..)` often looks more shorter and readable.
+    clippy::filter_map,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names,
+    // Variant name ends with the enum name. Similar behavior to similar_names.
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    clippy::use_self,
+    clippy::default_trait_access,
+)]
+
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
@@ -184,11 +206,11 @@ impl EncryptedMasterKey {
 pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys, failure::Error> {
     let tree = SecretTree::new(&mut thread_rng());
     save_master_key(path, passphrase, tree.seed())?;
-    generate_keys_from_master_password(tree)
+    generate_keys_from_master_password(&tree)
         .ok_or_else(|| format_err!("Error deriving keys from master key."))
 }
 
-fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
+fn generate_keys_from_master_password(tree: &SecretTree) -> Option<Keys> {
     let mut buffer = [0_u8; 32];
 
     tree.child(Name::new("consensus")).fill(&mut buffer);
@@ -219,7 +241,7 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let seed = keys.decrypt(pass_phrase)?;
 
     let tree = SecretTree::from_seed(&seed).expect("Error creating secret tree from seed.");
-    generate_keys_from_master_password(tree)
+    generate_keys_from_master_password(&tree)
         .ok_or_else(|| format_err!("Error deriving keys from master key"))
 }
 
