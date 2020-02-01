@@ -484,9 +484,9 @@ implement_index_traits! {Signature}
 
 /// Pair of matching secret and public keys.
 ///
-/// Prefer using this struct to `(PublicKey, SecretKey)`, since it asserts in compile time
-/// that public and secret keys match.
-#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+/// Prefer using this struct to `(PublicKey, SecretKey)`, since it asserts that public
+/// and secret keys necessarily match.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct KeyPair {
     public_key: PublicKey,
     secret_key: SecretKey,

@@ -28,6 +28,7 @@
 //! ```no_run
 //! use exonum::{
 //!     blockchain::config::GenesisConfig,
+//!     keys::Keys,
 //!     merkledb::TemporaryDB,
 //! };
 //! use exonum_node::{NodeBuilder, NodeConfig};
@@ -35,9 +36,11 @@
 //!
 //! let node_config: NodeConfig = // ...
 //! #    unimplemented!();
+//! let node_keys = Keys::random();
 //! let genesis_config: GenesisConfig = // ...
 //! #    unimplemented!();
-//! let node = NodeBuilder::new(TemporaryDB::new(), node_config, genesis_config)
+//! let db = TemporaryDB::new();
+//! let node = NodeBuilder::new(db, node_config, genesis_config, node_keys)
 //!     .with_plugin(SystemApiPlugin)
 //!     // Add runtimes etc...
 //!     .build();

@@ -250,7 +250,7 @@ impl WellKnownRuntime for SampleRuntime {
     const ID: u32 = 255;
 }
 
-fn node_config() -> NodeConfig {
+fn node_config() -> (NodeConfig, Keys) {
     let keys = Keys::random();
     let validator_keys = vec![ValidatorKeys::new(keys.consensus_pk(), keys.service_pk())];
     let consensus = ConsensusConfig::default().with_validator_keys(validator_keys);
@@ -263,7 +263,7 @@ fn node_config() -> NodeConfig {
 
     let peer_address = "0.0.0.0:2000";
 
-    NodeConfig {
+    let node_config = NodeConfig {
         listen_address: peer_address.parse().unwrap(),
         consensus,
         external_address: peer_address.to_owned(),
@@ -272,8 +272,8 @@ fn node_config() -> NodeConfig {
         api: api_cfg,
         mempool: Default::default(),
         thread_pool_size: Default::default(),
-        keys,
-    }
+    };
+    (node_config, keys)
 }
 
 fn main() {
@@ -282,16 +282,16 @@ fn main() {
     println!("Creating database in temporary dir...");
 
     let db = TemporaryDB::new();
-    let node_cfg = node_config();
+    let (node_cfg, node_keys) = node_config();
     let consensus_config = node_cfg.consensus.clone();
-    let service_keypair = node_cfg.service_keypair();
+    let service_keypair = node_keys.service.clone();
     let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
         .with_artifact(Supervisor.artifact_id())
         .with_instance(Supervisor::simple())
         .build();
 
     println!("Creating blockchain with additional runtime...");
-    let node = NodeBuilder::new(db, node_cfg, genesis_config)
+    let node = NodeBuilder::new(db, node_cfg, genesis_config, node_keys)
         .with_runtime(SampleRuntime::default())
         .with_runtime_fn(|channel| {
             RustRuntime::builder()

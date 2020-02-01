@@ -84,7 +84,7 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 }
 
 /// Container for all key pairs held by an Exonum node.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
     /// Consensus keypair.
     pub consensus: KeyPair,

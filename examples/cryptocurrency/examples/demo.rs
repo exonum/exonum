@@ -24,7 +24,7 @@ use exonum_system_api::SystemApiPlugin;
 
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
-fn node_config() -> NodeConfig {
+fn node_config() -> (NodeConfig, Keys) {
     let keys = Keys::random();
     let validator_keys = vec![ValidatorKeys::new(keys.consensus_pk(), keys.service_pk())];
     let consensus = ConsensusConfig::default().with_validator_keys(validator_keys);
@@ -36,8 +36,7 @@ fn node_config() -> NodeConfig {
     };
 
     let peer_address = "0.0.0.0:2000";
-
-    NodeConfig {
+    let node_config = NodeConfig {
         listen_address: peer_address.parse().unwrap(),
         consensus,
         external_address: peer_address.to_owned(),
@@ -46,15 +45,15 @@ fn node_config() -> NodeConfig {
         api: api_cfg,
         mempool: Default::default(),
         thread_pool_size: Default::default(),
-        keys,
-    }
+    };
+    (node_config, keys)
 }
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
-    let node_config = node_config();
+    let (node_cfg, node_keys) = node_config();
     let artifact_id = CryptocurrencyService.artifact_id();
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(node_config.consensus.clone())
+    let genesis_cfg = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
         .with_artifact(ExplorerFactory.artifact_id())
         .with_instance(ExplorerFactory.default_instance())
         .with_artifact(artifact_id.clone())
@@ -62,7 +61,8 @@ fn main() {
         .build();
 
     println!("Creating database in temporary dir...");
-    let node = NodeBuilder::new(TemporaryDB::new(), node_config, genesis_config)
+    let db = TemporaryDB::new();
+    let node = NodeBuilder::new(db, node_cfg, genesis_cfg, node_keys)
         .with_plugin(SystemApiPlugin)
         .with_runtime_fn(|channel| {
             RustRuntime::builder()
