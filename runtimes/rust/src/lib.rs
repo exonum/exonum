@@ -213,6 +213,7 @@
 //! | Stub | Behavior |
 //! |------|----------|
 //! | [`TxStub`] | Generates unsigned transactions |
+//! | `KeyPair` | Generates signed transactions (preferred) |
 //! | `(PublicKey, SecretKey)` | Generates signed transactions |
 //! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
 //! | [`ExecutionContext`] | Calls methods of another service during transaction execution **(1)** |

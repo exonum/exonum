@@ -17,7 +17,7 @@
 //! to add block after receiving correct consensus messages.
 
 use exonum::{
-    crypto::{gen_keypair_from_seed, Hash, Seed, HASH_SIZE, SEED_LENGTH},
+    crypto::{Hash, KeyPair, Seed, HASH_SIZE, SEED_LENGTH},
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
     messages::{Precommit, Verified},
@@ -255,7 +255,7 @@ fn test_store_txs_positions() {
 
     let generator = TimestampingTxGenerator::with_keypair(
         DATA_SIZE,
-        gen_keypair_from_seed(&Seed::new([11; SEED_LENGTH])),
+        KeyPair::from_seed(&Seed::new([11; SEED_LENGTH])),
     );
 
     let committed_height = Height(rng.gen_range(2, 30_u64));
@@ -294,7 +294,7 @@ fn tx_cache_with_tx_block_limit() {
 
     let generator = TimestampingTxGenerator::with_keypair(
         DATA_SIZE,
-        gen_keypair_from_seed(&Seed::new([10; SEED_LENGTH])),
+        KeyPair::from_seed(&Seed::new([10; SEED_LENGTH])),
     );
 
     let num_txs = 10;

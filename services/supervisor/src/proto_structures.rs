@@ -14,23 +14,18 @@
 
 use exonum::{
     blockchain::ConsensusConfig,
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::Hash,
     helpers::Height,
     merkledb::{
         impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue, ObjectHash,
     },
-    messages::{AnyTx, Verified},
-    runtime::{
-        ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, MigrationStatus,
-        SUPERVISOR_INSTANCE_ID,
-    },
+    runtime::{ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, MigrationStatus},
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use exonum_rust_runtime::TxStub;
 use serde_derive::{Deserialize, Serialize};
 
-use super::{mode::Mode, proto, transactions::SupervisorInterface};
+use super::{mode::Mode, proto};
 
 /// Supervisor service configuration (not to be confused with `ConfigPropose`, which
 /// contains core/service configuration change proposal).
@@ -155,17 +150,6 @@ pub struct ConfigPropose {
 }
 
 impl ConfigPropose {
-    /// Signs the proposal for the supervisor service.
-    pub fn sign_for_supervisor(
-        self,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
-        TxStub
-            .propose_config_change(SUPERVISOR_INSTANCE_ID, self)
-            .sign(public_key, secret_key)
-    }
-
     /// Creates a new proposal which activates at the specified height.
     pub fn new(configuration_number: u64, actual_from: Height) -> Self {
         Self {

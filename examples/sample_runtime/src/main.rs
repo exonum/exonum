@@ -334,20 +334,18 @@ fn main() {
 
         // Send a `StartService` request to the sample runtime.
         let instance_name = "instance";
-
+        let proposal = ConfigPropose::immediate(0).start_service(
+            "255:sample_artifact:0.1.0".parse().unwrap(),
+            instance_name,
+            10_u64,
+        );
+        let proposal = service_keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, proposal);
         blockchain_ref
             .sender()
-            .broadcast_transaction(
-                ConfigPropose::immediate(0)
-                    .start_service(
-                        "255:sample_artifact:0.1.0".parse().unwrap(),
-                        instance_name,
-                        10_u64,
-                    )
-                    .sign_for_supervisor(service_keypair.0, &service_keypair.1),
-            )
+            .broadcast_transaction(proposal)
             .wait()
             .unwrap();
+
         // Wait until instance identifier is assigned.
         thread::sleep(Duration::from_secs(1));
 
@@ -359,23 +357,23 @@ fn main() {
             .unwrap();
         assert_eq!(state.status.unwrap(), InstanceStatus::Active);
         let instance_id = state.spec.id;
+
         // Send an update counter transaction.
+        let tx = AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes());
+        let tx = tx.sign_with_keypair(&service_keypair);
         blockchain_ref
             .sender()
-            .broadcast_transaction(
-                AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes())
-                    .sign(service_keypair.0, &service_keypair.1),
-            )
+            .broadcast_transaction(tx)
             .wait()
             .unwrap();
         thread::sleep(Duration::from_secs(2));
+
         // Send a reset counter transaction.
+        let tx = AnyTx::new(CallInfo::new(instance_id, 1), vec![]);
+        let tx = tx.sign_with_keypair(&service_keypair);
         blockchain_ref
             .sender()
-            .broadcast_transaction(
-                AnyTx::new(CallInfo::new(instance_id, 1), Vec::default())
-                    .sign(service_keypair.0, &service_keypair.1),
-            )
+            .broadcast_transaction(tx)
             .wait()
             .unwrap();
 

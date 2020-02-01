@@ -43,7 +43,7 @@ use exonum::{
         config::{GenesisConfig, GenesisConfigBuilder},
         ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
     },
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
     merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
     messages::{AnyTx, Verified},
@@ -63,12 +63,12 @@ const PREPARE_TRANSACTIONS: usize = 10_000;
 /// `PREPARE_TRANSACTIONS` should be divisible by all values.
 const TXS_IN_BLOCK: &[usize] = &[10, 25, 50, 100];
 
-fn gen_keypair_from_rng(rng: &mut StdRng) -> (PublicKey, SecretKey) {
-    use exonum::crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+fn gen_keypair_from_rng(rng: &mut StdRng) -> KeyPair {
+    use exonum::crypto::{Seed, SEED_LENGTH};
 
     let mut bytes = [0_u8; SEED_LENGTH];
     rng.fill(&mut bytes);
-    gen_keypair_from_seed(&Seed::new(bytes))
+    KeyPair::from_seed(&Seed::new(bytes))
 }
 
 fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
@@ -107,11 +107,13 @@ fn create_blockchain_from_parts(
 fn create_consensus_config_and_blockchain_base(
     db: impl Into<Arc<dyn Database>>,
 ) -> (ConsensusConfig, Blockchain) {
-    let service_keypair = (PublicKey::zero(), SecretKey::zero());
-    let consensus_keypair = crypto::gen_keypair();
+    let service_keypair = KeyPair::random();
+    let consensus_keypair = KeyPair::random();
     let mut consensus_config = ConsensusConfig::default();
-    consensus_config.validator_keys =
-        vec![ValidatorKeys::new(consensus_keypair.0, service_keypair.0)];
+    consensus_config.validator_keys = vec![ValidatorKeys::new(
+        consensus_keypair.public_key(),
+        service_keypair.public_key(),
+    )];
 
     let api_sender = ApiSender::closed();
     let blockchain_base = Blockchain::new(db, service_keypair, api_sender);
@@ -300,7 +302,13 @@ mod cryptocurrency {
         (0..).map(move |seed| {
             let sender_and_receiver: Vec<_> = keys.choose_multiple(&mut rng, 2).collect();
             match &sender_and_receiver[..] {
-                [from, (to, ..)] => from.transfer(CRYPTOCURRENCY_SERVICE_ID, Tx { to: *to, seed }),
+                [from, to] => from.transfer(
+                    CRYPTOCURRENCY_SERVICE_ID,
+                    Tx {
+                        to: to.public_key(),
+                        seed,
+                    },
+                ),
                 _ => unreachable!(),
             }
         })
@@ -314,9 +322,13 @@ mod cryptocurrency {
         (0..).map(move |seed| {
             let sender_and_receiver: Vec<_> = keys.choose_multiple(&mut rng, 2).collect();
             match &sender_and_receiver[..] {
-                [from, (to, ..)] => {
-                    from.transfer_without_proof(CRYPTOCURRENCY_SERVICE_ID, Tx { to: *to, seed })
-                }
+                [from, to] => from.transfer_without_proof(
+                    CRYPTOCURRENCY_SERVICE_ID,
+                    Tx {
+                        to: to.public_key(),
+                        seed,
+                    },
+                ),
                 _ => unreachable!(),
             }
         })
@@ -330,9 +342,13 @@ mod cryptocurrency {
         (0..).map(move |seed| {
             let sender_and_receiver: Vec<_> = keys.choose_multiple(&mut rng, 2).collect();
             match &sender_and_receiver[..] {
-                [from, (to, ..)] => {
-                    from.transfer_error_sometimes(CRYPTOCURRENCY_SERVICE_ID, Tx { to: *to, seed })
-                }
+                [from, to] => from.transfer_error_sometimes(
+                    CRYPTOCURRENCY_SERVICE_ID,
+                    Tx {
+                        to: to.public_key(),
+                        seed,
+                    },
+                ),
                 _ => unreachable!(),
             }
         })

@@ -45,7 +45,7 @@ use exonum::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
         ConsensusConfig, Schema, SendError,
     },
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, KeyPair, PublicKey},
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     keys::Keys,
     merkledb::{Database, ObjectHash},
@@ -335,8 +335,8 @@ pub struct NodeConfig {
 
 impl NodeConfig {
     /// Returns a service key pair of the node.
-    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
-        (self.keys.service_pk(), self.keys.service_sk().clone())
+    pub fn service_keypair(&self) -> KeyPair {
+        self.keys.service.clone()
     }
 }
 
@@ -1216,11 +1216,11 @@ impl Node {
 
 #[doc(hidden)]
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
-    use exonum::{blockchain::ValidatorKeys, crypto::gen_keypair};
+    use exonum::blockchain::ValidatorKeys;
 
     let keys: Vec<_> = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair()))
-        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .map(|_| (KeyPair::random(), KeyPair::random()))
+        .map(|(consensus, service)| Keys { service, consensus })
         .collect();
 
     let validator_keys = keys

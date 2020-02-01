@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{Hash, PublicKey, SecretKey, HASH_SIZE};
+use exonum_crypto::{Hash, KeyPair, PublicKey, SecretKey, HASH_SIZE};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
@@ -132,9 +132,14 @@ impl AnyTx {
         }
     }
 
-    /// Signs a transaction with the specified Ed25519 keypair.
+    /// Signs a transaction with the specified Ed25519 keys.
     pub fn sign(self, public_key: PublicKey, secret_key: &SecretKey) -> Verified<Self> {
         Verified::from_value(self, public_key, secret_key)
+    }
+
+    /// Signs a transaction with the specified Ed25519 keypair.
+    pub fn sign_with_keypair(self, keypair: &KeyPair) -> Verified<Self> {
+        Verified::from_value(self, keypair.public_key(), keypair.secret_key())
     }
 
     /// Parse transaction arguments as a specific type.

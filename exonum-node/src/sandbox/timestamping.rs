@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::{gen_keypair, Hash, PublicKey, SecretKey, HASH_SIZE},
+    crypto::{Hash, KeyPair, HASH_SIZE},
     merkledb::access::AccessExt,
     messages::Verified,
     runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
@@ -70,13 +70,13 @@ impl TimestampingService {
 pub struct TimestampingTxGenerator {
     rand: ThreadRng,
     data_size: usize,
-    keypair: (PublicKey, SecretKey),
+    keypair: KeyPair,
     instance_id: InstanceId,
 }
 
 impl TimestampingTxGenerator {
     pub fn new(data_size: usize) -> Self {
-        let keypair = gen_keypair();
+        let keypair = KeyPair::random();
         TimestampingTxGenerator::with_keypair(data_size, keypair)
     }
 
@@ -87,10 +87,7 @@ impl TimestampingTxGenerator {
         this
     }
 
-    pub fn with_keypair(
-        data_size: usize,
-        keypair: (PublicKey, SecretKey),
-    ) -> TimestampingTxGenerator {
+    pub fn with_keypair(data_size: usize, keypair: KeyPair) -> TimestampingTxGenerator {
         let rand = thread_rng();
 
         TimestampingTxGenerator {
