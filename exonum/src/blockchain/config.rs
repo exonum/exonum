@@ -26,7 +26,7 @@ use log::warn;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    crypto::{gen_keypair, PublicKey},
+    crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
     keys::Keys,
     merkledb::BinaryValue,

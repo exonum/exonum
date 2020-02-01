@@ -51,8 +51,6 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-#[cfg(feature = "with-protobuf")]
-pub use self::proto::*;
 
 #[cfg(feature = "with-protobuf")]
 #[doc(hidden)]
@@ -485,6 +483,9 @@ implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
 /// Pair of matching secret and public keys.
+///
+/// Prefer using this struct to `(PublicKey, SecretKey)`, since it asserts in compile time
+/// that public and secret keys match.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct KeyPair {
     public_key: PublicKey,
@@ -509,7 +510,7 @@ impl KeyPair {
         }
     }
 
-    /// Generates a random keypair.
+    /// Generates a random keypair using the random number generator provided by the crypto backend.
     pub fn random() -> Self {
         let (public_key, secret_key) = gen_keypair();
         Self {

@@ -12,6 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Key management for [Exonum] nodes.
+//!
+//! This crate provides tools for storing and loading encrypted keys for a node.
+//!
+//! [Exonum]: https://exonum.com/
+//!
+//! # Examples
+//!
+//! ```
+//! use exonum_keys::{generate_keys, read_keys_from_file};
+//! use tempdir::TempDir;
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let dir = TempDir::new("test_keys")?;
+//! let file_path = dir.path().join("private_key.toml");
+//! let pass_phrase = b"super_secret_passphrase";
+//! let keys = generate_keys(file_path.as_path(), pass_phrase)?;
+//! let restored_keys = read_keys_from_file(file_path.as_path(), pass_phrase)?;
+//! assert_eq!(keys, restored_keys);
+//! # Ok(())
+//! # }
+//! ```
+
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
@@ -50,7 +73,8 @@ pub struct Keys {
 }
 
 impl Keys {
-    /// Creates a random set of keys.
+    /// Creates a random set of keys using the random number generator provided
+    /// by the crypto backend.
     pub fn random() -> Self {
         Self {
             consensus: KeyPair::random(),
