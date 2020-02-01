@@ -951,7 +951,6 @@ impl NodeBuilder {
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         node_config: NodeConfig,
-        genesis_config: GenesisConfig,
         node_keys: Keys,
     ) -> Self {
         node_config
@@ -960,7 +959,7 @@ impl NodeBuilder {
 
         let channel = NodeChannel::new(&node_config.mempool.events_pool_capacity);
         let blockchain = Blockchain::new(database, node_keys.service.clone(), channel.api_sender());
-        let blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
+        let blockchain_builder = BlockchainBuilder::new(blockchain);
 
         Self {
             channel,
@@ -970,6 +969,12 @@ impl NodeBuilder {
             config_manager: None,
             plugins: vec![],
         }
+    }
+
+    /// Adds a genesis config to use if the blockchain is not initialized yet.
+    pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
+        self.blockchain_builder = self.blockchain_builder.with_genesis_config(genesis_config);
+        self
     }
 
     /// Adds a runtime to the blockchain.
@@ -1244,7 +1249,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, 
 
 #[cfg(test)]
 mod tests {
-    use exonum::{blockchain::config::GenesisConfigBuilder, merkledb::TemporaryDB};
+    use exonum::merkledb::TemporaryDB;
 
     use super::*;
 
@@ -1252,9 +1257,7 @@ mod tests {
     fn test_good_internal_events_config() {
         let db = TemporaryDB::new();
         let (node_cfg, node_keys) = generate_testnet_config(1, 16_500).pop().unwrap();
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config, node_keys);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
@@ -1266,9 +1269,7 @@ mod tests {
             .mempool
             .events_pool_capacity
             .internal_events_capacity = 0;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config, node_keys);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
@@ -1280,9 +1281,7 @@ mod tests {
             .mempool
             .events_pool_capacity
             .network_requests_capacity = 0;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config, node_keys);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
@@ -1296,9 +1295,7 @@ mod tests {
             .mempool
             .events_pool_capacity
             .internal_events_capacity = accidental_large_value;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config, node_keys);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
@@ -1312,8 +1309,6 @@ mod tests {
             .mempool
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config, node_keys);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 }

@@ -109,7 +109,8 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
             .build();
 
         let db = TemporaryDB::new();
-        let node = NodeBuilder::new(db, node_cfg, genesis_cfg, node_keys)
+        let node = NodeBuilder::new(db, node_cfg, node_keys)
+            .with_genesis_config(genesis_cfg)
             .with_runtime_fn(|channel| {
                 RustRuntime::builder()
                     .with_factory(service)
@@ -150,7 +151,8 @@ fn test_node_restart_regression() {
                 .with_instance(artifact.into_default_instance(4, "startup-checker"))
                 .build();
 
-        let node = NodeBuilder::new(db, node_cfg, genesis_config, node_keys)
+        let node = NodeBuilder::new(db, node_cfg, node_keys)
+            .with_genesis_config(genesis_config)
             .with_runtime_fn(|channel| {
                 RustRuntime::builder()
                     .with_factory(service)

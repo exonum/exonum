@@ -99,7 +99,8 @@ fn create_blockchain_from_parts(
     genesis_config: GenesisConfig,
     rust_runtime: RustRuntime,
 ) -> BlockchainMut {
-    BlockchainBuilder::new(blockchain_base, genesis_config)
+    BlockchainBuilder::new(blockchain_base)
+        .with_genesis_config(genesis_config)
         .with_runtime(rust_runtime)
         .build()
 }

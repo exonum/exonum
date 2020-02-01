@@ -23,7 +23,6 @@ use crate::{
 ///
 /// During the `Blockchain` creation it creates and commits a genesis block if the database
 /// is empty. Otherwise, it restores the state from the database.
-// TODO: refine interface [ECR-3744]
 #[derive(Debug)]
 pub struct BlockchainBuilder {
     /// Underlying shared blockchain instance.
@@ -31,17 +30,23 @@ pub struct BlockchainBuilder {
     /// List of the supported runtimes.
     runtimes: Vec<RuntimeInstance>,
     /// Blockchain configuration used to create the genesis block.
-    genesis_config: GenesisConfig,
+    genesis_config: Option<GenesisConfig>,
 }
 
 impl BlockchainBuilder {
     /// Creates a new builder instance based on the `Blockchain`.
-    pub fn new(blockchain: Blockchain, genesis_config: GenesisConfig) -> Self {
+    pub fn new(blockchain: Blockchain) -> Self {
         Self {
             blockchain,
             runtimes: vec![],
-            genesis_config,
+            genesis_config: None,
         }
+    }
+
+    /// Adds the genesis config to use if the blockchain is not yet initialized.
+    pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
+        self.genesis_config = Some(genesis_config);
+        self
     }
 
     /// Adds a runtime with the specified identifier and returns a modified `Self` object for
@@ -57,9 +62,13 @@ impl BlockchainBuilder {
     ///
     /// # Panics
     ///
-    /// * If the genesis block cannot be created.
-    /// * If storage version is not specified or not supported.
+    /// - If the genesis config was not provided and the blockchain is not initialized.
+    /// - If the genesis block cannot be created.
+    /// - If storage version is not specified or not supported.
     pub fn build(self) -> BlockchainMut {
+        const NO_GENESIS_CFG: &str =
+            "No genesis config was provided for an uninitialized blockchain";
+
         let mut blockchain = BlockchainMut {
             dispatcher: Dispatcher::new(&self.blockchain, self.runtimes),
             inner: self.blockchain,
@@ -69,11 +78,11 @@ impl BlockchainBuilder {
         // otherwise creates genesis block with the given specification.
         let snapshot = blockchain.snapshot();
         let has_genesis_block = !Schema::new(&snapshot).block_hashes_by_height().is_empty();
-
         if has_genesis_block {
             blockchain.dispatcher.restore_state(&snapshot);
         } else {
-            blockchain.create_genesis_block(self.genesis_config);
+            let genesis_config = self.genesis_config.expect(NO_GENESIS_CFG);
+            blockchain.create_genesis_block(genesis_config);
         };
         blockchain
     }

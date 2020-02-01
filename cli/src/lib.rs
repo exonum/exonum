@@ -176,11 +176,11 @@ impl NodeBuilder {
 
             let node_config = run_config.node_config.into();
             let node_keys = run_config.node_keys;
-            let mut node_builder =
-                CoreNodeBuilder::new(database, node_config, genesis_config, node_keys)
-                    .with_config_manager(config_manager)
-                    .with_plugin(SystemApiPlugin)
-                    .with_runtime_fn(|channel| rust_runtime.build(channel.endpoints_sender()));
+            let mut node_builder = CoreNodeBuilder::new(database, node_config, node_keys)
+                .with_genesis_config(genesis_config)
+                .with_config_manager(config_manager)
+                .with_plugin(SystemApiPlugin)
+                .with_runtime_fn(|channel| rust_runtime.build(channel.endpoints_sender()));
             for runtime in self.external_runtimes {
                 node_builder = node_builder.with_runtime(runtime);
             }

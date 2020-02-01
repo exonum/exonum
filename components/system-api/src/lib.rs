@@ -40,7 +40,8 @@
 //! let genesis_config: GenesisConfig = // ...
 //! #    unimplemented!();
 //! let db = TemporaryDB::new();
-//! let node = NodeBuilder::new(db, node_config, genesis_config, node_keys)
+//! let node = NodeBuilder::new(db, node_config, node_keys)
+//!     .with_genesis_config(genesis_config)
 //!     .with_plugin(SystemApiPlugin)
 //!     // Add runtimes etc...
 //!     .build();

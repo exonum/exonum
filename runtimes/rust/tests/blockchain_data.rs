@@ -104,7 +104,8 @@ fn create_blockchain() -> BlockchainMut {
         .with_factory(OtherService)
         .build(mpsc::channel(1).0);
 
-    BlockchainBuilder::new(Blockchain::build_for_tests(), genesis_config)
+    BlockchainBuilder::new(Blockchain::build_for_tests())
+        .with_genesis_config(genesis_config)
         .with_runtime(runtime)
         .build()
 }

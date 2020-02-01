@@ -1151,8 +1151,8 @@ fn sandbox_with_services_uninitialized(
     );
 
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
-
-    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
+    let blockchain = BlockchainBuilder::new(blockchain)
+        .with_genesis_config(genesis_config)
         .with_runtime(rust_runtime.build_for_tests())
         .build();
 

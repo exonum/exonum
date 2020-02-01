@@ -291,7 +291,8 @@ fn main() {
         .build();
 
     println!("Creating blockchain with additional runtime...");
-    let node = NodeBuilder::new(db, node_cfg, genesis_config, node_keys)
+    let node = NodeBuilder::new(db, node_cfg, node_keys)
+        .with_genesis_config(genesis_config)
         .with_runtime(SampleRuntime::default())
         .with_runtime_fn(|channel| {
             RustRuntime::builder()

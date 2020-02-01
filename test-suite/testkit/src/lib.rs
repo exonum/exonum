@@ -225,7 +225,7 @@ impl TestKit {
         let blockchain = runtimes
             .into_iter()
             .fold(
-                BlockchainBuilder::new(blockchain, genesis_config),
+                BlockchainBuilder::new(blockchain).with_genesis_config(genesis_config),
                 |builder, runtime| builder.with_runtime(runtime),
             )
             .build();

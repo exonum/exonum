@@ -119,7 +119,8 @@ pub fn create_blockchain() -> BlockchainMut {
     let rust_runtime = RustRuntime::builder()
         .with_factory(my_service)
         .build_for_tests();
-    BlockchainBuilder::new(blockchain, genesis_config)
+    BlockchainBuilder::new(blockchain)
+        .with_genesis_config(genesis_config)
         .with_runtime(rust_runtime)
         .build()
 }

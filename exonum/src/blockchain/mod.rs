@@ -120,7 +120,7 @@ impl Blockchain {
     /// transactions and create blocks.
     #[cfg(test)]
     pub fn into_mut(self, genesis_config: GenesisConfig) -> BlockchainBuilder {
-        BlockchainBuilder::new(self, genesis_config)
+        BlockchainBuilder::new(self).with_genesis_config(genesis_config)
     }
 
     /// Starts building a mutable blockchain with the genesis config, in which
