@@ -18,7 +18,7 @@
 //! and the `explanation` module below for an explanation how stubs work.
 
 use exonum::{
-    crypto::{PublicKey, SecretKey},
+    crypto::{KeyPair, PublicKey, SecretKey},
     messages::Verified,
     runtime::{
         AnyTx, CallInfo, ExecutionContext, ExecutionContextUnstable, ExecutionError, InstanceId,
@@ -124,6 +124,20 @@ impl GenericCall<InstanceId> for (PublicKey, SecretKey) {
     ) -> Self::Output {
         let tx = TxStub.generic_call(instance_id, method, args);
         Verified::from_value(tx, self.0, &self.1)
+    }
+}
+
+impl GenericCall<InstanceId> for KeyPair {
+    type Output = Verified<AnyTx>;
+
+    fn generic_call(
+        &self,
+        instance_id: InstanceId,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        let tx = TxStub.generic_call(instance_id, method, args);
+        Verified::from_value(tx, self.public_key(), self.secret_key())
     }
 }
 

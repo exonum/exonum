@@ -26,7 +26,7 @@ pub mod config;
 
 pub(crate) use crate::runtime::ExecutionError;
 
-use exonum_crypto::gen_keypair;
+use exonum_crypto::{Hash, KeyPair};
 use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemSchema, TemporaryDB,
@@ -38,7 +38,6 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use crate::{
     blockchain::config::GenesisConfig,
-    crypto::{Hash, PublicKey, SecretKey},
     helpers::{Height, ValidateInput, ValidatorId},
     messages::{AnyTx, Precommit, Verified},
     runtime::Dispatcher,
@@ -62,19 +61,19 @@ pub mod tests;
 pub struct Blockchain {
     pub(crate) api_sender: ApiSender,
     db: Arc<dyn Database>,
-    service_keypair: (PublicKey, SecretKey),
+    service_keypair: KeyPair,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `database`.
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
-        service_keypair: (PublicKey, SecretKey),
+        service_keypair: impl Into<KeyPair>,
         api_sender: ApiSender,
     ) -> Self {
         Self {
             db: database.into(),
-            service_keypair,
+            service_keypair: service_keypair.into(),
             api_sender,
         }
     }
@@ -84,7 +83,7 @@ impl Blockchain {
     /// The created blockchain cannot send transactions; an attempt to do so will result
     /// in an error.
     pub fn build_for_tests() -> Self {
-        Self::new(TemporaryDB::new(), gen_keypair(), ApiSender::closed())
+        Self::new(TemporaryDB::new(), KeyPair::random(), ApiSender::closed())
     }
 
     /// Returns a reference to the database enclosed by this `Blockchain`.
@@ -131,7 +130,7 @@ impl Blockchain {
         use self::config::GenesisConfigBuilder;
 
         let (mut config, _) = ConsensusConfig::for_tests(1);
-        config.validator_keys[0].service_key = self.service_keypair.0;
+        config.validator_keys[0].service_key = self.service_keypair.public_key();
         let genesis_config = GenesisConfigBuilder::with_consensus_config(config).build();
         self.into_mut(genesis_config)
     }
@@ -142,7 +141,7 @@ impl Blockchain {
     }
 
     /// Returns reference to the service key pair of the current node.
-    pub fn service_keypair(&self) -> &(PublicKey, SecretKey) {
+    pub fn service_keypair(&self) -> &KeyPair {
         &self.service_keypair
     }
 

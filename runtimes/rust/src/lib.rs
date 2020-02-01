@@ -767,7 +767,7 @@ impl Runtime for RustRuntime {
         }
 
         let blockchain = self.blockchain();
-        let validator_id = core_schema.validator_id(blockchain.service_keypair().0);
+        let validator_id = core_schema.validator_id(blockchain.service_keypair().public_key());
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,
