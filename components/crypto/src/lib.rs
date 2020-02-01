@@ -518,6 +518,15 @@ impl KeyPair {
         }
     }
 
+    /// Generates a keypair from the provided seed.
+    pub fn from_seed(seed: &Seed) -> Self {
+        let (public_key, secret_key) = gen_keypair_from_seed(seed);
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
     /// Gets the public key.
     pub fn public_key(&self) -> PublicKey {
         self.public_key
