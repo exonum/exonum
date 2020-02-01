@@ -115,7 +115,7 @@ impl Finalize {
     }
 
     fn create_connect_list_config(public_configs: &[NodePublicConfig]) -> ConnectListConfig {
-        // FIXME: filter self.
+        // FIXME: filter self (ECR-4190).
         let peers = public_configs
             .iter()
             .map(|config| ConnectInfo {
