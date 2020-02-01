@@ -351,8 +351,9 @@
 //!
 //! ```
 //! use exonum::crypto::Hash;
-//! use exonum_supervisor::{ConfigPropose, ConfigVote, Supervisor};
+//! use exonum_supervisor::{ConfigPropose, ConfigVote, Supervisor, SupervisorInterface};
 //! # use exonum::helpers::{Height, ValidatorId};
+//! # use exonum::runtime::SUPERVISOR_INSTANCE_ID;
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
@@ -364,17 +365,15 @@
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
 //! #         .build();
-//!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(10));
 //!
 //! // Assuming that config proposal was broadcast by other validator...
-//! # let keys = &testkit.validator(ValidatorId(1)).service_keypair();
-//! # let tx = proposal.clone().sign_for_supervisor(keys.0, &keys.1);
+//! # let keys = testkit.validator(ValidatorId(1)).service_keypair();
+//! # let tx = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, proposal.clone());
 //! # testkit.create_block_with_transaction(tx).transactions[0]
 //! #     .status()
 //! #     .expect("Transaction with change propose discarded.");
-//!
 //! // Create a vote.
 //! let config_vote = ConfigVote::from(proposal);
 //!
@@ -388,7 +387,6 @@
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
-//!
 //! // Verify that transaction was executed successfully.
 //! assert!(block[tx_hash].status().is_ok());
 //! # Ok(())
@@ -494,7 +492,9 @@
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
 //! # use exonum_rust_runtime::ServiceFactory;
-//! use exonum_supervisor::{api::DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor};
+//! use exonum_supervisor::{
+//!     api::DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor,
+//! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # use exonum_derive::*;
@@ -528,7 +528,6 @@
 //! #     .query(&deploy_request)
 //! #     .post("deploy-artifact")?;
 //! # testkit.create_block();
-//!
 //! let query = DeployInfoQuery::from(deploy_request);
 //!
 //! let deploy_state: AsyncEventState = testkit
@@ -557,7 +556,9 @@
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
 //! # use exonum_rust_runtime::ServiceFactory;
-//! use exonum_supervisor::{api::MigrationInfoQuery, MigrationRequest, MigrationState, Supervisor};
+//! use exonum_supervisor::{
+//!     api::MigrationInfoQuery, MigrationRequest, MigrationState, Supervisor,
+//! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
@@ -567,7 +568,6 @@
 //! #         .with_artifact(Supervisor.artifact_id())
 //! #         .with_instance(Supervisor::simple())
 //! #         .build();
-//!
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
 //! #     MigrationRequest {
 //! #         new_artifact: Supervisor.artifact_id(),
@@ -581,7 +581,6 @@
 //! #     .query(&migration_request)
 //! #     .post("migrate")?;
 //! # testkit.create_block();
-//!
 //! let query = MigrationInfoQuery::from(migration_request);
 //!
 //! let migration_state: MigrationState = testkit
