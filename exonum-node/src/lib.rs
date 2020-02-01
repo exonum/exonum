@@ -1218,11 +1218,7 @@ impl Node {
 pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
     use exonum::blockchain::ValidatorKeys;
 
-    let keys: Vec<_> = (0..count as usize)
-        .map(|_| (KeyPair::random(), KeyPair::random()))
-        .map(|(consensus, service)| Keys { service, consensus })
-        .collect();
-
+    let keys: Vec<_> = (0..count as usize).map(|_| Keys::random()).collect();
     let validator_keys = keys
         .iter()
         .map(|keys| ValidatorKeys::new(keys.consensus_pk(), keys.service_pk()))

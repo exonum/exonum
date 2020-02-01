@@ -40,16 +40,7 @@ impl TestNetwork {
     /// Creates a new emulated network with a specific role of the node
     /// the network will be viewed from.
     pub fn with_our_role(us: Option<ValidatorId>, validator_count: u16) -> Self {
-        let keys = (0..validator_count).map(|_| {
-            let consensus_keypair = crypto::gen_keypair();
-            let service_keypair = crypto::gen_keypair();
-            Keys::from_keys(
-                consensus_keypair.0,
-                consensus_keypair.1,
-                service_keypair.0,
-                service_keypair.1,
-            )
-        });
+        let keys = (0..validator_count).map(|_| Keys::random());
         Self::with_our_role_from_keys(us, keys)
     }
 
@@ -185,10 +176,7 @@ impl TestNode {
     /// Creates a new auditor.
     pub fn new_auditor() -> Self {
         TestNode {
-            keys: Keys {
-                consensus: KeyPair::random(),
-                service: KeyPair::random(),
-            },
+            keys: Keys::random(),
             validator_id: None,
         }
     }
@@ -196,25 +184,19 @@ impl TestNode {
     /// Creates a new validator with the given id.
     pub fn new_validator(validator_id: ValidatorId) -> Self {
         TestNode {
-            keys: Keys {
-                consensus: KeyPair::random(),
-                service: KeyPair::random(),
-            },
+            keys: Keys::random(),
             validator_id: Some(validator_id),
         }
     }
 
     /// Constructs a new node from the given keypairs.
     pub fn from_parts(
-        consensus_keypair: impl Into<KeyPair>,
-        service_keypair: impl Into<KeyPair>,
+        consensus_keys: impl Into<KeyPair>,
+        service_keys: impl Into<KeyPair>,
         validator_id: Option<ValidatorId>,
     ) -> TestNode {
         TestNode {
-            keys: Keys {
-                consensus: consensus_keypair.into(),
-                service: service_keypair.into(),
-            },
+            keys: Keys::from_keys(consensus_keys, service_keys),
             validator_id,
         }
     }

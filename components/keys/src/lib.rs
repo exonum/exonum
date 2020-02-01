@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{gen_keypair_from_seed, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
+use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
@@ -38,30 +38,42 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
     }
 }
 
-/// Struct containing all validator key pairs.
+/// Container for all key pairs held by an Exonum node.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
     /// Consensus keypair.
     pub consensus: KeyPair,
     /// Service keypair.
     pub service: KeyPair,
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl Keys {
-    /// Create validator keys from provided keypairs.
+    /// Creates a random set of keys.
+    pub fn random() -> Self {
+        Self {
+            consensus: KeyPair::random(),
+            service: KeyPair::random(),
+            non_exhaustive: (),
+        }
+    }
+
+    /// Create validator keys from the provided keypairs.
+    ///
+    /// # Stability
+    ///
+    /// Since more keys may be added to `Keys` in the future, this method is considered
+    /// unstable.
     ///
     /// # Panics
     ///
     /// If public key in any keypair doesn't match with corresponding private key.
-    pub fn from_keys(
-        consensus_pk: PublicKey,
-        consensus_sk: SecretKey,
-        service_pk: PublicKey,
-        service_sk: SecretKey,
-    ) -> Self {
+    pub fn from_keys(consensus_keys: impl Into<KeyPair>, service_keys: impl Into<KeyPair>) -> Self {
         Self {
-            consensus: (consensus_pk, consensus_sk).into(),
-            service: (service_pk, service_sk).into(),
+            consensus: consensus_keys.into(),
+            service: service_keys.into(),
+            non_exhaustive: (),
         }
     }
 }
@@ -157,18 +169,13 @@ fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
 
     tree.child(Name::new("consensus")).fill(&mut buffer);
     let seed = Seed::from_slice(&buffer)?;
-    let (consensus_pk, consensus_sk) = gen_keypair_from_seed(&seed);
+    let consensus_keys = KeyPair::from_seed(&seed);
 
     tree.child(Name::new("service")).fill(&mut buffer);
     let seed = Seed::from_slice(&buffer)?;
-    let (service_pk, service_sk) = gen_keypair_from_seed(&seed);
+    let service_keys = KeyPair::from_seed(&seed);
 
-    Some(Keys::from_keys(
-        consensus_pk,
-        consensus_sk,
-        service_pk,
-        service_sk,
-    ))
+    Some(Keys::from_keys(consensus_keys, service_keys))
 }
 
 /// Reads encrypted master key from file and generate validator keys from it.

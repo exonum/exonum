@@ -251,18 +251,9 @@ impl WellKnownRuntime for SampleRuntime {
 }
 
 fn node_config() -> NodeConfig {
-    let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
-    let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
-
-    let validator_keys = vec![ValidatorKeys::new(consensus_public_key, service_public_key)];
+    let keys = Keys::random();
+    let validator_keys = vec![ValidatorKeys::new(keys.consensus_pk(), keys.service_pk())];
     let consensus = ConsensusConfig::default().with_validator_keys(validator_keys);
-
-    let keys = Keys::from_keys(
-        consensus_public_key,
-        consensus_secret_key,
-        service_public_key,
-        service_secret_key,
-    );
 
     let api_address = "0.0.0.0:8000".parse().unwrap();
     let api_cfg = NodeApiConfig {
