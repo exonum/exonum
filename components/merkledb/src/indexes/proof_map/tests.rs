@@ -935,64 +935,52 @@ where
         map_index.put(&k3, 3_u8);
 
         assert_eq!(
-            map_index.iter().collect::<Vec<([u8; 32], u8)>>(),
+            map_index.iter().collect::<Vec<_>>(),
             vec![(k1, 1), (k2, 2), (k3, 3)]
         );
 
         assert_eq!(
-            map_index.iter_from(&k0).collect::<Vec<([u8; 32], u8)>>(),
+            map_index.iter_from(&k0).collect::<Vec<_>>(),
             vec![(k1, 1), (k2, 2), (k3, 3)]
         );
         assert_eq!(
-            map_index.iter_from(&k1).collect::<Vec<([u8; 32], u8)>>(),
+            map_index.iter_from(&k1).collect::<Vec<_>>(),
             vec![(k1, 1), (k2, 2), (k3, 3)]
         );
         assert_eq!(
-            map_index.iter_from(&k2).collect::<Vec<([u8; 32], u8)>>(),
+            map_index.iter_from(&k2).collect::<Vec<_>>(),
             vec![(k2, 2), (k3, 3)]
         );
-        assert_eq!(
-            map_index.iter_from(&k4).collect::<Vec<([u8; 32], u8)>>(),
-            Vec::<([u8; 32], u8)>::new()
-        );
+        assert_eq!(map_index.iter_from(&k4).count(), 0);
+
+        assert_eq!(map_index.keys().collect::<Vec<_>>(), vec![k1, k2, k3]);
 
         assert_eq!(
-            map_index.keys().collect::<Vec<[u8; 32]>>(),
-            vec![k1, k2, k3]
-        );
-
-        assert_eq!(
-            map_index.keys_from(&k0).collect::<Vec<[u8; 32]>>(),
+            map_index.keys_from(&k0).collect::<Vec<_>>(),
             vec![k1, k2, k3]
         );
         assert_eq!(
-            map_index.keys_from(&k1).collect::<Vec<[u8; 32]>>(),
+            map_index.keys_from(&k1).collect::<Vec<_>>(),
             vec![k1, k2, k3]
         );
+        assert_eq!(map_index.keys_from(&k2).collect::<Vec<_>>(), vec![k2, k3]);
         assert_eq!(
-            map_index.keys_from(&k2).collect::<Vec<[u8; 32]>>(),
-            vec![k2, k3]
-        );
-        assert_eq!(
-            map_index.keys_from(&k4).collect::<Vec<[u8; 32]>>(),
+            map_index.keys_from(&k4).collect::<Vec<_>>(),
             Vec::<[u8; 32]>::new()
         );
 
-        assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.values().collect::<Vec<_>>(), vec![1, 2, 3]);
 
         assert_eq!(
-            map_index.values_from(&k0).collect::<Vec<u8>>(),
+            map_index.values_from(&k0).collect::<Vec<_>>(),
             vec![1, 2, 3]
         );
         assert_eq!(
             map_index.values_from(&k1).collect::<Vec<u8>>(),
             vec![1, 2, 3]
         );
-        assert_eq!(map_index.values_from(&k2).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(
-            map_index.values_from(&k4).collect::<Vec<u8>>(),
-            Vec::<u8>::new()
-        );
+        assert_eq!(map_index.values_from(&k2).collect::<Vec<_>>(), vec![2, 3]);
+        assert_eq!(map_index.values_from(&k4).count(), 0);
     }
 }
 

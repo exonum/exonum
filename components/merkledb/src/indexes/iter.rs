@@ -47,6 +47,19 @@ where
         Self { base_iter }
     }
 
+    pub(crate) fn with_detached_prefix<T, P>(
+        view: &'a View<T>,
+        prefix: &P,
+        from: Option<&K>,
+    ) -> Self
+    where
+        T: RawAccess,
+        P: BinaryKey,
+    {
+        let base_iter = view.iter_detached(prefix, from);
+        Self { base_iter }
+    }
+
     /// FIXME
     pub fn skip_values(self) -> Keys<'a, K> {
         Keys {

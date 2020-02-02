@@ -74,7 +74,7 @@ where
     V: BinaryValue,
 {
     type Key = u64;
-    type Iter = Zip<RangeFrom<u64>, indexes::proof_list::Iter<'a, V>>;
+    type Iter = Zip<RangeFrom<u64>, indexes::iter::Values<'a, V>>;
 
     fn continue_iter(self, from: Option<&u64>) -> Self::Iter {
         if let Some(&from) = from {
@@ -140,7 +140,7 @@ where
     KeyMode: ToProofPath<K>,
 {
     type Key = K;
-    type Iter = indexes::proof_map::Iter<'a, K, V>;
+    type Iter = indexes::iter::Entries<'a, K, V>;
 
     fn continue_iter(self, from: Option<&K>) -> Self::Iter {
         if let Some(from) = from {

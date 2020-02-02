@@ -162,6 +162,21 @@ fn iter() {
 }
 
 #[test]
+fn iter_from_with_large_index() {
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list_index = fork.get_proof_list(IDX_NAME);
+
+    list_index.extend(1_u8..10);
+    // This key should be present in the Merkle tree, but should not be returned
+    // from the iterator.
+    let key = ProofListKey::new(1, 0).as_db_key();
+    assert!(key >= 1 << 56);
+    let items = list_index.iter_from(key);
+    assert_eq!(items.count(), 0);
+}
+
+#[test]
 fn simple_proof() {
     let db = TemporaryDB::new();
     let fork = db.fork();
