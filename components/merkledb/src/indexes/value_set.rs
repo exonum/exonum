@@ -107,8 +107,8 @@ where
         self.base.contains(hash)
     }
 
-    /// Returns an iterator visiting all elements in arbitrary order. The iterator element type
-    /// is `(Hash, V)`.
+    /// Returns an iterator over set elements and their hashes. The elements are ordered as per
+    /// lexicorgraphic ordering of their hashes (i.e., effectively randomly).
     ///
     /// # Examples
     ///
@@ -127,8 +127,7 @@ where
         self.index_iter(None)
     }
 
-    /// Returns an iterator visiting hashes of all elements in ascending order. The iterator element type
-    /// is [Hash](../../../exonum_crypto/struct.Hash.html).
+    /// Returns an iterator over hashes of set elements in ascending order.
     ///
     /// # Examples
     ///
@@ -148,7 +147,7 @@ where
     }
 
     /// Returns an iterator visiting all elements in arbitrary order starting from the specified hash of
-    /// a value. The iterator element type is `(Hash, V)`.
+    /// a value. Elements are yielded together with their hashes.
     ///
     /// # Examples
     ///
@@ -171,7 +170,7 @@ where
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order starting from the specified
-    /// hash. The iterator element type is [Hash](../../../exonum_crypto/struct.Hash.html).
+    /// hash.
     ///
     /// # Examples
     ///

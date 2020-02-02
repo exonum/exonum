@@ -82,7 +82,7 @@ where
         self.base.contains(item)
     }
 
-    /// Returns an iterator visiting all elements in ascending order. The iterator element type is K.
+    /// Returns an iterator over set elements.
     ///
     /// # Examples
     ///
@@ -101,8 +101,7 @@ where
         self.index_iter(None).skip_values()
     }
 
-    /// Returns an iterator visiting all elements in arbitrary order starting from the specified value.
-    /// The iterator element type is K.
+    /// Returns an iterator over set elements starting from the specified value.
     ///
     /// # Examples
     ///

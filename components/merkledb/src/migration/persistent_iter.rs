@@ -214,8 +214,8 @@ where
         }
     }
 
-    /// FIXME
-    pub fn drop_values(self) -> PersistentKeys<'a, T, I> {
+    /// Skips values in the iterator output without parsing them.
+    pub fn skip_values(self) -> PersistentKeys<'a, T, I> {
         PersistentKeys { base_iter: self }
     }
 }
@@ -252,7 +252,12 @@ where
     }
 }
 
-/// FIXME
+/// Persistent iterator over index keys that stores its position in the database.
+///
+/// This iterator can be used similarly to [`PersistentIter`]; the only difference is the
+/// type of items yielded by the iterator.
+///
+/// [`PersistentIter`]: struct.PersistentIter.html
 pub struct PersistentKeys<'a, T: RawAccess, I: IndexIterator> {
     base_iter: PersistentIter<'a, T, I>,
 }
@@ -267,7 +272,7 @@ where
     where
         A: Access<Base = T>,
     {
-        PersistentIter::new(access, name, index).drop_values()
+        PersistentIter::new(access, name, index).skip_values()
     }
 }
 

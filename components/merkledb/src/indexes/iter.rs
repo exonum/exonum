@@ -19,7 +19,12 @@ use crate::{
     BinaryKey, BinaryValue,
 };
 
-/// FIXME
+/// Iterator over key-value pairs of an index.
+///
+/// This structure is returned by the [`IndexIterator`] trait and by inherent methods
+/// of some indexes.
+///
+/// [`IndexIterator`]: trait.IndexIterator.html
 #[derive(Debug)]
 pub struct Entries<'a, K: ?Sized, V> {
     base_iter: Iter<'a, K, V>,
@@ -30,10 +35,13 @@ where
     K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
+    /// Creates a new iterator based on the provided view.
     pub(crate) fn new<T: RawAccess>(view: &'a View<T>, from: Option<&K>) -> Self {
         Self::with_prefix(view, &(), from)
     }
 
+    /// Creates a new iterator based on the provided view. The keys returned by the iterator
+    /// are additionally filtered by the `prefix`.
     pub(crate) fn with_prefix<T, P>(view: &'a View<T>, prefix: &P, from: Option<&K>) -> Self
     where
         T: RawAccess,
@@ -47,6 +55,9 @@ where
         Self { base_iter }
     }
 
+    /// Creates a new iterator based on the provided view. The keys returned by the iterator
+    /// are additionally filtered by the `prefix`, which is detached from the key before
+    /// deserialization.
     pub(crate) fn with_detached_prefix<T, P>(
         view: &'a View<T>,
         prefix: &P,
@@ -60,14 +71,14 @@ where
         Self { base_iter }
     }
 
-    /// FIXME
+    /// Skips values in the iterator output without parsing them.
     pub fn skip_values(self) -> Keys<'a, K> {
         Keys {
             base_iter: self.base_iter.drop_value_type(),
         }
     }
 
-    /// FIXME
+    /// Skips keys in the iterator output without parsing them.
     pub fn skip_keys(self) -> Values<'a, V> {
         Values {
             base_iter: self.base_iter.drop_key_type(),
@@ -87,7 +98,12 @@ where
     }
 }
 
-/// FIXME
+/// Iterator over keys of an index.
+///
+/// This structure is returned by [`Entries::skip_values`] , and by inherent methods
+/// of some indexes.
+///
+/// [`Entries::skip_values`]: struct.Entries.html#method.skip_values
 #[derive(Debug)]
 pub struct Keys<'a, K: ?Sized> {
     base_iter: Iter<'a, K, ()>,
@@ -104,7 +120,12 @@ where
     }
 }
 
-/// FIXME
+/// Iterator over values of an index.
+///
+/// This structure is returned by [`Entries::skip_keys`] , and by inherent methods
+/// of some indexes.
+///
+/// [`Entries::skip_keys`]: struct.Entries.html#method.skip_keys
 #[derive(Debug)]
 pub struct Values<'a, V> {
     base_iter: Iter<'a, (), V>,
@@ -122,10 +143,13 @@ where
 }
 
 /// Database object that supports iteration and continuing iteration from an intermediate position.
+///
+/// This trait is implemented for all index collections (i.e., all index types except for
+/// `Entry` and `ProofEntry`) and can thus be used by the generic iteration routines.
 pub trait IndexIterator {
-    /// Type encompassing iteration position.
+    /// Type encompassing index keys.
     type Key: BinaryKey + ?Sized;
-    /// Type encompassing returned value.
+    /// Type encompassing index values.
     type Value: BinaryValue;
 
     /// Continues iteration from the specified position. If `from` is `None`, starts the iteration

@@ -284,8 +284,7 @@ where
         self.create_multiproof(keys)
     }
 
-    /// Returns an iterator over the entries of the map in ascending order. The iterator element
-    /// type is `(K::Output, V)`.
+    /// Returns an iterator over the entries of the map in ascending order.
     ///
     /// # Examples
     ///
@@ -305,8 +304,7 @@ where
         self.index_iter(None)
     }
 
-    /// Returns an iterator over the keys of the map in ascending order. The iterator element
-    /// type is `K::Output`.
+    /// Returns an iterator over the keys of the map in ascending order.
     ///
     /// # Examples
     ///
@@ -326,8 +324,7 @@ where
         self.iter().skip_values()
     }
 
-    /// Returns an iterator over the values of the map in ascending order of keys. The iterator
-    /// element type is `V`.
+    /// Returns an iterator over the values of the map in ascending order of keys.
     ///
     /// # Examples
     ///
@@ -348,7 +345,7 @@ where
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
-    /// specified key. The iterator element type is `(K::Output, V)`.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -370,7 +367,7 @@ where
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
-    /// specified key. The iterator element type is `K::Output`.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -392,7 +389,7 @@ where
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
-    /// specified key. The iterator element type is `V`.
+    /// specified key.
     ///
     /// # Examples
     ///

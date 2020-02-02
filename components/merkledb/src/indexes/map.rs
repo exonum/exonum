@@ -106,8 +106,7 @@ where
         self.base.contains(key)
     }
 
-    /// Returns an iterator over the entries of the map in ascending order. The iterator element
-    /// type is (K, V).
+    /// Returns an iterator over the entries of the map in ascending order.
     ///
     /// # Examples
     ///
@@ -126,8 +125,7 @@ where
         self.index_iter(None)
     }
 
-    /// Returns an iterator over the keys of a map in ascending order. The iterator element
-    /// type is K.
+    /// Returns an iterator over the keys of a map in ascending order.
     ///
     /// # Examples
     ///
@@ -146,8 +144,7 @@ where
         self.iter().skip_values()
     }
 
-    /// Returns an iterator over the values of a map in ascending order of keys. The iterator
-    /// element type is V.
+    /// Returns an iterator over the values of a map in ascending order of keys.
     ///
     /// # Examples
     ///
@@ -167,7 +164,7 @@ where
     }
 
     /// Returns an iterator over the entries of a map in ascending order starting from the
-    /// specified key. The iterator element type is (K, V).
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -187,7 +184,7 @@ where
     }
 
     /// Returns an iterator over the keys of a map in ascending order starting from the
-    /// specified key. The iterator element type is K.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -207,7 +204,7 @@ where
     }
 
     /// Returns an iterator over the values of a map in ascending order of keys starting from the
-    /// specified key. The iterator element type is V.
+    /// specified key.
     ///
     /// # Examples
     ///

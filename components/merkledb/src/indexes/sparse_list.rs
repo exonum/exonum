@@ -204,7 +204,7 @@ where
         self.size().length
     }
 
-    /// Returns an iterator over the list. The iterator element type is (u64, V).
+    /// Returns an iterator over the list elements with corresponding indexes.
     ///
     /// # Examples
     ///
@@ -246,8 +246,7 @@ where
         self.iter().skip_values()
     }
 
-    /// Returns an iterator over the values of the `SparseListIndex`. The iterator element type is
-    /// `V`.
+    /// Returns an iterator over list elements.
     ///
     /// # Examples
     ///
@@ -268,8 +267,8 @@ where
         self.iter().skip_keys()
     }
 
-    /// Returns an iterator over the list starting from the specified position. The iterator
-    /// element type is `(u64, V)`.
+    /// Returns an iterator over the list elements starting from the specified position. Elements
+    /// are yielded with the corresponding index.
     ///
     /// # Examples
     ///

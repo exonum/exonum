@@ -150,7 +150,7 @@ where
         self.state.get().unwrap_or_default()
     }
 
-    /// Returns an iterator over the list. The iterator element type is V.
+    /// Returns an iterator over the list values.
     ///
     /// # Examples
     ///
@@ -171,8 +171,7 @@ where
         self.index_iter(None).skip_keys()
     }
 
-    /// Returns an iterator over the list starting from the specified position. The iterator
-    /// element type is V.
+    /// Returns an iterator over the list values starting from the specified position.
     ///
     /// # Examples
     ///
