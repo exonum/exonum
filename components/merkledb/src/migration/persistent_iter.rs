@@ -25,7 +25,7 @@ use std::{
 
 use crate::{
     access::{Access, AccessExt, RawAccess, RawAccessMut},
-    indexes::iter::{Entries, IndexIterator},
+    indexes::{Entries, IndexIterator},
     BinaryKey, BinaryValue, Entry,
 };
 

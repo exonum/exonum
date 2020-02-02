@@ -34,7 +34,7 @@ use crate::{
 /// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
 /// `ValueSetIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T: RawAccess, V> {
     base: View<T>,

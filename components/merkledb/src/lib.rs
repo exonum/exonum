@@ -118,15 +118,15 @@
 //! [`merge`]: trait.Database.html#tymethod.merge
 //! [`BinaryKey`]: trait.BinaryKey.html
 //! [`BinaryValue`]: trait.BinaryValue.html
-//! [`Entry`]: indexes/entry/struct.Entry.html
-//! [`ProofEntry`]: indexes/proof_entry/struct.ProofEntry.html
-//! [`ListIndex`]: indexes/list/struct.ListIndex.html
-//! [`SparseListIndex`]: indexes/sparse_list/struct.SparseListIndex.html
-//! [`MapIndex`]: indexes/map/struct.MapIndex.html
+//! [`Entry`]: indexes/struct.Entry.html
+//! [`ProofEntry`]: indexes/struct.ProofEntry.html
+//! [`ListIndex`]: indexes/struct.ListIndex.html
+//! [`SparseListIndex`]: indexes/struct.SparseListIndex.html
+//! [`MapIndex`]: indexes/struct.MapIndex.html
 //! [`ProofListIndex`]: indexes/proof_list/struct.ProofListIndex.html
 //! [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html
-//! [`KeySetIndex`]: indexes/key_set/struct.KeySetIndex.html
-//! [`ValueSetIndex`]: indexes/value_set/struct.ValueSetIndex.html
+//! [`KeySetIndex`]: indexes/struct.KeySetIndex.html
+//! [`ValueSetIndex`]: indexes/struct.ValueSetIndex.html
 //! [`ObjectHash`]: trait.ObjectHash.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
@@ -187,14 +187,9 @@ pub use self::{
 // does not exist!'
 #[doc(no_inline)]
 pub use self::indexes::{
-    key_set::{self, KeySetIndex},
-    list::{self, ListIndex},
-    map::{self, MapIndex},
     proof_list::{self, ListProof, ProofListIndex},
     proof_map::{self, MapProof, ProofMapIndex, RawProofMapIndex},
-    sparse_list::{self, SparseListIndex},
-    value_set::{self, ValueSetIndex},
-    Entry, Group, ProofEntry,
+    Entry, Group, KeySetIndex, ListIndex, MapIndex, ProofEntry, SparseListIndex, ValueSetIndex,
 };
 
 #[macro_use]
@@ -215,6 +210,7 @@ mod values;
 mod views;
 
 #[cfg(feature = "with-protobuf")]
+#[doc(hidden)]
 pub mod proto;
 
 #[cfg(feature = "with-protobuf")]

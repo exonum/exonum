@@ -14,17 +14,26 @@
 
 //! All available `MerkleDB` indexes.
 
-pub use self::{entry::Entry, group::Group, proof_entry::ProofEntry};
+pub use self::{
+    entry::Entry,
+    group::Group,
+    iter::{Entries, IndexIterator, Keys, Values},
+    key_set::KeySetIndex,
+    list::ListIndex,
+    map::MapIndex,
+    proof_entry::ProofEntry,
+    sparse_list::SparseListIndex,
+    value_set::ValueSetIndex,
+};
 
 mod entry;
 mod group;
+mod iter;
+mod key_set;
+mod list;
+mod map;
 mod proof_entry;
-
-pub mod iter;
-pub mod key_set;
-pub mod list;
-pub mod map;
 pub mod proof_list;
 pub mod proof_map;
-pub mod sparse_list;
-pub mod value_set;
+mod sparse_list;
+mod value_set;

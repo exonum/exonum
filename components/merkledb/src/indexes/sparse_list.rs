@@ -57,9 +57,9 @@ impl BinaryAttribute for SparseListSize {
     }
 }
 
-/// A list of items similar to the [`ListIndex`], however, it may contain "spaces". For instance,
-/// a list might contain six elements with indexes: "1, 2, 3, 5, 7, 8" (missing 4 and 6). And if you
-/// try to get the element for index 4 or 6, you'll get `None`.
+/// A list of items similar to `ListIndex`; however, it may contain "spaces". For instance,
+/// a list might contain six elements with indexes: `1, 2, 3, 5, 7, 8` (missing 4 and 6). And if you
+/// try to get the element for index 4 or 6, you will get `None`.
 ///
 /// Later, elements can be added to the
 /// spaces, if required. Elements in this list are added to the end of the list and are
@@ -73,8 +73,7 @@ impl BinaryAttribute for SparseListSize {
 /// as an index.
 /// `SparseListIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../../trait.BinaryValue.html
-/// [`ListIndex`]: ../../indexes/list/struct.ListIndex.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct SparseListIndex<T: RawAccess, V> {
     base: View<T>,

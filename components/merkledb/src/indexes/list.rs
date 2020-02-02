@@ -34,7 +34,7 @@ use crate::{
 /// using `u64` as an index. `ListIndex` requires that elements implement the
 /// [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ListIndex<T: RawAccess, V> {
     base: View<T>,
