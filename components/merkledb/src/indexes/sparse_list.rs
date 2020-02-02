@@ -23,7 +23,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    indexes::iter::{Entries, Keys, Values},
+    indexes::iter::{Entries, IndexIterator, Keys, Values},
     views::{
         BinaryAttribute, IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View,
         ViewWithMetadata,
@@ -222,7 +222,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> Entries<'_, u64, V> {
-        Entries::new(&self.base, None)
+        self.index_iter(None)
     }
 
     /// Returns an iterator over the indexes of the `SparseListIndex`.
@@ -288,7 +288,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> Entries<'_, u64, V> {
-        Entries::new(&self.base, Some(&from))
+        self.index_iter(Some(&from))
     }
 }
 
@@ -494,6 +494,19 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<T, V> IndexIterator for SparseListIndex<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue,
+{
+    type Key = u64;
+    type Value = V;
+
+    fn index_iter(&self, from: Option<&u64>) -> Entries<'_, u64, V> {
+        Entries::new(&self.base, from)
     }
 }
 

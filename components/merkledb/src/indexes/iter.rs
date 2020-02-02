@@ -120,3 +120,15 @@ where
         self.base_iter.next().map(|(_, value)| value)
     }
 }
+
+/// Database object that supports iteration and continuing iteration from an intermediate position.
+pub trait IndexIterator {
+    /// Type encompassing iteration position.
+    type Key: BinaryKey + ?Sized;
+    /// Type encompassing returned value.
+    type Value: BinaryValue;
+
+    /// Continues iteration from the specified position. If `from` is `None`, starts the iteration
+    /// from scratch.
+    fn index_iter(&self, from: Option<&Self::Key>) -> Entries<'_, Self::Key, Self::Value>;
+}

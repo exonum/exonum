@@ -22,7 +22,7 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    indexes::iter::{Entries, Keys, Values},
+    indexes::iter::{Entries, IndexIterator, Keys, Values},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryKey, BinaryValue,
 };
@@ -123,7 +123,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> Entries<'_, K, V> {
-        Entries::new(&self.base, None)
+        self.index_iter(None)
     }
 
     /// Returns an iterator over the keys of a map in ascending order. The iterator element
@@ -183,7 +183,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &K) -> Entries<'_, K, V> {
-        Entries::new(&self.base, Some(from))
+        self.index_iter(Some(from))
     }
 
     /// Returns an iterator over the keys of a map in ascending order starting from the
@@ -313,6 +313,20 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<T, K, V> IndexIterator for MapIndex<T, K, V>
+where
+    T: RawAccess,
+    K: BinaryKey + ?Sized,
+    V: BinaryValue,
+{
+    type Key = K;
+    type Value = V;
+
+    fn index_iter(&self, from: Option<&K>) -> Entries<'_, K, V> {
+        Entries::new(&self.base, from)
     }
 }
 

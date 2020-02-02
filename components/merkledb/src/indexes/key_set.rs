@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    indexes::iter::{Entries, Keys},
+    indexes::iter::{Entries, IndexIterator, Keys},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryKey,
 };
@@ -98,7 +98,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> Keys<'_, K> {
-        Entries::<K, ()>::new(&self.base, None).skip_values()
+        self.index_iter(None).skip_values()
     }
 
     /// Returns an iterator visiting all elements in arbitrary order starting from the specified value.
@@ -118,7 +118,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &K) -> Keys<'_, K> {
-        Entries::<K, ()>::new(&self.base, Some(from)).skip_values()
+        self.index_iter(Some(from)).skip_values()
     }
 }
 
@@ -203,6 +203,19 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<T, K> IndexIterator for KeySetIndex<T, K>
+where
+    T: RawAccess,
+    K: BinaryKey + ?Sized,
+{
+    type Key = K;
+    type Value = ();
+
+    fn index_iter(&self, from: Option<&K>) -> Entries<'_, K, ()> {
+        Entries::new(&self.base, from)
     }
 }
 

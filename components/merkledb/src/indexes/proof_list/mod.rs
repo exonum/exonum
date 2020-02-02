@@ -28,7 +28,7 @@ use self::{
 use crate::{
     access::{Access, AccessError, FromAccess},
     hash::HashTag,
-    indexes::iter::{Entries, Values},
+    indexes::iter::{Entries, IndexIterator, Values},
     views::{IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, IndexAddress, ObjectHash,
 };
@@ -300,7 +300,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> Values<'_, V> {
-        Entries::<u64, _>::with_prefix(&self.base, &0_u8, None).skip_keys()
+        self.index_iter(None).skip_keys()
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -320,10 +320,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> Values<'_, V> {
-        // Using `from` directly works because of `prefix`. If `from` is greater than
-        // the maximum index of a leaf element, the iterator should immediately end
-        // because the key does not start with the prefix.
-        Entries::with_prefix(&self.base, &0_u8, Some(&from)).skip_keys()
+        self.index_iter(Some(&from)).skip_keys()
     }
 }
 
@@ -713,7 +710,7 @@ where
     }
 }
 
-impl<'a, T, V> std::iter::IntoIterator for &'a ProofListIndex<T, V>
+impl<'a, T, V> IntoIterator for &'a ProofListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
@@ -723,6 +720,22 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<T, V> IndexIterator for ProofListIndex<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue,
+{
+    type Key = u64;
+    type Value = V;
+
+    fn index_iter(&self, from: Option<&u64>) -> Entries<'_, u64, V> {
+        // Using `from` directly works because of `prefix`. If `from` is greater than
+        // the maximum index of a leaf element, the iterator should immediately end
+        // because the key does not start with the prefix.
+        Entries::with_prefix(&self.base, &0_u8, from)
     }
 }
 

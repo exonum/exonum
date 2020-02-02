@@ -24,7 +24,7 @@ use exonum_crypto::Hash;
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    indexes::iter::{Entries, Keys},
+    indexes::iter::{Entries, IndexIterator, Keys},
     views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
@@ -124,7 +124,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> Entries<'_, Hash, V> {
-        Entries::new(&self.base, None)
+        self.index_iter(None)
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order. The iterator element type
@@ -167,7 +167,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &Hash) -> Entries<'_, Hash, V> {
-        Entries::new(&self.base, Some(from))
+        self.index_iter(Some(from))
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order starting from the specified
@@ -299,6 +299,19 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<T, V> IndexIterator for ValueSetIndex<T, V>
+where
+    T: RawAccess,
+    V: BinaryValue + ObjectHash,
+{
+    type Key = Hash;
+    type Value = V;
+
+    fn index_iter(&self, from: Option<&Hash>) -> Entries<'_, Hash, V> {
+        Entries::new(&self.base, from)
     }
 }
 

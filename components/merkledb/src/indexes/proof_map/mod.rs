@@ -20,9 +20,9 @@ pub use self::{
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
-use std::{fmt, io, marker::PhantomData};
-
 use exonum_crypto::Hash;
+
+use std::{fmt, io, marker::PhantomData};
 
 use self::{
     key::{ChildKind, VALUE_KEY_PREFIX},
@@ -31,7 +31,7 @@ use self::{
 };
 use crate::{
     access::{Access, AccessError, FromAccess},
-    indexes::iter::{Entries, Keys, Values},
+    indexes::iter::{Entries, IndexIterator, Keys, Values},
     views::{
         BinaryAttribute, IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View,
         ViewWithMetadata,
@@ -302,7 +302,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> Entries<'_, K, V> {
-        Entries::with_detached_prefix(&self.base, &VALUE_KEY_PREFIX, None)
+        self.index_iter(None)
     }
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
@@ -366,7 +366,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &K) -> Entries<'_, K, V> {
-        Entries::with_detached_prefix(&self.base, &VALUE_KEY_PREFIX, Some(from))
+        self.index_iter(Some(from))
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
@@ -819,6 +819,21 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<T, K, V, KeyMode> IndexIterator for ProofMapIndex<T, K, V, KeyMode>
+where
+    T: RawAccess,
+    K: BinaryKey + ?Sized,
+    V: BinaryValue,
+    KeyMode: ToProofPath<K>,
+{
+    type Key = K;
+    type Value = V;
+
+    fn index_iter(&self, from: Option<&K>) -> Entries<'_, K, V> {
+        Entries::with_detached_prefix(&self.base, &VALUE_KEY_PREFIX, from)
     }
 }
 

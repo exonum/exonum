@@ -119,7 +119,7 @@
 //! # }
 //! ```
 
-pub use self::persistent_iter::{ContinueIterator, PersistentIter, PersistentIters};
+pub use self::persistent_iter::{PersistentIter, PersistentIters, PersistentKeys};
 
 use exonum_crypto::Hash;
 use failure::Fail;
