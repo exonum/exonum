@@ -193,7 +193,7 @@ impl Execute for Transaction {
                 // Code below will panic if there is already deployed artifact with the
                 // same ID. This sort of expected behavior, since we're intentionally skipping
                 // the `start_deploy` step (which will make the test nature much more complex).
-                Dispatcher::commit_artifact(&*context.fork, artifact_id, Vec::new());
+                Dispatcher::commit_artifact(context.fork, &artifact_id, Vec::new());
                 Ok(())
             }
 
@@ -202,7 +202,7 @@ impl Execute for Transaction {
             }
 
             Transaction::StopService(instance_id) => {
-                Dispatcher::initiate_stopping_service(&*context.fork, instance_id)
+                Dispatcher::initiate_stopping_service(context.fork, instance_id)
             }
         }
     }

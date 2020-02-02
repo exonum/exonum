@@ -101,7 +101,7 @@ impl Dispatcher {
         artifact: ArtifactId,
         payload: impl BinaryValue,
     ) {
-        Self::commit_artifact(fork, artifact.clone(), payload.to_bytes());
+        Self::commit_artifact(fork, &artifact, payload.to_bytes());
         self.block_until_deployed(artifact, payload.into_bytes());
     }
 }
@@ -773,7 +773,7 @@ fn delayed_deployment() {
     // Check that we don't require the runtime to deploy the artifact again if we mark it
     // as committed.
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
+    Dispatcher::commit_artifact(&fork, &artifact, spec);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
@@ -800,7 +800,7 @@ fn test_failed_deployment(db: &Arc<TemporaryDB>, runtime: &DeploymentRuntime, ar
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact, spec);
+    Dispatcher::commit_artifact(&fork, &artifact, spec);
     dispatcher.commit_block_and_notify_runtimes(fork); // << should panic
 }
 
@@ -841,7 +841,7 @@ fn failed_deployment_with_node_restart() {
     let spec = 100_u64.to_bytes();
 
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
+    Dispatcher::commit_artifact(&fork, &artifact, spec);
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
@@ -877,7 +877,7 @@ fn recoverable_error_during_deployment() {
     assert_eq!(runtime.deploy_attempts(&artifact), 1);
 
     let fork = db.fork();
-    Dispatcher::commit_artifact(&fork, artifact.clone(), spec);
+    Dispatcher::commit_artifact(&fork, &artifact, spec);
     dispatcher.commit_block_and_notify_runtimes(fork);
     // The dispatcher should try to deploy the artifact again despite a previous failure.
     assert!(dispatcher.is_artifact_deployed(&artifact));
