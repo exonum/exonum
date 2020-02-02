@@ -493,6 +493,32 @@ impl<'a, K: ?Sized, V> fmt::Debug for Iter<'a, K, V> {
     }
 }
 
+impl<'a, K, V> Iter<'a, K, V>
+where
+    K: BinaryKey + ?Sized,
+    V: BinaryValue,
+{
+    pub(crate) fn drop_key_type(self) -> Iter<'a, (), V> {
+        Iter {
+            base_iter: self.base_iter,
+            prefix: self.prefix,
+            ended: self.ended,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+
+    pub(crate) fn drop_value_type(self) -> Iter<'a, K, ()> {
+        Iter {
+            base_iter: self.base_iter,
+            prefix: self.prefix,
+            ended: self.ended,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+}
+
 impl<'a, K, V> Iterator for Iter<'a, K, V>
 where
     K: BinaryKey + ?Sized,
@@ -509,8 +535,7 @@ where
             if k.starts_with(&self.prefix) {
                 return Some((
                     K::read(k),
-                    V::from_bytes(Cow::Borrowed(v))
-                        .expect("Unable to decode value from bytes, an error occurred"),
+                    V::from_bytes(Cow::Borrowed(v)).expect("Unable to decode value from bytes"),
                 ));
             }
         }

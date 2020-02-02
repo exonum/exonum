@@ -53,7 +53,7 @@ where
     V: BinaryValue,
 {
     type Key = u64;
-    type Iter = Zip<RangeFrom<u64>, indexes::list::Iter<'a, V>>;
+    type Iter = Zip<RangeFrom<u64>, indexes::iter::Values<'a, V>>;
 
     fn continue_iter(self, from: Option<&u64>) -> Self::Iter {
         if let Some(&from) = from {
@@ -95,7 +95,7 @@ where
     V: BinaryValue,
 {
     type Key = u64;
-    type Iter = indexes::sparse_list::Iter<'a, V>;
+    type Iter = indexes::iter::Entries<'a, u64, V>;
 
     fn continue_iter(self, from: Option<&u64>) -> Self::Iter {
         if let Some(&from) = from {
@@ -117,7 +117,7 @@ where
     V: BinaryValue,
 {
     type Key = K;
-    type Iter = indexes::map::Iter<'a, K, V>;
+    type Iter = indexes::iter::Entries<'a, K, V>;
 
     fn continue_iter(self, from: Option<&K>) -> Self::Iter {
         if let Some(from) = from {
@@ -161,7 +161,7 @@ where
     K: BinaryKey,
 {
     type Key = K;
-    type Iter = indexes::key_set::Iter<'a, K>;
+    type Iter = indexes::iter::Keys<'a, K>;
 
     fn continue_iter(self, from: Option<&K>) -> Self::Iter {
         if let Some(from) = from {
@@ -182,7 +182,7 @@ where
     V: BinaryValue + ObjectHash,
 {
     type Key = Hash;
-    type Iter = indexes::value_set::Iter<'a, V>;
+    type Iter = indexes::iter::Entries<'a, Hash, V>;
 
     fn continue_iter(self, from: Option<&Hash>) -> Self::Iter {
         if let Some(from) = from {
@@ -622,7 +622,7 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         let mut set = fork.get_key_set("set");
-        for &i in &[0_u16, 1, 2, 3, 5, 8, 13, 21] {
+        for i in &[0_u16, 1, 2, 3, 5, 8, 13, 21] {
             set.insert(i);
         }
 

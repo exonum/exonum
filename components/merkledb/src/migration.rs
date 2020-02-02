@@ -737,7 +737,7 @@ mod tests {
         let migration = Migration::new("name", &fork);
         migration.get_proof_list("list").extend(vec![4_u64, 5]);
         migration.get_map("map").put(&1_u64, 42_i32);
-        migration.get_key_set("new").insert(0_u8);
+        migration.get_key_set("new").insert(&0_u8);
         migration.create_tombstone("removed");
 
         fork.flush_migration("name");
@@ -800,7 +800,7 @@ mod tests {
         let migration = Migration::new("name", &fork);
         migration.get_proof_list("list").extend(vec![4_u64, 5]);
         migration.get_map("map").put(&1_u64, 42_i32);
-        migration.get_key_set("new").insert(0_u8);
+        migration.get_key_set("new").insert(&0_u8);
         migration.create_tombstone(("name.family", &3_u8));
         // ^-- Removing non-existing indexes is weird, but should work fine.
         db.merge(fork.into_patch()).unwrap();

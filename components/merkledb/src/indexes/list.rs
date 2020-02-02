@@ -21,10 +21,8 @@ use std::marker::PhantomData;
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    views::{
-        IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View,
-        ViewWithMetadata,
-    },
+    indexes::iter::{Entries, Values},
+    views::{IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue,
 };
 
@@ -42,19 +40,6 @@ pub struct ListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
-}
-
-/// Returns an iterator over the items of a `ListIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`ListIndex`]. See its documentation for details.
-///
-/// [`iter`]: struct.ListIndex.html#method.iter
-/// [`iter_from`]: struct.ListIndex.html#method.iter_from
-/// [`ListIndex`]: struct.ListIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, V> {
-    base_iter: ViewIter<'a, u64, V>,
 }
 
 impl<T, V> FromAccess<T> for ListIndex<T::Base, V>
@@ -182,10 +167,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter_from(&(), &0_u64),
-        }
+    pub fn iter(&self) -> Values<'_, V> {
+        Entries::<u64, V>::new(&self.base, None).skip_keys()
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -206,10 +189,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter_from(&(), &from),
-        }
+    pub fn iter_from(&self, from: u64) -> Values<'_, V> {
+        Entries::<_, V>::new(&self.base, Some(&from)).skip_keys()
     }
 }
 
@@ -290,7 +271,6 @@ where
             self.base.put(&len, value);
             len += 1;
         }
-        self.base.put(&(), len);
         self.set_len(len);
     }
 
@@ -387,27 +367,16 @@ where
     }
 }
 
-impl<'a, T, V> std::iter::IntoIterator for &'a ListIndex<T, V>
+impl<'a, T, V> IntoIterator for &'a ListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;
-    type IntoIter = Iter<'a, V>;
+    type IntoIter = Values<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl<'a, V> Iterator for Iter<'a, V>
-where
-    V: BinaryValue,
-{
-    type Item = V;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(.., v)| v)
     }
 }
 
@@ -465,13 +434,10 @@ mod tests {
     fn list_index_iter(list_index: &mut ListIndex<&Fork, u8>) {
         list_index.extend(vec![1_u8, 2, 3]);
 
-        assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
-        assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
-        assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(
-            list_index.iter_from(3).collect::<Vec<u8>>(),
-            Vec::<u8>::new()
-        );
+        assert_eq!(list_index.iter().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(list_index.iter_from(0).collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(list_index.iter_from(1).collect::<Vec<_>>(), vec![2, 3]);
+        assert_eq!(list_index.iter_from(3).count(), 0);
     }
 
     fn list_index_clear_in_family(db: &dyn Database, x: u32, y: u32, merge_before_clear: bool) {

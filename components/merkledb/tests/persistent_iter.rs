@@ -91,7 +91,7 @@ impl Collection {
             IndexType::KeySet => {
                 let mut set = fork.get_key_set(addr);
                 for _ in 0..item_count {
-                    set.insert(rng.gen::<u64>());
+                    set.insert(&rng.gen::<u64>());
                 }
             }
             IndexType::ValueSet => {

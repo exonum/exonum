@@ -18,13 +18,12 @@
 //! The given section contains information on the methods related to `KeySetIndex`
 //! and the iterator over the items of this set.
 
-use std::{borrow::Borrow, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    views::{
-        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
-    },
+    indexes::iter::{Entries, Keys},
+    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryKey,
 };
 
@@ -35,28 +34,15 @@ use crate::{
 ///
 /// [`BinaryKey`]: ../../trait.BinaryKey.html
 #[derive(Debug)]
-pub struct KeySetIndex<T: RawAccess, K> {
+pub struct KeySetIndex<T: RawAccess, K: ?Sized> {
     base: View<T>,
     _k: PhantomData<K>,
-}
-
-/// Returns an iterator over the items of a `KeySetIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`KeySetIndex`]. See its documentation for details.
-///
-/// [`iter`]: struct.KeySetIndex.html#method.iter
-/// [`iter_from`]: struct.KeySetIndex.html#method.iter_from
-/// [`KeySetIndex`]: struct.KeySetIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, K> {
-    base_iter: ViewIter<'a, K, ()>,
 }
 
 impl<T, K> FromAccess<T> for KeySetIndex<T::Base, K>
 where
     T: Access,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     fn from_access(access: T, addr: IndexAddress) -> Result<Self, AccessError> {
         let view = access.get_or_create_view(addr, IndexType::KeySet)?;
@@ -67,7 +53,7 @@ where
 impl<T, K> KeySetIndex<T, K>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     fn new(view: ViewWithMetadata<T>) -> Self {
         let base = view.into();
@@ -89,14 +75,10 @@ where
     /// let mut index = fork.get_key_set("name");
     /// assert!(!index.contains(&1));
     ///
-    /// index.insert(1);
+    /// index.insert(&1);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn contains<Q>(&self, item: &Q) -> bool
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn contains(&self, item: &K) -> bool {
         self.base.contains(item)
     }
 
@@ -115,10 +97,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, K> {
-        Iter {
-            base_iter: self.base.iter(&()),
-        }
+    pub fn iter(&self) -> Keys<'_, K> {
+        Entries::<K, ()>::new(&self.base, None).skip_values()
     }
 
     /// Returns an iterator visiting all elements in arbitrary order starting from the specified value.
@@ -137,17 +117,15 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> Iter<'_, K> {
-        Iter {
-            base_iter: self.base.iter_from(&(), from),
-        }
+    pub fn iter_from(&self, from: &K) -> Keys<'_, K> {
+        Entries::<K, ()>::new(&self.base, Some(from)).skip_values()
     }
 }
 
 impl<T, K> KeySetIndex<T, K>
 where
     T: RawAccessMut,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     /// Adds a key to the set.
     ///
@@ -160,12 +138,11 @@ where
     /// let fork = db.fork();
     /// let mut index = fork.get_key_set("name");
     ///
-    /// index.insert(1);
+    /// index.insert(&1);
     /// assert!(index.contains(&1));
     /// ```
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
-    pub fn insert(&mut self, item: K) {
-        self.base.put(&item, ())
+    pub fn insert(&mut self, item: &K) {
+        self.base.put(item, ())
     }
 
     /// Removes a key from the set.
@@ -179,17 +156,13 @@ where
     /// let fork = db.fork();
     /// let mut index = fork.get_key_set("name");
     ///
-    /// index.insert(1);
+    /// index.insert(&1);
     /// assert!(index.contains(&1));
     ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     /// ```
-    pub fn remove<Q>(&mut self, item: &Q)
-    where
-        K: Borrow<Q>,
-        Q: BinaryKey + ?Sized,
-    {
+    pub fn remove(&mut self, item: &K) {
         self.base.remove(item)
     }
 
@@ -209,7 +182,7 @@ where
     /// let fork = db.fork();
     /// let mut index = fork.get_key_set("name");
     ///
-    /// index.insert(1);
+    /// index.insert(&1);
     /// assert!(index.contains(&1));
     ///
     /// index.clear();
@@ -220,27 +193,16 @@ where
     }
 }
 
-impl<'a, T, K> std::iter::IntoIterator for &'a KeySetIndex<T, K>
+impl<'a, T, K> IntoIterator for &'a KeySetIndex<T, K>
 where
     T: RawAccess,
-    K: BinaryKey,
+    K: BinaryKey + ?Sized,
 {
     type Item = K::Owned;
-    type IntoIter = Iter<'a, K>;
+    type IntoIter = Keys<'a, K>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-impl<'a, K> Iterator for Iter<'a, K>
-where
-    K: BinaryKey,
-{
-    type Item = K::Owned;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, ..)| k)
     }
 }
 
@@ -257,9 +219,9 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, String> = fork.get_key_set(INDEX_NAME);
+        let mut index: KeySetIndex<_, str> = fork.get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
-        index.insert(KEY.to_owned());
+        index.insert(KEY);
         assert_eq!(true, index.contains(KEY));
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
@@ -271,9 +233,9 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
 
-        let mut index: KeySetIndex<_, Vec<u8>> = fork.get_key_set(INDEX_NAME);
+        let mut index = fork.get_key_set(INDEX_NAME);
         assert_eq!(false, index.contains(KEY));
-        index.insert(KEY.to_owned());
+        index.insert(KEY);
         assert_eq!(true, index.contains(KEY));
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
@@ -286,9 +248,9 @@ mod tests {
 
         let mut index = fork.get_key_set(INDEX_NAME);
         assert!(!index.contains(&1_u8));
-        index.insert(1_u8);
+        index.insert(&1_u8);
         assert!(index.contains(&1_u8));
-        index.insert(2_u8);
+        index.insert(&2_u8);
         let key = index.iter().next().unwrap();
         index.remove(&key);
         assert!(!index.contains(&1_u8));
@@ -302,7 +264,7 @@ mod tests {
         let mut fork = db.fork();
         {
             let mut set = fork.get_key_set::<_, u8>(INDEX_NAME);
-            set.insert(4);
+            set.insert(&4);
             set.clear();
         }
         fork.flush();

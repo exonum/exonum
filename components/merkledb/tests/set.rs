@@ -82,7 +82,7 @@ impl Modifier<KeySetIndex<Rc<Fork>, u8>> for SetAction<u8> {
     fn modify(self, set: &mut KeySetIndex<Rc<Fork>, u8>) {
         match self {
             SetAction::Put(k) => {
-                set.insert(k);
+                set.insert(&k);
             }
             SetAction::Remove(k) => {
                 set.remove(&k);

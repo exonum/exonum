@@ -20,6 +20,7 @@ mod entry;
 mod group;
 mod proof_entry;
 
+pub mod iter;
 pub mod key_set;
 pub mod list;
 pub mod map;
