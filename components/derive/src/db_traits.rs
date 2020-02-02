@@ -383,7 +383,10 @@ impl AccessField {
     fn constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(exonum_merkledb::access::FromAccess);
         let ident = self.ident(field_index);
-        if self.flatten {
+
+        if self.ident.is_some() && self.ident.as_ref().unwrap() == "access" {
+            quote!(#ident: access.clone())
+        } else if self.flatten {
             quote!(#ident: #from_access::from_access(access.clone(), addr.clone())?)
         } else {
             let name = self.name_suffix.as_ref().unwrap();
@@ -394,7 +397,9 @@ impl AccessField {
     fn root_constructor(&self, field_index: usize) -> impl ToTokens {
         let from_access = quote!(exonum_merkledb::access::FromAccess);
         let ident = self.ident(field_index);
-        if self.flatten {
+        if self.ident.is_some() && self.ident.as_ref().unwrap() == "access" {
+            quote!(#ident: access.clone())
+        } else if self.flatten {
             quote!(#ident: #from_access::from_root(access.clone())?)
         } else {
             let name = &self.name_suffix;
