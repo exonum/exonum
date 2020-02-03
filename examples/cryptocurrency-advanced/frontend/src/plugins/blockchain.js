@@ -29,7 +29,7 @@ const walletTx = new Exonum.Transaction({
 })
 
 function deserializeWalletTx (transaction) {
-  const txTypes = [transferTransaction, issueTransaction]
+  const txTypes = [transferTransaction, issueTransaction, walletTx]
   for (const tx of txTypes) {
     const txData = tx.deserialize(Exonum.hexadecimalToUint8Array(transaction))
     if (txData) {
@@ -92,7 +92,7 @@ module.exports = {
           return axios.get(`/api/services/crypto/v1/wallets/info?pub_key=${publicKey}`)
             .then(response => response.data)
             .then(({ block_proof, wallet_proof, wallet_history }) => {
-              if (Exonum.verifyBlock(block_proof, validators) !== undefined) throw new Error('Block is invalid')
+              Exonum.verifyBlock(block_proof, validators)
               const tableRootHash = Exonum.verifyTable(wallet_proof.to_table, block_proof.block.state_hash, 'crypto.wallets')
               const walletProof = new Exonum.MapProof(wallet_proof.to_wallet, Exonum.MapProof.rawKey(Exonum.PublicKey), Wallet)
               if (walletProof.merkleRoot !== tableRootHash) throw new Error('Wallet proof is corrupted')
@@ -110,6 +110,9 @@ module.exports = {
               if (!validIndexes) throw new Error('Invalid transaction indexes in the proof')
 
               const transactions = wallet_history.transactions.map(deserializeWalletTx)
+
+              const correctHashes = transactions.every(({ hash }, i) => verifiedTransactions.entries[i].value === hash)
+              if (!correctHashes) throw new Error('Transaction hash mismatch')
 
               return {
                 block: block_proof.block,
