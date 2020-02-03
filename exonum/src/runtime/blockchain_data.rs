@@ -50,6 +50,11 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
         DispatcherSchema::new(self.access.as_readonly())
     }
 
+    /// TODO: docs
+    pub fn unstructured_access(&self) -> T::Readonly {
+        self.access.as_readonly()
+    }
+
     /// Returns a mount point for another service. If the service with `id` does not exist,
     /// returns `None`.
     ///
