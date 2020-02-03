@@ -1403,6 +1403,34 @@ mod tests {
     }
 
     #[test]
+    fn borrows_from_owned_forks() {
+        use crate::{access::AccessExt, Entry};
+
+        let db = TemporaryDB::new();
+        let fork = Rc::new(db.fork());
+        let readonly: OwnedReadonlyFork = fork.as_readonly();
+        // Modify an index via `fork`.
+        fork.get_proof_list("list").extend(vec![1_i64, 2, 3]);
+        // Check that if both `CopyAccessExt` and `AccessExt` traits are in scope, the correct one
+        // is used for `Rc<Fork>`.
+        let mut entry: Entry<Rc<Fork>, _> = fork.get_entry("entry");
+        // Access the list via `readonly`.
+        let list = readonly.get_proof_list::<_, i64>("list");
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.get(1), Some(2));
+        assert_eq!(list.iter_from(1).collect::<Vec<_>>(), vec![2, 3]);
+
+        entry.set("!".to_owned());
+        drop(entry);
+        let entry = readonly.get_entry::<_, String>("entry");
+        // Clone `readonly` access and get another `entry` instance.
+        let other_readonly = readonly.clone();
+        let other_entry = other_readonly.get_entry::<_, String>("entry");
+        assert_eq!(entry.get().unwrap(), "!");
+        assert_eq!(other_entry.get().unwrap(), "!");
+    }
+
+    #[test]
     fn concurrent_borrow_from_fork_and_readonly_fork() {
         let db = TemporaryDB::new();
         let fork = db.fork();
