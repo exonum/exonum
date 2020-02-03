@@ -103,7 +103,8 @@ use crate::{
     db::{ChangesMut, ChangesRef, ViewChanges},
     migration::{Migration, Scratchpad},
     views::{ChangeSet, GroupKeys, IndexMetadata, RawAccess, RawAccessMut, ViewWithMetadata},
-    BinaryKey, Fork, IndexAddress, IndexType, ReadonlyFork, ResolvedAddress, Snapshot,
+    BinaryKey, Fork, IndexAddress, IndexType, ReadonlyFork, ReadonlyRcFork, ResolvedAddress,
+    Snapshot,
 };
 
 /// Container for an arbitrary raw access. For `Fork`s and `Snapshot`s, this type provides
@@ -132,6 +133,8 @@ pub enum GenericRawAccess<'a> {
     OwnedFork(Rc<Fork>),
     /// Readonly fork.
     ReadonlyFork(ReadonlyFork<'a>),
+    /// Owned readonly fork.
+    OwnedReadonlyFork(ReadonlyRcFork),
 
     /// Never actually generated.
     #[doc(hidden)]
@@ -178,6 +181,34 @@ impl<'a> From<ReadonlyFork<'a>> for GenericRawAccess<'a> {
     }
 }
 
+impl From<ReadonlyRcFork> for GenericRawAccess<'_> {
+    fn from(ro_fork: ReadonlyRcFork) -> Self {
+        GenericRawAccess::OwnedReadonlyFork(ro_fork)
+    }
+}
+
+impl AsReadonly for GenericRawAccess<'_> {
+    type Readonly = Self;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        use self::GenericRawAccess::*;
+
+        match self {
+            // Copy access for snapshots.
+            Snapshot(snapshot) => Snapshot(*snapshot),
+            OwnedSnapshot(snapshot) => OwnedSnapshot(Rc::clone(snapshot)),
+            ReadonlyFork(ro_fork) => ReadonlyFork(*ro_fork),
+            OwnedReadonlyFork(ro_fork) => OwnedReadonlyFork(ro_fork.clone()),
+
+            // Translate access to readonly for forks.
+            Fork(fork) => ReadonlyFork(fork.readonly()),
+            OwnedFork(fork) => OwnedReadonlyFork(fork.as_readonly()),
+
+            __NonExhaustive => unreachable!(),
+        }
+    }
+}
+
 /// Generic changes supported the database backend.
 #[doc(hidden)] // should not be used directly by the client code
 #[derive(Debug)]
@@ -217,6 +248,7 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
             GenericRawAccess::Fork(fork) => fork.snapshot(),
             GenericRawAccess::OwnedFork(fork) => fork.snapshot(),
             GenericRawAccess::ReadonlyFork(ro_fork) => ro_fork.snapshot(),
+            GenericRawAccess::OwnedReadonlyFork(ro_fork) => ro_fork.snapshot(),
             GenericRawAccess::__NonExhaustive => unreachable!(),
         }
     }
@@ -229,6 +261,9 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
             GenericRawAccess::Fork(fork) => GenericChanges::Mut(fork.changes(address)),
             GenericRawAccess::OwnedFork(fork) => GenericChanges::Mut(fork.changes(address)),
             GenericRawAccess::ReadonlyFork(ro_fork) => {
+                GenericChanges::Ref(ro_fork.changes(address))
+            }
+            GenericRawAccess::OwnedReadonlyFork(ro_fork) => {
                 GenericChanges::Ref(ro_fork.changes(address))
             }
             GenericRawAccess::__NonExhaustive => unreachable!(),
@@ -503,6 +538,36 @@ mod tests {
         fork.get_entry("entry").set(1_u8);
         let access = GenericRawAccess::from(fork.readonly());
         access.get_entry("entry").set(2_u8); // should panic
+    }
+
+    #[test]
+    #[should_panic(expected = "Attempt to modify a readonly view of the database")]
+    fn generic_raw_access_as_readonly() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
+        let access = GenericRawAccess::from(&fork);
+        let readonly = access.as_readonly();
+        assert!(!readonly.is_mutable());
+        let mut list = readonly.get_proof_list::<_, u32>("list");
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.get(1), Some(2));
+        list.push(4); // should panic
+    }
+
+    #[test]
+    #[should_panic(expected = "Attempt to modify a readonly view of the database")]
+    fn generic_raw_access_as_static_readonly() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
+        let access = GenericRawAccess::from(fork);
+        let readonly = access.as_readonly();
+        assert!(!readonly.is_mutable());
+        let mut list = readonly.get_proof_list::<_, u32>("list");
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.get(1), Some(2));
+        list.push(4); // should panic
     }
 
     #[test]
