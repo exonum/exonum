@@ -36,7 +36,7 @@ pub struct GenerateTemplate {
     #[structopt(long)]
     pub validators_count: u32,
     /// Supervisor service mode. Possible options are "simple" and "decentralized".
-    #[structopt(long)]
+    #[structopt(long, default_value = "simple")]
     pub supervisor_mode: SupervisorMode,
 }
 
