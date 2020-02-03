@@ -122,6 +122,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Blockchain data access from the `ExecutionContext` after an error in a nested
   call is prohibited. (#1733)
 
+- `BlockchainBuilder` now accepts `GenesisConfig` as a separate argument,
+  rather than a part of `new` constructor. The config may be skipped if
+  the blockchain is guaranteed to be initialized. (#1761)
+
 #### exonum-cli
 
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
@@ -179,6 +183,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `TestKitBuilder::create` method was renamed to `build`. (#1740)
 
+- `TestNode` now returns `KeyPair` instead of a `(PublicKey, SecretKey)`
+  tuple. (#1761)
+
 ### exonum-time
 
 - Modules were made private, crate now provides re-exports of necessary types
@@ -231,9 +238,16 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Slash (`/`) is now allowed to be a part of artifact/instance name. (#1681)
 
+- `Blockchain::new` now supports any type convertible to `KeyPair`. (#1761)
+
 #### exonum-cli
 
 - Added maintenance command `restart-migration` to restart migration script. (#1728)
+
+#### exonum-crypto
+
+- `KeyPair` now can has constructors for generating a random keypair and
+  generating a keypair from the specified seed. (#1761)
 
 #### exonum-merkledb
 

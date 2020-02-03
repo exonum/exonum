@@ -51,8 +51,8 @@ pub fn sign_config_propose_transaction(
     config: ConfigPropose,
     initiator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let keys = &testkit.validator(initiator_id).service_keypair();
-    config.sign_for_supervisor(keys.0, &keys.1)
+    let keys = testkit.validator(initiator_id).service_keypair();
+    keys.propose_config_change(SUPERVISOR_INSTANCE_ID, config)
 }
 
 pub fn build_confirmation_transactions(

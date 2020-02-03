@@ -25,7 +25,7 @@ use exonum::{
         contains_transaction, Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut,
         ConsensusConfig, Schema, ValidatorKeys,
     },
-    crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
     helpers::{user_agent, Height, Round, ValidatorId},
     keys::Keys,
     merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
@@ -1102,11 +1102,11 @@ fn sandbox_with_services_uninitialized(
     let keys = (0..validators_count)
         .map(|i| {
             (
-                gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
-                gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
+                KeyPair::from_seed(&Seed::new([i; SEED_LENGTH])),
+                KeyPair::from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
             )
         })
-        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .map(|(consensus, service)| Keys::from_keys(consensus, service))
         .collect::<Vec<_>>();
 
     let validators = keys
@@ -1151,8 +1151,8 @@ fn sandbox_with_services_uninitialized(
     );
 
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
-
-    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
+    let blockchain = BlockchainBuilder::new(blockchain)
+        .with_genesis_config(genesis_config)
         .with_runtime(rust_runtime.build_for_tests())
         .build();
 

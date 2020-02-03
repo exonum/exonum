@@ -15,7 +15,7 @@
 // cspell:ignore Trillian, Vogon
 
 use exonum::{
-    crypto::{gen_keypair_from_seed, hash, PublicKey, SecretKey, Seed},
+    crypto::{hash, KeyPair, Seed},
     runtime::{
         migrations::{
             InitMigrationError, LinearMigrations, MigrateData, MigrationContext, MigrationError,
@@ -68,10 +68,10 @@ const USERS: &[TestUser] = &[
 ];
 
 impl TestUser {
-    fn keypair(&self) -> (PublicKey, SecretKey) {
+    fn keypair(&self) -> KeyPair {
         let seed = hash(self.full_name.as_bytes());
         let seed = Seed::from_slice(&seed[..]).unwrap();
-        gen_keypair_from_seed(&seed)
+        KeyPair::from_seed(&seed)
     }
 }
 
@@ -111,7 +111,7 @@ mod v01 {
     pub(crate) fn generate_test_data(access: Prefixed<&Fork>, users: &[TestUser]) {
         let mut schema = Schema::new(access);
         for user in users {
-            let (key, _) = user.keypair();
+            let key = user.keypair().public_key();
             let wallet = Wallet {
                 username: user.full_name.to_string(),
                 balance: user.balance,
@@ -146,7 +146,7 @@ mod v02 {
     pub(crate) fn verify_schema(snapshot: Prefixed<&dyn Snapshot>, users: &[TestUser]) {
         let schema = Schema::new(snapshot);
         for user in users {
-            let (key, _) = user.keypair();
+            let key = user.keypair().public_key();
             let wallet = schema.wallets.get(&key).unwrap();
             assert_eq!(wallet.balance, user.balance);
             assert_eq!(wallet.username, user.full_name);
@@ -204,7 +204,7 @@ mod v05 {
     pub(crate) fn verify_schema(snapshot: Prefixed<&dyn Snapshot>, users: &[TestUser]) {
         let schema = Schema::new(snapshot.clone());
         for user in users {
-            let (key, _) = user.keypair();
+            let key = user.keypair().public_key();
             let wallet = schema.wallets.get(&key).unwrap();
             assert_eq!(wallet.balance, user.balance);
             assert_eq!(wallet.first_name, user.first_name);

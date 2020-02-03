@@ -45,7 +45,7 @@ use exonum::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
         ConsensusConfig, Schema, SendError,
     },
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, PublicKey},
     helpers::{user_agent, Height, Milliseconds, Round, ValidateInput, ValidatorId},
     keys::Keys,
     merkledb::{Database, ObjectHash},
@@ -328,16 +328,6 @@ pub struct NodeConfig {
     pub connect_list: ConnectListConfig,
     /// Number of threads allocated for transaction verification.
     pub thread_pool_size: Option<u8>,
-    /// Validator keys.
-    #[serde(skip)]
-    pub keys: Keys,
-}
-
-impl NodeConfig {
-    /// Returns a service key pair of the node.
-    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
-        (self.keys.service_pk(), self.keys.service_sk().clone())
-    }
 }
 
 impl ValidateInput for NodeConfig {
@@ -940,6 +930,7 @@ pub struct NodeBuilder {
     channel: NodeChannel,
     blockchain_builder: BlockchainBuilder,
     node_config: NodeConfig,
+    node_keys: Keys,
     config_manager: Option<Box<dyn ConfigManager>>,
     plugins: Vec<Box<dyn NodePlugin>>,
 }
@@ -960,26 +951,30 @@ impl NodeBuilder {
     pub fn new(
         database: impl Into<Arc<dyn Database>>,
         node_config: NodeConfig,
-        genesis_config: GenesisConfig,
+        node_keys: Keys,
     ) -> Self {
         node_config
             .validate()
             .expect("Node configuration is inconsistent");
+
         let channel = NodeChannel::new(&node_config.mempool.events_pool_capacity);
-        let blockchain = Blockchain::new(
-            database,
-            node_config.service_keypair(),
-            channel.api_sender(),
-        );
-        let blockchain_builder = BlockchainBuilder::new(blockchain, genesis_config);
+        let blockchain = Blockchain::new(database, node_keys.service.clone(), channel.api_sender());
+        let blockchain_builder = BlockchainBuilder::new(blockchain);
 
         Self {
             channel,
             blockchain_builder,
             node_config,
+            node_keys,
             config_manager: None,
             plugins: vec![],
         }
+    }
+
+    /// Adds a genesis config to use if the blockchain is not initialized yet.
+    pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
+        self.blockchain_builder = self.blockchain_builder.with_genesis_config(genesis_config);
+        self
     }
 
     /// Adds a runtime to the blockchain.
@@ -1021,6 +1016,7 @@ impl NodeBuilder {
             blockchain,
             self.channel,
             self.node_config,
+            self.node_keys,
             self.config_manager,
             self.plugins,
         )
@@ -1033,6 +1029,7 @@ impl Node {
         blockchain: BlockchainMut,
         channel: NodeChannel,
         node_cfg: NodeConfig,
+        node_keys: Keys,
         config_manager: Option<Box<dyn ConfigManager>>,
         plugins: Vec<Box<dyn NodePlugin>>,
     ) -> Self {
@@ -1044,7 +1041,7 @@ impl Node {
             mempool: node_cfg.mempool,
             network: node_cfg.network,
             peer_discovery: peers,
-            keys: node_cfg.keys,
+            keys: node_keys,
         };
 
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
@@ -1215,14 +1212,10 @@ impl Node {
 }
 
 #[doc(hidden)]
-pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
-    use exonum::{blockchain::ValidatorKeys, crypto::gen_keypair};
+pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, Keys)> {
+    use exonum::blockchain::ValidatorKeys;
 
-    let keys: Vec<_> = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair()))
-        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
-        .collect();
-
+    let keys: Vec<_> = (0..count as usize).map(|_| Keys::random()).collect();
     let validator_keys = keys
         .iter()
         .map(|keys| ValidatorKeys::new(keys.consensus_pk(), keys.service_pk()))
@@ -1235,92 +1228,87 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
 
     keys.into_iter()
         .enumerate()
-        .map(|(idx, keys)| NodeConfig {
-            listen_address: peers[idx].parse().unwrap(),
-            external_address: peers[idx].clone(),
-            network: Default::default(),
-            consensus: consensus.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&consensus.validator_keys, &peers),
-            api: Default::default(),
-            mempool: Default::default(),
-            thread_pool_size: Default::default(),
-            keys,
+        .map(|(idx, keys)| {
+            let config = NodeConfig {
+                listen_address: peers[idx].parse().unwrap(),
+                external_address: peers[idx].clone(),
+                network: Default::default(),
+                consensus: consensus.clone(),
+                connect_list: ConnectListConfig::from_validator_keys(
+                    &consensus.validator_keys,
+                    &peers,
+                ),
+                api: Default::default(),
+                mempool: Default::default(),
+                thread_pool_size: Default::default(),
+            };
+            (config, keys)
         })
         .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
 mod tests {
-    use exonum::{blockchain::config::GenesisConfigBuilder, merkledb::TemporaryDB};
+    use exonum::merkledb::TemporaryDB;
 
     use super::*;
 
     #[test]
     fn test_good_internal_events_config() {
-        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let node_cfg = generate_testnet_config(1, 16_500)[0].clone();
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config);
+        let db = TemporaryDB::new();
+        let (node_cfg, node_keys) = generate_testnet_config(1, 16_500).pop().unwrap();
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
     #[should_panic(expected = "internal_events_capacity(0) must be strictly larger than 2")]
     fn test_bad_internal_events_capacity_too_small() {
-        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
+        let db = TemporaryDB::new();
+        let (mut node_cfg, node_keys) = generate_testnet_config(1, 16_500).pop().unwrap();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = 0;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
     #[should_panic(expected = "network_requests_capacity(0) must be strictly larger than 0")]
     fn test_bad_network_requests_capacity_too_small() {
-        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
+        let db = TemporaryDB::new();
+        let (mut node_cfg, node_keys) = generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = 0;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_internal_events_capacity_too_large() {
         let accidental_large_value = usize::max_value();
-        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
+        let db = TemporaryDB::new();
 
-        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
+        let (mut node_cfg, node_keys) = generate_testnet_config(1, 16_500).pop().unwrap();
         node_cfg
             .mempool
             .events_pool_capacity
             .internal_events_capacity = accidental_large_value;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_network_requests_capacity_too_large() {
         let accidental_large_value = usize::max_value();
-        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
+        let db = TemporaryDB::new();
 
-        let mut node_cfg = generate_testnet_config(1, 16_500)[0].clone();
+        let (mut node_cfg, node_keys) = generate_testnet_config(1, 16_500)[0].clone();
         node_cfg
             .mempool
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone()).build();
-        NodeBuilder::new(db, node_cfg, genesis_config);
+        NodeBuilder::new(db, node_cfg, node_keys);
     }
 }

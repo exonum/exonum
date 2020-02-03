@@ -108,8 +108,8 @@ pub use exonum_explorer as explorer;
 
 use exonum::{
     blockchain::{
-        config::{GenesisConfig, GenesisConfigBuilder},
-        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig,
     },
     crypto::{self, Hash},
     helpers::{byzantine_quorum, Height, ValidatorId},
@@ -207,7 +207,7 @@ impl TestKit {
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
-        genesis_config: GenesisConfig,
+        genesis_config: Option<GenesisConfig>,
         runtimes: Vec<RuntimeInstance>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
@@ -222,13 +222,14 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let blockchain = runtimes
-            .into_iter()
-            .fold(
-                BlockchainBuilder::new(blockchain, genesis_config),
-                |builder, runtime| builder.with_runtime(runtime),
-            )
-            .build();
+        let mut builder = BlockchainBuilder::new(blockchain);
+        if let Some(genesis_config) = genesis_config {
+            builder = builder.with_genesis_config(genesis_config);
+        }
+        for runtime in runtimes {
+            builder = builder.with_runtime(runtime);
+        }
+        let blockchain = builder.build();
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -837,7 +838,7 @@ impl StoppedTestKit {
         let mut testkit = TestKit::assemble(
             self.db,
             self.network,
-            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+            None,
             runtimes,
             self.api_notifier_channel,
         );
@@ -850,7 +851,7 @@ impl StoppedTestKit {
         TestKit::assemble(
             self.db,
             self.network,
-            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+            None,
             runtimes,
             self.api_notifier_channel,
         )

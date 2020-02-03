@@ -17,7 +17,7 @@
 use bit_vec::BitVec;
 use exonum::{
     blockchain::ProposerId,
-    crypto::{gen_keypair, Hash},
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified},
@@ -236,63 +236,6 @@ fn duplicate_tx_in_pool() {
         vec![tx1.clone()],
         sandbox.secret_key(ValidatorId(2)),
     ));
-}
-
-// TODO: transaction verification logic is duplicated,
-// in sandbox so this test is testing sandbox
-#[test]
-#[ignore]
-#[should_panic(expected = "Sent unexpected message Request(TransactionsRequest")]
-fn incorrect_tx_in_request() {
-    let sandbox = timestamping_sandbox();
-
-    let (pub_key, _) = gen_keypair();
-    let (_, sec_key) = gen_keypair();
-
-    let tx0 = TimestampingTxGenerator::with_keypair(DATA_SIZE, (pub_key, sec_key))
-        .next()
-        .unwrap();
-
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx0.object_hash()])
-        .build();
-
-    // Receive propose with unknown transaction `tx0`.
-    sandbox.recv(&propose);
-    // After `TRANSACTIONS_REQUEST_TIMEOUT` node send request with `tx0`.
-    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
-    sandbox.send(
-        sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_transactions_request(
-            sandbox.public_key(ValidatorId(0)),
-            sandbox.public_key(ValidatorId(2)),
-            vec![tx0.object_hash()],
-            &sandbox.secret_key(ValidatorId(0)),
-        ),
-    );
-
-    // Receive response with invalid `tx0`.
-    sandbox.recv(&sandbox.create_transactions_response(
-        sandbox.public_key(ValidatorId(2)),
-        sandbox.public_key(ValidatorId(0)),
-        vec![tx0.clone()],
-        sandbox.secret_key(ValidatorId(2)),
-    ));
-
-    add_one_height(&sandbox, &SandboxState::new());
-
-    let tx1 = gen_timestamping_tx();
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx0.object_hash(), tx1.object_hash()])
-        .build();
-
-    sandbox.recv(&tx1);
-    // Receive new propose with `tx0` and `tx1`.
-    // `tx1` - valid and after receiving go to the pool.
-    // `tx0` - invalid and after receiving should be dismissed.
-    sandbox.recv(&propose);
-
-    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 }
 
 #[test]

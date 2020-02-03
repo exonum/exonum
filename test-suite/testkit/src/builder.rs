@@ -238,8 +238,6 @@ impl TestKitBuilder {
         let rust_runtime = self.rust_runtime.build(self.api_notifier_channel.0.clone());
         self.additional_runtimes.push(rust_runtime.into());
 
-        // TODO: Parametrize TestKitBuilder with GenesisConfig on creation to prevent code duplication [ECR-3913].
-        // Prepare GenesisConfig.
         let genesis_config_builder = self.instances.into_iter().fold(
             GenesisConfigBuilder::with_consensus_config(genesis),
             |builder, instance| builder.with_instance(instance),
@@ -258,7 +256,7 @@ impl TestKitBuilder {
             let mut testkit = TestKit::assemble(
                 TemporaryDB::new(),
                 network,
-                genesis_config,
+                Some(genesis_config),
                 self.additional_runtimes,
                 self.api_notifier_channel,
             );
@@ -270,7 +268,7 @@ impl TestKitBuilder {
             TestKit::assemble(
                 TemporaryDB::new(),
                 network,
-                genesis_config,
+                Some(genesis_config),
                 self.additional_runtimes,
                 self.api_notifier_channel,
             )

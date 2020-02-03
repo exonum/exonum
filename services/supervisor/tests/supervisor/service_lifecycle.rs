@@ -22,7 +22,7 @@ use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use crate::inc::IncService;
-use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor};
+use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor, SupervisorInterface};
 
 /// Creates block with the specified transaction and returns its execution result.
 pub fn execute_transaction(
@@ -55,19 +55,16 @@ fn create_testkit() -> TestKit {
 
 /// Starts service instance and gets its ID
 fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
-    let keypair = testkit.us().service_keypair();
     // Start `inc` service instance
-    execute_transaction(
-        testkit,
-        ConfigPropose::immediate(0)
-            .start_service(
-                IncService.artifact_id(),
-                IncService::INSTANCE_NAME,
-                Vec::default(),
-            )
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Start service transaction should be processed");
+    let change = ConfigPropose::immediate(0).start_service(
+        IncService.artifact_id(),
+        IncService::INSTANCE_NAME,
+        Vec::default(),
+    );
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(testkit, change).expect("Start service transaction should be processed");
+
     // Get started service instance ID.
     testkit
         .snapshot()
@@ -79,21 +76,18 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
 #[test]
 fn start_stop_inc_service() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
-
     let instance_id = start_inc_service(&mut testkit).spec.id;
     assert!(
         is_inc_service_api_available(&mut testkit),
         "Inc service API should be available after starting."
     );
+
     // Stop service instance.
-    execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance_id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Stop service transaction should be processed");
+    let change = ConfigPropose::immediate(1).stop_service(instance_id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change)
+        .expect("Stop service transaction should be processed");
     assert!(
         !is_inc_service_api_available(&mut testkit),
         "Inc service API should not be available after stopping."
@@ -103,16 +97,13 @@ fn start_stop_inc_service() {
 #[test]
 fn stop_non_existent_service() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
 
     let instance_id = 2;
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance_id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let change = ConfigPropose::immediate(1).stop_service(instance_id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -125,18 +116,17 @@ fn stop_non_existent_service() {
 #[test]
 fn duplicate_stop_service_request() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
 
     let instance_id = start_inc_service(&mut testkit).spec.id;
+
     // An attempt to stop service twice.
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance_id)
-            .stop_service(instance_id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let change = ConfigPropose::immediate(1)
+        .stop_service(instance_id)
+        .stop_service(instance_id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -151,25 +141,19 @@ fn duplicate_stop_service_request() {
 #[test]
 fn stop_already_stopped_service() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
 
     let instance_id = start_inc_service(&mut testkit).spec.id;
+    let change = ConfigPropose::immediate(1).stop_service(instance_id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     // Stop service instance.
-    execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance_id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Transaction should be processed");
+    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
+
     // Second attempt to stop service instance.
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(2)
-            .stop_service(instance_id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let other_change = ConfigPropose::immediate(2).stop_service(instance_id);
+    let other_change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, other_change);
+    let actual_err = execute_transaction(&mut testkit, other_change)
+        .expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -184,26 +168,22 @@ fn stop_already_stopped_service() {
 #[test]
 fn resume_stopped_service() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
 
-    let instance = start_inc_service(&mut testkit);
     // Stop service instance.
-    execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance.spec.id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Transaction should be processed");
+    let instance = start_inc_service(&mut testkit);
+    let change = ConfigPropose::immediate(1).stop_service(instance.spec.id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
     // Resume service instance.
-    execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(2)
-            .resume_service(instance.spec.id, instance.spec.artifact, Vec::default())
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Transaction should be processed");
+    let change = ConfigPropose::immediate(2).resume_service(
+        instance.spec.id,
+        instance.spec.artifact,
+        vec![],
+    );
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
     // Check resumed service API.
     assert!(is_inc_service_api_available(&mut testkit));
@@ -212,17 +192,18 @@ fn resume_stopped_service() {
 #[test]
 fn resume_active_service() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
-
     let instance = start_inc_service(&mut testkit);
+
     // Resume service instance.
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .resume_service(instance.spec.id, instance.spec.artifact, Vec::default())
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let change = ConfigPropose::immediate(1).resume_service(
+        instance.spec.id,
+        instance.spec.artifact,
+        vec![],
+    );
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -237,28 +218,21 @@ fn resume_active_service() {
 #[test]
 fn resume_service_with_different_artifact_name() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
-
     let instance = start_inc_service(&mut testkit);
+
     // Stop service instance.
-    execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance.spec.id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Transaction should be processed");
+    let change = ConfigPropose::immediate(1).stop_service(instance.spec.id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
     // Resume service instance.
     let mut artifact = instance.spec.artifact;
     artifact.name = "inc2".to_owned();
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(2)
-            .resume_service(instance.spec.id, artifact, Vec::default())
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let change = ConfigPropose::immediate(2).resume_service(instance.spec.id, artifact, vec![]);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -273,28 +247,21 @@ fn resume_service_with_different_artifact_name() {
 #[test]
 fn resume_service_with_different_artifact_version() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
-
     let instance = start_inc_service(&mut testkit);
+
     // Stop service instance.
-    execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(1)
-            .stop_service(instance.spec.id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Transaction should be processed");
+    let change = ConfigPropose::immediate(1).stop_service(instance.spec.id);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
     // Resume service instance.
     let mut artifact = instance.spec.artifact;
     artifact.version.patch += 1;
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(2)
-            .resume_service(instance.spec.id, artifact, Vec::default())
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let change = ConfigPropose::immediate(2).resume_service(instance.spec.id, artifact, vec![]);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,
@@ -309,19 +276,17 @@ fn resume_service_with_different_artifact_version() {
 #[test]
 fn multiple_stop_resume_requests() {
     let mut testkit = create_testkit();
-    let keypair = testkit.us().service_keypair();
 
     let spec = start_inc_service(&mut testkit).spec;
 
     // Config proposal with two requests for single service instance.
-    let actual_err = execute_transaction(
-        &mut testkit,
-        ConfigPropose::immediate(2)
-            .stop_service(spec.id)
-            .resume_service(spec.id, spec.artifact, Vec::default())
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect_err("Transaction shouldn't be processed");
+    let change = ConfigPropose::immediate(2)
+        .stop_service(spec.id)
+        .resume_service(spec.id, spec.artifact, vec![]);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
 
     assert_eq!(
         actual_err,

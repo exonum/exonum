@@ -5,9 +5,9 @@
 ![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
 
 `exonum-keys` provides tools for storing and loading encrypted keys for
-Exonum core.
+Exonum nodes.
 
-This is a simple utility crate specialized for the Exonum core needs.
+This is a simple utility crate specialized for the Exonum needs.
 
 Consult [the crate docs](https://docs.rs/exonum-keys) for more details.
 

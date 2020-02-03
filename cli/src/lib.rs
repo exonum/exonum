@@ -170,15 +170,17 @@ impl NodeBuilder {
             let db_options = &run_config.node_config.private_config.database;
             let database = RocksDB::open(run_config.db_path, db_options)?;
 
-            let node_config_path = run_config.node_config_path.to_string_lossy().to_string();
-            let config_manager = DefaultConfigManager::new(node_config_path);
+            let node_config_path = run_config.node_config_path.to_string_lossy();
+            let config_manager = DefaultConfigManager::new(node_config_path.into_owned());
             let rust_runtime = self.rust_runtime;
 
-            let mut node_builder =
-                CoreNodeBuilder::new(database, run_config.node_config.into(), genesis_config)
-                    .with_config_manager(config_manager)
-                    .with_plugin(SystemApiPlugin)
-                    .with_runtime_fn(|channel| rust_runtime.build(channel.endpoints_sender()));
+            let node_config = run_config.node_config.into();
+            let node_keys = run_config.node_keys;
+            let mut node_builder = CoreNodeBuilder::new(database, node_config, node_keys)
+                .with_genesis_config(genesis_config)
+                .with_config_manager(config_manager)
+                .with_plugin(SystemApiPlugin)
+                .with_runtime_fn(|channel| rust_runtime.build(channel.endpoints_sender()));
             for runtime in self.external_runtimes {
                 node_builder = node_builder.with_runtime(runtime);
             }

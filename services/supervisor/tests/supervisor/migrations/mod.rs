@@ -127,14 +127,12 @@ fn migration_state(api: &TestKitApi, request: MigrationRequest) -> MigrationStat
 
 /// Stops service with the given ID.
 fn stop_service(testkit: &mut TestKit, id: InstanceId) {
-    let keypair = testkit.us().service_keypair();
-    execute_transaction(
-        testkit,
-        ConfigPropose::immediate(0)
-            .stop_service(id)
-            .sign_for_supervisor(keypair.0, &keypair.1),
-    )
-    .expect("Stop service transaction should be processed");
+    let change = ConfigPropose::immediate(0).stop_service(id);
+    let change = testkit
+        .us()
+        .service_keypair()
+        .propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(testkit, change).expect("Stop service transaction should be processed");
 }
 
 fn obtain_reference_hash(testkit: &mut TestKit, request: &MigrationRequest) -> Hash {

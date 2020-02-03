@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Protobuf declarations for cryptographic types.
+
 // Re-export raw Protobuf types so other modules can re-use it for custom serialization.
 pub use crate::proto::schema::*;
 

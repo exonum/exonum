@@ -32,6 +32,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
     supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, Supervisor,
+    SupervisorInterface,
 };
 
 pub fn sign_config_propose_transaction(
@@ -39,16 +40,15 @@ pub fn sign_config_propose_transaction(
     config: ConfigPropose,
     initiator_id: ValidatorId,
 ) -> Verified<AnyTx> {
-    let (pub_key, sec_key) = &testkit.validator(initiator_id).service_keypair();
-    config.sign_for_supervisor(*pub_key, sec_key)
+    let keypair = testkit.validator(initiator_id).service_keypair();
+    keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, config)
 }
 
 pub fn sign_config_propose_transaction_by_us(
     testkit: &TestKit,
     config: ConfigPropose,
 ) -> Verified<AnyTx> {
-    let initiator_id = testkit.network().us().validator_id().unwrap();
-
+    let initiator_id = testkit.us().validator_id().unwrap();
     sign_config_propose_transaction(&testkit, config, initiator_id)
 }
 
@@ -255,12 +255,11 @@ fn discard_config_propose_from_auditor() {
     let old_validators = testkit.network().validators();
 
     // Sign request by an auditor.
-    let keys = &testkit.network().us().service_keypair();
-    let config_propose = ConfigPropose::new(0, cfg_change_height)
-        .consensus_config(new_consensus_config.clone())
-        .sign_for_supervisor(keys.0, &keys.1);
-
-    let block = testkit.create_block_with_transaction(config_propose);
+    let propose =
+        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
+    let keys = testkit.us().service_keypair();
+    let propose = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, propose);
+    let block = testkit.create_block_with_transaction(propose);
     // Verify that transaction failed.
     let expected_err =
         ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(SUPERVISOR_INSTANCE_ID);
