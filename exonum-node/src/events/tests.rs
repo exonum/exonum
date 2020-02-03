@@ -15,8 +15,7 @@
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::{
-        gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH,
-        SEED_LENGTH, SIGNATURE_LENGTH,
+        KeyPair, PublicKey, SecretKey, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
     },
     helpers::user_agent,
     merkledb::BinaryValue,
@@ -212,8 +211,8 @@ pub fn connect_message(
 
 pub fn raw_message(payload_len: usize) -> SignedMessage {
     let buffer = vec![0u8; payload_len];
-    let (pk, sk) = gen_keypair();
-    SignedMessage::new(buffer, pk, &sk)
+    let keys = KeyPair::random();
+    SignedMessage::new(buffer, keys.public_key(), keys.secret_key())
 }
 
 #[derive(Debug, Clone)]
@@ -231,49 +230,49 @@ impl HandshakeParams {
     // default `max_message_len`.
     #[doc(hidden)]
     pub fn with_default_params() -> Self {
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
+        let keys = KeyPair::from_seed(&Seed::new([1; SEED_LENGTH]));
         let address = "127.0.0.1:8000";
 
         let connect = Verified::from_value(
             Connect::new(address, SystemTime::now().into(), &user_agent()),
-            public_key,
-            &secret_key,
+            keys.public_key(),
+            keys.secret_key(),
         );
 
         let mut params = HandshakeParams::new(
-            public_key,
-            secret_key.clone(),
+            keys.public_key(),
+            keys.secret_key().clone(),
             SharedConnectList::default(),
             connect,
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
         );
 
-        params.set_remote_key(public_key);
+        params.set_remote_key(keys.public_key());
         params
     }
 }
 
 impl ConnectionParams {
     fn from_address(address: SocketAddr) -> Self {
-        let (public_key, secret_key) = gen_keypair();
-        let connect = connect_message(address, public_key, &secret_key);
+        let keys = KeyPair::random();
+        let connect = connect_message(address, keys.public_key(), keys.secret_key());
         let handshake_params = HandshakeParams::new(
-            public_key,
-            secret_key.clone(),
+            keys.public_key(),
+            keys.secret_key().clone(),
             SharedConnectList::default(),
             connect.clone(),
             ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
         );
         let connect_info = ConnectInfo {
             address: address.to_string(),
-            public_key,
+            public_key: keys.public_key(),
         };
 
         ConnectionParams {
             connect,
             address,
-            public_key,
-            secret_key,
+            public_key: keys.public_key(),
+            secret_key: keys.secret_key().clone(),
             handshake_params,
             connect_info,
         }

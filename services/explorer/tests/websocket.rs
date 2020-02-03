@@ -17,7 +17,7 @@
 use actix_web::ws::CloseCode;
 use assert_matches::assert_matches;
 use exonum::{
-    crypto::gen_keypair,
+    crypto::KeyPair,
     helpers::Height,
     merkledb::ObjectHash,
     runtime::{CoreError, ExecutionError, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID},
@@ -106,7 +106,7 @@ fn test_send_transaction() {
     assert_no_message(&mut client);
 
     // Send transaction.
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let tx = keypair.increment(SERVICE_ID, 3);
     let tx_hash = tx.object_hash();
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
@@ -127,7 +127,7 @@ fn test_send_transaction() {
     assert!(testkit.is_tx_in_pool(&tx_hash));
 
     // Send invalid transaction.
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let tx = keypair.increment(SERVICE_ID + 1, 5);
     let tx_body = json!({ "type": "transaction", "payload": { "tx_body": tx }});
     send_message(&mut client, &tx_body);
@@ -167,7 +167,7 @@ fn test_transactions_subscription() {
     let mut client = create_ws_client(&url);
 
     // Create a block with a single transaction.
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let tx = keypair.increment(SERVICE_ID, 3);
     testkit.create_block_with_transaction(tx.clone());
 
@@ -191,7 +191,7 @@ fn test_transactions_subscription_with_filter() {
     let url = api.public_url(&url);
     let mut client = create_ws_client(&url);
 
-    let alice = gen_keypair();
+    let alice = KeyPair::random();
     let reset_tx = alice.reset(SERVICE_ID, ());
     let inc_tx = alice.increment(SERVICE_ID, 3);
     testkit.create_block_with_transactions(vec![reset_tx, inc_tx.clone()]);
@@ -227,7 +227,7 @@ fn test_transactions_subscribe_with_partial_filter() {
     let url = api.public_url(&url);
     let mut client = create_ws_client(&url);
 
-    let alice = gen_keypair();
+    let alice = KeyPair::random();
     let reset_tx = alice.reset(SERVICE_ID, ());
     let inc_tx = alice.increment(SERVICE_ID, 3);
     testkit.create_block_with_transactions(vec![reset_tx.clone(), inc_tx.clone()]);
@@ -264,7 +264,7 @@ fn test_transactions_subscribe_with_bad_filter() {
     let url = api.public_url("api/explorer/v1/transactions/subscribe?method_id=0");
     let mut client = create_ws_client(&url);
 
-    let alice = gen_keypair();
+    let alice = KeyPair::random();
     let reset_tx = alice.reset(SERVICE_ID, ());
     let inc_tx = alice.increment(SERVICE_ID, 3);
     testkit.create_block_with_transactions(vec![reset_tx.clone(), inc_tx.clone()]);
@@ -280,7 +280,7 @@ fn test_dynamic_subscriptions() {
 
     testkit.create_block();
     assert_no_message(&mut client);
-    let alice = gen_keypair();
+    let alice = KeyPair::random();
     testkit.create_block_with_transaction(alice.increment(SERVICE_ID, 1));
     assert_no_message(&mut client);
 
@@ -333,7 +333,7 @@ fn test_blocks_and_tx_subscriptions() {
     // Open transaction WS client and test it.
     let tx_url = api.public_url("api/explorer/v1/transactions/subscribe");
     let mut tx_client = create_ws_client(&tx_url);
-    let alice = gen_keypair();
+    let alice = KeyPair::random();
     let tx = alice.increment(SERVICE_ID, 3);
     testkit.create_block_with_transaction(tx.clone());
     let notification: Notification = receive_message(&mut tx_client).unwrap();

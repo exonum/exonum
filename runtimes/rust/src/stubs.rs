@@ -145,7 +145,7 @@ impl GenericCall<InstanceId> for KeyPair {
 mod explanation {
     use super::*;
 
-    use exonum::{crypto::gen_keypair, merkledb::BinaryValue};
+    use exonum::{crypto::KeyPair, merkledb::BinaryValue};
     use pretty_assertions::assert_eq;
 
     // Suppose we have the following trait describing user service.
@@ -217,7 +217,7 @@ mod explanation {
     fn standard_stubs_work() {
         const SERVICE_ID: InstanceId = 100;
 
-        let keypair = gen_keypair();
+        let keypair = KeyPair::random();
         let tx: Verified<AnyTx> = keypair.create_wallet(SERVICE_ID, CreateWallet::default());
         assert_eq!(tx.payload().call_info.method_id, 0);
         let other_tx = keypair.transfer(SERVICE_ID, Transfer::default());

@@ -251,12 +251,12 @@ mod tests {
 
     #[test]
     fn test_verified_any_tx_binary_value() {
-        let keypair = crypto::gen_keypair();
+        let keypair = crypto::KeyPair::random();
 
         let msg = Verified::from_value(
             AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]),
-            keypair.0,
-            &keypair.1,
+            keypair.public_key(),
+            keypair.secret_key(),
         );
         assert_eq!(msg.object_hash(), msg.as_raw().object_hash());
 
@@ -267,12 +267,12 @@ mod tests {
 
     #[test]
     fn test_verified_protobuf_convert() {
-        let keypair = crypto::gen_keypair();
+        let keypair = crypto::KeyPair::random();
 
         let msg = Verified::from_value(
             AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]),
-            keypair.0,
-            &keypair.1,
+            keypair.public_key(),
+            keypair.secret_key(),
         );
 
         let to_pb = msg.to_pb();
@@ -284,7 +284,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Failed to verify signature.")]
     fn test_precommit_serde_wrong_signature() {
-        let (pub_key, secret_key) = crypto::gen_keypair();
+        let keys = crypto::KeyPair::random();
         let ts = Utc::now();
 
         let mut precommit = Verified::from_value(
@@ -296,8 +296,8 @@ mod tests {
                 crypto::hash(&[3, 2, 1]),
                 ts,
             ),
-            pub_key,
-            &secret_key,
+            keys.public_key(),
+            keys.secret_key(),
         );
         // Break signature.
         precommit.raw.signature = Signature::zero();

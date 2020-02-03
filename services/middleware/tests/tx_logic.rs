@@ -15,7 +15,7 @@
 //! Tests related to transaction logic.
 
 use exonum::{
-    crypto::gen_keypair,
+    crypto::KeyPair,
     merkledb::{access::Access, Snapshot},
     runtime::{versioning::Version, CoreError, ErrorMatch, InstanceId, SnapshotExt},
 };
@@ -74,7 +74,7 @@ fn checked_call_normal_workflow() {
         "<2",
     ];
 
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     for (i, &version) in VERSIONS.iter().enumerate() {
         let checked_call = IncFactory::req(version).increment(INC_ID, 0);
         let signed = keypair.checked_call(MIDDLEWARE_ID, checked_call);
@@ -84,7 +84,9 @@ fn checked_call_normal_workflow() {
             .unwrap_or_else(|e| panic!("version req = {}: {}", version, e));
         let snapshot = testkit.snapshot();
         assert_eq!(
-            inc_schema(&snapshot, INC_ID).counts.get(&keypair.0),
+            inc_schema(&snapshot, INC_ID)
+                .counts
+                .get(&keypair.public_key()),
             Some(i as u64 + 1),
             "version req = {}",
             version
@@ -96,7 +98,7 @@ fn checked_call_normal_workflow() {
 fn checked_call_for_non_existing_service() {
     let mut testkit = create_testkit(vec!["1.1.3".parse().unwrap()]);
     let checked_call = IncFactory::req("1").increment(INC_ID + 100, 0);
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let checked_call = keypair.checked_call(MIDDLEWARE_ID, checked_call);
 
     let block = testkit.create_block_with_transaction(checked_call);
@@ -112,7 +114,7 @@ fn checked_call_with_mismatched_artifact() {
         .unwrap()
         .increment(INC_ID, 0);
 
-    let signed = gen_keypair().checked_call(MIDDLEWARE_ID, checked_call);
+    let signed = KeyPair::random().checked_call(MIDDLEWARE_ID, checked_call);
     let block = testkit.create_block_with_transaction(signed);
     let err = block[0].status().unwrap_err();
     assert_eq!(*err, ErrorMatch::from_fail(&TxError::ArtifactMismatch));
@@ -136,7 +138,7 @@ fn checked_call_with_mismatched_version() {
         ">=2",
     ];
 
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     for &version in VERSIONS {
         let checked_call = IncFactory::req(version).increment(INC_ID, 0);
         let signed = keypair.checked_call(MIDDLEWARE_ID, checked_call.clone());
@@ -155,14 +157,14 @@ fn batch_normal_workflow() {
     batch.increment(INC_ID, 0);
     batch.increment(INC_ID, 0);
     batch.checked_call(MIDDLEWARE_ID, checked_call);
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let batch = keypair.batch(MIDDLEWARE_ID, batch);
     let block = testkit.create_block_with_transaction(batch);
     block[0].status().unwrap();
 
     let snapshot = testkit.snapshot();
     let schema = inc_schema(&snapshot, INC_ID);
-    assert_eq!(schema.counts.get(&keypair.0), Some(3));
+    assert_eq!(schema.counts.get(&keypair.public_key()), Some(3));
 }
 
 #[test]
@@ -177,16 +179,16 @@ fn batch_with_calls_to_different_services() {
     batch.batch(MIDDLEWARE_ID, inner_batch);
     batch.increment(INC_ID + 1, 1);
 
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let signed = keypair.batch(MIDDLEWARE_ID, batch);
     let block = testkit.create_block_with_transaction(signed);
     block[0].status().unwrap();
 
     let snapshot = testkit.snapshot();
     let schema = inc_schema(&snapshot, INC_ID);
-    assert_eq!(schema.counts.get(&keypair.0), Some(3));
+    assert_eq!(schema.counts.get(&keypair.public_key()), Some(3));
     let schema = inc_schema(&snapshot, INC_ID + 1);
-    assert_eq!(schema.counts.get(&keypair.0), Some(2));
+    assert_eq!(schema.counts.get(&keypair.public_key()), Some(2));
 }
 
 #[test]
@@ -197,7 +199,7 @@ fn batch_with_call_to_non_existing_service() {
         .with_call(TxStub.increment(INC_ID + 1, 0)) // <- service doesn't exist
         .with_call(TxStub.increment(INC_ID, 0));
 
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let batch = keypair.batch(MIDDLEWARE_ID, batch);
     let block = testkit.create_block_with_transaction(batch);
     let err = block[0].status().unwrap_err();
@@ -205,7 +207,7 @@ fn batch_with_call_to_non_existing_service() {
 
     let snapshot = testkit.snapshot();
     let schema = inc_schema(&snapshot, INC_ID);
-    assert_eq!(schema.counts.get(&keypair.0), None);
+    assert_eq!(schema.counts.get(&keypair.public_key()), None);
 }
 
 #[test]
@@ -220,7 +222,7 @@ fn batch_with_service_error() {
     batch.checked_call(MIDDLEWARE_ID, checked_call);
     batch.increment(INC_ID, 0);
 
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let signed = keypair.batch(MIDDLEWARE_ID, batch);
     let block = testkit.create_block_with_transaction(signed);
     let err = block[0].status().unwrap_err();
@@ -231,5 +233,5 @@ fn batch_with_service_error() {
 
     let snapshot = testkit.snapshot();
     let schema = inc_schema(&snapshot, INC_ID);
-    assert_eq!(schema.counts.get(&keypair.0), None);
+    assert_eq!(schema.counts.get(&keypair.public_key()), None);
 }

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    crypto,
+    crypto::KeyPair,
     messages::{AnyTx, Verified},
     runtime::{
         CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, SnapshotExt,
@@ -56,7 +56,7 @@ fn execute_transaction(testkit: &mut TestKit, tx: Verified<AnyTx>) -> Result<(),
 #[test]
 fn test_create_wallet_ok() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     execute_transaction(
         &mut testkit,
@@ -68,7 +68,7 @@ fn test_create_wallet_ok() {
 #[test]
 fn test_create_wallet_fallthrough_auth() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     // Without fallthrough auth, the call should fail: `create_wallet` expects the caller
     // to be external, and it is a service.
@@ -89,7 +89,7 @@ fn test_create_wallet_fallthrough_auth() {
     assert_eq!(
         WalletService::get_schema(&snapshot)
             .wallets
-            .get(&keypair.0)
+            .get(&keypair.public_key())
             .unwrap()
             .balance,
         0
@@ -99,7 +99,7 @@ fn test_create_wallet_fallthrough_auth() {
 #[test]
 fn test_deposit_ok() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     execute_transaction(
         &mut testkit,
@@ -112,7 +112,7 @@ fn test_deposit_ok() {
         keypair.deposit(
             DepositService::ID,
             TxIssue {
-                to: keypair.0,
+                to: keypair.public_key(),
                 amount: 10_000,
             },
         ),
@@ -123,7 +123,7 @@ fn test_deposit_ok() {
     assert_eq!(
         WalletService::get_schema(&snapshot)
             .wallets
-            .get(&keypair.0)
+            .get(&keypair.public_key())
             .unwrap()
             .balance,
         10_000
@@ -135,7 +135,7 @@ fn test_deposit_ok() {
     let mut call = AnyCall::new(
         CallInfo::new(DepositService::ID, 0),
         TxIssue {
-            to: keypair.0,
+            to: keypair.public_key(),
             amount: 10_000,
         },
     );
@@ -150,7 +150,7 @@ fn test_deposit_ok() {
     assert_eq!(
         WalletService::get_schema(&snapshot)
             .wallets
-            .get(&keypair.0)
+            .get(&keypair.public_key())
             .unwrap()
             .balance,
         20_000
@@ -169,7 +169,7 @@ fn test_deposit_ok() {
     assert_eq!(
         WalletService::get_schema(&snapshot)
             .wallets
-            .get(&keypair.0)
+            .get(&keypair.public_key())
             .unwrap()
             .balance,
         30_000
@@ -179,7 +179,7 @@ fn test_deposit_ok() {
 #[test]
 fn test_deposit_invalid_auth() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     execute_transaction(
         &mut testkit,
@@ -190,7 +190,7 @@ fn test_deposit_invalid_auth() {
     let mut call = AnyCall::new(
         CallInfo::new(DepositService::ID, 0),
         TxIssue {
-            to: keypair.0,
+            to: keypair.public_key(),
             amount: 10_000,
         },
     );
@@ -222,14 +222,14 @@ fn test_deposit_invalid_auth() {
 #[test]
 fn test_deposit_err_issue_without_wallet() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     let err = execute_transaction(
         &mut testkit,
         keypair.deposit(
             DepositService::ID,
             TxIssue {
-                to: keypair.0,
+                to: keypair.public_key(),
                 amount: 10_000,
             },
         ),
@@ -245,7 +245,7 @@ fn test_deposit_err_issue_without_wallet() {
 #[test]
 fn test_any_call_ok_deposit() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     execute_transaction(
         &mut testkit,
@@ -256,7 +256,7 @@ fn test_any_call_ok_deposit() {
     let mut call = AnyCall::new(
         CallInfo::new(DepositService::ID, 0),
         TxIssue {
-            to: keypair.0,
+            to: keypair.public_key(),
             amount: 10_000,
         },
     );
@@ -268,7 +268,7 @@ fn test_any_call_ok_deposit() {
     assert_eq!(
         WalletService::get_schema(&snapshot)
             .wallets
-            .get(&keypair.0)
+            .get(&keypair.public_key())
             .unwrap()
             .balance,
         10_000
@@ -278,7 +278,7 @@ fn test_any_call_ok_deposit() {
 #[test]
 fn test_any_call_err_deposit_unauthorized() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     execute_transaction(
         &mut testkit,
@@ -289,7 +289,7 @@ fn test_any_call_err_deposit_unauthorized() {
     let mut call = AnyCall::new(
         CallInfo::new(WalletService::ID, 0),
         TxIssue {
-            to: keypair.0,
+            to: keypair.public_key(),
             amount: 10_000,
         },
     );
@@ -306,7 +306,7 @@ fn test_any_call_err_deposit_unauthorized() {
 #[test]
 fn test_any_call_err_unknown_instance() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
     let call = AnyCall::new(CallInfo::new(10_000, 0), ());
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
@@ -317,7 +317,7 @@ fn test_any_call_err_unknown_instance() {
 #[test]
 fn test_any_call_err_unknown_interface() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     let mut call = AnyCall::new(CallInfo::new(WalletService::ID, 0), ());
     call.interface_name = "FooFace".to_owned();
@@ -330,12 +330,12 @@ fn test_any_call_err_unknown_interface() {
 #[test]
 fn test_any_call_err_unknown_method() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     let mut call = AnyCall::new(
         CallInfo::new(WalletService::ID, 1),
         TxIssue {
-            to: keypair.0,
+            to: keypair.public_key(),
             amount: 10_000,
         },
     );
@@ -349,7 +349,7 @@ fn test_any_call_err_unknown_method() {
 #[test]
 fn test_any_call_err_wrong_arg() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     let inner_call = b"\xfe\xff".to_vec();
     let outer_call = AnyCall::new(CallInfo::new(WalletService::ID, 0), inner_call);
@@ -369,7 +369,7 @@ fn test_any_call_err_wrong_arg() {
 #[test]
 fn test_any_call_panic_recursion_limit() {
     let mut testkit = testkit_with_interfaces();
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
 
     execute_transaction(
         &mut testkit,
@@ -402,7 +402,7 @@ fn execute_custom_call(f: CustomCall) -> (TestKit, Result<(), ExecutionError>) {
         .with_default_rust_service(CustomCallService::new(f))
         .build();
 
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
     let res = execute_transaction(
         &mut testkit,
         keypair.custom_call(CustomCallService::INSTANCE_ID, vec![]),
