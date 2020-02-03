@@ -99,12 +99,7 @@ impl CallInfo {
 /// // `AnyTx` object created from `CallInfo` and payload.
 /// let arguments = "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes();
 /// let any_tx = AnyTx::new(call_info, arguments);
-///
-/// let transaction = Verified::from_value(
-///     any_tx,
-///     keypair.public_key(),
-///     keypair.secret_key()
-/// );
+/// let transaction = any_tx.sign_with_keypair(&keypair);
 /// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]

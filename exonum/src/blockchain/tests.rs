@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{PublicKey, SecretKey};
+use exonum_crypto::KeyPair;
 use exonum_derive::{BinaryValue, FromAccess};
 use exonum_merkledb::{
     access::{Access, FromAccess},
@@ -155,14 +155,9 @@ enum Transaction {
 }
 
 impl Transaction {
-    fn sign(
-        self,
-        instance_id: InstanceId,
-        public_key: PublicKey,
-        secret_key: &SecretKey,
-    ) -> Verified<AnyTx> {
+    fn sign(self, instance_id: InstanceId, keypair: &KeyPair) -> Verified<AnyTx> {
         let tx = AnyTx::new(CallInfo::new(instance_id, 0), self.into_bytes());
-        Verified::from_value(tx, public_key, secret_key)
+        tx.sign_with_keypair(&keypair)
     }
 }
 
@@ -459,11 +454,8 @@ fn handling_tx_panic_error() {
     ];
 
     for (tx, expected_err) in failed_transactions {
-        let actual_err = execute_transaction(
-            &mut blockchain,
-            tx.sign(TEST_SERVICE_ID, keys.public_key(), keys.secret_key()),
-        )
-        .expect_err("Transaction must fail");
+        let actual_err = execute_transaction(&mut blockchain, tx.sign(TEST_SERVICE_ID, &keys))
+            .expect_err("Transaction must fail");
 
         assert_eq!(actual_err.description(), expected_err);
         let snapshot = blockchain.snapshot();
@@ -476,7 +468,7 @@ fn handling_tx_panic_error() {
     // Check that the transaction modifies inspector schema.
     execute_transaction(
         &mut blockchain,
-        Transaction::AddValue(10).sign(TEST_SERVICE_ID, keys.public_key(), keys.secret_key()),
+        Transaction::AddValue(10).sign(TEST_SERVICE_ID, &keys),
     )
     .expect("Transaction must success");
 
@@ -496,7 +488,7 @@ fn handling_tx_merkledb_error() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::MerkledbError.sign(TEST_SERVICE_ID, keys.public_key(), keys.secret_key()),
+        Transaction::MerkledbError.sign(TEST_SERVICE_ID, &keys),
     )
     .unwrap();
 }
@@ -525,11 +517,7 @@ fn deploy_available() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::DeployArtifact(artifact_id).sign(
-            TEST_SERVICE_ID,
-            keys.public_key(),
-            keys.secret_key(),
-        ),
+        Transaction::DeployArtifact(artifact_id).sign(TEST_SERVICE_ID, &keys),
     )
     .unwrap();
 }
@@ -545,11 +533,8 @@ fn deploy_already_deployed() {
 
     let actual_err = execute_transaction(
         &mut blockchain,
-        Transaction::DeployArtifact(RuntimeInspector::default_artifact_id()).sign(
-            TEST_SERVICE_ID,
-            keys.public_key(),
-            keys.secret_key(),
-        ),
+        Transaction::DeployArtifact(RuntimeInspector::default_artifact_id())
+            .sign(TEST_SERVICE_ID, &keys),
     )
     .unwrap_err();
 
@@ -577,11 +562,7 @@ fn deploy_unavailable_artifact() {
     );
     execute_transaction(
         &mut blockchain,
-        Transaction::DeployArtifact(artifact_id).sign(
-            TEST_SERVICE_ID,
-            keys.public_key(),
-            keys.secret_key(),
-        ),
+        Transaction::DeployArtifact(artifact_id).sign(TEST_SERVICE_ID, &keys),
     )
     .unwrap_err();
 }
@@ -610,11 +591,8 @@ fn start_stop_service_instance() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::AddService(instance_spec.clone(), InitAction::Noop).sign(
-            TEST_SERVICE_ID,
-            keys.public_key(),
-            keys.secret_key(),
-        ),
+        Transaction::AddService(instance_spec.clone(), InitAction::Noop)
+            .sign(TEST_SERVICE_ID, &keys),
     )
     .unwrap();
 
@@ -632,11 +610,7 @@ fn start_stop_service_instance() {
     // Stop another service instance.
     execute_transaction(
         &mut blockchain,
-        Transaction::StopService(instance_spec.id).sign(
-            TEST_SERVICE_ID,
-            keys.public_key(),
-            keys.secret_key(),
-        ),
+        Transaction::StopService(instance_spec.id).sign(TEST_SERVICE_ID, &keys),
     )
     .unwrap();
     // Check that the service status in the dispatcher schema is stopped.
@@ -664,12 +638,10 @@ fn test_check_tx() {
 
     let snapshot = blockchain.snapshot();
 
-    let correct_tx =
-        Transaction::AddValue(1).sign(TEST_SERVICE_ID, keys.public_key(), keys.secret_key());
+    let correct_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID, &keys);
     Blockchain::check_tx(&snapshot, &correct_tx).expect("Correct transaction");
 
-    let incorrect_tx =
-        Transaction::AddValue(1).sign(TEST_SERVICE_ID + 1, keys.public_key(), keys.secret_key());
+    let incorrect_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID + 1, &keys);
     assert_eq!(
         Blockchain::check_tx(&snapshot, &incorrect_tx).expect_err("Incorrect transaction"),
         ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
@@ -678,11 +650,7 @@ fn test_check_tx() {
     // Stop service instance to make correct_tx incorrect.
     execute_transaction(
         &mut blockchain,
-        Transaction::StopService(TEST_SERVICE_ID).sign(
-            TEST_SERVICE_ID,
-            keys.public_key(),
-            keys.secret_key(),
-        ),
+        Transaction::StopService(TEST_SERVICE_ID).sign(TEST_SERVICE_ID, &keys),
     )
     .expect("Correct transaction");
 
@@ -820,7 +788,7 @@ fn state_aggregation() {
 
     execute_transaction(
         &mut blockchain,
-        Transaction::AddValue(10).sign(TEST_SERVICE_ID, keys.public_key(), keys.secret_key()),
+        Transaction::AddValue(10).sign(TEST_SERVICE_ID, &keys),
     )
     .expect("Transaction must success");
 

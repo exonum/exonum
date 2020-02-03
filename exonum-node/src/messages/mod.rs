@@ -345,7 +345,7 @@ mod tests {
         let signed = SignedMessage::new(
             protocol_message.clone(),
             keypair.public_key(),
-            &keypair.secret_key(),
+            keypair.secret_key(),
         );
 
         let verified_protocol = signed.clone().into_verified::<ExonumMessage>().unwrap();
@@ -371,7 +371,7 @@ mod tests {
         let mut signed = SignedMessage::new(
             protocol_message.clone(),
             keypair.public_key(),
-            &keypair.secret_key(),
+            keypair.secret_key(),
         );
         // Update author
         signed.author = KeyPair::random().public_key();

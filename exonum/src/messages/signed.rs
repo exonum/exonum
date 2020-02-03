@@ -253,11 +253,7 @@ mod tests {
     fn test_verified_any_tx_binary_value() {
         let keypair = crypto::KeyPair::random();
 
-        let msg = Verified::from_value(
-            AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]),
-            keypair.public_key(),
-            keypair.secret_key(),
-        );
+        let msg = AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]).sign_with_keypair(&keypair);
         assert_eq!(msg.object_hash(), msg.as_raw().object_hash());
 
         let bytes = msg.to_bytes();
@@ -268,13 +264,7 @@ mod tests {
     #[test]
     fn test_verified_protobuf_convert() {
         let keypair = crypto::KeyPair::random();
-
-        let msg = Verified::from_value(
-            AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]),
-            keypair.public_key(),
-            keypair.secret_key(),
-        );
-
+        let msg = AnyTx::new(CallInfo::new(5, 2), vec![1, 2, 3, 4]).sign_with_keypair(&keypair);
         let to_pb = msg.to_pb();
         let from_pb = Verified::from_pb(to_pb).expect("Failed to convert from protobuf.");
 
