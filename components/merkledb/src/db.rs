@@ -920,6 +920,61 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
     }
 }
 
+/// Version of `ReadonlyFork` with a static lifetime. Can be produced from an `Rc<Fork>` using
+/// the `AsReadonly` trait.
+///
+/// Beware that producing an instance increases the reference counter of the unrelying fork.
+/// If you need to obtain `Fork` from `Rc<Fork>` via [`Rc::try_unwrap`], make sure that all
+/// `ReadonlyRcFork` instances are dropped by this time.
+///
+/// [`Rc::try_unwrap`]: https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, AsReadonly, Database, ReadonlyRcFork, TemporaryDB};
+/// # use std::rc::Rc;
+/// let db = TemporaryDB::new();
+/// let fork = Rc::new(db.fork());
+/// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
+/// let ro_fork: ReadonlyRcFork = fork.as_readonly();
+/// let list = ro_fork.get_proof_list::<_, u32>("list");
+/// assert_eq!(list.len(), 3);
+/// ```
+#[derive(Debug, Clone)]
+pub struct ReadonlyRcFork(Rc<Fork>);
+
+impl RawAccess for ReadonlyRcFork {
+    type Changes = ChangesRef<'static>;
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        &self.0.patch
+    }
+
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
+        ChangesRef {
+            inner: self.0.working_patch.clone_view_changes(address),
+            _lifetime: PhantomData,
+        }
+    }
+}
+
+impl AsReadonly for ReadonlyRcFork {
+    type Readonly = Self;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        self.clone()
+    }
+}
+
+impl AsReadonly for Rc<Fork> {
+    type Readonly = ReadonlyRcFork;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        ReadonlyRcFork(self.clone())
+    }
+}
+
 impl AsRef<dyn Snapshot> for dyn Snapshot {
     fn as_ref(&self) -> &dyn Snapshot {
         self
