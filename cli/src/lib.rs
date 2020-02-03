@@ -116,6 +116,7 @@ mod config_manager;
 pub struct NodeBuilder {
     rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
+    default_instances: Vec<InstanceInitParams>,
 }
 
 impl Default for NodeBuilder {
@@ -132,6 +133,7 @@ impl NodeBuilder {
                 .with_factory(Supervisor)
                 .with_factory(ExplorerFactory),
             external_runtimes: vec![],
+            default_instances: vec![],
         }
     }
 
@@ -149,6 +151,21 @@ impl NodeBuilder {
         self
     }
 
+    /// Adds a service instance that will be available immediately after creating a genesis block.
+    ///
+    /// Make sure that artifact for this instance is provided to this builder.
+    pub fn with_default_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
+        self.default_instances.push(instance.into());
+        self
+    }
+
+    /// Adds a default Rust service instance that will be available immediately after creating a
+    /// genesis block.
+    pub fn with_default_service<S: DefaultInstance>(self, service: S) -> Self {
+        self.with_default_instance(service.default_instance())
+            .with_service(service)
+    }
+
     /// Configures the node using parameters provided by user from stdin and then runs it.
     ///
     /// Only Rust runtime is enabled.
@@ -158,14 +175,20 @@ impl NodeBuilder {
         if let StandardResult::Run(run_config) = command.execute()? {
             // Add builtin services to genesis config.
             let supervisor = Self::supervisor_service(&run_config);
-            let genesis_config = GenesisConfigBuilder::with_consensus_config(
-                run_config.node_config.public_config.consensus.clone(),
-            )
-            .with_artifact(Supervisor.artifact_id())
-            .with_instance(supervisor)
-            .with_artifact(ExplorerFactory.artifact_id())
-            .with_instance(ExplorerFactory.default_instance())
-            .build();
+            let genesis_config = {
+                let mut builder = GenesisConfigBuilder::with_consensus_config(
+                    run_config.node_config.public_config.consensus.clone(),
+                )
+                .with_artifact(Supervisor.artifact_id())
+                .with_instance(supervisor)
+                .with_artifact(ExplorerFactory.artifact_id())
+                .with_instance(ExplorerFactory.default_instance());
+                // Add default instances.
+                for instance in self.default_instances {
+                    builder = builder.with_instance(instance);
+                }
+                builder.build()
+            };
 
             let db_options = &run_config.node_config.private_config.database;
             let database = RocksDB::open(run_config.db_path, db_options)?;
