@@ -108,7 +108,7 @@ where
     }
 
     /// Returns an iterator over set elements and their hashes. The elements are ordered as per
-    /// lexicorgraphic ordering of their hashes (i.e., effectively randomly).
+    /// lexicographic ordering of their hashes (i.e., effectively randomly).
     ///
     /// # Examples
     ///
