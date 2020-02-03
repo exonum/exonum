@@ -103,7 +103,7 @@ use crate::{
     db::{ChangesMut, ChangesRef, ViewChanges},
     migration::{Migration, Scratchpad},
     views::{ChangeSet, GroupKeys, IndexMetadata, RawAccess, RawAccessMut, ViewWithMetadata},
-    BinaryKey, Fork, IndexAddress, IndexType, ReadonlyFork, ReadonlyRcFork, ResolvedAddress,
+    BinaryKey, Fork, IndexAddress, IndexType, OwnedReadonlyFork, ReadonlyFork, ResolvedAddress,
     Snapshot,
 };
 
@@ -134,7 +134,7 @@ pub enum GenericRawAccess<'a> {
     /// Readonly fork.
     ReadonlyFork(ReadonlyFork<'a>),
     /// Owned readonly fork.
-    OwnedReadonlyFork(ReadonlyRcFork),
+    OwnedReadonlyFork(OwnedReadonlyFork),
 
     /// Never actually generated.
     #[doc(hidden)]
@@ -181,8 +181,8 @@ impl<'a> From<ReadonlyFork<'a>> for GenericRawAccess<'a> {
     }
 }
 
-impl From<ReadonlyRcFork> for GenericRawAccess<'_> {
-    fn from(ro_fork: ReadonlyRcFork) -> Self {
+impl From<OwnedReadonlyFork> for GenericRawAccess<'_> {
+    fn from(ro_fork: OwnedReadonlyFork) -> Self {
         GenericRawAccess::OwnedReadonlyFork(ro_fork)
     }
 }

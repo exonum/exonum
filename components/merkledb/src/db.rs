@@ -925,26 +925,26 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
 ///
 /// Beware that producing an instance increases the reference counter of the underlying fork.
 /// If you need to obtain `Fork` from `Rc<Fork>` via [`Rc::try_unwrap`], make sure that all
-/// `ReadonlyRcFork` instances are dropped by this time.
+/// `OwnedReadonlyFork` instances are dropped by this time.
 ///
 /// [`Rc::try_unwrap`]: https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap
 ///
 /// # Examples
 ///
 /// ```
-/// # use exonum_merkledb::{access::AccessExt, AsReadonly, Database, ReadonlyRcFork, TemporaryDB};
+/// # use exonum_merkledb::{access::AccessExt, AsReadonly, Database, OwnedReadonlyFork, TemporaryDB};
 /// # use std::rc::Rc;
 /// let db = TemporaryDB::new();
 /// let fork = Rc::new(db.fork());
 /// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
-/// let ro_fork: ReadonlyRcFork = fork.as_readonly();
+/// let ro_fork: OwnedReadonlyFork = fork.as_readonly();
 /// let list = ro_fork.get_proof_list::<_, u32>("list");
 /// assert_eq!(list.len(), 3);
 /// ```
 #[derive(Debug, Clone)]
-pub struct ReadonlyRcFork(Rc<Fork>);
+pub struct OwnedReadonlyFork(Rc<Fork>);
 
-impl RawAccess for ReadonlyRcFork {
+impl RawAccess for OwnedReadonlyFork {
     type Changes = ChangesRef<'static>;
 
     fn snapshot(&self) -> &dyn Snapshot {
@@ -959,7 +959,7 @@ impl RawAccess for ReadonlyRcFork {
     }
 }
 
-impl AsReadonly for ReadonlyRcFork {
+impl AsReadonly for OwnedReadonlyFork {
     type Readonly = Self;
 
     fn as_readonly(&self) -> Self::Readonly {
@@ -968,10 +968,10 @@ impl AsReadonly for ReadonlyRcFork {
 }
 
 impl AsReadonly for Rc<Fork> {
-    type Readonly = ReadonlyRcFork;
+    type Readonly = OwnedReadonlyFork;
 
     fn as_readonly(&self) -> Self::Readonly {
-        ReadonlyRcFork(self.clone())
+        OwnedReadonlyFork(self.clone())
     }
 }
 
