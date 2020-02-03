@@ -105,7 +105,7 @@ impl Keys {
         }
     }
 
-    /// Create validator keys from the provided keypairs.
+    /// Creates validator keys from the provided keypairs.
     ///
     /// # Stability
     ///
@@ -114,7 +114,7 @@ impl Keys {
     ///
     /// # Panics
     ///
-    /// If public key in any keypair doesn't match with corresponding private key.
+    /// If a public key in any keypair doesn't match with corresponding private key.
     pub fn from_keys(consensus_keys: impl Into<KeyPair>, service_keys: impl Into<KeyPair>) -> Self {
         Self {
             consensus: consensus_keys.into(),
