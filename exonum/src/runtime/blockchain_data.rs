@@ -40,6 +40,11 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
         }
     }
 
+    /// Returns the instance name of the executing service.
+    pub fn instance_name(&self) -> &str {
+        &self.instance_name
+    }
+
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
         CoreSchema::new(self.access.as_readonly())
