@@ -923,7 +923,7 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
 /// Version of `ReadonlyFork` with a static lifetime. Can be produced from an `Rc<Fork>` using
 /// the `AsReadonly` trait.
 ///
-/// Beware that producing an instance increases the reference counter of the unrelying fork.
+/// Beware that producing an instance increases the reference counter of the underlying fork.
 /// If you need to obtain `Fork` from `Rc<Fork>` via [`Rc::try_unwrap`], make sure that all
 /// `ReadonlyRcFork` instances are dropped by this time.
 ///
