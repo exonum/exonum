@@ -355,7 +355,7 @@ impl<'a> SupervisorExtensions<'a> {
     /// a requirement for all nodes in the network. A node that did not successfully
     /// deploy the artifact previously blocks until the artifact is deployed successfully.
     /// If a node cannot deploy the artifact, it panics.
-    pub fn start_artifact_registration(&self, artifact: ArtifactId, spec: Vec<u8>) {
+    pub fn start_artifact_registration(&self, artifact: &ArtifactId, spec: Vec<u8>) {
         Dispatcher::commit_artifact(self.0.fork, artifact, spec);
     }
 

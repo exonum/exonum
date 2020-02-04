@@ -96,7 +96,7 @@ where
         }
 
         if transaction.value % COLD_CHANCE == 0 {
-            self.other_cold_index.insert(transaction.value);
+            self.other_cold_index.insert(&transaction.value);
         }
     }
 }
@@ -157,7 +157,7 @@ where
         }
 
         if transaction.value % COLD_CHANCE == 0 {
-            self.other_cold_index.get().insert(transaction.value);
+            self.other_cold_index.get().insert(&transaction.value);
         }
     }
 }
@@ -234,7 +234,7 @@ where
         }
 
         if transaction.value % COLD_CHANCE == 0 {
-            self.other_cold_index().insert(transaction.value);
+            self.other_cold_index().insert(&transaction.value);
         }
     }
 }

@@ -300,7 +300,7 @@ where
     /// be sure to decrement it when the transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
-        self.transactions_pool().insert(tx.object_hash());
+        self.transactions_pool().insert(&tx.object_hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);
         self.transactions().put(&tx.object_hash(), tx);

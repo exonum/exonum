@@ -22,9 +22,8 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    views::{
-        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
-    },
+    indexes::iter::{Entries, IndexIterator, Keys, Values},
+    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryKey, BinaryValue,
 };
 
@@ -33,52 +32,13 @@ use crate::{
 /// `MapIndex` requires that keys implement the [`BinaryKey`] trait and values implement
 /// the [`BinaryValue`] trait.
 ///
-/// [`BinaryKey`]: ../../trait.BinaryKey.html
-/// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`BinaryKey`]: ../trait.BinaryKey.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct MapIndex<T: RawAccess, K: ?Sized, V> {
     base: View<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
-}
-
-/// Returns an iterator over the entries of a `MapIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`MapIndex`]. See its documentation for additional details.
-///
-/// [`iter`]: struct.MapIndex.html#method.iter
-/// [`iter_from`]: struct.MapIndex.html#method.iter_from
-/// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, K: ?Sized, V> {
-    base_iter: ViewIter<'a, K, V>,
-}
-
-/// Returns an iterator over the keys of a `MapIndex`.
-///
-/// This struct is created by the [`keys`] or
-/// [`keys_from`] method on [`MapIndex`]. See its documentation for additional details.
-///
-/// [`keys`]: struct.MapIndex.html#method.keys
-/// [`keys_from`]: struct.MapIndex.html#method.keys_from
-/// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct Keys<'a, K: ?Sized> {
-    base_iter: ViewIter<'a, K, ()>,
-}
-
-/// Returns an iterator over the values of a `MapIndex`.
-///
-/// This struct is created by the [`values`] or
-/// [`values_from`] method on [`MapIndex`]. See its documentation for additional details.
-///
-/// [`values`]: struct.MapIndex.html#method.values
-/// [`values_from`]: struct.MapIndex.html#method.values_from
-/// [`MapIndex`]: struct.MapIndex.html
-#[derive(Debug)]
-pub struct Values<'a, V> {
-    base_iter: ViewIter<'a, (), V>,
 }
 
 impl<T, K, V> FromAccess<T> for MapIndex<T::Base, K, V>
@@ -146,8 +106,7 @@ where
         self.base.contains(key)
     }
 
-    /// Returns an iterator over the entries of the map in ascending order. The iterator element
-    /// type is (K, V).
+    /// Returns an iterator over the entries of the map in ascending order.
     ///
     /// # Examples
     ///
@@ -162,14 +121,11 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, K, V> {
-        Iter {
-            base_iter: self.base.iter(&()),
-        }
+    pub fn iter(&self) -> Entries<'_, K, V> {
+        self.index_iter(None)
     }
 
-    /// Returns an iterator over the keys of a map in ascending order. The iterator element
-    /// type is K.
+    /// Returns an iterator over the keys of a map in ascending order.
     ///
     /// # Examples
     ///
@@ -185,13 +141,10 @@ where
     /// }
     /// ```
     pub fn keys(&self) -> Keys<'_, K> {
-        Keys {
-            base_iter: self.base.iter(&()),
-        }
+        self.iter().skip_values()
     }
 
-    /// Returns an iterator over the values of a map in ascending order of keys. The iterator
-    /// element type is V.
+    /// Returns an iterator over the values of a map in ascending order of keys.
     ///
     /// # Examples
     ///
@@ -207,13 +160,11 @@ where
     /// }
     /// ```
     pub fn values(&self) -> Values<'_, V> {
-        Values {
-            base_iter: self.base.iter(&()),
-        }
+        self.iter().skip_keys()
     }
 
     /// Returns an iterator over the entries of a map in ascending order starting from the
-    /// specified key. The iterator element type is (K, V).
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -228,14 +179,12 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> Iter<'_, K, V> {
-        Iter {
-            base_iter: self.base.iter_from(&(), from),
-        }
+    pub fn iter_from(&self, from: &K) -> Entries<'_, K, V> {
+        self.index_iter(Some(from))
     }
 
     /// Returns an iterator over the keys of a map in ascending order starting from the
-    /// specified key. The iterator element type is K.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -251,13 +200,11 @@ where
     /// }
     /// ```
     pub fn keys_from(&self, from: &K) -> Keys<'_, K> {
-        Keys {
-            base_iter: self.base.iter_from(&(), from),
-        }
+        self.iter_from(from).skip_values()
     }
 
     /// Returns an iterator over the values of a map in ascending order of keys starting from the
-    /// specified key. The iterator element type is V.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -272,9 +219,7 @@ where
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> Values<'_, V> {
-        Values {
-            base_iter: self.base.iter_from(&(), from),
-        }
+        self.iter_from(from).skip_keys()
     }
 }
 
@@ -361,44 +306,24 @@ where
     V: BinaryValue,
 {
     type Item = (K::Owned, V);
-    type IntoIter = Iter<'a, K, V>;
+    type IntoIter = Entries<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for Iter<'a, K, V>
+impl<T, K, V> IndexIterator for MapIndex<T, K, V>
 where
+    T: RawAccess,
     K: BinaryKey + ?Sized,
     V: BinaryValue,
 {
-    type Item = (K::Owned, V);
+    type Key = K;
+    type Value = V;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next()
-    }
-}
-
-impl<'a, K> Iterator for Keys<'a, K>
-where
-    K: BinaryKey + ?Sized,
-{
-    type Item = K::Owned;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, ..)| k)
-    }
-}
-
-impl<'a, V> Iterator for Values<'a, V>
-where
-    V: BinaryValue,
-{
-    type Item = V;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(.., v)| v)
+    fn index_iter(&self, from: Option<&K>) -> Entries<'_, K, V> {
+        Entries::new(&self.base, from)
     }
 }
 

@@ -186,16 +186,16 @@ impl Schema<&Fork> {
     /// Adds artifact specification to the set of the pending artifacts.
     pub(super) fn add_pending_artifact(
         &mut self,
-        artifact: ArtifactId,
+        artifact: &ArtifactId,
         deploy_spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts().contains(&artifact) {
+        if self.artifacts().contains(artifact) {
             return Err(CoreError::ArtifactAlreadyDeployed.into());
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
-            &artifact,
+            artifact,
             ArtifactState::new(deploy_spec, ArtifactStatus::Pending),
         );
         // Add artifact to pending artifacts queue.

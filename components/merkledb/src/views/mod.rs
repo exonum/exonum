@@ -302,6 +302,7 @@ impl<T: RawAccess> View<T> {
         Iter {
             base_iter: self.iter_bytes(&iter_prefix),
             prefix: iter_prefix,
+            detach_prefix: false,
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -323,6 +324,32 @@ impl<T: RawAccess> View<T> {
         Iter {
             base_iter: self.iter_bytes(&iter_from),
             prefix: iter_prefix,
+            detach_prefix: false,
+            ended: false,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+
+    /// Returns an iterator over the entries of the index in ascending order, optionally
+    /// starting from the specified key. Unlike `iter_from`, the provided prefix will be detached
+    /// from the beginning of each key slice.
+    pub fn iter_detached<P, K, V>(&self, detached_prefix: &P, from: Option<&K>) -> Iter<'_, K, V>
+    where
+        P: BinaryKey,
+        K: BinaryKey + ?Sized,
+        V: BinaryValue,
+    {
+        let iter_prefix = key_bytes(detached_prefix);
+        let iter_from = if let Some(from) = from {
+            Cow::Owned(concat_keys!(detached_prefix, from))
+        } else {
+            Cow::Borrowed(&*iter_prefix)
+        };
+        Iter {
+            base_iter: self.iter_bytes(&iter_from),
+            prefix: iter_prefix,
+            detach_prefix: true,
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -482,6 +509,7 @@ where
 pub struct Iter<'a, K: ?Sized, V> {
     base_iter: BytesIter<'a>,
     prefix: Vec<u8>,
+    detach_prefix: bool,
     ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -490,6 +518,36 @@ pub struct Iter<'a, K: ?Sized, V> {
 impl<'a, K: ?Sized, V> fmt::Debug for Iter<'a, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Iter(..)")
+    }
+}
+
+impl<'a, K, V> Iter<'a, K, V>
+where
+    K: BinaryKey + ?Sized,
+    V: BinaryValue,
+{
+    /// Drops the keys returned by the underlying iterator without parsing them.
+    pub(crate) fn drop_key_type(self) -> Iter<'a, (), V> {
+        Iter {
+            base_iter: self.base_iter,
+            prefix: self.prefix,
+            detach_prefix: self.detach_prefix,
+            ended: self.ended,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+
+    /// Drops the values returned by the underlying iterator without parsing them.
+    pub(crate) fn drop_value_type(self) -> Iter<'a, K, ()> {
+        Iter {
+            base_iter: self.base_iter,
+            prefix: self.prefix,
+            detach_prefix: self.detach_prefix,
+            ended: self.ended,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
     }
 }
 
@@ -505,13 +563,17 @@ where
             return None;
         }
 
-        if let Some((k, v)) = self.base_iter.next() {
-            if k.starts_with(&self.prefix) {
-                return Some((
-                    K::read(k),
-                    V::from_bytes(Cow::Borrowed(v))
-                        .expect("Unable to decode value from bytes, an error occurred"),
-                ));
+        if let Some((key_slice, value_slice)) = self.base_iter.next() {
+            if key_slice.starts_with(&self.prefix) {
+                let key = if self.detach_prefix {
+                    // Since we've checked `start_with`, slicing here cannot panic.
+                    K::read(&key_slice[self.prefix.len()..])
+                } else {
+                    K::read(key_slice)
+                };
+                let value = V::from_bytes(Cow::Borrowed(value_slice))
+                    .expect("Unable to decode value from bytes");
+                return Some((key, value));
             }
         }
 

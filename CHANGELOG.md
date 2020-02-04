@@ -174,7 +174,13 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `MapProof` Protobuf messages now serialize keys according to their
   `BinaryValue` implementation, rather than `BinaryKey`. (#1743)
 
-- Protobuf declarations were organized according to their packages. (#1756)
+- All index types now share a common set of iterators: `Entries`, `Keys`
+  and `Values`. (#1762)
+
+- `KeySetIndex::insert` now takes the element by reference. (#1762)
+
+- `KeySetIndex` now supports unsized keys. Its getter methods are no longer
+  parameterized by the key type, similar to `MapIndex` / `ProofMapIndex`. (#1762)
 
 #### exonum-proto
 
@@ -343,6 +349,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - `Snapshot` implementation for `Patch` has been fixed. The previous implementation
   could lead to stale reads from a `Patch` or a `Fork`. (#1611)
+
+- Maximum height in `ProofListIndex` was fixed from the bogus value 58 to 56. (#1762)
+
+- Bogus setting of the empty key was removed for `ListIndex`. (#1762)
 
 ## 0.13.0-rc.2 - 2019-12-04
 

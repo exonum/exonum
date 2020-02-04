@@ -219,7 +219,7 @@ impl BlockchainMut {
             .set(genesis_config.consensus_config);
 
         for spec in genesis_config.artifacts {
-            Dispatcher::commit_artifact(&fork, spec.artifact.clone(), spec.payload.clone());
+            Dispatcher::commit_artifact(&fork, &spec.artifact, spec.payload.clone());
             self.dispatcher
                 .deploy_artifact(spec.artifact, spec.payload)
                 .wait()

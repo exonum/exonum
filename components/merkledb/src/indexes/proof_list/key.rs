@@ -18,7 +18,7 @@ use std::cmp::Ordering;
 
 use crate::BinaryKey;
 
-const HEIGHT_SHIFT: u64 = 56;
+pub(crate) const HEIGHT_SHIFT: u64 = 56;
 pub(crate) const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,7 +29,7 @@ pub struct ProofListKey {
 
 impl ProofListKey {
     pub fn new(height: u8, index: u64) -> Self {
-        debug_assert!(height <= 58 && index <= MAX_INDEX);
+        debug_assert!(u64::from(height) <= HEIGHT_SHIFT && index <= MAX_INDEX);
         Self { height, index }
     }
 
