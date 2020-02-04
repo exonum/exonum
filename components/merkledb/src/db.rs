@@ -920,6 +920,61 @@ impl<'a> RawAccess for ReadonlyFork<'a> {
     }
 }
 
+/// Version of `ReadonlyFork` with a static lifetime. Can be produced from an `Rc<Fork>` using
+/// the `AsReadonly` trait.
+///
+/// Beware that producing an instance increases the reference counter of the underlying fork.
+/// If you need to obtain `Fork` from `Rc<Fork>` via [`Rc::try_unwrap`], make sure that all
+/// `OwnedReadonlyFork` instances are dropped by this time.
+///
+/// [`Rc::try_unwrap`]: https://doc.rust-lang.org/std/rc/struct.Rc.html#method.try_unwrap
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_merkledb::{access::AccessExt, AsReadonly, Database, OwnedReadonlyFork, TemporaryDB};
+/// # use std::rc::Rc;
+/// let db = TemporaryDB::new();
+/// let fork = Rc::new(db.fork());
+/// fork.get_proof_list("list").extend(vec![1_u32, 2, 3]);
+/// let ro_fork: OwnedReadonlyFork = fork.as_readonly();
+/// let list = ro_fork.get_proof_list::<_, u32>("list");
+/// assert_eq!(list.len(), 3);
+/// ```
+#[derive(Debug, Clone)]
+pub struct OwnedReadonlyFork(Rc<Fork>);
+
+impl RawAccess for OwnedReadonlyFork {
+    type Changes = ChangesRef<'static>;
+
+    fn snapshot(&self) -> &dyn Snapshot {
+        &self.0.patch
+    }
+
+    fn changes(&self, address: &ResolvedAddress) -> Self::Changes {
+        ChangesRef {
+            inner: self.0.working_patch.clone_view_changes(address),
+            _lifetime: PhantomData,
+        }
+    }
+}
+
+impl AsReadonly for OwnedReadonlyFork {
+    type Readonly = Self;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        self.clone()
+    }
+}
+
+impl AsReadonly for Rc<Fork> {
+    type Readonly = OwnedReadonlyFork;
+
+    fn as_readonly(&self) -> Self::Readonly {
+        OwnedReadonlyFork(self.clone())
+    }
+}
+
 impl AsRef<dyn Snapshot> for dyn Snapshot {
     fn as_ref(&self) -> &dyn Snapshot {
         self
@@ -1345,6 +1400,34 @@ mod tests {
             aggregator.get(&"other_list".to_owned()).unwrap(),
             patch.get_proof_list::<_, u64>("other_list").object_hash()
         );
+    }
+
+    #[test]
+    fn borrows_from_owned_forks() {
+        use crate::{access::AccessExt, Entry};
+
+        let db = TemporaryDB::new();
+        let fork = Rc::new(db.fork());
+        let readonly: OwnedReadonlyFork = fork.as_readonly();
+        // Modify an index via `fork`.
+        fork.get_proof_list("list").extend(vec![1_i64, 2, 3]);
+        // Check that if both `CopyAccessExt` and `AccessExt` traits are in scope, the correct one
+        // is used for `Rc<Fork>`.
+        let mut entry: Entry<Rc<Fork>, _> = fork.get_entry("entry");
+        // Access the list via `readonly`.
+        let list = readonly.get_proof_list::<_, i64>("list");
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.get(1), Some(2));
+        assert_eq!(list.iter_from(1).collect::<Vec<_>>(), vec![2, 3]);
+
+        entry.set("!".to_owned());
+        drop(entry);
+        let entry = readonly.get_entry::<_, String>("entry");
+        // Clone `readonly` access and get another `entry` instance.
+        let other_readonly = readonly.clone();
+        let other_entry = other_readonly.get_entry::<_, String>("entry");
+        assert_eq!(entry.get().unwrap(), "!");
+        assert_eq!(other_entry.get().unwrap(), "!");
     }
 
     #[test]

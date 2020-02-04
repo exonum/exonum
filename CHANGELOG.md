@@ -282,6 +282,12 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - Unsafe optimizations / experimental features are now behind a `yolo` feature,
   which is off by default. (#1740)
 
+- MerkleDB now provides enumerations for all supported types of DB accesses
+  which can be used to simplify generic code (e.g., in bindings). (#1747)
+
+- It is now possible to obtain readonly access to fork data with static lifetime.
+  (#1763)
+
 #### exonum-node
 
 - Node logic (including P2P networking and consensus algorithm) was moved
