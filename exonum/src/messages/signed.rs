@@ -28,7 +28,7 @@ use std::{
 use crate::{
     crypto::{self, Hash, PublicKey, SecretKey},
     messages::types::SignedMessage,
-    proto,
+    proto::schema,
 };
 
 impl SignedMessage {
@@ -223,7 +223,7 @@ impl<T> ProtobufConvert for Verified<T>
 where
     T: TryFrom<SignedMessage>,
 {
-    type ProtoStruct = proto::SignedMessage;
+    type ProtoStruct = schema::messages::SignedMessage;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let signed_message = self.as_raw();

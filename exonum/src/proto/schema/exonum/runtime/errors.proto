@@ -1,0 +1,113 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.runtime;
+
+option java_package = "com.exonum.messages.core.runtime";
+
+import "google/protobuf/empty.proto";
+
+// The type of ExecutionError.
+// Note that ErrorKind isn't a primary source for determining the origin of the error.
+// First, see the 'runtime_id' and 'call_site' fields of ExecutionError, and only then
+// you can rely on `ErrorKind` to resolve ambiguity.
+enum ErrorKind {
+  // An unexpected error which does not have a specific cause.
+  // The description of the error is the only source of information about this kind of errors.
+  UNEXPECTED = 0;
+  // An error specific to the core. See core error codes for details.
+  CORE = 1;
+  // An error specific to the certain runtime. See error codes of corresponding runtime for details.
+  RUNTIME = 2;
+  // An error specific to the certain service. See error codes of corresponding service for details.
+  SERVICE = 3;
+  // A common error which can occur in different contexts. See common error codes for details.
+  COMMON = 4;
+}
+
+// Result of unsuccessful runtime execution.
+//
+// ExecutionError message provides the information about the source of the error.
+// The source of error is determined as following:
+// - If both runtime ID and call site are set, then error is related to the service code.
+// - If runtime ID is set, and call site is not set, then error is related to the runtime code.
+// - If none of runtime ID and call site is set, then error originates in the core code.
+// Option with set call site and unset runtime ID is not valid, receiving a message
+// with such a combination means receiving a malformed message.
+//
+// Though in most cases 'runtime_id' and 'call_site' are enough to deduce the source of error,
+// 'ErrorKind' type can be used to resolve ambiguity.
+message ExecutionError {
+  // The kind of error that indicates its type.
+  ErrorKind kind = 1;
+  // User defined error code that can have different meanings for the different
+  // error kinds.
+  uint32 code = 2;
+  // Optional description which doesn't affect `object_hash`.
+  string description = 3;
+
+  // Runtime ID will be set if the error is related to the certain runtime.
+  oneof runtime {
+    // Identifier of runtime associated with the error.
+    uint32 runtime_id = 4;
+    // There was no runtime to process an erroneous call.
+    google.protobuf.Empty no_runtime_id = 5;
+  }
+
+  // Call site will be set if the error is related to the certain service.
+  oneof call_info {
+    // Information about service call associated with the error.
+    CallSite call_site = 6;
+    // There was no service to process an erroneous call.
+    google.protobuf.Empty no_call_site = 7;
+  }
+}
+
+// Call site associated with an error.
+message CallSite {
+  enum Type {
+    // Service method.
+    METHOD = 0;
+    // Service constructor.
+    CONSTRUCTOR = 1;
+    // Hook executing before processing transactions in a block.
+    BEFORE_TRANSACTIONS = 2;
+    // Hook executing after processing transactions in a block.
+    AFTER_TRANSACTIONS = 3;
+    // Service resuming routine.
+    RESUME = 4;
+  }
+
+  // Type of the call.
+  Type call_type = 1;
+  // Identifier of the service being called.
+  uint32 instance_id = 2;
+  // Numeric ID of the method. Set only for `call_type == METHOD`.
+  uint32 method_id = 3;
+  // Name of the interface defining the method. This field is empty for the
+  // default service interface. Set only for `call_type == METHOD`.
+  string interface = 4;
+}
+
+// Result of runtime execution.
+message ExecutionStatus {
+  oneof result {
+    // Successful execution.
+    google.protobuf.Empty ok = 1;
+    // Execution ended with an error.
+    ExecutionError error = 2;
+  }
+}

@@ -12,28 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate simplifies writing `build.rs` for Exonum and Exonum services.
+//! This crate simplifies writing build scripts (`build.rs`) for Exonum and Exonum services.
 //!
 //! Since Protobuf is the Exonum default serialization format, `build.rs` is mostly used
 //! to compile Protobuf files and generate a corresponding code. This code is used later by
 //! the Exonum core and services.
 //!
-//! All you need to do is to call `ProtobufGenerator` with required params, for an example see
-//! [`ProtobufGenerator`] docs.
+//! In order to use the crate, call `ProtobufGenerator` with the required params.
+//! See [`ProtobufGenerator`] docs for an example.
 //!
-//! There are several predefined sets of protobuf sources available for use.
-//! See [`ProtoSources`].
+//! # File Sets
 //!
-//! Currently presented sets:
+//! There are several predefined sets of Protobuf sources available for use, split according
+//! to the crate the sources are defined in. These sets are described by [`ProtoSources`]:
 //!
-//! - Crypto sources: all the necessary crypto types used in services and system proto-files.
-//! These types are `Hash`, `PublicKey` and `Signature`.
+//! - **Crypto sources:** cryptographic types used in services and the code.
+//! - **Common sources:** types that can be used by various parts of Exonum.
+//! - **MerkleDB sources:** types representing proofs of existence of element in database.
+//! - **Core sources:** types used in core and in system services such as supervisor.
 //!
-//! - Exonum sources: types used in core and in system services such as supervisor.
+//! | File path | Set | Description |
+//! |-----------|-----|-------------|
+//! | `exonum/crypto/types.proto` | Crypto | Basic types: `Hash`, `PublicKey` and `Signature` |
+//! | `exonum/common/bit_vec.proto` | Common | Protobuf mapping for `BitVec` |
+//! | `exonum/proof/list_proof.proto` | MerkleDB | `ListProof` and related helpers |
+//! | `exonum/proof/map_proof.proto` | MerkleDB | `MapProof` and related helpers |
+//! | `exonum/blockchain.proto` | Core | Basic core types (e.g., `Block`) |
+//! | `exonum/key_value_sequence.proto` | Core | Key-value sequence used to store additional headers in `Block` |
+//! | `exonum/messages.proto` | Core | Base types for Ed25519-authenticated messages |
+//! | `exonum/proofs.proto` | Core | Block and index proofs |
+//! | `exonum/runtime/auth.proto` | Core | Authorization-related types |
+//! | `exonum/runtime/base.proto` | Core | Basic runtime types (e.g., artifact ID) |
+//! | `exonum/runtime/errors.proto` | Core | Execution errors |
+//! | `exonum/runtime/lifecycle.proto` | Core | Advanced types used in service lifecycle |
 //!
-//! - Common sources: types that can be used by various parts of Exonum.
-//!
-//! - MerkleDB sources: types representing proofs of existence of element in database.
+//! Each file is placed in the Protobuf package matching its path, similar to well-known Protobuf
+//! types. For example, `exonum/runtime/auth.proto` types are in the `exonum.runtime` package.
 //!
 //! [`ProtobufGenerator`]: struct.ProtobufGenerator.html
 //! [`ProtoSources`]: enum.ProtoSources.html
@@ -41,7 +55,7 @@
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenStream};
 use protoc_rust::Customize;
 use quote::{quote, ToTokens};
 use walkdir::WalkDir;
@@ -54,18 +68,18 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Enum represents various sources of protobuf files.
+/// Enum representing various sources of Protobuf files.
 #[derive(Debug, Copy, Clone)]
 pub enum ProtoSources<'a> {
-    /// Path to exonum core protobuf files.
+    /// Path to core Protobuf files.
     Exonum,
-    /// Path to exonum crypto protobuf files.
+    /// Path to crypto Protobuf files.
     Crypto,
-    /// Path to common protobuf files.
+    /// Path to common Protobuf files.
     Common,
-    /// Path to merkledb protobuf files.
+    /// Path to database-related Protobuf files.
     Merkledb,
-    /// Path to manually specified protobuf sources.
+    /// Manually specified path.
     Path(&'a str),
 }
 
@@ -88,14 +102,30 @@ impl<'a> From<&'a str> for ProtoSources<'a> {
     }
 }
 
-/// Finds all .proto files in `path` and subfolders and returns a vector of their paths.
-fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct ProtobufFile {
+    full_path: PathBuf,
+    relative_path: String,
+}
+
+/// Finds all .proto files in `path` and sub-directories and returns a vector
+/// with metadata on found files.
+fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<ProtobufFile> {
     WalkDir::new(path)
         .into_iter()
         .filter_map(|e| {
-            let e = e.ok()?;
-            if e.path().extension()?.to_str() == Some("proto") {
-                Some(e.path().into())
+            let entry = e.ok()?;
+            if entry.file_type().is_file() && entry.path().extension()?.to_str() == Some("proto") {
+                let full_path = entry.path().to_owned();
+                let relative_path = full_path.strip_prefix(path).unwrap().to_owned();
+                let relative_path = relative_path
+                    .to_str()
+                    .expect("Cannot convert relative path to string");
+
+                Some(ProtobufFile {
+                    full_path,
+                    relative_path: canonicalize_protobuf_path(&relative_path),
+                })
             } else {
                 None
             }
@@ -103,20 +133,26 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<PathBuf> {
         .collect()
 }
 
+#[cfg(windows)]
+fn canonicalize_protobuf_path(path_str: &str) -> String {
+    path_str.replace('\\', "/")
+}
+
+#[cfg(not(windows))]
+fn canonicalize_protobuf_path(path_str: &str) -> String {
+    path_str.to_owned()
+}
+
 /// Includes all .proto files with their names into generated file as array of tuples,
 /// where tuple content is (file_name, file_content).
-fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTokens {
+fn include_proto_files(proto_files: HashSet<&ProtobufFile>, name: &str) -> impl ToTokens {
     let proto_files_len = proto_files.len();
     // TODO Think about syn crate and token streams instead of dirty strings.
-    let proto_files = proto_files.iter().map(|path| {
-        let name = path
-            .file_name()
-            .unwrap()
-            .to_str()
-            .expect(".proto file name is not convertible to &str");
+    let proto_files = proto_files.iter().map(|file| {
+        let name = &file.relative_path;
 
         let mut content = String::new();
-        File::open(path)
+        File::open(&file.full_path)
             .expect("Unable to open .proto file")
             .read_to_string(&mut content)
             .expect("Unable to read .proto file");
@@ -139,36 +175,39 @@ fn include_proto_files(proto_files: HashSet<&PathBuf>, name: &str) -> impl ToTok
     }
 }
 
+fn get_mod_files(proto_files: &[ProtobufFile]) -> impl Iterator<Item = TokenStream> + '_ {
+    proto_files.iter().map(|file| {
+        let mod_name = file
+            .full_path
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .expect(".proto file name is not convertible to &str");
+
+        let mod_name = Ident::new(mod_name, Span::call_site());
+        if mod_name == "tests" {
+            quote! {
+                #[cfg(test)] pub mod #mod_name;
+            }
+        } else {
+            quote! {
+                pub mod #mod_name;
+            }
+        }
+    })
+}
+
 /// Collects .rs files generated by the rust-protobuf into single module.
 ///
 /// - If module name is `tests` it adds `#[cfg(test)]` to declaration.
 /// - Also this method includes source files as `PROTO_SOURCES` constant.
-fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
-    out_dir: P,
-    proto_files: &[PathBuf],
-    includes: &[PathBuf],
-    mod_file: Q,
+fn generate_mod_rs(
+    out_dir: impl AsRef<Path>,
+    proto_files: &[ProtobufFile],
+    includes: &[ProtobufFile],
+    mod_file: impl AsRef<Path>,
 ) {
-    let mod_files = {
-        proto_files.iter().map(|f| {
-            let mod_name = f
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .expect(".proto file name is not convertible to &str");
-
-            let mod_name = Ident::new(mod_name, Span::call_site());
-            if mod_name == "tests" {
-                quote! {
-                    #[cfg(test)] pub mod #mod_name;
-                }
-            } else {
-                quote! {
-                    pub mod #mod_name;
-                }
-            }
-        })
-    };
+    let mod_files = get_mod_files(proto_files);
 
     // To avoid cases where input sources are also added as includes, use only
     // unique paths.
@@ -186,6 +225,21 @@ fn generate_mod_rs<P: AsRef<Path>, Q: AsRef<Path>>(
         #includes
     };
 
+    let dest_path = out_dir.as_ref().join(mod_file);
+    let mut file = File::create(dest_path).expect("Unable to create output file");
+    file.write_all(content.into_token_stream().to_string().as_bytes())
+        .expect("Unable to write data to file");
+}
+
+fn generate_mod_rs_without_sources(
+    out_dir: impl AsRef<Path>,
+    proto_files: &[ProtobufFile],
+    mod_file: impl AsRef<Path>,
+) {
+    let mod_files = get_mod_files(proto_files);
+    let content = quote! {
+        #( #mod_files )*
+    };
     let dest_path = out_dir.as_ref().join(mod_file);
     let mut file = File::create(dest_path).expect("Unable to create output file");
     file.write_all(content.into_token_stream().to_string().as_bytes())
@@ -229,6 +283,7 @@ pub struct ProtobufGenerator<'a> {
     includes: Vec<ProtoSources<'a>>,
     mod_name: &'a str,
     input_dir: &'a str,
+    include_sources: bool,
 }
 
 impl<'a> ProtobufGenerator<'a> {
@@ -243,6 +298,7 @@ impl<'a> ProtobufGenerator<'a> {
             includes: Vec::new(),
             input_dir: "",
             mod_name,
+            include_sources: true,
         }
     }
 
@@ -304,6 +360,12 @@ impl<'a> ProtobufGenerator<'a> {
         self
     }
 
+    /// Switches off inclusion of source Protobuf files into the generated output.
+    pub fn without_sources(mut self) -> Self {
+        self.include_sources = false;
+        self
+    }
+
     /// Generate proto files from specified sources.
     ///
     /// # Panics
@@ -312,41 +374,37 @@ impl<'a> ProtobufGenerator<'a> {
     pub fn generate(self) {
         assert!(!self.input_dir.is_empty(), "Input dir is not specified");
         assert!(!self.includes.is_empty(), "Includes are not specified");
-        protobuf_generate(self.input_dir, &self.includes, self.mod_name);
+        protobuf_generate(
+            self.input_dir,
+            &self.includes,
+            self.mod_name,
+            self.include_sources,
+        );
     }
 }
 
-fn protobuf_generate<P, T>(input_dir: P, includes: &[ProtoSources<'_>], mod_file_name: T)
-where
-    P: AsRef<Path>,
-    T: AsRef<str>,
-{
+fn protobuf_generate(
+    input_dir: &str,
+    includes: &[ProtoSources<'_>],
+    mod_file_name: &str,
+    include_sources: bool,
+) {
     let out_dir = env::var("OUT_DIR")
         .map(PathBuf::from)
         .expect("Unable to get OUT_DIR");
 
     // Converts paths to strings and adds input dir to includes.
     let mut includes: Vec<_> = includes.iter().map(ProtoSources::path).collect();
-
-    includes.push(
-        input_dir
-            .as_ref()
-            .to_str()
-            .expect("Input dir name is not convertible to &str")
-            .into(),
-    );
-
+    includes.push(input_dir.to_owned());
     let includes: Vec<&str> = includes.iter().map(String::as_str).collect();
 
     let proto_files = get_proto_files(&input_dir);
-    let included_files = get_included_files(&includes);
-
-    generate_mod_rs(
-        &out_dir,
-        &proto_files,
-        &included_files,
-        &mod_file_name.as_ref(),
-    );
+    if include_sources {
+        let included_files = get_included_files(&includes);
+        generate_mod_rs(&out_dir, &proto_files, &included_files, mod_file_name);
+    } else {
+        generate_mod_rs_without_sources(&out_dir, &proto_files, mod_file_name);
+    }
 
     protoc_rust::run(protoc_rust::Args {
         out_dir: out_dir
@@ -354,7 +412,11 @@ where
             .expect("Out dir name is not convertible to &str"),
         input: &proto_files
             .iter()
-            .map(|s| s.to_str().expect("File name is not convertible to &str"))
+            .map(|s| {
+                s.full_path
+                    .to_str()
+                    .expect("File name is not convertible to &str")
+            })
             .collect::<Vec<_>>(),
         includes: &includes,
         customize: Customize {
@@ -365,7 +427,7 @@ where
     .expect("protoc");
 }
 
-fn get_included_files(includes: &[&str]) -> Vec<PathBuf> {
+fn get_included_files(includes: &[&str]) -> Vec<ProtobufFile> {
     includes
         .iter()
         .flat_map(|path| get_proto_files(path))

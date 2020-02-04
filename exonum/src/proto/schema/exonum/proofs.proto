@@ -16,11 +16,11 @@ syntax = "proto3";
 
 package exonum;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.core";
 
-import "blockchain.proto";
-import "messages.proto";
-import "map_proof.proto";
+import "exonum/blockchain.proto";
+import "exonum/messages.proto";
+import "exonum/proof/map_proof.proto";
 
 // Block with its `Precommit` messages.
 //
@@ -33,7 +33,7 @@ message BlockProof {
   // in the block, etc.
   Block block = 1;
   // List of `Precommit` messages for the block.
-  repeated messages.SignedMessage precommits = 2;
+  repeated SignedMessage precommits = 2;
 }
 
 // Proof of authenticity for a single index within the database.

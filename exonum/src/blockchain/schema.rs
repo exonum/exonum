@@ -28,7 +28,7 @@ use crate::{
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Precommit, Verified},
-    proto::{self, schema::blockchain as pb_blockchain},
+    proto::schema::blockchain as pb_blockchain,
     runtime::InstanceId,
 };
 
@@ -62,7 +62,7 @@ define_names!(
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxLocation")]
+#[protobuf_convert(source = "pb_blockchain::TxLocation")]
 pub struct TxLocation {
     /// Height of the block where the transaction was included.
     block_height: Height,

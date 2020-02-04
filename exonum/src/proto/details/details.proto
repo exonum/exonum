@@ -12,13 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Module with protobuf generated files from `schema/exonum`.
+syntax = "proto3";
 
-// For rust-protobuf generated files.
-#![allow(bare_trait_objects, clippy::pedantic)]
+package exonum.runtime._details;
 
-use crate::crypto::proto::*;
-use crate::merkledb::proto::*;
+// Information about a modified service instance. This type is considered
+// an implementation detail of the core.
+message ModifiedInstanceInfo {
+  enum MigrationTransition {
+    NONE = 0;
+    START = 1;
+    COMMIT = 2;
+    ROLLBACK = 3;
+  }
 
-include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
-include!(concat!(env!("OUT_DIR"), "/exonum_details_mod.rs"));
+  MigrationTransition migration_transition = 1;
+}

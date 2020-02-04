@@ -16,12 +16,12 @@
 
 syntax = "proto3";
 
-package exonum.messages;
+package exonum;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.core";
 
-import "types.proto";
-import "runtime.proto";
+import "exonum/crypto/types.proto";
+import "exonum/runtime/base.proto";
 import "google/protobuf/timestamp.proto";
 
 // Container for the signed messages.
