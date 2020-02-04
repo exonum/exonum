@@ -131,6 +131,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
   (#1598)
 
+- `with_service` has been renamed to the `with_rust_service`. (#1765)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)

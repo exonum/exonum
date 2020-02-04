@@ -138,7 +138,7 @@ impl NodeBuilder {
     }
 
     /// Adds new Rust service to the list of available services.
-    pub fn with_service(mut self, service: impl ServiceFactory) -> Self {
+    pub fn with_rust_service(mut self, service: impl ServiceFactory) -> Self {
         self.rust_runtime = self.rust_runtime.with_factory(service);
         self
     }
@@ -161,9 +161,9 @@ impl NodeBuilder {
 
     /// Adds a default Rust service instance that will be available immediately after creating a
     /// genesis block.
-    pub fn with_default_service(self, service: impl DefaultInstance) -> Self {
+    pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
         self.with_default_instance(service.default_instance())
-            .with_service(service)
+            .with_rust_service(service)
     }
 
     /// Configures the node using parameters provided by user from stdin and then runs it.
