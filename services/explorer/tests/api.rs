@@ -15,7 +15,7 @@
 use assert_matches::assert_matches;
 use exonum::{
     blockchain::{AdditionalHeaders, CallInBlock, ProposerId},
-    crypto::{gen_keypair, Hash},
+    crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
     merkledb::{BinaryValue, HashTag, ObjectHash},
     runtime::{ErrorKind, ExecutionError},
@@ -174,7 +174,7 @@ fn test_explorer_api_block_request() {
 fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
-        let tx = gen_keypair().increment(SERVICE_ID, height);
+        let tx = KeyPair::random().increment(SERVICE_ID, height);
         testkit.api().send(tx.clone());
     }
     testkit.create_block();
@@ -352,7 +352,7 @@ fn test_explorer_blocks_loaded_info() {
 #[test]
 fn test_explorer_transaction_info() {
     let (mut testkit, api) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 5);
+    let tx = KeyPair::random().increment(SERVICE_ID, 5);
 
     let info = api
         .public(ApiKind::Explorer)
@@ -419,9 +419,9 @@ fn test_explorer_transaction_info() {
 #[test]
 fn test_explorer_transaction_statuses() {
     let (mut testkit, api) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 5);
-    let error_tx = gen_keypair().increment(SERVICE_ID, 0);
-    let panicking_tx = gen_keypair().increment(SERVICE_ID, u64::max_value() - 3);
+    let tx = KeyPair::random().increment(SERVICE_ID, 5);
+    let error_tx = KeyPair::random().increment(SERVICE_ID, 0);
+    let panicking_tx = KeyPair::random().increment(SERVICE_ID, u64::max_value() - 3);
 
     let block = testkit.create_block_with_transactions(vec![
         tx.clone(),
@@ -510,7 +510,7 @@ fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
 
     // Send valid transaction.
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let tx = keypair.reset(SERVICE_ID, ());
     let data = hex::encode(tx.to_bytes());
     let response = api
@@ -544,7 +544,7 @@ fn test_explorer_add_invalid_transaction() {
 #[test]
 fn test_explorer_api_with_before_transactions_error() {
     let (mut testkit, api) = init_testkit();
-    let key_pair = gen_keypair();
+    let key_pair = KeyPair::random();
     let tx = key_pair.increment(SERVICE_ID, 13);
 
     // This tx lead to error in before_transaction on the next transaction
@@ -597,7 +597,7 @@ fn test_explorer_api_with_before_transactions_error() {
 #[test]
 fn test_explorer_api_with_transaction_error() {
     let (mut testkit, api) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 0);
+    let tx = KeyPair::random().increment(SERVICE_ID, 0);
 
     testkit.create_block_with_transaction(tx.clone());
 
@@ -637,7 +637,7 @@ fn test_explorer_api_with_transaction_error() {
 #[test]
 fn test_explorer_api_with_after_transactions_error() {
     let (mut testkit, api) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 42);
+    let tx = KeyPair::random().increment(SERVICE_ID, 42);
 
     testkit.create_block_with_transaction(tx.clone());
 
@@ -677,7 +677,7 @@ fn test_explorer_api_with_after_transactions_error() {
 #[test]
 fn test_explorer_api_without_error() {
     let (mut testkit, api) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 1);
+    let tx = KeyPair::random().increment(SERVICE_ID, 1);
 
     testkit.create_block_with_transaction(tx.clone());
 

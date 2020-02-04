@@ -15,7 +15,7 @@
 //! Simple timestamping service implementation.
 
 use exonum::{
-    crypto::gen_keypair,
+    crypto::KeyPair,
     merkledb::ObjectHash,
     runtime::{ExecutionContext, ExecutionError, SnapshotExt},
 };
@@ -56,7 +56,7 @@ fn main() {
         .with_rust_service(service)
         .build();
     // Create few transactions.
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let tx1 = keypair.timestamp(instance_id, "Down To Earth".to_owned());
     let tx2 = keypair.timestamp(instance_id, "Cry Over Spilt Milk".to_owned());
     let tx3 = keypair.timestamp(instance_id, "Dropping Like Flies".to_owned());

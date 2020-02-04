@@ -56,7 +56,7 @@ use std::{
 };
 
 use super::{CallInfo, InstanceId, MethodId};
-use crate::proto::schema::runtime as runtime_proto;
+use crate::proto::schema::errors as errors_proto;
 
 /// Trait representing an error type defined in the service or runtime code.
 ///
@@ -198,10 +198,10 @@ impl fmt::Display for CallSite {
 }
 
 impl ProtobufConvert for CallSite {
-    type ProtoStruct = runtime_proto::CallSite;
+    type ProtoStruct = errors_proto::CallSite;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        use runtime_proto::CallSite_Type::*;
+        use errors_proto::CallSite_Type::*;
 
         let mut pb = Self::ProtoStruct::new();
         pb.set_instance_id(self.instance_id);
@@ -221,7 +221,7 @@ impl ProtobufConvert for CallSite {
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        use runtime_proto::CallSite_Type::*;
+        use errors_proto::CallSite_Type::*;
 
         let call_type = match pb.get_call_type() {
             CONSTRUCTOR => CallType::Constructor,

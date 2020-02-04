@@ -16,10 +16,10 @@ syntax = "proto3";
 
 package exonum;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.core";
 
-import "types.proto";
-import "key_value_sequence.proto";
+import "exonum/crypto/types.proto";
+import "exonum/key_value_sequence.proto";
 
 // Extensible set of additional headers, represented
 // as a sequence of key-value pairs.

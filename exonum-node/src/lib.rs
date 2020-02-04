@@ -1147,8 +1147,7 @@ impl Node {
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
-            self.state().keys().consensus_pk(),
-            self.state().keys().consensus_sk().to_owned(),
+            &self.state().keys().consensus,
             self.state().connect_list().clone(),
             self.state().our_connect_message().clone(),
             self.max_message_len,

@@ -14,7 +14,7 @@
 
 // spell-checker:ignore rustc
 
-use exonum_build::ProtobufGenerator;
+use exonum_build::{ProtoSources, ProtobufGenerator};
 
 use std::{env, fs::File, io::Write, path::Path, process::Command};
 
@@ -26,7 +26,7 @@ fn create_path_to_protobuf_schema_env() {
     // and dependents in their `build.rs` will have access to `$DEP_EXONUM_PROTOBUF_PROTOS`.
 
     let current_dir = env::current_dir().expect("Failed to get current dir.");
-    let protos = current_dir.join("src/proto/schema/exonum");
+    let protos = current_dir.join("src/proto/schema");
     println!("cargo:protos={}", protos.to_str().unwrap());
 
     // Reexport common, MerkleDB and crypto protobuf files.
@@ -56,20 +56,25 @@ fn write_user_agent_file() {
 
 fn main() {
     write_user_agent_file();
-
     create_path_to_protobuf_schema_env();
 
     ProtobufGenerator::with_mod_name("exonum_proto_mod.rs")
-        .with_input_dir("src/proto/schema/exonum")
+        .with_input_dir("src/proto/schema")
         .with_crypto()
         .with_common()
         .with_merkledb()
+        .generate();
+
+    ProtobufGenerator::with_mod_name("exonum_details_mod.rs")
+        .with_input_dir("src/proto/details")
+        .with_crypto()
+        .with_includes(&[ProtoSources::Path("src/proto/schema")])
+        .without_sources()
         .generate();
 }
 
 fn rust_version() -> Option<String> {
     let rustc = option_env!("RUSTC").unwrap_or("rustc");
-
     let output = Command::new(rustc).arg("-V").output().ok()?.stdout;
     String::from_utf8(output).ok()
 }

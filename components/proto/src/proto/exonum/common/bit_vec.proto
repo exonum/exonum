@@ -14,12 +14,15 @@
 
 syntax = "proto3";
 
-package exonum.crypto;
+package exonum.common;
 
-option java_package = "com.exonum.core.messages";
+option java_package = "com.exonum.messages.common";
 
-message Hash { bytes data = 1; }
-
-message PublicKey { bytes data = 1; }
-
-message Signature { bytes data = 1; }
+// Vector of bits.
+message BitVec {
+  // Buffer containing the bits. Most significant bits of each byte
+  // have lower indexes in the vector.
+  bytes data = 1;
+  // Number of bits.
+  uint64 len = 2;
+}

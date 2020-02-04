@@ -20,7 +20,7 @@
 //! ```
 //! use exonum::{
 //!     blockchain::{Block, Schema},
-//!     crypto::{gen_keypair, Hash},
+//!     crypto::{Hash, KeyPair},
 //!     helpers::Height,
 //!     runtime::{BlockchainData, SnapshotExt, ExecutionError},
 //! };
@@ -72,7 +72,7 @@
 //!     .build();
 //!
 //! // Create a few transactions.
-//! let keys = gen_keypair();
+//! let keys = KeyPair::random();
 //! let id = SERVICE_ID;
 //! let tx1 = keys.timestamp(id, "Down To Earth".into());
 //! let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
@@ -343,7 +343,7 @@ impl TestKit {
     /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
-    /// # use exonum::{crypto::{PublicKey, Hash, SecretKey}, runtime::ExecutionError};
+    /// # use exonum::{crypto::{Hash, KeyPair, PublicKey, SecretKey}, runtime::ExecutionError};
     /// # use exonum_rust_runtime::{ExecutionContext, Service, ServiceFactory};
     /// #
     /// // Suppose we test this service interface:
@@ -386,7 +386,7 @@ impl TestKit {
     ///     .with_rust_service(ExampleService)
     ///     .build();
     /// expensive_setup(&mut testkit);
-    /// let keys = exonum::crypto::gen_keypair();
+    /// let keys = KeyPair::random();
     /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
     /// let tx_b = keys.example_tx(SERVICE_ID, "bar".into());
     ///

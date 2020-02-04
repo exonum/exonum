@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.examples.cryptocurrency;
 
-import "types.proto";
+import "exonum/crypto/types.proto";
 
 // Transaction type for creating a new wallet.
 message TxCreateWallet {

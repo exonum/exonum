@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "types.proto";
+import "exonum/crypto/types.proto";
 
 package exonum.benchmarks;
 

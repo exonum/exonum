@@ -128,7 +128,7 @@ impl ConnectListConfig {
 
 #[cfg(test)]
 mod test {
-    use exonum::crypto::{gen_keypair, PublicKey, PUBLIC_KEY_LENGTH};
+    use exonum::crypto::{KeyPair, PublicKey, PUBLIC_KEY_LENGTH};
     use pretty_assertions::assert_eq;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
@@ -228,7 +228,7 @@ mod test {
 
     #[test]
     fn test_address_allowed() {
-        let (public_key, _) = gen_keypair();
+        let public_key = KeyPair::random().public_key();
         let address = "127.0.0.1:80".to_owned();
 
         let mut connect_list = ConnectList::default();

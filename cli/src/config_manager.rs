@@ -84,7 +84,7 @@ impl ConfigManager for DefaultConfigManager {
 
 #[cfg(test)]
 mod tests {
-    use exonum::crypto::gen_keypair;
+    use exonum::crypto::KeyPair;
     use exonum_node::{ConnectInfo, ConnectListConfig};
     use exonum_supervisor::mode::Mode;
     use tempfile::tempdir;
@@ -124,7 +124,7 @@ mod tests {
         // Test config update.
         let peer = ConnectInfo {
             address: "0.0.0.1:8080".to_owned(),
-            public_key: gen_keypair().0,
+            public_key: KeyPair::random().public_key(),
         };
 
         let connect_list = ConnectListConfig { peers: vec![peer] };

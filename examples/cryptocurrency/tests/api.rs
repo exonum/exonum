@@ -19,7 +19,7 @@
 //! about the storage state.
 
 use exonum::{
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{Hash, KeyPair, PublicKey},
     messages::{AnyTx, Verified},
 };
 use exonum_explorer_service::ExplorerFactory;
@@ -273,8 +273,8 @@ impl CryptocurrencyApi {
     /// within the response).
     /// Note that the transaction is not immediately added to the blockchain, but rather is put
     /// to the pool of unconfirmed transactions.
-    fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, (PublicKey, SecretKey)) {
-        let keypair = crypto::gen_keypair();
+    fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, KeyPair) {
+        let keypair = KeyPair::random();
         // Create a pre-signed transaction
         let tx = keypair.create_wallet(INSTANCE_ID, CreateWallet::new(name));
         let tx_info: serde_json::Value = self

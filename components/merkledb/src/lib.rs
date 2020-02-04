@@ -174,7 +174,10 @@ pub mod _reexports {
 
 pub use self::{
     backends::{rocksdb::RocksDB, temporarydb::TemporaryDB},
-    db::{Database, DatabaseExt, Fork, Iter, Iterator, Patch, ReadonlyFork, Snapshot},
+    db::{
+        Database, DatabaseExt, Fork, Iter, Iterator, OwnedReadonlyFork, Patch, ReadonlyFork,
+        Snapshot,
+    },
     error::Error,
     hash::{root_hash, HashTag, ObjectHash, ValidationError},
     keys::BinaryKey,

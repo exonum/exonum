@@ -18,7 +18,7 @@ use failure::ensure;
 
 use std::fmt::Display;
 
-use crate::proto::schema::runtime as runtime_proto;
+use crate::proto::schema::errors as errors_proto;
 
 /// Kind of execution error, divided into several distinct sub-groups.
 ///
@@ -133,22 +133,22 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
-    pub(super) fn into_raw(self) -> (runtime_proto::ErrorKind, u8) {
+    pub(super) fn into_raw(self) -> (errors_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Unexpected => (runtime_proto::ErrorKind::UNEXPECTED, 0),
-            ErrorKind::Common { code } => (runtime_proto::ErrorKind::COMMON, code),
-            ErrorKind::Core { code } => (runtime_proto::ErrorKind::CORE, code),
-            ErrorKind::Runtime { code } => (runtime_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (runtime_proto::ErrorKind::SERVICE, code),
+            ErrorKind::Unexpected => (errors_proto::ErrorKind::UNEXPECTED, 0),
+            ErrorKind::Common { code } => (errors_proto::ErrorKind::COMMON, code),
+            ErrorKind::Core { code } => (errors_proto::ErrorKind::CORE, code),
+            ErrorKind::Runtime { code } => (errors_proto::ErrorKind::RUNTIME, code),
+            ErrorKind::Service { code } => (errors_proto::ErrorKind::SERVICE, code),
             ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 
     pub(super) fn from_raw(
-        kind: runtime_proto::ErrorKind,
+        kind: errors_proto::ErrorKind,
         code: u8,
     ) -> Result<Self, failure::Error> {
-        use runtime_proto::ErrorKind::*;
+        use errors_proto::ErrorKind::*;
         let kind = match kind {
             UNEXPECTED => {
                 ensure!(code == 0, "Error code for panic should be zero");
