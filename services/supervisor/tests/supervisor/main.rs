@@ -272,7 +272,7 @@ fn test_static_service() {
 
     assert_count_is_not_set(&api, SERVICE_NAME);
 
-    let keypair = crypto::gen_keypair();
+    let keypair = crypto::KeyPair::random();
     api.send(keypair.inc(SERVICE_ID, 0));
     testkit.create_block();
     assert_count(&api, SERVICE_NAME, 1);
@@ -292,7 +292,7 @@ fn test_dynamic_service_normal_workflow() {
 
     assert_count_is_not_set(&api, instance_name);
 
-    let keypair = crypto::gen_keypair();
+    let keypair = crypto::KeyPair::random();
     api.send(keypair.inc(instance_id, 0));
     testkit.create_block();
     assert_count(&api, instance_name, 1);
@@ -537,7 +537,7 @@ fn test_restart_node_and_start_service_instance() {
     assert!(artifact_exists(&testkit, &default_artifact().name));
 
     let instance_name = "test_basics";
-    let keypair = crypto::gen_keypair();
+    let keypair = crypto::KeyPair::random();
 
     // Start IncService's instance now.
     let instance_id = start_service_instance(&mut testkit, instance_name);
@@ -674,7 +674,7 @@ fn test_two_validators() {
     // Basic check that service works.
     {
         assert_count_is_not_set(&api, instance_name);
-        let keypair = crypto::gen_keypair();
+        let keypair = crypto::KeyPair::random();
         api.send(keypair.inc(instance_id, 0));
         testkit.create_block();
         assert_count(&api, instance_name, 1);
@@ -799,7 +799,7 @@ fn test_auditor_normal_workflow() {
     // Check that service still works.
     {
         assert_count_is_not_set(&api, instance_name);
-        let keypair = crypto::gen_keypair();
+        let keypair = crypto::KeyPair::random();
         api.send(keypair.inc(instance_id, 0));
         testkit.create_block();
         assert_count(&api, instance_name, 1);

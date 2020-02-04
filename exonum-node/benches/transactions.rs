@@ -89,12 +89,11 @@ impl EventHandler for MessagesHandler {
 }
 
 fn gen_messages(count: u64, tx_size: usize) -> Vec<Vec<u8>> {
-    let (pk, sk) = crypto::gen_keypair();
+    let keypair = crypto::KeyPair::random();
     (0..count)
         .map(|_| {
-            let any_tx = AnyTx::new(CallInfo::new(0, 0), vec![0; tx_size]);
-            let msg = Verified::from_value(any_tx, pk, &sk);
-            msg.into_bytes()
+            let tx = AnyTx::new(CallInfo::new(0, 0), vec![0; tx_size]).sign_with_keypair(&keypair);
+            tx.into_bytes()
         })
         .collect()
 }

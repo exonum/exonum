@@ -22,7 +22,7 @@
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    crypto::{gen_keypair, PublicKey},
+    crypto::{KeyPair, PublicKey},
     helpers::Height,
     merkledb::{
         access::{Access, FromAccess},
@@ -145,9 +145,9 @@ fn main() {
     let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
     assert_eq!(time_schema.time.get(), Some(mock_provider.time()));
 
-    let keypair1 = gen_keypair();
-    let keypair2 = gen_keypair();
-    let keypair3 = gen_keypair();
+    let keypair1 = KeyPair::random();
+    let keypair2 = KeyPair::random();
+    let keypair3 = KeyPair::random();
     let tx1 = keypair1.mark(SERVICE_ID, TxMarker::new(1, mock_provider.time()));
     let tx2 = keypair2.mark(
         SERVICE_ID,
@@ -161,14 +161,14 @@ fn main() {
 
     let snapshot = testkit.snapshot();
     let schema: MarkerSchema<_> = snapshot.service_schema(SERVICE_NAME).unwrap();
-    assert_eq!(schema.marks.get(&keypair1.0), Some(1));
-    assert_eq!(schema.marks.get(&keypair2.0), Some(2));
-    assert_eq!(schema.marks.get(&keypair3.0), None);
+    assert_eq!(schema.marks.get(&keypair1.public_key()), Some(1));
+    assert_eq!(schema.marks.get(&keypair2.public_key()), Some(2));
+    assert_eq!(schema.marks.get(&keypair3.public_key()), None);
 
     let tx4 = keypair3.mark(SERVICE_ID, TxMarker::new(4, Utc.timestamp(15, 0)));
     testkit.create_block_with_transactions(vec![tx4]);
 
     let snapshot = testkit.snapshot();
     let schema: MarkerSchema<_> = snapshot.service_schema(SERVICE_NAME).unwrap();
-    assert_eq!(schema.marks.get(&keypair3.0), Some(4));
+    assert_eq!(schema.marks.get(&keypair3.public_key()), Some(4));
 }

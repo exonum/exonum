@@ -249,7 +249,7 @@
 //! ```
 //! # use exonum::runtime::ExecutionError;
 //! # use exonum_rust_runtime::ExecutionContext;
-//! # use exonum::crypto::gen_keypair;
+//! # use exonum::crypto::KeyPair;
 //! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
 //! # type Transfer = String;
@@ -263,7 +263,7 @@
 //! }
 //!
 //! // Create a signed transaction.
-//! let keypair = gen_keypair();
+//! let keypair = KeyPair::random();
 //! let create_wallet: CreateWallet = // ...
 //! #    "create_wallet".to_owned();
 //! // The context in this case is the numerical instance ID.

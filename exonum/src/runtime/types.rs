@@ -89,7 +89,7 @@ impl CallInfo {
 ///     runtime::{AnyTx, CallInfo},
 /// };
 ///
-/// let keypair = crypto::gen_keypair();
+/// let keypair = crypto::KeyPair::random();
 /// // Service instance which we want to call.
 /// let instance_id = 1024;
 /// // Specific method of the service interface.
@@ -99,12 +99,7 @@ impl CallInfo {
 /// // `AnyTx` object created from `CallInfo` and payload.
 /// let arguments = "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes();
 /// let any_tx = AnyTx::new(call_info, arguments);
-///
-/// let transaction = Verified::from_value(
-///     any_tx,
-///     keypair.0,
-///     &keypair.1
-/// );
+/// let transaction = any_tx.sign_with_keypair(&keypair);
 /// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
@@ -958,7 +953,7 @@ impl ProtobufConvert for Caller {
 ///
 /// ```
 /// # use exonum::{crypto, merkledb::BinaryValue, runtime::{Caller, CallerAddress}};
-/// let (public_key, _) = crypto::gen_keypair();
+/// let public_key = crypto::KeyPair::random().public_key();
 /// let address = CallerAddress::from_key(public_key);
 /// let caller = Caller::Transaction { author: public_key };
 /// // Obtain Protobuf serialization of the `Caller`.

@@ -41,23 +41,23 @@
 //! ```
 //! # use chrono::Utc;
 //! # use exonum::{
-//! #     crypto::{self, Hash},
+//! #     crypto::{hash, Hash, KeyPair},
 //! #     helpers::{Height, Round, ValidatorId},
 //! #     messages::{Precommit, Verified},
 //! # };
 //! # fn send<T>(_: T) {}
-//! let keypair = crypto::gen_keypair();
+//! let keypair = KeyPair::random();
 //! // For example, let's create a `Precommit` message.
 //! let payload = Precommit::new(
 //!     ValidatorId(0),
 //!     Height(15),
 //!     Round::first(),
-//!     crypto::hash(b"propose_hash"),
-//!     crypto::hash(b"block_hash"),
+//!     hash(b"propose_hash"),
+//!     hash(b"block_hash"),
 //!     Utc::now(),
 //! );
 //! // Sign the message with some keypair to get a trusted `Precommit` message.
-//! let signed_payload = Verified::from_value(payload, keypair.0, &keypair.1);
+//! let signed_payload = Verified::from_value(payload, keypair.public_key(), keypair.secret_key());
 //! // Further, convert the trusted message into a raw signed message and send
 //! // it through the network.
 //! let raw_signed_message = signed_payload.into_raw();
@@ -70,21 +70,21 @@
 //! # use assert_matches::assert_matches;
 //! # use chrono::Utc;
 //! # use exonum::{
-//! #     crypto::{self, Hash},
+//! #     crypto::{hash, Hash, KeyPair},
 //! #     helpers::{Height, Round, ValidatorId},
 //! #     messages::{CoreMessage, Precommit, Verified, SignedMessage},
 //! # };
 //! # fn get_signed_message() -> SignedMessage {
-//! #     let keypair = crypto::gen_keypair();
+//! #     let keypair = KeyPair::random();
 //! #     let payload = Precommit::new(
 //! #         ValidatorId(0),
 //! #         Height(15),
 //! #         Round::first(),
-//! #         crypto::hash(b"propose_hash"),
-//! #         crypto::hash(b"block_hash"),
+//! #         hash(b"propose_hash"),
+//! #         hash(b"block_hash"),
 //! #         Utc::now(),
 //! #     );
-//! #     Verified::from_value(payload, keypair.0, &keypair.1).into_raw()
+//! #     Verified::from_value(payload, keypair.public_key(), keypair.secret_key()).into_raw()
 //! # }
 //! // Assume you have some signed message.
 //! let raw: SignedMessage = get_signed_message();
@@ -116,7 +116,7 @@ pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH 
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use exonum_crypto::{self as crypto, gen_keypair};
+    use exonum_crypto::{self as crypto, KeyPair};
     use exonum_merkledb::BinaryValue;
     use exonum_proto::ProtobufConvert;
     use protobuf::Message;
@@ -129,14 +129,14 @@ mod tests {
 
     #[test]
     fn test_signed_message_min_size() {
-        let (public_key, secret_key) = gen_keypair();
-        let msg = SignedMessage::new(vec![], public_key, &secret_key);
+        let keys = KeyPair::random();
+        let msg = SignedMessage::new(vec![], keys.public_key(), keys.secret_key());
         assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.into_bytes().len())
     }
 
     #[test]
     fn test_message_roundtrip() {
-        let (pub_key, secret_key) = gen_keypair();
+        let keys = KeyPair::random();
         let ts = Utc::now();
 
         let msg = Verified::from_value(
@@ -148,8 +148,8 @@ mod tests {
                 crypto::hash(&[3, 2, 1]),
                 ts,
             ),
-            pub_key,
-            &secret_key,
+            keys.public_key(),
+            keys.secret_key(),
         );
 
         let bytes = msg.to_bytes();
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_signed_message_unusual_protobuf() {
-        let (pub_key, secret_key) = gen_keypair();
+        let keys = KeyPair::random();
 
         let mut ex_msg = proto::CoreMessage::new();
         let precommit_msg = Precommit::new(
@@ -179,7 +179,7 @@ mod tests {
         // Duplicate pb serialization to create unusual but correct protobuf message.
         payload.append(&mut payload.clone());
 
-        let signed = SignedMessage::new(payload, pub_key, &secret_key);
+        let signed = SignedMessage::new(payload, keys.public_key(), keys.secret_key());
 
         let bytes = signed.into_bytes();
         let message =
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_precommit_serde_correct() {
-        let (pub_key, secret_key) = gen_keypair();
+        let keys = KeyPair::random();
         let ts = Utc::now();
 
         let precommit = Verified::from_value(
@@ -204,8 +204,8 @@ mod tests {
                 crypto::hash(&[3, 2, 1]),
                 ts,
             ),
-            pub_key,
-            &secret_key,
+            keys.public_key(),
+            keys.secret_key(),
         );
 
         let precommit_json = serde_json::to_string(&precommit).unwrap();

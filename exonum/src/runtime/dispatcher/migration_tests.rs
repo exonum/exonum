@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::gen_keypair;
+use exonum_crypto::KeyPair;
 use exonum_merkledb::{
     access::{AccessExt, CopyAccessExt},
     migration::Migration,
@@ -207,8 +207,11 @@ impl Rig {
     }
 
     fn with_db_and_flag(db: Arc<TemporaryDB>, flag: bool) -> Self {
-        let blockchain =
-            Blockchain::new(db as Arc<dyn Database>, gen_keypair(), ApiSender::closed());
+        let blockchain = Blockchain::new(
+            db as Arc<dyn Database>,
+            KeyPair::random(),
+            ApiSender::closed(),
+        );
         let blockchain = blockchain
             .into_mut_with_dummy_config()
             .with_runtime(MigrationRuntime::with_script_flag(flag))

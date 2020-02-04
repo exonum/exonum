@@ -116,7 +116,7 @@ impl InternalPart {
 #[cfg(test)]
 mod tests {
     use exonum::{
-        crypto::{gen_keypair, Hash, Signature},
+        crypto::{Hash, KeyPair, Signature},
         helpers::Height,
         messages::Verified,
     };
@@ -156,8 +156,13 @@ mod tests {
     }
 
     fn get_signed_message() -> SignedMessage {
-        let (pk, sk) = gen_keypair();
-        Verified::from_value(Status::new(Height(0), Hash::zero(), 0), pk, &sk).into_raw()
+        let keys = KeyPair::random();
+        Verified::from_value(
+            Status::new(Height(0), Hash::zero(), 0),
+            keys.public_key(),
+            keys.secret_key(),
+        )
+        .into_raw()
     }
 
     #[test]

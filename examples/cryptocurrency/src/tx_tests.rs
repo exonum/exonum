@@ -19,7 +19,7 @@
 //! the service schema to make assertions about the storage state.
 
 use exonum::{
-    crypto::{gen_keypair, PublicKey},
+    crypto::{KeyPair, PublicKey},
     runtime::SnapshotExt,
 };
 use exonum_merkledb::{access::Access, Snapshot};
@@ -48,7 +48,7 @@ fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CurrencySchema<impl Access + 'a
 #[test]
 fn test_create_wallet() {
     let mut testkit = init_testkit();
-    let tx = gen_keypair().create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME));
+    let tx = KeyPair::random().create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME));
     testkit.create_block_with_transaction(tx.clone());
 
     // Check that the user indeed is persisted by the service
@@ -61,8 +61,8 @@ fn test_create_wallet() {
 #[test]
 fn test_transfer() {
     let mut testkit = init_testkit();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     testkit.create_block_with_transactions(vec![
         alice.create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME)),
         bob.create_wallet(INSTANCE_ID, CreateWallet::new(BOB_NAME)),
@@ -71,22 +71,22 @@ fn test_transfer() {
             TxTransfer {
                 amount: 10,
                 seed: 0,
-                to: bob.0,
+                to: bob.public_key(),
             },
         ),
     ]);
 
-    let alice_wallet = get_wallet(&testkit, &alice.0);
+    let alice_wallet = get_wallet(&testkit, &alice.public_key());
     assert_eq!(alice_wallet.balance, 90);
-    let bob_wallet = get_wallet(&testkit, &bob.0);
+    let bob_wallet = get_wallet(&testkit, &bob.public_key());
     assert_eq!(bob_wallet.balance, 110);
 }
 
 #[test]
 fn test_transfer_from_nonexisting_wallet() {
     let mut testkit = init_testkit();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     testkit.create_block_with_transactions(vec![
         bob.create_wallet(INSTANCE_ID, CreateWallet::new(BOB_NAME)),
         alice.transfer(
@@ -94,21 +94,21 @@ fn test_transfer_from_nonexisting_wallet() {
             TxTransfer {
                 amount: 10,
                 seed: 0,
-                to: bob.0,
+                to: bob.public_key(),
             },
         ),
     ]);
 
-    assert!(try_get_wallet(&testkit, &alice.0).is_none());
-    let bob_wallet = get_wallet(&testkit, &bob.0);
+    assert!(try_get_wallet(&testkit, &alice.public_key()).is_none());
+    let bob_wallet = get_wallet(&testkit, &bob.public_key());
     assert_eq!(bob_wallet.balance, 100);
 }
 
 #[test]
 fn test_transfer_to_nonexisting_wallet() {
     let mut testkit = init_testkit();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     testkit.create_block_with_transactions(vec![
         alice.create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME)),
         alice.transfer(
@@ -116,24 +116,24 @@ fn test_transfer_to_nonexisting_wallet() {
             TxTransfer {
                 amount: 10,
                 seed: 0,
-                to: bob.0,
+                to: bob.public_key(),
             },
         ),
         // Although Bob's wallet is created, this occurs after the transfer is executed.
         bob.create_wallet(INSTANCE_ID, CreateWallet::new(BOB_NAME)),
     ]);
 
-    let alice_wallet = get_wallet(&testkit, &alice.0);
+    let alice_wallet = get_wallet(&testkit, &alice.public_key());
     assert_eq!(alice_wallet.balance, 100);
-    let bob_wallet = get_wallet(&testkit, &bob.0);
+    let bob_wallet = get_wallet(&testkit, &bob.public_key());
     assert_eq!(bob_wallet.balance, 100);
 }
 
 #[test]
 fn test_transfer_overcharge() {
     let mut testkit = init_testkit();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     testkit.create_block_with_transactions(vec![
         alice.create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME)),
         bob.create_wallet(INSTANCE_ID, CreateWallet::new(BOB_NAME)),
@@ -142,24 +142,24 @@ fn test_transfer_overcharge() {
             TxTransfer {
                 amount: 150,
                 seed: 0,
-                to: bob.0,
+                to: bob.public_key(),
             },
         ),
     ]);
 
     // The transfer amount is greater than what Alice has at her disposal, so
     // the transfer should fail.
-    let alice_wallet = get_wallet(&testkit, &alice.0);
+    let alice_wallet = get_wallet(&testkit, &alice.public_key());
     assert_eq!(alice_wallet.balance, 100);
-    let bob_wallet = get_wallet(&testkit, &bob.0);
+    let bob_wallet = get_wallet(&testkit, &bob.public_key());
     assert_eq!(bob_wallet.balance, 100);
 }
 
 #[test]
 fn test_transfers_in_single_block() {
     let mut testkit = init_testkit();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     testkit.create_block_with_transactions(vec![
         alice.create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME)),
         bob.create_wallet(INSTANCE_ID, CreateWallet::new(BOB_NAME)),
@@ -168,7 +168,7 @@ fn test_transfers_in_single_block() {
     let tx_a_to_b = alice.transfer(
         INSTANCE_ID,
         TxTransfer {
-            to: bob.0,
+            to: bob.public_key(),
             amount: 90,
             seed: 0,
         },
@@ -176,7 +176,7 @@ fn test_transfers_in_single_block() {
     let tx_b_to_a = bob.transfer(
         INSTANCE_ID,
         TxTransfer {
-            to: alice.0,
+            to: alice.public_key(),
             amount: 120,
             seed: 0,
         },
@@ -184,9 +184,9 @@ fn test_transfers_in_single_block() {
 
     testkit.create_block_with_transactions(vec![tx_a_to_b, tx_b_to_a]);
 
-    let alice_wallet = get_wallet(&testkit, &alice.0);
+    let alice_wallet = get_wallet(&testkit, &alice.public_key());
     assert_eq!(alice_wallet.balance, 130);
-    let bob_wallet = get_wallet(&testkit, &bob.0);
+    let bob_wallet = get_wallet(&testkit, &bob.public_key());
     assert_eq!(bob_wallet.balance, 70);
 }
 
@@ -206,8 +206,8 @@ fn test_fuzz_transfers() {
     let mut rng = rand::thread_rng();
 
     let mut testkit = init_testkit();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     let keys = &[alice.clone(), bob.clone()];
     testkit.create_block_with_transactions(vec![
         alice.create_wallet(INSTANCE_ID, CreateWallet::new(ALICE_NAME)),
@@ -227,7 +227,7 @@ fn test_fuzz_transfers() {
             sender.transfer(
                 INSTANCE_ID,
                 TxTransfer {
-                    to: receiver.0,
+                    to: receiver.public_key(),
                     amount,
                     seed: rng.gen::<u64>(),
                 },
@@ -244,7 +244,7 @@ fn test_fuzz_transfers() {
         // These wallets should belong to Alice and Bob.
         assert_eq!(
             BTreeSet::from_iter(wallets.iter().map(|w| &w.pub_key)),
-            BTreeSet::from_iter(vec![&alice.0, &bob.0])
+            BTreeSet::from_iter(vec![&alice.public_key(), &bob.public_key()])
         );
         // The total amount of funds should equal 200, no matter which transactions were executed.
         assert_eq!(wallets.iter().map(|w| w.balance).sum::<u64>(), 200);

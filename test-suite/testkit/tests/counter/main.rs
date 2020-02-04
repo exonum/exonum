@@ -14,7 +14,7 @@
 
 use exonum::{
     blockchain::{CallInBlock, ValidatorKeys},
-    crypto::{gen_keypair, Hash},
+    crypto::{Hash, KeyPair},
     helpers::Height,
     messages::{AnyTx, Verified},
     runtime::SnapshotExt,
@@ -62,11 +62,11 @@ fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a>
 }
 
 fn gen_inc_tx(by: u64) -> Verified<AnyTx> {
-    gen_keypair().increment(SERVICE_ID, by)
+    KeyPair::random().increment(SERVICE_ID, by)
 }
 
 fn gen_inc_incorrect_tx(by: u64) -> Verified<AnyTx> {
-    gen_keypair().increment(SERVICE_ID + 1, by)
+    KeyPair::random().increment(SERVICE_ID + 1, by)
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn test_inc_add_tx_incorrect_transaction() {
 #[test]
 fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
 
     // Create a pre-signed transaction
     testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
@@ -128,7 +128,7 @@ fn test_inc_count_create_block() {
 #[test]
 fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     // Create a pre-signed transaction
     testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
     // Create another block with the same transaction
@@ -298,8 +298,8 @@ fn test_duplicate_tx() {
 #[test]
 fn test_explorer_with_after_transactions_error() {
     let (mut testkit, _) = init_testkit();
-    let tx1 = gen_keypair().increment(SERVICE_ID, 21);
-    let keypair = gen_keypair();
+    let tx1 = KeyPair::random().increment(SERVICE_ID, 21);
+    let keypair = KeyPair::random();
     let tx2 = keypair.increment(SERVICE_ID, 21);
 
     let block = testkit.create_block_with_transactions(vec![tx1, tx2]);
@@ -319,7 +319,7 @@ fn test_explorer_with_after_transactions_error() {
 #[test]
 fn test_explorer_with_before_transactions_error() {
     let (mut testkit, _) = init_testkit();
-    let tx = gen_keypair().increment(SERVICE_ID, 13);
+    let tx = KeyPair::random().increment(SERVICE_ID, 13);
 
     let block = testkit.create_block_with_transaction(tx);
     let errors = block.error_map();
@@ -353,7 +353,7 @@ fn test_explorer_single_block() {
     assert_eq!(block.header().prev_hash, Hash::default());
     assert_eq!(&*block.transaction_hashes(), &[]);
 
-    let tx = gen_keypair().increment(SERVICE_ID, 5);
+    let tx = KeyPair::random().increment(SERVICE_ID, 5);
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 

@@ -325,7 +325,7 @@ mod tests {
     use chrono::Utc;
     use exonum::{
         blockchain::{AdditionalHeaders, Block, BlockProof},
-        crypto::{self, gen_keypair},
+        crypto::{self, KeyPair},
         merkledb::ObjectHash,
     };
     use pretty_assertions::assert_eq;
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_verified_from_signed_correct_signature() {
-        let keypair = gen_keypair();
+        let keypair = KeyPair::random();
 
         let msg = Status {
             height: Height(0),
@@ -342,7 +342,11 @@ mod tests {
             pool_size: 0,
         };
         let protocol_message = ExonumMessage::from(msg.clone());
-        let signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
+        let signed = SignedMessage::new(
+            protocol_message.clone(),
+            keypair.public_key(),
+            keypair.secret_key(),
+        );
 
         let verified_protocol = signed.clone().into_verified::<ExonumMessage>().unwrap();
         assert_eq!(*verified_protocol.payload(), protocol_message);
@@ -356,7 +360,7 @@ mod tests {
 
     #[test]
     fn test_verified_from_signed_incorrect_signature() {
-        let keypair = gen_keypair();
+        let keypair = KeyPair::random();
 
         let msg = Status {
             height: Height(0),
@@ -364,16 +368,20 @@ mod tests {
             pool_size: 0,
         };
         let protocol_message = ExonumMessage::from(msg.clone());
-        let mut signed = SignedMessage::new(protocol_message.clone(), keypair.0, &keypair.1);
+        let mut signed = SignedMessage::new(
+            protocol_message.clone(),
+            keypair.public_key(),
+            keypair.secret_key(),
+        );
         // Update author
-        signed.author = gen_keypair().0;
+        signed.author = KeyPair::random().public_key();
         let err = signed.clone().into_verified::<ExonumMessage>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to verify signature.");
     }
 
     #[test]
     fn test_verified_status_binary_value() {
-        let keypair = gen_keypair();
+        let keypair = KeyPair::random();
 
         let msg = Verified::from_value(
             Status {
@@ -381,8 +389,8 @@ mod tests {
                 last_hash: Hash::zero(),
                 pool_size: 0,
             },
-            keypair.0,
-            &keypair.1,
+            keypair.public_key(),
+            keypair.secret_key(),
         );
         assert_eq!(msg.object_hash(), msg.as_raw().object_hash());
 
@@ -393,15 +401,15 @@ mod tests {
 
     #[test]
     fn test_tx_response_empty_size() {
-        let (public_key, secret_key) = gen_keypair();
-        let msg = TransactionsResponse::new(public_key, vec![]);
-        let msg = Verified::from_value(msg, public_key, &secret_key);
+        let keys = KeyPair::random();
+        let msg = TransactionsResponse::new(keys.public_key(), vec![]);
+        let msg = Verified::from_value(msg, keys.public_key(), keys.secret_key());
         assert_eq!(TX_RES_EMPTY_SIZE, msg.into_bytes().len())
     }
 
     #[test]
     fn test_tx_response_with_txs_size() {
-        let (public_key, secret_key) = gen_keypair();
+        let keys = KeyPair::random();
         let txs = vec![
             vec![1_u8; 8],
             vec![2_u8; 16],
@@ -412,14 +420,14 @@ mod tests {
         let txs_size = txs.iter().fold(0, |acc, tx| acc + tx.len());
         let pb_max_overhead = TX_RES_PB_OVERHEAD_PAYLOAD * txs.len();
 
-        let msg = TransactionsResponse::new(public_key, txs);
-        let msg = Verified::from_value(msg, public_key, &secret_key);
+        let msg = TransactionsResponse::new(keys.public_key(), txs);
+        let msg = Verified::from_value(msg, keys.public_key(), keys.secret_key());
         assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.into_bytes().len())
     }
 
     #[test]
     fn test_block() {
-        let (pub_key, secret_key) = gen_keypair();
+        let keys = KeyPair::random();
         let ts = Utc::now();
         let txs = [2];
         let tx_count = txs.len() as u32;
@@ -444,8 +452,8 @@ mod tests {
                     crypto::hash(&[3, 2, 1]),
                     ts,
                 ),
-                pub_key,
-                &secret_key,
+                keys.public_key(),
+                keys.secret_key(),
             ),
             Verified::from_value(
                 Precommit::new(
@@ -456,8 +464,8 @@ mod tests {
                     crypto::hash(&[3, 3, 1]),
                     ts,
                 ),
-                pub_key,
-                &secret_key,
+                keys.public_key(),
+                keys.secret_key(),
             ),
             Verified::from_value(
                 Precommit::new(
@@ -468,25 +476,25 @@ mod tests {
                     crypto::hash(&[5, 2, 1]),
                     ts,
                 ),
-                pub_key,
-                &secret_key,
+                keys.public_key(),
+                keys.secret_key(),
             ),
         ];
         let transactions = [
             Verified::from_value(
                 Status::new(Height(2), crypto::hash(&[]), 0),
-                pub_key,
-                &secret_key,
+                keys.public_key(),
+                keys.secret_key(),
             ),
             Verified::from_value(
                 Status::new(Height(4), crypto::hash(&[2]), 0),
-                pub_key,
-                &secret_key,
+                keys.public_key(),
+                keys.secret_key(),
             ),
             Verified::from_value(
                 Status::new(Height(7), crypto::hash(&[3]), 0),
-                pub_key,
-                &secret_key,
+                keys.public_key(),
+                keys.secret_key(),
             ),
         ]
         .iter()
@@ -496,17 +504,17 @@ mod tests {
         let precommits_buf: Vec<_> = precommits.iter().map(BinaryValue::to_bytes).collect();
         let block = Verified::from_value(
             BlockResponse::new(
-                pub_key,
+                keys.public_key(),
                 content.clone(),
                 precommits_buf.clone(),
                 transactions.iter().cloned(),
             ),
-            pub_key,
-            &secret_key,
+            keys.public_key(),
+            keys.secret_key(),
         );
 
-        assert_eq!(block.author(), pub_key);
-        assert_eq!(block.payload().to, pub_key);
+        assert_eq!(block.author(), keys.public_key());
+        assert_eq!(block.payload().to, keys.public_key());
         assert_eq!(block.payload().block, content);
         assert_eq!(block.payload().precommits, precommits_buf);
         assert_eq!(block.payload().transactions, transactions);
@@ -516,8 +524,8 @@ mod tests {
             .into_verified()
             .unwrap();
 
-        assert_eq!(block2.author(), pub_key);
-        assert_eq!(block2.payload().to, pub_key);
+        assert_eq!(block2.author(), keys.public_key());
+        assert_eq!(block2.payload().to, keys.public_key());
         assert_eq!(block2.payload().block, content);
         assert_eq!(block2.payload().precommits, precommits_buf);
         assert_eq!(block2.payload().transactions, transactions);

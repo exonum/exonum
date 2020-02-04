@@ -15,7 +15,7 @@
 use exonum::{
     crypto::{
         x25519::{self, into_x25519_keypair, into_x25519_public_key},
-        PublicKey, SecretKey,
+        KeyPair, PublicKey,
     },
     merkledb::BinaryValue,
     messages::Verified,
@@ -49,13 +49,13 @@ pub struct HandshakeParams {
 
 impl HandshakeParams {
     pub(crate) fn new(
-        public_key: PublicKey,
-        secret_key: SecretKey,
+        keypair: &KeyPair,
         connect_list: SharedConnectList,
         connect: Verified<Connect>,
         max_message_len: u32,
     ) -> Self {
-        let (_, secret_key) = into_x25519_keypair(public_key, secret_key).unwrap();
+        let (_, secret_key) =
+            into_x25519_keypair(keypair.public_key(), keypair.secret_key().to_owned()).unwrap();
 
         HandshakeParams {
             secret_key,

@@ -16,7 +16,7 @@
 
 use exonum::{
     blockchain::TxLocation,
-    crypto::{gen_keypair, Hash},
+    crypto::{Hash, KeyPair},
     helpers::Height,
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
@@ -37,12 +37,12 @@ use self::blockchain::{
 #[allow(clippy::cognitive_complexity)]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
 
     let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
-    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.0, 2));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.public_key(), 2));
 
     let snapshot = blockchain.snapshot();
     let explorer = BlockchainExplorer::new(snapshot.as_ref());
@@ -164,7 +164,7 @@ fn test_explorer_basics() {
 #[test]
 fn test_explorer_errors_in_block() {
     let mut blockchain = create_blockchain();
-    let bob = gen_keypair();
+    let bob = KeyPair::random();
     let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
 
     create_block(&mut blockchain, vec![tx_bob]);
@@ -213,7 +213,7 @@ fn test_explorer_errors_in_block() {
 #[test]
 fn test_explorer_pool_transaction() {
     let mut blockchain = create_blockchain();
-    let alice = gen_keypair();
+    let alice = KeyPair::random();
     let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_hash = tx_alice.object_hash();
 
@@ -233,7 +233,7 @@ fn test_explorer_pool_transaction() {
 
 fn tx_generator() -> impl Iterator<Item = Verified<AnyTx>> {
     (0..).map(|i| {
-        gen_keypair().create_wallet(SERVICE_ID, CreateWallet::new(format!("Alice #{}", i)))
+        KeyPair::random().create_wallet(SERVICE_ID, CreateWallet::new(format!("Alice #{}", i)))
     })
 }
 
@@ -386,11 +386,11 @@ fn test_transaction_iterator() {
     }
 
     // Test filtering and other nice stuff.
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
     let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
-    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.0, 2));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.public_key(), 2));
 
     create_block(
         &mut blockchain,
@@ -481,7 +481,7 @@ fn test_transaction_info_roundtrip() {
 #[test]
 fn test_block_with_transactions_roundtrip() {
     let mut blockchain = create_blockchain();
-    let tx = gen_keypair().create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
+    let tx = KeyPair::random().create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     create_block(&mut blockchain, vec![tx]);
 
     let snapshot = blockchain.snapshot();
