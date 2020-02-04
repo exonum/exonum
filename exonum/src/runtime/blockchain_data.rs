@@ -40,6 +40,11 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
         }
     }
 
+    /// Returns the instance name of the executing service.
+    pub fn instance_name(&self) -> &str {
+        &self.instance_name
+    }
+
     /// Returns unstructured readonly access to blockchain data.
     ///
     /// # Safety
