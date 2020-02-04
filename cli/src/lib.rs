@@ -91,7 +91,7 @@ pub use crate::config_manager::DefaultConfigManager;
 pub use structopt;
 
 use exonum::{
-    blockchain::{config::GenesisConfigBuilder, config::InstanceInitParams},
+    blockchain::config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
     merkledb::RocksDB,
     runtime::{RuntimeInstance, WellKnownRuntime},
 };
@@ -138,7 +138,7 @@ impl NodeBuilder {
     }
 
     /// Adds new Rust service to the list of available services.
-    pub fn with_service<S: ServiceFactory>(mut self, service: S) -> Self {
+    pub fn with_service(mut self, service: impl ServiceFactory) -> Self {
         self.rust_runtime = self.rust_runtime.with_factory(service);
         self
     }
@@ -161,7 +161,7 @@ impl NodeBuilder {
 
     /// Adds a default Rust service instance that will be available immediately after creating a
     /// genesis block.
-    pub fn with_default_service<S: DefaultInstance>(self, service: S) -> Self {
+    pub fn with_default_service(self, service: impl DefaultInstance) -> Self {
         self.with_default_instance(service.default_instance())
             .with_service(service)
     }
@@ -173,22 +173,7 @@ impl NodeBuilder {
         let command = Command::from_args();
 
         if let StandardResult::Run(run_config) = command.execute()? {
-            // Add builtin services to genesis config.
-            let supervisor = Self::supervisor_service(&run_config);
-            let genesis_config = {
-                let mut builder = GenesisConfigBuilder::with_consensus_config(
-                    run_config.node_config.public_config.consensus.clone(),
-                )
-                .with_artifact(Supervisor.artifact_id())
-                .with_instance(supervisor)
-                .with_artifact(ExplorerFactory.artifact_id())
-                .with_instance(ExplorerFactory.default_instance());
-                // Add default instances.
-                for instance in self.default_instances {
-                    builder = builder.with_instance(instance);
-                }
-                builder.build()
-            };
+            let genesis_config = Self::genesis_config(&run_config, self.default_instances);
 
             let db_options = &run_config.node_config.private_config.database;
             let database = RocksDB::open(run_config.db_path, db_options)?;
@@ -199,6 +184,7 @@ impl NodeBuilder {
 
             let node_config = run_config.node_config.into();
             let node_keys = run_config.node_keys;
+
             let mut node_builder = CoreNodeBuilder::new(database, node_config, node_keys)
                 .with_genesis_config(genesis_config)
                 .with_config_manager(config_manager)
@@ -211,6 +197,28 @@ impl NodeBuilder {
         } else {
             Ok(())
         }
+    }
+
+    fn genesis_config(
+        run_config: &NodeRunConfig,
+        default_instances: Vec<InstanceInitParams>,
+    ) -> GenesisConfig {
+        let mut builder = GenesisConfigBuilder::with_consensus_config(
+            run_config.node_config.public_config.consensus.clone(),
+        );
+        // Add builtin services to genesis config.
+        builder = builder
+            .with_artifact(Supervisor.artifact_id())
+            .with_instance(Self::supervisor_service(&run_config))
+            .with_artifact(ExplorerFactory.artifact_id())
+            .with_instance(ExplorerFactory.default_instance());
+        // Add default instances.
+        for instance in default_instances {
+            builder = builder
+                .with_artifact(instance.instance_spec.artifact.clone())
+                .with_instance(instance)
+        }
+        builder.build()
     }
 
     fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {

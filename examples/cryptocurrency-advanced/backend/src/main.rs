@@ -14,7 +14,6 @@
 
 use exonum_cli::NodeBuilder;
 use exonum_cryptocurrency_advanced as cryptocurrency;
-use exonum_rust_runtime::ServiceFactory;
 
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
@@ -22,10 +21,6 @@ fn main() -> Result<(), failure::Error> {
         .with_service(cryptocurrency::CryptocurrencyService)
         // Starts cryptocurrency instance with given id and name
         // immediately after genesis block creation.
-        .with_default_instance(
-            cryptocurrency::CryptocurrencyService
-                .artifact_id()
-                .into_default_instance(101, "cryptocurrency"),
-        )
+        .with_default_service(cryptocurrency::CryptocurrencyService)
         .run()
 }

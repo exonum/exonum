@@ -28,9 +28,9 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::runtime::{ExecutionContext, ExecutionError};
+use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
-use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
 use crate::{api::PublicApi as CryptocurrencyApi, schema::SchemaImpl};
 
@@ -58,4 +58,10 @@ impl Service for CryptocurrencyService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         CryptocurrencyApi::wire(builder);
     }
+}
+
+/// Use predefined instance name and id for frontend.
+impl DefaultInstance for CryptocurrencyService {
+    const INSTANCE_ID: InstanceId = 3;
+    const INSTANCE_NAME: &'static str = "crypto";
 }
