@@ -14,6 +14,7 @@
 
 use exonum_merkledb::{
     access::{AsReadonly, FromAccess, Prefixed, RawAccess},
+    generic::GenericRawAccess,
     Snapshot, SystemSchema,
 };
 
@@ -119,6 +120,16 @@ impl BlockchainData<&dyn Snapshot> {
     pub fn proof_for_service_index(&self, index_name: &str) -> Option<IndexProof> {
         let full_index_name = [&self.instance_name, ".", index_name].concat();
         self.access.proof_for_index(&full_index_name)
+    }
+}
+
+impl<'a, T> BlockchainData<T>
+where
+    T: Into<GenericRawAccess<'a>>,
+{
+    /// Erases the enclosed access, converting it to the generic form.
+    pub fn erase_access(self) -> BlockchainData<GenericRawAccess<'a>> {
+        BlockchainData::new(self.access.into(), self.instance_name)
     }
 }
 
