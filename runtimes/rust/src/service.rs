@@ -14,7 +14,7 @@
 
 use exonum::{
     blockchain::{config::InstanceInitParams, ApiSender, SendError},
-    crypto::{Hash, PublicKey, SecretKey},
+    crypto::{Hash, KeyPair, PublicKey},
     helpers::{Height, ValidatorId},
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
@@ -203,7 +203,7 @@ impl<'a> AfterCommitContext<'a> {
         mailbox: &'a mut Mailbox,
         instance: InstanceDescriptor,
         snapshot: &'a dyn Snapshot,
-        service_keypair: &'a (PublicKey, SecretKey),
+        service_keypair: &'a KeyPair,
         tx_sender: &'a ApiSender,
         validator_id: Option<ValidatorId>,
     ) -> Self {
@@ -233,7 +233,7 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns the service key of this node.
     pub fn service_key(&self) -> PublicKey {
-        self.broadcaster.service_keypair.0
+        self.broadcaster.service_keypair.public_key()
     }
 
     /// Returns the ID of this node as a validator. If the node is not a validator, returns `None`.
@@ -281,7 +281,7 @@ impl<'a> AfterCommitContext<'a> {
 #[derive(Debug, Clone)]
 pub struct Broadcaster<'a> {
     instance: InstanceDescriptor,
-    service_keypair: Cow<'a, (PublicKey, SecretKey)>,
+    service_keypair: Cow<'a, KeyPair>,
     tx_sender: Cow<'a, ApiSender>,
 }
 
@@ -289,7 +289,7 @@ impl<'a> Broadcaster<'a> {
     /// Creates a new broadcaster.
     pub(super) fn new(
         instance: InstanceDescriptor,
-        service_keypair: &'a (PublicKey, SecretKey),
+        service_keypair: &'a KeyPair,
         tx_sender: &'a ApiSender,
     ) -> Self {
         Self {
@@ -299,7 +299,7 @@ impl<'a> Broadcaster<'a> {
         }
     }
 
-    pub(super) fn keypair(&self) -> &(PublicKey, SecretKey) {
+    pub(super) fn keypair(&self) -> &KeyPair {
         self.service_keypair.as_ref()
     }
 

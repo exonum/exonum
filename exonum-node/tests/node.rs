@@ -98,18 +98,19 @@ impl StartCheckerServiceFactory {
 fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
-    for node_cfg in generate_testnet_config(count, start_port) {
+    for (node_cfg, node_keys) in generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = mpsc::unbounded();
 
         let service = CommitWatcherService(commit_tx);
         let artifact = service.artifact_id();
-        let genesis_config =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-                .with_artifact(artifact.clone())
-                .with_instance(artifact.into_default_instance(2, "commit-watcher"))
-                .build();
+        let genesis_cfg = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
+            .with_artifact(artifact.clone())
+            .with_instance(artifact.into_default_instance(2, "commit-watcher"))
+            .build();
 
-        let node = NodeBuilder::new(TemporaryDB::new(), node_cfg, genesis_config)
+        let db = TemporaryDB::new();
+        let node = NodeBuilder::new(db, node_cfg, node_keys)
+            .with_genesis_config(genesis_cfg)
             .with_runtime_fn(|channel| {
                 RustRuntime::builder()
                     .with_factory(service)
@@ -141,7 +142,7 @@ fn test_node_run() {
 
 #[test]
 fn test_node_restart_regression() {
-    let start_node = |node_cfg: NodeConfig, db, start_times| {
+    let start_node = |node_cfg: NodeConfig, node_keys, db, start_times| {
         let service = StartCheckerServiceFactory(start_times);
         let artifact = service.artifact_id();
         let genesis_config =
@@ -150,7 +151,8 @@ fn test_node_restart_regression() {
                 .with_instance(artifact.into_default_instance(4, "startup-checker"))
                 .build();
 
-        let node = NodeBuilder::new(db, node_cfg, genesis_config)
+        let node = NodeBuilder::new(db, node_cfg, node_keys)
+            .with_genesis_config(genesis_config)
             .with_runtime_fn(|channel| {
                 RustRuntime::builder()
                     .with_factory(service)
@@ -160,14 +162,19 @@ fn test_node_restart_regression() {
         RunHandle::new(node).join();
     };
 
-    let db = Arc::from(TemporaryDB::new()) as Arc<dyn Database>;
-    let node_cfg = generate_testnet_config(1, 3600)[0].clone();
+    let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
+    let (node_cfg, node_keys) = generate_testnet_config(1, 3600).pop().unwrap();
 
     let start_times = Arc::new(Mutex::new(0));
     // First launch
-    start_node(node_cfg.clone(), db.clone(), Arc::clone(&start_times));
+    start_node(
+        node_cfg.clone(),
+        node_keys.clone(),
+        Arc::clone(&db),
+        Arc::clone(&start_times),
+    );
     // Second launch
-    start_node(node_cfg, db, Arc::clone(&start_times));
+    start_node(node_cfg, node_keys, db, Arc::clone(&start_times));
 
     // The service is created two times on instantiation (for `start_adding_service`
     // and `commit_service` methods), and then once on each new node startup.

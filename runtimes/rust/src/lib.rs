@@ -213,6 +213,7 @@
 //! | Stub | Behavior |
 //! |------|----------|
 //! | [`TxStub`] | Generates unsigned transactions |
+//! | `KeyPair` | Generates signed transactions (preferred) |
 //! | `(PublicKey, SecretKey)` | Generates signed transactions |
 //! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
 //! | [`ExecutionContext`] | Calls methods of another service during transaction execution **(1)** |
@@ -767,7 +768,7 @@ impl Runtime for RustRuntime {
         }
 
         let blockchain = self.blockchain();
-        let validator_id = core_schema.validator_id(blockchain.service_keypair().0);
+        let validator_id = core_schema.validator_id(blockchain.service_keypair().public_key());
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::runtime::{CoreError, ErrorMatch, ExecutionError, InstanceId};
+use exonum::runtime::{CoreError, ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID};
 use exonum_rust_runtime::ServiceFactory;
-use exonum_supervisor::{ConfigPropose, Supervisor};
+use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use exonum_time::{MockTimeProvider, TimeServiceFactory};
 
@@ -75,9 +75,8 @@ fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
 /// configuration or corresponding `ExecutionError`.
 fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), ExecutionError> {
     let tx = ConfigPropose::immediate(0).service_config(SERVICE_ID, config.clone());
-
-    let (pub_key, sec_key) = testkit.network().us().service_keypair();
-    let tx = tx.sign_for_supervisor(pub_key, &sec_key);
+    let keypair = testkit.network().us().service_keypair();
+    let tx = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, tx);
     let block = testkit.create_block_with_transaction(tx);
 
     if let Err(e) = block[0].status() {

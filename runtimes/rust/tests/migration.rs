@@ -190,7 +190,8 @@ fn create_runtime() -> (BlockchainMut, EventsHandle) {
     );
     let events_handle = inspected.events.clone();
 
-    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
+    let blockchain = BlockchainBuilder::new(blockchain)
+        .with_genesis_config(genesis_config)
         .with_runtime(inspected)
         .build();
     (blockchain, events_handle)

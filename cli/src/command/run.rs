@@ -15,11 +15,15 @@
 //! Standard Exonum CLI command used to run the node using prepared node
 //! configuration file.
 
+use exonum::keys::{read_keys_from_file, Keys};
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     command::{ExonumCommand, StandardResult},
@@ -29,9 +33,12 @@ use crate::{
 };
 
 /// Container for node configuration parameters produced by `Run` command.
+#[derive(Debug)]
 pub struct NodeRunConfig {
     /// Final node configuration parameters.
     pub node_config: NodeConfig,
+    /// Node keys.
+    pub node_keys: Keys,
     /// Path to a directory containing database files, provided by user.
     pub db_path: PathBuf,
     /// User-provided path to the node configuration file.
@@ -69,9 +76,8 @@ pub struct Run {
 
 impl ExonumCommand for Run {
     fn execute(self) -> Result<StandardResult, Error> {
-        let config_path = self.node_config.clone();
-
-        let mut config: NodeConfig = load_config_file(&config_path)?;
+        let config_path = &self.node_config;
+        let mut config: NodeConfig = load_config_file(config_path)?;
         let public_addr = self.public_api_address;
         let private_addr = self.private_api_address;
 
@@ -88,15 +94,36 @@ impl ExonumCommand for Run {
             .master_key_pass
             .unwrap_or_default()
             .get_passphrase(PassphraseUsage::Using)?;
-
-        config.read_secret_keys(&config_path, master_passphrase.as_bytes());
+        let node_keys = read_secret_keys(
+            config_path,
+            &config.private_config.master_key_path,
+            master_passphrase.as_bytes(),
+        );
 
         let run_config = NodeRunConfig {
             node_config: config,
+            node_keys,
             db_path: self.db_path,
             node_config_path: self.node_config,
         };
 
         Ok(StandardResult::Run(run_config))
     }
+}
+
+/// Reads validator keys from the encrypted file.
+fn read_secret_keys(
+    config_file_path: impl AsRef<Path>,
+    master_key_path: &Path,
+    master_key_passphrase: &[u8],
+) -> Keys {
+    let config_folder = config_file_path.as_ref().parent().unwrap();
+    let master_key_path = if master_key_path.is_absolute() {
+        master_key_path.to_owned()
+    } else {
+        config_folder.join(&master_key_path)
+    };
+
+    read_keys_from_file(&master_key_path, master_key_passphrase)
+        .expect("Could not read master_key_path from file")
 }

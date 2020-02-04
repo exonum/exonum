@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "cryptography", "library"]
 categories = ["cryptography", "hashing"]
-description = "Exonum validator keys management."
+description = "Exonum node keys management."
 
 [dependencies]
 rand = "0.7"

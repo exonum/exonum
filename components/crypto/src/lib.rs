@@ -20,6 +20,28 @@
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // `filter(..).map(..)` often looks more shorter and readable.
+    clippy::filter_map,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names,
+    // Variant name ends with the enum name. Similar behavior to similar_names.
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    clippy::use_self,
+    clippy::default_trait_access,
+)]
+
 #[macro_use]
 extern crate serde_derive; // Required for Protobuf.
 
@@ -29,10 +51,9 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-#[cfg(feature = "with-protobuf")]
-pub use self::proto::*;
 
 #[cfg(feature = "with-protobuf")]
+#[doc(hidden)]
 pub mod proto;
 
 use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
@@ -461,13 +482,22 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, Serialize, Deserialize)]
+/// Pair of matching secret and public keys.
+///
+/// Prefer using this struct to `(PublicKey, SecretKey)`, since it asserts that public
+/// and secret keys necessarily match.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct KeyPair {
     public_key: PublicKey,
     secret_key: SecretKey,
 }
 
 impl KeyPair {
+    /// Creates a keypair from the provided keys, checking that they correspond to each other.
+    ///
+    /// # Panics
+    ///
+    /// - If the keys do not match.
     pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
         assert!(
             verify_keys_match(&public_key, &secret_key),
@@ -480,10 +510,30 @@ impl KeyPair {
         }
     }
 
+    /// Generates a random keypair using the random number generator provided by the crypto backend.
+    pub fn random() -> Self {
+        let (public_key, secret_key) = gen_keypair();
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    /// Generates a keypair from the provided seed.
+    pub fn from_seed(seed: &Seed) -> Self {
+        let (public_key, secret_key) = gen_keypair_from_seed(seed);
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    /// Gets the public key.
     pub fn public_key(&self) -> PublicKey {
         self.public_key
     }
 
+    /// Gets a reference to the secret key.
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }

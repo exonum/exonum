@@ -16,7 +16,6 @@
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
-    keys::{read_keys_from_file, Keys},
     merkledb::DbOptions,
 };
 use exonum_node::{
@@ -26,10 +25,7 @@ use exonum_node::{
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
+use std::{net::SocketAddr, path::PathBuf};
 
 /// Part of the template configuration.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -79,9 +75,6 @@ pub struct NodePrivateConfig {
     pub thread_pool_size: Option<u8>,
     /// Information about peers within network.
     pub connect_list: ConnectListConfig,
-    /// Validator keys.
-    #[serde(skip)]
-    pub keys: Keys,
 }
 
 /// Configuration for the `Node`.
@@ -104,32 +97,6 @@ impl Into<CoreNodeConfig> for NodeConfig {
             mempool: self.private_config.mempool,
             connect_list: self.private_config.connect_list,
             thread_pool_size: self.private_config.thread_pool_size,
-            keys: self.private_config.keys,
         }
-    }
-}
-
-impl NodeConfig {
-    /// Read validator keys from the encrypted file.
-    pub fn read_secret_keys(
-        &mut self,
-        config_file_path: impl AsRef<Path>,
-        master_key_passphrase: &[u8],
-    ) {
-        let config_folder = config_file_path.as_ref().parent().unwrap();
-        let master_key_path = self.private_config.master_key_path.clone();
-        let master_key_path = if master_key_path.is_absolute() {
-            master_key_path.clone()
-        } else {
-            config_folder.join(&master_key_path)
-        };
-
-        let keys = read_keys_from_file(&master_key_path, master_key_passphrase)
-            .expect("Could not read master_key_path from file");
-
-        self.private_config = NodePrivateConfig {
-            keys,
-            ..self.private_config.clone()
-        };
     }
 }

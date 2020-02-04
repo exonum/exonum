@@ -19,7 +19,7 @@ use exonum::{
         config::GenesisConfigBuilder, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
         ConsensusConfig,
     },
-    crypto::{self, PublicKey, SecretKey},
+    crypto::{self, KeyPair, PublicKey},
     merkledb::{ObjectHash, TemporaryDB},
     messages::Verified,
     runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
@@ -99,23 +99,16 @@ impl ExplorerTransactions<ExecutionContext<'_>> for MyService {
 impl Service for MyService {}
 
 /// Generates a keypair from a fixed passphrase.
-pub fn consensus_keys() -> (PublicKey, SecretKey) {
+pub fn consensus_keys() -> KeyPair {
     const SEED_PHRASE: &[u8] = b"correct horse battery staple";
     let seed = crypto::Seed::from_slice(crypto::hash(SEED_PHRASE).as_ref()).unwrap();
-    crypto::gen_keypair_from_seed(&seed)
+    KeyPair::from_seed(&seed)
 }
 
 /// Creates a blockchain with no blocks.
 pub fn create_blockchain() -> BlockchainMut {
     let (config, node_keys) = ConsensusConfig::for_tests(1);
-    let blockchain = Blockchain::new(
-        TemporaryDB::new(),
-        (
-            node_keys.service.public_key(),
-            node_keys.service.secret_key().to_owned(),
-        ),
-        ApiSender::closed(),
-    );
+    let blockchain = Blockchain::new(TemporaryDB::new(), node_keys.service, ApiSender::closed());
 
     let my_service = MyService;
     let my_service_artifact = my_service.artifact_id();
@@ -126,7 +119,8 @@ pub fn create_blockchain() -> BlockchainMut {
     let rust_runtime = RustRuntime::builder()
         .with_factory(my_service)
         .build_for_tests();
-    BlockchainBuilder::new(blockchain, genesis_config)
+    BlockchainBuilder::new(blockchain)
+        .with_genesis_config(genesis_config)
         .with_runtime(rust_runtime)
         .build()
 }
@@ -148,7 +142,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     let mut tx_cache = BTreeMap::new();
     let (block_hash, patch) =
         blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &mut tx_cache);
-    let (consensus_public_key, consensus_secret_key) = consensus_keys();
+    let consensus_keys = consensus_keys();
 
     let precommit = Verified::from_value(
         Precommit::new(
@@ -159,8 +153,8 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
             block_hash,
             SystemTime::now().into(),
         ),
-        consensus_public_key,
-        &consensus_secret_key,
+        consensus_keys.public_key(),
+        consensus_keys.secret_key(),
     );
 
     blockchain

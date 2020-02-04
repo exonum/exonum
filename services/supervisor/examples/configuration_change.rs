@@ -136,7 +136,7 @@ fn send_and_vote_for_propose(
     let propose_hash = propose.object_hash();
 
     // Sign propose with validator keys.
-    let signed_proposal = propose.sign_for_supervisor(keys.0, &keys.1);
+    let signed_proposal = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, propose);
 
     // Create block with this proposal.
     testkit

@@ -26,7 +26,7 @@ use log::warn;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    crypto::{gen_keypair, PublicKey},
+    crypto::PublicKey,
     helpers::{Milliseconds, ValidateInput, ValidatorId},
     keys::Keys,
     merkledb::BinaryValue,
@@ -185,15 +185,11 @@ impl ConsensusConfig {
         let mut node_keys = None;
         let validator_keys = (0..validator_count)
             .map(|i| {
-                let (consensus_pk, consensus_sk) = gen_keypair();
-                let (service_pk, service_sk) = gen_keypair();
+                let keys = Keys::random();
+                let consensus_pk = keys.consensus_pk();
+                let service_pk = keys.service_pk();
                 if i == 0 {
-                    node_keys = Some(Keys::from_keys(
-                        consensus_pk,
-                        consensus_sk,
-                        service_pk,
-                        service_sk,
-                    ));
+                    node_keys = Some(keys);
                 }
                 ValidatorKeys::new(consensus_pk, service_pk)
             })

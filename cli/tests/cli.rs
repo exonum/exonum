@@ -125,8 +125,11 @@ impl ConfigSpec {
         self.expected_root_dir.join("cfg")
     }
 
-    fn expected_template_file(&self) -> PathBuf {
-        self.expected_dir().join("template.toml")
+    fn expected_template_file(&self, mode: SupervisorMode) -> PathBuf {
+        match mode {
+            SupervisorMode::Simple => self.expected_dir().join("template.simple.toml"),
+            SupervisorMode::Decentralized => self.expected_dir().join("template.dec.toml"),
+        }
     }
 
     fn expected_node_config_dir(&self, index: usize) -> PathBuf {
@@ -228,10 +231,12 @@ fn test_generate_template() {
     env.command("generate-template")
         .with_arg(&output_template_file)
         .with_named_arg("--validators-count", env.validators_count.to_string())
-        .with_named_arg("--supervisor-mode", "simple")
         .run()
         .unwrap();
-    assert_config_files_eq(&output_template_file, env.expected_template_file());
+    assert_config_files_eq(
+        &output_template_file,
+        env.expected_template_file(SupervisorMode::Simple),
+    );
 }
 
 #[test]
@@ -244,7 +249,26 @@ fn test_generate_template_simple_supervisor() {
         .with_named_arg("--supervisor-mode", "simple")
         .run()
         .unwrap();
-    assert_config_files_eq(&output_template_file, env.expected_template_file());
+    assert_config_files_eq(
+        &output_template_file,
+        env.expected_template_file(SupervisorMode::Simple),
+    );
+}
+
+#[test]
+fn test_generate_template_decentralized_supervisor() {
+    let env = ConfigSpec::new_without_pass();
+    let output_template_file = env.output_template_file();
+    env.command("generate-template")
+        .with_arg(&output_template_file)
+        .with_named_arg("--validators-count", env.validators_count.to_string())
+        .with_named_arg("--supervisor-mode", "decentralized")
+        .run()
+        .unwrap();
+    assert_config_files_eq(
+        &output_template_file,
+        env.expected_template_file(SupervisorMode::Decentralized),
+    );
 }
 
 #[test]
@@ -252,7 +276,7 @@ fn test_generate_config_key_files() {
     let env = ConfigSpec::new_without_pass();
 
     env.command("generate-config")
-        .with_arg(&env.expected_template_file())
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
         .with_named_arg("-a", "0.0.0.0:8000")
         .with_arg("--no-password")
@@ -274,7 +298,7 @@ fn master_key_path_current_dir() {
     env::set_current_dir(temp_dir).unwrap();
 
     env.command("generate-config")
-        .with_arg(&env.expected_template_file())
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
         .with_named_arg("-a", "0.0.0.0:8000")
         .with_arg("--no-password")
@@ -296,7 +320,7 @@ fn invalid_master_key_path() {
     let env = ConfigSpec::new_without_pass();
 
     env.command("generate-config")
-        .with_arg(&env.expected_template_file())
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
         .with_named_arg("-a", "0.0.0.0:8000")
         .with_arg("--no-password")
@@ -309,7 +333,7 @@ fn invalid_master_key_path() {
 fn test_generate_config_ipv4() {
     let env = ConfigSpec::new_without_pass();
     env.command("generate-config")
-        .with_arg(&env.expected_template_file())
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
         .with_named_arg("-a", "127.0.0.1")
         .with_arg("--no-password")
@@ -321,7 +345,7 @@ fn test_generate_config_ipv4() {
 fn test_generate_config_ipv6() {
     let env = ConfigSpec::new_without_pass();
     env.command("generate-config")
-        .with_arg(&env.expected_template_file())
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
         .with_named_arg("-a", "::1")
         .with_arg("--no-password")
@@ -511,7 +535,6 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
         database: Default::default(),
         thread_pool_size: None,
         connect_list: Default::default(),
-        keys: Default::default(),
     };
 
     let testnet_dir = tempfile::tempdir()?;

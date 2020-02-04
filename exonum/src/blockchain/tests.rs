@@ -31,7 +31,7 @@ use std::{
 use crate::{
     blockchain::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainBuilder, BlockchainMut, Schema,
+        Blockchain, BlockchainMut, Schema,
     },
     helpers::{Height, ValidatorId},
     messages::Verified,
@@ -404,7 +404,8 @@ fn create_blockchain(
         )
         .build();
 
-    BlockchainBuilder::new(Blockchain::build_for_tests(), genesis_config)
+    Blockchain::build_for_tests()
+        .into_mut(genesis_config)
         .with_runtime(runtime)
         .build()
 }
@@ -761,8 +762,9 @@ fn blockchain_next_height_does_not_panic_before_genesis() {
 /// Checks that `Schema::height` and `Schema::next_height` work as expected.
 #[test]
 fn blockchain_height() {
-    let mut blockchain =
-        BlockchainBuilder::new(Blockchain::build_for_tests(), create_genesis_config()).build();
+    let mut blockchain = Blockchain::build_for_tests()
+        .into_mut(create_genesis_config())
+        .build();
 
     // Check that height is 0 after genesis creation.
     let snapshot = blockchain.snapshot();
