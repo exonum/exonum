@@ -24,8 +24,9 @@ use rand_xorshift::XorShiftRng;
 
 use exonum_merkledb::migration::{rollback_migration, Scratchpad};
 use exonum_merkledb::{
-    access::CopyAccessExt, migration::PersistentIter, Database, Fork, IndexAddress, IndexType,
-    TemporaryDB,
+    access::CopyAccessExt,
+    migration::{PersistentIter, PersistentKeys},
+    Database, Fork, IndexAddress, IndexType, TemporaryDB,
 };
 
 const ACTIONS_MAX_LEN: usize = 50;
@@ -91,7 +92,7 @@ impl Collection {
             IndexType::KeySet => {
                 let mut set = fork.get_key_set(addr);
                 for _ in 0..item_count {
-                    set.insert(rng.gen::<u64>());
+                    set.insert(&rng.gen::<u64>());
                 }
             }
             IndexType::ValueSet => {
@@ -209,7 +210,7 @@ impl IterState {
 
             IndexType::KeySet => {
                 let set = fork.get_key_set::<_, u64>(addr);
-                let iter = PersistentIter::new(&scratchpad, &self.name, &set);
+                let iter = PersistentKeys::new(&scratchpad, &self.name, &set);
                 self.items.extend(iter.take(amount));
             }
             IndexType::ValueSet => {

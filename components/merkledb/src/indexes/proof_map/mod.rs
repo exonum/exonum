@@ -20,9 +20,9 @@ pub use self::{
     proof::{CheckedMapProof, MapProof, MapProofError, ValidationError},
 };
 
-use std::{fmt, io, marker::PhantomData};
-
 use exonum_crypto::Hash;
+
+use std::{fmt, io, marker::PhantomData};
 
 use self::{
     key::{ChildKind, VALUE_KEY_PREFIX},
@@ -31,9 +31,10 @@ use self::{
 };
 use crate::{
     access::{Access, AccessError, FromAccess},
+    indexes::iter::{Entries, IndexIterator, Keys, Values},
     views::{
-        BinaryAttribute, IndexAddress, IndexState, IndexType, Iter as ViewIter, RawAccess,
-        RawAccessMut, View, ViewWithMetadata,
+        BinaryAttribute, IndexAddress, IndexState, IndexType, RawAccess, RawAccessMut, View,
+        ViewWithMetadata,
     },
     BinaryKey, BinaryValue, HashTag, ObjectHash,
 };
@@ -83,47 +84,6 @@ pub struct ProofMapIndex<T: RawAccess, K: ?Sized, V, KeyMode: ToProofPath<K> = H
     _key_mode: PhantomData<KeyMode>,
 }
 
-/// An iterator over the entries of a `ProofMapIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`ProofMapIndex`]. See its documentation for details.
-///
-/// [`iter`]: struct.ProofMapIndex.html#method.iter
-/// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, K: ?Sized, V> {
-    base_iter: ViewIter<'a, Vec<u8>, V>,
-    _k: PhantomData<K>,
-}
-
-/// An iterator over the keys of a `ProofMapIndex`.
-///
-/// This struct is created by the [`keys`] or
-/// [`keys_from`] method on [`ProofMapIndex`]. See its documentation for details.
-///
-/// [`keys`]: struct.ProofMapIndex.html#method.keys
-/// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
-#[derive(Debug)]
-pub struct Keys<'a, K: ?Sized> {
-    base_iter: ViewIter<'a, Vec<u8>, ()>,
-    _k: PhantomData<K>,
-}
-
-/// An iterator over the values of a `ProofMapIndex`.
-///
-/// This struct is created by the [`values`] or
-/// [`values_from`] method on [`ProofMapIndex`]. See its documentation for details.
-///
-/// [`values`]: struct.ProofMapIndex.html#method.values
-/// [`values_from`]: struct.ProofMapIndex.html#method.values_from
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
-#[derive(Debug)]
-pub struct Values<'a, V> {
-    base_iter: ViewIter<'a, Vec<u8>, V>,
-}
-
 /// TODO Clarify documentation. [ECR-2820]
 enum RemoveAction {
     KeyNotFound,
@@ -136,11 +96,9 @@ enum RemoveAction {
 ///
 /// Represents the original key bytes with the `VALUE_KEY_PREFIX` prefix.
 /// TODO Clarify documentation. [ECR-2820]
-trait ValuePath: ToOwned {
+trait ValuePath {
     /// Converts the given key to the value path bytes.
     fn to_value_path(&self) -> Vec<u8>;
-    /// Extracts the given key from the value path bytes.
-    fn from_value_path(bytes: &[u8]) -> Self::Owned;
 }
 
 impl<T: BinaryKey + ?Sized> ValuePath for T {
@@ -149,10 +107,6 @@ impl<T: BinaryKey + ?Sized> ValuePath for T {
         buf[0] = VALUE_KEY_PREFIX;
         self.write(&mut buf[1..]);
         buf
-    }
-
-    fn from_value_path(buffer: &[u8]) -> Self::Owned {
-        Self::read(&buffer[1..])
     }
 }
 
@@ -330,8 +284,7 @@ where
         self.create_multiproof(keys)
     }
 
-    /// Returns an iterator over the entries of the map in ascending order. The iterator element
-    /// type is `(K::Output, V)`.
+    /// Returns an iterator over the entries of the map in ascending order.
     ///
     /// # Examples
     ///
@@ -347,15 +300,11 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, K, V> {
-        Iter {
-            base_iter: self.base.iter(&VALUE_KEY_PREFIX),
-            _k: PhantomData,
-        }
+    pub fn iter(&self) -> Entries<'_, K, V> {
+        self.index_iter(None)
     }
 
-    /// Returns an iterator over the keys of the map in ascending order. The iterator element
-    /// type is `K::Output`.
+    /// Returns an iterator over the keys of the map in ascending order.
     ///
     /// # Examples
     ///
@@ -372,14 +321,10 @@ where
     /// }
     /// ```
     pub fn keys(&self) -> Keys<'_, K> {
-        Keys {
-            base_iter: self.base.iter(&VALUE_KEY_PREFIX),
-            _k: PhantomData,
-        }
+        self.iter().skip_values()
     }
 
-    /// Returns an iterator over the values of the map in ascending order of keys. The iterator
-    /// element type is `V`.
+    /// Returns an iterator over the values of the map in ascending order of keys.
     ///
     /// # Examples
     ///
@@ -396,13 +341,11 @@ where
     /// }
     /// ```
     pub fn values(&self) -> Values<'_, V> {
-        Values {
-            base_iter: self.base.iter(&VALUE_KEY_PREFIX),
-        }
+        self.iter().skip_keys()
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
-    /// specified key. The iterator element type is `(K::Output, V)`.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -419,17 +362,12 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> Iter<'_, K, V> {
-        Iter {
-            base_iter: self
-                .base
-                .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
-            _k: PhantomData,
-        }
+    pub fn iter_from(&self, from: &K) -> Entries<'_, K, V> {
+        self.index_iter(Some(from))
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
-    /// specified key. The iterator element type is `K::Output`.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -447,16 +385,11 @@ where
     /// }
     /// ```
     pub fn keys_from(&self, from: &K) -> Keys<'_, K> {
-        Keys {
-            base_iter: self
-                .base
-                .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
-            _k: PhantomData,
-        }
+        self.iter_from(from).skip_values()
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
-    /// specified key. The iterator element type is `V`.
+    /// specified key.
     ///
     /// # Examples
     ///
@@ -474,11 +407,7 @@ where
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> Values<'_, V> {
-        Values {
-            base_iter: self
-                .base
-                .iter_from(&VALUE_KEY_PREFIX, &from.to_value_path()),
-        }
+        self.iter_from(from).skip_keys()
     }
 }
 
@@ -883,46 +812,25 @@ where
     KeyMode: ToProofPath<K>,
 {
     type Item = (K::Owned, V);
-    type IntoIter = Iter<'a, K, V>;
+    type IntoIter = Entries<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for Iter<'a, K, V>
+impl<T, K, V, KeyMode> IndexIterator for ProofMapIndex<T, K, V, KeyMode>
 where
+    T: RawAccess,
     K: BinaryKey + ?Sized,
     V: BinaryValue,
+    KeyMode: ToProofPath<K>,
 {
-    type Item = (K::Owned, V);
+    type Key = K;
+    type Value = V;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter
-            .next()
-            .map(|(k, v)| (K::from_value_path(&k), v))
-    }
-}
-
-impl<'a, K> Iterator for Keys<'a, K>
-where
-    K: BinaryKey + ?Sized,
-{
-    type Item = K::Owned;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, _)| K::from_value_path(&k))
-    }
-}
-
-impl<'a, V> Iterator for Values<'a, V>
-where
-    V: BinaryValue,
-{
-    type Item = V;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(_, v)| v)
+    fn index_iter(&self, from: Option<&K>) -> Entries<'_, K, V> {
+        Entries::with_detached_prefix(&self.base, &VALUE_KEY_PREFIX, from)
     }
 }
 

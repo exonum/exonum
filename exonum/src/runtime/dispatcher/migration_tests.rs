@@ -297,7 +297,7 @@ impl Rig {
         let artifact = ArtifactId::from_raw_parts(MigrationRuntime::ID, name.into(), version);
 
         let fork = self.blockchain.fork();
-        Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
+        Dispatcher::commit_artifact(&fork, &artifact, vec![]);
         self.create_block(fork);
         artifact
     }
@@ -485,7 +485,7 @@ fn migration_immediate_errors() {
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::UnknownArtifactId));
 
     // Mark the artifact as pending.
-    Dispatcher::commit_artifact(&fork, unknown_artifact.clone(), vec![]);
+    Dispatcher::commit_artifact(&fork, &unknown_artifact, vec![]);
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact, &old_service.name)

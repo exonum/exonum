@@ -21,16 +21,15 @@ use exonum_crypto::Hash;
 use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
 
 use self::{
-    key::{ProofListKey, MAX_INDEX},
+    key::ProofListKey,
     proof::HashedEntry,
     proof_builder::{BuildProof, MerkleTree},
 };
 use crate::{
     access::{Access, AccessError, FromAccess},
     hash::HashTag,
-    views::{
-        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
-    },
+    indexes::iter::{Entries, IndexIterator, Values},
+    views::{IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, IndexAddress, ObjectHash,
 };
 
@@ -59,19 +58,6 @@ pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
-}
-
-/// An iterator over the items of a `ProofListIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`ProofListIndex`]. See its documentation for details.
-///
-/// [`iter`]: struct.ProofListIndex.html#method.iter
-/// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
-/// [`ProofListIndex`]: struct.ProofListIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, V> {
-    base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
 impl<T, V> MerkleTree<V> for ProofListIndex<T, V>
@@ -298,7 +284,7 @@ where
         self.create_range_proof(range)
     }
 
-    /// Returns an iterator over the list. The iterator element type is V.
+    /// Returns an iterator over the list values.
     ///
     /// # Examples
     ///
@@ -313,14 +299,11 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter(&0_u8),
-        }
+    pub fn iter(&self) -> Values<'_, V> {
+        self.index_iter(None).skip_keys()
     }
 
-    /// Returns an iterator over the list starting from the specified position. The iterator
-    /// element type is V.
+    /// Returns an iterator over the list values starting from the specified position.
     ///
     /// # Examples
     ///
@@ -335,10 +318,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
-        }
+    pub fn iter_from(&self, from: u64) -> Values<'_, V> {
+        self.index_iter(Some(&from)).skip_keys()
     }
 }
 
@@ -728,27 +709,32 @@ where
     }
 }
 
-impl<'a, T, V> std::iter::IntoIterator for &'a ProofListIndex<T, V>
+impl<'a, T, V> IntoIterator for &'a ProofListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;
-    type IntoIter = Iter<'a, V>;
+    type IntoIter = Values<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for Iter<'a, V>
+impl<T, V> IndexIterator for ProofListIndex<T, V>
 where
+    T: RawAccess,
     V: BinaryValue,
 {
-    type Item = V;
+    type Key = u64;
+    type Value = V;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(_, v)| v)
+    fn index_iter(&self, from: Option<&u64>) -> Entries<'_, u64, V> {
+        // Using `from` directly works because of `prefix`. If `from` is greater than
+        // the maximum index of a leaf element, the iterator should immediately end
+        // because the key does not start with the prefix.
+        Entries::with_prefix(&self.base, &0_u8, from)
     }
 }
 
@@ -760,9 +746,14 @@ mod proto {
 
     use std::borrow::Cow;
 
-    use super::{HashedEntry, ListProof, ProofListKey};
-    pub use crate::proto::{self, *};
-    use crate::{indexes::proof_list::MAX_INDEX, BinaryValue};
+    use super::{
+        key::{HEIGHT_SHIFT, MAX_INDEX},
+        HashedEntry, ListProof, ProofListKey,
+    };
+    use crate::{
+        proto::{self, *},
+        BinaryValue,
+    };
 
     impl ProtobufConvert for ProofListKey {
         type ProtoStruct = proto::ProofListKey;
@@ -780,7 +771,7 @@ mod proto {
 
             // ProtobufConvert is implemented manually to add these checks.
             ensure!(index <= MAX_INDEX, "index is out of range");
-            ensure!(height <= 58, "height is out of range");
+            ensure!(u64::from(height) <= HEIGHT_SHIFT, "height is out of range");
 
             Ok(ProofListKey::new(height as u8, index))
         }

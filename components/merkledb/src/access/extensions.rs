@@ -238,10 +238,10 @@ pub trait CopyAccessExt: Access + Copy {
     /// # Panics
     ///
     /// If the index exists, but is not a key set.
-    fn get_key_set<I, V>(self, addr: I) -> KeySetIndex<Self::Base, V>
+    fn get_key_set<I, K>(self, addr: I) -> KeySetIndex<Self::Base, K>
     where
         I: Into<IndexAddress>,
-        V: BinaryKey,
+        K: BinaryKey + ?Sized,
     {
         KeySetIndex::from_access(self, addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))
@@ -461,10 +461,10 @@ pub trait AccessExt: Access {
     /// # Panics
     ///
     /// If the index exists, but is not a key set.
-    fn get_key_set<I, V>(&self, addr: I) -> KeySetIndex<Self::Base, V>
+    fn get_key_set<I, K>(&self, addr: I) -> KeySetIndex<Self::Base, K>
     where
         I: Into<IndexAddress>,
-        V: BinaryKey,
+        K: BinaryKey + ?Sized,
     {
         KeySetIndex::from_access(self.clone(), addr.into())
             .unwrap_or_else(|e| panic!("MerkleDB error: {}", e))

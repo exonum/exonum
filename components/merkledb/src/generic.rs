@@ -540,7 +540,7 @@ mod tests {
         let access = Migration::new("foo", &fork).into_erased();
         assert!(access.is_mutable());
         access.get_proof_list("list").extend(vec![4_i32, 5, 6, 7]);
-        access.get_key_set("set").insert(99_u8);
+        access.get_key_set("set").insert(&99_u8);
         let access = Scratchpad::new("foo", &fork).into_erased();
         access.get_entry("iter_position").set(123_u32);
         drop(access);
