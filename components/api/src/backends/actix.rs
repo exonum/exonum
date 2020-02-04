@@ -398,7 +398,8 @@ mod tests {
             },
             123,
         );
-        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
+        let expected_warning_text =
+            "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
              Currently there is no specific date for disabling this endpoint.";
         let expected_warning = create_warning_header(expected_warning_text);
@@ -417,7 +418,8 @@ mod tests {
             },
             123,
         );
-        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
+        let expected_warning_text =
+            "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
              Currently there is no specific date for disabling this endpoint. \
              Additional information: Docs can be found on docs.rs.";
@@ -438,7 +440,8 @@ mod tests {
             },
             123,
         );
-        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
+        let expected_warning_text =
+            "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
              The old API is maintained until Thu, 31 Dec 2020 23:59:59 GMT.";
         let expected_warning = create_warning_header(expected_warning_text);

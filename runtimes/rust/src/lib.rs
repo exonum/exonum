@@ -681,10 +681,10 @@ impl Runtime for RustRuntime {
                 let instance = self
                     .new_service(&spec.artifact, &spec.as_descriptor())
                     .expect(
-                        "BUG: Attempt to create a new service instance failed; \
+                    "BUG: Attempt to create a new service instance failed; \
                      within `instantiate_adding_service` we were able to create a new instance, \
                      but now we are not.",
-                    );
+                );
                 self.add_started_service(instance);
             }
             InstanceStatus::Stopped => {
