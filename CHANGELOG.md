@@ -252,6 +252,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Added maintenance command `restart-migration` to restart migration script. (#1728)
 
+- Added `with_default_instance` and `with_default_service` to start service
+  instances immediately after genesis block creation. (#1765)
+
 #### exonum-crypto
 
 - `KeyPair` now can has constructors for generating a random keypair and
