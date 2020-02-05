@@ -52,7 +52,29 @@ fn tree_height_by_length(len: u64) -> u8 {
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that elements implement the [`BinaryValue`] trait.
 ///
+/// # Safety
+///
+/// A `ProofListIndex` may contain at most `2 ** 56` elements (which is approximately `7.2e16`),
+/// **not** `2 ** 64` as [`ListIndex`]. Since this amount is still astronomically large,
+/// an index overflow is treated similar to an integer overflow; [`extend`] and [`push`]
+/// methods will panic if the index size exceeds `2 ** 56`. (Unlike integer overflows, the panic
+/// will occur in any compile mode, regardless of whether debug assertions are on.)
+/// For added safety, the application may check that an overflow does not occur before performing
+/// these operations. However, this check will be redundant in most realistic scenarios:
+/// even if 10,000,000 elements are added to a `ProofListIndex` every second, it will take
+/// ~228 years to overflow it.
+///
+/// Using readonly methods such as [`get`], [`iter_from`] and [`get_proof`] is safe for *all*
+/// index values; it is unnecessary to check on the calling side whether the index exceeds
+/// `2 ** 56 - 1` .
+///
 /// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`ListIndex`]: ../struct.ListIndex.html
+/// [`extend`]: #method.extend
+/// [`push`]: #method.push
+/// [`get`]: #method.get
+/// [`iter_from`]: #method.iter_from
+/// [`get_proof`]: #method.get_proof
 #[derive(Debug)]
 pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
