@@ -2,6 +2,7 @@
 external_address = "127.0.0.1:5401"
 listen_address = "0.0.0.0:5401"
 master_key_path = "master.key.toml"
+consensus_key = "531cd1323febe624a34cda4efa68d9bb78c9e59e0fcb9b5702a8f94dbf7080e1"
 
 [private_config.api]
 state_update_timeout = 10000
@@ -16,10 +17,6 @@ public_key = "11e1b1902690aa22c8c976cb74a27f167b3899141c1c6ce8e19bafef32715d40"
 [[private_config.connect_list.peers]]
 address = "127.0.0.1:5402"
 public_key = "242a4e1fc9d0f5ba2003189bded859153aaa9e86f033a7cadb213ec4328601bf"
-
-[[private_config.connect_list.peers]]
-address = "127.0.0.1:5401"
-public_key = "531cd1323febe624a34cda4efa68d9bb78c9e59e0fcb9b5702a8f94dbf7080e1"
 
 [[private_config.connect_list.peers]]
 address = "127.0.0.1:5403"

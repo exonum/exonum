@@ -114,13 +114,24 @@ impl Finalize {
             .consensus_key)
     }
 
-    fn create_connect_list_config(public_configs: &[NodePublicConfig]) -> ConnectListConfig {
-        // FIXME: filter self (ECR-4190).
+    fn create_connect_list_config(
+        public_configs: &[NodePublicConfig],
+        skipped_key: &PublicKey,
+    ) -> ConnectListConfig {
         let peers = public_configs
             .iter()
-            .map(|config| ConnectInfo {
-                public_key: Self::get_consensus_key(config).unwrap(),
-                address: config.address.clone().unwrap(),
+            .filter_map(|config| {
+                let public_key = Self::get_consensus_key(config).unwrap();
+                // `skipped_key` is a consensus key of the current node. We don't need
+                // to include `ConnectInfo` with this key in the connect list.
+                if public_key != *skipped_key {
+                    Some(ConnectInfo {
+                        public_key,
+                        address: config.address.clone().unwrap(),
+                    })
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -160,7 +171,10 @@ impl ExonumCommand for Finalize {
             .collect();
         let consensus = common.consensus.with_validator_keys(validator_keys);
 
-        let connect_list = Self::create_connect_list_config(&public_configs);
+        let connect_list = Self::create_connect_list_config(
+            &public_configs,
+            &private_config.consensus_key.unwrap(),
+        );
         let private_config = NodePrivateConfig {
             api: NodeApiConfig {
                 public_api_address: self.public_api_address,
@@ -170,6 +184,7 @@ impl ExonumCommand for Finalize {
                 ..private_config.api
             },
             connect_list,
+            consensus_key: None, // We use it in creation connect list. We don't need it anymore.
             ..private_config
         };
         let public_config = NodePublicConfig {

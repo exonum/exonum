@@ -160,6 +160,7 @@ impl ExonumCommand for GenerateConfig {
             database: Default::default(),
             thread_pool_size: Default::default(),
             connect_list: Default::default(),
+            consensus_key: Some(keys.consensus_pk()),
         };
 
         save_config_file(&private_config, &private_config_path)?;

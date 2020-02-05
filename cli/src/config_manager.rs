@@ -106,6 +106,7 @@ mod tests {
                 database: Default::default(),
                 thread_pool_size: None,
                 connect_list: Default::default(),
+                consensus_key: None,
             },
             public_config: NodePublicConfig {
                 consensus: Default::default(),

@@ -18,10 +18,6 @@ address = "127.0.0.1:5402"
 public_key = "242a4e1fc9d0f5ba2003189bded859153aaa9e86f033a7cadb213ec4328601bf"
 
 [[private_config.connect_list.peers]]
-address = "127.0.0.1:5401"
-public_key = "531cd1323febe624a34cda4efa68d9bb78c9e59e0fcb9b5702a8f94dbf7080e1"
-
-[[private_config.connect_list.peers]]
 address = "127.0.0.1:5403"
 public_key = "6f3f614692d678b664be7eaafbe280d14e2d4191299ae146874eec389c93ece7"
 

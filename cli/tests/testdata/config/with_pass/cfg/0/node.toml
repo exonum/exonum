@@ -9,9 +9,8 @@ state_update_timeout = 10000
 max_retries = 20
 retry_timeout = 500
 
-[[private_config.connect_list.peers]]
-address = "127.0.0.1:5400"
-public_key = "12285e9b9d6440ffe0e0dc8e8d381cf6a071c38d053d9f1273c7b794175529fc"
+[private_config.connect_list]
+peers = []
 
 [private_config.database]
 compression_type = "none"
