@@ -69,7 +69,7 @@ fn list_methods() {
 }
 
 #[test]
-fn get_with_overly_large_index() {
+fn get_and_iter_from_with_overly_large_index() {
     const LARGE_INDEXES: &[u64] = &[
         1_u64 << 56,
         (1_u64 << 56) + 10,
@@ -81,10 +81,12 @@ fn get_with_overly_large_index() {
 
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let list = fork.get_proof_list::<_, u64>(IDX_NAME);
+    let mut list = fork.get_proof_list::<_, u64>(IDX_NAME);
+    list.extend(0..10);
 
     for &index in LARGE_INDEXES {
         assert_eq!(list.get(index), None);
+        assert_eq!(list.iter_from(index).count(), 0);
     }
 }
 
