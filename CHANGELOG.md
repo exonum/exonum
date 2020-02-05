@@ -360,6 +360,9 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Bogus setting of the empty key was removed for `ListIndex`. (#1762)
 
+- `ProofListIndex` now properly processes all index values; previously,
+  some of its methods panicked if called with an index exceeding `2 ** 56`. (#1768)
+
 ## 0.13.0-rc.2 - 2019-12-04
 
 ### Breaking changes
