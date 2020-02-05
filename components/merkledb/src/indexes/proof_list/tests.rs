@@ -1007,6 +1007,61 @@ fn invalid_proofs_with_no_values() {
     );
 }
 
+#[test]
+fn proof_with_out_of_bound_elements() {
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [],
+        "proof": [],
+        "length": (1_u64 << 56) + 1,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // length is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [(0, 0), (1_u64 << 56, 42)],
+        "proof": [],
+        "length": 100,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // one of the entry indexes is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [],
+        "proof": [
+            { "height": 57, "index": 0, "hash": Hash::zero() },
+        ],
+        "length": 100,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // `height` is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [],
+        "proof": [
+            { "height": 1, "index": 1_u64 << 56, "hash": Hash::zero() },
+        ],
+        "length": 100,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // `index` is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+}
+
 mod root_hash {
     use crate::{
         access::CopyAccessExt, hash::HashTag, BinaryValue, Database, ObjectHash, TemporaryDB,
