@@ -21,7 +21,7 @@ use exonum_crypto::Hash;
 use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
 
 use self::{
-    key::ProofListKey,
+    key::{ProofListKey, MAX_INDEX},
     proof::HashedEntry,
     proof_builder::{BuildProof, MerkleTree},
 };
@@ -500,6 +500,20 @@ where
             // No elements in the iterator; we're done.
             return;
         }
+
+        // For efficiency, we check the constraint once rather than in a loop above.
+        // If the list length exceeds the allowed bounds, `ProofListKey::leaf` in the loop
+        // will panic in the debug mode, but we don't expect users to run MerkleDB in the debug mode
+        // in all cases.
+        assert!(
+            new_list_len < MAX_INDEX + 1,
+            "Length of a `ProofListIndex` exceeding the maximum allowed value ({}). \
+             This should never happen in realistic scenarios. If you feel this is not a bug, \
+             open an issue on https://github.com/exonum/exonum and tell us your use case \
+             for such a large list.",
+            MAX_INDEX + 1
+        );
+
         self.set_len(new_list_len);
         self.update_range(old_list_len, new_list_len - 1);
     }
