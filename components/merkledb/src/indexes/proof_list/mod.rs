@@ -145,6 +145,9 @@ where
     /// assert_eq!(Some(10), index.get(0));
     /// ```
     pub fn get(&self, index: u64) -> Option<V> {
+        if index > MAX_INDEX {
+            return None;
+        }
         self.base.get(&ProofListKey::leaf(index))
     }
 

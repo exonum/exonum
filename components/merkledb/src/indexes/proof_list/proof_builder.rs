@@ -54,7 +54,7 @@ where
     T: MerkleTree<V>,
 {
     fn create_proof(&self, index: u64) -> ListProof<V> {
-        create_proof(self, index, index + 1)
+        create_proof(self, index, index)
     }
 
     fn create_range_proof(&self, indexes: impl RangeBounds<u64>) -> ListProof<V> {
@@ -68,7 +68,9 @@ where
         // Exclusive upper boundary of the proof range.
         let to = match indexes.end_bound() {
             Bound::Unbounded => self.len(),
-            Bound::Included(to) => *to + 1,
+            // Saturation below doesn't matter: if `to == u64::max_value()`, it is guaranteed
+            // to be larger than any possible list length.
+            Bound::Included(to) => to.saturating_add(1),
             Bound::Excluded(to) => *to,
         };
 
@@ -83,27 +85,31 @@ where
             from,
             to
         );
-        create_proof(self, from, to)
+        create_proof(self, from, to - 1)
     }
 }
 
-/// Creates a `ListProof` for a contiguous half-open range of indexes `[from, to)`.
+/// Creates a `ListProof` for a contiguous closed range of indexes `[from, inclusive_to]`.
 ///
-/// The caller must ensure that `to > from`.
-fn create_proof<V: BinaryValue>(tree: &impl MerkleTree<V>, from: u64, to: u64) -> ListProof<V> {
+/// The caller must ensure that `inclusive_to >= from`.
+fn create_proof<V: BinaryValue>(
+    tree: &impl MerkleTree<V>,
+    from: u64,
+    inclusive_to: u64,
+) -> ListProof<V> {
     let tree_len = tree.len();
     let tree_height = tree_height_by_length(tree_len);
     if from >= tree_len {
         return ListProof::empty(tree.merkle_root(), tree_len);
     }
 
-    let items = (from..to).zip(tree.values(from));
+    let items = (from..=inclusive_to).zip(tree.values(from));
     let mut proof = ListProof::new(items, tree_len);
 
     // `left` and `right` track the indexes of elements for which we build the proof,
     // on the particular `height` of the tree. Both these values are inclusive; i.e., the range
     // is `[left, right]`.
-    let (mut left, mut right) = (from, to - 1);
+    let (mut left, mut right) = (from, inclusive_to);
     let mut last_index_on_level = tree_len - 1;
 
     for height in 1..tree_height {

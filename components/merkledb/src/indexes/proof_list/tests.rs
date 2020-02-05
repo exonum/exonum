@@ -69,6 +69,26 @@ fn list_methods() {
 }
 
 #[test]
+fn get_with_overly_large_index() {
+    const LARGE_INDEXES: &[u64] = &[
+        1_u64 << 56,
+        (1_u64 << 56) + 10,
+        1_u64 << 57,
+        1_u64 << 60,
+        u64::max_value() - 10,
+        u64::max_value(),
+    ];
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let list = fork.get_proof_list::<_, u64>(IDX_NAME);
+
+    for &index in LARGE_INDEXES {
+        assert_eq!(list.get(index), None);
+    }
+}
+
+#[test]
 fn extend_is_equivalent_to_sequential_pushes() {
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -347,6 +367,67 @@ fn random_proofs() {
             .map(|(i, value)| (*i, value))
             .eq(expected_entries));
     }
+}
+
+#[test]
+fn proofs_with_overly_large_indexes() {
+    const LARGE_INDEXES: &[u64] = &[
+        1_u64 << 56,
+        (1_u64 << 56) + 10,
+        1_u64 << 57,
+        1_u64 << 60,
+        u64::max_value() - 10,
+        u64::max_value(),
+    ];
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = fork.get_proof_list(IDX_NAME);
+    index.extend(0_u64..1_000);
+
+    for &i in LARGE_INDEXES {
+        let proof = index.get_proof(i);
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+    }
+}
+
+#[test]
+fn proofs_with_overly_large_index_ranges() {
+    const LARGE_INDEXES: &[u64] = &[
+        1_u64 << 56,
+        (1_u64 << 56) + 10,
+        1_u64 << 57,
+        1_u64 << 60,
+        u64::max_value() - 10,
+    ];
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = fork.get_proof_list(IDX_NAME);
+    index.extend(0_u64..10);
+
+    for &i in LARGE_INDEXES {
+        let proof = index.get_range_proof(i..);
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+
+        let proof = index.get_range_proof(i..(i + 5));
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+
+        let proof = index.get_range_proof((i - 5)..=i);
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+    }
+
+    let proof = index.get_range_proof(..=u64::max_value());
+    let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+    assert_eq!(checked_proof.entries().len(), 10);
+
+    let proof = index.get_range_proof(7..u64::max_value());
+    let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+    assert_eq!(checked_proof.entries().len(), 3);
 }
 
 #[test]
