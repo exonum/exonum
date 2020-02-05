@@ -1,4 +1,5 @@
 [private_config]
+consensus_public_key = "12285e9b9d6440ffe0e0dc8e8d381cf6a071c38d053d9f1273c7b794175529fc"
 external_address = "127.0.0.1:5400"
 listen_address = "0.0.0.0:5400"
 master_key_path = "master.key.toml"

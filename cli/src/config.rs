@@ -77,7 +77,7 @@ pub struct NodePrivateConfig {
     /// Information about peers within network.
     pub connect_list: ConnectListConfig,
     /// Consensus public key of the node.
-    pub consensus_key: Option<PublicKey>,
+    pub consensus_public_key: PublicKey,
 }
 
 /// Configuration for the `Node`.

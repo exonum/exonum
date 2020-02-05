@@ -535,7 +535,7 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
         database: Default::default(),
         thread_pool_size: None,
         connect_list: Default::default(),
-        consensus_key: None,
+        consensus_public_key: KeyPair::random().public_key(),
     };
 
     let testnet_dir = tempfile::tempdir()?;
