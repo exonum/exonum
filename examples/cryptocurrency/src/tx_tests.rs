@@ -256,7 +256,7 @@ fn init_testkit() -> TestKit {
     TestKit::for_rust_service(CryptocurrencyService, INSTANCE_NAME, INSTANCE_ID, ())
 }
 
-/// Returns the wallet identified by the given public key or `None` such wallet doesn't exist.
+/// Returns the wallet identified by the given public key or `None` if such a wallet doesn't exist.
 fn try_get_wallet(testkit: &TestKit, pubkey: &PublicKey) -> Option<Wallet> {
     let snapshot = testkit.snapshot();
     let schema = get_schema(&snapshot);
