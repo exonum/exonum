@@ -794,6 +794,20 @@ mod proto {
         }
     }
 
+    #[test]
+    fn proof_list_key_errors() {
+        let mut bogus_key = proto::ProofListKey::new();
+        bogus_key.set_height(57);
+        let err = ProofListKey::from_pb(bogus_key).unwrap_err();
+        assert!(err.to_string().contains("height is out of range"));
+
+        let mut bogus_key = proto::ProofListKey::new();
+        bogus_key.set_height(3);
+        bogus_key.set_index(1_u64 << 57);
+        let err = ProofListKey::from_pb(bogus_key).unwrap_err();
+        assert!(err.to_string().contains("index is out of range"));
+    }
+
     impl<V> ProtobufConvert for ListProof<V>
     where
         V: BinaryValue,
