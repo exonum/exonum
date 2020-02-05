@@ -41,6 +41,12 @@ impl ProofListKey {
         self.index
     }
 
+    /// Checks if a key is valid. An invalid key may be obtained, for example, by deserializing
+    /// untrusted input.
+    pub fn is_valid(&self) -> bool {
+        u64::from(self.height) <= HEIGHT_SHIFT && self.index <= MAX_INDEX
+    }
+
     pub fn leaf(index: u64) -> Self {
         Self::new(0, index)
     }

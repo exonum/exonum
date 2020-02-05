@@ -20,7 +20,10 @@ use serde_derive::*;
 
 use std::cmp::Ordering;
 
-use super::{key::ProofListKey, tree_height_by_length};
+use super::{
+    key::{ProofListKey, MAX_INDEX},
+    tree_height_by_length,
+};
 use crate::{BinaryValue, HashTag};
 
 #[cfg(feature = "with-protobuf")]
@@ -298,6 +301,24 @@ impl<V: BinaryValue> ListProof<V> {
         self
     }
 
+    /// Checks bounds on indexes and heights in this proof.
+    fn check_index_bounds(&self) -> Result<(), ListProofError> {
+        if self.length > MAX_INDEX + 1 {
+            return Err(ListProofError::OutOfBounds);
+        }
+
+        let allowed_entry_indexes = self.entries.iter().all(|(index, _)| *index <= MAX_INDEX);
+        if !allowed_entry_indexes {
+            return Err(ListProofError::OutOfBounds);
+        }
+        let allowed_proof_positions = self.proof.iter().all(|proof| proof.key.is_valid());
+        if !allowed_proof_positions {
+            return Err(ListProofError::OutOfBounds);
+        }
+
+        Ok(())
+    }
+
     /// Restores the root hash of the Merkle tree.
     ///
     /// The root hash is computed by iterating over each height of the Merkle tree
@@ -308,6 +329,7 @@ impl<V: BinaryValue> ListProof<V> {
     /// For proofs of a single element or a contiguous range of elements,
     /// the total number of restored hashes is `O(log_2(N))`, where `N` is the list length.
     fn collect(&self) -> Result<Hash, ListProofError> {
+        self.check_index_bounds()?;
         let tree_height = tree_height_by_length(self.length);
 
         // First, check an edge case when the list contains no elements.
@@ -443,6 +465,7 @@ impl<V: BinaryValue> ListProof<V> {
     /// does not guarantee that the proof is valid, however; the estimation skips most
     /// of the checks for speed.
     pub fn hash_ops(&self) -> Result<usize, ListProofError> {
+        self.check_index_bounds()?;
         // First, we need to hash all values in the proof.
         let mut hash_ops = self.entries.len();
 
@@ -570,7 +593,7 @@ impl<'a, V> CheckedListProof<'a, V> {
 
     /// Returns iterator over indexes of the elements in the proof without verifying
     /// proof integrity.
-    pub fn indexes<'s>(&'s self) -> impl Iterator<Item = u64> + 's {
+    pub fn indexes(&self) -> impl Iterator<Item = u64> + '_ {
         self.entries().iter().map(|(index, _)| *index)
     }
 
@@ -620,6 +643,13 @@ pub enum ListProofError {
     /// or hashes from.
     #[fail(display = "non-empty proof for an empty list")]
     NonEmptyProof,
+
+    /// Proof does not satisfy built-in constraints on element positions.
+    ///
+    /// For example, this error is generated if the list length indicated in the proof
+    /// exceeds the maximum possible list length (`2**56`).
+    #[fail(display = "proof does not satisfy built-in constraints on element positions")]
+    OutOfBounds,
 
     /// Never actually generated.
     #[doc(hidden)]

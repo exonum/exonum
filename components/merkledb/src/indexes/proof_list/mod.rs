@@ -21,7 +21,7 @@ use exonum_crypto::Hash;
 use std::{cmp, iter, marker::PhantomData, ops::RangeBounds};
 
 use self::{
-    key::ProofListKey,
+    key::{ProofListKey, MAX_INDEX},
     proof::HashedEntry,
     proof_builder::{BuildProof, MerkleTree},
 };
@@ -52,7 +52,29 @@ fn tree_height_by_length(len: u64) -> u8 {
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that elements implement the [`BinaryValue`] trait.
 ///
+/// # Safety
+///
+/// A `ProofListIndex` may contain at most `2 ** 56` elements (which is approximately `7.2e16`),
+/// **not** `2 ** 64` as [`ListIndex`]. Since this amount is still astronomically large,
+/// an index overflow is treated similar to an integer overflow; [`extend`] and [`push`]
+/// methods will panic if the index size exceeds `2 ** 56`. (Unlike integer overflows, the panic
+/// will occur in any compile mode, regardless of whether debug assertions are on.)
+/// For added safety, the application may check that an overflow does not occur before performing
+/// these operations. However, this check will be redundant in most realistic scenarios:
+/// even if 10,000,000 elements are added to a `ProofListIndex` every second, it will take
+/// ~228 years to overflow it.
+///
+/// Using readonly methods such as [`get`], [`iter_from`] and [`get_proof`] is safe for *all*
+/// index values; it is unnecessary to check on the calling side whether the index exceeds
+/// `2 ** 56 - 1` .
+///
 /// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`ListIndex`]: ../struct.ListIndex.html
+/// [`extend`]: #method.extend
+/// [`push`]: #method.push
+/// [`get`]: #method.get
+/// [`iter_from`]: #method.iter_from
+/// [`get_proof`]: #method.get_proof
 #[derive(Debug)]
 pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
@@ -145,6 +167,9 @@ where
     /// assert_eq!(Some(10), index.get(0));
     /// ```
     pub fn get(&self, index: u64) -> Option<V> {
+        if index > MAX_INDEX {
+            return None;
+        }
         self.base.get(&ProofListKey::leaf(index))
     }
 
@@ -500,6 +525,20 @@ where
             // No elements in the iterator; we're done.
             return;
         }
+
+        // For efficiency, we check the constraint once rather than in a loop above.
+        // If the list length exceeds the allowed bounds, `ProofListKey::leaf` in the loop
+        // will panic in the debug mode, but we don't expect users to run MerkleDB in the debug mode
+        // in all cases.
+        assert!(
+            new_list_len < MAX_INDEX + 1,
+            "Length of a `ProofListIndex` exceeding the maximum allowed value ({}). \
+             This should never happen in realistic scenarios. If you feel this is not a bug, \
+             open an issue on https://github.com/exonum/exonum and tell us your use case \
+             for such a large list.",
+            MAX_INDEX + 1
+        );
+
         self.set_len(new_list_len);
         self.update_range(old_list_len, new_list_len - 1);
     }
@@ -775,6 +814,20 @@ mod proto {
 
             Ok(ProofListKey::new(height as u8, index))
         }
+    }
+
+    #[test]
+    fn proof_list_key_errors() {
+        let mut bogus_key = proto::ProofListKey::new();
+        bogus_key.set_height(57);
+        let err = ProofListKey::from_pb(bogus_key).unwrap_err();
+        assert!(err.to_string().contains("height is out of range"));
+
+        let mut bogus_key = proto::ProofListKey::new();
+        bogus_key.set_height(3);
+        bogus_key.set_index(1_u64 << 57);
+        let err = ProofListKey::from_pb(bogus_key).unwrap_err();
+        assert!(err.to_string().contains("index is out of range"));
     }
 
     impl<V> ProtobufConvert for ListProof<V>

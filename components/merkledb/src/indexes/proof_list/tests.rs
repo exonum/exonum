@@ -69,6 +69,28 @@ fn list_methods() {
 }
 
 #[test]
+fn get_and_iter_from_with_overly_large_index() {
+    const LARGE_INDEXES: &[u64] = &[
+        1_u64 << 56,
+        (1_u64 << 56) + 10,
+        1_u64 << 57,
+        1_u64 << 60,
+        u64::max_value() - 10,
+        u64::max_value(),
+    ];
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut list = fork.get_proof_list::<_, u64>(IDX_NAME);
+    list.extend(0..10);
+
+    for &index in LARGE_INDEXES {
+        assert_eq!(list.get(index), None);
+        assert_eq!(list.iter_from(index).count(), 0);
+    }
+}
+
+#[test]
 fn extend_is_equivalent_to_sequential_pushes() {
     let db = TemporaryDB::new();
     let fork = db.fork();
@@ -347,6 +369,67 @@ fn random_proofs() {
             .map(|(i, value)| (*i, value))
             .eq(expected_entries));
     }
+}
+
+#[test]
+fn proofs_with_overly_large_indexes() {
+    const LARGE_INDEXES: &[u64] = &[
+        1_u64 << 56,
+        (1_u64 << 56) + 10,
+        1_u64 << 57,
+        1_u64 << 60,
+        u64::max_value() - 10,
+        u64::max_value(),
+    ];
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = fork.get_proof_list(IDX_NAME);
+    index.extend(0_u64..1_000);
+
+    for &i in LARGE_INDEXES {
+        let proof = index.get_proof(i);
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+    }
+}
+
+#[test]
+fn proofs_with_overly_large_index_ranges() {
+    const LARGE_INDEXES: &[u64] = &[
+        1_u64 << 56,
+        (1_u64 << 56) + 10,
+        1_u64 << 57,
+        1_u64 << 60,
+        u64::max_value() - 10,
+    ];
+
+    let db = TemporaryDB::new();
+    let fork = db.fork();
+    let mut index = fork.get_proof_list(IDX_NAME);
+    index.extend(0_u64..10);
+
+    for &i in LARGE_INDEXES {
+        let proof = index.get_range_proof(i..);
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+
+        let proof = index.get_range_proof(i..(i + 5));
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+
+        let proof = index.get_range_proof((i - 5)..=i);
+        let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+        assert!(checked_proof.entries().is_empty());
+    }
+
+    let proof = index.get_range_proof(..=u64::max_value());
+    let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+    assert_eq!(checked_proof.entries().len(), 10);
+
+    let proof = index.get_range_proof(7..u64::max_value());
+    let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
+    assert_eq!(checked_proof.entries().len(), 3);
 }
 
 #[test]
@@ -1005,6 +1088,61 @@ fn invalid_proofs_with_no_values() {
         proof.check().unwrap_err(),
         ListProofError::UnexpectedBranch // the hash is at an incorrect position
     );
+}
+
+#[test]
+fn proof_with_out_of_bound_elements() {
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [],
+        "proof": [],
+        "length": (1_u64 << 56) + 1,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // length is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [(0, 0), (1_u64 << 56, 42)],
+        "proof": [],
+        "length": 100,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // one of the entry indexes is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [],
+        "proof": [
+            { "height": 57, "index": 0, "hash": Hash::zero() },
+        ],
+        "length": 100,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // `height` is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
+
+    let proof: ListProof<u64> = serde_json::from_value(json!({
+        "entries": [],
+        "proof": [
+            { "height": 1, "index": 1_u64 << 56, "hash": Hash::zero() },
+        ],
+        "length": 100,
+    }))
+    .unwrap();
+    assert_eq!(
+        proof.check().unwrap_err(),
+        ListProofError::OutOfBounds // `index` is overly large
+    );
+    assert_eq!(proof.hash_ops().unwrap_err(), ListProofError::OutOfBounds);
 }
 
 mod root_hash {
