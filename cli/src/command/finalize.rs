@@ -116,7 +116,7 @@ impl Finalize {
 
     fn create_connect_list_config(
         public_configs: &[NodePublicConfig],
-        skipped_key: &PublicKey,
+        key_to_skip: &PublicKey,
     ) -> ConnectListConfig {
         let peers = public_configs
             .iter()
@@ -124,7 +124,7 @@ impl Finalize {
                 let public_key = Self::get_consensus_key(config).unwrap();
                 // `skipped_key` is a consensus key of the current node. We don't need
                 // to include `ConnectInfo` with this key in the connect list.
-                if public_key != *skipped_key {
+                if public_key != *key_to_skip {
                     Some(ConnectInfo {
                         public_key,
                         address: config.address.clone().unwrap(),
