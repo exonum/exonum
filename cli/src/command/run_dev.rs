@@ -20,7 +20,7 @@ use failure::{Error, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{fs, net::SocketAddr, path::PathBuf, str::FromStr};
 
 use crate::command::{
     finalize::Finalize,
@@ -31,13 +31,21 @@ use crate::command::{
 };
 
 /// Run application in development mode (generate configuration and db files automatically).
-/// The public API of the node will be available on 127.0.0.1:8080 and the private API on
-/// 127.0.0.1:8081.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub struct RunDev {
     /// The path where configuration and db files will be generated.
     #[structopt(long, short = "a")]
     pub artifacts_dir: PathBuf,
+    /// Listen address for node public API.
+    ///
+    /// Public API is used mainly for sending API requests to user services.
+    #[structopt(long, default_value = "127.0.0.1:8080")]
+    pub public_api_address: SocketAddr,
+    /// Listen address for node private API.
+    ///
+    /// Private API is used by node administrators for node monitoring and control.
+    #[structopt(long, default_value = "127.0.0.1:8081")]
+    pub private_api_address: SocketAddr,
 }
 
 impl RunDev {
@@ -54,6 +62,20 @@ impl RunDev {
                 .context("Expected DATABASE_PATH folder being removable.")?;
         }
         Ok(())
+    }
+
+    fn allowed_origins(addr: SocketAddr, kind: &str) -> String {
+        let mut allow_origin = format!("http://{}", addr);
+        if addr.ip().is_loopback() {
+            allow_origin += &format!(", http://localhost:{}", addr.port());
+        } else {
+            log::warn!(
+                "Non-loopback {} API address used for `run-dev` command: {}",
+                kind,
+                addr
+            );
+        }
+        allow_origin
     }
 }
 
@@ -82,15 +104,16 @@ impl ExonumCommand for RunDev {
         generate_config.execute()?;
 
         let node_config_file_name = "node.toml";
-
+        let public_origins = Self::allowed_origins(self.public_api_address, "public");
+        let private_origins = Self::allowed_origins(self.private_api_address, "private");
         let finalize = Finalize {
             private_config_path: self.artifact_path(PRIVATE_CONFIG_FILE_NAME),
             output_config_path: self.artifact_path(node_config_file_name),
             public_configs: vec![self.artifact_path(PUBLIC_CONFIG_FILE_NAME)],
-            public_api_address: Some("127.0.0.1:8080".parse().unwrap()),
-            private_api_address: Some("127.0.0.1:8081".parse().unwrap()),
-            public_allow_origin: Some("http://127.0.0.1:8080, http://localhost:8080".to_string()),
-            private_allow_origin: Some("http://127.0.0.1:8081, http://localhost:8081".to_string()),
+            public_api_address: Some(self.public_api_address),
+            private_api_address: Some(self.private_api_address),
+            public_allow_origin: Some(public_origins),
+            private_allow_origin: Some(private_origins),
         };
         finalize.execute()?;
 
