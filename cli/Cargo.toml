@@ -28,5 +28,8 @@ rpassword = "4.0"
 toml = "0.5"
 
 [dev-dependencies]
+exonum-derive = { version = "0.13.0-rc.2", path = "../components/derive" }
+futures = "0.1.29"
 pretty_assertions = "0.6"
+reqwest = "0.9"
 tempfile = "3.1"
