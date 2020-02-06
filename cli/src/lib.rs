@@ -145,8 +145,9 @@ impl NodeBuilder {
         }
     }
 
-    /// Creates a new builder with the provided command-line arguments. Note that the path
-    /// to the executable needs to be specified as the first parameter.
+    /// Creates a new builder with the provided command-line arguments. The path
+    /// to the current executable **does not** need to be specified as the first argument.
+    #[doc(hidden)] // unstable
     pub fn with_args<I>(args: I) -> Self
     where
         I: IntoIterator,
@@ -219,6 +220,7 @@ impl NodeBuilder {
     /// - `Ok(Some(_))` if the command lead to the node creation
     /// - `Ok(None)` if the command executed successfully and did not lead to node creation
     /// - `Err(_)` if an error occurred during command execution
+    #[doc(hidden)] // unstable
     pub fn execute_command(self) -> Result<Option<Node>, failure::Error> {
         let command = if let Some(args) = self.args {
             Command::from_iter(args)
