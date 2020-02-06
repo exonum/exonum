@@ -193,7 +193,7 @@ pub mod errors {
 pub mod contracts {
     use exonum::runtime::{ExecutionContext, ExecutionError};
     use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
-    use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
+    use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
     use crate::{
         api::CryptocurrencyApi,
@@ -276,6 +276,12 @@ pub mod contracts {
         fn wire_api(&self, builder: &mut ServiceApiBuilder) {
             CryptocurrencyApi::wire(builder);
         }
+    }
+
+    // Specify default instantiation parameters for the service.
+    impl DefaultInstance for CryptocurrencyService {
+        const INSTANCE_ID: u32 = 101;
+        const INSTANCE_NAME: &'static str = "cryptocurrency";
     }
 }
 
