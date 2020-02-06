@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_docs)]
-
 //! Helper crate for secure and convenient configuration of the Exonum nodes.
 //!
 //! `exonum-cli` supports multi-stage configuration process made with safety in mind. It involves
@@ -87,6 +85,8 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
+#![deny(missing_docs)]
+
 pub use crate::config_manager::DefaultConfigManager;
 pub use structopt;
 
@@ -96,10 +96,11 @@ use exonum::{
     runtime::{RuntimeInstance, WellKnownRuntime},
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_node::NodeBuilder as CoreNodeBuilder;
+use exonum_node::{Node, NodeBuilder as CoreNodeBuilder};
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 use exonum_system_api::SystemApiPlugin;
+use structopt::StructOpt;
 
 use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
 
@@ -116,7 +117,8 @@ mod config_manager;
 pub struct NodeBuilder {
     rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
-    default_instances: Vec<InstanceInitParams>,
+    builtin_instances: Vec<InstanceInitParams>,
+    args: Option<Vec<String>>,
 }
 
 impl Default for NodeBuilder {
@@ -126,15 +128,25 @@ impl Default for NodeBuilder {
 }
 
 impl NodeBuilder {
-    /// Creates new builder.
+    /// Creates a new builder.
     pub fn new() -> Self {
         Self {
             rust_runtime: RustRuntimeBuilder::new()
                 .with_factory(Supervisor)
                 .with_factory(ExplorerFactory),
             external_runtimes: vec![],
-            default_instances: vec![],
+            builtin_instances: vec![],
+            args: None,
         }
+    }
+
+    /// Creates a new builder with the provided command-line arguments. Note that the path
+    /// to the executable needs to be specified as the first parameter.
+    #[doc(hidden)]
+    pub fn with_args(args: Vec<String>) -> Self {
+        let mut this = Self::new();
+        this.args = Some(args);
+        this
     }
 
     /// Adds new Rust service to the list of available services.
@@ -143,9 +155,9 @@ impl NodeBuilder {
         self
     }
 
-    /// Adds a new Runtime to the list of available runtimes.
+    /// Adds a new `Runtime` to the list of available runtimes.
     ///
-    /// Note that you don't have to add a Rust Runtime, since it's included by default.
+    /// Note that you don't have to add the Rust runtime, since it is included by default.
     pub fn with_external_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         self.external_runtimes.push(runtime.into());
         self
@@ -153,27 +165,38 @@ impl NodeBuilder {
 
     /// Adds a service instance that will be available immediately after creating a genesis block.
     ///
-    /// Make sure that artifact for this instance is provided to this builder.
-    pub fn with_default_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
-        self.default_instances.push(instance.into());
+    /// For Rust services, the service factory needs to be separately supplied
+    /// via [`with_rust_service`](#method.with_rust_service).
+    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
+        self.builtin_instances.push(instance.into());
         self
     }
 
     /// Adds a default Rust service instance that will be available immediately after creating a
     /// genesis block.
     pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
-        self.with_default_instance(service.default_instance())
+        self.with_instance(service.default_instance())
             .with_rust_service(service)
     }
 
-    /// Configures the node using parameters provided by user from stdin and then runs it.
+    /// Executes a command received from the command line.
     ///
-    /// Only Rust runtime is enabled.
-    pub fn run(self) -> Result<(), failure::Error> {
-        let command = Command::from_args();
+    /// # Return value
+    ///
+    /// Returns:
+    ///
+    /// - `Ok(Some(_))` if the command lead to the node creation
+    /// - `Ok(None)` if the command executed successfully and did not lead to node creation
+    /// - `Err(_)` if an error occurred during command execution
+    pub fn execute_command(self) -> Result<Option<Node>, failure::Error> {
+        let command = if let Some(args) = self.args {
+            Command::from_iter(args)
+        } else {
+            Command::from_args()
+        };
 
         if let StandardResult::Run(run_config) = command.execute()? {
-            let genesis_config = Self::genesis_config(&run_config, self.default_instances);
+            let genesis_config = Self::genesis_config(&run_config, self.builtin_instances);
 
             let db_options = &run_config.node_config.private_config.database;
             let database = RocksDB::open(run_config.db_path, db_options)?;
@@ -193,7 +216,16 @@ impl NodeBuilder {
             for runtime in self.external_runtimes {
                 node_builder = node_builder.with_runtime(runtime);
             }
-            node_builder.build().run()
+            Ok(Some(node_builder.build()))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Configures the node using parameters provided by user from stdin and then runs it.
+    pub fn run(self) -> Result<(), failure::Error> {
+        if let Some(node) = self.execute_command()? {
+            node.run()
         } else {
             Ok(())
         }

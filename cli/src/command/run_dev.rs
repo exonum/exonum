@@ -31,6 +31,8 @@ use crate::command::{
 };
 
 /// Run application in development mode (generate configuration and db files automatically).
+/// The public API of the node will be available on 127.0.0.1:8080 and the private API on
+/// 127.0.0.1:8081.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 pub struct RunDev {
     /// The path where configuration and db files will be generated.
