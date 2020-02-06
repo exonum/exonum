@@ -101,6 +101,9 @@ use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 use exonum_system_api::SystemApiPlugin;
 use structopt::StructOpt;
+use tempfile::TempDir;
+
+use std::{env, ffi::OsString, iter, path::PathBuf};
 
 use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
 
@@ -118,7 +121,8 @@ pub struct NodeBuilder {
     rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
     builtin_instances: Vec<InstanceInitParams>,
-    args: Option<Vec<String>>,
+    args: Option<Vec<OsString>>,
+    temp_dir: Option<TempDir>,
 }
 
 impl Default for NodeBuilder {
@@ -137,16 +141,43 @@ impl NodeBuilder {
             external_runtimes: vec![],
             builtin_instances: vec![],
             args: None,
+            temp_dir: None,
         }
     }
 
     /// Creates a new builder with the provided command-line arguments. Note that the path
     /// to the executable needs to be specified as the first parameter.
-    #[doc(hidden)]
-    pub fn with_args(args: Vec<String>) -> Self {
+    pub fn with_args<I>(args: I) -> Self
+    where
+        I: IntoIterator,
+        I::Item: Into<OsString>,
+    {
         let mut this = Self::new();
-        this.args = Some(args);
+        let executable = env::current_exe()
+            .map(PathBuf::into_os_string)
+            .unwrap_or_else(|_| "node".into());
+        let all_args = iter::once(executable)
+            .chain(args.into_iter().map(Into::into))
+            .collect();
+        this.args = Some(all_args);
         this
+    }
+
+    /// Creates a single-node development network with default settings. The node stores
+    /// its data in a temporary directory, which is automatically removed when the node is stopped.
+    ///
+    /// # Return value
+    ///
+    /// Returns an error if the temporary directory cannot be created.
+    pub fn development_node() -> Result<Self, failure::Error> {
+        let temp_dir = TempDir::new()?;
+        let mut this = Self::with_args(vec![
+            OsString::from("run-dev"),
+            OsString::from("--artifacts-dir"),
+            temp_dir.path().into(),
+        ]);
+        this.temp_dir = Some(temp_dir);
+        Ok(this)
     }
 
     /// Adds new Rust service to the list of available services.
@@ -223,7 +254,9 @@ impl NodeBuilder {
     }
 
     /// Configures the node using parameters provided by user from stdin and then runs it.
-    pub fn run(self) -> Result<(), failure::Error> {
+    pub fn run(mut self) -> Result<(), failure::Error> {
+        // Store temporary directory until the node is done.
+        let _temp_dir = self.temp_dir.take();
         if let Some(node) = self.execute_command()? {
             node.run()
         } else {

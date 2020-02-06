@@ -18,14 +18,16 @@ exonum-explorer-service = { version = "0.13.0-rc.2", path = "../services/explore
 exonum-supervisor = { version = "0.13.0-rc.2", path = "../services/supervisor" }
 exonum-system-api = { version = "0.13.0-rc.2", path = "../components/system-api" }
 exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../runtimes/rust" }
-structopt = "0.3"
-serde = "1.0"
-log = "0.4"
-serde_derive = "1.0"
+
 failure = "0.1"
-zeroize = "0.9"
+log = "0.4"
 rpassword = "4.0"
+serde = "1.0"
+serde_derive = "1.0"
+structopt = "0.3"
+tempfile = "3.1"
 toml = "0.5"
+zeroize = "0.9"
 
 [dev-dependencies]
 exonum-derive = { version = "0.13.0-rc.2", path = "../components/derive" }
@@ -34,4 +36,3 @@ futures = "0.1.29"
 lazy_static = "1.4.0"
 pretty_assertions = "0.6"
 reqwest = "0.9"
-tempfile = "3.1"
