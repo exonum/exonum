@@ -16,6 +16,7 @@
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
+    crypto::PublicKey,
     merkledb::DbOptions,
 };
 use exonum_node::{
@@ -75,6 +76,8 @@ pub struct NodePrivateConfig {
     pub thread_pool_size: Option<u8>,
     /// Information about peers within network.
     pub connect_list: ConnectListConfig,
+    /// Consensus public key of the node.
+    pub consensus_public_key: PublicKey,
 }
 
 /// Configuration for the `Node`.

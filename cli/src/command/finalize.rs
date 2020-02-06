@@ -114,13 +114,24 @@ impl Finalize {
             .consensus_key)
     }
 
-    fn create_connect_list_config(public_configs: &[NodePublicConfig]) -> ConnectListConfig {
-        // FIXME: filter self (ECR-4190).
+    fn create_connect_list_config(
+        public_configs: &[NodePublicConfig],
+        key_to_skip: &PublicKey,
+    ) -> ConnectListConfig {
         let peers = public_configs
             .iter()
-            .map(|config| ConnectInfo {
-                public_key: Self::get_consensus_key(config).unwrap(),
-                address: config.address.clone().unwrap(),
+            .filter_map(|config| {
+                let public_key = Self::get_consensus_key(config).unwrap();
+                // `skipped_key` is a consensus key of the current node. We don't need
+                // to include `ConnectInfo` with this key in the connect list.
+                if public_key != *key_to_skip {
+                    Some(ConnectInfo {
+                        public_key,
+                        address: config.address.clone().unwrap(),
+                    })
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -160,7 +171,8 @@ impl ExonumCommand for Finalize {
             .collect();
         let consensus = common.consensus.with_validator_keys(validator_keys);
 
-        let connect_list = Self::create_connect_list_config(&public_configs);
+        let connect_list =
+            Self::create_connect_list_config(&public_configs, &private_config.consensus_public_key);
         let private_config = NodePrivateConfig {
             api: NodeApiConfig {
                 public_api_address: self.public_api_address,

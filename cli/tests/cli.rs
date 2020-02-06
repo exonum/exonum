@@ -14,7 +14,7 @@
 
 // This is a regression test for exonum configuration.
 
-use exonum::{blockchain::ValidatorKeys, crypto::gen_keypair};
+use exonum::{blockchain::ValidatorKeys, crypto::KeyPair};
 use exonum_cli::{
     command::{
         finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
@@ -535,6 +535,7 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
         database: Default::default(),
         thread_pool_size: None,
         connect_list: Default::default(),
+        consensus_public_key: KeyPair::random().public_key(),
     };
 
     let testnet_dir = tempfile::tempdir()?;
@@ -563,7 +564,10 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
 }
 
 fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
-    let keys = ValidatorKeys::new(gen_keypair().0, gen_keypair().0);
+    let keys = ValidatorKeys::new(
+        KeyPair::random().public_key(),
+        KeyPair::random().public_key(),
+    );
     NodePublicConfig {
         consensus: Default::default(),
         general: GeneralConfig {
