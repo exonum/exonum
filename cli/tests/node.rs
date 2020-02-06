@@ -80,7 +80,6 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
         .to_str()
         .expect("Path to temporary directory cannot be encoded in UTF-8 string");
     let args = vec![
-        "node-executable".to_owned(),
         "run-dev".to_owned(),
         "-a".to_owned(),
         dir_path.to_owned(),
