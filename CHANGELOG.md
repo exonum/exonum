@@ -135,7 +135,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `supervisor-mode` parameter has been added for `generate-template` subcommand.
   (#1598)
 
-- `with_service` has been renamed to the `with_rust_service`. (#1765)
+- `NodeBuilder::with_service` has been renamed to the `with_rust_service`. (#1765)
 
 #### exonum-crypto
 
@@ -273,8 +273,11 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Added maintenance command `restart-migration` to restart migration script. (#1728)
 
-- Added `with_default_instance` and `with_default_service` to start service
-  instances immediately after genesis block creation. (#1765)
+- Added `with_instance` and `with_default_rust_service` methods to `NodeBuilder`,
+  which start service instances immediately after genesis block creation. (#1765)
+
+- Added `NodeBuilder::development_node` constructor, which can be used
+  to quickly set up a single-node development network. (#1765)
 
 #### exonum-crypto
 
