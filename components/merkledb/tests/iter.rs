@@ -13,6 +13,18 @@
 // limitations under the License.
 
 //! Property testing for index iterators.
+//!
+//! The test generates several indexes with their contents, and adds this content
+//! in two stages (in order to test all kinds of access during iteration: from the fork,
+//! flushed fork and snapshot). After each stage, the iterator tests are run for several kinds
+//! of access:
+//!
+//! - non-flushed `Fork`
+//! - flushed `Fork`
+//! - `Patch`
+//! - `Box<dyn Snapshot>`
+//!
+//! Each access kind is tested in the raw variation and within a `Prefixed` access.
 
 use proptest::{
     collection::{hash_map, vec},
