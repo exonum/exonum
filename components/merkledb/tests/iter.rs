@@ -48,15 +48,11 @@ use exonum_merkledb::{
 };
 
 /// Possible index names.
-const INDEX_NAMES: &[&str] = &[
-    "foo",
-    "bar",
-    "b",
-    "overly_long_prefix_still_should_work_though",
-];
-
+const INDEX_NAMES: &[&str] = &["foo", "bar", "b"];
+/// Maximum number of generated indexes.
 const MAX_INDEXES: usize = 5;
-const MAX_ENTRIES: usize = 10;
+/// Maximum number of generated entries within the index.
+const MAX_ENTRIES: usize = 8;
 
 /// Generates an `IndexAddress` optionally placed in a group.
 fn generate_address() -> impl Strategy<Value = IndexAddress> {
@@ -87,7 +83,8 @@ where
     K: Clone + Eq + Ord + BinaryKey<Owned = K> + ObjectHash + Debug,
     V: Clone + PartialEq + BinaryValue + ObjectHash + Debug,
 {
-    /// Generates a vector of indexes. Addresses of indexes are guaranteed to be different.
+    /// Generates a vector of indexes with randomized entries. Addresses of indexes are guaranteed
+    /// to be different.
     fn generate_vec(
         entries: impl Strategy<Value = Vec<(K, V)>> + Clone,
         max_size: usize,
@@ -105,7 +102,7 @@ where
         hash_map(
             generate_address(),
             (ty, entries.clone(), entries),
-            1..max_size,
+            1..=max_size,
         )
         .prop_map(|indexes| {
             indexes
@@ -455,7 +452,7 @@ mod string_vec_entries {
 
     fn generate_entries() -> impl Strategy<Value = Vec<(String, Vec<u8>)>> + Clone {
         let value = vec(num::u8::ANY, 1..8);
-        vec(("[A-Za-z]{1,8}", value), 0..MAX_ENTRIES)
+        vec(("[A-Za-z]{1,8}", value), 0..=MAX_ENTRIES)
     }
 
     #[test]
@@ -473,7 +470,7 @@ mod u8_string_entries {
     use super::*;
 
     fn generate_entries() -> impl Strategy<Value = Vec<(u8, String)>> + Clone {
-        vec((num::u8::ANY, "[0-9]{8}"), 0..MAX_ENTRIES)
+        vec((num::u8::ANY, "[0-9]{8}"), 0..=MAX_ENTRIES)
     }
 
     #[test]
