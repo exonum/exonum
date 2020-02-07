@@ -491,7 +491,7 @@ impl ExplorerApi {
             api::Error::not_found()
                 .title("Failed to get block info")
                 .detail(format!(
-                    "Requested block height({}) exceeds the blockchain height ({})",
+                    "Requested block height ({}) exceeds the blockchain height ({})",
                     query.height,
                     explorer.height()
                 ))
