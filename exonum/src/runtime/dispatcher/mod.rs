@@ -396,7 +396,7 @@ impl Dispatcher {
     /// `ArtifactId` and deployment was completed successfully.
     /// If any error happens within `commit_artifact`, it is considered either a bug in the
     /// `Supervisor` service or `Dispatcher` itself, and as a result, this method will panic.
-    pub(crate) fn commit_artifact(fork: &Fork, artifact: ArtifactId, deploy_spec: Vec<u8>) {
+    pub(crate) fn commit_artifact(fork: &Fork, artifact: &ArtifactId, deploy_spec: Vec<u8>) {
         debug_assert!(artifact.validate().is_ok(), "{:?}", artifact.validate());
         Schema::new(fork)
             .add_pending_artifact(artifact, deploy_spec)

@@ -14,7 +14,7 @@
 
 use exonum::{
     blockchain::CallInBlock,
-    crypto,
+    crypto::{self, KeyPair},
     helpers::{Height, ValidatorId},
     merkledb::ObjectHash,
     runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
@@ -261,12 +261,11 @@ fn test_propose_config_change_by_incorrect_validator() {
     let mut testkit = testkit_with_supervisor(1);
 
     let consensus_config = consensus_config_propose_first_variant(&testkit);
-    let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
+    let change = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_config.clone())
         .build();
-
-    let keys = crypto::gen_keypair();
-    let signed_confirm = config_proposal.sign_for_supervisor(keys.0, &keys.1);
+    let keys = KeyPair::random();
+    let signed_confirm = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();
@@ -297,7 +296,7 @@ fn test_confirm_config_by_incorrect_validator() {
         .status()
         .expect("Transaction with change propose discarded.");
 
-    let keys = crypto::gen_keypair();
+    let keys = KeyPair::random();
     let signed_confirm = keys.confirm_config_change(
         SUPERVISOR_INSTANCE_ID,
         ConfigVote {
@@ -493,7 +492,7 @@ fn test_another_configuration_change_proposal() {
 #[test]
 fn test_service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
-    let keypair = crypto::gen_keypair();
+    let keypair = KeyPair::random();
     let fake_supervisor_artifact = Supervisor.artifact_id();
 
     let fake_supervisor_instance = fake_supervisor_artifact

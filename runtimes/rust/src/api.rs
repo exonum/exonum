@@ -78,7 +78,7 @@ impl<'a> ServiceApiState<'a> {
 
     /// Returns the service key of this node.
     pub fn service_key(&self) -> PublicKey {
-        self.broadcaster.keypair().0
+        self.broadcaster.keypair().public_key()
     }
 
     /// Returns information about the executing service.
@@ -89,7 +89,7 @@ impl<'a> ServiceApiState<'a> {
     /// Returns a transaction broadcaster if the current node is a validator. If the node
     /// is not a validator, returns `None`.
     pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
-        CoreSchema::new(&self.snapshot).validator_id(self.broadcaster.keypair().0)?;
+        CoreSchema::new(&self.snapshot).validator_id(self.broadcaster.keypair().public_key())?;
         Some(self.broadcaster.clone())
     }
 

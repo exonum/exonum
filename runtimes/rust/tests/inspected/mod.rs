@@ -347,7 +347,7 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
     ) -> Self::Output {
         context
             .supervisor_extensions()
-            .start_artifact_registration(request.test_service_artifact, request.spec);
+            .start_artifact_registration(&request.test_service_artifact, request.spec);
         Ok(())
     }
 

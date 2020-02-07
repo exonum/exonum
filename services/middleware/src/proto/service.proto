@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package exonum.service.middleware;
 
-import "runtime.proto";
+import "exonum/runtime/base.proto";
 
 message CheckedCall {
   string artifact_name = 1;

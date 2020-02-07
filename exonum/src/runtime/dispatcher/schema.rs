@@ -25,7 +25,7 @@ use semver::Version;
 
 use crate::{
     proto::schema::{
-        self, runtime::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
+        self, details::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
     },
     runtime::{
         migrations::{InstanceMigration, MigrationStatus},
@@ -43,7 +43,7 @@ const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
 /// Information about a modified service instance.
 #[derive(Debug, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "schema::runtime::ModifiedInstanceInfo")]
+#[protobuf_convert(source = "schema::details::ModifiedInstanceInfo")]
 pub(super) struct ModifiedInstanceInfo {
     #[protobuf_convert(with = "MigrationTransition")]
     pub migration_transition: Option<MigrationTransition>,
@@ -186,16 +186,16 @@ impl Schema<&Fork> {
     /// Adds artifact specification to the set of the pending artifacts.
     pub(super) fn add_pending_artifact(
         &mut self,
-        artifact: ArtifactId,
+        artifact: &ArtifactId,
         deploy_spec: Vec<u8>,
     ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
-        if self.artifacts().contains(&artifact) {
+        if self.artifacts().contains(artifact) {
             return Err(CoreError::ArtifactAlreadyDeployed.into());
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
-            &artifact,
+            artifact,
             ArtifactState::new(deploy_spec, ArtifactStatus::Pending),
         );
         // Add artifact to pending artifacts queue.

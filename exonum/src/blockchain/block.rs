@@ -22,7 +22,7 @@ use crate::{
     crypto::Hash,
     helpers::{Height, OrderedMap, ValidatorId},
     messages::{Precommit, Verified},
-    proto,
+    proto::schema,
 };
 
 /// Trait that represents a key in block header entry map. Provides
@@ -58,7 +58,7 @@ impl BlockHeaderKey for ProposerId {
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
-#[protobuf_convert(source = "proto::AdditionalHeaders")]
+#[protobuf_convert(source = "schema::blockchain::AdditionalHeaders")]
 pub struct AdditionalHeaders {
     /// Underlying storage for additional headers.
     headers: OrderedMap<String, Vec<u8>>,
@@ -95,7 +95,7 @@ impl AdditionalHeaders {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::Block")]
+#[protobuf_convert(source = "schema::blockchain::Block")]
 pub struct Block {
     /// Height of the block, which is also the number of this particular
     /// block in the blockchain.
@@ -183,7 +183,7 @@ impl Block {
 /// a block. It consists of the block itself and the `Precommit`
 /// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert(source = "proto::BlockProof")]
+#[protobuf_convert(source = "schema::proofs::BlockProof")]
 pub struct BlockProof {
     /// Block header containing such information as the ID of the node which
     /// proposed the block, the height of the block, the number of transactions
@@ -211,7 +211,7 @@ impl BlockProof {
 
 /// Proof of authenticity for a single index within the database.
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
-#[protobuf_convert(source = "proto::IndexProof")]
+#[protobuf_convert(source = "schema::proofs::IndexProof")]
 pub struct IndexProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]

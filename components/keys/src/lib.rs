@@ -12,7 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{gen_keypair_from_seed, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
+//! Key management for [Exonum] nodes.
+//!
+//! This crate provides tools for storing and loading encrypted keys for a node.
+//!
+//! [Exonum]: https://exonum.com/
+//!
+//! # Examples
+//!
+//! ```
+//! use exonum_keys::{generate_keys, read_keys_from_file};
+//! use tempdir::TempDir;
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let dir = TempDir::new("test_keys")?;
+//! let file_path = dir.path().join("private_key.toml");
+//! let pass_phrase = b"super_secret_passphrase";
+//! let keys = generate_keys(file_path.as_path(), pass_phrase)?;
+//! let restored_keys = read_keys_from_file(file_path.as_path(), pass_phrase)?;
+//! assert_eq!(keys, restored_keys);
+//! # Ok(())
+//! # }
+//! ```
+
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // `filter(..).map(..)` often looks more shorter and readable.
+    clippy::filter_map,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names,
+    // Variant name ends with the enum name. Similar behavior to similar_names.
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    clippy::use_self,
+    clippy::default_trait_access,
+)]
+
+use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
@@ -38,30 +83,43 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
     }
 }
 
-/// Struct containing all validator key pairs.
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+/// Container for all key pairs held by an Exonum node.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Keys {
     /// Consensus keypair.
     pub consensus: KeyPair,
     /// Service keypair.
     pub service: KeyPair,
+    #[serde(default, skip)]
+    non_exhaustive: (),
 }
 
 impl Keys {
-    /// Create validator keys from provided keypairs.
+    /// Creates a random set of keys using the random number generator provided
+    /// by the crypto backend.
+    pub fn random() -> Self {
+        Self {
+            consensus: KeyPair::random(),
+            service: KeyPair::random(),
+            non_exhaustive: (),
+        }
+    }
+
+    /// Creates validator keys from the provided keypairs.
+    ///
+    /// # Stability
+    ///
+    /// Since more keys may be added to `Keys` in the future, this method is considered
+    /// unstable.
     ///
     /// # Panics
     ///
-    /// If public key in any keypair doesn't match with corresponding private key.
-    pub fn from_keys(
-        consensus_pk: PublicKey,
-        consensus_sk: SecretKey,
-        service_pk: PublicKey,
-        service_sk: SecretKey,
-    ) -> Self {
+    /// If a public key in any keypair doesn't match with corresponding private key.
+    pub fn from_keys(consensus_keys: impl Into<KeyPair>, service_keys: impl Into<KeyPair>) -> Self {
         Self {
-            consensus: (consensus_pk, consensus_sk).into(),
-            service: (service_pk, service_sk).into(),
+            consensus: consensus_keys.into(),
+            service: service_keys.into(),
+            non_exhaustive: (),
         }
     }
 }
@@ -148,27 +206,22 @@ impl EncryptedMasterKey {
 pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys, failure::Error> {
     let tree = SecretTree::new(&mut thread_rng());
     save_master_key(path, passphrase, tree.seed())?;
-    generate_keys_from_master_password(tree)
+    generate_keys_from_master_password(&tree)
         .ok_or_else(|| format_err!("Error deriving keys from master key."))
 }
 
-fn generate_keys_from_master_password(tree: SecretTree) -> Option<Keys> {
+fn generate_keys_from_master_password(tree: &SecretTree) -> Option<Keys> {
     let mut buffer = [0_u8; 32];
 
     tree.child(Name::new("consensus")).fill(&mut buffer);
     let seed = Seed::from_slice(&buffer)?;
-    let (consensus_pk, consensus_sk) = gen_keypair_from_seed(&seed);
+    let consensus_keys = KeyPair::from_seed(&seed);
 
     tree.child(Name::new("service")).fill(&mut buffer);
     let seed = Seed::from_slice(&buffer)?;
-    let (service_pk, service_sk) = gen_keypair_from_seed(&seed);
+    let service_keys = KeyPair::from_seed(&seed);
 
-    Some(Keys::from_keys(
-        consensus_pk,
-        consensus_sk,
-        service_pk,
-        service_sk,
-    ))
+    Some(Keys::from_keys(consensus_keys, service_keys))
 }
 
 /// Reads encrypted master key from file and generate validator keys from it.
@@ -188,7 +241,7 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let seed = keys.decrypt(pass_phrase)?;
 
     let tree = SecretTree::from_seed(&seed).expect("Error creating secret tree from seed.");
-    generate_keys_from_master_password(tree)
+    generate_keys_from_master_password(&tree)
         .ok_or_else(|| format_err!("Error deriving keys from master key"))
 }
 

@@ -5,8 +5,8 @@
 #
 
 # Base URL for demo service endpoints
-$BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency/v1';
-$TRANSACTION_URL = 'http://127.0.0.1:8000/api/explorer/v1/transactions';
+$BASE_URL = 'http://127.0.0.1:8080/api/services/cryptocurrency/v1';
+$TRANSACTION_URL = 'http://127.0.0.1:8080/api/explorer/v1/transactions';
 # Directory with the current script
 $wd = $myinvocation.mycommand.path | Split-Path;
 

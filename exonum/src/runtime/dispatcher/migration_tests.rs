@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::gen_keypair;
+use exonum_crypto::KeyPair;
 use exonum_merkledb::{
     access::{AccessExt, CopyAccessExt},
     migration::Migration,
@@ -207,8 +207,11 @@ impl Rig {
     }
 
     fn with_db_and_flag(db: Arc<TemporaryDB>, flag: bool) -> Self {
-        let blockchain =
-            Blockchain::new(db as Arc<dyn Database>, gen_keypair(), ApiSender::closed());
+        let blockchain = Blockchain::new(
+            db as Arc<dyn Database>,
+            KeyPair::random(),
+            ApiSender::closed(),
+        );
         let blockchain = blockchain
             .into_mut_with_dummy_config()
             .with_runtime(MigrationRuntime::with_script_flag(flag))
@@ -297,7 +300,7 @@ impl Rig {
         let artifact = ArtifactId::from_raw_parts(MigrationRuntime::ID, name.into(), version);
 
         let fork = self.blockchain.fork();
-        Dispatcher::commit_artifact(&fork, artifact.clone(), vec![]);
+        Dispatcher::commit_artifact(&fork, &artifact, vec![]);
         self.create_block(fork);
         artifact
     }
@@ -485,7 +488,7 @@ fn migration_immediate_errors() {
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::UnknownArtifactId));
 
     // Mark the artifact as pending.
-    Dispatcher::commit_artifact(&fork, unknown_artifact.clone(), vec![]);
+    Dispatcher::commit_artifact(&fork, &unknown_artifact, vec![]);
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact, &old_service.name)

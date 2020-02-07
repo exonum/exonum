@@ -687,7 +687,7 @@ impl Supervisor {
             // if this action fails, this transaction will be canceled.
             context
                 .supervisor_extensions()
-                .start_artifact_registration(deploy_request.artifact, deploy_request.spec);
+                .start_artifact_registration(&deploy_request.artifact, deploy_request.spec);
         }
         Ok(())
     }

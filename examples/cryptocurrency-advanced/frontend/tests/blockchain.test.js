@@ -11,18 +11,18 @@ const bigIntRegex = /[0-9]+/i
 const hexRegex = /[0-9A-Fa-f]+/i
 const TRANSACTION_URL = '/api/explorer/v1/transactions'
 const TRANSACTION_EXPLORER_URL = '/api/explorer/v1/transactions?hash='
-const PROOF_URL = '/api/services/cryptocurrency/v1/wallets/info?pub_key='
+const PROOF_URL = '/api/services/crypto/v1/wallets/info?pub_key='
 const keyPair = {
-  publicKey: '15bfd860538540d0635de8322af12a89163990d13329f8a4ec7982f663323683',
-  secretKey: 'b5b3ccf6ca4475b7ff3d910d5ab31e4723098490a3e341dd9d2896b42ebc9f8978cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e8'
+  'publicKey': '68110bb9aa704d8fb8e711421e2a848ff7b72f910209af8723d7b45591b21bd7',
+  'secretKey': 'd678892e2891dd54f9da7e94702e1d882c9f4a75b6e8e67dc40fe934fa6843aa68110bb9aa704d8fb8e711421e2a848ff7b72f910209af8723d7b45591b21bd7'
 }
 
 Vue.use(Blockchain)
 
 // Mock `createWallet` transaction
-const createWalletTxHash = '55209b3c6bd8593b9c90eacd3a57cfc448ebc0d47316235a4ca3a1751548a384'
+const createWalletTxHash = '060ae9f8a22f53ea127a3486a7636756027ca1dfe06976b3565d54336ad93b4e'
 mock.onPost(TRANSACTION_URL, {
-  'tx_body': '78cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e80000800002000a084a6f686e20446f65a71558ef2f2d592acfffbac71ea13327a78be83d6977240d3ca8cf4a92ba3d87cd30b9df1ca9b83147be274a85369ce5a2ce3e3a490be6acbaca48c764b40907'
+  'tx_body': '0a100a0e0a040803100212060a044976616e12220a2068110bb9aa704d8fb8e711421e2a848ff7b72f910209af8723d7b45591b21bd71a420a400c1f2260b4e1470529a66200471f57d863963647c2b0125acde0a5a381ad4363012b0f65d8c672f554f9b60edfff2be6f7de31fa42eaa9f8bb92855cb508f50b'
 }).replyOnce(200)
 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 'type': 'in-pool' })
@@ -30,9 +30,9 @@ mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 'type': 'committed' })
 
 // Mock `addFunds` transaction
-const addFundsTxHash = 'b26f1e9e01a6f7f07d6224597992bb04fd5a4bd633faf0a28c384fa2b99ba322'
+const addFundsTxHash = 'a6ae586be952539db0d76741e75e29ab22129c83889242ae6a8a3d7167880272'
 mock.onPost(TRANSACTION_URL, {
-  'tx_body': '78cf8b5e5c020696319eb32a1408e6c65e7d97733d34528fbdce08438a0243e800008000010008321080d0b6db99b1c3f1890106ecdedffe9d00b6c1911e7a75f8c0fea17554f31497c914686bc63ad175cabfb02eaa40230573bb1ff1c4d98cd996c9c7c0eb54843f306d03ae4bf24aa72408'
+  'tx_body': '0a160a140a0408031001120c080a109081c18ada99e6b20112220a2068110bb9aa704d8fb8e711421e2a848ff7b72f910209af8723d7b45591b21bd71a420a40764404fcb6370874e41c6c69d41d4d6e2378ecefa9909fc4afe5d312f4170dd1bbb75d71d71b8c20b84c5e2699836e4f466c9f9eac06c9bb54730a15b9db9508'
 }).replyOnce(200)
 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${addFundsTxHash}`).replyOnce(200, { 'type': 'committed' })
@@ -46,7 +46,7 @@ mock.onPost(TRANSACTION_URL, {
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${transferTxHash}`).replyOnce(200, { 'type': 'committed' })
 
 // Mock proof
-mock.onGet('/api/services/configuration/v1/configs/actual').reply(200, actual)
+mock.onGet('/api/services/supervisor/consensus-config').reply(200, actual)
 
 mock.onGet(`${PROOF_URL}${keyPair.publicKey}`).replyOnce(200, proof)
 
@@ -73,8 +73,8 @@ describe('Interaction with blockchain', () => {
   })
 
   it('should add funds', async () => {
-    const amountToAdd = '50'
-    const seed = '9935800087578782468'
+    const amountToAdd = '10'
+    const seed = '100654575627813010'
 
     await expect(Vue.prototype.$blockchain.addFunds(keyPair, amountToAdd, seed)).resolves
   })
@@ -92,78 +92,78 @@ describe('Interaction with blockchain', () => {
 
     expect(data.wallet)
       .toEqual({
-          'pub_key': {
+          'owner': {
             'data': [
-              21,
-              191,
-              216,
-              96,
-              83,
-              133,
-              64,
-              208,
-              99,
-              93,
-              232,
+              16,
               50,
-              42,
+              110,
+              218,
+              148,
               241,
-              42,
-              137,
-              22,
-              57,
-              144,
-              209,
-              51,
-              41,
-              248,
-              164,
-              236,
-              121,
-              130,
-              246,
-              99,
-              50,
-              54,
-              131]
+              6,
+              249,
+              181,
+              172,
+              96,
+              154,
+              25,
+              67,
+              132,
+              255,
+              239,
+              225,
+              189,
+              72,
+              92,
+              192,
+              63,
+              191,
+              221,
+              77,
+              244,
+              203,
+              153,
+              148,
+              109,
+              195]
           },
-          'name': 'I am a name',
-          'balance': 100,
-          'history_len': 1,
+          'name': 'Ivan',
+          'balance': 240,
+          'history_len': 7,
           'history_hash': {
             'data': [
+              82,
+              43,
+              251,
+              102,
+              18,
+              193,
+              69,
+              90,
               184,
               25,
-              173,
-              170,
-              217,
-              218,
-              84,
-              183,
-              171,
               60,
-              183,
-              247,
-              49,
-              154,
+              65,
+              59,
+              156,
+              142,
+              24,
+              241,
+              61,
+              92,
+              203,
+              187,
+              11,
               178,
-              71,
-              105,
-              211,
-              78,
-              247,
-              39,
-              134,
-              150,
-              20,
-              75,
-              109,
-              6,
-              33,
-              240,
-              245,
-              208,
-              186]
+              216,
+              130,
+              196,
+              17,
+              151,
+              72,
+              217,
+              213,
+              174]
           }
         }
       )

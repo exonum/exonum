@@ -24,9 +24,8 @@ use exonum_crypto::Hash;
 
 use crate::{
     access::{Access, AccessError, FromAccess},
-    views::{
-        IndexAddress, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
-    },
+    indexes::iter::{Entries, IndexIterator, Keys},
+    views::{IndexAddress, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, ObjectHash,
 };
 
@@ -35,37 +34,11 @@ use crate::{
 /// `ValueSetIndex` implements a set, storing an element as a value and using its hash as a key.
 /// `ValueSetIndex` requires that elements should implement the [`BinaryValue`] trait.
 ///
-/// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`BinaryValue`]: ../trait.BinaryValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T: RawAccess, V> {
     base: View<T>,
     _v: PhantomData<V>,
-}
-
-/// Returns an iterator over the items of a `ValueSetIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`ValueSetIndex`]. See its documentation for details.
-///
-/// [`iter`]: struct.ValueSetIndex.html#method.iter
-/// [`iter_from`]: struct.ValueSetIndex.html#method.iter_from
-/// [`ValueSetIndex`]: struct.ValueSetIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, V> {
-    base_iter: ViewIter<'a, Hash, V>,
-}
-
-/// Returns an iterator over the hashes of items of a `ValueSetIndex`.
-///
-/// This struct is created by the [`hashes`] or
-/// [`hashes_from`] method on [`ValueSetIndex`]. See its documentation for details.
-///
-/// [`hashes`]: struct.ValueSetIndex.html#method.iter
-/// [`hashes_from`]: struct.ValueSetIndex.html#method.iter_from
-/// [`ValueSetIndex`]: struct.ValueSetIndex.html
-#[derive(Debug)]
-pub struct Hashes<'a> {
-    base_iter: ViewIter<'a, Hash, ()>,
 }
 
 impl<T, V> FromAccess<T> for ValueSetIndex<T::Base, V>
@@ -134,7 +107,8 @@ where
         self.base.contains(hash)
     }
 
-    /// Returns an iterator visiting all elements in arbitrary order. The iterator element type is V.
+    /// Returns an iterator over set elements and their hashes. The elements are ordered as per
+    /// lexicographic ordering of their hashes (i.e., effectively randomly).
     ///
     /// # Examples
     ///
@@ -149,14 +123,31 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter(&()),
-        }
+    pub fn iter(&self) -> Entries<'_, Hash, V> {
+        self.index_iter(None)
+    }
+
+    /// Returns an iterator over hashes of set elements in ascending order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ValueSetIndex};
+    ///
+    /// let db = TemporaryDB::new();
+    /// let fork = db.fork();
+    /// let index: ValueSetIndex<_, u8> = fork.get_value_set("name");
+    ///
+    /// for val in index.hashes() {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
+    pub fn hashes(&self) -> Keys<'_, Hash> {
+        self.iter().skip_values()
     }
 
     /// Returns an iterator visiting all elements in arbitrary order starting from the specified hash of
-    /// a value. The iterator element type is V.
+    /// a value. Elements are yielded together with their hashes.
     ///
     /// # Examples
     ///
@@ -174,36 +165,12 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &Hash) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter_from(&(), from),
-        }
-    }
-
-    /// Returns an iterator visiting hashes of all elements in ascending order. The iterator element type
-    /// is [Hash](../../../exonum_crypto/struct.Hash.html).
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum_merkledb::{access::CopyAccessExt, TemporaryDB, Database, ValueSetIndex};
-    ///
-    /// let db = TemporaryDB::new();
-    /// let fork = db.fork();
-    /// let index: ValueSetIndex<_, u8> = fork.get_value_set("name");
-    ///
-    /// for val in index.hashes() {
-    ///     println!("{:?}", val);
-    /// }
-    /// ```
-    pub fn hashes(&self) -> Hashes<'_> {
-        Hashes {
-            base_iter: self.base.iter(&()),
-        }
+    pub fn iter_from(&self, from: &Hash) -> Entries<'_, Hash, V> {
+        self.index_iter(Some(from))
     }
 
     /// Returns an iterator visiting hashes of all elements in ascending order starting from the specified
-    /// hash. The iterator element type is [Hash](../../../exonum_crypto/struct.Hash.html).
+    /// hash.
     ///
     /// # Examples
     ///
@@ -221,10 +188,8 @@ where
     ///     println!("{:?}", val);
     /// }
     /// ```
-    pub fn hashes_from(&self, from: &Hash) -> Hashes<'_> {
-        Hashes {
-            base_iter: self.base.iter_from(&(), from),
-        }
+    pub fn hashes_from(&self, from: &Hash) -> Keys<'_, Hash> {
+        self.iter_from(from).skip_values()
     }
 }
 
@@ -323,40 +288,36 @@ where
     }
 }
 
-impl<'a, T, V> std::iter::IntoIterator for &'a ValueSetIndex<T, V>
+impl<'a, T, V> IntoIterator for &'a ValueSetIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
     type Item = (Hash, V);
-    type IntoIter = Iter<'a, V>;
+    type IntoIter = Entries<'a, Hash, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for Iter<'a, V>
+impl<T, V> IndexIterator for ValueSetIndex<T, V>
 where
+    T: RawAccess,
     V: BinaryValue + ObjectHash,
 {
-    type Item = (Hash, V);
+    type Key = Hash;
+    type Value = V;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next()
-    }
-}
-
-impl<'a> Iterator for Hashes<'a> {
-    type Item = Hash;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, ..)| k)
+    fn index_iter(&self, from: Option<&Hash>) -> Entries<'_, Hash, V> {
+        Entries::new(&self.base, from)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use crate::{access::CopyAccessExt, Database, ObjectHash, TemporaryDB};
 
     #[test]
@@ -379,5 +340,29 @@ mod tests {
 
         index.clear();
         assert!(!index.contains(&2_u8));
+    }
+
+    #[test]
+    fn value_set_iter() {
+        let db = TemporaryDB::default();
+        let fork = db.fork();
+        let mut index = fork.get_value_set("index");
+        let mut sorted_map = BTreeMap::new();
+
+        for i in 0_u32..10 {
+            index.insert(i);
+            sorted_map.insert(i.object_hash(), i);
+        }
+
+        assert_eq!(index.iter().collect::<BTreeMap<_, _>>(), sorted_map);
+        for i in 0_u32..10 {
+            let start = i.object_hash();
+            let actual: BTreeMap<_, _> = index.iter_from(&start).collect();
+            let expected = sorted_map
+                .range(start..)
+                .map(|(hash, value)| (*hash, *value))
+                .collect::<BTreeMap<_, _>>();
+            assert_eq!(actual, expected);
+        }
     }
 }

@@ -14,13 +14,6 @@
 
 //! Module that contains Protobuf messages used by Exonum.
 
-pub use self::schema::{
-    blockchain::{AdditionalHeaders, Block, CallInBlock, TxLocation},
-    messages::{CoreMessage, Precommit, SignedMessage},
-    proofs::{BlockProof, IndexProof},
-    runtime::{AnyTx, CallInfo, GenesisConfig, InstanceInitParams},
-};
-
 use exonum_proto::ProtobufConvert;
 use failure::{ensure, Error};
 

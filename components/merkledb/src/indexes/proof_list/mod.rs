@@ -28,9 +28,8 @@ use self::{
 use crate::{
     access::{Access, AccessError, FromAccess},
     hash::HashTag,
-    views::{
-        IndexState, IndexType, Iter as ViewIter, RawAccess, RawAccessMut, View, ViewWithMetadata,
-    },
+    indexes::iter::{Entries, IndexIterator, Values},
+    views::{IndexState, IndexType, RawAccess, RawAccessMut, View, ViewWithMetadata},
     BinaryValue, IndexAddress, ObjectHash,
 };
 
@@ -53,25 +52,34 @@ fn tree_height_by_length(len: u64) -> u8 {
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that elements implement the [`BinaryValue`] trait.
 ///
+/// # Safety
+///
+/// A `ProofListIndex` may contain at most `2 ** 56` elements (which is approximately `7.2e16`),
+/// **not** `2 ** 64` as [`ListIndex`]. Since this amount is still astronomically large,
+/// an index overflow is treated similar to an integer overflow; [`extend`] and [`push`]
+/// methods will panic if the index size exceeds `2 ** 56`. (Unlike integer overflows, the panic
+/// will occur in any compile mode, regardless of whether debug assertions are on.)
+/// For added safety, the application may check that an overflow does not occur before performing
+/// these operations. However, this check will be redundant in most realistic scenarios:
+/// even if 10,000,000 elements are added to a `ProofListIndex` every second, it will take
+/// ~228 years to overflow it.
+///
+/// Using readonly methods such as [`get`], [`iter_from`] and [`get_proof`] is safe for *all*
+/// index values; it is unnecessary to check on the calling side whether the index exceeds
+/// `2 ** 56 - 1` .
+///
 /// [`BinaryValue`]: ../../trait.BinaryValue.html
+/// [`ListIndex`]: ../struct.ListIndex.html
+/// [`extend`]: #method.extend
+/// [`push`]: #method.push
+/// [`get`]: #method.get
+/// [`iter_from`]: #method.iter_from
+/// [`get_proof`]: #method.get_proof
 #[derive(Debug)]
 pub struct ProofListIndex<T: RawAccess, V> {
     base: View<T>,
     state: IndexState<T, u64>,
     _v: PhantomData<V>,
-}
-
-/// An iterator over the items of a `ProofListIndex`.
-///
-/// This struct is created by the [`iter`] or
-/// [`iter_from`] method on [`ProofListIndex`]. See its documentation for details.
-///
-/// [`iter`]: struct.ProofListIndex.html#method.iter
-/// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
-/// [`ProofListIndex`]: struct.ProofListIndex.html
-#[derive(Debug)]
-pub struct Iter<'a, V> {
-    base_iter: ViewIter<'a, ProofListKey, V>,
 }
 
 impl<T, V> MerkleTree<V> for ProofListIndex<T, V>
@@ -159,6 +167,9 @@ where
     /// assert_eq!(Some(10), index.get(0));
     /// ```
     pub fn get(&self, index: u64) -> Option<V> {
+        if index > MAX_INDEX {
+            return None;
+        }
         self.base.get(&ProofListKey::leaf(index))
     }
 
@@ -298,7 +309,7 @@ where
         self.create_range_proof(range)
     }
 
-    /// Returns an iterator over the list. The iterator element type is V.
+    /// Returns an iterator over the list values.
     ///
     /// # Examples
     ///
@@ -313,14 +324,11 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter(&self) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter(&0_u8),
-        }
+    pub fn iter(&self) -> Values<'_, V> {
+        self.index_iter(None).skip_keys()
     }
 
-    /// Returns an iterator over the list starting from the specified position. The iterator
-    /// element type is V.
+    /// Returns an iterator over the list values starting from the specified position.
     ///
     /// # Examples
     ///
@@ -335,10 +343,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn iter_from(&self, from: u64) -> Iter<'_, V> {
-        Iter {
-            base_iter: self.base.iter_from(&0_u8, &ProofListKey::leaf(from)),
-        }
+    pub fn iter_from(&self, from: u64) -> Values<'_, V> {
+        self.index_iter(Some(&from)).skip_keys()
     }
 }
 
@@ -519,6 +525,20 @@ where
             // No elements in the iterator; we're done.
             return;
         }
+
+        // For efficiency, we check the constraint once rather than in a loop above.
+        // If the list length exceeds the allowed bounds, `ProofListKey::leaf` in the loop
+        // will panic in the debug mode, but we don't expect users to run MerkleDB in the debug mode
+        // in all cases.
+        assert!(
+            new_list_len < MAX_INDEX + 1,
+            "Length of a `ProofListIndex` exceeding the maximum allowed value ({}). \
+             This should never happen in realistic scenarios. If you feel this is not a bug, \
+             open an issue on https://github.com/exonum/exonum and tell us your use case \
+             for such a large list.",
+            MAX_INDEX + 1
+        );
+
         self.set_len(new_list_len);
         self.update_range(old_list_len, new_list_len - 1);
     }
@@ -728,27 +748,32 @@ where
     }
 }
 
-impl<'a, T, V> std::iter::IntoIterator for &'a ProofListIndex<T, V>
+impl<'a, T, V> IntoIterator for &'a ProofListIndex<T, V>
 where
     T: RawAccess,
     V: BinaryValue,
 {
     type Item = V;
-    type IntoIter = Iter<'a, V>;
+    type IntoIter = Values<'a, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for Iter<'a, V>
+impl<T, V> IndexIterator for ProofListIndex<T, V>
 where
+    T: RawAccess,
     V: BinaryValue,
 {
-    type Item = V;
+    type Key = u64;
+    type Value = V;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(_, v)| v)
+    fn index_iter(&self, from: Option<&u64>) -> Entries<'_, u64, V> {
+        // Using `from` directly works because of `prefix`. If `from` is greater than
+        // the maximum index of a leaf element, the iterator should immediately end
+        // because the key does not start with the prefix.
+        Entries::with_prefix(&self.base, &0_u8, from)
     }
 }
 
@@ -760,9 +785,14 @@ mod proto {
 
     use std::borrow::Cow;
 
-    use super::{HashedEntry, ListProof, ProofListKey};
-    pub use crate::proto::{self, *};
-    use crate::{indexes::proof_list::MAX_INDEX, BinaryValue};
+    use super::{
+        key::{HEIGHT_SHIFT, MAX_INDEX},
+        HashedEntry, ListProof, ProofListKey,
+    };
+    use crate::{
+        proto::{self, *},
+        BinaryValue,
+    };
 
     impl ProtobufConvert for ProofListKey {
         type ProtoStruct = proto::ProofListKey;
@@ -780,10 +810,24 @@ mod proto {
 
             // ProtobufConvert is implemented manually to add these checks.
             ensure!(index <= MAX_INDEX, "index is out of range");
-            ensure!(height <= 58, "height is out of range");
+            ensure!(u64::from(height) <= HEIGHT_SHIFT, "height is out of range");
 
             Ok(ProofListKey::new(height as u8, index))
         }
+    }
+
+    #[test]
+    fn proof_list_key_errors() {
+        let mut bogus_key = proto::ProofListKey::new();
+        bogus_key.set_height(57);
+        let err = ProofListKey::from_pb(bogus_key).unwrap_err();
+        assert!(err.to_string().contains("height is out of range"));
+
+        let mut bogus_key = proto::ProofListKey::new();
+        bogus_key.set_height(3);
+        bogus_key.set_index(1_u64 << 57);
+        let err = ProofListKey::from_pb(bogus_key).unwrap_err();
+        assert!(err.to_string().contains("index is out of range"));
     }
 
     impl<V> ProtobufConvert for ListProof<V>

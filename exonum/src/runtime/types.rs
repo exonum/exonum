@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{Hash, PublicKey, SecretKey, HASH_SIZE};
+use exonum_crypto::{Hash, KeyPair, PublicKey, SecretKey, HASH_SIZE};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     impl_binary_key_for_binary_value,
@@ -51,7 +51,7 @@ pub type MethodId = u32;
 #[derive(Default, Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
-#[protobuf_convert(source = "schema::runtime::CallInfo")]
+#[protobuf_convert(source = "schema::base::CallInfo")]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// runtime to execute a transaction.
@@ -89,7 +89,7 @@ impl CallInfo {
 ///     runtime::{AnyTx, CallInfo},
 /// };
 ///
-/// let keypair = crypto::gen_keypair();
+/// let keypair = crypto::KeyPair::random();
 /// // Service instance which we want to call.
 /// let instance_id = 1024;
 /// // Specific method of the service interface.
@@ -99,17 +99,12 @@ impl CallInfo {
 /// // `AnyTx` object created from `CallInfo` and payload.
 /// let arguments = "Talk is cheap. Show me the code. – Linus Torvalds".to_owned().into_bytes();
 /// let any_tx = AnyTx::new(call_info, arguments);
-///
-/// let transaction = Verified::from_value(
-///     any_tx,
-///     keypair.0,
-///     &keypair.1
-/// );
+/// let transaction = any_tx.sign_with_keypair(&keypair);
 /// ```
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "schema::runtime::AnyTx")]
+#[protobuf_convert(source = "schema::base::AnyTx")]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
@@ -132,9 +127,14 @@ impl AnyTx {
         }
     }
 
-    /// Signs a transaction with the specified Ed25519 keypair.
+    /// Signs a transaction with the specified Ed25519 keys.
     pub fn sign(self, public_key: PublicKey, secret_key: &SecretKey) -> Verified<Self> {
         Verified::from_value(self, public_key, secret_key)
+    }
+
+    /// Signs a transaction with the specified Ed25519 keypair.
+    pub fn sign_with_keypair(self, keypair: &KeyPair) -> Verified<Self> {
+        Verified::from_value(self, keypair.public_key(), keypair.secret_key())
     }
 
     /// Parse transaction arguments as a specific type.
@@ -178,7 +178,7 @@ impl AnyTx {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash, ProtobufConvert)]
-#[protobuf_convert(source = "schema::runtime::ArtifactId")]
+#[protobuf_convert(source = "schema::base::ArtifactId")]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
@@ -301,7 +301,7 @@ impl FromStr for ArtifactId {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::runtime::ArtifactSpec")]
+#[protobuf_convert(source = "schema::base::ArtifactSpec")]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
     pub artifact: ArtifactId,
@@ -329,7 +329,7 @@ impl ArtifactSpec {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::runtime::InstanceSpec")]
+#[protobuf_convert(source = "schema::base::InstanceSpec")]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///
@@ -342,7 +342,7 @@ pub struct InstanceSpec {
     /// The name serves as a primary identifier of this service in most operations.
     /// It is assigned by the network administrators.
     ///
-    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\:-_]+`
+    /// The name must correspond to the following regular expression: `[a-zA-Z0-9/\:-_]+`.
     pub name: String,
 
     /// Identifier of the corresponding artifact.
@@ -467,21 +467,21 @@ impl Display for ArtifactStatus {
 }
 
 impl ProtobufConvert for ArtifactStatus {
-    type ProtoStruct = schema::runtime::ArtifactState_Status;
+    type ProtoStruct = schema::lifecycle::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            ArtifactStatus::Active => schema::runtime::ArtifactState_Status::ACTIVE,
-            ArtifactStatus::Pending => schema::runtime::ArtifactState_Status::PENDING,
+            ArtifactStatus::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
+            ArtifactStatus::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
             ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(match pb {
-            schema::runtime::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
-            schema::runtime::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
-            schema::runtime::ArtifactState_Status::NONE => {
+            schema::lifecycle::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
+            schema::lifecycle::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
+            schema::lifecycle::ArtifactState_Status::NONE => {
                 bail!("Status `NONE` is reserved for the further usage.")
             }
         })
@@ -491,7 +491,7 @@ impl ProtobufConvert for ArtifactStatus {
 /// Information about a migration of a service instance.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "schema::runtime::InstanceMigration")]
+#[protobuf_convert(source = "schema::lifecycle::InstanceMigration")]
 pub struct InstanceMigration {
     /// Migration target to obtain migration scripts from. This artifact
     /// must be deployed on the blockchain.
@@ -602,14 +602,14 @@ impl Display for InstanceStatus {
 impl InstanceStatus {
     // Used by `InstanceState`.
     #[allow(clippy::wrong_self_convention)]
-    pub(super) fn to_pb(status: &Option<Self>) -> schema::runtime::InstanceStatus {
+    pub(super) fn to_pb(status: &Option<Self>) -> schema::lifecycle::InstanceStatus {
         Self::create_pb(status.as_ref())
     }
 
-    fn create_pb(status: Option<&Self>) -> schema::runtime::InstanceStatus {
-        use schema::runtime::InstanceStatus_Simple::*;
+    fn create_pb(status: Option<&Self>) -> schema::lifecycle::InstanceStatus {
+        use schema::lifecycle::InstanceStatus_Simple::*;
 
-        let mut pb = schema::runtime::InstanceStatus::new();
+        let mut pb = schema::lifecycle::InstanceStatus::new();
         match status {
             None => pb.set_simple(NONE),
             Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
@@ -621,9 +621,9 @@ impl InstanceStatus {
     }
 
     pub(super) fn from_pb(
-        mut pb: schema::runtime::InstanceStatus,
+        mut pb: schema::lifecycle::InstanceStatus,
     ) -> Result<Option<Self>, failure::Error> {
-        use schema::runtime::InstanceStatus_Simple::*;
+        use schema::lifecycle::InstanceStatus_Simple::*;
 
         if pb.has_simple() {
             Ok(match pb.get_simple() {
@@ -641,7 +641,7 @@ impl InstanceStatus {
 }
 
 impl ProtobufConvert for InstanceStatus {
-    type ProtoStruct = schema::runtime::InstanceStatus;
+    type ProtoStruct = schema::lifecycle::InstanceStatus;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         Self::create_pb(Some(self))
@@ -658,7 +658,7 @@ impl ProtobufConvert for InstanceStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::runtime::ArtifactState")]
+#[protobuf_convert(source = "schema::lifecycle::ArtifactState")]
 pub struct ArtifactState {
     /// Runtime-specific deployment specification.
     pub deploy_spec: Vec<u8>,
@@ -686,7 +686,7 @@ impl ArtifactState {
 #[derive(Debug, Clone, PartialEq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "schema::runtime::InstanceState")]
+#[protobuf_convert(source = "schema::lifecycle::InstanceState")]
 pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
@@ -798,7 +798,7 @@ impl InstanceState {
 pub struct MigrationStatus(pub Result<Hash, String>);
 
 impl ProtobufConvert for MigrationStatus {
-    type ProtoStruct = schema::runtime::MigrationStatus;
+    type ProtoStruct = schema::lifecycle::MigrationStatus;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
@@ -911,7 +911,7 @@ impl Caller {
 }
 
 impl ProtobufConvert for Caller {
-    type ProtoStruct = schema::runtime::Caller;
+    type ProtoStruct = schema::auth::Caller;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
@@ -953,7 +953,7 @@ impl ProtobufConvert for Caller {
 ///
 /// ```
 /// # use exonum::{crypto, merkledb::BinaryValue, runtime::{Caller, CallerAddress}};
-/// let (public_key, _) = crypto::gen_keypair();
+/// let public_key = crypto::KeyPair::random().public_key();
 /// let address = CallerAddress::from_key(public_key);
 /// let caller = Caller::Transaction { author: public_key };
 /// // Obtain Protobuf serialization of the `Caller`.

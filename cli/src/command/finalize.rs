@@ -116,16 +116,22 @@ impl Finalize {
 
     fn create_connect_list_config(
         public_configs: &[NodePublicConfig],
-        private_config: &NodePrivateConfig,
+        key_to_skip: &PublicKey,
     ) -> ConnectListConfig {
         let peers = public_configs
             .iter()
-            .filter(|config| {
-                Self::get_consensus_key(config).unwrap() != private_config.keys.consensus_pk()
-            })
-            .map(|config| ConnectInfo {
-                public_key: Self::get_consensus_key(config).unwrap(),
-                address: config.address.clone().unwrap(),
+            .filter_map(|config| {
+                let public_key = Self::get_consensus_key(config).unwrap();
+                // `skipped_key` is a consensus key of the current node. We don't need
+                // to include `ConnectInfo` with this key in the connect list.
+                if public_key != *key_to_skip {
+                    Some(ConnectInfo {
+                        public_key,
+                        address: config.address.clone().unwrap(),
+                    })
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -161,16 +167,13 @@ impl ExonumCommand for Finalize {
 
         let validator_keys = public_configs
             .iter()
-            .flat_map(|c| c.validator_keys)
+            .flat_map(|public_config| public_config.validator_keys)
             .collect();
         let consensus = common.consensus.with_validator_keys(validator_keys);
 
-        let connect_list = Self::create_connect_list_config(&public_configs, &private_config);
-
+        let connect_list =
+            Self::create_connect_list_config(&public_configs, &private_config.consensus_public_key);
         let private_config = NodePrivateConfig {
-            listen_address: private_config.listen_address,
-            external_address: private_config.external_address,
-            master_key_path: private_config.master_key_path,
             api: NodeApiConfig {
                 public_api_address: self.public_api_address,
                 private_api_address: self.private_api_address,
@@ -178,12 +181,8 @@ impl ExonumCommand for Finalize {
                 private_allow_origin,
                 ..private_config.api
             },
-            network: private_config.network,
-            mempool: private_config.mempool,
-            database: private_config.database,
-            thread_pool_size: private_config.thread_pool_size,
             connect_list,
-            keys: private_config.keys,
+            ..private_config
         };
         let public_config = NodePublicConfig {
             consensus,
@@ -196,7 +195,6 @@ impl ExonumCommand for Finalize {
             private_config,
             public_config,
         };
-
         save_config_file(&config, &self.output_config_path)?;
 
         Ok(StandardResult::Finalize {

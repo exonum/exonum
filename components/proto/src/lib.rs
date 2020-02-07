@@ -49,7 +49,7 @@ use protobuf::well_known_types;
 
 use std::collections::HashMap;
 
-use proto::common::BitVec;
+use proto::bit_vec::BitVec;
 
 #[macro_use]
 mod macros;

@@ -213,6 +213,7 @@
 //! | Stub | Behavior |
 //! |------|----------|
 //! | [`TxStub`] | Generates unsigned transactions |
+//! | `KeyPair` | Generates signed transactions (preferred) |
 //! | `(PublicKey, SecretKey)` | Generates signed transactions |
 //! | [`Broadcaster`] | Broadcasts transactions signed by the service keys of the node |
 //! | [`ExecutionContext`] | Calls methods of another service during transaction execution **(1)** |
@@ -248,7 +249,7 @@
 //! ```
 //! # use exonum::runtime::ExecutionError;
 //! # use exonum_rust_runtime::ExecutionContext;
-//! # use exonum::crypto::gen_keypair;
+//! # use exonum::crypto::KeyPair;
 //! # use exonum_derive::{exonum_interface, interface_method};
 //! # type CreateWallet = String;
 //! # type Transfer = String;
@@ -262,7 +263,7 @@
 //! }
 //!
 //! // Create a signed transaction.
-//! let keypair = gen_keypair();
+//! let keypair = KeyPair::random();
 //! let create_wallet: CreateWallet = // ...
 //! #    "create_wallet".to_owned();
 //! // The context in this case is the numerical instance ID.
@@ -767,7 +768,7 @@ impl Runtime for RustRuntime {
         }
 
         let blockchain = self.blockchain();
-        let validator_id = core_schema.validator_id(blockchain.service_keypair().0);
+        let validator_id = core_schema.validator_id(blockchain.service_keypair().public_key());
         for service in self.started_services.values() {
             service.as_ref().after_commit(AfterCommitContext::new(
                 mailbox,

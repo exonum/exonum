@@ -16,7 +16,7 @@
 
 use exonum::{
     blockchain::{BlockchainMut, CallInBlock, ProposerId},
-    crypto::gen_keypair,
+    crypto::KeyPair,
     helpers::{Height, ValidatorId},
     merkledb::{MapProof, ObjectHash},
     messages::{AnyTx, Verified},
@@ -54,12 +54,12 @@ pub fn mempool_transaction() -> Verified<AnyTx> {
 /// Additionally, a single transaction is placed into the pool.
 pub fn sample_blockchain() -> BlockchainMut {
     let mut blockchain = create_blockchain();
-    let alice = gen_keypair();
-    let bob = gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
 
     let tx_alice = alice.create_wallet(SERVICE_ID, CreateWallet::new("Alice"));
     let tx_bob = bob.create_wallet(SERVICE_ID, CreateWallet::new("Bob"));
-    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.0, 100));
+    let tx_transfer = alice.transfer(SERVICE_ID, Transfer::new(bob.public_key(), 100));
     create_block(&mut blockchain, vec![tx_alice, tx_bob, tx_transfer]);
 
     blockchain.add_transactions_into_pool(iter::once(mempool_transaction()));

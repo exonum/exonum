@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    crypto::{gen_keypair, hash, Hash},
+    crypto::{hash, Hash, KeyPair},
     helpers::Height,
     merkledb::ObjectHash,
     messages::Verified,
@@ -100,7 +100,7 @@ fn test_api_get_timestamp_nothing() {
 fn test_api_post_timestamp() {
     let (mut testkit, _) = init_testkit();
     let content = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = gen_keypair().timestamp(SERVICE_ID, content);
+    let tx = KeyPair::random().timestamp(SERVICE_ID, content);
 
     let api = testkit.api();
     let tx_info: TransactionResponse = api
@@ -115,7 +115,7 @@ fn test_api_post_timestamp() {
 #[test]
 fn test_api_get_timestamp_proof() {
     let (mut testkit, _) = init_testkit();
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
 
     // Create timestamp
     let content = Timestamp::new(&Hash::zero(), "metadata");
@@ -139,7 +139,7 @@ fn test_api_get_timestamp_entry() {
 
     // Create timestamp
     let content = Timestamp::new(&Hash::zero(), "metadata");
-    let tx = gen_keypair().timestamp(SERVICE_ID, content.clone());
+    let tx = KeyPair::random().timestamp(SERVICE_ID, content.clone());
     testkit.create_block_with_transaction(tx.clone());
 
     let api = testkit.api();
@@ -158,7 +158,7 @@ fn test_api_get_timestamp_entry() {
 fn test_api_cannot_add_same_content_hash() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();
-    let keypair = gen_keypair();
+    let keypair = KeyPair::random();
     let content_hash = hash(&[1]);
     let timestamp1 = Timestamp::new(&content_hash, "metadata");
     let timestamp2 = Timestamp::new(&content_hash, "other metadata");
@@ -185,4 +185,17 @@ fn test_api_cannot_add_same_content_hash() {
             "type": "service_error",
         }),
     );
+}
+
+#[test]
+fn test_api_get_configuration() {
+    let (mut testkit, _) = init_testkit();
+    let api = testkit.api();
+
+    let config: Config = api
+        .public(ApiKind::Service(SERVICE_NAME))
+        .get("v1/timestamps/config")
+        .expect("Failed to get service configuration.");
+
+    assert_eq!(config.time_service_name, "time");
 }

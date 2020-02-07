@@ -35,10 +35,11 @@ class CryptoAdvancedTest(unittest.TestCase):
             with Launcher(cryptocurrency_advanced_config) as launcher:
                 explorer = launcher.explorer()
 
-                launcher.deploy_all()
-                launcher.wait_for_deploy()
-                launcher.start_all()
-                launcher.wait_for_start()
+                # Skip deploy and start. The service has been already included.
+                # launcher.deploy_all()
+                # launcher.wait_for_deploy()
+                # launcher.start_all()
+                # launcher.wait_for_start()
 
                 for artifact in launcher.launch_state.completed_deployments():
                     deployed = explorer.check_deployed(artifact)
@@ -138,8 +139,8 @@ class CryptoAdvancedTest(unittest.TestCase):
                 crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
-        # it should contain 4 txs for wallet creation plus 6 services txs
-        self.assertEqual(client.public_api.stats().json()["tx_count"], 10)
+        # it should contain 4 txs for wallet creation
+        self.assertEqual(client.public_api.stats().json()["tx_count"], 4)
 
     def test_create_wallet_unique_for_key_pair(self):
         """Tests the transaction with the same keys for different wallets is failed"""

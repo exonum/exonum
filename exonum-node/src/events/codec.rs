@@ -94,7 +94,7 @@ impl Encoder for MessagesCodec {
 mod test {
     use bytes::BytesMut;
     use exonum::{
-        crypto::{gen_keypair, Hash},
+        crypto::{Hash, KeyPair},
         helpers::Height,
         merkledb::BinaryValue,
         messages::{Verified, SIGNED_MESSAGE_MIN_SIZE},
@@ -188,8 +188,12 @@ mod test {
         let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
 
         let raw = {
-            let (pk, sk) = gen_keypair();
-            let msg = Verified::from_value(Status::new(Height(0), Hash::zero(), 0), pk, &sk);
+            let keys = KeyPair::random();
+            let msg = Verified::from_value(
+                Status::new(Height(0), Hash::zero(), 0),
+                keys.public_key(),
+                keys.secret_key(),
+            );
             msg.into_raw()
         };
         let data = raw.to_bytes();

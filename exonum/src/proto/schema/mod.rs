@@ -21,3 +21,4 @@ use crate::crypto::proto::*;
 use crate::merkledb::proto::*;
 
 include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
+include!(concat!(env!("OUT_DIR"), "/exonum_details_mod.rs"));

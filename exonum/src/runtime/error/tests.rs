@@ -70,8 +70,8 @@ fn execution_error_binary_value_round_trip() {
 #[test]
 fn execution_error_binary_value_unexpected_with_code() {
     let bytes = {
-        let mut inner = runtime_proto::ExecutionError::default();
-        inner.set_kind(runtime_proto::ErrorKind::UNEXPECTED);
+        let mut inner = errors_proto::ExecutionError::default();
+        inner.set_kind(errors_proto::ErrorKind::UNEXPECTED);
         inner.set_code(2);
         inner.write_to_bytes().unwrap()
     };

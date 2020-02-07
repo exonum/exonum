@@ -134,10 +134,10 @@ impl ExonumCommand for GenerateConfig {
 
         let keys = {
             let passphrase =
-                Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default());
+                Self::get_passphrase(self.no_password, self.master_key_pass.unwrap_or_default())?;
             create_keys_and_files(
                 &self.output_dir.join(master_key_path.clone()),
-                passphrase?.as_bytes(),
+                passphrase.as_bytes(),
             )
         }?;
 
@@ -160,7 +160,7 @@ impl ExonumCommand for GenerateConfig {
             database: Default::default(),
             thread_pool_size: Default::default(),
             connect_list: Default::default(),
-            keys,
+            consensus_public_key: keys.consensus_pk(),
         };
 
         save_config_file(&private_config, &private_config_path)?;

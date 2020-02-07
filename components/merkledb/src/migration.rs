@@ -119,7 +119,7 @@
 //! # }
 //! ```
 
-pub use self::persistent_iter::{ContinueIterator, PersistentIter, PersistentIters};
+pub use self::persistent_iter::{PersistentIter, PersistentIters, PersistentKeys};
 
 use exonum_crypto::Hash;
 use failure::Fail;
@@ -164,7 +164,19 @@ pub struct Migration<T> {
     namespace: String,
 }
 
-impl<'a, T: RawAccess> Migration<T> {
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Migration`.
+impl<T> Migration<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
+    pub(crate) fn into_parts(self) -> (String, T) {
+        (self.namespace, self.access)
+    }
+}
+
+impl<T: RawAccess> Migration<T> {
     /// Creates a migration in the specified namespace.
     pub fn new(namespace: impl Into<String>, access: T) -> Self {
         Self {
@@ -266,6 +278,18 @@ impl<T: RawAccess> Access for Migration<T> {
 pub struct Scratchpad<T> {
     access: T,
     namespace: String,
+}
+
+// **NB.** Must not be made public! This would allow the caller to violate access restrictions
+// imposed by `Scratchpad`.
+impl<T> Scratchpad<T> {
+    pub(crate) fn access(&self) -> &T {
+        &self.access
+    }
+
+    pub(crate) fn into_parts(self) -> (String, T) {
+        (self.namespace, self.access)
+    }
 }
 
 impl<T: RawAccess> Scratchpad<T> {
@@ -713,7 +737,7 @@ mod tests {
         let migration = Migration::new("name", &fork);
         migration.get_proof_list("list").extend(vec![4_u64, 5]);
         migration.get_map("map").put(&1_u64, 42_i32);
-        migration.get_key_set("new").insert(0_u8);
+        migration.get_key_set("new").insert(&0_u8);
         migration.create_tombstone("removed");
 
         fork.flush_migration("name");
@@ -776,7 +800,7 @@ mod tests {
         let migration = Migration::new("name", &fork);
         migration.get_proof_list("list").extend(vec![4_u64, 5]);
         migration.get_map("map").put(&1_u64, 42_i32);
-        migration.get_key_set("new").insert(0_u8);
+        migration.get_key_set("new").insert(&0_u8);
         migration.create_tombstone(("name.family", &3_u8));
         // ^-- Removing non-existing indexes is weird, but should work fine.
         db.merge(fork.into_patch()).unwrap();

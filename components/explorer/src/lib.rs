@@ -502,7 +502,7 @@ impl CommittedTransaction {
 ///
 /// ```
 /// use exonum_explorer::TransactionInfo;
-/// use exonum::{crypto::gen_keypair, runtime::InstanceId};
+/// use exonum::{crypto::KeyPair, runtime::InstanceId};
 /// # use exonum_derive::*;
 /// # use serde_derive::*;
 /// # use serde_json::json;
@@ -517,7 +517,7 @@ impl CommittedTransaction {
 ///
 /// # fn main() {
 /// // Create a signed transaction.
-/// let keypair = gen_keypair();
+/// let keypair = KeyPair::random();
 /// const SERVICE_ID: InstanceId = 100;
 /// let tx = keypair.create_wallet(SERVICE_ID, "Alice".to_owned());
 /// // This transaction in pool will be represented as follows:

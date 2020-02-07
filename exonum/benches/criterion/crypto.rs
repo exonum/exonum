@@ -19,21 +19,21 @@
 use criterion::{
     AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
 };
-use exonum::crypto::{gen_keypair, hash, sign, verify};
+use exonum::crypto::{hash, sign, verify, KeyPair};
 
 use std::convert::TryInto;
 
 fn bench_sign(b: &mut Bencher<'_>, &count: &usize) {
-    let (_, secret_key) = gen_keypair();
+    let keys = KeyPair::random();
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
-    b.iter(|| sign(&data, &secret_key))
+    b.iter(|| sign(&data, keys.secret_key()))
 }
 
 fn bench_verify(b: &mut Bencher<'_>, &count: &usize) {
-    let (public_key, secret_key) = gen_keypair();
+    let keys = KeyPair::random();
     let data = (0..count).map(|x| (x % 255) as u8).collect::<Vec<u8>>();
-    let signature = sign(&data, &secret_key);
-    b.iter(|| verify(&signature, &data, &public_key))
+    let signature = sign(&data, keys.secret_key());
+    b.iter(|| verify(&signature, &data, &keys.public_key()))
 }
 
 fn bench_hash(b: &mut Bencher<'_>, &count: &usize) {

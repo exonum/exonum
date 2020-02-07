@@ -25,7 +25,7 @@ use exonum::{
         contains_transaction, Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut,
         ConsensusConfig, Schema, ValidatorKeys,
     },
-    crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, SEED_LENGTH},
+    crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
     helpers::{user_agent, Height, Round, ValidatorId},
     keys::Keys,
     merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
@@ -1102,11 +1102,11 @@ fn sandbox_with_services_uninitialized(
     let keys = (0..validators_count)
         .map(|i| {
             (
-                gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])),
-                gen_keypair_from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
+                KeyPair::from_seed(&Seed::new([i; SEED_LENGTH])),
+                KeyPair::from_seed(&Seed::new([i + validators_count; SEED_LENGTH])),
             )
         })
-        .map(|(v, s)| Keys::from_keys(v.0, v.1, s.0, s.1))
+        .map(|(consensus, service)| Keys::from_keys(consensus, service))
         .collect::<Vec<_>>();
 
     let validators = keys
@@ -1151,8 +1151,8 @@ fn sandbox_with_services_uninitialized(
     );
 
     let genesis_config = create_genesis_config(genesis, artifacts, instances);
-
-    let blockchain = BlockchainBuilder::new(blockchain, genesis_config)
+    let blockchain = BlockchainBuilder::new(blockchain)
+        .with_genesis_config(genesis_config)
         .with_runtime(rust_runtime.build_for_tests())
         .build();
 
@@ -1231,8 +1231,6 @@ pub fn timestamping_sandbox_builder() -> SandboxBuilder {
 
 #[cfg(test)]
 mod unit_tests {
-    use exonum::crypto::gen_keypair;
-
     use super::*;
 
     impl Sandbox {
@@ -1277,9 +1275,9 @@ mod unit_tests {
         // As far as all validators have connected to each other during
         // sandbox initialization, we need to use connect-message with unknown
         // keypair.
-        let consensus = gen_keypair();
-        let service = gen_keypair();
-        let validator_keys = ValidatorKeys::new(consensus.0, service.0);
+        let consensus = KeyPair::random();
+        let service = KeyPair::random();
+        let validator_keys = ValidatorKeys::new(consensus.public_key(), service.public_key());
 
         let new_peer_addr = gen_primitive_socket_addr(2);
         // We also need to add public key from this keypair to the ConnectList.
@@ -1287,14 +1285,14 @@ mod unit_tests {
         s.add_peer_to_connect_list(new_peer_addr, validator_keys);
 
         s.recv(&s.create_connect(
-            &consensus.0,
+            &consensus.public_key(),
             new_peer_addr.to_string(),
             s.time().into(),
             &user_agent(),
-            &consensus.1,
+            consensus.secret_key(),
         ));
         s.send(
-            consensus.0,
+            consensus.public_key(),
             &s.create_connect(
                 &s.public_key(ValidatorId(0)),
                 s.address(ValidatorId(0)),
@@ -1336,16 +1334,16 @@ mod unit_tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
-        let (consensus_key, consensus_secret) = gen_keypair();
-        let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys::new(consensus_key, service_key);
+        let consensus_keys = KeyPair::random();
+        let service_key = KeyPair::random().public_key();
+        let validator_keys = ValidatorKeys::new(consensus_keys.public_key(), service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
-            &consensus_key,
+            &consensus_keys.public_key(),
             s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent(),
-            &consensus_secret,
+            consensus_keys.secret_key(),
         ));
         s.send(
             s.public_key(ValidatorId(1)),
@@ -1364,16 +1362,16 @@ mod unit_tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys::new(public, service_key);
+        let consensus_keys = KeyPair::random();
+        let service_key = KeyPair::random().public_key();
+        let validator_keys = ValidatorKeys::new(consensus_keys.public_key(), service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
-            &public,
+            &consensus_keys.public_key(),
             s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent(),
-            &secret,
+            consensus_keys.secret_key(),
         ));
     }
 
@@ -1382,23 +1380,23 @@ mod unit_tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys::new(public, service_key);
+        let consensus_keys = KeyPair::random();
+        let service_key = KeyPair::random().public_key();
+        let validator_keys = ValidatorKeys::new(consensus_keys.public_key(), service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
-            &public,
+            &consensus_keys.public_key(),
             s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent(),
-            &secret,
+            consensus_keys.secret_key(),
         ));
         s.recv(&s.create_connect(
-            &public,
+            &consensus_keys.public_key(),
             s.address(ValidatorId(3)),
             s.time().into(),
             &user_agent(),
-            &secret,
+            consensus_keys.secret_key(),
         ));
         panic!("Oops! We don't catch unexpected message");
     }
@@ -1408,16 +1406,16 @@ mod unit_tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         // See comments to `test_sandbox_recv_and_send`.
-        let (public, secret) = gen_keypair();
-        let (service_key, _) = gen_keypair();
-        let validator_keys = ValidatorKeys::new(public, service_key);
+        let consensus_keys = KeyPair::random();
+        let service_key = KeyPair::random().public_key();
+        let validator_keys = ValidatorKeys::new(consensus_keys.public_key(), service_key);
         s.add_peer_to_connect_list(gen_primitive_socket_addr(1), validator_keys);
         s.recv(&s.create_connect(
-            &public,
+            &consensus_keys.public_key(),
             s.address(ValidatorId(2)),
             s.time().into(),
             &user_agent(),
-            &secret,
+            consensus_keys.secret_key(),
         ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");

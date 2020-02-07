@@ -16,8 +16,8 @@
 
 pub use exonum_api::ApiAccess;
 
-use actix::{actors::signal, Addr, System};
-use actix_net::server::Server;
+use actix::{Addr, System};
+use actix_net::server::{Server, StopServer};
 use actix_web::{
     server::{HttpServer, IntoHttpHandler},
     App,
@@ -423,11 +423,8 @@ impl TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
-        // Stop http server.
-        let _ = self
-            .backend
-            .send(signal::Signal(signal::SignalType::Term))
-            .wait();
+        // Stop http server gracefully.
+        let _ = self.backend.send(StopServer { graceful: true }).wait();
         self.system.stop();
         // Wait server thread.
         let _ = self.handle.take().unwrap().join();

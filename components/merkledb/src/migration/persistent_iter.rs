@@ -14,188 +14,20 @@
 
 //! Persistent iterators.
 
-use exonum_crypto::Hash;
 use failure::{bail, ensure};
 
 use std::{
     borrow::{Borrow, Cow},
     collections::HashSet,
     fmt,
-    iter::{Peekable, Zip},
-    ops::RangeFrom,
+    iter::Peekable,
 };
 
 use crate::{
     access::{Access, AccessExt, RawAccess, RawAccessMut},
-    indexes::{self, proof_map::ToProofPath},
-    BinaryKey, BinaryValue, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofListIndex,
-    ProofMapIndex, SparseListIndex, ValueSetIndex,
+    indexes::{Entries, IndexIterator},
+    BinaryKey, BinaryValue, Entry,
 };
-
-/// Database object that supports iteration and continuing iteration from an intermediate position.
-pub trait ContinueIterator {
-    /// Type encompassing iteration position.
-    type Key: BinaryKey + ?Sized;
-    /// Iterator returned by the object.
-    type Iter: Iterator;
-
-    /// Continues iteration from the specified position. If `from` is `None`, starts the iteration
-    /// from scratch.
-    fn continue_iter(self, from: Option<&Self::Key>) -> Self::Iter;
-
-    /// Extracts the iteration position from the item returned by the iterator.
-    fn extract_key(item: &<Self::Iter as Iterator>::Item) -> <Self::Key as ToOwned>::Owned;
-}
-
-impl<'a, T, V> ContinueIterator for &'a ListIndex<T, V>
-where
-    T: RawAccess,
-    V: BinaryValue,
-{
-    type Key = u64;
-    type Iter = Zip<RangeFrom<u64>, indexes::list::Iter<'a, V>>;
-
-    fn continue_iter(self, from: Option<&u64>) -> Self::Iter {
-        if let Some(&from) = from {
-            (from..).zip(self.iter_from(from))
-        } else {
-            (0..).zip(self.iter())
-        }
-    }
-
-    fn extract_key(item: &(u64, V)) -> u64 {
-        item.0
-    }
-}
-
-impl<'a, T, V> ContinueIterator for &'a ProofListIndex<T, V>
-where
-    T: RawAccess,
-    V: BinaryValue,
-{
-    type Key = u64;
-    type Iter = Zip<RangeFrom<u64>, indexes::proof_list::Iter<'a, V>>;
-
-    fn continue_iter(self, from: Option<&u64>) -> Self::Iter {
-        if let Some(&from) = from {
-            (from..).zip(self.iter_from(from))
-        } else {
-            (0..).zip(self.iter())
-        }
-    }
-
-    fn extract_key(item: &(u64, V)) -> u64 {
-        item.0
-    }
-}
-
-impl<'a, T, V> ContinueIterator for &'a SparseListIndex<T, V>
-where
-    T: RawAccess,
-    V: BinaryValue,
-{
-    type Key = u64;
-    type Iter = indexes::sparse_list::Iter<'a, V>;
-
-    fn continue_iter(self, from: Option<&u64>) -> Self::Iter {
-        if let Some(&from) = from {
-            self.iter_from(from)
-        } else {
-            self.iter()
-        }
-    }
-
-    fn extract_key(item: &(u64, V)) -> u64 {
-        item.0
-    }
-}
-
-impl<'a, T, K, V> ContinueIterator for &'a MapIndex<T, K, V>
-where
-    T: RawAccess,
-    K: BinaryKey + ?Sized,
-    V: BinaryValue,
-{
-    type Key = K;
-    type Iter = indexes::map::Iter<'a, K, V>;
-
-    fn continue_iter(self, from: Option<&K>) -> Self::Iter {
-        if let Some(from) = from {
-            self.iter_from(from)
-        } else {
-            self.iter()
-        }
-    }
-
-    fn extract_key(item: &(K::Owned, V)) -> K::Owned {
-        item.0.borrow().to_owned()
-    }
-}
-
-impl<'a, T, K, V, KeyMode> ContinueIterator for &'a ProofMapIndex<T, K, V, KeyMode>
-where
-    T: RawAccess,
-    K: BinaryKey + ?Sized,
-    V: BinaryValue,
-    KeyMode: ToProofPath<K>,
-{
-    type Key = K;
-    type Iter = indexes::proof_map::Iter<'a, K, V>;
-
-    fn continue_iter(self, from: Option<&K>) -> Self::Iter {
-        if let Some(from) = from {
-            self.iter_from(from)
-        } else {
-            self.iter()
-        }
-    }
-
-    fn extract_key(item: &(K::Owned, V)) -> K::Owned {
-        item.0.borrow().to_owned()
-    }
-}
-
-impl<'a, T, K> ContinueIterator for &'a KeySetIndex<T, K>
-where
-    T: RawAccess,
-    K: BinaryKey,
-{
-    type Key = K;
-    type Iter = indexes::key_set::Iter<'a, K>;
-
-    fn continue_iter(self, from: Option<&K>) -> Self::Iter {
-        if let Some(from) = from {
-            self.iter_from(from)
-        } else {
-            self.iter()
-        }
-    }
-
-    fn extract_key(item: &K::Owned) -> K::Owned {
-        item.borrow().to_owned()
-    }
-}
-
-impl<'a, T, V> ContinueIterator for &'a ValueSetIndex<T, V>
-where
-    T: RawAccess,
-    V: BinaryValue + ObjectHash,
-{
-    type Key = Hash;
-    type Iter = indexes::value_set::Iter<'a, V>;
-
-    fn continue_iter(self, from: Option<&Hash>) -> Self::Iter {
-        if let Some(from) = from {
-            self.iter_from(from)
-        } else {
-            self.iter()
-        }
-    }
-
-    fn extract_key(item: &(Hash, V)) -> Hash {
-        item.0
-    }
-}
 
 /// Persistent iterator position.
 #[derive(PartialEq)]
@@ -302,14 +134,14 @@ where
 ///
 /// [`Scratchpad`]: struct.Scratchpad.html
 /// [`MigrationHelper`]: struct.MigrationHelper.html
-pub struct PersistentIter<T: RawAccess, I: ContinueIterator> {
-    inner: Inner<T, I>,
+pub struct PersistentIter<'a, T: RawAccess, I: IndexIterator> {
+    inner: Inner<'a, T, I>,
 }
 
-impl<T, I> fmt::Debug for PersistentIter<T, I>
+impl<T, I> fmt::Debug for PersistentIter<'_, T, I>
 where
     T: RawAccess,
-    I: ContinueIterator,
+    I: IndexIterator,
     I::Key: fmt::Debug,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -321,21 +153,21 @@ where
 }
 
 /// Internal details of a persistent iterator.
-enum Inner<T: RawAccess, I: ContinueIterator> {
+enum Inner<'a, T: RawAccess, I: IndexIterator> {
     /// The iterator is active: it has an underlying iterator over a database object,
     /// and an entry storing the iterator position.
     Active {
-        iter: Peekable<I::Iter>,
+        iter: Peekable<Entries<'a, I::Key, I::Value>>,
         position_entry: Entry<T, IteratorPosition<I::Key>>,
     },
     /// The iterator has ended.
     Ended,
 }
 
-impl<T, I> fmt::Debug for Inner<T, I>
+impl<T, I> fmt::Debug for Inner<'_, T, I>
 where
     T: RawAccess,
-    I: ContinueIterator,
+    I: IndexIterator,
     I::Key: fmt::Debug,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -349,13 +181,13 @@ where
     }
 }
 
-impl<T, I> PersistentIter<T, I>
+impl<'a, T, I> PersistentIter<'a, T, I>
 where
     T: RawAccessMut,
-    I: ContinueIterator,
+    I: IndexIterator,
 {
     /// Creates a new persistent iterator.
-    pub fn new<A>(access: &A, name: &str, index: I) -> Self
+    pub fn new<A>(access: &A, name: &str, index: &'a I) -> Self
     where
         A: Access<Base = T>,
     {
@@ -375,20 +207,25 @@ where
         Self {
             inner: Inner::Active {
                 iter: index
-                    .continue_iter(start_key.as_ref().map(Borrow::borrow))
+                    .index_iter(start_key.as_ref().map(Borrow::borrow))
                     .peekable(),
                 position_entry,
             },
         }
     }
+
+    /// Skips values in the iterator output without parsing them.
+    pub fn skip_values(self) -> PersistentKeys<'a, T, I> {
+        PersistentKeys { base_iter: self }
+    }
 }
 
-impl<T, I> Iterator for PersistentIter<T, I>
+impl<T, I> Iterator for PersistentIter<'_, T, I>
 where
     T: RawAccessMut,
-    I: ContinueIterator,
+    I: IndexIterator,
 {
-    type Item = <I::Iter as Iterator>::Item;
+    type Item = (<I::Key as ToOwned>::Owned, I::Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Inner::Active {
@@ -398,9 +235,9 @@ where
         {
             let next = iter.next();
             if next.is_some() {
-                position_entry.set(if let Some(ref item) = iter.peek() {
-                    let key = I::extract_key(item);
-                    IteratorPosition::NextKey(key)
+                position_entry.set(if let Some((key, _)) = iter.peek() {
+                    // Slightly clumsy way to clone the key.
+                    IteratorPosition::NextKey(key.borrow().to_owned())
                 } else {
                     IteratorPosition::Ended
                 });
@@ -412,6 +249,56 @@ where
         } else {
             None
         }
+    }
+}
+
+/// Persistent iterator over index keys that stores its position in the database.
+///
+/// This iterator can be used similarly to [`PersistentIter`]; the only difference is the
+/// type of items yielded by the iterator.
+///
+/// [`PersistentIter`]: struct.PersistentIter.html
+pub struct PersistentKeys<'a, T: RawAccess, I: IndexIterator> {
+    base_iter: PersistentIter<'a, T, I>,
+}
+
+impl<'a, T, I> PersistentKeys<'a, T, I>
+where
+    T: RawAccessMut,
+    I: IndexIterator,
+{
+    /// Creates a new persistent iterator.
+    pub fn new<A>(access: &A, name: &str, index: &'a I) -> Self
+    where
+        A: Access<Base = T>,
+    {
+        PersistentIter::new(access, name, index).skip_values()
+    }
+}
+
+impl<T, I> fmt::Debug for PersistentKeys<'_, T, I>
+where
+    T: RawAccess,
+    I: IndexIterator,
+    I::Key: fmt::Debug,
+{
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PersistentIter")
+            .field("inner", &self.base_iter.inner)
+            .finish()
+    }
+}
+
+impl<T, I> Iterator for PersistentKeys<'_, T, I>
+where
+    T: RawAccessMut,
+    I: IndexIterator,
+{
+    type Item = <I::Key as ToOwned>::Owned;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.base_iter.next().map(|(key, _)| key)
     }
 }
 
@@ -436,11 +323,11 @@ where
     }
 
     /// Creates a persistent iterator identified by the `name`.
-    pub fn create<I: ContinueIterator>(
+    pub fn create<'a, I: IndexIterator>(
         &mut self,
         name: &str,
-        index: I,
-    ) -> PersistentIter<T::Base, I> {
+        index: &'a I,
+    ) -> PersistentIter<'a, T::Base, I> {
         self.names.insert(name.to_owned());
         PersistentIter::new(&self.access, name, index)
     }
@@ -467,7 +354,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{access::CopyAccessExt, migration::Scratchpad, Database, TemporaryDB};
+    use crate::{
+        access::CopyAccessExt, migration::Scratchpad, Database, ProofMapIndex, TemporaryDB,
+    };
 
     use std::{collections::HashSet, iter::FromIterator};
 
@@ -622,17 +511,17 @@ mod tests {
         let db = TemporaryDB::new();
         let fork = db.fork();
         let mut set = fork.get_key_set("set");
-        for &i in &[0_u16, 1, 2, 3, 5, 8, 13, 21] {
+        for i in &[0_u16, 1, 2, 3, 5, 8, 13, 21] {
             set.insert(i);
         }
 
         let scratchpad = Scratchpad::new("iter", &fork);
-        let iter = PersistentIter::new(&scratchpad, "set", &set);
+        let iter = PersistentKeys::new(&scratchpad, "set", &set);
         let head: Vec<_> = iter.take(3).collect();
         assert_eq!(head, vec![0, 1, 2]);
 
         {
-            let mut iter = PersistentIter::new(&scratchpad, "set", &set);
+            let mut iter = PersistentKeys::new(&scratchpad, "set", &set);
             assert_eq!(iter.nth(2), Some(8));
         }
         {
@@ -640,7 +529,7 @@ mod tests {
             assert_eq!(position_entry.get(), Some(IteratorPosition::NextKey(13)));
         }
 
-        let iter = PersistentIter::new(&scratchpad, "set", &set);
+        let iter = PersistentKeys::new(&scratchpad, "set", &set);
         let tail: Vec<_> = iter.collect();
         assert_eq!(tail, vec![13, 21]);
     }

@@ -14,6 +14,7 @@
 
 use exonum_merkledb::{
     access::{AsReadonly, FromAccess, Prefixed, RawAccess},
+    generic::GenericRawAccess,
     Snapshot, SystemSchema,
 };
 
@@ -40,6 +41,11 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
         }
     }
 
+    /// Returns the instance name of the executing service.
+    pub fn instance_name(&self) -> &str {
+        &self.instance_name
+    }
+
     /// Returns unstructured readonly access to blockchain data.
     ///
     /// # Safety
@@ -48,18 +54,18 @@ impl<T: RawAccess + AsReadonly> BlockchainData<T> {
     /// can lead to a panic because of borrowing checks performed by the database.
     /// Check that your wrapper prevent such attempts to access.
     #[doc(hidden)]
-    pub fn unstructured_assess(&self) -> T::Readonly {
+    pub fn unstructured_access(&self) -> T::Readonly {
         self.access.as_readonly()
     }
 
     /// Returns core schema.
     pub fn for_core(&self) -> CoreSchema<T::Readonly> {
-        CoreSchema::new(self.unstructured_assess())
+        CoreSchema::new(self.unstructured_access())
     }
 
     /// Returns dispatcher schema.
     pub fn for_dispatcher(&self) -> DispatcherSchema<T::Readonly> {
-        DispatcherSchema::new(self.unstructured_assess())
+        DispatcherSchema::new(self.unstructured_access())
     }
 
     /// Returns a mount point for another service. If the service with `id` does not exist,
@@ -121,6 +127,16 @@ impl BlockchainData<&dyn Snapshot> {
     pub fn proof_for_service_index(&self, index_name: &str) -> Option<IndexProof> {
         let full_index_name = [&self.instance_name, ".", index_name].concat();
         self.access.proof_for_index(&full_index_name)
+    }
+}
+
+impl<'a, T> BlockchainData<T>
+where
+    T: Into<GenericRawAccess<'a>>,
+{
+    /// Erases the enclosed access, converting it to the generic form.
+    pub fn erase_access(self) -> BlockchainData<GenericRawAccess<'a>> {
+        BlockchainData::new(self.access.into(), self.instance_name)
     }
 }
 

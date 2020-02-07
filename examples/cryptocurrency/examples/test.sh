@@ -7,8 +7,8 @@
 set -e
 
 # Base URL for demo service endpoints
-BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
-TRANSACTION_URL=http://127.0.0.1:8000/api/explorer/v1/transactions
+BASE_URL=http://127.0.0.1:8080/api/services/cryptocurrency/v1
+TRANSACTION_URL=http://127.0.0.1:8080/api/explorer/v1/transactions
 
 # Directory with the script.
 ROOT_DIR=`dirname $0`
@@ -17,27 +17,38 @@ ROOT_DIR=`dirname $0`
 STATUS=0
 
 # Launches the cryptocurrency demo and waits until it starts listening
-# on the TCP port 8000.
+# on the TCP port 8080.
 function launch-server {
     cargo run -p exonum-cryptocurrency --example demo &
     CTR=0
     MAXCTR=60
-    while [[ ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
+    while [[
+      ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'` )
+      && ( $CTR -lt $MAXCTR )
+    ]]; do
       sleep 1
       CTR=$(( $CTR + 1 ))
     done
+
     if [[ $CTR == $MAXCTR ]]; then
         echo "Failed to launch the server; aborting"
         exit 1
     fi
 }
 
-# Kills whatever program is listening on the TCP port 8000, on which the cryptocurrency
+# Kills whatever program is listening on the TCP port 8080, on which the cryptocurrency
 # demo needs to bind to.
 function kill-server {
-    SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'`
+    SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'`
     if [[ -n $SERVER_PID ]]; then
-        kill -9 $SERVER_PID
+        # First, try to send the shutdown message to the node in order to shut down it gracefully.
+        curl -X POST http://127.0.0.1:8081/api/system/v1/shutdown &>/dev/null
+        sleep 1
+
+        SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'`
+        if [[ -n $SERVER_PID ]]; then
+            kill -KILL $SERVER_PID
+        fi
     fi
 }
 

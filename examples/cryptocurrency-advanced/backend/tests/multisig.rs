@@ -16,7 +16,7 @@
 //! changing membership, cancelling proposals, etc.
 
 use exonum::{
-    crypto::{self, Hash, PublicKey},
+    crypto::{Hash, KeyPair, PublicKey},
     merkledb::{
         access::{Access, FromAccess},
         BinaryValue, Entry, MapIndex, ObjectHash,
@@ -201,9 +201,9 @@ fn create_testkit_with_multisig(keys: Vec<PublicKey>, threshold: usize) -> TestK
 
 #[test]
 fn test_multisig() {
-    let alice = crypto::gen_keypair();
-    let bob = crypto::gen_keypair();
-    let mut testkit = create_testkit_with_multisig(vec![alice.0, bob.0], 2);
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
+    let mut testkit = create_testkit_with_multisig(vec![alice.public_key(), bob.public_key()], 2);
     let ms_address = Caller::Service {
         instance_id: MULTISIG_ID,
     }
@@ -228,7 +228,7 @@ fn test_multisig() {
     assert_eq!(ms_wallet.balance, 100);
 
     // Spend some tokens from the wallet!
-    let alice_address = CallerAddress::from_key(alice.0);
+    let alice_address = CallerAddress::from_key(alice.public_key());
     let action = TxStub.transfer(
         SERVICE_ID,
         Transfer {
@@ -266,11 +266,14 @@ fn test_multisig() {
 
 #[test]
 fn test_2_of_3_multisig() {
-    let alice = crypto::gen_keypair();
-    let bob = crypto::gen_keypair();
-    let carol = crypto::gen_keypair();
+    let alice = KeyPair::random();
+    let bob = KeyPair::random();
+    let carol = KeyPair::random();
 
-    let mut testkit = create_testkit_with_multisig(vec![alice.0, bob.0, carol.0], 2);
+    let mut testkit = create_testkit_with_multisig(
+        vec![alice.public_key(), bob.public_key(), carol.public_key()],
+        2,
+    );
     let ms_address = Caller::Service {
         instance_id: MULTISIG_ID,
     }
@@ -293,7 +296,7 @@ fn test_2_of_3_multisig() {
     let action = TxStub.transfer(
         SERVICE_ID,
         Transfer {
-            to: CallerAddress::from_key(carol.0),
+            to: CallerAddress::from_key(carol.public_key()),
             amount: 10,
             seed: 0,
         },

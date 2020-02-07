@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use exonum::{
     blockchain::{ConsensusConfig, ValidatorKeys},
-    crypto::{self, Hash, PublicKey, SecretKey},
+    crypto::{self, Hash, KeyPair, PublicKey},
     helpers::{Height, Round, ValidatorId},
     keys::Keys,
     messages::{Precommit, Verified},
@@ -40,16 +40,7 @@ impl TestNetwork {
     /// Creates a new emulated network with a specific role of the node
     /// the network will be viewed from.
     pub fn with_our_role(us: Option<ValidatorId>, validator_count: u16) -> Self {
-        let keys = (0..validator_count).map(|_| {
-            let consensus_keypair = crypto::gen_keypair();
-            let service_keypair = crypto::gen_keypair();
-            Keys::from_keys(
-                consensus_keypair.0,
-                consensus_keypair.1,
-                service_keypair.0,
-                service_keypair.1,
-            )
-        });
+        let keys = (0..validator_count).map(|_| Keys::random());
         Self::with_our_role_from_keys(us, keys)
     }
 
@@ -144,8 +135,8 @@ impl TestNetwork {
     pub fn update_consensus_config(&mut self, config: ConsensusConfig) {
         // Assign new node roles.
         for node in &mut self.nodes {
-            node.validator_id =
-                config.find_validator(|keys| keys.consensus_key == node.consensus_keypair().0);
+            node.validator_id = config
+                .find_validator(|keys| keys.consensus_key == node.consensus_keypair().public_key());
         }
         // Verify that all validator keys have been assigned.
         let validators_count = self
@@ -155,8 +146,8 @@ impl TestNetwork {
             .count();
         assert_eq!(validators_count, config.validator_keys.len());
         // Modify us.
-        self.us.validator_id =
-            config.find_validator(|keys| keys.consensus_key == self.us.consensus_keypair().0);
+        self.us.validator_id = config
+            .find_validator(|keys| keys.consensus_key == self.us.consensus_keypair().public_key());
     }
 
     /// Returns service public key of the validator with given id.
@@ -184,39 +175,28 @@ pub struct TestNode {
 impl TestNode {
     /// Creates a new auditor.
     pub fn new_auditor() -> Self {
-        let (consensus_pk, consensus_sk) = crypto::gen_keypair();
-        let (service_pk, service_sk) = crypto::gen_keypair();
-
         TestNode {
-            keys: Keys::from_keys(consensus_pk, consensus_sk, service_pk, service_sk),
+            keys: Keys::random(),
             validator_id: None,
         }
     }
 
     /// Creates a new validator with the given id.
     pub fn new_validator(validator_id: ValidatorId) -> Self {
-        let (consensus_pk, consensus_sk) = crypto::gen_keypair();
-        let (service_pk, service_sk) = crypto::gen_keypair();
-
         TestNode {
-            keys: Keys::from_keys(consensus_pk, consensus_sk, service_pk, service_sk),
+            keys: Keys::random(),
             validator_id: Some(validator_id),
         }
     }
 
     /// Constructs a new node from the given keypairs.
     pub fn from_parts(
-        consensus_keypair: (PublicKey, SecretKey),
-        service_keypair: (PublicKey, SecretKey),
+        consensus_keys: impl Into<KeyPair>,
+        service_keys: impl Into<KeyPair>,
         validator_id: Option<ValidatorId>,
     ) -> TestNode {
         TestNode {
-            keys: Keys::from_keys(
-                consensus_keypair.0,
-                consensus_keypair.1,
-                service_keypair.0,
-                service_keypair.1,
-            ),
+            keys: Keys::from_keys(consensus_keys, service_keys),
             validator_id,
         }
     }
@@ -260,13 +240,13 @@ impl TestNode {
     }
 
     /// Returns the service keypair of the node.
-    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
-        (self.keys.service_pk(), self.keys.service_sk().clone())
+    pub fn service_keypair(&self) -> KeyPair {
+        self.keys.service.clone()
     }
 
     /// Returns the consensus keypair of the node.
-    pub fn consensus_keypair(&self) -> (PublicKey, SecretKey) {
-        (self.keys.consensus_pk(), self.keys.consensus_sk().clone())
+    pub fn consensus_keypair(&self) -> KeyPair {
+        self.keys.consensus.clone()
     }
 }
 

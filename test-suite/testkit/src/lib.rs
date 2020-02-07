@@ -20,7 +20,7 @@
 //! ```
 //! use exonum::{
 //!     blockchain::{Block, Schema},
-//!     crypto::{gen_keypair, Hash},
+//!     crypto::{Hash, KeyPair},
 //!     helpers::Height,
 //!     runtime::{BlockchainData, SnapshotExt, ExecutionError},
 //! };
@@ -72,7 +72,7 @@
 //!     .build();
 //!
 //! // Create a few transactions.
-//! let keys = gen_keypair();
+//! let keys = KeyPair::random();
 //! let id = SERVICE_ID;
 //! let tx1 = keys.timestamp(id, "Down To Earth".into());
 //! let tx2 = keys.timestamp(id, "Cry Over Spilt Milk".into());
@@ -108,8 +108,8 @@ pub use exonum_explorer as explorer;
 
 use exonum::{
     blockchain::{
-        config::{GenesisConfig, GenesisConfigBuilder},
-        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig,
     },
     crypto::{self, Hash},
     helpers::{byzantine_quorum, Height, ValidatorId},
@@ -207,7 +207,7 @@ impl TestKit {
     fn assemble(
         database: impl Into<CheckpointDb<TemporaryDB>>,
         network: TestNetwork,
-        genesis_config: GenesisConfig,
+        genesis_config: Option<GenesisConfig>,
         runtimes: Vec<RuntimeInstance>,
         api_notifier_channel: ApiNotifierChannel,
     ) -> Self {
@@ -222,13 +222,14 @@ impl TestKit {
             api_sender.clone(),
         );
 
-        let blockchain = runtimes
-            .into_iter()
-            .fold(
-                BlockchainBuilder::new(blockchain, genesis_config),
-                |builder, runtime| builder.with_runtime(runtime),
-            )
-            .build();
+        let mut builder = BlockchainBuilder::new(blockchain);
+        if let Some(genesis_config) = genesis_config {
+            builder = builder.with_genesis_config(genesis_config);
+        }
+        for runtime in runtimes {
+            builder = builder.with_runtime(runtime);
+        }
+        let blockchain = builder.build();
 
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
@@ -342,7 +343,7 @@ impl TestKit {
     /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
-    /// # use exonum::{crypto::{PublicKey, Hash, SecretKey}, runtime::ExecutionError};
+    /// # use exonum::{crypto::{Hash, KeyPair, PublicKey, SecretKey}, runtime::ExecutionError};
     /// # use exonum_rust_runtime::{ExecutionContext, Service, ServiceFactory};
     /// #
     /// // Suppose we test this service interface:
@@ -385,7 +386,7 @@ impl TestKit {
     ///     .with_rust_service(ExampleService)
     ///     .build();
     /// expensive_setup(&mut testkit);
-    /// let keys = exonum::crypto::gen_keypair();
+    /// let keys = KeyPair::random();
     /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
     /// let tx_b = keys.example_tx(SERVICE_ID, "bar".into());
     ///
@@ -837,7 +838,7 @@ impl StoppedTestKit {
         let mut testkit = TestKit::assemble(
             self.db,
             self.network,
-            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+            None,
             runtimes,
             self.api_notifier_channel,
         );
@@ -850,7 +851,7 @@ impl StoppedTestKit {
         TestKit::assemble(
             self.db,
             self.network,
-            GenesisConfigBuilder::with_consensus_config(ConsensusConfig::default()).build(),
+            None,
             runtimes,
             self.api_notifier_channel,
         )

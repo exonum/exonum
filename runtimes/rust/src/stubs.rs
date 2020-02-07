@@ -18,7 +18,7 @@
 //! and the `explanation` module below for an explanation how stubs work.
 
 use exonum::{
-    crypto::{PublicKey, SecretKey},
+    crypto::{KeyPair, PublicKey, SecretKey},
     messages::Verified,
     runtime::{
         AnyTx, CallInfo, ExecutionContext, ExecutionContextUnstable, ExecutionError, InstanceId,
@@ -127,11 +127,25 @@ impl GenericCall<InstanceId> for (PublicKey, SecretKey) {
     }
 }
 
+impl GenericCall<InstanceId> for KeyPair {
+    type Output = Verified<AnyTx>;
+
+    fn generic_call(
+        &self,
+        instance_id: InstanceId,
+        method: MethodDescriptor<'_>,
+        args: Vec<u8>,
+    ) -> Self::Output {
+        let tx = TxStub.generic_call(instance_id, method, args);
+        Verified::from_value(tx, self.public_key(), self.secret_key())
+    }
+}
+
 #[cfg(test)]
 mod explanation {
     use super::*;
 
-    use exonum::{crypto::gen_keypair, merkledb::BinaryValue};
+    use exonum::{crypto::KeyPair, merkledb::BinaryValue};
     use pretty_assertions::assert_eq;
 
     // Suppose we have the following trait describing user service.
@@ -203,7 +217,7 @@ mod explanation {
     fn standard_stubs_work() {
         const SERVICE_ID: InstanceId = 100;
 
-        let keypair = gen_keypair();
+        let keypair = KeyPair::random();
         let tx: Verified<AnyTx> = keypair.create_wallet(SERVICE_ID, CreateWallet::default());
         assert_eq!(tx.payload().call_info.method_id, 0);
         let other_tx = keypair.transfer(SERVICE_ID, Transfer::default());
