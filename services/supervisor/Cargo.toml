@@ -1,6 +1,6 @@
 [package]
 name = "exonum-supervisor"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -23,16 +23,16 @@ protobuf = "2.8.0"
 log = "0.4.6"
 hex = "0.4"
 
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 [dev-dependencies]
 futures = "0.1.25"
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 bincode = "1.2.1"
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../../components/build" }

@@ -31,7 +31,7 @@ Include `exonum-merkledb` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-merkledb = "0.13.0-rc.2"
+exonum-merkledb = "1.0.0-rc.1"
 
 ```
 

@@ -16,8 +16,8 @@ Include `exonum-node` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.13.0-rc.2"
-exonum-node = "0.13.0-rc.2"
+exonum = "1.0.0-rc.1"
+exonum-node = "1.0.0-rc.1"
 ```
 
 `exonum-node` provides relatively low-level (but more fine-grained) control

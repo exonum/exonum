@@ -1,6 +1,6 @@
 [package]
 name = "exonum-node"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -36,11 +36,11 @@ tokio-retry = "0.2.0"
 tokio-threadpool = "0.1.10"
 tokio-dns-unofficial = "0.4.0"
 
-exonum = { version = "0.13.0-rc.2", path = "../exonum" }
-exonum-api = { version = "0.13.0-rc.2", path = "../components/api" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../components/proto" }
+exonum = { version = "1.0.0-rc.1", path = "../exonum" }
+exonum-api = { version = "1.0.0-rc.1", path = "../components/api" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.1", path = "../components/proto" }
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
 
 [dev-dependencies]
@@ -50,10 +50,10 @@ hex = "0.4.0"
 pretty_assertions = "0.6.1"
 serde_json = "1.0.44"
 
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../runtimes/rust" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../runtimes/rust" }
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../components/build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../components/build" }
 
 [features]
 default = ["exonum_sodiumoxide"]
