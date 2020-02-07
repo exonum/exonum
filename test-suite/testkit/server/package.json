@@ -25,7 +25,7 @@
   "homepage": "https://github.com/exonum/exonum-testkit/tree/master/examples/server#readme",
   "dependencies": {
     "chai": "^4.2.0",
-    "exonum-client": "^0.18.1",
+    "exonum-client": "https://github.com/exonum/exonum-client#master",
     "mocha": "^6.2.0",
     "node-fetch": "^2.6.0",
     "protobufjs": "^6.8.8",
