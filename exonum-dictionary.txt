@@ -76,6 +76,7 @@ libsnappy
 libsodium
 libssl
 lifecycle
+loopback
 maintainer's
 markdownlint
 memlimit

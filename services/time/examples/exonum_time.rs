@@ -27,6 +27,6 @@ use exonum_time::TimeServiceFactory;
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service(TimeServiceFactory::default())
+        .with_rust_service(TimeServiceFactory::default())
         .run()
 }

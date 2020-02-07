@@ -17,7 +17,7 @@ use exonum_cli::NodeBuilder;
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
-        .with_service(exonum_time::TimeServiceFactory::default())
-        .with_service(exonum_timestamping::TimestampingService)
+        .with_rust_service(exonum_time::TimeServiceFactory::default())
+        .with_rust_service(exonum_timestamping::TimestampingService)
         .run()
 }
