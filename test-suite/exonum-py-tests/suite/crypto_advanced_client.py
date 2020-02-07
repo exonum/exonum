@@ -29,10 +29,7 @@ class ExonumCryptoAdvancedClient:
             cryptocurrency_service_name, cryptocurrency_service_version, "service"
         )
         self.types_module = ModuleManager.import_service_module(
-            cryptocurrency_service_name, cryptocurrency_service_version, "types"
-        )
-        self.runtime_module = ModuleManager.import_service_module(
-            cryptocurrency_service_name, cryptocurrency_service_version, "runtime"
+            cryptocurrency_service_name, cryptocurrency_service_version, "exonum.crypto.types"
         )
         instance_id = client.public_api.get_instance_id_by_name("crypto")
         self.msg_generator = MessageGenerator(
