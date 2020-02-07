@@ -64,7 +64,6 @@
             this.$router.push({ name: 'timestamp', params: { hash: this.hash } })
           })
         } catch (error) {
-          console.error(error)
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
         }
